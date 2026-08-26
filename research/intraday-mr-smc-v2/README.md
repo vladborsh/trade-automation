@@ -44,6 +44,7 @@ around. Nothing synthetic is used.
 | `run_assets.py` | THREAD 2: every candidate × 8 perps at 1h, net and gross. `--engine-check` compares the v1 and gap-aware engines. |
 | `run_index.py` | THREAD 3: every candidate × 4 index products, 1h and 1d, two hold horizons. |
 | `mom_scan.py` | Parameter scan of the momentum-inversion family on the fit period, best configs re-run once on the holdout. |
+| `viz_trades.py` | Visualisation only (`VIZ-SPEC.md`): reproduces the §2.3 `momentum_breakout` table as a gate, then draws 10 seed-selected example trades into `viz/`. |
 
 ## Reproducing
 
@@ -55,6 +56,7 @@ around. Nothing synthetic is used.
 ../../.venv/bin/python run_index.py                  # results/summary_index.csv
 ../../.venv/bin/python run_index.py --fee-bps 0 --tag index_nofee --intervals 1h --time-stops 24
 ../../.venv/bin/python mom_scan.py                   # results/mom_scan_*.csv
+../../.venv/bin/python viz_trades.py                 # viz/trade_01..10_*.png + CAPTIONS.md
 ```
 
 ## Risk rules — unchanged from v1
