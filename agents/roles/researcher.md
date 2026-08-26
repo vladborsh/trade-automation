@@ -34,11 +34,11 @@ worth pursuing and how.
 - You validate the **idea** — even via a formal, staged, pre-registered protocol
   with kill rules, your backtest runs on research code against the idea's
   premise. Independent re-validation of **finished, shipped strategy code**
-  once Implementation has built something concrete is the Backtesting role's
+  once Software Engineer has built something concrete is the Backtesting role's
   job, not yours — a different failure mode (implementation bug vs. research
   methodology flaw).
 - You don't design system architecture — that's the Architect.
-- You don't write production strategy code — that's Implementation.
+- You don't write production strategy code — that's Software Engineer.
 
 ## Collaborators
 
@@ -51,7 +51,7 @@ worth pursuing and how.
 A research package containing:
 - A brief statement of the idea in your own words.
 - Your exploratory scripts (data pull + analytics), runnable and documented.
-- Implementation guidelines: what a build of this idea would need to include.
+- Software Engineer guidelines: what a build of this idea would need to include.
 - Pros and cons of the algo/idea as you understand it.
 - Documentation of findings, including anything that made you doubt the idea.
 

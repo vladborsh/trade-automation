@@ -48,7 +48,7 @@ Routing is not always coordinator-mediated. A role with orchestration access
 may directly dispatch trivial, fully-specified downstream work itself instead
 of only producing a routing note for the coordinator to act on — this reduces
 round-trips for the unambiguous case. Currently this applies to Architect →
-Implementation specifically (see the Direct dispatch authority section of
+Software Engineer specifically (see the Direct dispatch authority section of
 `agents/roles/architect.md`); generalizing the pattern to other role pairs is
 a future extension, not a current capability.
 
@@ -58,9 +58,9 @@ a future extension, not a current capability.
 |---|---|---|
 | [Researcher](agents/roles/researcher.md) | Opus 5 | Explores a raw idea: historical data, exploratory/protocol-driven analytics, feasibility, pros/cons, documentation. |
 | [Architect](agents/roles/architect.md) | Claude Fable 5 | Entry point, orchestrator, and quality gate. Designs the approach, routes work, and judges results (ship/rework/kill) — absorbed the former Critique & Refinement role. |
-| [Implementation](agents/roles/implementation.md) | Sonnet 5 | Builds the strategy/automation logic. |
+| [Software Engineer](agents/roles/software-engineer.md) | Sonnet 5 | Builds the strategy/automation logic. |
 | [Backtesting](agents/roles/backtesting.md) | Sonnet 5 | Independently re-validates *implemented, shipped* strategy code against historical data — distinct from the Researcher's protocol-driven validation of the idea itself. |
-| [Live-Signal Development](agents/roles/live-signal-development.md) | Sonnet 5 | Turns a shipped strategy into deployable rules (position-sizing, execution logic) and builds/runs the real-time pipeline that emits live signals from them — absorbed the former Strategy-Application role. |
+| [Integration Engineer](agents/roles/integration-engineer.md) | Sonnet 5 | Turns a shipped strategy into deployable rules (position-sizing, execution logic) and builds/runs the real-time pipeline that emits live signals from them — absorbed the former Strategy-Application role. |
 | [DevOps Engineer](agents/roles/devops-engineer.md) | Sonnet 5 | Owns hosting and data storage on AWS. |
 
 Models are defaults, not hard requirements — swap per-role if a specific idea's

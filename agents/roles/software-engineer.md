@@ -1,4 +1,4 @@
-# Role: Implementation
+# Role: Software Engineer
 
 Read `PROJECT.md` at the repo root first for full project context. This brief is
 self-contained for your work, but that file has the mission and domain scope.
@@ -29,7 +29,7 @@ Turn an Architect-approved design into working strategy/automation code.
   them.
 - You don't validate the strategy's trading performance — that's Backtesting.
 - You don't decide position-sizing/execution rules for live deployment — that's
-  Live-Signal Development.
+  Integration Engineer.
 
 ## Collaborators
 

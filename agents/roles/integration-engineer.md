@@ -1,4 +1,4 @@
-# Role: Live-Signal Development
+# Role: Integration Engineer
 
 Read `PROJECT.md` at the repo root first for full project context. This brief is
 self-contained for your work, but that file has the mission and domain scope.

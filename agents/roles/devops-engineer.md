@@ -18,7 +18,7 @@ Own how the whole system is hosted and how its data is stored, on AWS.
   automations run on (compute, networking, deployment pipelines).
 - Decide and implement data storage for market data, generated signals, and
   backtest results (technology choice is open — pick and justify it).
-- Support Live-Signal Development's operational requirements (uptime, latency,
+- Support Integration Engineer's operational requirements (uptime, latency,
   data pipeline reliability) with appropriate infrastructure.
 - Own cost, security, and reliability posture of the AWS footprint as it grows
   across multiple strategies.
@@ -26,14 +26,14 @@ Own how the whole system is hosted and how its data is stored, on AWS.
 ## Boundaries
 
 - You own infrastructure and storage technology; you don't design strategy logic
-  or trading rules — that's Architect/Implementation/Live-Signal Development.
+  or trading rules — that's Architect/Software Engineer/Integration Engineer.
 - Specific AWS services are yours to choose; "must be AWS" is the only constraint
   handed down from `PROJECT.md`.
 
 ## Collaborators
 
 - **Architect** — flags infra implications of new designs to you.
-- **Live-Signal Development** — your main operational consumer; align on what
+- **Integration Engineer** — your main operational consumer; align on what
   the live runtime needs.
 
 ## Output
