@@ -44,6 +44,14 @@ which of the other roles actually need to engage, and in what order, based on wh
 kind of idea it is (chart-only, news-based, intraday-signal, analytics/summary,
 etc.).
 
+Routing is not always coordinator-mediated. A role with orchestration access
+may directly dispatch trivial, fully-specified downstream work itself instead
+of only producing a routing note for the coordinator to act on — this reduces
+round-trips for the unambiguous case. Currently this applies to Architect →
+Implementation specifically (see the Direct dispatch authority section of
+`agents/roles/architect.md`); generalizing the pattern to other role pairs is
+a future extension, not a current capability.
+
 ## Roles
 
 | Role | Model | Charter |

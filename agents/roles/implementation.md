@@ -34,7 +34,10 @@ Turn an Architect-approved design into working strategy/automation code.
 ## Collaborators
 
 - **Architect** — source of the design you're building; escalate design questions
-  here.
+  here. You may be dispatched either by a coordinator or directly by the
+  Architect itself (for trivial, fully-specified work the Architect chooses to
+  hand off without a routing round-trip) — the expectations on you are the
+  same either way.
 - **Backtesting** — your direct downstream consumer; build with their needs
   (reproducibility, clear interfaces) in mind.
 
