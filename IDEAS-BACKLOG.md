@@ -9,7 +9,9 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## VWAP mean-reversion, US index futures (ES/NQ/YM)
 
-**Status:** logged, not dispatched.
+**Status:** dispatched to Architect for routing (user requested launch,
+2026-08-26) — explicitly confirmed to include Nasdaq (NQ, Nasdaq-100 futures)
+as one of the three instruments.
 
 **Idea:** Intraday mean-reversion off session VWAP (not a rolling mean/z-score
 like the crypto MR candidate) on CME index futures — ES (S&P 500), NQ (Nasdaq
@@ -57,6 +59,62 @@ minimum-frequency floor + pre-committed sample size, WR reported but not gated).
   *same* trigger shape work on an instrument without those mechanics? Worth
   flagging explicitly when this is picked up, rather than treated as an
   unrelated idea.
+
+---
+
+## Pivot-based structure (major/minor CHoCH) — replacement for the SMC engine
+
+**Status:** logged, design grilled with user, needs Architect decisions before
+dispatch to Researcher.
+
+**Idea:** Replace `indicators.structure()` (single-`k` fractal → BOS/CHoCH,
+the engine behind both `smc` v1 and the `mtf.py` v2 variants, which the
+Architect closed for entry use — see `RESEARCH-LOG.md` Запись 5) with a
+two-tier pivot structure built on the same `fractals(df, k)` primitive
+(already equivalent to TradingView's pivothigh/pivotlow — k bars each side,
+causally shifted):
+
+- **Major pivot**: k=15 — sets the baseline/tracked structural bias.
+- **Minor pivot**: k=3-5 — a small-swing CHoCH on the minor pivot *is* the
+  event that flips the tracked major bias (not merely a candidate awaiting
+  separate major-level confirmation — user confirmed this reading explicitly).
+- **Phase 2 (deferred until phase 1 results land):** 1h-timeframe FVGs treated
+  as priority/problem reversal zones. Mechanism undecided (hard gate vs.
+  scoring/priority vs. risk-sizing influence) — user wants structure-only
+  results first before layering this on.
+
+**Parameter grid for phase 1 (structure-only, no FVG):**
+- Major k ∈ {10, 15, 20}
+- Minor k ∈ {2, 3, 4, 5}
+- Timeframe: (i) both on one timeframe first (cheapest/fastest baseline
+  sweep), then (ii) multi-timeframe — major on 1h / minor on 5m, following the
+  existing `add_htf_context`/`merge_asof` pattern in
+  `research/intraday-mtf-smc/mtf.py` (same `k` is already shared cross-TF
+  there today; two different `k` values on one TF has no prior precedent in
+  this codebase — confirmed by search).
+
+**Open questions explicitly delegated to the Architect (user declined to
+decide, asked for Architect design judgment + several variants to test):**
+1. **Role of major k=15 after initialization.** (a) sets only the starting
+   bias, then minor-CHoCH flips fully drive direction going forward with k=15
+   unused thereafter; (b) minor CHoCH is an early candidate but entry still
+   requires price to also break the major (k=15) swing level in the same
+   direction — early-warning + confirmation, not a full redefinition; (c)
+   other. Recommendation offered to user during grilling: (a), since (b)
+   degenerates into "old BOS/CHoCH plus an early filter" rather than the new
+   "minor structure drives major" idea — but left open for Architect.
+2. **Entry timing, stop, target for the structure-only variant.** Enter on the
+   flip bar's close with no retest (baseline recommendation, for a fair
+   apples-to-apples comparison against the old engine), vs. requiring a
+   pullback/retest of the broken minor swing before entry. Stop beyond the
+   minor-swing extreme; target RR — reuse the old `smc()` RR=2.0 default, or
+   something else. User asked Architect to think this through and design
+   several concrete variants rather than picking one now.
+
+**Why this needs Architect (not straight to Researcher):** two structurally
+open design decisions above are not fully specified, so this doesn't qualify
+for direct-dispatch-to-Implementation (see "Direct dispatch authority" in
+`agents/roles/architect.md`) — it needs an architecture note first.
 
 ---
 
