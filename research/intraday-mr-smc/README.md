@@ -31,6 +31,7 @@ Coverage pulled: `2022-08-01 .. 2026-07-31`, complete bars, no gaps
 | `param_scan.py` | Parameter sensitivity grid per candidate, aggregated across the three symbols. |
 | `edge_probe.py` | Measures raw conditional forward return of each trigger, independent of exit mechanics. |
 | `stability.py` | Splits the 48 months into four 12-month blocks and reruns the best configuration of each candidate. |
+| `viz_trades_smc.py` | Ten example-trade charts for the retired `smc` candidate @ 1h (`VIZ-SPEC-SMC.md`). Visualisation only: re-runs the unchanged engine, gates on the REPORT.md §3 `smc / 1h` rows, then draws a seed-selected sample into `viz/`. |
 
 ## Reproducing the headline numbers
 
@@ -40,6 +41,7 @@ Coverage pulled: `2022-08-01 .. 2026-07-31`, complete bars, no gaps
 ../../.venv/bin/python param_scan.py --candidate hybrid      # sensitivity grid
 ../../.venv/bin/python edge_probe.py
 ../../.venv/bin/python stability.py
+../../.venv/bin/python viz_trades_smc.py                    # the 10 smc example-trade charts
 ```
 
 Runtime: full sweep ≈ 3 min, each param scan ≈ 3 min on a laptop.
