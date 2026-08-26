@@ -1,0 +1,26 @@
+    mean_reversion  1h SPY       ts=24  n=  106 wr=31.1% pf=0.60 sharpe=-1.49 dd=24.7% gapexit=13%
+    mean_reversion  1h QQQ       ts=24  n=  122 wr=40.2% pf=0.98 sharpe=0.01 dd=10.2% gapexit=17%
+    mean_reversion  1h IDX_GSPC  ts=24  n=  108 wr=31.5% pf=0.61 sharpe=-1.51 dd=25.9% gapexit=15%
+    mean_reversion  1h IDX_NDX   ts=24  n=  124 wr=39.5% pf=1.05 sharpe=0.21 dd=10.3% gapexit=23%
+               smc  1h SPY       ts=24  n=  387 wr=40.3% pf=0.89 sharpe=-0.46 dd=37.1% gapexit=23%
+               smc  1h QQQ       ts=24  n=  390 wr=42.1% pf=0.81 sharpe=-1.03 dd=45.5% gapexit=24%
+               smc  1h IDX_GSPC  ts=24  n=  372 wr=38.2% pf=0.80 sharpe=-1.21 dd=49.2% gapexit=21%
+               smc  1h IDX_NDX   ts=24  n=  401 wr=39.9% pf=0.73 sharpe=-1.40 dd=57.8% gapexit=25%
+            hybrid  1h SPY       ts=24  n=    3 wr=0.0% pf=0.00 sharpe=-1.26 dd=3.0% gapexit=0%
+            hybrid  1h QQQ       ts=24  n=    2 wr=50.0% pf=0.49 sharpe=-0.24 dd=1.5% gapexit=0%
+            hybrid  1h IDX_GSPC  ts=24  n=    3 wr=0.0% pf=0.00 sharpe=-1.37 dd=3.0% gapexit=0%
+            hybrid  1h IDX_NDX   ts=24  n=    2 wr=50.0% pf=0.53 sharpe=-0.21 dd=1.5% gapexit=0%
+          momentum  1h SPY       ts=24  n=   99 wr=50.5% pf=1.31 sharpe=0.96 dd=8.7% gapexit=19%
+          momentum  1h QQQ       ts=24  n=  115 wr=47.8% pf=1.02 sharpe=0.13 dd=13.7% gapexit=23%
+          momentum  1h IDX_GSPC  ts=24  n=  102 wr=51.0% pf=1.55 sharpe=1.47 dd=6.0% gapexit=18%
+          momentum  1h IDX_NDX   ts=24  n=  117 wr=46.2% pf=1.04 sharpe=0.19 dd=12.1% gapexit=25%
+ momentum_breakout  1h SPY       ts=24  n=  112 wr=50.9% pf=1.28 sharpe=0.88 dd=6.6% gapexit=13%
+ momentum_breakout  1h QQQ       ts=24  n=  119 wr=48.7% pf=1.05 sharpe=0.23 dd=14.6% gapexit=15%
+ momentum_breakout  1h IDX_GSPC  ts=24  n=  112 wr=49.1% pf=1.23 sharpe=0.77 dd=7.1% gapexit=10%
+ momentum_breakout  1h IDX_NDX   ts=24  n=  123 wr=47.2% pf=1.01 sharpe=0.07 dd=17.2% gapexit=17%
+      momentum_smc  1h SPY       ts=24  n=   92 wr=46.7% pf=1.14 sharpe=0.46 dd=10.7% gapexit=21%
+      momentum_smc  1h QQQ       ts=24  n=  103 wr=47.6% pf=1.01 sharpe=0.08 dd=14.0% gapexit=21%
+      momentum_smc  1h IDX_GSPC  ts=24  n=   94 wr=47.9% pf=1.42 sharpe=1.12 dd=8.4% gapexit=19%
+      momentum_smc  1h IDX_NDX   ts=24  n=  107 wr=45.8% pf=1.02 sharpe=0.13 dd=11.9% gapexit=24%
+
+wrote results/summary_index_nofee.csv

@@ -1,0 +1,72 @@
+    mean_reversion  1h NONE            fit pf=0.79 n=1409  | hold pf=0.86 n=782
+    mean_reversion  1h H_pos           fit pf=1.09 n=227   | hold pf=0.94 wr=48.7% n=119
+    mean_reversion  1h H_top12         fit pf=0.90 n=843   | hold pf=0.89 wr=46.8% n=470
+    mean_reversion  1h H_top6          fit pf=1.01 n=448   | hold pf=1.04 wr=49.1% n=234
+    mean_reversion  1h D_weekday       fit pf=0.86 n=1136  | hold pf=0.85 wr=46.2% n=652
+   -> perm null k=3: selected pf 0.94 at percentile 68% (null median 0.86)
+    mean_reversion 15m NONE            fit pf=0.68 n=5022  | hold pf=0.76 n=2566
+    mean_reversion 15m H_top12         fit pf=0.79 n=2986  | hold pf=0.80 wr=48.1% n=1484
+    mean_reversion 15m H_top6          fit pf=0.82 n=1747  | hold pf=0.82 wr=48.8% n=922
+    mean_reversion 15m D_weekday       fit pf=0.69 n=3785  | hold pf=0.81 wr=48.1% n=1906
+               smc  1h NONE            fit pf=0.85 n=4778  | hold pf=0.81 n=2432
+               smc  1h H_pos           fit pf=0.84 n=2640  | hold pf=0.85 wr=38.9% n=1365
+               smc  1h H_top12         fit pf=0.92 n=4249  | hold pf=0.82 wr=38.5% n=2167
+               smc  1h H_top6          fit pf=0.88 n=3455  | hold pf=0.86 wr=40.1% n=1779
+               smc  1h D_pos           fit pf=0.92 n=1675  | hold pf=0.72 wr=34.6% n=804
+               smc  1h D_weekday       fit pf=0.89 n=3623  | hold pf=0.81 wr=37.2% n=1833
+               smc  1h H_pos_x_D_pos   fit pf=0.90 n=930   | hold pf=0.73 wr=35.7% n=443
+   -> perm null k=3: selected pf 0.85 at percentile 55% (null median 0.84)
+               smc 15m NONE            fit pf=0.71 n=9329  | hold pf=0.66 n=6108
+               smc 15m H_top12         fit pf=0.66 n=8891  | hold pf=0.68 wr=37.0% n=5268
+               smc 15m H_top6          fit pf=0.72 n=8072  | hold pf=0.70 wr=37.9% n=4087
+               smc 15m D_weekday       fit pf=0.72 n=9341  | hold pf=0.65 wr=36.1% n=4483
+            hybrid  1h NONE            fit pf=0.87 n=138   | hold pf=0.94 n=54
+            hybrid  1h H_pos           fit pf=2.61 n=65    | hold pf=0.67 wr=50.0% n=28
+            hybrid  1h H_top12         fit pf=1.96 n=84    | hold pf=0.63 wr=51.5% n=33
+            hybrid  1h H_top6          fit pf=4.07 n=36    | hold pf=0.66 wr=46.7% n=15
+            hybrid  1h D_pos           fit pf=1.13 n=42    | hold pf=0.99 wr=53.8% n=13
+            hybrid  1h D_weekday       fit pf=0.86 n=100   | hold pf=0.88 wr=57.4% n=47
+            hybrid  1h H_pos_x_D_pos   fit pf=4.60 n=20    | hold pf=1.12 wr=50.0% n=4
+   -> perm null k=10: selected pf 0.67 at percentile 14% (null median 0.92)
+            hybrid 15m NONE            fit pf=0.60 n=470   | hold pf=0.64 n=189
+            hybrid 15m H_pos           fit pf=1.13 n=49    | hold pf=0.62 wr=50.0% n=22
+            hybrid 15m H_top12         fit pf=0.81 n=266   | hold pf=0.54 wr=50.5% n=105
+            hybrid 15m H_top6          fit pf=0.94 n=127   | hold pf=0.51 wr=52.1% n=48
+            hybrid 15m D_pos           fit pf=1.01 n=71    | hold pf=0.24 wr=33.3% n=27
+            hybrid 15m D_weekday       fit pf=0.59 n=308   | hold pf=0.88 wr=57.4% n=129
+            hybrid 15m H_pos_x_D_pos   fit pf=4.96 n=14    | hold pf=0.00 wr=0.0% n=2
+   -> perm null k=3: selected pf 0.62 at percentile 39% (null median 0.69)
+          momentum  1h NONE            fit pf=0.96 n=1410  | hold pf=0.92 n=770
+          momentum  1h H_pos           fit pf=1.22 n=579   | hold pf=1.07 wr=46.6% n=307
+          momentum  1h H_top12         fit pf=1.14 n=780   | hold pf=1.05 wr=46.7% n=452
+          momentum  1h H_top6          fit pf=1.26 n=384   | hold pf=1.17 wr=48.6% n=179
+          momentum  1h D_pos           fit pf=1.23 n=588   | hold pf=0.95 wr=42.2% n=325
+          momentum  1h D_weekday       fit pf=0.92 n=1136  | hold pf=0.92 wr=42.7% n=644
+          momentum  1h H_pos_x_D_pos   fit pf=1.76 n=251   | hold pf=1.10 wr=45.3% n=137
+   -> perm null k=9: selected pf 1.07 at percentile 91% (null median 0.96)
+          momentum 15m NONE            fit pf=0.86 n=5096  | hold pf=0.77 n=2569
+          momentum 15m H_pos           fit pf=1.00 n=806   | hold pf=0.91 wr=45.7% n=411
+          momentum 15m H_top12         fit pf=0.91 n=2909  | hold pf=0.77 wr=41.4% n=1475
+          momentum 15m H_top6          fit pf=0.92 n=1608  | hold pf=0.81 wr=42.3% n=799
+          momentum 15m D_pos           fit pf=1.08 n=899   | hold pf=0.66 wr=38.7% n=393
+          momentum 15m D_weekday       fit pf=0.90 n=3862  | hold pf=0.76 wr=40.4% n=1900
+          momentum 15m H_pos_x_D_pos   fit pf=1.09 n=128   | hold pf=0.89 wr=44.6% n=65
+   -> perm null k=3: selected pf 0.91 at percentile 99% (null median 0.69)
+ momentum_breakout  1h NONE            fit pf=1.04 n=1703  | hold pf=1.00 n=848
+ momentum_breakout  1h H_pos           fit pf=1.20 n=1125  | hold pf=1.02 wr=46.7% n=595
+ momentum_breakout  1h H_top12         fit pf=1.20 n=1125  | hold pf=1.02 wr=46.7% n=595
+ momentum_breakout  1h H_top6          fit pf=1.29 n=650   | hold pf=1.10 wr=47.0% n=364
+ momentum_breakout  1h D_pos           fit pf=1.12 n=976   | hold pf=0.91 wr=44.4% n=482
+ momentum_breakout  1h D_weekday       fit pf=1.00 n=1401  | hold pf=1.07 wr=46.9% n=670
+ momentum_breakout  1h H_pos_x_D_pos   fit pf=1.23 n=634   | hold pf=0.91 wr=45.1% n=324
+   -> perm null k=12: selected pf 1.02 at percentile 72% (null median 0.98)
+ momentum_breakout 15m NONE            fit pf=0.84 n=6528  | hold pf=0.85 n=3193
+ momentum_breakout 15m H_pos           fit pf=0.96 n=1228  | hold pf=0.78 wr=40.8% n=655
+ momentum_breakout 15m H_top12         fit pf=0.89 n=4478  | hold pf=0.81 wr=42.3% n=2175
+ momentum_breakout 15m H_top6          fit pf=0.92 n=2621  | hold pf=0.74 wr=40.1% n=1256
+ momentum_breakout 15m D_pos           fit pf=1.01 n=1044  | hold pf=0.86 wr=44.4% n=462
+ momentum_breakout 15m D_weekday       fit pf=0.91 n=4749  | hold pf=0.90 wr=44.3% n=2319
+ momentum_breakout 15m H_pos_x_D_pos   fit pf=1.18 n=178   | hold pf=0.78 wr=44.3% n=79
+   -> perm null k=2: selected pf 0.78 at percentile 46% (null median 0.78)
+
+filters evaluated on holdout: 52 (+ 200 random allow-lists per candidate x interval as the null)
