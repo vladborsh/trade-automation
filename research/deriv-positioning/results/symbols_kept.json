@@ -1,0 +1,40 @@
+{
+ "kept": {
+  "a": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "BNBUSDT",
+   "XRPUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "LINKUSDT"
+  ],
+  "b1": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "BNBUSDT",
+   "XRPUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "LINKUSDT"
+  ],
+  "b2": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "BNBUSDT",
+   "XRPUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "LINKUSDT"
+  ]
+ },
+ "dropped": {
+  "a": [],
+  "b1": [],
+  "b2": []
+ },
+ "rule": "DESIGN.md \u00a71.3: > 10% unusable 1h bars in the fit window, per hypothesis"
+}

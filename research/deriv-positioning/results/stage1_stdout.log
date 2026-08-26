@@ -1,0 +1,98 @@
+symbols in pooled statistics — (a) 8/8 ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT']
+                              (b1) 8/8 ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT']
+                              (b2) 8/8 ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT']
+effective fit windows — (a) ('2022-08-01', '2025-04-01')  (b1) ('2022-12-16', '2025-04-01')  (b2) ('2022-08-01', '2025-04-01')
+
+=== (a) OI-conditioned momentum_breakout — top minus bottom ΔOI tercile, FIT ===
+
+-- a_dOI_4h (primary)
+      cond  horizon  n_bottom  n_mid  n_top  mean_bottom_bps  mean_mid_bps  mean_top_bps  diff_bps    t_stat     t_top  t_bottom  passes
+dOI_4h_pct        3      2129   1685   3039           -2.532        -1.078         3.060     5.592     1.018     0.852    -0.609   False
+dOI_4h_pct        6      1801   1412   2586           -1.428         1.709         9.352    10.780     1.389     1.840    -0.244   False
+dOI_4h_pct       12      1419   1083   2116           -1.597         3.436        22.629    24.226     2.076     2.793    -0.190    True
+dOI_4h_pct       24      1090    853   1589          -26.635        -2.715        18.931    45.566     2.536     1.502    -2.080    True
+dOI_4h_pct       36       873    713   1350          -47.101        14.713        37.619    84.720     3.435     2.284    -2.565    True
+dOI_4h_pct       48       798    636   1111           14.744        17.616        35.976    21.232     0.761     1.915     0.715   False
+   verdict: PASS
+
+-- a_dOI_1h (secondary)
+      cond  horizon  n_bottom  n_mid  n_top  mean_bottom_bps  mean_mid_bps  mean_top_bps  diff_bps    t_stat     t_top  t_bottom  passes
+dOI_1h_pct        3      2293   1252   3309           -1.597        -4.979         3.529     5.126     0.980     1.009    -0.410   False
+dOI_1h_pct        6      1999    988   2813            2.017        -4.198         8.497     6.480     0.874     1.700     0.369   False
+dOI_1h_pct       12      1629    735   2256           -5.082        10.559        22.087    27.169     2.452     2.808    -0.651    True
+dOI_1h_pct       24      1254    574   1705          -23.677        11.296        12.426    36.103     2.091     1.032    -1.913    True
+dOI_1h_pct       36      1034    476   1426          -31.880        20.262        30.565    62.445     2.618     1.809    -1.893    True
+dOI_1h_pct       48       914    426   1205           -2.726        36.281        41.677    44.403     1.631     2.256    -0.136   False
+   verdict: PASS
+
+-- a_shadow_ret4h (§5.3)
+     cond  horizon  n_bottom  n_mid  n_top  mean_bottom_bps  mean_mid_bps  mean_top_bps  diff_bps    t_stat     t_top  t_bottom  passes
+ret4h_pct        3      3152    616   3085           -5.735        -8.528         8.241    13.976     2.896     2.306    -1.769    True
+ret4h_pct        6      2772    362   2665           -6.628       -18.624        18.438    25.066     3.700     3.628    -1.479    True
+ret4h_pct       12      2228    153   2237           -8.716       -14.646        31.738    40.453     3.965     4.250    -1.254    True
+ret4h_pct       24      1755     82   1695          -37.948       -60.835        41.487    79.435     4.975     3.465    -3.594    True
+ret4h_pct       36      1439     74   1423          -32.862        14.602        46.637    79.499     3.662     3.028    -2.148    True
+ret4h_pct       48      1243     84   1218          -21.525        29.559        71.602    93.127     3.797     3.948    -1.304    True
+   verdict: PASS
+
+=== (b1)/(b2) standalone events — pooled direction-adjusted forward returns, FIT ===
+
+-- b1_crowd   raw events (pre-de-overlap) 2087
+ horizon  n_raw_events    n  mean_bps    t_stat  hit_rate  passes
+       3          2087 1188    -7.879    -1.664     0.421   False
+       6          2087 1188   -18.308    -2.835     0.455   False
+      12          2087 1188   -29.199    -3.309     0.447   False
+      24          2087 1188   -58.424    -4.560     0.444   False
+      36          2087 1188   -62.445    -3.973     0.466   False
+      48          2087 1188   -53.208    -2.894     0.481   False
+   n_max 1188 (floor 400: met)  verdict: FAIL
+
+-- b1_crowd_p90   raw events (pre-de-overlap) 3090
+ horizon  n_raw_events    n  mean_bps    t_stat  hit_rate  passes
+       3          3090 1735   -10.198    -2.599     0.424   False
+       6          3090 1735   -19.529    -3.657     0.446   False
+      12          3090 1735   -25.054    -3.477     0.455   False
+      24          3090 1735   -44.180    -4.310     0.447   False
+      36          3090 1735   -44.379    -3.475     0.473   False
+      48          3090 1735   -40.655    -2.765     0.481   False
+   n_max 1735 (floor 400: met)  verdict: FAIL
+
+-- b1_shadow   raw events (pre-de-overlap) 88
+ horizon  n_raw_events  n  mean_bps    t_stat  hit_rate  passes
+       3            88 72    20.919     1.011     0.472   False
+       6            88 72     8.297     0.307     0.514   False
+      12            88 72    83.381     1.896     0.583   False
+      24            88 72    39.670     0.538     0.500   False
+      36            88 72   -37.465    -0.396     0.514   False
+      48            88 72   -38.683    -0.464     0.458   False
+   n_max 72 (floor 400: NOT MET -> unmeasurable)  verdict: UNMEASURABLE
+
+-- b2_taker   raw events (pre-de-overlap) 4565
+ horizon  n_raw_events    n  mean_bps    t_stat  hit_rate  passes
+       3          4565 3416    -7.527    -3.806     0.446   False
+       6          4565 3416    -7.391    -2.401     0.465   False
+      12          4565 3416   -13.626    -2.699     0.474   False
+      24          4565 3416   -19.787    -2.857     0.465   False
+      36          4565 3416   -17.042    -2.105     0.472   False
+      48          4565 3416   -15.801    -1.711     0.483   False
+   n_max 3416 (floor 400: met)  verdict: FAIL
+
+-- b2_taker_p90   raw events (pre-de-overlap) 9098
+ horizon  n_raw_events    n  mean_bps    t_stat  hit_rate  passes
+       3          9098 5723    -7.754    -4.617     0.450   False
+       6          9098 5723    -7.012    -2.803     0.464   False
+      12          9098 5723   -10.125    -2.619     0.480   False
+      24          9098 5723   -17.726    -3.313     0.471   False
+      36          9098 5723   -12.589    -1.978     0.481   False
+      48          9098 5723    -9.648    -1.307     0.489   False
+   n_max 5723 (floor 400: met)  verdict: FAIL
+
+-- b2_shadow   raw events (pre-de-overlap) 6841
+ horizon  n_raw_events    n  mean_bps    t_stat  hit_rate  passes
+       3          6841 3568     2.129     0.536     0.452   False
+       6          6841 3568     0.356     0.072     0.466   False
+      12          6841 3568    -0.745    -0.114     0.467   False
+      24          6841 3568    -6.075    -0.708     0.468   False
+      36          6841 3568    -6.084    -0.587     0.475   False
+      48          6841 3568    19.377     1.661     0.484   False
+   n_max 3568 (floor 400: met)  verdict: FAIL

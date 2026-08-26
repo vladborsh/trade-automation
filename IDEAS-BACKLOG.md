@@ -183,7 +183,7 @@ wins), so a WR>50% floor would be an even worse fit here than it was for MR/SMC.
 
 ## Funding-rate signals: carry and funding-extreme continuation (crypto perps)
 
-**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+**Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
 
 **Idea:** Use the perp **funding rate itself as the signal input**, not just as
 an unmodelled cost. Two distinct sub-hypotheses, probed separately:
@@ -219,7 +219,7 @@ belongs in the protocol from day one.
 
 ## Cross-sectional relative momentum, dollar-neutral, 8-perp universe
 
-**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+**Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
 
 **Idea:** Rank the existing 8-perp universe by trailing return (e.g. 12–48h),
 go **long the top 2 / short the bottom 2**, dollar-neutral, rebalance on a fixed
@@ -252,7 +252,8 @@ judge accordingly).
 
 ## Opening-range breakout (ORB), US index products — session-anchored momentum
 
-**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+**Status:** logged (Architect idea-generation pass, 2026-08-26); **not
+prioritized** at the 2026-08-26 user review (not rejected — just not picked).
 
 **Idea:** Classic session-structure momentum on equity index products (ES/NQ
 futures, or SPY/QQQ): define the opening range as the first 15–30 minutes after
@@ -290,7 +291,8 @@ right on the same days, which is a useful mutual control).
 
 ## Scheduled-macro-event reaction, BTC/ETH — first entry into the news pillar
 
-**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+**Status:** logged (Architect idea-generation pass, 2026-08-26); **not
+prioritized** at the 2026-08-26 user review (not rejected — just not picked).
 
 **Idea:** Trade the **first directional reaction after scheduled US macro
 releases** (CPI, FOMC statement/press conference, NFP) on BTC/ETH perps: at a
@@ -324,7 +326,8 @@ scheduled events (ETF flows, unlock schedules) is a later idea, not this one.
 
 ## Derivatives-positioning data: OI and taker-flow imbalance (crypto perps)
 
-**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+**Status:** **prioritized and dispatched** (user review, 2026-08-26) — design
+fixed in `research/deriv-positioning/DESIGN.md`, Researcher pass in flight.
 
 **Idea:** Binance's same free bulk archive exposes a **futures `metrics`
 dataset** — open interest, top-trader long/short ratios, taker buy/sell volume
@@ -360,7 +363,7 @@ yesterday's return in disguise is not a second signal).
 
 ## Spot–perp basis and spot-lead signals (Binance spot vs USD-M perp)
 
-**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+**Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
 
 **Idea:** Pull Binance **spot** klines (same free bulk archive, same symbols)
 alongside the existing perp data and trade the **relationship between the two
