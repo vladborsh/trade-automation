@@ -44,8 +44,9 @@ for name in rulesets.NAMES:
         stops.append(sd)
 
         # ---- engine, fit window only
-        df = d.loc[m | ~m].loc[fitmask(d)].reset_index(drop=True)
-        sf = sig.loc[fitmask(d), ["sig", "stop", "target"]].reset_index(drop=True)
+        fm = fitmask(d)
+        df = d.loc[fm].reset_index(drop=True)
+        sf = sig.loc[fm, ["sig", "stop", "target"]].reset_index(drop=True)
         res = bt.run(df, sf, mtf.P["time_stop"])
         tr = res["trades"]
         eq = res["equity"]
