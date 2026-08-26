@@ -1,0 +1,59 @@
+smc 15m smc_rr=1.0 smc_k=2 time_stop=24 -> n=10631 wr=46.1% pf=0.66 calmar=-0.90
+smc 15m smc_rr=1.0 smc_k=2 time_stop=96 -> n=13676 wr=49.8% pf=0.76 calmar=-0.87
+smc 15m smc_rr=1.0 smc_k=3 time_stop=24 -> n=10031 wr=45.2% pf=0.64 calmar=-0.90
+smc 15m smc_rr=1.0 smc_k=3 time_stop=96 -> n=12745 wr=49.4% pf=0.72 calmar=-0.86
+smc 15m smc_rr=1.0 smc_k=5 time_stop=24 -> n=9006 wr=43.7% pf=0.56 calmar=-0.90
+smc 15m smc_rr=1.0 smc_k=5 time_stop=96 -> n=12275 wr=48.9% pf=0.66 calmar=-0.86
+smc 15m smc_rr=1.5 smc_k=2 time_stop=24 -> n=10703 wr=39.7% pf=0.71 calmar=-0.90
+smc 15m smc_rr=1.5 smc_k=2 time_stop=96 -> n=12614 wr=42.2% pf=0.82 calmar=-0.77
+smc 15m smc_rr=1.5 smc_k=3 time_stop=24 -> n=9926 wr=38.9% pf=0.67 calmar=-0.90
+smc 15m smc_rr=1.5 smc_k=3 time_stop=96 -> n=12164 wr=42.2% pf=0.78 calmar=-0.77
+smc 15m smc_rr=1.5 smc_k=5 time_stop=24 -> n=8708 wr=37.8% pf=0.60 calmar=-0.90
+smc 15m smc_rr=1.5 smc_k=5 time_stop=96 -> n=11159 wr=40.8% pf=0.71 calmar=-0.83
+smc 15m smc_rr=2.0 smc_k=2 time_stop=24 -> n=9503 wr=34.5% pf=0.70 calmar=-0.90
+smc 15m smc_rr=2.0 smc_k=2 time_stop=96 -> n=11802 wr=37.0% pf=0.85 calmar=-0.74
+smc 15m smc_rr=2.0 smc_k=3 time_stop=24 -> n=9400 wr=34.5% pf=0.67 calmar=-0.90
+smc 15m smc_rr=2.0 smc_k=3 time_stop=96 -> n=11138 wr=36.8% pf=0.79 calmar=-0.75
+smc 15m smc_rr=2.0 smc_k=5 time_stop=24 -> n=8090 wr=33.6% pf=0.61 calmar=-0.90
+smc 15m smc_rr=2.0 smc_k=5 time_stop=96 -> n=9941 wr=35.6% pf=0.73 calmar=-0.81
+smc 15m smc_rr=3.0 smc_k=2 time_stop=24 -> n=8764 wr=30.0% pf=0.67 calmar=-0.90
+smc 15m smc_rr=3.0 smc_k=2 time_stop=96 -> n=9810 wr=29.5% pf=0.85 calmar=-0.76
+smc 15m smc_rr=3.0 smc_k=3 time_stop=24 -> n=8862 wr=30.2% pf=0.68 calmar=-0.90
+smc 15m smc_rr=3.0 smc_k=3 time_stop=96 -> n=9585 wr=30.0% pf=0.79 calmar=-0.76
+smc 15m smc_rr=3.0 smc_k=5 time_stop=24 -> n=7750 wr=29.7% pf=0.61 calmar=-0.90
+smc 15m smc_rr=3.0 smc_k=5 time_stop=96 -> n=9099 wr=29.7% pf=0.72 calmar=-0.81
+smc 1h smc_rr=1.0 smc_k=2 time_stop=24 -> n=9337 wr=49.0% pf=0.77 calmar=-0.56
+smc 1h smc_rr=1.0 smc_k=2 time_stop=96 -> n=5635 wr=52.6% pf=0.94 calmar=-0.23
+smc 1h smc_rr=1.0 smc_k=3 time_stop=24 -> n=8656 wr=48.3% pf=0.76 calmar=-0.57
+smc 1h smc_rr=1.0 smc_k=3 time_stop=96 -> n=5028 wr=52.4% pf=0.93 calmar=-0.19
+smc 1h smc_rr=1.0 smc_k=5 time_stop=24 -> n=7864 wr=47.2% pf=0.72 calmar=-0.58
+smc 1h smc_rr=1.0 smc_k=5 time_stop=96 -> n=4553 wr=50.3% pf=0.85 calmar=-0.33
+smc 1h smc_rr=1.5 smc_k=2 time_stop=24 -> n=7979 wr=42.1% pf=0.80 calmar=-0.50
+smc 1h smc_rr=1.5 smc_k=2 time_stop=96 -> n=4365 wr=44.6% pf=1.00 calmar=0.11
+smc 1h smc_rr=1.5 smc_k=3 time_stop=24 -> n=7435 wr=42.0% pf=0.79 calmar=-0.48
+smc 1h smc_rr=1.5 smc_k=3 time_stop=96 -> n=3983 wr=44.1% pf=0.98 calmar=-0.03
+smc 1h smc_rr=1.5 smc_k=5 time_stop=24 -> n=6860 wr=40.7% pf=0.73 calmar=-0.55
+smc 1h smc_rr=1.5 smc_k=5 time_stop=96 -> n=3676 wr=42.1% pf=0.88 calmar=-0.25
+smc 1h smc_rr=2.0 smc_k=2 time_stop=24 -> n=7210 wr=38.1% pf=0.81 calmar=-0.48
+smc 1h smc_rr=2.0 smc_k=2 time_stop=96 -> n=3736 wr=38.8% pf=1.01 calmar=0.10
+smc 1h smc_rr=2.0 smc_k=3 time_stop=24 -> n=6842 wr=38.1% pf=0.80 calmar=-0.47
+smc 1h smc_rr=2.0 smc_k=3 time_stop=96 -> n=3416 wr=38.9% pf=1.00 calmar=0.17
+smc 1h smc_rr=2.0 smc_k=5 time_stop=24 -> n=6400 wr=37.2% pf=0.75 calmar=-0.53
+smc 1h smc_rr=2.0 smc_k=5 time_stop=96 -> n=3263 wr=37.8% pf=0.92 calmar=-0.16
+smc 1h smc_rr=3.0 smc_k=2 time_stop=24 -> n=6560 wr=34.0% pf=0.78 calmar=-0.53
+smc 1h smc_rr=3.0 smc_k=2 time_stop=96 -> n=3139 wr=30.8% pf=0.93 calmar=-0.07
+smc 1h smc_rr=3.0 smc_k=3 time_stop=24 -> n=6229 wr=34.5% pf=0.78 calmar=-0.50
+smc 1h smc_rr=3.0 smc_k=3 time_stop=96 -> n=2925 wr=31.7% pf=0.96 calmar=-0.06
+smc 1h smc_rr=3.0 smc_k=5 time_stop=24 -> n=5848 wr=33.5% pf=0.74 calmar=-0.55
+smc 1h smc_rr=3.0 smc_k=5 time_stop=96 -> n=2845 wr=31.1% pf=0.90 calmar=-0.17
+
+wrote /Users/Vladyslav_Borsh/Documents/trade_automation/research/intraday-mr-smc/results/scan_smc.csv
+ smc_rr  smc_k  time_stop interval  symbols_ok  trades  win_rate  profit_factor    sharpe   sortino   max_dd    calmar  worst_symbol_pf
+    2.0      2         96       1h           3    3736  0.387848       1.005517  0.205226  0.356492 0.473339  0.103196         0.952124
+    1.5      2         96       1h           3    4365  0.446048       1.004132  0.203120  0.361617 0.450860  0.108852         0.930936
+    2.0      3         96       1h           3    3416  0.389052       0.998593  0.150096  0.287411 0.510543  0.170277         0.916566
+    1.5      3         96       1h           3    3983  0.440623       0.979410  0.017419  0.040465 0.574115 -0.030276         0.935891
+    3.0      3         96       1h           3    2925  0.317265       0.963689 -0.075251 -0.097088 0.617371 -0.058300         0.850800
+    1.0      2         96       1h           3    5635  0.526353       0.936675 -0.447509 -0.693510 0.606620 -0.228425         0.889217
+    1.0      3         96       1h           3    5028  0.524065       0.933801 -0.475159 -0.693968 0.622467 -0.194444         0.876457
+    3.0      2         96       1h           3    3139  0.307741       0.927020 -0.335089 -0.508669 0.774520 -0.065699         0.782905

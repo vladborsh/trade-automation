@@ -1,0 +1,83 @@
+hybrid 15m mr_z=1.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=6 -> n=1464 wr=58.9% pf=0.39 calmar=-0.35
+hybrid 15m mr_z=1.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=12 -> n=2093 wr=58.1% pf=0.37 calmar=-0.40
+hybrid 15m mr_z=1.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=6 -> n=1431 wr=63.9% pf=0.40 calmar=-0.31
+hybrid 15m mr_z=1.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=12 -> n=2026 wr=63.0% pf=0.38 calmar=-0.35
+hybrid 15m mr_z=1.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=6 -> n=1415 wr=65.9% pf=0.41 calmar=-0.29
+hybrid 15m mr_z=1.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=12 -> n=1994 wr=64.9% pf=0.38 calmar=-0.32
+hybrid 15m mr_z=1.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=6 -> n=1391 wr=52.9% pf=0.54 calmar=-0.34
+hybrid 15m mr_z=1.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=12 -> n=1944 wr=51.6% pf=0.52 calmar=-0.40
+hybrid 15m mr_z=1.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=6 -> n=1353 wr=59.7% pf=0.55 calmar=-0.30
+hybrid 15m mr_z=1.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=12 -> n=1860 wr=58.8% pf=0.54 calmar=-0.34
+hybrid 15m mr_z=1.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=6 -> n=1332 wr=62.2% pf=0.55 calmar=-0.27
+hybrid 15m mr_z=1.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=12 -> n=1825 wr=61.3% pf=0.53 calmar=-0.31
+hybrid 15m mr_z=2.0 tp_frac=0.5 stop_atr=1.0 sweep_lookback=6 -> n=688 wr=59.7% pf=0.50 calmar=-0.28
+hybrid 15m mr_z=2.0 tp_frac=0.5 stop_atr=1.0 sweep_lookback=12 -> n=1071 wr=57.4% pf=0.43 calmar=-0.33
+hybrid 15m mr_z=2.0 tp_frac=0.5 stop_atr=2.0 sweep_lookback=6 -> n=670 wr=64.3% pf=0.47 calmar=-0.27
+hybrid 15m mr_z=2.0 tp_frac=0.5 stop_atr=2.0 sweep_lookback=12 -> n=1038 wr=63.1% pf=0.44 calmar=-0.30
+hybrid 15m mr_z=2.0 tp_frac=0.5 stop_atr=3.0 sweep_lookback=6 -> n=665 wr=67.4% pf=0.49 calmar=-0.25
+hybrid 15m mr_z=2.0 tp_frac=0.5 stop_atr=3.0 sweep_lookback=12 -> n=1023 wr=66.3% pf=0.45 calmar=-0.28
+hybrid 15m mr_z=2.0 tp_frac=1.0 stop_atr=1.0 sweep_lookback=6 -> n=673 wr=49.2% pf=0.62 calmar=-0.27
+hybrid 15m mr_z=2.0 tp_frac=1.0 stop_atr=1.0 sweep_lookback=12 -> n=1039 wr=47.6% pf=0.55 calmar=-0.32
+hybrid 15m mr_z=2.0 tp_frac=1.0 stop_atr=2.0 sweep_lookback=6 -> n=653 wr=54.4% pf=0.60 calmar=-0.26
+hybrid 15m mr_z=2.0 tp_frac=1.0 stop_atr=2.0 sweep_lookback=12 -> n=1001 wr=53.8% pf=0.58 calmar=-0.29
+hybrid 15m mr_z=2.0 tp_frac=1.0 stop_atr=3.0 sweep_lookback=6 -> n=647 wr=57.8% pf=0.62 calmar=-0.25
+hybrid 15m mr_z=2.0 tp_frac=1.0 stop_atr=3.0 sweep_lookback=12 -> n=985 wr=57.4% pf=0.59 calmar=-0.26
+hybrid 15m mr_z=2.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=6 -> n=328 wr=59.1% pf=0.52 calmar=-0.26
+hybrid 15m mr_z=2.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=12 -> n=561 wr=56.9% pf=0.50 calmar=-0.28
+hybrid 15m mr_z=2.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=6 -> n=324 wr=67.6% pf=0.57 calmar=-0.24
+hybrid 15m mr_z=2.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=12 -> n=547 wr=65.4% pf=0.54 calmar=-0.27
+hybrid 15m mr_z=2.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=6 -> n=323 wr=70.9% pf=0.60 calmar=-0.23
+hybrid 15m mr_z=2.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=12 -> n=542 wr=69.0% pf=0.59 calmar=-0.25
+hybrid 15m mr_z=2.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=6 -> n=326 wr=48.5% pf=0.62 calmar=-0.24
+hybrid 15m mr_z=2.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=12 -> n=553 wr=47.6% pf=0.61 calmar=-0.27
+hybrid 15m mr_z=2.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=6 -> n=322 wr=56.8% pf=0.68 calmar=-0.21
+hybrid 15m mr_z=2.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=12 -> n=539 wr=55.7% pf=0.67 calmar=-0.24
+hybrid 15m mr_z=2.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=6 -> n=320 wr=60.3% pf=0.71 calmar=-0.19
+hybrid 15m mr_z=2.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=12 -> n=533 wr=59.5% pf=0.72 calmar=-0.20
+hybrid 1h mr_z=1.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=6 -> n=365 wr=63.0% pf=0.57 calmar=-0.23
+hybrid 1h mr_z=1.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=12 -> n=521 wr=66.2% pf=0.64 calmar=-0.24
+hybrid 1h mr_z=1.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=6 -> n=355 wr=73.0% pf=0.68 calmar=-0.19
+hybrid 1h mr_z=1.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=12 -> n=498 wr=74.7% pf=0.72 calmar=-0.21
+hybrid 1h mr_z=1.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=6 -> n=352 wr=75.6% pf=0.63 calmar=-0.19
+hybrid 1h mr_z=1.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=12 -> n=493 wr=76.9% pf=0.67 calmar=-0.21
+hybrid 1h mr_z=1.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=6 -> n=345 wr=53.6% pf=0.70 calmar=-0.22
+hybrid 1h mr_z=1.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=12 -> n=488 wr=57.0% pf=0.80 calmar=-0.22
+hybrid 1h mr_z=1.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=6 -> n=328 wr=64.9% pf=0.90 calmar=-0.07
+hybrid 1h mr_z=1.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=12 -> n=456 wr=66.7% pf=0.95 calmar=-0.04
+hybrid 1h mr_z=1.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=6 -> n=324 wr=67.0% pf=0.81 calmar=-0.13
+hybrid 1h mr_z=1.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=12 -> n=451 wr=69.0% pf=0.88 calmar=-0.12
+hybrid 1h mr_z=2.0 tp_frac=0.5 stop_atr=1.0 sweep_lookback=6 -> n=201 wr=61.7% pf=0.65 calmar=-0.20
+hybrid 1h mr_z=2.0 tp_frac=0.5 stop_atr=1.0 sweep_lookback=12 -> n=295 wr=62.4% pf=0.67 calmar=-0.20
+hybrid 1h mr_z=2.0 tp_frac=0.5 stop_atr=2.0 sweep_lookback=6 -> n=193 wr=70.5% pf=0.75 calmar=-0.14
+hybrid 1h mr_z=2.0 tp_frac=0.5 stop_atr=2.0 sweep_lookback=12 -> n=281 wr=71.5% pf=0.77 calmar=-0.14
+hybrid 1h mr_z=2.0 tp_frac=0.5 stop_atr=3.0 sweep_lookback=6 -> n=192 wr=75.5% pf=0.84 calmar=-0.11
+hybrid 1h mr_z=2.0 tp_frac=0.5 stop_atr=3.0 sweep_lookback=12 -> n=275 wr=75.3% pf=0.82 calmar=-0.13
+hybrid 1h mr_z=2.0 tp_frac=1.0 stop_atr=1.0 sweep_lookback=6 -> n=198 wr=52.0% pf=0.86 calmar=-0.11
+hybrid 1h mr_z=2.0 tp_frac=1.0 stop_atr=1.0 sweep_lookback=12 -> n=290 wr=52.1% pf=0.86 calmar=-0.11
+hybrid 1h mr_z=2.0 tp_frac=1.0 stop_atr=2.0 sweep_lookback=6 -> n=186 wr=61.8% pf=0.95 calmar=-0.05
+hybrid 1h mr_z=2.0 tp_frac=1.0 stop_atr=2.0 sweep_lookback=12 -> n=271 wr=62.7% pf=0.99 calmar=-0.01
+hybrid 1h mr_z=2.0 tp_frac=1.0 stop_atr=3.0 sweep_lookback=6 -> n=184 wr=67.9% pf=1.10 calmar=0.07
+hybrid 1h mr_z=2.0 tp_frac=1.0 stop_atr=3.0 sweep_lookback=12 -> n=263 wr=68.1% pf=1.09 calmar=0.09
+hybrid 1h mr_z=2.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=6 -> n=89 wr=55.1% pf=0.57 calmar=-0.18
+hybrid 1h mr_z=2.5 tp_frac=0.5 stop_atr=1.0 sweep_lookback=12 -> n=150 wr=53.3% pf=0.51 calmar=-0.22
+hybrid 1h mr_z=2.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=6 -> n=87 wr=64.4% pf=0.68 calmar=-0.12
+hybrid 1h mr_z=2.5 tp_frac=0.5 stop_atr=2.0 sweep_lookback=12 -> n=148 wr=64.2% pf=0.70 calmar=-0.14
+hybrid 1h mr_z=2.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=6 -> n=84 wr=72.6% pf=0.82 calmar=-0.07
+hybrid 1h mr_z=2.5 tp_frac=0.5 stop_atr=3.0 sweep_lookback=12 -> n=144 wr=70.1% pf=0.81 calmar=-0.09
+hybrid 1h mr_z=2.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=6 -> n=88 wr=48.9% pf=0.80 calmar=-0.06
+hybrid 1h mr_z=2.5 tp_frac=1.0 stop_atr=1.0 sweep_lookback=12 -> n=149 wr=45.6% pf=0.66 calmar=-0.17
+hybrid 1h mr_z=2.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=6 -> n=86 wr=59.3% pf=0.97 calmar=0.03
+hybrid 1h mr_z=2.5 tp_frac=1.0 stop_atr=2.0 sweep_lookback=12 -> n=147 wr=55.8% pf=0.81 calmar=-0.08
+hybrid 1h mr_z=2.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=6 -> n=83 wr=68.7% pf=1.07 calmar=0.04
+hybrid 1h mr_z=2.5 tp_frac=1.0 stop_atr=3.0 sweep_lookback=12 -> n=143 wr=63.6% pf=0.96 calmar=-0.02
+
+wrote /Users/Vladyslav_Borsh/Documents/trade_automation/research/intraday-mr-smc/results/scan_hybrid.csv
+ mr_z  tp_frac  stop_atr  sweep_lookback interval  symbols_ok  trades  win_rate  profit_factor    sharpe   sortino   max_dd    calmar  worst_symbol_pf
+  2.0      1.0       3.0               6       1h           3     184  0.679348       1.096789  0.159289  0.044602 0.057418  0.074871         1.057270
+  2.0      1.0       3.0              12       1h           3     263  0.680608       1.093324  0.173024  0.055353 0.094601  0.094406         0.969488
+  2.5      1.0       3.0               6       1h           3      83  0.686747       1.065873  0.078235  0.018866 0.037705  0.042985         0.775074
+  2.0      1.0       2.0              12       1h           3     271  0.627306       0.988188 -0.013759 -0.013679 0.094719 -0.008892         0.926805
+  2.5      1.0       2.0               6       1h           3      86  0.593023       0.965772 -0.123530 -0.067029 0.086882  0.031699         0.428625
+  2.5      1.0       3.0              12       1h           3     143  0.636364       0.958390 -0.053369 -0.014353 0.058106 -0.016572         0.712238
+  2.0      1.0       2.0               6       1h           3     186  0.618280       0.951866 -0.071837 -0.026066 0.079020 -0.048698         0.886873
+  1.5      1.0       2.0              12       1h           3     456  0.666667       0.950374 -0.131573 -0.077682 0.126582 -0.041481         0.810690

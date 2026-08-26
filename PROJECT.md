@@ -1,0 +1,68 @@
+# Trade Automation
+
+## Mission
+
+Build and operate a portfolio of algorithmic trading strategies and supporting
+automations, spanning:
+
+- **Chart-driven strategies** — decisions based purely on price/volume/indicator data.
+- **News-driven strategies** — shallow analysis of news/headlines feeding into signals.
+- **Intraday signal generators** — automations that produce intraday trading signals.
+- **Analytics/reporting automations** — summarize signals, performance, and system
+  health into high-level overviews for a human to consume.
+
+Not every strategy needs every capability above — a chart-only strategy has no news
+component, a pure summarizer never places a trade. The team and its workflow are
+built to route each idea through only the roles it actually needs.
+
+## Domain scope
+
+- **Asset classes**: crypto and equities to start. Other asset classes (forex,
+  futures, options) may be added later once the crypto/equities pipeline is proven.
+- **Timeframe**: intraday-first. Swing/longer-horizon strategies are a possible
+  future expansion, not a current requirement.
+
+## Infrastructure
+
+- Hosting and runtime infrastructure **must be built on AWS**. Specific services
+  (compute, storage, messaging, etc.) are not pinned yet — that's owned by the
+  DevOps Engineer role.
+- Persistent storage is a hard requirement for market data, generated signals, and
+  backtest results. No specific storage technology is chosen yet.
+
+## Team model
+
+This project uses **Orca ADE** to run the team: each role is a separate agent
+session working in its own isolated git worktree, not a single session dispatching
+sub-agents. Because of that, every role is defined as a **self-contained brief**
+under `agents/roles/*.md` — each brief carries everything that role needs to work
+cold, including who it hands its output to next.
+
+There is no single fixed pipeline every idea passes through. The **Architect**
+role is the entry point and orchestrator: it receives a trading idea and decides
+which of the other roles actually need to engage, and in what order, based on what
+kind of idea it is (chart-only, news-based, intraday-signal, analytics/summary,
+etc.).
+
+## Roles
+
+| Role | Model | Charter |
+|---|---|---|
+| [Researcher](agents/roles/researcher.md) | Opus 5 | Explores a raw idea: historical data, exploratory analytics, feasibility, pros/cons, documentation. |
+| [Architect](agents/roles/architect.md) | Claude Fable 5 | Entry point and orchestrator. Designs the approach and routes work to the roles it needs. |
+| [Implementation](agents/roles/implementation.md) | Sonnet 5 | Builds the strategy/automation logic. |
+| [Backtesting](agents/roles/backtesting.md) | Sonnet 5 | Rigorously validates implemented strategies against historical data. |
+| [Critique & Refinement](agents/roles/critique-refinement.md) | Opus 5 | Reviews strategies and results, drives iteration. |
+| [Strategy-Application](agents/roles/strategy-application.md) | Sonnet 5 | Turns a validated strategy into deployable rules: position-sizing, execution logic. |
+| [Live-Signal Development](agents/roles/live-signal-development.md) | Sonnet 5 | Builds and runs the real-time pipeline that emits live signals from deployed rules. |
+| [DevOps Engineer](agents/roles/devops-engineer.md) | Sonnet 5 | Owns hosting and data storage on AWS. |
+
+Models are defaults, not hard requirements — swap per-role if a specific idea's
+complexity or budget calls for it.
+
+## Status
+
+Roles and this context document are the current deliverable. Actual strategy
+implementation, the trading-idea intake format, and specific AWS service choices
+are deliberately **not** decided yet — that work starts once the team receives its
+first trading idea.

@@ -1,0 +1,83 @@
+mean_reversion 15m mr_z=1.5 tp_frac=0.5 stop_atr=1.0 time_stop=12 -> n=4754 wr=50.7% pf=0.59 calmar=-0.55
+mean_reversion 15m mr_z=1.5 tp_frac=0.5 stop_atr=1.0 time_stop=48 -> n=4647 wr=50.6% pf=0.59 calmar=-0.59
+mean_reversion 15m mr_z=1.5 tp_frac=0.5 stop_atr=2.0 time_stop=12 -> n=4621 wr=56.2% pf=0.61 calmar=-0.42
+mean_reversion 15m mr_z=1.5 tp_frac=0.5 stop_atr=2.0 time_stop=48 -> n=4410 wr=60.8% pf=0.62 calmar=-0.47
+mean_reversion 15m mr_z=1.5 tp_frac=0.5 stop_atr=3.0 time_stop=12 -> n=4572 wr=57.7% pf=0.61 calmar=-0.37
+mean_reversion 15m mr_z=1.5 tp_frac=0.5 stop_atr=3.0 time_stop=48 -> n=4244 wr=66.3% pf=0.65 calmar=-0.39
+mean_reversion 15m mr_z=1.5 tp_frac=1.0 stop_atr=1.0 time_stop=12 -> n=4681 wr=42.2% pf=0.58 calmar=-0.57
+mean_reversion 15m mr_z=1.5 tp_frac=1.0 stop_atr=1.0 time_stop=48 -> n=4451 wr=36.6% pf=0.60 calmar=-0.62
+mean_reversion 15m mr_z=1.5 tp_frac=1.0 stop_atr=2.0 time_stop=12 -> n=4570 wr=47.9% pf=0.62 calmar=-0.44
+mean_reversion 15m mr_z=1.5 tp_frac=1.0 stop_atr=2.0 time_stop=48 -> n=4203 wr=47.2% pf=0.65 calmar=-0.49
+mean_reversion 15m mr_z=1.5 tp_frac=1.0 stop_atr=3.0 time_stop=12 -> n=4517 wr=49.2% pf=0.63 calmar=-0.38
+mean_reversion 15m mr_z=1.5 tp_frac=1.0 stop_atr=3.0 time_stop=48 -> n=4033 wr=52.7% pf=0.68 calmar=-0.41
+mean_reversion 15m mr_z=2.0 tp_frac=0.5 stop_atr=1.0 time_stop=12 -> n=8179 wr=52.1% pf=0.63 calmar=-0.69
+mean_reversion 15m mr_z=2.0 tp_frac=0.5 stop_atr=1.0 time_stop=48 -> n=7943 wr=53.4% pf=0.65 calmar=-0.71
+mean_reversion 15m mr_z=2.0 tp_frac=0.5 stop_atr=2.0 time_stop=12 -> n=7886 wr=57.0% pf=0.64 calmar=-0.53
+mean_reversion 15m mr_z=2.0 tp_frac=0.5 stop_atr=2.0 time_stop=48 -> n=7565 wr=63.3% pf=0.67 calmar=-0.55
+mean_reversion 15m mr_z=2.0 tp_frac=0.5 stop_atr=3.0 time_stop=12 -> n=7677 wr=58.1% pf=0.64 calmar=-0.44
+mean_reversion 15m mr_z=2.0 tp_frac=0.5 stop_atr=3.0 time_stop=48 -> n=7250 wr=67.9% pf=0.67 calmar=-0.47
+mean_reversion 15m mr_z=2.0 tp_frac=1.0 stop_atr=1.0 time_stop=12 -> n=7974 wr=43.7% pf=0.66 calmar=-0.69
+mean_reversion 15m mr_z=2.0 tp_frac=1.0 stop_atr=1.0 time_stop=48 -> n=7408 wr=38.8% pf=0.65 calmar=-0.74
+mean_reversion 15m mr_z=2.0 tp_frac=1.0 stop_atr=2.0 time_stop=12 -> n=7747 wr=48.3% pf=0.67 calmar=-0.53
+mean_reversion 15m mr_z=2.0 tp_frac=1.0 stop_atr=2.0 time_stop=48 -> n=7084 wr=49.0% pf=0.69 calmar=-0.58
+mean_reversion 15m mr_z=2.0 tp_frac=1.0 stop_atr=3.0 time_stop=12 -> n=7548 wr=49.5% pf=0.67 calmar=-0.45
+mean_reversion 15m mr_z=2.0 tp_frac=1.0 stop_atr=3.0 time_stop=48 -> n=6742 wr=54.1% pf=0.71 calmar=-0.48
+mean_reversion 15m mr_z=2.5 tp_frac=0.5 stop_atr=1.0 time_stop=12 -> n=7025 wr=50.7% pf=0.63 calmar=-0.65
+mean_reversion 15m mr_z=2.5 tp_frac=0.5 stop_atr=1.0 time_stop=48 -> n=6863 wr=51.9% pf=0.64 calmar=-0.68
+mean_reversion 15m mr_z=2.5 tp_frac=0.5 stop_atr=2.0 time_stop=12 -> n=6764 wr=55.4% pf=0.65 calmar=-0.50
+mean_reversion 15m mr_z=2.5 tp_frac=0.5 stop_atr=2.0 time_stop=48 -> n=6574 wr=61.4% pf=0.68 calmar=-0.54
+mean_reversion 15m mr_z=2.5 tp_frac=0.5 stop_atr=3.0 time_stop=12 -> n=6522 wr=57.1% pf=0.67 calmar=-0.42
+mean_reversion 15m mr_z=2.5 tp_frac=0.5 stop_atr=3.0 time_stop=48 -> n=6334 wr=66.1% pf=0.68 calmar=-0.45
+mean_reversion 15m mr_z=2.5 tp_frac=1.0 stop_atr=1.0 time_stop=12 -> n=6905 wr=43.1% pf=0.67 calmar=-0.64
+mean_reversion 15m mr_z=2.5 tp_frac=1.0 stop_atr=1.0 time_stop=48 -> n=6597 wr=39.1% pf=0.70 calmar=-0.67
+mean_reversion 15m mr_z=2.5 tp_frac=1.0 stop_atr=2.0 time_stop=12 -> n=6670 wr=47.8% pf=0.70 calmar=-0.49
+mean_reversion 15m mr_z=2.5 tp_frac=1.0 stop_atr=2.0 time_stop=48 -> n=6333 wr=48.4% pf=0.74 calmar=-0.54
+mean_reversion 15m mr_z=2.5 tp_frac=1.0 stop_atr=3.0 time_stop=12 -> n=6436 wr=49.4% pf=0.71 calmar=-0.41
+mean_reversion 15m mr_z=2.5 tp_frac=1.0 stop_atr=3.0 time_stop=48 -> n=6069 wr=53.3% pf=0.74 calmar=-0.46
+mean_reversion 1h mr_z=1.5 tp_frac=0.5 stop_atr=1.0 time_stop=12 -> n=1578 wr=49.0% pf=0.69 calmar=-0.32
+mean_reversion 1h mr_z=1.5 tp_frac=0.5 stop_atr=1.0 time_stop=48 -> n=1563 wr=49.3% pf=0.71 calmar=-0.32
+mean_reversion 1h mr_z=1.5 tp_frac=0.5 stop_atr=2.0 time_stop=12 -> n=1485 wr=55.4% pf=0.70 calmar=-0.28
+mean_reversion 1h mr_z=1.5 tp_frac=0.5 stop_atr=2.0 time_stop=48 -> n=1435 wr=60.2% pf=0.73 calmar=-0.28
+mean_reversion 1h mr_z=1.5 tp_frac=0.5 stop_atr=3.0 time_stop=12 -> n=1443 wr=58.6% pf=0.75 calmar=-0.25
+mean_reversion 1h mr_z=1.5 tp_frac=0.5 stop_atr=3.0 time_stop=48 -> n=1358 wr=68.0% pf=0.80 calmar=-0.23
+mean_reversion 1h mr_z=1.5 tp_frac=1.0 stop_atr=1.0 time_stop=12 -> n=1568 wr=41.6% pf=0.73 calmar=-0.31
+mean_reversion 1h mr_z=1.5 tp_frac=1.0 stop_atr=1.0 time_stop=48 -> n=1530 wr=35.2% pf=0.74 calmar=-0.32
+mean_reversion 1h mr_z=1.5 tp_frac=1.0 stop_atr=2.0 time_stop=12 -> n=1475 wr=47.3% pf=0.72 calmar=-0.28
+mean_reversion 1h mr_z=1.5 tp_frac=1.0 stop_atr=2.0 time_stop=48 -> n=1380 wr=45.9% pf=0.76 calmar=-0.26
+mean_reversion 1h mr_z=1.5 tp_frac=1.0 stop_atr=3.0 time_stop=12 -> n=1428 wr=50.2% pf=0.76 calmar=-0.24
+mean_reversion 1h mr_z=1.5 tp_frac=1.0 stop_atr=3.0 time_stop=48 -> n=1285 wr=54.2% pf=0.83 calmar=-0.20
+mean_reversion 1h mr_z=2.0 tp_frac=0.5 stop_atr=1.0 time_stop=12 -> n=2326 wr=48.6% pf=0.68 calmar=-0.36
+mean_reversion 1h mr_z=2.0 tp_frac=0.5 stop_atr=1.0 time_stop=48 -> n=2308 wr=49.1% pf=0.70 calmar=-0.36
+mean_reversion 1h mr_z=2.0 tp_frac=0.5 stop_atr=2.0 time_stop=12 -> n=2162 wr=56.4% pf=0.73 calmar=-0.28
+mean_reversion 1h mr_z=2.0 tp_frac=0.5 stop_atr=2.0 time_stop=48 -> n=2121 wr=61.2% pf=0.77 calmar=-0.28
+mean_reversion 1h mr_z=2.0 tp_frac=0.5 stop_atr=3.0 time_stop=12 -> n=2081 wr=58.1% pf=0.74 calmar=-0.26
+mean_reversion 1h mr_z=2.0 tp_frac=0.5 stop_atr=3.0 time_stop=48 -> n=1981 wr=67.4% pf=0.81 calmar=-0.23
+mean_reversion 1h mr_z=2.0 tp_frac=1.0 stop_atr=1.0 time_stop=12 -> n=2309 wr=42.6% pf=0.75 calmar=-0.33
+mean_reversion 1h mr_z=2.0 tp_frac=1.0 stop_atr=1.0 time_stop=48 -> n=2269 wr=37.5% pf=0.82 calmar=-0.31
+mean_reversion 1h mr_z=2.0 tp_frac=1.0 stop_atr=2.0 time_stop=12 -> n=2138 wr=50.4% pf=0.80 calmar=-0.26
+mean_reversion 1h mr_z=2.0 tp_frac=1.0 stop_atr=2.0 time_stop=48 -> n=2045 wr=48.9% pf=0.86 calmar=-0.23
+mean_reversion 1h mr_z=2.0 tp_frac=1.0 stop_atr=3.0 time_stop=12 -> n=2052 wr=52.2% pf=0.81 calmar=-0.24
+mean_reversion 1h mr_z=2.0 tp_frac=1.0 stop_atr=3.0 time_stop=48 -> n=1886 wr=54.5% pf=0.87 calmar=-0.21
+mean_reversion 1h mr_z=2.5 tp_frac=0.5 stop_atr=1.0 time_stop=12 -> n=1869 wr=47.7% pf=0.66 calmar=-0.34
+mean_reversion 1h mr_z=2.5 tp_frac=0.5 stop_atr=1.0 time_stop=48 -> n=1863 wr=47.6% pf=0.68 calmar=-0.35
+mean_reversion 1h mr_z=2.5 tp_frac=0.5 stop_atr=2.0 time_stop=12 -> n=1752 wr=52.9% pf=0.67 calmar=-0.30
+mean_reversion 1h mr_z=2.5 tp_frac=0.5 stop_atr=2.0 time_stop=48 -> n=1742 wr=58.3% pf=0.72 calmar=-0.30
+mean_reversion 1h mr_z=2.5 tp_frac=0.5 stop_atr=3.0 time_stop=12 -> n=1678 wr=54.3% pf=0.65 calmar=-0.28
+mean_reversion 1h mr_z=2.5 tp_frac=0.5 stop_atr=3.0 time_stop=48 -> n=1656 wr=64.1% pf=0.74 calmar=-0.25
+mean_reversion 1h mr_z=2.5 tp_frac=1.0 stop_atr=1.0 time_stop=12 -> n=1852 wr=41.6% pf=0.71 calmar=-0.32
+mean_reversion 1h mr_z=2.5 tp_frac=1.0 stop_atr=1.0 time_stop=48 -> n=1822 wr=37.2% pf=0.78 calmar=-0.31
+mean_reversion 1h mr_z=2.5 tp_frac=1.0 stop_atr=2.0 time_stop=12 -> n=1736 wr=47.0% pf=0.71 calmar=-0.28
+mean_reversion 1h mr_z=2.5 tp_frac=1.0 stop_atr=2.0 time_stop=48 -> n=1700 wr=47.2% pf=0.82 calmar=-0.27
+mean_reversion 1h mr_z=2.5 tp_frac=1.0 stop_atr=3.0 time_stop=12 -> n=1659 wr=48.5% pf=0.70 calmar=-0.27
+mean_reversion 1h mr_z=2.5 tp_frac=1.0 stop_atr=3.0 time_stop=48 -> n=1603 wr=52.8% pf=0.83 calmar=-0.21
+
+wrote /Users/Vladyslav_Borsh/Documents/trade_automation/research/intraday-mr-smc/results/scan_mean_reversion.csv
+ mr_z  tp_frac  stop_atr  time_stop interval  symbols_ok  trades  win_rate  profit_factor    sharpe   sortino   max_dd    calmar  worst_symbol_pf
+  2.0      1.0       3.0         48       1h           3    1886  0.545069       0.866630 -0.780428 -0.870386 0.491485 -0.211101         0.797990
+  2.0      1.0       2.0         48       1h           3    2045  0.488509       0.857455 -0.878557 -1.081948 0.589758 -0.232977         0.810739
+  2.5      1.0       3.0         48       1h           3    1603  0.527760       0.834452 -0.919518 -0.961637 0.502189 -0.213605         0.751918
+  1.5      1.0       3.0         48       1h           3    1285  0.541634       0.829831 -0.844490 -0.847675 0.452394 -0.199753         0.686715
+  2.0      1.0       1.0         48       1h           3    2269  0.375496       0.817911 -1.225727 -1.804367 0.733439 -0.306997         0.786677
+  2.5      1.0       2.0         48       1h           3    1700  0.471765       0.815483 -1.045291 -1.172967 0.577539 -0.271686         0.758555
+  2.0      0.5       3.0         48       1h           3    1981  0.674407       0.813732 -1.088928 -1.003993 0.462273 -0.233146         0.743885
+  2.0      1.0       3.0         12       1h           3    2052  0.522417       0.806875 -1.075657 -0.942249 0.437036 -0.237505         0.746591

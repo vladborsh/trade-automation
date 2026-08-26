@@ -1,0 +1,29 @@
+mean_reversion  5m BTCUSDT  n= 2358 wr=41.3% pf=0.56 sharpe=-9.04 dd=100.0% calmar=-0.90
+mean_reversion  5m ETHUSDT  n= 2975 wr=45.2% pf=0.54 sharpe=-7.93 dd=100.0% calmar=-0.88
+mean_reversion  5m SOLUSDT  n= 4916 wr=45.7% pf=0.73 sharpe=-5.99 dd=100.0% calmar=-0.87
+mean_reversion 15m BTCUSDT  n= 2360 wr=45.8% pf=0.62 sharpe=-4.64 dd=98.9% calmar=-0.68
+mean_reversion 15m ETHUSDT  n= 2548 wr=48.0% pf=0.68 sharpe=-3.35 dd=96.5% calmar=-0.59
+mean_reversion 15m SOLUSDT  n= 2680 wr=46.0% pf=0.74 sharpe=-3.24 dd=96.3% calmar=-0.58
+mean_reversion  1h BTCUSDT  n=  708 wr=46.5% pf=0.80 sharpe=-1.25 dd=55.5% calmar=-0.30
+mean_reversion  1h ETHUSDT  n=  716 wr=48.0% pf=0.86 sharpe=-0.75 dd=48.5% calmar=-0.22
+mean_reversion  1h SOLUSDT  n=  767 wr=43.5% pf=0.77 sharpe=-1.72 dd=68.4% calmar=-0.32
+           smc  5m BTCUSDT  n= 1916 wr=32.8% pf=0.54 sharpe=-8.84 dd=100.0% calmar=-0.90
+           smc  5m ETHUSDT  n= 2142 wr=33.0% pf=0.66 sharpe=-7.88 dd=100.0% calmar=-0.90
+           smc  5m SOLUSDT  n= 2752 wr=34.5% pf=0.63 sharpe=-7.64 dd=100.0% calmar=-0.90
+           smc 15m BTCUSDT  n= 2309 wr=33.3% pf=0.67 sharpe=-7.17 dd=100.0% calmar=-0.90
+           smc 15m ETHUSDT  n= 2930 wr=34.4% pf=0.70 sharpe=-6.19 dd=100.0% calmar=-0.90
+           smc 15m SOLUSDT  n= 4264 wr=35.1% pf=0.74 sharpe=-5.17 dd=100.0% calmar=-0.90
+           smc  1h BTCUSDT  n= 2408 wr=37.7% pf=0.71 sharpe=-2.15 dd=96.3% calmar=-0.58
+           smc  1h ETHUSDT  n= 2387 wr=38.0% pf=0.81 sharpe=-1.39 dd=89.8% calmar=-0.47
+           smc  1h SOLUSDT  n= 2415 wr=38.6% pf=0.91 sharpe=-1.02 dd=83.2% calmar=-0.39
+        hybrid  5m BTCUSDT  n=  520 wr=46.5% pf=0.33 sharpe=-4.22 dd=83.8% calmar=-0.43
+        hybrid  5m ETHUSDT  n=  598 wr=50.2% pf=0.42 sharpe=-3.94 dd=82.9% calmar=-0.43
+        hybrid  5m SOLUSDT  n=  480 wr=52.5% pf=0.61 sharpe=-2.21 dd=58.9% calmar=-0.33
+        hybrid 15m BTCUSDT  n=  213 wr=54.9% pf=0.58 sharpe=-1.54 dd=35.5% calmar=-0.24
+        hybrid 15m ETHUSDT  n=  216 wr=51.4% pf=0.59 sharpe=-1.63 dd=35.7% calmar=-0.27
+        hybrid 15m SOLUSDT  n=  230 wr=50.9% pf=0.65 sharpe=-1.42 dd=34.0% calmar=-0.27
+        hybrid  1h BTCUSDT  n=   63 wr=58.7% pf=1.01 sharpe=0.04 dd=8.9% calmar=0.01
+        hybrid  1h ETHUSDT  n=   64 wr=59.4% pf=0.87 sharpe=-0.20 dd=6.1% calmar=-0.11
+        hybrid  1h SOLUSDT  n=   65 wr=52.3% pf=0.82 sharpe=-0.36 dd=10.4% calmar=-0.14
+
+wrote /Users/Vladyslav_Borsh/Documents/trade_automation/research/intraday-mr-smc/results/summary_main.csv
