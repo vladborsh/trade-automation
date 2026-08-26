@@ -1,0 +1,14 @@
+=== §0 redundancy diagnostic — Spearman rho of each positioning percentile ===
+                       rho_vs_shadow  rho_vs_ret24h  rho_vs_same_bar_ret
+series     shadow                                                       
+crowd      ret24h_pct         -0.003          0.043               -0.008
+dOI_4h_pct ret4h_pct           0.123          0.088                0.038
+taker      vol_pct             0.003          0.022                0.104
+
+=== §6 engine accounting (breaker binding, skipped signals) ===
+                      raw_signals  trades_taken  skipped  skipped_pct  breaker_bar_pct  breaker_day_pct
+variant       window                                                                                   
+b1_crowd      fit            2087           897     1190        56.99             0.02             0.03
+b2_taker      fit            4565          2607     1958        42.87             0.41             1.14
+top_tercile   fit            3258          2465      793        24.21             0.04             0.13
+unconditioned fit            7329          4477     2852        38.86             0.14             0.53

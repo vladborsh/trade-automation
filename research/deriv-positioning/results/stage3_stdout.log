@@ -1,0 +1,15 @@
+=== (a) momentum_breakout, ΔOI conditioning — FIT window ===
+ trades  win_rate    net_pf  net_exp_R    net_pnl  median_cost_R  gross_exp_R  median_hold_h  long_share  stop_share  target_share  time_share     r_p05     r_p25     r_med     r_p75     r_p95        variant window  gross_pf  sym_gross_pf_gt1
+   4477    0.4418    1.0421     0.0202  8339.4875         0.0344       0.0603        18.0000      0.4961      0.3424        0.2654      0.3916   -1.0682   -1.0280   -0.2032    1.4018    1.4800  unconditioned    fit    1.1446                 8
+   2465    0.4333    1.0071     0.0070   816.2744         0.0356       0.0480        16.0000      0.5834      0.3704        0.2787      0.3497   -1.0697   -1.0298   -0.2449    1.4141    1.4791    top_tercile    fit    1.1093                 8
+   1839    0.4176    0.9294    -0.0315 -5465.1879         0.0328       0.0067        20.0000      0.3866      0.3437        0.2333      0.4231   -1.0665   -1.0276   -0.2533    0.9031    1.4781 bottom_tercile    fit    1.0159                 4
+
+§3 comparative bar (can-only-subtract): conditioned must beat unconditioned on BOTH net expectancy/trade AND total net PnL, n >= 300
+  net_exp_R  +0.0070 vs +0.0202  -> FAIL
+  net_pnl    +816.3 vs +8339.5  -> FAIL
+  trades     2465 (floor 300) -> PASS
+
+=== (b) standalone events — FIT window ===
+ trades  win_rate    net_pf  net_exp_R     net_pnl  median_cost_R  gross_exp_R  median_hold_h  long_share  stop_share  target_share  time_share     r_p05     r_p25     r_med     r_p75     r_p95  variant window  gross_pf  sym_gross_pf_gt1
+    897    0.3991    0.8893    -0.0569  -4765.2093         0.0264      -0.0251        48.0000      0.4203      0.4114        0.0613      0.5262   -1.0629   -1.0266   -0.3157    0.5242    2.9298 b1_crowd    fit    0.9466                 3
+   2607    0.3418    0.8884    -0.0642 -15724.5241         0.0480      -0.0051        22.0000      0.5359      0.5658        0.1377      0.2961   -1.1233   -1.0589   -1.0254    0.6254    2.9484 b2_taker    fit    0.9914                 4

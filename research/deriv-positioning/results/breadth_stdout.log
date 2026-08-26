@@ -1,0 +1,53 @@
+=== per-symbol breadth, fit window (diff_bps = top-minus-bottom for (a), pooled mean for (b)) ===
+
+-- a_dOI_4h
+horizon         3         6         12        24        36        48
+symbol                                                              
+BTCUSDT       -2.9       1.0      32.3      12.7      70.7      51.6
+ETHUSDT       -7.8      18.3      27.4      -4.7      -0.5     -36.8
+SOLUSDT       21.3      11.3      57.8     165.9     183.4     110.6
+BNBUSDT        4.6       2.3     -29.7       7.8       6.9     -11.8
+XRPUSDT       38.9      61.6      69.0     135.1     136.4     166.3
+DOGEUSDT       3.4      14.7      30.1      19.1      67.0     -42.3
+ADAUSDT       -7.0     -23.6      -9.5      34.4     107.6     -26.4
+LINKUSDT      -5.1       0.9      16.0       4.4     121.6     -44.5
+  symbols with positive sign per horizon: 3:4/8, 6:7/8, 12:6/8, 24:7/8, 36:7/8, 48:3/8
+
+-- a_shadow_ret4h
+horizon         3         6         12        24        36        48
+symbol                                                              
+BTCUSDT        2.5       9.2      26.6      45.4      64.2     103.3
+ETHUSDT        1.8       4.7      -8.6      30.1       0.4       9.3
+SOLUSDT       35.7      55.8      86.9     108.8     130.6     177.8
+BNBUSDT        5.6      16.6      23.7      36.2      38.3      58.1
+XRPUSDT       33.0      48.2      47.5     149.0     100.1     142.3
+DOGEUSDT      14.9       2.4      52.0      48.3      94.1      37.7
+ADAUSDT       18.3      38.2      50.1     123.0     146.3     107.2
+LINKUSDT      -3.1      24.5      46.6      91.8      62.8     121.3
+  symbols with positive sign per horizon: 3:7/8, 6:8/8, 12:7/8, 24:8/8, 36:8/8, 48:8/8
+
+-- b1_crowd
+horizon         3         6         12        24        36        48
+symbol                                                              
+BTCUSDT        1.0       9.2      10.8       6.9      25.8      15.1
+ETHUSDT       12.0       6.9      -0.5     -13.6      23.0      74.7
+SOLUSDT      -23.3     -34.9     -19.0     -22.3     -53.7     -45.4
+BNBUSDT        0.4      13.4      12.3       4.4      -9.8      24.0
+XRPUSDT      -16.8     -33.9     -46.5     -81.6    -146.3    -138.9
+DOGEUSDT      -1.3     -25.3     -60.0     -94.4    -100.3    -102.7
+ADAUSDT       -8.5     -29.6     -25.0     -98.1     -92.0    -130.8
+LINKUSDT     -27.9     -49.1     -94.1    -156.9    -139.7    -119.9
+  symbols with positive sign per horizon: 3:3/8, 6:3/8, 12:2/8, 24:2/8, 36:2/8, 48:3/8
+
+-- b2_taker
+horizon         3         6         12        24        36        48
+symbol                                                              
+BTCUSDT      -12.1     -15.3     -22.0     -20.4     -14.5     -24.7
+ETHUSDT       -3.1      -9.8     -11.4     -16.3     -18.5     -25.8
+SOLUSDT       -7.1      -7.3     -28.9     -50.8     -61.0     -79.8
+BNBUSDT        1.5       3.8       3.1     -17.0      -6.1       1.6
+XRPUSDT       -8.4       7.5       8.4       6.0       1.9      17.1
+DOGEUSDT     -16.8     -18.6      -9.8     -24.6     -12.6      -0.2
+ADAUSDT      -11.4      -5.0     -30.1     -32.9     -18.5      -1.6
+LINKUSDT      -3.7     -14.0     -15.7       1.0      -2.0      -4.7
+  symbols with positive sign per horizon: 3:1/8, 6:2/8, 12:2/8, 24:2/8, 36:1/8, 48:2/8
