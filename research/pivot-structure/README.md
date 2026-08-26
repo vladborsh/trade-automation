@@ -1,0 +1,29 @@
+# research/pivot-structure — two-tier pivot structure (major/minor CHoCH)
+
+Execution of `DESIGN.md`, the Architect's pre-committed research protocol for
+replacing the retired `indicators.structure()` SMC engine with a two-tier
+pivot engine (major pivots at `K` initialise the bias and supply the target
+reference; a minor CHoCH at `k` **is** the bias flip).
+
+**Read `REPORT.md` for the findings.** Headline: **all 48 pre-registered cells**
+— flip and retest event classes × 12 (K, k) combos × Mode S and Mode M — **fail
+stage 1** of `DESIGN.md` §6 on the fit window, and the primary config
+(K=15, k=4, Mode S) is significantly *negative* (t = −4.73 at 24 h). The kill
+rule fires: the engine is retired, phase 2 (FVG zones) does not run, and **the
+holdout window was never read**.
+
+The one anomaly — control arm C1 coming out positive — is dissected in
+`REPORT.md` §5 and attributed to the bare major-swing break, i.e. to
+`momentum_breakout` rediscovered, not to the two-tier machinery.
+
+Imports v1 (`../intraday-mr-smc`: `indicators.py`, `strategies.py`,
+`backtest.py`), v2 (`strategies_v2.py`) and the MTF package unchanged; nothing
+in any of them is modified. In particular `indicators.structure()` is never
+called here — the new primitive lives in `pivot.py`, and the one mandated engine
+change (the opposite-flip exit) lives in `engine.py` as a copy of
+`backtest.run`, not as an edit to it.
+
+**Data** is the existing 5m pull in `../intraday-mtf-smc/data/` (gitignored);
+regenerate with that package's `fetch_mtf.py` if absent. 1h bars are derived by
+resampling. `results/` is committed; see `REPORT.md` §9 for the run order and a
+file-by-file map.
