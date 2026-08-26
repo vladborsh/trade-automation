@@ -9,9 +9,16 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## VWAP mean-reversion, US index futures (ES/NQ/YM)
 
-**Status:** dispatched to Architect for routing (user requested launch,
-2026-08-26) — explicitly confirmed to include Nasdaq (NQ, Nasdaq-100 futures)
-as one of the three instruments.
+**Status:** design fixed (Architect's `research/vwap-mr-indices/ARCHITECT-NOTE.md`,
+branch `architect-mr-smc-review`, commit `9ea71d4`), explicitly confirmed to
+include Nasdaq (NQ, Nasdaq-100 futures) as one of the three instruments. **Paid
+data-vendor backtest (Stage 0/1/2 in the architect's note) is deliberately
+paused** — user does not want to spend on Databento/CME DataMine/broker-API
+data yet. Instead: Researcher should produce a **Pine Script implementation**
+of the fixed design (RTH-anchored session VWAP, VWAP±k·σ bands trigger,
+revert-to-VWAP target, session-end flat) for the user to hand-test on
+TradingView and report back with results. No Python backtest, no credentials,
+no spend until the user decides otherwise based on that manual test.
 
 **Idea:** Intraday mean-reversion off session VWAP (not a rolling mean/z-score
 like the crypto MR candidate) on CME index futures — ES (S&P 500), NQ (Nasdaq
