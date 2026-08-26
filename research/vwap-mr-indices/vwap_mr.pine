@@ -1,0 +1,220 @@
+//@version=6
+// VWAP mean-reversion, RTH-anchored — ES / NQ / YM hand-test vehicle.
+//
+// Encodes the fixed design in research/vwap-mr-indices/ARCHITECT-NOTE.md §3, as
+// routed by ROUTING-ADDENDUM-PINE.md. This is a hand-test instrument, not a
+// production strategy. Read RUNBOOK.md before running it: results are only
+// interpretable with the chart settings pinned there.
+//
+// Frozen by design (NOT inputs — these are pre-registered, and exposing them as
+// inputs invites the knob-turning the addendum forbids):
+//   session 09:30-16:00 America/New_York, entry cutoff 15:30, flat 15:55,
+//   1% risk per trade, 2% session circuit breaker, stop at the stretch extreme.
+// The ONLY input is k, with the one pre-registered sensitivity set {1.5,2.0,2.5}.
+
+strategy(
+     title                 = "VWAP MR — RTH session (ES/NQ/YM)",
+     shorttitle            = "VWAP-MR",
+     overlay               = true,
+     initial_capital       = 100000,
+     currency              = currency.USD,
+     pyramiding            = 0,
+     calc_on_every_tick    = false,
+     calc_on_order_fills   = false,
+     process_orders_on_close = false,
+     commission_type       = strategy.commission.cash_per_contract,
+     commission_value      = 1.40,
+     slippage              = 1,
+     margin_long           = 0,
+     margin_short          = 0)
+// commission_value / slippage are declaration DEFAULTS only. Pine requires a
+// const here, so per-symbol costs are set in the chart's Settings -> Properties
+// tab (Commission, Slippage) — RUNBOOK.md gives the values and requires them to
+// be recorded with each result cell. Defaults of zero flatter everything, hence
+// the non-zero defaults above.
+
+// ---------------------------------------------------------------- inputs -----
+float k = input.float(2.0, "Band width k (sigma)", options = [1.5, 2.0, 2.5],
+     tooltip = "Pre-registered sensitivity set only. Run 1.5 / 2.0 / 2.5 per symbol and report all nine cells. No other knob-turning.")
+
+// ------------------------------------------------------------- constants -----
+string SESS      = "0930-1600"
+string TZ        = "America/New_York"
+int    CUTOFF_M  = 15 * 60 + 30   // no new entries once a bar closes at/after 15:30 ET
+int    FLAT_M    = 15 * 60 + 55   // unconditional flat at 15:55 ET
+float  RISK_FRAC = 0.01           // 1% of equity per trade
+float  BREAKER   = -0.02          // -2% of session-start equity blocks new entries
+
+// --------------------------------------------------------- session state -----
+// Timezone is given by name, never as a UTC offset, so DST is handled by the
+// exchange calendar rather than by us.
+bool inSession = not na(time(timeframe.period, SESS, TZ))
+
+var bool wasInSession = false
+var int  lastSessionDay = na
+int  dayNY = dayofmonth(time, TZ)
+// New session = first RTH bar after a non-RTH bar, or a new ET calendar date
+// (the second clause covers RTH-only data feeds where no non-RTH bar exists).
+bool newSession = inSession and (not wasInSession or na(lastSessionDay) or dayNY != lastSessionDay)
+if newSession
+    lastSessionDay := dayNY
+
+// Minute-of-day of the bar's CLOSE, in exchange time. Using the close (not the
+// open) keeps the 15:30 / 15:55 rules timeframe-agnostic: an order placed at a
+// bar's close fills at the next bar's open, which is this timestamp.
+int  closeMin = hour(time_close, TZ) * 60 + minute(time_close, TZ)
+bool pastEntryCutoff = closeMin >= CUTOFF_M
+bool flatNow = inSession and closeMin >= FLAT_M
+
+// -------------------------------------------------- session VWAP + sigma -----
+// ta.vwap is NOT used: on TradingView the CME symbols carry a near-24h Globex
+// tape, and ta.vwap's anchor would silently fold overnight volume into the
+// mean. The claimed mechanism (VWAP-benchmarked institutional execution) is an
+// RTH phenomenon, so the accumulator below runs over RTH bars only.
+var float cumPV  = 0.0   // sum(hlc3 * volume)
+var float cumV   = 0.0   // sum(volume)
+var float cumPPV = 0.0   // sum(hlc3^2 * volume)
+
+if newSession
+    cumPV  := 0.0
+    cumV   := 0.0
+    cumPPV := 0.0
+
+float src = hlc3
+if inSession
+    float v = nz(volume, 0.0)
+    cumPV  := cumPV  + src * v
+    cumV   := cumV   + v
+    cumPPV := cumPPV + src * src * v
+
+float vwap = cumV > 0 ? cumPV / cumV : na
+// Volume-weighted variance in cumulative sum-of-squares form. Floored at 0:
+// catastrophic cancellation in this form can produce a small negative value.
+float vwVar = cumV > 0 ? math.max(cumPPV / cumV - vwap * vwap, 0.0) : na
+float sigma = math.sqrt(vwVar)
+
+float upper = vwap + k * sigma
+float lower = vwap - k * sigma
+bool  bandsReady = inSession and not na(upper) and not na(lower) and sigma > 0
+
+// ----------------------------------------------------- stretch tracking ------
+// A "stretch" opens when a bar trades beyond the band and stays open across
+// subsequent bars that still close outside it; its extreme is the extreme of
+// the whole excursion, which is where the stop goes.
+var bool  upStretch   = false
+var float upExtreme   = na
+var bool  dnStretch   = false
+var float dnExtreme   = na
+
+if newSession
+    upStretch := false
+    upExtreme := na
+    dnStretch := false
+    dnExtreme := na
+
+if bandsReady
+    if high > upper
+        upStretch := true
+        upExtreme := na(upExtreme) ? high : math.max(upExtreme, high)
+    if low < lower
+        dnStretch := true
+        dnExtreme := na(dnExtreme) ? low : math.min(dnExtreme, low)
+
+// Trigger: an open stretch, and this bar closes back inside the band.
+bool shortTrigger = bandsReady and upStretch and close < upper
+bool longTrigger  = bandsReady and dnStretch and close > lower
+
+// ---------------------------------------------------- circuit breaker --------
+// strategy.equity already includes open position PnL, so this is realized +
+// open against the session's starting equity.
+var float sessionStartEquity = na
+var bool  breakerTripped = false
+if newSession
+    sessionStartEquity := strategy.equity
+    breakerTripped := false
+if not na(sessionStartEquity) and sessionStartEquity > 0
+    if (strategy.equity - sessionStartEquity) / sessionStartEquity <= BREAKER
+        breakerTripped := true
+
+// ----------------------------------------------------------- execution -------
+var float activeStop = na
+
+bool flat     = strategy.position_size == 0
+bool canEnter = barstate.isconfirmed and inSession and not pastEntryCutoff and not flatNow and not breakerTripped and flat
+
+// Sizing uses the signal bar's close as a proxy for the unknown next-bar-open
+// fill; the stop is a fixed price level, so the realised risk drifts by the
+// entry gap. floor() with no minimum: if 1% of equity cannot pay for one
+// contract at this stop distance, the trade is skipped, never forced to 1.
+qtyFor(float stopPrice, float refPrice) =>
+    float dist = math.abs(refPrice - stopPrice)
+    float perContract = dist * syminfo.pointvalue
+    int q = perContract > 0 ? int(math.floor(RISK_FRAC * strategy.equity / perContract)) : 0
+    q
+
+if canEnter and longTrigger and not na(dnExtreme)
+    float stopPrice = dnExtreme - syminfo.mintick   // beyond the stretch extreme
+    int   q = qtyFor(stopPrice, close)
+    if q > 0
+        activeStop := stopPrice
+        strategy.entry("L", strategy.long, qty = q, comment = "MR long")
+        strategy.exit("X-L", from_entry = "L", stop = stopPrice, limit = vwap)
+    dnStretch := false
+    dnExtreme := na
+    upStretch := false
+    upExtreme := na
+
+if canEnter and shortTrigger and not na(upExtreme)
+    float stopPrice = upExtreme + syminfo.mintick
+    int   q = qtyFor(stopPrice, close)
+    if q > 0
+        activeStop := stopPrice
+        strategy.entry("S", strategy.short, qty = q, comment = "MR short")
+        strategy.exit("X-S", from_entry = "S", stop = stopPrice, limit = vwap)
+    upStretch := false
+    upExtreme := na
+    dnStretch := false
+    dnExtreme := na
+
+// Consume a stretch that resolved while entries were blocked, so a stale
+// excursion cannot fire hours later.
+if not canEnter and bandsReady
+    if shortTrigger
+        upStretch := false
+        upExtreme := na
+    if longTrigger
+        dnStretch := false
+        dnExtreme := na
+
+// Target is the CURRENT session VWAP, re-issued every bar. It is a moving
+// target by design — that is the hypothesis under test — so the limit price
+// walks with the anchor rather than being fixed at entry.
+if not flatNow and not na(activeStop)
+    if strategy.position_size > 0
+        strategy.exit("X-L", from_entry = "L", stop = activeStop, limit = vwap)
+    else if strategy.position_size < 0
+        strategy.exit("X-S", from_entry = "S", stop = activeStop, limit = vwap)
+
+// Unconditional session-end flat. No overnight holds.
+if flatNow
+    strategy.cancel_all()
+    if strategy.position_size != 0
+        strategy.close_all(comment = "15:55 flat")
+
+// Safety net: if a session ended without the 15:55 rule firing (half-day close,
+// data gap, coarse timeframe), flatten on the first non-RTH bar.
+if not inSession
+    strategy.cancel_all()
+    if strategy.position_size != 0
+        strategy.close_all(comment = "session-end flat (fallback)")
+    activeStop := na
+
+// ---------------------------------------------------------------- plots ------
+plot(inSession ? vwap  : na, "Session VWAP", color.new(color.orange, 0), 2)
+plot(inSession ? upper : na, "VWAP + k*sigma", color.new(color.teal, 0))
+plot(inSession ? lower : na, "VWAP - k*sigma", color.new(color.teal, 0))
+bgcolor(breakerTripped ? color.new(color.red, 90) : na, title = "Circuit breaker active")
+
+// Must be the last statement: holds the previous bar's session state for the
+// newSession test above.
+wasInSession := inSession
