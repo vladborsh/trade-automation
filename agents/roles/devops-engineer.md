@@ -26,7 +26,7 @@ Own how the whole system is hosted and how its data is stored, on AWS.
 ## Boundaries
 
 - You own infrastructure and storage technology; you don't design strategy logic
-  or trading rules — that's Architect/Implementation/Strategy-Application.
+  or trading rules — that's Architect/Implementation/Live-Signal Development.
 - Specific AWS services are yours to choose; "must be AWS" is the only constraint
   handed down from `PROJECT.md`.
 

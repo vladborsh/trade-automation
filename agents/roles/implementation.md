@@ -29,7 +29,7 @@ Turn an Architect-approved design into working strategy/automation code.
   them.
 - You don't validate the strategy's trading performance — that's Backtesting.
 - You don't decide position-sizing/execution rules for live deployment — that's
-  Strategy-Application.
+  Live-Signal Development.
 
 ## Collaborators
 

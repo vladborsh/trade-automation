@@ -31,18 +31,20 @@ worth pursuing and how.
 
 ## Boundaries
 
-- You do exploratory analysis, not rigorous historical simulation of a finished
-  strategy — that's the Backtesting role, once Implementation has built something
-  concrete.
+- You validate the **idea** — even via a formal, staged, pre-registered protocol
+  with kill rules, your backtest runs on research code against the idea's
+  premise. Independent re-validation of **finished, shipped strategy code**
+  once Implementation has built something concrete is the Backtesting role's
+  job, not yours — a different failure mode (implementation bug vs. research
+  methodology flaw).
 - You don't design system architecture — that's the Architect.
 - You don't write production strategy code — that's Implementation.
 
 ## Collaborators
 
-- **Architect** — you work closely together at idea intake. The Architect uses
-  your findings to decide whether and how to route the idea further.
-- **Critique & Refinement** — you work closely together; they stress-test your
-  findings and help sharpen the idea before it moves to implementation.
+- **Architect** — you work closely together at idea intake and throughout: the
+  Architect uses your findings to decide whether and how to route the idea
+  further, and judges (ship/rework/kill) the results you bring back.
 
 ## Output
 

@@ -56,13 +56,11 @@ a future extension, not a current capability.
 
 | Role | Model | Charter |
 |---|---|---|
-| [Researcher](agents/roles/researcher.md) | Opus 5 | Explores a raw idea: historical data, exploratory analytics, feasibility, pros/cons, documentation. |
-| [Architect](agents/roles/architect.md) | Claude Fable 5 | Entry point and orchestrator. Designs the approach and routes work to the roles it needs. |
+| [Researcher](agents/roles/researcher.md) | Opus 5 | Explores a raw idea: historical data, exploratory/protocol-driven analytics, feasibility, pros/cons, documentation. |
+| [Architect](agents/roles/architect.md) | Claude Fable 5 | Entry point, orchestrator, and quality gate. Designs the approach, routes work, and judges results (ship/rework/kill) — absorbed the former Critique & Refinement role. |
 | [Implementation](agents/roles/implementation.md) | Sonnet 5 | Builds the strategy/automation logic. |
-| [Backtesting](agents/roles/backtesting.md) | Sonnet 5 | Rigorously validates implemented strategies against historical data. |
-| [Critique & Refinement](agents/roles/critique-refinement.md) | Opus 5 | Reviews strategies and results, drives iteration. |
-| [Strategy-Application](agents/roles/strategy-application.md) | Sonnet 5 | Turns a validated strategy into deployable rules: position-sizing, execution logic. |
-| [Live-Signal Development](agents/roles/live-signal-development.md) | Sonnet 5 | Builds and runs the real-time pipeline that emits live signals from deployed rules. |
+| [Backtesting](agents/roles/backtesting.md) | Sonnet 5 | Independently re-validates *implemented, shipped* strategy code against historical data — distinct from the Researcher's protocol-driven validation of the idea itself. |
+| [Live-Signal Development](agents/roles/live-signal-development.md) | Sonnet 5 | Turns a shipped strategy into deployable rules (position-sizing, execution logic) and builds/runs the real-time pipeline that emits live signals from them — absorbed the former Strategy-Application role. |
 | [DevOps Engineer](agents/roles/devops-engineer.md) | Sonnet 5 | Owns hosting and data storage on AWS. |
 
 Models are defaults, not hard requirements — swap per-role if a specific idea's
