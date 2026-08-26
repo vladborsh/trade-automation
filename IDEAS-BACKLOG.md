@@ -178,3 +178,218 @@ wins), so a WR>50% floor would be an even worse fit here than it was for MR/SMC.
 - Reuse existing 48-month BTC/ETH/SOL data already fetched
   (`research/intraday-mr-smc/data/`, or whatever Researcher-v2/momentum-probe
   extends it to) rather than re-pulling.
+
+---
+
+## Funding-rate signals: carry and funding-extreme continuation (crypto perps)
+
+**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+
+**Idea:** Use the perp **funding rate itself as the signal input**, not just as
+an unmodelled cost. Two distinct sub-hypotheses, probed separately:
+(a) **funding carry** — when funding is persistently extreme (e.g. top-decile
+positive over the last N settlements), hold the paying side short (collect
+funding) with a price-based stop; (b) **funding-extreme continuation** — the
+Architect's own diagnosis (`intraday-mr-smc/ARCHITECT-NOTE.md` §2.1) says
+funding pressure makes price stretches *self-reinforcing*; extreme funding plus
+price pushing in the crowded direction should then predict continuation of the
+squeeze against the crowd once price turns (long-squeeze / short-squeeze
+mechanics).
+
+**Why this is genuinely new here:** every candidate so far consumed only OHLCV.
+This is the first idea whose input is the venue's own positioning mechanism —
+the very mechanism the project's one confirmed diagnosis is built on. It
+*monetizes* the diagnosis instead of merely avoiding its failure mode.
+
+**Data:** Binance USD-M `fundingRate` history lives in the same free
+`data.binance.vision` bulk-archive family as the klines already used (flagged in
+ARCHITECT-NOTE.md §6 as a required future input anyway). No credentials.
+Researcher verifies per-symbol coverage across the 2022-08 → 2026-07 window
+before designing anything.
+
+**Open questions:** funding-extreme definition (absolute threshold vs rolling
+percentile — percentile preferred, thresholds are regime-dependent); holding
+horizon vs the 8h settlement cycle; whether carry P&L survives the price risk
+taken to collect it (that is the whole question); interaction with the momentum
+findings — funding may just proxy the same continuation effect already measured,
+so a pre-registered "does it add anything beyond momentum_breakout" comparison
+belongs in the protocol from day one.
+
+---
+
+## Cross-sectional relative momentum, dollar-neutral, 8-perp universe
+
+**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+
+**Idea:** Rank the existing 8-perp universe by trailing return (e.g. 12–48h),
+go **long the top 2 / short the bottom 2**, dollar-neutral, rebalance on a fixed
+intraday cadence. Every candidate so far has been **time-series per-asset**;
+this is the first **cross-sectional** hypothesis — it bets on *relative*
+continuation (leaders keep leading) rather than absolute direction.
+
+**Why this is plausible given what's been found:** (1) time-series continuation
+is the one signed-positive effect in three packages, and cross-sectional
+momentum is its standard, extensively documented sibling; (2) it directly
+attacks two standing structural criticisms — the drift exposure that poisoned
+symmetric long/short rule-sets (pivot pass §4.4: shorts pay the 2022–25 drift)
+and the "8 correlated perps are not 8 bets" portfolio problem (v2 §5.3) —
+because a dollar-neutral basket nets out both the drift and the common market
+factor by construction.
+
+**Data:** already on disk (`research/intraday-mtf-smc/` 5m pull, 8 symbols).
+No new pull.
+
+**Open questions:** this doesn't fit the per-asset engine — it needs a small
+portfolio-level harness (one account, N legs, netted risk), which is new
+engine work the design must scope honestly; how the 1%/trade risk rule maps to
+a basket (per-leg vs per-basket risk — Architect decision); rebalance cadence
+vs fee drag (8 legs × frequent rebalance can eat the edge the way 5m churn did
+— the cost-floor rule applies to basket turnover); whether 8 symbols is enough
+cross-section for ranking to mean anything (it is thin — say so up front and
+judge accordingly).
+
+---
+
+## Opening-range breakout (ORB), US index products — session-anchored momentum
+
+**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+
+**Idea:** Classic session-structure momentum on equity index products (ES/NQ
+futures, or SPY/QQQ): define the opening range as the first 15–30 minutes after
+the 9:30 ET cash open; trade a breakout beyond that range in the breakout
+direction; stop at the opposite side of the range; session-end flat. The
+mechanism is the **session auction** — an anchor point (the open) that crypto's
+24/7 tape structurally lacks — which is why this is not a re-skin of any crypto
+candidate: none of the crypto work had a session anchor at all, and the one
+session-shaped thing tried (time-of-day filters) failed precisely because it
+*imposed* clock structure on an anchor-less market. Here the market itself
+provides the anchor.
+
+**Why plausible:** it is continuation-shaped (the only positive family so far);
+ORB is one of the most-documented intraday equity effects; and the v2 index
+thread already found the momentum family positive-leaning on S&P products
+(SPY 1.17–1.18) with everything reversion-shaped negative — consistent sign.
+
+**Data / route:** intraday RTH bars finer than 1h are the constraint (Yahoo's
+free 1h feed won't carve a 15-minute opening range; 15m history there is
+~60 days). Two no-spend routes, Architect to pick at dispatch: (a) **Pine
+Script for manual TradingView testing** — the exact route just built for
+VWAP-MR (`research/vwap-mr-indices/`), reusing its RTH/session plumbing; (b)
+free-source hunt for ≥2 years of 5m/15m RTH bars with the stooq/Yahoo caveats
+already learned. Do not spend on data without the user's explicit go-ahead.
+
+**Open questions:** range width (fixed minutes vs volatility-scaled); breakout
+confirmation (touch vs close-beyond — the pivot pass showed close-beyond is
+the honest reading); one-trade-per-day vs re-entry; NQ vs ES first (v2 found
+S&P-side positive, Nasdaq-side flat — test both, expect divergence); overlap
+with the paused VWAP-MR item (same instruments, opposite mechanism — running
+both against the same tape is a feature, not a conflict: they cannot both be
+right on the same days, which is a useful mutual control).
+
+---
+
+## Scheduled-macro-event reaction, BTC/ETH — first entry into the news pillar
+
+**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+
+**Idea:** Trade the **first directional reaction after scheduled US macro
+releases** (CPI, FOMC statement/press conference, NFP) on BTC/ETH perps: at a
+known timestamp, measure the first N-minute move (e.g. 5–15 min), enter in its
+direction, structural stop at the pre-release price, time-boxed exit (1–4h).
+Hypothesis: scheduled releases inject genuine information; the initial repricing
+under-shoots and continues (event-momentum), and on perps the continuation is
+amplified by the same liquidation mechanics already diagnosed.
+
+**Why this is genuinely new here:** `PROJECT.md` names news-driven strategies
+as a core pillar and **nothing in six log entries has touched it**. This is the
+cheapest possible entry into that pillar: scheduled events need a calendar, not
+NLP — the "news analysis" is one timestamp column. It also isolates exactly the
+hours where the time-of-day study's *negative* result doesn't apply: that study
+showed uniform clock-hours carry no signal, but event hours are not uniform
+clock-hours, and nothing tested conditioned on them.
+
+**Data:** kline data already on disk (5m, 8 perps). Release calendar:
+historical CPI/FOMC/NFP timestamps are public and small (BLS/Fed schedules) —
+Researcher assembles a dated event table as part of the pass, no vendor needed.
+
+**Open questions:** sample size is the honest worry — ~12 CPI + ~8 FOMC + ~12
+NFP per year × 4 years ≈ 120–130 events; a per-event-type split will be
+underpowered, so pre-commit pooling rules and a minimum-event floor before
+looking; reaction-window and holding-period grid must be tiny (this is exactly
+the setting where 144-config sweeps manufacture fit); the 2%-day breaker
+interacts with event days by design — report it; extension to crypto-native
+scheduled events (ETF flows, unlock schedules) is a later idea, not this one.
+
+---
+
+## Derivatives-positioning data: OI and taker-flow imbalance (crypto perps)
+
+**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+
+**Idea:** Binance's same free bulk archive exposes a **futures `metrics`
+dataset** — open interest, top-trader long/short ratios, taker buy/sell volume
+ratio — at 5m granularity. Use these as a *positioning/order-flow* input layer,
+with two concrete probe-able hypotheses: (a) **OI-confirmed continuation** — a
+price move on *rising* OI is new positioning (continuation-favorable), the same
+move on *falling* OI is covering (fade-favorable); probe whether OI-rising
+breakouts outperform OI-falling ones; (b) **crowding reversal** — extreme
+long/short-ratio + an adverse price push predicts squeeze acceleration
+(complements the funding idea; same mechanism, different sensor).
+
+**Why this is genuinely new here:** second non-OHLCV input class, and the most
+direct measurement available of the liquidation-fuel mechanism the whole
+crypto diagnosis rests on. Funding is the *price* of crowding; OI and taker
+flow are its *quantity* — the pair covers the mechanism from both sides.
+
+**Data:** `data.binance.vision` futures `metrics` files, no credentials.
+Coverage typically starts ~2021-12 — Researcher must verify per-symbol
+completeness over the study window first, and treat gaps honestly (this
+dataset is known to have holes; a gap-handling rule belongs in the protocol,
+not in post-hoc cleaning).
+
+**Open questions:** (a) is best framed as a *conditioning study on
+momentum_breakout* (does OI-rising select the good half of its trades?) — that
+makes it a filter, so the can-only-subtract rule applies and the pre-registered
+question must be "does the conditioned subset beat the unconditioned strategy
+net of the trades it gives up", with the v2 permutation-null discipline; (b) is
+standalone-entry-shaped and gets the full staged probe; both must show they add
+anything beyond price-derived signals (a positioning signal that is just
+yesterday's return in disguise is not a second signal).
+
+---
+
+## Spot–perp basis and spot-lead signals (Binance spot vs USD-M perp)
+
+**Status:** logged (Architect idea-generation pass, 2026-08-26), not dispatched.
+
+**Idea:** Pull Binance **spot** klines (same free bulk archive, same symbols)
+alongside the existing perp data and trade the **relationship between the two
+prices of the same asset**: (a) **basis-extreme convergence** — when the
+perp-spot basis stretches beyond its rolling distribution, trade the perp
+toward convergence (the anchor is the spot print, not a rolling mean of the
+perp itself); (b) **spot-lead confirmation** — probe whether moves led by spot
+(spot moves first / on dominant volume) continue more reliably than
+perp-led moves (hypothesis: spot flow is closer to informed/organic demand,
+perp flow closer to leverage churn).
+
+**Why this is genuinely new here:** first *relative-value* hypothesis — every
+prior candidate priced one instrument against its own history. It also gives
+the reversion family its only principled second chance: crypto MR failed
+because a rolling mean of the perp's own price is not an anchor (the
+Architect's §2.1 diagnosis), but spot *is* a real anchor — the arbitrage
+relation is mechanical, enforced by actual capital. If basis-MR fails too, the
+reversion story on this venue is closed with a much stronger argument.
+
+**Data:** Binance spot monthly klines, `data.binance.vision`, no credentials;
+5m/1h for the 8 symbols' spot pairs. Note: basis measured off 5m closes of two
+separate feeds is noisy — the design must set a minimum basis threshold well
+above tick noise and state clock-alignment assumptions explicitly.
+
+**Open questions:** basis definition (raw difference vs funding-adjusted —
+funding-adjusted is the economically honest one, which couples this to the
+funding-data pull above; do both pulls in one pass); whether basis extremes at
+retail-visible size occur often enough to trade (frequency floor first, before
+any backtest); execution realism — basis trades in size are the domain of
+HFT/market-makers, so the pre-registered question is whether anything survives
+at taker fees on the *perp leg only* (this project trades the perp leg
+directionally, not the two-legged arb).
