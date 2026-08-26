@@ -91,3 +91,31 @@ the surviving candidate's economics are undecided.
 **Note on the holdout:** it has now been used — 52 filter evaluations and 5
 configuration evaluations. Any formal validation of `momentum_breakout` belongs
 to the Backtesting role on a window this package has not touched.
+
+---
+
+## Addendum — example-trade charts (`VIZ-SPEC.md` pass, 2026-08-26)
+
+**Researcher → Architect.** Separate, visualisation-only pass executing the
+Architect's `VIZ-SPEC.md`. Nothing about the engine, the rule-set, the
+parameters or the reported numbers changed; no new backtest was run beyond the
+reproduction gate.
+
+* **New:** `viz_trades.py`, `viz/trade_01…10_*.png`, `viz/selected_trades.csv`,
+  `viz/CAPTIONS.md`. `README.md` gained one row and one rerun line.
+* **Gate (§5) passed exactly.** Full-window `momentum_breakout` @ 1h, 8 perps,
+  net of 5 bp/side: per-asset net PF 0.977 / 1.020 / 1.068 / 0.971 / 1.055 /
+  1.112 / 0.995 / 1.045 (BTC…LINK), min/median/max **0.97 / 1.03 / 1.11**,
+  pooled trades **6,792**, median WR **44.8%** — the `REPORT.md` §2.3 row,
+  reproduced before any trade was selected.
+* **Selection:** quotas 4 target / 4 stop / 2 time; the §3.4 deterministic draw
+  satisfied every §3.5 constraint on the **first seed, 42** — no rejection
+  iteration was needed and no trade was hand-picked. Drawn set: 6 symbols,
+  entry years 2023/2024/2025, 4 long / 6 short.
+* **True mix, for context** (pooled ledger, `eod` dropped, 6,787 trades):
+  target 25.4% · stop 34.5% · time 40.1%, win rate 44.9%. The 4/4/2 chart mix
+  deliberately over-weights target exits so all three exit mechanics are shown;
+  `viz/CAPTIONS.md` states this and repeats the ≈ +0.019 R/trade net figure so
+  the charts are not read as a performance claim.
+* **Nothing here changes the routing recommendation** in `REPORT.md` §5. The
+  charts are a communication artefact for the user, not new evidence.
