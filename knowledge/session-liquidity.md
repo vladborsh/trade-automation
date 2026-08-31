@@ -17,8 +17,15 @@ file updated whenever a definition changes during implementation.
   delay, and from-confirmation geometry numbers. Take-out frequency and the
   window-length findings survive (they're upstream of confirmation).
   `RESEARCH-LOG.md` Записи 10–12.
-- **v3 iFVG mechanic** (§5.1) — corrected, not yet re-run. This is the
-  authoritative iFVG spec; anything computed under v2's algorithm is stale.
+- **v3 iFVG mechanic** (§5.1) — corrected. v3's own invalidation clause
+  (a "give up if price closes beyond the take-out bar's extreme" rule, and
+  the resulting A/B/C invalidation-semantics question) turned out to be a
+  **fabricated requirement that was never part of the idea** — invented
+  during grilling, not requested by the user, and confirmed wrong against a
+  worked diagram (2026-08-31, see §5.1's note). **v4 drops invalidation
+  entirely**; this is the authoritative iFVG spec. Anything computed under v2
+  or v3's algorithms (confirmation rate, delay, from-confirmation geometry,
+  the A/B/C variants) is stale and must be re-run under v4.
 - **BoS** — never correctly measured (phase-1 mechanic was defective, v2
   excluded it entirely). Own later pass, not yet designed. See
   `research/session-liquidity/corrections/BOS-CORRECTION-NOTE.md`.
@@ -96,7 +103,17 @@ A sweep = a level (§3) is taken out (a wick beyond it is sufficient —
 close-through not required) and price then reverses, confirmed by a
 detection method.
 
-### 5.1 iFVG (inverted Fair Value Gap) — v3, corrected
+### 5.1 iFVG (inverted Fair Value Gap) — v4, corrected
+
+**The sweep, defined simply (this is the actual idea — everything below is
+just the mechanics of detecting it):** price crosses a horizontal liquidity
+boundary (a level from §3 — session high/low, or PDH/PDL) at any point, and
+later reverses, confirmed by an opposite-direction iFVG forming *somewhere
+after* the crossing — no matter how far price travels past the boundary
+first, and no matter how many local highs/lows it makes on the way. The
+boundary itself never moves and there is no separate "give-up" trigger tied
+to some other bar's extreme — see the correction note below, this used to be
+implemented as something more complicated and it was wrong.
 
 Standard 3-candle FVG: a gap between candle 1 and candle 3 (candle 2's range
 inside the gap). It becomes an **iFVG** when price later fully **closes**
@@ -107,36 +124,40 @@ through the far edge of the gap with candles in the opposite direction
 **reaching beyond** the swept level qualifies it as a candidate (phase-1's
 strict whole-gap-beyond reading is retired to a sensitivity row).
 
-**Confirmation tracking — v3 state machine (corrected 2026-08-31).**
+**Confirmation tracking — v4 (corrected 2026-08-31, invalidation removed).**
 v2's algorithm was defective: it scanned every qualifying gap anywhere in the
 block-scoped window, computed each one's inversion time, and retroactively
 kept whichever confirmed *earliest across the whole set* — not what a trader
-watching live would see, and structurally biased toward small gaps close to
-price (they invert fastest), flattening the measured effect and contaminating
-any gap-size-vs-outcome analysis. Corrected mechanic, sequential and causal
-(one active candidate at a time, no retroactive comparison across the
-window):
+watching live would see, and structurally biased toward large gaps in v3's
+measurement (the opposite of what was predicted going in — see §0). v3's
+fix added a sequential "active candidate" tracker, which was right, but also
+added an **invalidation rule** ("give up on the candidate if price closes
+beyond the take-out bar's own extreme") that turned out to be **fabricated
+during grilling — the user never asked for it, and it doesn't match how they
+actually think about a sweep** (confirmed against a hand-drawn diagram,
+2026-08-31: price crossing London's high, making two further local highs
+inside NY, then reversing through a gap that formed near the top — none of
+those intermediate highs invalidate anything; the boundary is just London's
+high, fixed, full stop). It also produced a confusing A/B/C
+invalidation-semantics decision that is now moot.
+
+**v4 mechanic — sequential, no invalidation:**
 
 1. Starting at the take-out bar, watch for gaps that pass the location filter
    above (a candidate).
 2. **Active candidate = the most recently formed qualifying gap** that has
-   neither confirmed nor been invalidated yet. A new qualifying gap forming
-   while the current one is still live **replaces** it (mirrors this
-   project's existing order-block convention of preferring the nearest/latest
-   qualifying formation over the earliest).
-3. **Invalidation:** the active candidate is discarded if price **closes**
-   beyond the extreme of the take-out bar itself (not the original swept
-   session/day level — that's already broken by the take-out, by definition).
-   After invalidation, only gaps forming **after** the invalidation bar are
-   eligible — never retroactively reconsidering gaps that formed earlier.
-4. **Confirmation** = a close through the far edge of the active candidate's
-   gap. This is the final event — MFE/MAE and all downstream geometry are
-   measured from this confirmation close to the end of the `sweep_block`
-   exactly as in §6.1, unaffected by anything after confirmation (§5.1's
-   invalidation rule governs *candidate selection* only, not an exit rule on
-   an already-confirmed trade — that's a separate, not-yet-designed question).
-5. If no candidate ever confirms before block end (repeated invalidation, or
-   none form), the take-out is "unconfirmed" — unchanged from v2.
+   not yet confirmed. A new qualifying gap forming while the current one is
+   still unconfirmed **replaces** it (mirrors this project's existing
+   order-block convention of preferring the nearest/latest qualifying
+   formation over the earliest) — this alone is what fixes the v2 bug; no
+   separate invalidation step is needed, because a stale candidate is
+   automatically superseded the moment a fresher one forms.
+3. **Confirmation** = a close through the far edge of the active candidate's
+   gap. Final event — MFE/MAE and all downstream geometry are measured from
+   this confirmation close to the end of the `sweep_block` exactly as in
+   §6.1.
+4. If no candidate ever confirms before block end, the take-out is
+   "unconfirmed" — unchanged from v2/v3.
 
 **Required deliverable when this is re-run:** an hour-of-day chart — gap
 frequency by hour, and which hourly windows produce a higher confirmed-reversal
@@ -205,7 +226,7 @@ pass that deviates must say so explicitly.
 | V6 | BoS mechanic | **not pinned** — deferred to the BoS correction pass | §5.2 | replaces D7 |
 | V7 | Re-sweeping a level | not allowed — retired on first take-out | — | = D8 |
 | V8 | Level lifetime | 48h from session close, then expired unswept | — | = D9 |
-| V9 | iFVG confirmation tracking | **sequential state machine** (§5.1) — latest-live-candidate, close-based invalidation against the take-out bar's own extreme, no retroactive cross-window pick | §5.1 | new, corrects a v2 implementation bug (not a phase-1 default) |
+| V9 | iFVG confirmation tracking | **sequential, no invalidation** (§5.1, v4) — active candidate = latest-formed qualifying gap, replaced by newer ones, no retroactive cross-window pick. An earlier v3 draft added an invalidation rule (give up on new highs beyond the take-out bar) — dropped, it was fabricated during grilling and never part of the idea | §5.1 | new, corrects a v2 implementation bug (not a phase-1 default); v3→v4 removed a spurious addition, not a phase-1 reversion |
 
 ## 8. Research protocol notes
 
@@ -216,12 +237,12 @@ gallery (the format that surfaced both the phase-1 problems and the v2 iFVG
 bug; see `research/session-liquidity/examples_10x10.py`). Assets:
 BTC/ETH/SOL/BNB, 5m.
 
-**Flow:** Researcher (§5.1-corrected redo, iFVG only) → user review of worked
-examples/hour-of-day chart → PDH/PDL drill-down (§3.2, 3 combos: NY sweeps
-London, NY sweeps PDH/PDL, Asia sweeps PDH/PDL) → BoS correction pass (§5.2)
-→ Architect (strategy design, re-derived — the phase-2 `STRATEGY-DESIGN.md`
-was written against phase-1 numbers and is provisionally invalidated) →
-Researcher (backtest).
+**Flow:** Researcher (§5.1 v4 redo — no invalidation, iFVG only) → user
+review of worked examples/hour-of-day chart → PDH/PDL drill-down (§3.2, 3
+combos: NY sweeps London, NY sweeps PDH/PDL, Asia sweeps PDH/PDL) → BoS
+correction pass (§5.2) → Architect (strategy design, re-derived — the
+phase-2 `STRATEGY-DESIGN.md` was written against phase-1 numbers and is
+provisionally invalidated) → Researcher (backtest).
 
 Deliverables per pass: Python analysis engine + tables + charts, and an
 updated Pine indicator reflecting the current definitions (non-overlapping
