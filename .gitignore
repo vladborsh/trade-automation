@@ -2,3 +2,5 @@
 __pycache__/
 research/session-liquidity/data
 research/session-liquidity/results/uncond_*.csv.gz
+research/session-liquidity-v2/data
+research/session-liquidity-v2/results/uncond_*.csv.gz
