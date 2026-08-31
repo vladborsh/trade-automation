@@ -1,0 +1,5 @@
+quantity,mean,p50,p90,max,share_zero_pct
+qualifying gaps seen (candidates),1.5390661994507056,1.0,4.0,17,30.3106354768444
+replacements (a newer gap displaced a live one),0.8421725542191495,0.0,3.0,16,59.36168197745999
+closes beyond the take-out extreme (v3 would have killed the candidate on the first of these; v4 ignores them),20.978075575338575,9.0,65.0,95,27.838810493417938
+local extremes printed beyond the take-out extreme,4.220712188654229,3.0,11.0,18,17.67212804242826
