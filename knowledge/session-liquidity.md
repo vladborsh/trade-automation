@@ -40,9 +40,23 @@ file updated whenever a definition changes during implementation.
   across remaining-window buckets, and "hour of day" effects are window
   length in disguise); the 30.3% of take-outs with no qualifying gap carry
   the largest reversals in the sample.
-- **BoS** — never correctly measured (phase-1 mechanic was defective, v2
-  excluded it entirely). Own later pass, not yet designed. See
-  `research/session-liquidity/corrections/BOS-CORRECTION-NOTE.md`.
+- **BoS mechanic** (§5.2) — **authoritative** as of the BoS pass
+  (`research/session-liquidity-bos/`, RESEARCH-LOG Запись 15): anchor pinned at
+  the take-out bar, no re-anchoring, break = first close through it inside the
+  block. Key measured facts for any design pass: the corrected mechanic
+  confirms **33.8%** of primary take-outs (phase 1's defective one confirmed
+  82.4% — a near-unconditional, different event, and its numbers are retired);
+  the anchor sits a median **4.93 ATR** from the take-out wick and on the near
+  side of the swept level in ~100% of events, so a BoS is a close back deep
+  inside the swept range — median stop proxy **5.77 ATR** against iFVG's 2.67,
+  median R proxy **0.41** against 0.84; BoS and iFVG confirm the same take-out
+  only **15.6%** of the time and BoS is later by a median of 11 bars; and **BoS
+  does not select either** — the non-circular forward lift is 0.87 (iFVG 0.83),
+  both below 1.0, so §5.1's "timing mechanic, not a selection filter" now
+  covers both methods. The phase-1 defect analysis is
+  `research/session-liquidity/corrections/BOS-CORRECTION-NOTE.md`; its
+  *directional* prediction (that re-anchoring inflated delay and stop) was
+  measured and is **wrong** — re-anchoring made the test easier and tighter.
 - **PDH/PDL drill-down** (§3.2) — designed, dispatch was halted mid-run when
   the iFVG bug surfaced; partial non-iFVG output (PDH/PDL stream, sub-window
   stratification code) is salvageable once §5.1 lands.
@@ -184,16 +198,60 @@ take-out whose block ends before confirmation completes is unconfirmed.
 Sweep rule: an iFVG forming above a swept high in the bearish direction =
 sweep of the high; mirror for a swept low.
 
-### 5.2 BoS (break of structure) — not yet correctly measured
+### 5.2 BoS (break of structure) — corrected, pinned anchor
 
-Phase-1's mechanic re-anchored its tracked level every time any new k=3 pivot
-confirmed (including a late-confirming shallow pullback pivot *after* the
-take-out), silently testing the wrong level — see
-`research/session-liquidity/corrections/BOS-CORRECTION-NOTE.md` for the full
-defect analysis and the corrected spec sketch (pin the pre-extreme opposing
-pivot at take-out time, draw/track it as a forward ray, break = close through
-it, no re-anchoring). **Not pinned as a v-numbered default yet** — own later
-pass.
+**Authoritative** (pinned 2026-08-31 by `research/session-liquidity-bos/`,
+RESEARCH-LOG Запись 15). Replaces the phase-1 mechanic in full.
+
+**What was wrong.** Phase 1's `bos_flags()` kept one active level per side and
+**overwrote it every time any new k=3 pivot confirmed** — including pivots
+confirming *after* the take-out, during the incipient reversal — so it tested a
+level nobody was watching when the sweep happened. v2/v3/v4 excluded BoS rather
+than carry that forward. Full diagnosis and the user's two hand-drawn sketches:
+`research/session-liquidity/corrections/BOS-CORRECTION-NOTE.md`.
+
+**The mechanic.** High sweep; low sweep is the exact mirror. Pivots are
+`fractals(df, k=3)` from `research/intraday-mr-smc/indicators.py`, reused
+verbatim — its flags are already shifted by k, so a pivot is known exactly k
+bars after it prints.
+
+1. **Anchor selection, once, at the take-out bar `t0`:** the BoS level = the
+   most recent pivot **low** that is **confirmed as of `t0`** (its confirmation
+   bar ≤ `t0`) and whose **pivot bar is strictly before `t0`**. Pivots
+   confirming after `t0` are ignored for this event, permanently.
+   *The second condition is provably redundant* — "confirmed as of `t0`" forces
+   the pivot bar to be ≤ `t0 − k` — which is what mechanically resolves the
+   correction note's open question about multi-bar grind extremes: plain
+   bar-index ordering decides it, no special case. Both conditions are asserted
+   on every event in `checks.py` regardless.
+2. **Persistence:** the anchor is **fixed for the life of the event** and
+   watched as a forward ray. **No re-anchoring, ever** — this is the entire
+   correction.
+3. **Break (the confirmation event):** the first **close** beyond the anchor
+   (below the pivot low for a high sweep) within `[t0, end of sweep_block]`
+   (§6.1). One break maximum.
+4. **No anchor exists** (no qualifying confirmed pivot before `t0`): the event
+   is **"unanchorable"** — its own reported category, never silently dropped.
+   Measured on BTC/ETH/SOL/BNB 5m: **0 of 23,423 events**. The category stays
+   in the schema so a re-run elsewhere has a stated zero to compare against.
+5. No break before block end → unconfirmed, as elsewhere.
+
+**Rendering is part of the definition, not decoration.** Every worked example
+must draw the anchored ray from its pivot to its break (or window end). The
+reason phase 1's defect survived a whole pass is that no chart ever showed the
+level being watched, so no example could contradict the engine. If a rendered
+ray ever *steps*, the implementation is wrong.
+
+**Measured character (see §0 for the numbers, `research/session-liquidity-bos/REPORT.md`
+for all of them).** The anchor is fresh in time (median age 7 bars) but far in
+price (median 4.93 ATR from the take-out wick) and on the near side of the
+swept level in ~100% of events. A BoS is therefore always a close back deep
+**inside** the swept range: late, from a worse price, with a wide stop. Under
+the §6.1 stop convention its R proxy is roughly half the iFVG's. An open
+question the Architect owns: a trader taking a BoS entry would plausibly stop
+above the swing that forms *after* the break rather than above the sweep wick,
+which is a different measurement, not a fix — it would not change the selection
+result.
 
 ## 6. Measurement
 
@@ -237,7 +295,7 @@ pass that deviates must say so explicitly.
 | V3 | Overlap handling | **removed** — sessions are non-overlapping by construction | §1 | replaces D3 |
 | V4 | Confirmation / measurement window | **block-scoped** (end of `sweep_block`); primary tables require ≥ 12 bars remaining | §6.1 | replaces D4 (2h) and D6 |
 | V5 | iFVG location | **relaxed** (gap reaches beyond the level); strict = sensitivity row | §5.1 | D5 as overridden |
-| V6 | BoS mechanic | **not pinned** — deferred to the BoS correction pass | §5.2 | replaces D7 |
+| V6 | BoS mechanic | **pinned (BoS pass, 2026-08-31)** — anchor = the most recent OPPOSING k=3 pivot confirmed as of the take-out bar `t0`; **fixed for the event's life, no re-anchoring**; break = the first close beyond it inside `[t0, end of sweep_block]`, one maximum; no qualifying pivot → **unanchorable**, a reported category (measured 0 of 23,423). Phase 1's re-anchoring mechanic is retired in full: it confirmed 82.4% vs the corrected 33.8%, still tested the take-out-time level on only 11.3% of its own firings, and is a different, near-unconditional event — its T2/T3/T5/T12/T13 BoS rows and the C-BoS arm of `STRATEGY-DESIGN.md` are not to be cited. Every worked example must draw the anchored ray (§5.2) | §5.2 | replaces D7 |
 | V7 | Re-sweeping a level | not allowed — retired on first take-out | — | = D8 |
 | V8 | Level lifetime | 48h from session close, then expired unswept | — | = D9 |
 | V9 | iFVG confirmation tracking | **sequential, no invalidation** (§5.1, v4) — active candidate = latest-formed qualifying gap, replaced by newer ones, no retroactive cross-window pick. The v3 invalidation rule (give up on closes beyond the take-out bar's extreme) was fabricated during grilling and dropped in v4. The v4 pass proved the sequential fix is **output-equivalent to v2's best-pick** (identical confirmations on identical bars; only the named gap differs, on 6.7% of events, with no metric consequence) — so v4 is the correct *definition*, and the substantive v3→v4 change was removing the fabricated rule, while the v2→v3 sequencing change was definitional hygiene with no numeric effect | §5.1 | v4 current; v3 superseded in full; v2 numbers valid |
@@ -251,14 +309,19 @@ gallery (the format that surfaced both the phase-1 problems and the v2 iFVG
 bug; see `research/session-liquidity/examples_10x10.py`). Assets:
 BTC/ETH/SOL/BNB, 5m.
 
-**Flow:** Researcher (§5.1 v4 redo — no invalidation, iFVG only) → user
-review of worked examples/hour-of-day chart → PDH/PDL drill-down (§3.2, 3
-combos: NY sweeps London, NY sweeps PDH/PDL, Asia sweeps PDH/PDL) → BoS
-correction pass (§5.2) → Architect (strategy design, re-derived — the
-phase-2 `STRATEGY-DESIGN.md` was written against phase-1 numbers and is
-provisionally invalidated) → Researcher (backtest).
+**Flow:** Researcher (§5.1 v4 redo — no invalidation, iFVG only) **[done]**
+→ user review of worked examples/hour-of-day chart → BoS correction pass
+(§5.2) **[done — `research/session-liquidity-bos/`, RESEARCH-LOG Запись 15]**
+→ PDH/PDL drill-down (§3.2, 3 combos: NY sweeps London, NY sweeps PDH/PDL,
+Asia sweeps PDH/PDL) → Architect (strategy design, re-derived — the phase-2
+`STRATEGY-DESIGN.md` was written against phase-1 numbers and is provisionally
+invalidated; note that **neither** confirmation method selects, so a design
+must treat both as timing/entry references) → Researcher (backtest).
 
 Deliverables per pass: Python analysis engine + tables + charts, and an
 updated Pine indicator reflecting the current definitions (non-overlapping
-session rectangles, block-scoped relaxed iFVG per §5.1, optional PDH/PDL ray
-toggle) for the user's manual TradingView audit.
+session rectangles, block-scoped relaxed iFVG per §5.1, **the pinned BoS
+anchor ray per §5.2**, optional PDH/PDL ray toggle) for the user's manual
+TradingView audit. §5.2's rendering requirement is not optional: every worked
+example draws the anchored ray, because that omission is what hid the phase-1
+BoS defect for a whole pass.
