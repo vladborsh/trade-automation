@@ -15,6 +15,7 @@ Start with **`REPORT.md`**. `HANDOFF.md` is the Architect's routing note.
 | `tables.py` | all 13 aggregation tables → `results/t*.csv` and `results/TABLES.md` |
 | `charts.py` | statistical charts → `viz/02..09_*.png` |
 | `examples.py` | worked example events → `viz/ex01..ex08_*.png` |
+| `checks.py` | correctness assertions for the hygiene claims in `REPORT.md` §0 — run it after `engine.py` |
 | `session_liquidity.pine` | TradingView v6 **indicator** for the manual visual audit |
 | `RUNBOOK.md` | how to run and verify the indicator |
 | `REPORT.md` | the findings. §4 is `results/TABLES.md` pasted in — regenerate that file and re-paste if the engine changes |
@@ -32,7 +33,11 @@ cd research/session-liquidity
 ../../.venv/bin/python tables.py
 ../../.venv/bin/python charts.py
 ../../.venv/bin/python examples.py
+../../.venv/bin/python checks.py   # all assertions must pass
 ```
+
+`results/uncond_*.csv.gz` (the unconditional yardstick, 1.68M rows/asset) is
+gitignored — `engine.py` regenerates it.
 
 ## Definitions
 

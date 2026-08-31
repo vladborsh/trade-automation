@@ -24,6 +24,9 @@ What *is* enforced, because it is correctness rather than protocol:
 | No lookahead in a measurement | every forward window starts at `take_out_bar + 1` |
 | ATR is causal | `ATR(14)` read at the take-out bar, not over the horizon |
 
+All five are asserted mechanically by `checks.py` (run it after `engine.py`);
+as of this commit all checks pass.
+
 **Scope:** BTCUSDT / ETHUSDT / SOLUSDT / BNBUSDT, 5m Binance USD-M perp klines,
 2022-08-01 .. 2026-07-31 (1460 days, 420,768 bars/asset), reusing the existing
 `research/intraday-mtf-smc/` pull — no new data was fetched.
@@ -406,6 +409,7 @@ cd research/session-liquidity
 ../../.venv/bin/python tables.py     # -> results/t*.csv + results/TABLES.md
 ../../.venv/bin/python charts.py     # -> viz/02..09_*.png
 ../../.venv/bin/python examples.py   # -> viz/ex01..ex08_*.png
+../../.venv/bin/python checks.py      # hygiene assertions -- must all pass
 ```
 
 `common.py` imports `atr()` and `fractals()` from
