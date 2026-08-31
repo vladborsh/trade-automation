@@ -113,7 +113,7 @@ any later pass that deviates must say so explicitly.
 | D2 | Attribution when one bar takes out several levels | the level that required the **largest excursion** (highest high / lowest low); ties → most recently closed session. All levels taken are retired; the count is kept as `n_levels_taken` |
 | D3 | London/NY overlap (13:00–16:00) | both sessions keep their own levels as separate entries; D2 breaks the tie |
 | D4 | Confirmation window after a take-out | **24 bars = 2h** on 5m, matching the reverse-move horizon. Note: the observed delay p90 sits at 22/24 bars, so this cap is load-bearing |
-| D5 | iFVG location relative to the swept level | strict — the **whole gap** beyond the level (`gap_low ≥ level` for a high sweep). The relaxed reading (gap merely reaches beyond) is reported as a sensitivity: 38.6% vs 47.5% confirmation rate |
+| D5 | iFVG location relative to the swept level | **relaxed — the gap merely reaching beyond the level counts** (47.5% confirmation rate). User override, 2026-08-31, replacing the phase-1 strict default (whole gap beyond the level, `gap_low ≥ level` for a high sweep, 38.6%); strict is kept as the sensitivity row. Note: phase-1 report tables (T12/T13 geometry) were computed under strict — relaxed-basis numbers must be re-derived by the next pass |
 | D6 | When the FVG may form | its 3rd bar inside `[take-out bar, take-out bar + 24]`, inversion close after it in the same window |
 | D7 | Which pivot BoS breaks | the most recently confirmed, still-unbroken pivot low (high sweep) / pivot high (low sweep); each swing breaks at most once |
 | D8 | Re-sweeping a level | not allowed — a level is retired on its first take-out |
