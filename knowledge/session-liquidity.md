@@ -98,3 +98,45 @@ iFVG formations, pivot markers on a live TradingView chart for manual visual
 audit) **and** a Python analysis engine (frequency/magnitude statistics on
 the existing cached Binance data) — both, not either/or. Keep this file
 updated if either indicator's definition changes during implementation.
+
+## Pinned mechanical defaults (D1–D9)
+
+The definitions above left several operational points open. They were pinned
+during the phase-1 descriptive study (`research/session-liquidity/`, REPORT.md
+§1) and are recorded here per this file's own instruction to stay current.
+**These are choices, not findings** — changing one changes what is measured, so
+any later pass that deviates must say so explicitly.
+
+| # | Point | Pinned default |
+|---|---|---|
+| D1 | When a session level becomes sweepable | at the first bar **after** its window closes (earlier is lookahead) |
+| D2 | Attribution when one bar takes out several levels | the level that required the **largest excursion** (highest high / lowest low); ties → most recently closed session. All levels taken are retired; the count is kept as `n_levels_taken` |
+| D3 | London/NY overlap (13:00–16:00) | both sessions keep their own levels as separate entries; D2 breaks the tie |
+| D4 | Confirmation window after a take-out | **24 bars = 2h** on 5m, matching the reverse-move horizon. Note: the observed delay p90 sits at 22/24 bars, so this cap is load-bearing |
+| D5 | iFVG location relative to the swept level | strict — the **whole gap** beyond the level (`gap_low ≥ level` for a high sweep). The relaxed reading (gap merely reaches beyond) is reported as a sensitivity: 38.6% vs 47.5% confirmation rate |
+| D6 | When the FVG may form | its 3rd bar inside `[take-out bar, take-out bar + 24]`, inversion close after it in the same window |
+| D7 | Which pivot BoS breaks | the most recently confirmed, still-unbroken pivot low (high sweep) / pivot high (low sweep); each swing breaks at most once |
+| D8 | Re-sweeping a level | not allowed — a level is retired on its first take-out |
+| D9 | Level lifetime | 48h from session close, then expired unswept |
+
+Two distinct session labels are used and must not be conflated:
+**`level_session`** (whose liquidity was taken) and **`sweep_session`** (the
+clock session the take-out happened in: Asia / London / London-NY overlap / NY /
+off-session 21:00–24:00).
+
+## What phase 1 measured (2026-08-31)
+
+`research/session-liquidity/REPORT.md` — 20,999 take-outs, BTC/ETH/SOL/BNB, 5m,
+2022-08..2026-07. Key facts to carry forward, all descriptive:
+
+- iFVG and BoS largely confirm **different** take-outs: BoS-only 37.9%,
+  iFVG-only 22.5%, both 16.1%, neither 23.5%. When both fire, iFVG is first 82%
+  of the time (median 6 bars earlier).
+- Measured from the confirmation close with a stop at the sweep leg's extreme,
+  **iFVG** has median R 0.81 (41% reach 1R within 2h, stop 2.53 ATR) versus
+  **BoS** 0.47 (21%, stop 3.76 ATR).
+- Reverse-move subset medians measured from the *wick extreme* are contaminated
+  by each method's own definition and must not be used to rank the methods.
+- The user's NY/Asia prior holds **as lift over each clock session's own
+  unconditional 2h volatility** (NY 1.29/1.32, Asia 1.27/1.36, London
+  1.21/1.24, overlap 1.11/1.20), not in raw ATR, where NY is the smallest.

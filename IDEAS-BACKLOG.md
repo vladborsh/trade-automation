@@ -9,8 +9,18 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** design grilled with user (2026-08-31), ready for Architect
-routing to Researcher (descriptive/frequency phase only).
+**Status:** **phase 1 (descriptive) done 2026-08-31** — `research/session-liquidity/`
+(REPORT.md / HANDOFF.md), logged as `RESEARCH-LOG.md` Запись 10. Not a
+ship/kill: the pass was descriptive by design. Now with Architect for
+strategy/entry design; backtest is a later, separate dispatch.
+
+Headline: iFVG and BoS confirm largely **different** take-outs (BoS-only 37.9%,
+iFVG-only 22.5%, both 16.1%, neither 23.5%) — the backlog's open question is
+answered. From the confirmation bar, iFVG is the stronger candidate (median R
+0.81, 41% reach 1R in 2h, stop 2.53 ATR) vs BoS (0.47 / 21% / 3.76 ATR). The
+NY/Asia prior holds as *lift* over each clock session's own volatility, not in
+raw ATR. Nine mechanical defaults (D1-D9) were pinned and written back into
+`knowledge/session-liquidity.md`.
 
 **Idea:** Mark each of the three trading sessions' high/low as "session
 liquidity" (wide time-of-day windows, not narrow killzones — see
@@ -48,13 +58,14 @@ engine computing frequency/magnitude statistics on history. See
 `research/_explainers/fractals-vs-pivots/` for the precedent visual-explainer
 format already produced for the pivot primitive this idea reuses.
 
-**Open questions for whoever picks this up:** exact session hour boundaries
-need pinning against daylight-saving/exchange conventions (only a working
-default is fixed in `knowledge/session-liquidity.md`); whether iFVG and BoS
-sweep counts should be reported separately or as an overlap/agreement matrix;
-session-of-interest prioritization (user's stated hypothesis: New York and
-Asia produce the most favorable reverse moves — untested prior, not a
-constraint on what gets measured).
+**Open questions — status after phase 1:** the iFVG-vs-BoS reporting question is
+**answered** (both separately *and* as an overlap matrix; they are largely
+different event sets — see above). The session-of-interest prior is **answered
+with a caveat** (holds as lift, not in raw ATR). Still open: exact session hour
+boundaries against daylight-saving/exchange conventions (only the working UTC
+default is fixed in `knowledge/session-liquidity.md`), and the matched control
+that would separate sweep behaviour from ordinary large-bar behaviour —
+explicitly not measured in phase 1.
 
 ---
 
