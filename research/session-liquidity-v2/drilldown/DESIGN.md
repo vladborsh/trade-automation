@@ -1,12 +1,38 @@
 # Design: session-liquidity drill-down — three combos, sub-windows, gap-size predictor
 
 **Role:** Architect · **Hand-off to:** Researcher.
-**Parent package:** `research/session-liquidity-v2/` (definitions, engine,
-event stream — reuse, do not modify). **Authoritative definitions:**
-`knowledge/session-liquidity.md`, including the new **PDH/PDL level class**
-pinned there for this pass. Protocol unchanged from v2: **descriptive only**
-(no nulls, no gates), block-scoped horizon, non-overlapping sessions,
-ATR(14, 5m) primary unit, **iFVG only** (BoS still quarantined).
+**REFRAMED 2026-08-31 after the v4 pass** (this section supersedes the
+original framing below where they conflict): the v4 result established that
+**iFVG confirmation is a timing/entry-reference mechanic, not a selection
+filter** (keeps 64% of take-outs; confirmed lift below bare take-outs), and
+that window length dominates every clock effect. The drill-down's question is
+therefore **"which level class and which window regime select"** — with the
+**iFVG-v4 mechanic as the fixed, not-under-test entry reference**
+(`knowledge/session-liquidity.md` §5.1 v4; implementation:
+`research/session-liquidity-v4/engine.py:ifvg_confirm_v4`, a ~60-line
+stateless function — fork it, do not re-derive). Consequences: in §1, the
+**window-length stratum is the primary axis** and clock sub-window the
+secondary/derived one (the v4 hour-of-day result — "no best hour, only a best
+remaining window" — is the null hypothesis every sub-window claim is tested
+against); the gap-size predictor (§2) stands unchanged as an interior-cut
+question.
+
+**Parent packages:** `research/session-liquidity-v2/` (event stream, tables
+conventions) and `research/session-liquidity-v4/` (confirmation layer) —
+reuse, do not modify. **Salvage:** the halted first drill-down attempt left
+near-complete uncommitted work in the worktree
+`/Users/Vladyslav_Borsh/orca/workspaces/trade_automation/researcher-sl-drilldown`
+(`research/session-liquidity-v2/drilldown/`: PDH/PDL stream machinery
+`pd_engine.py`, stratification code, tables/charts/gallery plumbing, a REPORT
+draft). Copy what is reusable into your package (read-only from that
+worktree); everything downstream of its pre-v4 confirmation logic is stale
+and must be rewired to `ifvg_confirm_v4`. **Authoritative definitions:**
+`knowledge/session-liquidity.md`, including the **PDH/PDL level class**
+(§3.2). Protocol: **descriptive only** (no nulls, no gates), block-scoped
+horizon, non-overlapping sessions, ATR(14, 5m) primary unit, **iFVG-v4 only**
+(BoS still quarantined). Gallery note (user request): drop the take-out-wick
+star marker from new panels — informational only, user finds it noisy;
+measurement anchors are unaffected.
 
 ## 0. The three combos under the microscope
 
