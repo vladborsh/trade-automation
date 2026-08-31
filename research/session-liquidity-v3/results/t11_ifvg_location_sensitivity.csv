@@ -1,0 +1,3 @@
+variant,rate_pct,n,delay_median,rev_atr_median
+"relaxed — gap merely reaches beyond the level (V5, used everywhere)",20.7358651387442,4379,14.0,4.264177134265562
+"strict — whole gap beyond the level (phase-1 D5, sensitivity)",14.276920162894214,3015,19.0,4.002102034822566
