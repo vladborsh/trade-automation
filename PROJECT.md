@@ -122,7 +122,15 @@ pivot/structure/liquidity indicator is defined) that later work will need to
 recall precisely. Update in place as understanding sharpens; these are
 reference documents, not a log — no dated entries, just the current best
 understanding, with pointers to the research package(s) that established or
-tested it.
+tested it. Embed/point to real chart images from the research packages where
+one exists — a picture of a real worked example is worth keeping alongside
+the prose definition, for whoever reads this next.
+
+| File | Covers |
+|---|---|
+| [`session-liquidity.md`](knowledge/session-liquidity.md) | Session definitions, session liquidity, sweep detection (iFVG, BoS), PDH/PDL, measurement conventions |
+| [`smc.md`](knowledge/smc.md) | Order block, FVG, CHoCH, BoS mechanics; three tested entry-encodings, all closed |
+| [`derivatives-positioning.md`](knowledge/derivatives-positioning.md) | OI/top-trader-ratio/taker-flow definitions; redundancy-control methodology; all three hypotheses closed |
 
 ## Status
 
