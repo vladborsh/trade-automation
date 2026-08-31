@@ -66,6 +66,27 @@ a future extension, not a current capability.
 Models are defaults, not hard requirements — swap per-role if a specific idea's
 complexity or budget calls for it.
 
+## Communicating with the user
+
+Anything written **for the user to read directly** — a presentation/artifact,
+a RUNBOOK.md, a summary handed up a chain of Architects back to them, chart
+captions — is not the same audience as `REPORT.md`/`HANDOFF.md` (those are
+role-to-role, technical detail is the point). For user-facing material:
+
+- **Plain language, in Russian.** Explain what a chart shows and what a
+  number means in terms a trader who is not a statistician already
+  understands — not "the uncontaminated comparison" or "the most
+  decision-relevant number," just what it is and why it matters for a trade.
+- **No unexplained statistics jargon.** If a statistical term is genuinely
+  necessary (t-stat, percentile, CDF, confidence), define it inline in one
+  plain sentence the first time it's used on that page — don't assume the
+  reader already knows what a permutation null or a p90 is. Every paragraph
+  and every chart should be understandable standalone, without needing to
+  have read the underlying `REPORT.md`.
+- This is not "dumb it down" — the numbers and the honesty (caveats,
+  descriptive-vs-tested, what a proxy metric isn't) stay exactly as rigorous.
+  Only the vocabulary changes.
+
 ## Logging conventions
 
 Two append-only logs at the repo root track the team's work; a role skipping
