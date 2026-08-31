@@ -9,18 +9,28 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** **phase 1 (descriptive) done 2026-08-31** — `research/session-liquidity/`
-(REPORT.md / HANDOFF.md), logged as `RESEARCH-LOG.md` Запись 10. Not a
-ship/kill: the pass was descriptive by design. Now with Architect for
-strategy/entry design; backtest is a later, separate dispatch.
+**Status:** **phase 1 methodology REJECTED after review, full redo in
+progress (2026-08-31)** — see `RESEARCH-LOG.md` Запись 11. The
+2026-08-31 phase-1 pass (Запись 10, `research/session-liquidity/REPORT.md`)
+and the strategy design built on it (Запись 10.1, `STRATEGY-DESIGN.md`) are
+**provisionally invalidated**, not deleted — kept for reference, do not build
+on them until the redo lands. Both Architects are on HOLD pending a new
+design brief. Corrections ordered by the user after reviewing 20 worked
+example charts: drop the fixed 2h measurement horizon (measure across the
+whole clock-session instead — exact semantics TBD by Architect); drop the
+London/NY session overlap (confusing, wants non-overlapping session bounds);
+ATR stays as the unit (user initially objected, kept after being shown why
+raw % isn't cross-asset comparable); redo iFVG methodology first, BoS
+separately after; BoS's underlying mechanic is wrong, not just its
+visualization — user-drawn correction sketches saved at
+`research/session-liquidity/corrections/bos_correction_{downtrend,uptrend}.png`
+for the Architect to read directly.
 
-Headline: iFVG and BoS confirm largely **different** take-outs (BoS-only 37.9%,
-iFVG-only 22.5%, both 16.1%, neither 23.5%) — the backlog's open question is
-answered. From the confirmation bar, iFVG is the stronger candidate (median R
-0.81, 41% reach 1R in 2h, stop 2.53 ATR) vs BoS (0.47 / 21% / 3.76 ATR). The
-NY/Asia prior holds as *lift* over each clock session's own volatility, not in
-raw ATR. Nine mechanical defaults (D1-D9) were pinned and written back into
-`knowledge/session-liquidity.md`.
+Prior (now-superseded) headline for reference only: iFVG and BoS confirmed
+largely **different** take-outs (BoS-only 37.9%, iFVG-only 22.5%, both 16.1%,
+neither 23.5%); from the confirmation bar iFVG looked stronger (median R
+0.81 vs BoS 0.47). Don't treat these numbers as current — the horizon,
+session bounds, and BoS mechanic they were computed under have all changed.
 
 **Idea:** Mark each of the three trading sessions' high/low as "session
 liquidity" (wide time-of-day windows, not narrow killzones — see
