@@ -9,8 +9,23 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** **phase 1 methodology REJECTED after review, full redo in
-progress (2026-08-31)** — see `RESEARCH-LOG.md` Запись 11. The
+**Status:** **v2 redo DONE for iFVG, awaiting user audit; BoS still open
+(2026-08-31)** — see `RESEARCH-LOG.md` Запись 12 and
+`research/session-liquidity-v2/REPORT.md`. The v2 pass re-measured everything
+under the reissued definitions (non-overlapping sessions, block-scoped
+horizon, relaxed iFVG, ATR primary) and found the iFVG-confirmed sweep to be
+**in aggregate a coin flip**: from the confirmation close median MFE 2.34 ATR
+vs median MAE 2.36 ATR, MFE>MAE in 49.7% of events, favourable at the block
+close 51.4% of the time. The take-out itself carries mild lift over its
+block's own baseline (1.25–1.48×) and the iFVG confirmation removes most of it
+(1.02–1.15×), because the median confirmation costs 75 minutes of the move.
+The NY/Asia prior splits: NY is the best *block* to watch and the worst
+*level source* to hunt. Late (21–24 UTC) is a distinctly worse regime.
+Next: user audits the 30-panel gallery + the v2 Pine → BoS correction pass →
+Architect re-derives the strategy design → backtest.
+
+Prior status (2026-08-31, superseded by the above): phase 1 methodology
+REJECTED after review, full redo in progress — see `RESEARCH-LOG.md` Запись 11. The
 2026-08-31 phase-1 pass (Запись 10, `research/session-liquidity/REPORT.md`)
 and the strategy design built on it (Запись 10.1, `STRATEGY-DESIGN.md`) are
 **provisionally invalidated**, not deleted — kept for reference, do not build
