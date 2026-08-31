@@ -7,6 +7,57 @@ to route any of these, rather than treating them as pre-committed work.
 
 ---
 
+## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
+
+**Status:** design grilled with user (2026-08-31), ready for Architect
+routing to Researcher (descriptive/frequency phase only).
+
+**Idea:** Mark each of the three trading sessions' high/low as "session
+liquidity" (wide time-of-day windows, not narrow killzones — see
+`knowledge/session-liquidity.md` for exact hours and full definitions). A
+**liquidity sweep** = a session extreme is taken out (wick sufficient) and
+price reverses, confirmed by one of two candidate methods compared
+experimentally: **iFVG** (a 3-candle FVG fully closed-through/inverted by
+opposite-direction candles) or **BoS** (break of structure via the existing
+`fractals(df, k=3)` pivot primitive, used as a local trigger — not the
+general-purpose bias/CHoCH engine already closed twice, Записи 5/6). Full
+mechanical definitions, the reference-level scope (unswept levels from the
+last 2 days), and the reverse-move measurement convention (extreme-to-extreme,
+fixed 2h horizon) are all pinned in `knowledge/session-liquidity.md` — read
+that, not this summary, before designing the research pass.
+
+**Why this is genuinely new here:** first idea in the log built on
+session/time-of-day structure combined with ICT-style liquidity concepts
+(iFVG, BoS-after-sweep) rather than a rolling-window statistical trigger —
+distinct mechanism family from MR/SMC/pivot-structure/momentum/positioning.
+
+**Assets/data:** BTC/ETH/SOL/BNB, 5m (reuses the already-cached Binance pull).
+
+**Research protocol (user's explicit call — deviates from prior packages'
+discipline):** no permutation-null, no formal kill-rule stage. Phase 1 is
+deliberately descriptive: measure sweep frequency per method (iFVG vs BoS)
+and reverse-move magnitude, with charts/diagrams reported at each step — not
+a pass/fail statistical gate. Flow: Researcher (frequency/magnitude study,
+this dispatch) → Architect (strategy/entry design based on what the numbers
+show) → Researcher (backtest, later, separate dispatch).
+
+**Deliverables required (both, not either/or):** a Pine Script indicator
+that draws session rectangles + iFVG formations + pivot markers on a live
+TradingView chart for the user's manual visual audit, and a Python analysis
+engine computing frequency/magnitude statistics on history. See
+`research/_explainers/fractals-vs-pivots/` for the precedent visual-explainer
+format already produced for the pivot primitive this idea reuses.
+
+**Open questions for whoever picks this up:** exact session hour boundaries
+need pinning against daylight-saving/exchange conventions (only a working
+default is fixed in `knowledge/session-liquidity.md`); whether iFVG and BoS
+sweep counts should be reported separately or as an overlap/agreement matrix;
+session-of-interest prioritization (user's stated hypothesis: New York and
+Asia produce the most favorable reverse moves — untested prior, not a
+constraint on what gets measured).
+
+---
+
 ## VWAP mean-reversion, US index futures (ES/NQ/YM)
 
 **Status:** design fixed (Architect's `research/vwap-mr-indices/ARCHITECT-NOTE.md`,

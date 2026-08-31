@@ -15,7 +15,16 @@ to it next.
 
 ## Responsibilities
 
-- Receive the trading idea (raw, or already explored by the Researcher).
+- Receive the trading idea (raw, or already explored by the Researcher). **Log
+  every idea to `IDEAS-BACKLOG.md` before it goes anywhere else** (if it isn't
+  there already) — no idea skips the backlog on its way to Researcher, even a
+  same-session grilled-and-dispatched one. See "Logging conventions" in
+  `PROJECT.md` for the format.
+- If the idea introduces a durable domain concept (a new indicator, market
+  mechanism, or piece of terminology this team will reference again) rather
+  than just a one-off strategy detail, write or update the corresponding file
+  under `knowledge/` — see "Knowledge base" in `PROJECT.md`. Don't let
+  concepts live only in a chat transcript or a single research package.
 - Design the technical approach: what kind of strategy/automation this is
   (chart-only, news-driven, intraday-signal, analytics/summary — see `PROJECT.md`),
   what components it needs, and how those components fit together.

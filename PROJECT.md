@@ -66,6 +66,43 @@ a future extension, not a current capability.
 Models are defaults, not hard requirements — swap per-role if a specific idea's
 complexity or budget calls for it.
 
+## Logging conventions
+
+Two append-only logs at the repo root track the team's work; a role skipping
+either one is a process gap, not a shortcut.
+
+- **`IDEAS-BACKLOG.md`** — every trading idea, logged **before** it is
+  dispatched to Researcher, whether raw or already grilled/designed. Each
+  entry: Status, Idea, relevant framing (instrument/risk/data), open
+  questions. The Architect reads this at each decision gate to decide
+  whether/when to route an entry, rather than treating backlog entries as
+  pre-committed work.
+- **`RESEARCH-LOG.md`** — one numbered "Запись N" per completed Researcher (or
+  Architect) pass, **regardless of outcome** — a kill is as much a result as a
+  ship. Chronological, project-wide (not per-package). Each entry: Дата,
+  Статус, **1. Идея**, **2. Исследование** (who/method/link to the package's
+  REPORT.md), **3. Результат** (bulleted findings). Old entries are never
+  rewritten; a changed verdict gets a new status line or a follow-up entry.
+- Individual research packages under `research/<package>/` additionally carry
+  their own `HANDOFF.md` (Researcher → Architect routing note) — see existing
+  packages for the format. That's package-scoped detail; the two root logs
+  are the durable, project-wide record and must stay in sync with what
+  actually happened (update backlog status alongside logging a result, not
+  just the log).
+
+## Knowledge base
+
+Durable domain concepts — market mechanisms, indicator definitions, jargon
+this team will reference across multiple ideas/packages — live under
+`knowledge/*.md`, one file per concept area, not scattered across chat
+history or buried in a single research package's README. Write one when a
+grilling session or design pass establishes a concept (e.g. how a specific
+pivot/structure/liquidity indicator is defined) that later work will need to
+recall precisely. Update in place as understanding sharpens; these are
+reference documents, not a log — no dated entries, just the current best
+understanding, with pointers to the research package(s) that established or
+tested it.
+
 ## Status
 
 Roles and this context document are the current deliverable. Actual strategy

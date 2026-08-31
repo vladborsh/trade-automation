@@ -54,5 +54,8 @@ A research package containing:
 - Software Engineer guidelines: what a build of this idea would need to include.
 - Pros and cons of the algo/idea as you understand it.
 - Documentation of findings, including anything that made you doubt the idea.
+- **A `RESEARCH-LOG.md` entry for this pass, regardless of outcome.** A kill
+  is as much a result as a ship — log it. See "Logging conventions" in
+  `PROJECT.md` for the format.
 
 Hand this package to the **Architect**.
