@@ -1,0 +1,4 @@
+combo,n,rho_hour_vs_barsleft,hours_per_stratum,two_h_windows_per_stratum,strata_per_2h_window
+C1,6671,-0.9442733057100421,1.75,1.0,1.0
+C2,1327,-0.9862898645537089,1.75,1.0,1.0
+C3,2645,-0.9705163466018988,1.75,1.0,1.0
