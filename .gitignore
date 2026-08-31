@@ -11,3 +11,5 @@ research/session-liquidity-v3/results/uncond_*.csv.gz
 
 research/session-liquidity-v4/data
 research/session-liquidity-v4/results/uncond_*.csv.gz
+
+research/session-liquidity-v2/drilldown/results/dd_events.csv.gz

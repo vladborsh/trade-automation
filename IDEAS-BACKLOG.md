@@ -9,8 +9,31 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** **v4 iFVG mechanic DONE, awaiting user audit + two Architect
-rulings; BoS still open (2026-08-31)** — see `RESEARCH-LOG.md` Запись 14 and
+**Status:** **PDH/PDL drill-down DONE — answer is NO; v4 iFVG mechanic DONE,
+awaiting user audit; BoS still open (2026-08-31)** — see `RESEARCH-LOG.md`
+Запись 15 and `research/session-liquidity-v2/drilldown/REPORT.md`. The
+drill-down asked which level class and which window regime select, with the
+iFVG-v4 mechanic held fixed. **No (level class × window regime) cut separates
+from the break-even aggregate once window-length scaling is removed.** The one
+cell above median R 1.00 — London-level-swept-in-NY with ≥72 bars of block left,
+R 1.128 / R≥1 54.2 % / n=3,502 / 4 of 4 assets — has MFE/MAE 0.90 and median
+signed ER +0.003: the regime buys a longer window, not a better sweep. The
+clock question closed the same way v4 closed it (raw 2h R spread 0.37–0.59
+collapses to 0.043–0.125 within a window-length stratum; hour vs bars-left
+ρ = −0.94…−0.99) — "the clock, not the hour". The gap-size predictor is flat
+(|ρ| ≤ 0.06 vs signed ER; its R correlation is a relationship with the stop
+proxy, ρ = +0.34…+0.42). PDH/PDL itself works and is fully audited, but **73.2 %
+of its take-outs sit within 0.05 ATR of a still-alive session level** — the new
+population is ~0.24 pure day-level take-outs per asset-day. The only consistent
+structural signal: **PDH/PDL swept in Asia has MFE > MAE and positive median ER
+in 4/4 assets**, at the cost of a wider stop (median R 0.80–0.92). Open for the
+Architect: whether that population warrants a design pass, and pinning a real
+stop rule before any further R-based comparison (the stop proxy drives most of
+the R numbers). C2 (PDH/PDL in NY) does not warrant further work.
+
+Prior status (2026-08-31, superseded by the above): **v4 iFVG mechanic DONE,
+awaiting user audit + two Architect rulings; BoS still open** — see
+`RESEARCH-LOG.md` Запись 14 and
 `research/session-liquidity-v4/REPORT.md`. v4 deleted the invalidation clause
 v3 had added (fabricated during grilling, never part of the idea) and
 re-derived everything. Result: deleting it restores v2's numbers **exactly** —
