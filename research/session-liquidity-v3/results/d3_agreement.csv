@@ -1,0 +1,6 @@
+case,n,share_pct
+"both confirm, SAME gap selected",3191,15.1103324178426
+"both confirm, DIFFERENT gap selected",1188,5.6255327209016
+"v2 confirms, v3 does not",9227,43.69258452504972
+"v3 confirms, v2 does not",0,0.0
+neither confirms,7512,35.57155033620608

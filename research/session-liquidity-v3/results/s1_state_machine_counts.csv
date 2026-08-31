@@ -1,0 +1,6 @@
+quantity,mean,p50,p90,max,share_zero_pct
+qualifying gaps seen (candidates),2.4619282128989486,1.0,7.0,20,30.3106354768444
+replacements (a newer gap displaced a live one),0.054313855478738515,0.0,0.0,5,95.71929159958329
+invalidations (close beyond the take-out extreme),2.160005682356284,1.0,7.0,19,45.264703096884176
+tie bars (invalidation AND inversion on one close),0.18107775357514916,0.0,1.0,5,85.44843261672507
+"orphan breaches (beyond the extreme, nothing active)",16.506250591912114,4.0,55.0,88,31.660195094232407
