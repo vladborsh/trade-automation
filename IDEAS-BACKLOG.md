@@ -161,12 +161,32 @@ original WR>50% hard gate — momentum/trend-following strategies canonically ha
 *lower* win rates than mean-reversion (small frequent losses, occasional large
 wins), so a WR>50% floor would be an even worse fit here than it was for MR/SMC.
 
+**Pre-registered candidate hypotheses carried forward from other packages'
+kill messages (flagged there, not yet done — this is where they land):**
+- **K=20 confirmed-swing breakout @ 1h** (from `research/pivot-structure/
+  REPORT.md` §3, kill message 2026-08-26): the pivot-structure engine's only
+  cell with a coherent positive sign was a bare close beyond a confirmed
+  ~20h swing (+12.9 bp t=2.60 @6h, +15.7 bp t=2.42 @12h) — attribution showed
+  the sign belonged to the raw swing break, not the two-tier pivot machinery.
+  This is `momentum_breakout` rediscovered through a different
+  parameterization; treat as a hypothesis, not evidence, and needs its own
+  permutation null / cost model / funding check (median holds 16–27h, past
+  the funding-flag threshold).
+- **Trailing-4h-return-strength terciles on `momentum_breakout` triggers**
+  (from `research/deriv-positioning/REPORT.md`, kill message 2026-08-26): the
+  redundancy control's price-shadow variable produced the strongest
+  conditioning split measured in any package (t up to ~5.0, 6/6 horizons,
+  8/8 symbols) — post-hoc (it was a control), and even a working split failed
+  hypothesis (a)'s comparative-economics bar there, but worth pre-registering
+  properly here with the full comparative bar.
+
 **Open questions for whoever picks this up:**
 - Trigger definition: needs its own design pass — candidates include
   range/structure breakout, MA/MACD crossover, ROC or RSI threshold
-  continuation. Should not just inherit the MR candidate's 2σ trigger inverted
-  (that's what the narrow probe already covers) — a well-designed momentum
-  entry may look nothing like an inverted mean-reversion entry.
+  continuation (the two carried-forward hypotheses above are candidates, not
+  the whole design). Should not just inherit the MR candidate's 2σ trigger
+  inverted (that's what the narrow probe already covers) — a well-designed
+  momentum entry may look nothing like an inverted mean-reversion entry.
 - Exit design: trend-following payoffs are usually asymmetric (trail a stop,
   let winners run) rather than a fixed R-multiple target like the MR/SMC
   candidates used — worth deciding deliberately rather than reusing the fixed
@@ -326,8 +346,28 @@ scheduled events (ETF flows, unlock schedules) is a later idea, not this one.
 
 ## Derivatives-positioning data: OI and taker-flow imbalance (crypto perps)
 
-**Status:** **prioritized and dispatched** (user review, 2026-08-26) — design
-fixed in `research/deriv-positioning/DESIGN.md`, Researcher pass in flight.
+**Status:** **closed — all three hypotheses killed** (Researcher pass complete,
+Architect-ratified, 2026-08-26; `research/deriv-positioning/REPORT.md`,
+`RESEARCH-LOG.md` Запись 8). (a) OI-conditioned `momentum_breakout` passed
+stage-1 and its permutation null but failed the mandatory redundancy control —
+a price-derived shadow (trailing-4h-return percentile) separates the same
+trades better, so it's "price in disguise," not a second signal; the
+pre-registered filter also made the base strategy's net PnL worse, not better.
+(b1) crowding squeeze and (b2) taker-imbalance continuation were both
+significantly negative at stage 1 (0th percentile of their nulls) — killed
+outright. Deliverable: Binance's public positioning feeds add no signal beyond
+price at 1h. **Do not re-dispatch this idea** without a genuinely different
+angle — the redundancy-control finding is a structural objection to
+OI/taker/ratio data as a *signal source* here, not a parameter-tuning miss.
+
+**Spin-off worth carrying forward (not this idea, flagged for Запись 4 /
+standalone-momentum instead):** the redundancy control's price-shadow variable
+(trailing-4h-return-strength terciles on `momentum_breakout` triggers)
+produced the strongest conditioning split measured in any package so far
+(t up to ~5.0, beats null at 6/6 horizons, 8/8 symbols) — but it's post-hoc
+(it was a control, not a hypothesis) and even a working split failed (a)'s
+comparative-economics bar. Should be pre-registered as a hypothesis, with the
+full comparative bar, whenever the standalone-momentum design pass happens.
 
 **Idea:** Binance's same free bulk archive exposes a **futures `metrics`
 dataset** — open interest, top-trader long/short ratios, taker buy/sell volume
