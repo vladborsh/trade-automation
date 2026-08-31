@@ -1,0 +1,9 @@
+pair,case,n,share_pct
+v2 vs v4,both confirm,13606,64.42844966379391
+v2 vs v4,only the older algorithm confirms,0,0.0
+v2 vs v4,only v4 confirms,0,0.0
+v2 vs v4,neither confirms,7512,35.57155033620608
+v3-A vs v4,both confirm,4379,20.7358651387442
+v3-A vs v4,only the older algorithm confirms,0,0.0
+v3-A vs v4,only v4 confirms,9227,43.69258452504972
+v3-A vs v4,neither confirms,7512,35.57155033620608

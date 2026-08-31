@@ -1,0 +1,6 @@
+quantity,n,p10,median,mean,p90,share_positive_pct,share_zero_pct
+"confirmation delay, v4 - v2 (bars)",918,0.0,0.0,0.0,0.0,0.0,100.0
+"gap FORMATION bar, v4 - v2 (bars)",918,1.0,1.0,2.715686274509804,6.0,100.0,0.0
+"selected gap height, v4 - v2 (ATR)",918,-0.5113678200314902,0.08274151909065855,0.17390278001676168,0.8433879947853224,58.27886710239652,0.5446623093681917
+"MFE from the confirmation close, v4 - v2 (ATR)",911,0.0,0.0,0.0,0.0,0.0,100.0
+"R proxy, v4 - v2",911,0.0,0.0,0.0,0.0,0.0,100.0

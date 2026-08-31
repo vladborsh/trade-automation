@@ -1,0 +1,353 @@
+//@version=6
+// Session liquidity v4 — non-overlapping sessions + the sequential iFVG
+// confirmation state machine WITHOUT invalidation
+// (knowledge/session-liquidity.md §5.1, V9 — v4).
+//
+// Draws, on a live TradingView chart, exactly what the Python engine in
+// research/session-liquidity-v4/engine.py computes on cached history, so the
+// user can eyeball whether the mechanic matches what they see:
+//
+//   * NON-OVERLAPPING session rectangles: Asia 00-08, London 08-13, NY 13-21,
+//     plus the residual Late block 21-24 which produces NO levels;
+//   * the unswept-level pool from the last 48h, as horizontal rays;
+//   * take-outs of those levels (a wick beyond the level is sufficient);
+//   * for each take-out, the state machine, drawn as it runs:
+//       - each qualifying gap as it becomes the ACTIVE candidate,
+//       - a REPLACED candidate greyed out the moment a newer gap displaces it
+//         (it is permanently out — it can never confirm later),
+//       - the CONFIRMATION when a close goes through the ACTIVE candidate's
+//         far edge — and only the active one;
+//   * the current block's end, so the measurement window is visible.
+//
+// WHAT CHANGED vs research/session-liquidity-v3/session_liquidity_v3.pine —
+// exactly one thing, a DELETION:
+//
+//   v3 drew an INVALIDATION LINE at the take-out bar's own extreme and killed
+//   the active candidate on the first close beyond it, with a "tie" label for
+//   the (common) bar that did both. That rule was fabricated during grilling —
+//   the user never asked for it, and it fires on exactly the shape their own
+//   diagram draws as a valid sweep (price crosses the boundary, prints several
+//   further local highs, then reverses). v4 deletes the line, the kill, the tie
+//   label and the post-invalidation eligibility bookkeeping.
+//
+//   THE ONLY HORIZONTAL REFERENCE THIS INDICATOR TRACKS IS THE SWEPT LEVEL.
+//   It is fixed at the moment it is taken out and it never moves. However far
+//   price runs past it, and however many local highs/lows it prints there,
+//   nothing is discarded — a candidate leaves only by being replaced by a
+//   fresher qualifying gap, by confirming, or by the block ending.
+//
+// Still absent, deliberately: no BoS (§5.2, deferred to its own pass), no
+// PDH/PDL rays (they return with the drill-down pass).
+//
+// SIMPLIFICATION vs the Python engine, stated rather than hidden: Python runs
+// one independent state machine per take-out EVENT; Pine keeps one watch per
+// DIRECTION per block, and a fresh take-out on that side restarts it. When one
+// block hosts several take-outs on the same side, the chart shows the latest
+// one's machine. Everything else — ordering, replacement finality, active-only
+// confirmation, block scoping — is identical.
+//
+// This is an INDICATOR, not a strategy: no orders, no equity curve, nothing to
+// over-fit. Read RUNBOOK.md before reading anything off it.
+
+indicator("Session liquidity v4 — sweeps / sequential iFVG (no invalidation)",
+     "SessLiq v4", overlay = true, max_boxes_count = 500, max_lines_count = 500,
+     max_labels_count = 500)
+
+// ------------------------------------------------------------------ inputs --
+grpS = "Sessions (UTC, non-overlapping — knowledge/session-liquidity.md §1)"
+bool  showAsia   = input.bool(true,  "Asia   00:00-08:00  (produces levels)", group = grpS)
+bool  showLondon = input.bool(true,  "London 08:00-13:00  (produces levels)", group = grpS)
+bool  showNY     = input.bool(true,  "NY     13:00-21:00  (produces levels)", group = grpS)
+bool  showLate   = input.bool(true,  "Late   21:00-24:00  (NO levels)",       group = grpS)
+string sessAsia  = input.session("0000-0800", "Asia window",   group = grpS)
+string sessLon   = input.session("0800-1300", "London window", group = grpS)
+string sessNY    = input.session("1300-2100", "NY window",     group = grpS)
+string sessLate  = input.session("2100-0000", "Late window",   group = grpS)
+string tz        = input.string("UTC", "Session timezone", group = grpS,
+     tooltip = "The study is defined in UTC, fixed, no DST. Change only if you know why.")
+
+grpL = "Levels"
+int   lookbackH  = input.int(48, "Level lifetime (hours)", minval = 2, maxval = 240,
+     group = grpL, tooltip = "V8: unswept levels from the last 2 days = 48h.")
+bool  showRays   = input.bool(true, "Draw unswept level rays", group = grpL)
+bool  markSweeps = input.bool(true, "Mark take-outs", group = grpL)
+bool  keepBoundary = input.bool(true, "Keep the swept boundary drawn across the window",
+     group = grpL, tooltip = "The swept level is the ONLY reference the mechanic " +
+               "tracks. It is drawn solid from the take-out to the block end so " +
+               "it is obvious that nothing else is being watched.")
+
+grpF = "iFVG state machine (§5.1 / V9, v4 — no invalidation)"
+bool  showFVG     = input.bool(false, "Draw every 3-candle FVG (noisy)", group = grpF,
+     tooltip = "Off by default: what matters is the CANDIDATE gaps, which are " +
+               "drawn regardless. Turn on to see what the location filter rejects.")
+bool  showMachine = input.bool(true,  "Draw the state machine", group = grpF)
+int   fvgKeep     = input.int(90, "Drop a stale candidate after N bars", minval = 5,
+     maxval = 400, group = grpF,
+     tooltip = "COSMETIC ONLY — it stops an ancient box from being extended " +
+               "forever on the chart. The Python engine has no such rule; a " +
+               "candidate there lives until it is replaced, confirms, or the " +
+               "block ends. Set it above the longest block (96 bars on 5m) to " +
+               "match the engine exactly.")
+
+grpW = "Measurement window"
+bool  showBlockEnd = input.bool(true, "Shade the current block and mark its end", group = grpW,
+     tooltip = "V4: every window — magnitude AND the iFVG machine — runs from " +
+               "the take-out bar to the last bar of the block it happened in.")
+
+color cAsia = input.color(color.new(#e08b3a, 88), "Asia fill",   group = "Colors")
+color cLon  = input.color(color.new(#3f7fbf, 88), "London fill", group = "Colors")
+color cNY   = input.color(color.new(#7b5ea7, 88), "NY fill",     group = "Colors")
+color cLate = input.color(color.new(#9aa0a6, 92), "Late fill",   group = "Colors")
+
+// --------------------------------------------------------------- utilities --
+type Sess
+    string  name
+    color   col
+    bool    makesLevels
+    bool    inS
+    float   hi
+    float   lo
+    box     bx
+
+var Sess sA = Sess.new("Asia",   cAsia, true,  false, na, na, na)
+var Sess sL = Sess.new("London", cLon,  true,  false, na, na, na)
+var Sess sN = Sess.new("NY",     cNY,   true,  false, na, na, na)
+var Sess sT = Sess.new("Late",   cLate, false, false, na, na, na)
+
+// Level pool. Parallel arrays: price, is-high-side, expiry bar_index, ray, name.
+var array<float>  lvPx   = array.new_float()
+var array<bool>   lvHigh = array.new_bool()
+var array<int>    lvExp  = array.new_int()
+var array<line>   lvLn   = array.new_line()
+var array<string> lvSes  = array.new_string()
+
+lifeBars = math.max(1, int(lookbackH * 60 / math.max(1, timeframe.in_seconds() / 60)))
+
+addLevel(float px, bool isHigh, string nm, color col) =>
+    ln = line.new(bar_index, px, bar_index + 1, px, extend = extend.none,
+         color = showRays ? col : color.new(color.gray, 100), width = 1,
+         style = line.style_dashed)
+    array.push(lvLn, ln)
+    array.push(lvPx, px)
+    array.push(lvHigh, isHigh)
+    array.push(lvExp, bar_index + lifeBars)
+    array.push(lvSes, nm)
+
+track(Sess s, string spec, bool enabled) =>
+    if enabled
+        bool nowIn = not na(time(timeframe.period, spec, tz))
+        if nowIn and not s.inS
+            s.inS := true
+            s.hi := high
+            s.lo := low
+            s.bx := box.new(bar_index, high, bar_index, low, bgcolor = s.col,
+                 border_color = color.new(s.col, 40), border_width = 1,
+                 border_style = s.makesLevels ? line.style_solid : line.style_dotted)
+        else if nowIn
+            s.hi := math.max(s.hi, high)
+            s.lo := math.min(s.lo, low)
+            box.set_top(s.bx, s.hi)
+            box.set_bottom(s.bx, s.lo)
+            box.set_right(s.bx, bar_index)
+        else if s.inS
+            s.inS := false
+            box.set_right(s.bx, bar_index - 1)
+            if s.makesLevels
+                addLevel(s.hi, true,  s.name, color.new(s.col, 20))
+                addLevel(s.lo, false, s.name, color.new(s.col, 20))
+
+track(sA, sessAsia, showAsia)
+track(sL, sessLon,  showLondon)
+track(sN, sessNY,   showNY)
+track(sT, sessLate, showLate)
+
+// ---------------------------------------------------- the current clock block
+inAsia = not na(time(timeframe.period, sessAsia, tz))
+inLon  = not na(time(timeframe.period, sessLon,  tz))
+inNY   = not na(time(timeframe.period, sessNY,   tz))
+string curBlock = inAsia ? "Asia" : inLon ? "London" : inNY ? "NY" : "Late"
+bool newBlock = curBlock != curBlock[1]
+
+if showBlockEnd and newBlock and not na(curBlock[1])
+    line.new(bar_index - 1, low, bar_index - 1, high, extend = extend.both,
+         color = color.new(color.olive, 55), style = line.style_dashed, width = 1)
+    label.new(bar_index - 1, high, curBlock[1] + " block ends", yloc = yloc.abovebar,
+         style = label.style_label_down, color = color.new(color.olive, 75),
+         textcolor = color.gray, size = size.tiny,
+         tooltip = "V4: every measurement / iFVG window for a take-out inside " +
+                   "the previous block stopped here.")
+
+// ------------------------------------------------------- take-out detection --
+bool tookHi = false
+bool tookLo = false
+float tookHiPx = na
+float tookLoPx = na
+
+if array.size(lvPx) > 0
+    for i = array.size(lvPx) - 1 to 0
+        float px = array.get(lvPx, i)
+        bool  ish = array.get(lvHigh, i)
+        bool  expired = bar_index > array.get(lvExp, i)
+        bool  taken = ish ? high > px : low < px
+        if not expired and not taken
+            line.set_x2(array.get(lvLn, i), bar_index + 1)
+        if expired or taken
+            if taken
+                if ish
+                    tookHi := true
+                    // V2 attribution: the deepest level reached wins
+                    tookHiPx := na(tookHiPx) ? px : math.max(tookHiPx, px)
+                else
+                    tookLo := true
+                    tookLoPx := na(tookLoPx) ? px : math.min(tookLoPx, px)
+            l = array.get(lvLn, i)
+            line.set_color(l, showRays ? (taken ? color.new(color.gray, 45) : color.new(color.gray, 80))
+                 : color.new(color.gray, 100))
+            line.set_style(l, line.style_dotted)
+            array.remove(lvPx, i)
+            array.remove(lvHigh, i)
+            array.remove(lvExp, i)
+            array.remove(lvLn, i)
+            array.remove(lvSes, i)
+
+if markSweeps and tookHi
+    label.new(bar_index, high, "sweep ▲", yloc = yloc.abovebar, style = label.style_label_down,
+         color = color.new(color.red, 25), textcolor = color.white, size = size.tiny,
+         tooltip = "session HIGH taken out at " + str.tostring(tookHiPx, format.mintick) +
+                   "  |  window: this bar -> end of the " + curBlock + " block")
+if markSweeps and tookLo
+    label.new(bar_index, low, "sweep ▼", yloc = yloc.belowbar, style = label.style_label_up,
+         color = color.new(color.teal, 25), textcolor = color.white, size = size.tiny,
+         tooltip = "session LOW taken out at " + str.tostring(tookLoPx, format.mintick) +
+                   "  |  window: this bar -> end of the " + curBlock + " block")
+
+// ================================================ THE v4 STATE MACHINE (§5.1)
+// One Watch per direction. `on` = a take-out is being watched inside this
+// block; `active` = a candidate gap is currently live. There is no `lastInval`
+// and no `ref` — v3's two invalidation fields are gone, not disabled.
+type Watch
+    bool  on
+    bool  isHigh
+    float lvl        // THE BOUNDARY: the swept level. Fixed. The only reference.
+    line  lvlLn
+    bool  active
+    float gLo
+    float gHi
+    int   born       // bar_index of the active candidate's 3rd bar
+    box   gBx
+    int   nCand
+
+var Watch wHi = Watch.new(false, true,  na, na, false, na, na, na, na, 0)
+var Watch wLo = Watch.new(false, false, na, na, false, na, na, na, na, 0)
+
+// A candidate leaves the stage: colour its box by fate and stop extending it.
+sealCandidate(Watch w, color col, string txt, bool up) =>
+    if showMachine and not na(w.gBx)
+        box.set_bgcolor(w.gBx, color.new(col, 78))
+        box.set_border_color(w.gBx, col)
+        box.set_right(w.gBx, bar_index)
+        label.new(bar_index, close, txt, style = up ? label.style_label_up : label.style_label_down,
+             color = color.new(col, 25), textcolor = color.white, size = size.tiny,
+             tooltip = "candidate #" + str.tostring(w.nCand) + " formed at bar " +
+                       str.tostring(w.born) + ", gap " + str.tostring(w.gLo, format.mintick) +
+                       " .. " + str.tostring(w.gHi, format.mintick))
+    w.active := false
+
+// V4: the block boundary ends every window.
+resetWatch(Watch w) =>
+    if w.on and w.active and showMachine and not na(w.gBx)
+        box.set_bgcolor(w.gBx, color.new(color.orange, 82))
+        box.set_border_color(w.gBx, color.orange)
+    w.on := false
+    w.active := false
+    w.nCand := 0
+
+if newBlock
+    resetWatch(wHi)
+    resetWatch(wLo)
+
+// ---- (a) a take-out (re)starts the watch on that side ----------------------
+startWatch(Watch w, float lvl) =>
+    w.on := true
+    w.lvl := lvl
+    w.active := false
+    w.nCand := 0
+    if keepBoundary
+        w.lvlLn := line.new(bar_index, lvl, bar_index + 1, lvl,
+             color = color.new(color.black, 10), width = 2, style = line.style_dashed)
+
+if tookHi
+    startWatch(wHi, tookHiPx)
+if tookLo
+    startWatch(wLo, tookLoPx)
+
+// keep the boundary extending across the window — it is the only line here
+if wHi.on and keepBoundary and not na(wHi.lvlLn)
+    line.set_x2(wHi.lvlLn, bar_index + 1)
+if wLo.on and keepBoundary and not na(wLo.lvlLn)
+    line.set_x2(wLo.lvlLn, bar_index + 1)
+
+// ---- (b) resolve this bar's CLOSE against the already-active candidate -----
+// Order matters and mirrors the Python engine exactly: a gap that becomes
+// active on THIS bar is not tested until the NEXT bar (pin 3). There is only
+// ONE test left — the confirmation.
+stepWatch(Watch w) =>
+    if w.on and w.active and bar_index > w.born
+        bool hitConf = w.isHigh ? close < w.gLo : close > w.gHi
+        if hitConf
+            sealCandidate(w, color.green, w.isHigh ? "iFVG ✓ CONFIRM ▼" : "iFVG ✓ CONFIRM ▲",
+                 not w.isHigh)
+            w.on := false            // the event is resolved; nothing more to watch
+        else if showMachine and not na(w.gBx)
+            box.set_right(w.gBx, bar_index + 1)
+    else if w.on and w.active and showMachine and not na(w.gBx)
+        box.set_right(w.gBx, bar_index + 1)
+    // drop a candidate that has gone stale on the chart (COSMETIC only — the
+    // engine has no such rule; see the input's tooltip)
+    if w.on and w.active and bar_index - w.born > fvgKeep
+        sealCandidate(w, color.gray, "stale (chart only)", not w.isHigh)
+
+stepWatch(wHi)
+stepWatch(wLo)
+
+// ---- (c) formation: the LATEST qualifying gap becomes the candidate --------
+bool bullFvg = low > high[2]
+bool bearFvg = high < low[2]
+
+if showFVG and bullFvg
+    box.new(bar_index - 2, low, bar_index + 3, high[2],
+         bgcolor = color.new(color.teal, 92), border_color = color.new(color.teal, 75))
+if showFVG and bearFvg
+    box.new(bar_index - 2, low[2], bar_index + 3, high,
+         bgcolor = color.new(color.maroon, 92), border_color = color.new(color.maroon, 75))
+
+activate(Watch w, float gLo, float gHi) =>
+    if w.active
+        // pin 1: replacement is FINAL — the displaced gap can never confirm
+        sealCandidate(w, color.gray, "replaced", not w.isHigh)
+    w.nCand += 1
+    w.active := true
+    w.gLo := gLo
+    w.gHi := gHi
+    w.born := bar_index
+    if showMachine
+        w.gBx := box.new(bar_index - 2, gHi, bar_index + 1, gLo,
+             bgcolor = color.new(color.blue, 82), border_color = color.new(color.blue, 40),
+             border_width = 1)
+        label.new(bar_index, w.isHigh ? gHi : gLo, "#" + str.tostring(w.nCand),
+             style = w.isHigh ? label.style_label_down : label.style_label_up,
+             color = color.new(color.blue, 45), textcolor = color.white, size = size.tiny,
+             tooltip = "candidate #" + str.tostring(w.nCand) + " — the ACTIVE gap. " +
+                       "Only THIS gap can confirm; an older one is out for good.")
+
+// V5 relaxed location: for a swept HIGH, a BULLISH gap [high[2], low] whose
+// upper edge merely REACHES above the level qualifies. Mirrored for a swept LOW
+// with a BEARISH gap [high, low[2]] whose lower edge reaches below it.
+if wHi.on and bullFvg and low > wHi.lvl
+    activate(wHi, high[2], low)
+if wLo.on and bearFvg and high < wLo.lvl
+    activate(wLo, high, low[2])
+
+// ----------------------------------------------------------------- alerts ----
+alertcondition(tookHi, "Session high taken out", "Session HIGH swept")
+alertcondition(tookLo, "Session low taken out",  "Session LOW swept")

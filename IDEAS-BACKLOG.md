@@ -9,8 +9,32 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** **v2 redo DONE for iFVG, awaiting user audit; BoS still open
-(2026-08-31)** — see `RESEARCH-LOG.md` Запись 12 and
+**Status:** **v4 iFVG mechanic DONE, awaiting user audit + two Architect
+rulings; BoS still open (2026-08-31)** — see `RESEARCH-LOG.md` Запись 14 and
+`research/session-liquidity-v4/REPORT.md`. v4 deleted the invalidation clause
+v3 had added (fabricated during grilling, never part of the idea) and
+re-derived everything. Result: deleting it restores v2's numbers **exactly** —
+same confirmed set over all 23,423 take-outs, same confirming bar, 64.4 %
+confirmation rate; the algorithms differ only in which gap they name (same gap
+93.3 % of the time, zero consequence for any measured number). So **v3's
+headline was misattributed** — the 64 %→21 % collapse was the invalidation
+rule, not the sequencing fix — and **v2's confirmation/delay/geometry numbers,
+marked stale in `knowledge/session-liquidity.md` §0, are in fact correct**
+(§0/§7 need an Architect edit). The decision-relevant finding: at a 64 %
+confirmation rate the mechanic **does not select** — confirmed take-outs
+reverse 0.97–1.23× the unconditional baseline against 1.23–1.58× for bare
+take-outs, so iFVG confirmation is a timing/entry-reference mechanic, not a
+filter. And 30.3 % of take-outs never produce a qualifying gap at all — the
+group with the **largest** median reversal in the sample (5.98 ATR). Next:
+user audits the 24-panel gallery + hour chart → Architect rules on §0/§7 and
+on trigger-vs-filter → PDH/PDL drill-down → BoS correction → strategy design.
+
+Prior status (2026-08-31, superseded by the above; v3 numbers are stale — they
+measure the fabricated invalidation rule): **v3 corrected-iFVG pass DONE**,
+see `RESEARCH-LOG.md` Запись 13 and `research/session-liquidity-v3/REPORT.md`.
+
+Prior status (2026-08-31, superseded): **v2 redo DONE for iFVG, awaiting user
+audit; BoS still open** — see `RESEARCH-LOG.md` Запись 12 and
 `research/session-liquidity-v2/REPORT.md`. The v2 pass re-measured everything
 under the reissued definitions (non-overlapping sessions, block-scoped
 horizon, relaxed iFVG, ATR primary) and found the iFVG-confirmed sweep to be
