@@ -11,21 +11,35 @@ file updated whenever a definition changes during implementation.
   overlap, strict iFVG) — **rejected after user review**, kept on disk for
   reference only. Do not build on it. `RESEARCH-LOG.md` Запись 11.
 - **v2** (`research/session-liquidity-v2/`) — reissued sessions/horizon/units
-  fixed the phase-1 problems above and are still in force (§1, §6). But its
-  **iFVG confirmation algorithm had its own bug** (retroactive best-pick
-  across the whole window — see §5.1) that invalidated its confirmation-rate,
-  delay, and from-confirmation geometry numbers. Take-out frequency and the
-  window-length findings survive (they're upstream of confirmation).
-  `RESEARCH-LOG.md` Записи 10–12.
-- **v3 iFVG mechanic** (§5.1) — corrected. v3's own invalidation clause
-  (a "give up if price closes beyond the take-out bar's extreme" rule, and
-  the resulting A/B/C invalidation-semantics question) turned out to be a
-  **fabricated requirement that was never part of the idea** — invented
-  during grilling, not requested by the user, and confirmed wrong against a
-  worked diagram (2026-08-31, see §5.1's note). **v4 drops invalidation
-  entirely**; this is the authoritative iFVG spec. Anything computed under v2
-  or v3's algorithms (confirmation rate, delay, from-confirmation geometry,
-  the A/B/C variants) is stale and must be re-run under v4.
+  fixed the phase-1 problems above and are still in force (§1, §6). Its iFVG
+  confirmation *algorithm* was ill-defined (retroactive best-pick across the
+  whole window — see §5.1), **but the v4 pass proved the defect was
+  output-equivalent**: v2 and v4 confirm the identical event set on identical
+  bars over all 23,423 take-outs (gap-stacking geometry makes the
+  latest-formed gap always the first to invert — near-proof in the v4
+  REPORT §2). **v2's confirmation-rate, delay, and from-confirmation
+  geometry numbers are therefore numerically correct**, alongside its
+  take-out frequency and window-length findings. `RESEARCH-LOG.md`
+  Записи 10–12.
+- **v3** (`research/session-liquidity-v3/`) — **superseded in full.** Its
+  invalidation clause ("give up if price closes beyond the take-out bar's
+  extreme", and the resulting A/B/C semantics question) was a **fabricated
+  requirement, never part of the idea** — invented during grilling, confirmed
+  wrong against the user's worked diagram (2026-08-31). The v4 pass showed
+  v3's entire 64%→21% confirmation collapse came from that fabricated rule,
+  not from the sequencing fix; v3's numbers measure a rule that does not
+  exist in the idea. Kept on disk as the audit trail only.
+- **v4 iFVG mechanic** (§5.1) — **authoritative**: fixed boundary,
+  latest-formed qualifying gap as the single active candidate, no
+  invalidation. Numbers under v4: `research/session-liquidity-v4/`
+  (RESEARCH-LOG Запись 13). Key measured facts for any design pass: iFVG
+  confirmation is a **timing/entry-reference mechanic, not a selection
+  filter** (it keeps 64% of take-outs; confirmed lift 0.97–1.23× vs
+  1.23–1.58× for bare take-outs); from-confirmation geometry is a coin flip
+  in aggregate; window length dominates everything (37.7→72.5% confirmation
+  across remaining-window buckets, and "hour of day" effects are window
+  length in disguise); the 30.3% of take-outs with no qualifying gap carry
+  the largest reversals in the sample.
 - **BoS** — never correctly measured (phase-1 mechanic was defective, v2
   excluded it entirely). Own later pass, not yet designed. See
   `research/session-liquidity/corrections/BOS-CORRECTION-NOTE.md`.
@@ -226,7 +240,7 @@ pass that deviates must say so explicitly.
 | V6 | BoS mechanic | **not pinned** — deferred to the BoS correction pass | §5.2 | replaces D7 |
 | V7 | Re-sweeping a level | not allowed — retired on first take-out | — | = D8 |
 | V8 | Level lifetime | 48h from session close, then expired unswept | — | = D9 |
-| V9 | iFVG confirmation tracking | **sequential, no invalidation** (§5.1, v4) — active candidate = latest-formed qualifying gap, replaced by newer ones, no retroactive cross-window pick. An earlier v3 draft added an invalidation rule (give up on new highs beyond the take-out bar) — dropped, it was fabricated during grilling and never part of the idea | §5.1 | new, corrects a v2 implementation bug (not a phase-1 default); v3→v4 removed a spurious addition, not a phase-1 reversion |
+| V9 | iFVG confirmation tracking | **sequential, no invalidation** (§5.1, v4) — active candidate = latest-formed qualifying gap, replaced by newer ones, no retroactive cross-window pick. The v3 invalidation rule (give up on closes beyond the take-out bar's extreme) was fabricated during grilling and dropped in v4. The v4 pass proved the sequential fix is **output-equivalent to v2's best-pick** (identical confirmations on identical bars; only the named gap differs, on 6.7% of events, with no metric consequence) — so v4 is the correct *definition*, and the substantive v3→v4 change was removing the fabricated rule, while the v2→v3 sequencing change was definitional hygiene with no numeric effect | §5.1 | v4 current; v3 superseded in full; v2 numbers valid |
 
 ## 8. Research protocol notes
 
