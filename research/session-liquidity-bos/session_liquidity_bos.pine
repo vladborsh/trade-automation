@@ -1,0 +1,532 @@
+//@version=6
+// Session liquidity — BoS pass: non-overlapping sessions + the CORRECTED
+// break-of-structure mechanic, drawn beside the v4 iFVG state machine.
+// (knowledge/session-liquidity.md §5.2 / V6, pinned by
+//  research/session-liquidity-bos/DESIGN.md §1.)
+//
+// Draws, on a live TradingView chart, what the Python engine in
+// research/session-liquidity-bos/engine.py computes on cached history:
+//
+//   * NON-OVERLAPPING session rectangles: Asia 00-08, London 08-13, NY 13-21,
+//     plus the residual Late block 21-24 which produces NO levels;
+//   * the unswept-level pool from the last 48h, as horizontal rays;
+//   * take-outs of those levels (a wick beyond the level is sufficient);
+//   * ** THE BoS ANCHOR RAY ** — at the take-out bar, the most recent
+//     OPPOSING k=3 pivot that is already confirmed is pinned, and drawn as a
+//     ray from its own pivot bar forward until a CLOSE breaks it or the block
+//     ends. The ray NEVER MOVES. That immobility is the entire correction;
+//   * optionally, phase 1's defective level as it moved, so the defect is
+//     visible on the chart rather than only in a table;
+//   * the v4 iFVG state machine, unchanged, so the two methods can be
+//     compared bar by bar;
+//   * the current block's end, so the measurement window is visible.
+//
+// WHY THIS FILE EXISTS — the defect it renders
+// --------------------------------------------
+// Phase 1's engine kept ONE active level per side and OVERWROTE it every time
+// any new k=3 pivot confirmed, including pivots confirming AFTER the take-out,
+// during the incipient reversal. It therefore tested a level that nobody was
+// watching when the sweep happened. The correction note classified the missing
+// ray as a "viz gap"; it was more than that — with no ray on the chart, no
+// worked example could ever contradict the engine. So drawing the ray is part
+// of the fix, and this indicator is the manual-audit half of it.
+//
+// THE MECHANIC, high sweep (low sweep is the exact mirror):
+//   1. at the take-out bar t0, anchor = the most recent pivot LOW confirmed as
+//      of t0 (with k = 3, a pivot is known 3 bars after it prints, so the
+//      anchor's own bar is always >= 3 bars before t0);
+//   2. the anchor is FIXED for the life of the event — no re-anchoring, ever;
+//   3. BoS = the first CLOSE below it inside [t0, end of the sweep block];
+//   4. no qualifying pivot at all -> "unanchorable" (never observed in the
+//      4-asset 5m sample; the label exists so the case is visible if it ever
+//      happens on another instrument or timeframe);
+//   5. no break before the block ends -> unconfirmed.
+//
+// READ THIS BEFORE READING ANYTHING OFF THE CHART: the measured result is that
+// the anchor sits a MEDIAN OF ~4.9 ATR from the take-out wick and is on the
+// near side of the swept level in ~100% of events, so a BoS is a close back
+// deep INSIDE the swept range — late, with a wide stop (median R proxy 0.41 vs
+// 0.84 for the iFVG). See RUNBOOK.md and REPORT.md.
+//
+// Still absent, deliberately: no PDH/PDL rays (they belong to the drill-down
+// pass).
+//
+// SIMPLIFICATION vs the Python engine, stated rather than hidden: Python runs
+// one independent machine per take-out EVENT; Pine keeps one watch per
+// DIRECTION per block, and a fresh take-out on that side restarts it. When one
+// block hosts several take-outs on the same side, the chart shows the latest
+// one. Everything else — anchor selection, immobility, close-through
+// confirmation, block scoping — is identical.
+//
+// This is an INDICATOR, not a strategy: no orders, no equity curve, nothing to
+// over-fit.
+
+indicator("Session liquidity — BoS (corrected, pinned anchor) + iFVG v4",
+     "SessLiq BoS", overlay = true, max_boxes_count = 500, max_lines_count = 500,
+     max_labels_count = 500)
+
+// ------------------------------------------------------------------ inputs --
+grpS = "Sessions (UTC, non-overlapping — knowledge/session-liquidity.md §1)"
+bool  showAsia   = input.bool(true,  "Asia   00:00-08:00  (produces levels)", group = grpS)
+bool  showLondon = input.bool(true,  "London 08:00-13:00  (produces levels)", group = grpS)
+bool  showNY     = input.bool(true,  "NY     13:00-21:00  (produces levels)", group = grpS)
+bool  showLate   = input.bool(true,  "Late   21:00-24:00  (NO levels)",       group = grpS)
+string sessAsia  = input.session("0000-0800", "Asia window",   group = grpS)
+string sessLon   = input.session("0800-1300", "London window", group = grpS)
+string sessNY    = input.session("1300-2100", "NY window",     group = grpS)
+string sessLate  = input.session("2100-0000", "Late window",   group = grpS)
+string tz        = input.string("UTC", "Session timezone", group = grpS,
+     tooltip = "The study is defined in UTC, fixed, no DST. Change only if you know why.")
+
+grpL = "Levels"
+int   lookbackH  = input.int(48, "Level lifetime (hours)", minval = 2, maxval = 240,
+     group = grpL, tooltip = "V8: unswept levels from the last 2 days = 48h.")
+bool  showRays   = input.bool(true, "Draw unswept level rays", group = grpL)
+bool  markSweeps = input.bool(true, "Mark take-outs", group = grpL)
+bool  keepBoundary = input.bool(true, "Keep the swept boundary drawn across the window",
+     group = grpL, tooltip = "The swept level is the ONLY reference the mechanic " +
+               "tracks. It is drawn solid from the take-out to the block end so " +
+               "it is obvious that nothing else is being watched.")
+
+grpF = "iFVG state machine (§5.1 / V9, v4) — the COMPARISON method"
+bool  showFVG     = input.bool(false, "Draw every 3-candle FVG (noisy)", group = grpF,
+     tooltip = "Off by default: what matters is the CANDIDATE gaps, which are " +
+               "drawn regardless. Turn on to see what the location filter rejects.")
+bool  showMachine = input.bool(true,  "Draw the iFVG state machine", group = grpF)
+int   fvgKeep     = input.int(90, "Drop a stale candidate after N bars", minval = 5,
+     maxval = 400, group = grpF,
+     tooltip = "COSMETIC ONLY — it stops an ancient box from being extended " +
+               "forever on the chart. The Python engine has no such rule; a " +
+               "candidate there lives until it is replaced, confirms, or the " +
+               "block ends. Set it above the longest block (96 bars on 5m) to " +
+               "match the engine exactly.")
+
+grpW = "Measurement window"
+bool  showBlockEnd = input.bool(true, "Shade the current block and mark its end", group = grpW,
+     tooltip = "V4: every window — magnitude AND the iFVG machine — runs from " +
+               "the take-out bar to the last bar of the block it happened in.")
+
+grpB = "BoS — CORRECTED mechanic (§5.2 / V6, DESIGN.md §1)"
+bool  showBos     = input.bool(true, "Draw the pinned BoS anchor ray", group = grpB,
+     tooltip = "The ray is chosen ONCE, at the take-out bar, and never moves. " +
+               "If you ever see it step, this indicator is wrong.")
+int   pivK        = input.int(3, "Pivot half-width k", minval = 1, maxval = 10, group = grpB,
+     tooltip = "SPEC value, not a tuning knob: k = 3, the same fractals() the " +
+               "Python engine uses. A pivot is confirmed k bars after it prints, " +
+               "which is why the anchor is always >= k bars before the take-out.")
+bool  showPivots  = input.bool(false, "Mark every confirmed k=3 pivot", group = grpB,
+     tooltip = "Off by default. Turn on to see the pool the anchor is chosen from.")
+bool  showPhase1  = input.bool(false, "Also draw PHASE 1's level, as it moved (the defect)",
+     group = grpB,
+     tooltip = "Phase 1 overwrote its tested level on EVERY new pivot " +
+               "confirmation. Turning this on shows the level walking away from " +
+               "the pinned ray — that walk is what the phase-1 BoS numbers were " +
+               "measuring. Off by default because it is a museum piece.")
+
+color cAsia = input.color(color.new(#e08b3a, 88), "Asia fill",   group = "Colors")
+color cLon  = input.color(color.new(#3f7fbf, 88), "London fill", group = "Colors")
+color cNY   = input.color(color.new(#7b5ea7, 88), "NY fill",     group = "Colors")
+color cLate = input.color(color.new(#9aa0a6, 92), "Late fill",   group = "Colors")
+
+// --------------------------------------------------------------- utilities --
+type Sess
+    string  name
+    color   col
+    bool    makesLevels
+    bool    inS
+    float   hi
+    float   lo
+    box     bx
+
+var Sess sA = Sess.new("Asia",   cAsia, true,  false, na, na, na)
+var Sess sL = Sess.new("London", cLon,  true,  false, na, na, na)
+var Sess sN = Sess.new("NY",     cNY,   true,  false, na, na, na)
+var Sess sT = Sess.new("Late",   cLate, false, false, na, na, na)
+
+// Level pool. Parallel arrays: price, is-high-side, expiry bar_index, ray, name.
+var array<float>  lvPx   = array.new_float()
+var array<bool>   lvHigh = array.new_bool()
+var array<int>    lvExp  = array.new_int()
+var array<line>   lvLn   = array.new_line()
+var array<string> lvSes  = array.new_string()
+
+lifeBars = math.max(1, int(lookbackH * 60 / math.max(1, timeframe.in_seconds() / 60)))
+
+addLevel(float px, bool isHigh, string nm, color col) =>
+    ln = line.new(bar_index, px, bar_index + 1, px, extend = extend.none,
+         color = showRays ? col : color.new(color.gray, 100), width = 1,
+         style = line.style_dashed)
+    array.push(lvLn, ln)
+    array.push(lvPx, px)
+    array.push(lvHigh, isHigh)
+    array.push(lvExp, bar_index + lifeBars)
+    array.push(lvSes, nm)
+
+track(Sess s, string spec, bool enabled) =>
+    if enabled
+        bool nowIn = not na(time(timeframe.period, spec, tz))
+        if nowIn and not s.inS
+            s.inS := true
+            s.hi := high
+            s.lo := low
+            s.bx := box.new(bar_index, high, bar_index, low, bgcolor = s.col,
+                 border_color = color.new(s.col, 40), border_width = 1,
+                 border_style = s.makesLevels ? line.style_solid : line.style_dotted)
+        else if nowIn
+            s.hi := math.max(s.hi, high)
+            s.lo := math.min(s.lo, low)
+            box.set_top(s.bx, s.hi)
+            box.set_bottom(s.bx, s.lo)
+            box.set_right(s.bx, bar_index)
+        else if s.inS
+            s.inS := false
+            box.set_right(s.bx, bar_index - 1)
+            if s.makesLevels
+                addLevel(s.hi, true,  s.name, color.new(s.col, 20))
+                addLevel(s.lo, false, s.name, color.new(s.col, 20))
+
+track(sA, sessAsia, showAsia)
+track(sL, sessLon,  showLondon)
+track(sN, sessNY,   showNY)
+track(sT, sessLate, showLate)
+
+// ---------------------------------------------------- the current clock block
+inAsia = not na(time(timeframe.period, sessAsia, tz))
+inLon  = not na(time(timeframe.period, sessLon,  tz))
+inNY   = not na(time(timeframe.period, sessNY,   tz))
+string curBlock = inAsia ? "Asia" : inLon ? "London" : inNY ? "NY" : "Late"
+bool newBlock = curBlock != curBlock[1]
+
+if showBlockEnd and newBlock and not na(curBlock[1])
+    line.new(bar_index - 1, low, bar_index - 1, high, extend = extend.both,
+         color = color.new(color.olive, 55), style = line.style_dashed, width = 1)
+    label.new(bar_index - 1, high, curBlock[1] + " block ends", yloc = yloc.abovebar,
+         style = label.style_label_down, color = color.new(color.olive, 75),
+         textcolor = color.gray, size = size.tiny,
+         tooltip = "V4: every measurement / iFVG window for a take-out inside " +
+                   "the previous block stopped here.")
+
+// ============================================ k=3 PIVOTS — the anchor pool
+// `ta.pivotlow(k, k)` returns a value on the bar where the pivot becomes
+// CONFIRMED; the pivot itself printed k bars earlier. That is exactly the
+// causality of the project's fractals(df, k=3): a flag on bar j names the
+// pivot at bar j - k. So "the most recent pivot confirmed as of t0" is simply
+// "the last value these two variables held when t0 arrived".
+float pvLo = ta.pivotlow(low, pivK, pivK)
+float pvHi = ta.pivothigh(high, pivK, pivK)
+
+var float lastPvLoPx  = na
+var int   lastPvLoBar = na
+var float lastPvHiPx  = na
+var int   lastPvHiBar = na
+
+if not na(pvLo)
+    lastPvLoPx  := pvLo
+    lastPvLoBar := bar_index - pivK
+    if showPivots
+        label.new(bar_index - pivK, pvLo, "▲", yloc = yloc.belowbar,
+             style = label.style_none, textcolor = color.new(color.teal, 25),
+             size = size.tiny,
+             tooltip = "pivot low, confirmed " + str.tostring(pivK) + " bars later")
+if not na(pvHi)
+    lastPvHiPx  := pvHi
+    lastPvHiBar := bar_index - pivK
+    if showPivots
+        label.new(bar_index - pivK, pvHi, "▼", yloc = yloc.abovebar,
+             style = label.style_none, textcolor = color.new(color.maroon, 25),
+             size = size.tiny,
+             tooltip = "pivot high, confirmed " + str.tostring(pivK) + " bars later")
+
+// ---- PHASE 1's level, kept only so the defect can be drawn ----------------
+// One active level per side, OVERWRITTEN on every confirmation and retired
+// after one break. This is the museum piece; it is never used for anything
+// but the optional grey step-line.
+var float p1Lo = na
+var float p1Hi = na
+if not na(pvLo)
+    p1Lo := pvLo
+if not na(pvHi)
+    p1Hi := pvHi
+bool p1FiredDn = not na(p1Lo) and close < p1Lo
+bool p1FiredUp = not na(p1Hi) and close > p1Hi
+if p1FiredDn
+    p1Lo := na
+if p1FiredUp
+    p1Hi := na
+
+// ------------------------------------------------------- take-out detection --
+bool tookHi = false
+bool tookLo = false
+float tookHiPx = na
+float tookLoPx = na
+
+if array.size(lvPx) > 0
+    for i = array.size(lvPx) - 1 to 0
+        float px = array.get(lvPx, i)
+        bool  ish = array.get(lvHigh, i)
+        bool  expired = bar_index > array.get(lvExp, i)
+        bool  taken = ish ? high > px : low < px
+        if not expired and not taken
+            line.set_x2(array.get(lvLn, i), bar_index + 1)
+        if expired or taken
+            if taken
+                if ish
+                    tookHi := true
+                    // V2 attribution: the deepest level reached wins
+                    tookHiPx := na(tookHiPx) ? px : math.max(tookHiPx, px)
+                else
+                    tookLo := true
+                    tookLoPx := na(tookLoPx) ? px : math.min(tookLoPx, px)
+            l = array.get(lvLn, i)
+            line.set_color(l, showRays ? (taken ? color.new(color.gray, 45) : color.new(color.gray, 80))
+                 : color.new(color.gray, 100))
+            line.set_style(l, line.style_dotted)
+            array.remove(lvPx, i)
+            array.remove(lvHigh, i)
+            array.remove(lvExp, i)
+            array.remove(lvLn, i)
+            array.remove(lvSes, i)
+
+if markSweeps and tookHi
+    label.new(bar_index, high, "sweep ▲", yloc = yloc.abovebar, style = label.style_label_down,
+         color = color.new(color.red, 25), textcolor = color.white, size = size.tiny,
+         tooltip = "session HIGH taken out at " + str.tostring(tookHiPx, format.mintick) +
+                   "  |  window: this bar -> end of the " + curBlock + " block")
+if markSweeps and tookLo
+    label.new(bar_index, low, "sweep ▼", yloc = yloc.belowbar, style = label.style_label_up,
+         color = color.new(color.teal, 25), textcolor = color.white, size = size.tiny,
+         tooltip = "session LOW taken out at " + str.tostring(tookLoPx, format.mintick) +
+                   "  |  window: this bar -> end of the " + curBlock + " block")
+
+// ======================================== THE CORRECTED BoS MECHANIC (§5.2)
+// One watch per direction. `px` is chosen ONCE, at the take-out bar, from the
+// pivot variables above, and is NEVER assigned again while the watch is on —
+// that is the whole correction, and it is visible in the code: there is no
+// second assignment to `w.px` anywhere below.
+type Bos
+    bool  on
+    bool  isHigh
+    float px
+    int   anchorBar
+    line  ray
+    int   startBar
+
+var Bos bHi = Bos.new(false, true,  na, na, na, na)
+var Bos bLo = Bos.new(false, false, na, na, na, na)
+
+sealBos(Bos w, color col, string txt, bool up) =>
+    if showBos and not na(w.ray)
+        line.set_color(w.ray, col)
+        line.set_x2(w.ray, bar_index)
+        label.new(bar_index, close, txt, style = up ? label.style_label_up : label.style_label_down,
+             color = color.new(col, 25), textcolor = color.white, size = size.tiny,
+             tooltip = "anchor " + str.tostring(w.px, format.mintick) +
+                       ", pinned at bar " + str.tostring(w.anchorBar) +
+                       " and never moved. Break = a full CLOSE through it. " +
+                       "Take-out bar: " + str.tostring(w.startBar) + ", i.e. " +
+                       str.tostring(bar_index - w.startBar) + " bars ago.")
+    w.on := false
+
+startBos(Bos w) =>
+    float px  = w.isHigh ? lastPvLoPx  : lastPvHiPx
+    int   abar = w.isHigh ? lastPvLoBar : lastPvHiBar
+    if na(px)
+        // DESIGN §1 pin 4 — reported, never silently dropped
+        label.new(bar_index, close, "BoS UNANCHORABLE", style = label.style_label_left,
+             color = color.new(color.gray, 20), textcolor = color.white, size = size.tiny,
+             tooltip = "no confirmed opposing k=" + str.tostring(pivK) +
+                       " pivot existed before this take-out. Never observed in " +
+                       "the 4-asset 5m study sample.")
+        w.on := false
+    else
+        w.on := true
+        w.px := px
+        w.anchorBar := abar
+        w.startBar := bar_index
+        if showBos
+            w.ray := line.new(abar, px, bar_index + 1, px,
+                 color = color.new(color.green, 10), width = 2, style = line.style_solid)
+            label.new(abar, px, w.isHigh ? "BoS anchor ▲" : "BoS anchor ▼",
+                 style = w.isHigh ? label.style_label_up : label.style_label_down,
+                 color = color.new(color.green, 55), textcolor = color.white, size = size.tiny,
+                 tooltip = "the most recent " + (w.isHigh ? "pivot LOW" : "pivot HIGH") +
+                           " confirmed as of the take-out bar. Pinned here for the " +
+                           "life of the event: no re-anchoring, ever.")
+
+stepBos(Bos w) =>
+    if w.on
+        if showBos and not na(w.ray)
+            line.set_x2(w.ray, bar_index + 1)
+        bool broke = w.isHigh ? close < w.px : close > w.px
+        if broke
+            sealBos(w, color.green, w.isHigh ? "BoS ✓ ▼" : "BoS ✓ ▲", not w.isHigh)
+
+// the block boundary ends every BoS window, exactly as it ends the iFVG one
+if newBlock
+    if bHi.on
+        sealBos(bHi, color.orange, "BoS — no break before block end", false)
+    if bLo.on
+        sealBos(bLo, color.orange, "BoS — no break before block end", true)
+
+if tookHi
+    startBos(bHi)
+if tookLo
+    startBos(bLo)
+
+stepBos(bHi)
+stepBos(bLo)
+
+// ---- the optional museum piece: phase 1's level, drawn as it MOVES ---------
+// One short segment per bar while a watch is live. Costly in line objects, so
+// it is off by default and only covers recent history.
+if showPhase1 and bHi.on and not na(p1Lo)
+    line.new(bar_index - 1, nz(p1Lo[1], p1Lo), bar_index, p1Lo,
+         color = color.new(color.red, 25), width = 1, style = line.style_solid)
+if showPhase1 and bLo.on and not na(p1Hi)
+    line.new(bar_index - 1, nz(p1Hi[1], p1Hi), bar_index, p1Hi,
+         color = color.new(color.red, 25), width = 1, style = line.style_solid)
+if showPhase1 and bHi.on and p1FiredDn
+    label.new(bar_index, close, "phase-1 BoS ✗", style = label.style_label_down,
+         color = color.new(color.red, 35), textcolor = color.white, size = size.tiny,
+         tooltip = "phase 1 fires here, on a level it re-anchored to AFTER the " +
+                   "take-out. The green ray is what the mechanic actually watches.")
+if showPhase1 and bLo.on and p1FiredUp
+    label.new(bar_index, close, "phase-1 BoS ✗", style = label.style_label_up,
+         color = color.new(color.red, 35), textcolor = color.white, size = size.tiny,
+         tooltip = "phase 1 fires here, on a level it re-anchored to AFTER the " +
+                   "take-out. The green ray is what the mechanic actually watches.")
+
+// ================================================ THE v4 STATE MACHINE (§5.1)
+// One Watch per direction. `on` = a take-out is being watched inside this
+// block; `active` = a candidate gap is currently live. There is no `lastInval`
+// and no `ref` — v3's two invalidation fields are gone, not disabled.
+type Watch
+    bool  on
+    bool  isHigh
+    float lvl        // THE BOUNDARY: the swept level. Fixed. The only reference.
+    line  lvlLn
+    bool  active
+    float gLo
+    float gHi
+    int   born       // bar_index of the active candidate's 3rd bar
+    box   gBx
+    int   nCand
+
+var Watch wHi = Watch.new(false, true,  na, na, false, na, na, na, na, 0)
+var Watch wLo = Watch.new(false, false, na, na, false, na, na, na, na, 0)
+
+// A candidate leaves the stage: colour its box by fate and stop extending it.
+sealCandidate(Watch w, color col, string txt, bool up) =>
+    if showMachine and not na(w.gBx)
+        box.set_bgcolor(w.gBx, color.new(col, 78))
+        box.set_border_color(w.gBx, col)
+        box.set_right(w.gBx, bar_index)
+        label.new(bar_index, close, txt, style = up ? label.style_label_up : label.style_label_down,
+             color = color.new(col, 25), textcolor = color.white, size = size.tiny,
+             tooltip = "candidate #" + str.tostring(w.nCand) + " formed at bar " +
+                       str.tostring(w.born) + ", gap " + str.tostring(w.gLo, format.mintick) +
+                       " .. " + str.tostring(w.gHi, format.mintick))
+    w.active := false
+
+// V4: the block boundary ends every window.
+resetWatch(Watch w) =>
+    if w.on and w.active and showMachine and not na(w.gBx)
+        box.set_bgcolor(w.gBx, color.new(color.orange, 82))
+        box.set_border_color(w.gBx, color.orange)
+    w.on := false
+    w.active := false
+    w.nCand := 0
+
+if newBlock
+    resetWatch(wHi)
+    resetWatch(wLo)
+
+// ---- (a) a take-out (re)starts the watch on that side ----------------------
+startWatch(Watch w, float lvl) =>
+    w.on := true
+    w.lvl := lvl
+    w.active := false
+    w.nCand := 0
+    if keepBoundary
+        w.lvlLn := line.new(bar_index, lvl, bar_index + 1, lvl,
+             color = color.new(color.black, 10), width = 2, style = line.style_dashed)
+
+if tookHi
+    startWatch(wHi, tookHiPx)
+if tookLo
+    startWatch(wLo, tookLoPx)
+
+// keep the boundary extending across the window — it is the only line here
+if wHi.on and keepBoundary and not na(wHi.lvlLn)
+    line.set_x2(wHi.lvlLn, bar_index + 1)
+if wLo.on and keepBoundary and not na(wLo.lvlLn)
+    line.set_x2(wLo.lvlLn, bar_index + 1)
+
+// ---- (b) resolve this bar's CLOSE against the already-active candidate -----
+// Order matters and mirrors the Python engine exactly: a gap that becomes
+// active on THIS bar is not tested until the NEXT bar (pin 3). There is only
+// ONE test left — the confirmation.
+stepWatch(Watch w) =>
+    if w.on and w.active and bar_index > w.born
+        bool hitConf = w.isHigh ? close < w.gLo : close > w.gHi
+        if hitConf
+            sealCandidate(w, color.green, w.isHigh ? "iFVG ✓ CONFIRM ▼" : "iFVG ✓ CONFIRM ▲",
+                 not w.isHigh)
+            w.on := false            // the event is resolved; nothing more to watch
+        else if showMachine and not na(w.gBx)
+            box.set_right(w.gBx, bar_index + 1)
+    else if w.on and w.active and showMachine and not na(w.gBx)
+        box.set_right(w.gBx, bar_index + 1)
+    // drop a candidate that has gone stale on the chart (COSMETIC only — the
+    // engine has no such rule; see the input's tooltip)
+    if w.on and w.active and bar_index - w.born > fvgKeep
+        sealCandidate(w, color.gray, "stale (chart only)", not w.isHigh)
+
+stepWatch(wHi)
+stepWatch(wLo)
+
+// ---- (c) formation: the LATEST qualifying gap becomes the candidate --------
+bool bullFvg = low > high[2]
+bool bearFvg = high < low[2]
+
+if showFVG and bullFvg
+    box.new(bar_index - 2, low, bar_index + 3, high[2],
+         bgcolor = color.new(color.teal, 92), border_color = color.new(color.teal, 75))
+if showFVG and bearFvg
+    box.new(bar_index - 2, low[2], bar_index + 3, high,
+         bgcolor = color.new(color.maroon, 92), border_color = color.new(color.maroon, 75))
+
+activate(Watch w, float gLo, float gHi) =>
+    if w.active
+        // pin 1: replacement is FINAL — the displaced gap can never confirm
+        sealCandidate(w, color.gray, "replaced", not w.isHigh)
+    w.nCand += 1
+    w.active := true
+    w.gLo := gLo
+    w.gHi := gHi
+    w.born := bar_index
+    if showMachine
+        w.gBx := box.new(bar_index - 2, gHi, bar_index + 1, gLo,
+             bgcolor = color.new(color.blue, 82), border_color = color.new(color.blue, 40),
+             border_width = 1)
+        label.new(bar_index, w.isHigh ? gHi : gLo, "#" + str.tostring(w.nCand),
+             style = w.isHigh ? label.style_label_down : label.style_label_up,
+             color = color.new(color.blue, 45), textcolor = color.white, size = size.tiny,
+             tooltip = "candidate #" + str.tostring(w.nCand) + " — the ACTIVE gap. " +
+                       "Only THIS gap can confirm; an older one is out for good.")
+
+// V5 relaxed location: for a swept HIGH, a BULLISH gap [high[2], low] whose
+// upper edge merely REACHES above the level qualifies. Mirrored for a swept LOW
+// with a BEARISH gap [high, low[2]] whose lower edge reaches below it.
+if wHi.on and bullFvg and low > wHi.lvl
+    activate(wHi, high[2], low)
+if wLo.on and bearFvg and high < wLo.lvl
+    activate(wLo, high, low[2])
+
+// ----------------------------------------------------------------- alerts ----
+alertcondition(tookHi, "Session high taken out", "Session HIGH swept")
+alertcondition(tookLo, "Session low taken out",  "Session LOW swept")
+alertcondition(bHi.on and close < bHi.px, "BoS down (corrected)",
+     "Corrected BoS: close through the pinned pivot low after a session-high sweep")
+alertcondition(bLo.on and close > bLo.px, "BoS up (corrected)",
+     "Corrected BoS: close through the pinned pivot high after a session-low sweep")

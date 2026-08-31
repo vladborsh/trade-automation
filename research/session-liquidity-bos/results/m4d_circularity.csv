@@ -1,0 +1,4 @@
+quantity,p10,median,p90
+anchor distance |take-out wick - anchor| (ATR),2.800528106429928,4.224144735977016,6.325112906592202
+"wick-anchored reversal rev_atr, BoS-confirmed events",4.570734524645643,7.759202148951643,15.395779129645014
+"rev_atr, ALL primary take-outs (the comparison base)",1.404900340747663,4.050653551913768,10.185782646394784
