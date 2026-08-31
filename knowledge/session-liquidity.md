@@ -95,6 +95,30 @@ Unchanged from phase 1: a session's price action is checked against **all
 unswept levels from the last 2 days** (today's earlier sessions plus all of
 yesterday), not just the same session on the prior day.
 
+## Previous-day high/low (PDH/PDL) — second level class (added 2026-08-31)
+
+A separate level class introduced for the drill-down pass
+(`research/session-liquidity-v2/drilldown/`), alongside — not replacing — the
+per-session levels:
+
+- **Definition:** PDH = the high of the **entire prior UTC day (00:00–24:00)**;
+  PDL = its low. Note this deliberately includes the Late block, deviating from
+  the "max of Asia/London/NY highs" shorthand: the day's true extreme can print
+  in 21:00–24:00, and a level meant to read as "yesterday's high" must be the
+  actual high. The share of days where Late set the extreme is reported as a
+  diagnostic.
+- **Sweepable:** from the first bar of the following UTC day (00:00).
+  **Lifetime:** that following day only (superseded at the next midnight by the
+  new PDH/PDL). Retired on first take-out (V7 analog).
+- **Coexistence / no double-counting:** PDH/PDL events form a **separate event
+  stream** from the per-session-level events — existing v2 tables are not
+  contaminated. A single excursion may legitimately take out both the day level
+  and a still-alive constituent session level at the same price; the day-level
+  event records a `coincident_session_level` flag (an alive session level
+  within 0.05 × ATR of the day level at take-out) so tables can split "pure"
+  day-level sweeps from coincident ones. Within the PDH/PDL stream itself,
+  V2-style attribution applies (one bar, one event).
+
 ## Pinned mechanical defaults (v2 ledger)
 
 Carried, changed, or removed relative to the phase-1 D1–D9 ledger — any later
