@@ -9,7 +9,53 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** **PDH/PDL drill-down DONE — answer is NO; v4 iFVG mechanic DONE,
+**Status:** **SHELVED by Architect ruling, 2026-08-31** — the family is closed as
+a strategy candidate; all measurement work is kept. Decision record:
+`RESEARCH-LOG.md` Запись 17. Six descriptive passes (phase 1, v2, v3, v4, the
+PDH/PDL drill-down, the BoS pass) converge on one null that no further pass can
+overturn from inside: **confirmation is a timing / entry-reference mechanic, not
+a selection filter**, and the circularity-free forward lift is **below 1.0 for
+every confirmation rule measured** — corrected BoS **0.87**, iFVG-v4 **0.83**,
+phase-1 BoS **0.74**, against an unconditional 1.00. The stop-free measures
+agree: at the iFVG confirmation close MFE/MAE = 0.99, 51.4 % are still on the
+favourable side at block close with a median of +0.10 ATR; the best drill-down
+cell has MFE/MAE 0.90 and median signed ER +0.003. Nothing has been costed, and
+nothing reached a bar that would justify costing it.
+
+Both pre-registered follow-ups are **declined**, with reasons on the record:
+
+* **(a) A trader-realistic stop for BoS** (`session-liquidity-bos/HANDOFF.md`
+  item 1). A stop convention re-labels R; it does not create drift. R already
+  correlates with the stop proxy (ρ = +0.34…+0.42, drill-down §4) and every
+  stop-free measure is flat, so the pass would re-order two mechanics that are
+  both flat — and its only consumer is a strategy design the nulls do not
+  support. Pin a real stop rule if and when something reopens (below), not
+  before.
+* **(b) The no-confirmation reversal thread** (v4 §7 `no_candidate`: 6,401
+  events, 30.3 %, median wick reversal 5.98 ATR vs 3.31 for confirmed; the BoS
+  pass's "neither" cell, 17.4 %). The 5.98 ATR is measured from the sweep wick,
+  which is knowable only in hindsight; there is no trigger and no entry
+  reference in that population. Turning it into a rule means inventing a new
+  confirmation mechanic — a new research family, not a follow-up — and every
+  trigger measured so far has forward lift below 1.0.
+
+**Kept:** the pinned definitions (`knowledge/session-liquidity.md` §3.2, §5.1 v4,
+§5.2 BoS, §6, §7 ledger), the four audited engines and their reuse harness, the
+galleries, and the Pine indicators. **Formally retired:** the phase-1 BoS numbers
+(T2/T3/T5/T12/T13 BoS rows) — as a *different, near-unconditional event*, not as
+an inflated version of the right number — and the C-BoS arm of the invalidated
+`research/session-liquidity/STRATEGY-DESIGN.md`.
+
+**Single named reopen trigger — C3.** PDH/PDL swept in Asia is the only finding
+that survives stratification on stop-free metrics (MFE/MAE 1.11 and median
+signed ER +0.024, both consistent in 4/4 assets). It reopens **only** as a
+pre-registered, hypothesis-tested pass — permutation null, kill rule,
+fit/holdout split, costs in from bar one, and a real stop rule pinned *before*
+any R is computed — on the ~0.24 pure day-level take-outs per asset-day. Under
+the descriptive protocol it would yield another shape, and the log already holds
+six of those.
+
+Prior status (2026-08-31, superseded by the above): **PDH/PDL drill-down DONE — answer is NO; v4 iFVG mechanic DONE,
 awaiting user audit; BoS still open (2026-08-31)** — see `RESEARCH-LOG.md`
 Запись 15 and `research/session-liquidity-v2/drilldown/REPORT.md`. The
 drill-down asked which level class and which window regime select, with the

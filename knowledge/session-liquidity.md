@@ -7,6 +7,19 @@ file updated whenever a definition changes during implementation.
 
 ## 0. Status
 
+- **Idea SHELVED by Architect ruling, 2026-08-31** (`RESEARCH-LOG.md`
+  Запись 17, `IDEAS-BACKLOG.md`) — closed as a strategy candidate after six
+  descriptive passes converge on one null: confirmation (iFVG or BoS) is a
+  timing/entry-reference mechanic, not a selection filter, and the
+  circularity-free forward lift is below 1.0 for every rule measured
+  (corrected BoS 0.87, iFVG-v4 0.83, phase-1 BoS 0.74). All definitions below,
+  the four audited engines, galleries, and Pine indicators are **kept** as the
+  measurement base. Both pre-registered follow-ups (a trader-realistic BoS
+  stop; the no-confirmation reversal population) were declined — see the
+  backlog entry for why. **Single named reopen trigger (C3):** PDH/PDL swept
+  in Asia (MFE/MAE 1.11, median signed ER +0.024, 4/4 assets) — reopens only
+  as a pre-registered, hypothesis-tested pass with a real stop rule pinned
+  before any R is computed.
 - **Phase 1** (`research/session-liquidity/`, fixed 2h horizon, session
   overlap, strict iFVG) — **rejected after user review**, kept on disk for
   reference only. Do not build on it. `RESEARCH-LOG.md` Запись 11.
@@ -309,14 +322,13 @@ gallery (the format that surfaced both the phase-1 problems and the v2 iFVG
 bug; see `research/session-liquidity/examples_10x10.py`). Assets:
 BTC/ETH/SOL/BNB, 5m.
 
-**Flow:** Researcher (§5.1 v4 redo — no invalidation, iFVG only) **[done]**
-→ user review of worked examples/hour-of-day chart → BoS correction pass
-(§5.2) **[done — `research/session-liquidity-bos/`, RESEARCH-LOG Запись 15]**
-→ PDH/PDL drill-down (§3.2, 3 combos: NY sweeps London, NY sweeps PDH/PDL,
-Asia sweeps PDH/PDL) → Architect (strategy design, re-derived — the phase-2
-`STRATEGY-DESIGN.md` was written against phase-1 numbers and is provisionally
-invalidated; note that **neither** confirmation method selects, so a design
-must treat both as timing/entry references) → Researcher (backtest).
+**Flow (closed):** Researcher (§5.1 v4 redo — no invalidation, iFVG only)
+**[done]** → user review of worked examples/hour-of-day chart → BoS correction
+pass (§5.2) **[done — `research/session-liquidity-bos/`, RESEARCH-LOG
+Запись 15]** → PDH/PDL drill-down (§3.2) **[done — answer is no, see §0]** →
+Architect ruling **[done, 2026-08-31 — shelved, RESEARCH-LOG Запись 17]**. No
+further pass is scheduled; the phase-2 `STRATEGY-DESIGN.md` (written against
+phase-1 numbers) stays invalidated. Reopens only via C3 (§0).
 
 Deliverables per pass: Python analysis engine + tables + charts, and an
 updated Pine indicator reflecting the current definitions (non-overlapping
