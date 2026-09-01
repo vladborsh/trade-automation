@@ -358,6 +358,10 @@ def main():
     rows_desc = []
     rows_null = []
     verdicts = []
+    # The null draws are SAVED, not recomputed downstream: charts.py reads this
+    # file so the p-value printed on a chart is the same number the report
+    # quotes, rather than a fresh draw from a different RNG stream.
+    null_draws: dict[str, np.ndarray] = {}
 
     for pre, arm_lab in ARMS:
         for h, h_lab in HORIZONS:
@@ -382,6 +386,10 @@ def main():
             m_fit = fit.netR.mean() if len(fit) else np.nan
             pA_fit = float((nA_fit >= m_fit).mean()) if len(fit) else np.nan
 
+            null_draws[f"{pre}_{h}_nullA"] = nA
+            null_draws[f"{pre}_{h}_nullB"] = nB
+            null_draws[f"{pre}_{h}_boot"] = bt
+            null_draws[f"{pre}_{h}_obs"] = np.array([m_hold, pA, len(hold)])
             rows_null.append(dict(
                 arm=arm_lab, horizon=h_lab,
                 n_holdout=len(hold), mean_netR_holdout=m_hold,
@@ -396,6 +404,7 @@ def main():
                   f"mean={m_hold:+.4f} nullA_mean={np.nanmean(nA):+.4f} "
                   f"p={pA:.3f} pB={pB:.3f} fit={m_fit:+.4f}", flush=True)
 
+    np.savez(os.path.join(C.RESULTS, "null_draws.npz"), **null_draws)
     d = pd.DataFrame(rows_desc)
     d.to_csv(os.path.join(C.RESULTS, "p1_trade_stats.csv"), index=False)
     nl = pd.DataFrame(rows_null)

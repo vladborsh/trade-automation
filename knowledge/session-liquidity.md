@@ -20,6 +20,27 @@ file updated whenever a definition changes during implementation.
   in Asia (MFE/MAE 1.11, median signed ER +0.024, 4/4 assets) — reopens only
   as a pre-registered, hypothesis-tested pass with a real stop rule pinned
   before any R is computed.
+- **v5-NY** (`research/session-liquidity-v5-ny/`, RESEARCH-LOG Запись 18,
+  2026-09-01) — the **shelving confirmed under test**. The first
+  pre-registered, hypothesis-tested pass in the family (the standard §0's C3
+  trigger demands): pinned stop and trade template, 0.10% costs, 75/25
+  chronological split, matched-time permutation null, numeric kill rule, all
+  committed before any R existed. It tested a live 09:40–11:20 New York window
+  (§6.3.2) and a 24h horizon (§6.3.1) on BTC/ETH. **All four pre-registered
+  numbers fail the kill rule**: holdout mean net R −0.261 / −0.271 (iFVG,
+  block / 24h) and −0.019 / −0.037 (BoS), against a +0.05R threshold. The
+  strongest negative in the family: a matched-time placebo beat the iFVG
+  signal in **91% of 1,000 runs**. **Gross expectancy is ≈ 0** (−0.006R /
+  +0.009R) — the fee is the entire negative, which is a cleaner statement of
+  the null than "lift below 1.0". The one thing that moved: forward lift rises
+  0.84 → 0.95 and 0.89 → 1.00 inside the window — real, and exactly **par**.
+  The pass reproduces the v4 and BoS event streams **bit-for-bit** and ships
+  `MECHANIC-PROOF.md` (8 captioned real-chart examples + 36 machine checks
+  including prefix-causal re-derivation of both mechanics), which stands as an
+  independent re-audit of §5.1 and §5.2. **C3 is untouched** — a time window on
+  the session-level stream is not PDH/PDL-in-Asia; its `hypothesis.py` is
+  reusable machinery if C3 is ever authorised. New definitions added in §6.3;
+  no pinned definition changed.
 - **Phase 1** (`research/session-liquidity/`, fixed 2h horizon, session
   overlap, strict iFVG) — **rejected after user review**, kept on disk for
   reference only. Do not build on it. `RESEARCH-LOG.md` Запись 11.
@@ -296,6 +317,93 @@ that block; a sweep near block end gets a short window. Consequences, pinned:
 ~2× BTC purely through asset-level volatility). Raw % is reported as a
 secondary column, per asset, never pooled across assets.
 
+### 6.3 Secondary measurement additions (v5-NY pass, 2026-09-01)
+
+Added by `research/session-liquidity-v5-ny/` (RESEARCH-LOG Запись 18).
+**Nothing in §5.1, §5.2, §6.1, §6.2 or the §7 ledger changes.** These are
+*additional* columns and an *additional* filter, defined here so a later pass
+reusing them does not have to re-derive them.
+
+#### 6.3.1 The `h24` long horizon — secondary, never primary
+
+- **Definition:** measurement runs from the confirmation bar to
+  `min(t0 + 288 bars, last bar of the dataset)` — **24 hours from the take-out
+  bar** at 5m. It deliberately crosses block and day boundaries.
+- **Detection is NOT extended.** A confirmation must still occur inside the
+  block-scoped window of §6.1 to exist at all. Only the post-confirmation
+  measurement horizon is lengthened. Mixing the two would conflate "does the
+  move continue past the block boundary" with "does a longer search find more
+  events", which are different questions.
+- **The stop proxy is horizon-invariant** by construction: it depends only on
+  `[t0, confirmation bar]`, so it is identical under both horizons. Asserted,
+  not assumed (v5-NY `checks.py` C6).
+- **§6.1 stays primary.** Report `h24` beside the block-scoped column, in the
+  same units, with the same MFE / MAE / end-of-window convention — never
+  instead of it.
+- **Measured answer (BTC+ETH, NY window):** the long horizon does not change
+  the conclusion. Median MFE rises 4.01 → 7.09 ATR (iFVG) but median MAE rises
+  4.36 → 7.06 alongside it; the ratio stays ~1.0 and the end-of-window value
+  barely moves. Under the §6.3.3 trade template the holdout expectancy is
+  −0.010R (iFVG) / −0.018R (BoS) *worse* on the long horizon. **This question
+  is considered closed.**
+
+#### 6.3.2 The NY filter window — a fixed-UTC reading of 09:40–11:20 New York
+
+- **Definition:** a bar is *in window* iff its UTC open time falls in
+  **`[13:40, 15:20)` UTC** — 20 five-minute bars. That is 09:40–11:20 New York
+  at the **pinned fixed offset UTC−4 (EDT)**, chosen because EDT covers ~8
+  months of the calendar against EST's 4. The **UTC−5** reading
+  (`[14:40, 16:20)`) is a sensitivity row, not a second definition.
+- **Consistent with §1's fixed-UTC, no-DST convention.** **Caveat that must
+  travel with any number computed on it:** a fixed UTC−4 window is *not*
+  09:40–11:20 New York wall clock all year — in EST months it is really
+  **08:40–10:20** New York. It coincides with the intended window for about two
+  thirds of a 4-year sample. Do not present it as wall-clock precision around
+  the 09:30 NYSE open.
+- **Applied as a LIVE FILTER on the confirmation bar** (the iFVG inversion
+  close or the BoS break close), not on the take-out bar. It is a pure function
+  of the clock and cannot look forward.
+- **Structural consequence, measured and asserted:** because confirmation is
+  block-scoped and `u ≥ t0`, an in-window confirmation forces `t0` itself into
+  **13:00–15:15 UTC** inside the NY block. The eligible population is therefore
+  a narrow slice — of 11,584 BTC+ETH take-outs, 3,705 have a `t0` that could
+  produce an in-window confirmation, and 1,056 (iFVG) / 768 (BoS) actually do.
+  Any pass using this window must report that funnel rather than only its
+  final count.
+- **Measured character:** the window is a **genuinely busier and slightly
+  better** stretch of tape — the circularity-free forward lift rises from 0.84
+  to **0.95** (iFVG) and 0.89 to **1.00** (BoS) inside it, the first cut in the
+  study to move that metric. It lands at **par** (1.00 = no better than a
+  random comparable stretch), and MFE *and* MAE both roughly double, so the
+  improvement reads as volatility, not direction. Net of a real exit rule and
+  real fees it is negative (§6.3.3).
+
+#### 6.3.3 The trade template used for hypothesis-tested passes
+
+Pinned by `research/session-liquidity-v5-ny/DESIGN.md` §4 **before any R was
+computed**, and recorded here so a future pre-registered pass (e.g. the C3
+reopen trigger, §0) reuses it rather than inventing one after seeing results:
+
+- **Entry** at the confirmation close; high sweep → short, low sweep → long.
+- **Stop** at the **sweep leg's running extreme over `[t0, u]`** — the existing
+  §6.1-era stop proxy, unchanged, so R stays comparable across all seven
+  passes. `1R ≡ |entry − stop|`.
+- **Target +1R.** No parameter fitting, and unlike MFE it is an exit an engine
+  can actually take.
+- **Path:** walk bar by bar; **the stop is checked first**, so a bar touching
+  both books a **loss**; unresolved trades are **marked to market** at the
+  horizon's last close, signed, in R. (Measured: the tie never binds — the
+  barriers are 2R apart and a 5m bar does not span that.)
+- **Costs: 0.10 % round trip** (2 × 5 bp Binance USD-M taker),
+  `cost_R = 0.001 × entry / stop_dist`, `netR = grossR − cost_R`. Slippage is
+  **not** modelled, so a reported net number is optimistic, not conservative.
+- **Degenerate trades** (no forward bars, zero stop distance) are excluded
+  **and counted**, never silently dropped.
+- **Measured baseline for any future comparison:** on BTC+ETH in the §6.3.2
+  window, gross expectancy is **≈ 0** (−0.006R iFVG, +0.009R BoS) and the fee
+  is the entire negative — it is 0.192R / 0.116R because these stops are only
+  3–6 ATR wide.
+
 ## 7. Pinned mechanical defaults ledger
 
 Carried, changed, or removed relative to the phase-1 D1–D9 ledger; any later
@@ -316,7 +424,15 @@ pass that deviates must say so explicitly.
 ## 8. Research protocol notes
 
 Descriptive throughout (user's standing call): no permutation null, no kill
-rule, no pass/fail gate. Frequency and magnitude of iFVG-confirmed sweeps,
+rule, no pass/fail gate. **One deliberate exception, and the template for any
+future one:** the **v5-NY pass** (§0, Запись 18) was run as a *pre-registered
+hypothesis test* — permutation null, numeric kill rule, chronological
+fit/holdout split, costs, a stop rule pinned before any R — because it was
+motivated by disagreement with a null and built on a hand-picked cut, which is
+the p-hacking setup the descriptive protocol has no defence against. That is
+the same standard §0's C3 reopen trigger requires. **Rule of thumb going
+forward: exploring the shape of the idea is descriptive; arguing with a null,
+or acting on a cut somebody chose by eye, is not.** Frequency and magnitude of iFVG-confirmed sweeps,
 with charts/diagrams at every step — including a 10×10-style worked-example
 gallery (the format that surfaced both the phase-1 problems and the v2 iFVG
 bug; see `research/session-liquidity/examples_10x10.py`). Assets:
@@ -326,9 +442,12 @@ BTC/ETH/SOL/BNB, 5m.
 **[done]** → user review of worked examples/hour-of-day chart → BoS correction
 pass (§5.2) **[done — `research/session-liquidity-bos/`, RESEARCH-LOG
 Запись 15]** → PDH/PDL drill-down (§3.2) **[done — answer is no, see §0]** →
-Architect ruling **[done, 2026-08-31 — shelved, RESEARCH-LOG Запись 17]**. No
-further pass is scheduled; the phase-2 `STRATEGY-DESIGN.md` (written against
-phase-1 numbers) stays invalidated. Reopens only via C3 (§0).
+Architect ruling **[done, 2026-08-31 — shelved, RESEARCH-LOG Запись 17]** →
+user-requested re-examination under a pre-registered protocol
+**[done, 2026-09-01 — `research/session-liquidity-v5-ny/`, RESEARCH-LOG
+Запись 18; shelving confirmed under test]**. No further pass is scheduled; the
+phase-2 `STRATEGY-DESIGN.md` (written against phase-1 numbers) stays
+invalidated. Reopens only via C3 (§0).
 
 Deliverables per pass: Python analysis engine + tables + charts, and an
 updated Pine indicator reflecting the current definitions (non-overlapping
