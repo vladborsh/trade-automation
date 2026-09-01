@@ -9,18 +9,59 @@ to route any of these, rather than treating them as pre-committed work.
 
 ## Session-liquidity sweeps (Asia/London/NY), iFVG vs BoS confirmation
 
-**Status:** **SHELVED by Architect ruling, 2026-08-31** — the family is closed as
-a strategy candidate; all measurement work is kept. Decision record:
-`RESEARCH-LOG.md` Запись 17. Six descriptive passes (phase 1, v2, v3, v4, the
-PDH/PDL drill-down, the BoS pass) converge on one null that no further pass can
-overturn from inside: **confirmation is a timing / entry-reference mechanic, not
-a selection filter**, and the circularity-free forward lift is **below 1.0 for
-every confirmation rule measured** — corrected BoS **0.87**, iFVG-v4 **0.83**,
+**Status:** **SHELVED by Architect ruling, 2026-08-31 — confirmed under test,
+2026-09-01.** The family is closed as a strategy candidate; all measurement work
+is kept. Decision record: `RESEARCH-LOG.md` Запись 17; the test that confirmed
+it: Запись 18.
+
+**Update, 2026-09-01 (Запись 18, `research/session-liquidity-v5-ny/`).** The
+user reviewed the shelving, was not convinced, and commissioned a seventh pass
+with three definitional changes — a 24h horizon beside the block-scoped one, a
+live 09:40–11:20 New York filter (fixed UTC−4 = 13:40–15:20 UTC), BTC/ETH
+foregrounded — plus visual proof that the detection mechanics are correctly
+implemented. Because the pass was motivated by disagreement with a null and
+built on a hand-picked cut, it was run as the **first pre-registered,
+hypothesis-tested pass in this repo**: pinned stop, pinned 1R trade template,
+0.10 % round-trip costs, 75/25 chronological split, matched-time permutation
+null, numeric kill rule — all committed before any R was computed.
+
+* **All four pre-registered numbers fail the kill rule**, at the first gate.
+  Holdout mean net R: iFVG **−0.261** (block) / **−0.271** (24h); BoS
+  **−0.019** / **−0.037**. Threshold was +0.05R. 297 and 209 holdout trades, so
+  not a power problem.
+* **The strongest negative the family has produced:** a matched-time placebo
+  (same window, same side, same stop in ATR, same fees, random date) beat the
+  iFVG signal in **91 % of 1,000 runs** (p = 0.910). BoS's holdout p = 0.070 is
+  contradicted by its own fit period (p = 0.870) and is still negative in
+  absolute terms.
+* **Gross expectancy is ≈ 0** (−0.006R / +0.009R); the fee is the entire
+  negative. Cleaner statement of the null than "lift below 1.0".
+* **The 24h horizon question is closed**: −0.010R / −0.018R, both slightly
+  worse. MFE and MAE grow together.
+* **One thing genuinely moved, and it is worth remembering:** the
+  circularity-free forward lift rises from 0.84 → **0.95** (iFVG) and 0.89 →
+  **1.00** (BoS) inside the NY window — the first cut in seven passes to shift
+  it. It lands at **par**, and MFE and MAE both roughly double, so it reads as
+  a volatility effect. The user's read on *where* was partly right; the read on
+  *whether there is an edge there* was not.
+* **The mechanics are not the problem.** The pass reproduces the v4 and BoS
+  event streams **bit-for-bit** on all four assets and ships
+  `MECHANIC-PROOF.md` — 8 captioned real-chart examples plus 36 machine checks
+  including prefix-causal re-derivation of both the BoS anchor and the iFVG gap.
+* **C3 is untouched** — this tested a time window on the session-level stream,
+  not PDH/PDL-in-Asia. `hypothesis.py` is reusable machinery for it.
+
+Six descriptive passes (phase 1, v2, v3, v4, the PDH/PDL drill-down, the BoS
+pass) had already converged on one null that no further pass could overturn from
+inside: **confirmation is a timing / entry-reference mechanic, not a selection
+filter**, and the circularity-free forward lift is **below 1.0 for every
+confirmation rule measured** — corrected BoS **0.87**, iFVG-v4 **0.83**,
 phase-1 BoS **0.74**, against an unconditional 1.00. The stop-free measures
 agree: at the iFVG confirmation close MFE/MAE = 0.99, 51.4 % are still on the
 favourable side at block close with a median of +0.10 ATR; the best drill-down
-cell has MFE/MAE 0.90 and median signed ER +0.003. Nothing has been costed, and
-nothing reached a bar that would justify costing it.
+cell has MFE/MAE 0.90 and median signed ER +0.003. Costs were applied for the
+first time in the v5-NY pass, and they confirmed the null rather than creating
+it.
 
 Both pre-registered follow-ups are **declined**, with reasons on the record:
 
