@@ -1,0 +1,7 @@
+arm,cut,n,mean_netR_all,n_hold,mean_netR_hold
+iFVG-v4,NY window UTC−4 (pinned),1056,-0.19820727908211216,297,-0.2610060172466825
+iFVG-v4,NY window UTC−5 (sensitivity),1214,-0.2794894665842327,322,-0.39351658297541114
+iFVG-v4,all hours (no window filter),6561,-0.2157717621259351,1735,-0.23816240254851562
+BoS pinned anchor,NY window UTC−4 (pinned),768,-0.10663661654582059,209,-0.01933591328648552
+BoS pinned anchor,NY window UTC−5 (sensitivity),633,-0.025002153337924687,176,0.034091640981542444
+BoS pinned anchor,all hours (no window filter),3525,-0.10028537900407881,843,-0.09146011957564673
