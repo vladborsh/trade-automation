@@ -1,4 +1,4 @@
-import type { Candle, Instrument, InstrumentId, Timeframe } from '../src/app/core/contracts/contracts';
+import type { Candle, Instrument, InstrumentId, Timeframe } from '@trade-automation/contracts';
 
 /** Deterministic PRNG (mulberry32) so fixture runs are reproducible across boots. */
 function mulberry32(seed: number): () => number {

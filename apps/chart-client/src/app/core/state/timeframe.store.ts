@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { Timeframe } from '../contracts/contracts';
+import type { Timeframe } from '@trade-automation/contracts';
 
 const ORDER: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 const LAST_SELECTED_KEY = 'chart-client:selected-timeframe';

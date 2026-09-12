@@ -1,14 +1,7 @@
 import { Injectable } from '@angular/core';
 import { AppConfigService } from '../config/app-config.service';
-import type {
-  Candle,
-  Health,
-  InstrumentId,
-  InstrumentWithStatus,
-  Signal,
-  StrategyInfo,
-  Timeframe,
-} from '../contracts/contracts';
+import type { Candle, IndicatorPoint, InstrumentId, Signal, Timeframe } from '@trade-automation/contracts';
+import type { Health, InstrumentWithStatus, StrategyInfo } from '../contracts/derived';
 
 /**
  * Typed fetchers for the REST surface in §3.5. Plain `fetch`, no RxJS here —
@@ -58,6 +51,10 @@ export class RestClient {
 
   getStrategies(): Promise<StrategyInfo[]> {
     return this.getJson<StrategyInfo[]>('/strategies');
+  }
+
+  getIndicators(instrument: InstrumentId, from?: number, to?: number, strategyId?: string): Promise<IndicatorPoint[]> {
+    return this.getJson<IndicatorPoint[]>('/indicators', { instrument, from, to, strategyId });
   }
 
   getHealth(): Promise<Health> {

@@ -1,15 +1,15 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { Subject, Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
+import type { InstrumentId, Timeframe } from '@trade-automation/contracts';
 import type {
-  InstrumentId,
-  Timeframe,
   WsCandleFrame,
   WsClientFrame,
+  WsIndicatorFrame,
   WsServerFrame,
   WsSignalFrame,
   WsStatusFrame,
-} from '../contracts/contracts';
+} from '../contracts/derived';
 import { browserSocketFactory, SOCKET_OPEN, type SocketFactory, type SocketLike } from './socket-factory';
 
 export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline';
@@ -65,6 +65,9 @@ export class LiveSocket implements OnDestroy {
   );
   readonly signalFrames$: Observable<WsSignalFrame> = this.frames$.pipe(
     filter((f): f is WsSignalFrame => f.type === 'signal'),
+  );
+  readonly indicatorFrames$: Observable<WsIndicatorFrame> = this.frames$.pipe(
+    filter((f): f is WsIndicatorFrame => f.type === 'indicator'),
   );
   readonly statusFrames$: Observable<WsStatusFrame> = this.frames$.pipe(
     filter((f): f is WsStatusFrame => f.type === 'status'),
@@ -207,6 +210,15 @@ export class LiveSocket implements OnDestroy {
       map((f) => f),
       filter((f) => f.signal.instrument === instrument),
     );
+  }
+
+  /**
+   * `indicator` frames ride the same `signals` topic subscription
+   * (architecture/vwap-band-reversal-plugin.md §3.1 — no new client→server
+   * verb), so there is no separate `subscribeIndicators`.
+   */
+  indicatorsFor(instrument: InstrumentId): Observable<WsIndicatorFrame> {
+    return this.indicatorFrames$.pipe(filter((f) => f.point.instrument === instrument));
   }
 
   ngOnDestroy(): void {

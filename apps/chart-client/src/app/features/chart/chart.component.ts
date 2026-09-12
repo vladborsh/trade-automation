@@ -8,6 +8,7 @@ import {
   effect,
   input,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import {
@@ -18,7 +19,7 @@ import {
   type LogicalRange,
 } from 'lightweight-charts';
 import { createChart } from 'lightweight-charts';
-import type { Candle, OverlayPrimitive } from '../../core/contracts/contracts';
+import type { Candle, IndicatorPoint, IndicatorSeriesSpec, OverlayPrimitive, Timeframe } from '@trade-automation/contracts';
 import { toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
 import { OverlayLayer } from './overlay/overlay-layer';
 import { MarkerRenderer } from './overlay/marker.renderer';
@@ -26,6 +27,8 @@ import { PriceLineRenderer } from './overlay/price-line.renderer';
 import { RectRenderer } from './overlay/rect.renderer';
 import { RayRenderer } from './overlay/ray.renderer';
 import { LineRenderer } from './overlay/line.renderer';
+import { ShapesPrimitive } from './overlay/shapes.primitive';
+import { IndicatorLayer } from './indicator/indicator-layer';
 
 const NEAR_START_LOGICAL_INDEX = 10;
 
@@ -38,9 +41,15 @@ const NEAR_START_LOGICAL_INDEX = 10;
   selector: 'app-chart',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // data-marker-count is a test hook (e2e asserts on it) — lightweight-charts
-  // draws markers to canvas, so there is nothing else in the DOM to assert on.
-  template: `<div class="chart-container" #container [attr.data-marker-count]="markerCount()"></div>`,
+  // data-marker-count / data-indicator-series-count are test hooks (e2e
+  // asserts on them) — lightweight-charts draws to canvas, so there is
+  // nothing else in the DOM to assert on.
+  template: `<div
+    class="chart-container"
+    #container
+    [attr.data-marker-count]="markerCount()"
+    [attr.data-indicator-series-count]="indicatorSeriesCount()"
+  ></div>`,
   styles: [
     `
       :host {
@@ -58,15 +67,21 @@ const NEAR_START_LOGICAL_INDEX = 10;
 export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly candles = input.required<Candle[]>();
   readonly overlays = input<OverlayPrimitive[]>([]);
+  readonly indicatorPoints = input<IndicatorPoint[]>([]);
+  readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
+  readonly timeframe = input.required<Timeframe>();
   readonly loadOlderRequested = output<void>();
 
   readonly markerCount = computed(() => this.overlays().filter((o) => o.type === 'marker').length);
+  readonly indicatorSeriesCount = signal(0);
 
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   private chart: IChartApi | null = null;
   private series: ISeriesApi<'Candlestick'> | null = null;
   private readonly overlayLayer = new OverlayLayer();
+  private readonly shapesPrimitive = new ShapesPrimitive();
+  private readonly indicatorLayer = new IndicatorLayer();
   private lastRenderedCount = 0;
   private lastRenderedOpenTime: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -74,9 +89,9 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   constructor() {
     this.overlayLayer.register(new MarkerRenderer());
     this.overlayLayer.register(new PriceLineRenderer());
-    this.overlayLayer.register(new RectRenderer());
-    this.overlayLayer.register(new RayRenderer());
-    this.overlayLayer.register(new LineRenderer());
+    this.overlayLayer.register(new RectRenderer(this.shapesPrimitive));
+    this.overlayLayer.register(new RayRenderer(this.shapesPrimitive));
+    this.overlayLayer.register(new LineRenderer(this.shapesPrimitive));
 
     effect(() => {
       const candles = this.candles();
@@ -86,6 +101,14 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       const overlays = this.overlays();
       this.overlayLayer.render(overlays);
+    });
+
+    effect(() => {
+      const points = this.indicatorPoints();
+      const specs = this.indicatorSpecs();
+      const tf = this.timeframe();
+      this.indicatorLayer.render(points, specs, tf);
+      this.indicatorSeriesCount.set(this.indicatorLayer.visibleSeriesCount());
     });
   }
 
@@ -114,6 +137,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       wickDownColor: '#ef5350',
     });
     this.overlayLayer.attachAll(this.chart, this.series);
+    this.indicatorLayer.attach(this.chart);
 
     this.chart.timeScale().subscribeVisibleLogicalRangeChange((range: LogicalRange | null) => {
       if (range && range.from <= NEAR_START_LOGICAL_INDEX) {
@@ -124,6 +148,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     // re-run pending effects now that chart/series exist
     this.renderCandles(this.candles());
     this.overlayLayer.render(this.overlays());
+    this.indicatorLayer.render(this.indicatorPoints(), this.indicatorSpecs(), this.timeframe());
+    this.indicatorSeriesCount.set(this.indicatorLayer.visibleSeriesCount());
   }
 
   private renderCandles(candles: Candle[]): void {
@@ -154,6 +180,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.overlayLayer.clearAll();
+    this.indicatorLayer.clearAll();
     this.chart?.remove();
   }
 }

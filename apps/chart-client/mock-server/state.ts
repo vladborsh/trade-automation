@@ -1,11 +1,12 @@
 import type {
   Candle,
+  IndicatorPoint,
   Instrument,
   InstrumentId,
   Signal,
   Timeframe,
   VenueStatus,
-} from '../src/app/core/contracts/contracts';
+} from '@trade-automation/contracts';
 import {
   FIXTURE_INSTRUMENTS,
   advanceFormingCandle,
@@ -15,25 +16,43 @@ import {
   startFormingCandle,
 } from './fixtures';
 import { computeHistoricalSignals, detectExampleCrossSignal } from './example-cross';
+import {
+  computeHistoricalVwapBandPoints,
+  computeHistoricalVwapBandSignals,
+  computeVwapBandPoint,
+  detectVwapBandResearchSignal,
+} from './vwap-band-mock';
 
 export type CandleListener = (candle: Candle) => void;
 export type SignalListener = (signal: Signal) => void;
+export type IndicatorListener = (point: IndicatorPoint) => void;
+
+/** The mock's synthetic VWAP band strategy (§8.2 step 1) only covers capitalcom instruments, as the real one does. */
+function supportsVwapBandMock(id: InstrumentId): boolean {
+  return id.startsWith('capitalcom:');
+}
 
 /**
  * In-memory replay of fixture candles standing in for the real
- * MarketDataModule + StorageModule + StrategyEngine, until SE-1's
- * apps/signal-server lands (§9.1 note on SE-2's mock server).
+ * MarketDataModule + StorageModule + StrategyEngine, until SE-3's
+ * apps/signal-server lands (§9.1 note on SE-2's mock server). Also stands
+ * in for the vwap-band-reversal plug-in (architecture/vwap-band-reversal-plugin.md
+ * §8.2 step 1) with a synthetic band + research-tier marker, since that
+ * plug-in's real parity fixture only exists in `apps/signal-server`.
  */
 export class MockMarketState {
   readonly instruments: Instrument[] = FIXTURE_INSTRUMENTS;
+  readonly bootTime = Date.now();
   private readonly venueStatus = new Map<InstrumentId, VenueStatus>(
     FIXTURE_INSTRUMENTS.map((i) => [i.id, 'up' as VenueStatus]),
   );
   private readonly oneMinuteHistory = new Map<InstrumentId, Candle[]>();
   private readonly signals = new Map<InstrumentId, Signal[]>();
+  private readonly indicators = new Map<InstrumentId, IndicatorPoint[]>();
 
   private readonly candleListeners = new Set<CandleListener>();
   private readonly signalListeners = new Set<SignalListener>();
+  private readonly indicatorListeners = new Set<IndicatorListener>();
 
   private tickTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -45,7 +64,15 @@ export class MockMarketState {
       // Backfill signals for the seed window too, so a fresh boot already has
       // something for the client to render (§4.4's end-to-end proof) instead
       // of waiting on a live crossover.
-      this.signals.set(instrument.id, computeHistoricalSignals(history));
+      const signals = computeHistoricalSignals(history);
+      if (supportsVwapBandMock(instrument.id)) {
+        signals.push(...computeHistoricalVwapBandSignals(history));
+        this.indicators.set(instrument.id, computeHistoricalVwapBandPoints(history));
+      } else {
+        this.indicators.set(instrument.id, []);
+      }
+      signals.sort((a, b) => a.time - b.time);
+      this.signals.set(instrument.id, signals);
     }
   }
 
@@ -57,6 +84,11 @@ export class MockMarketState {
   onSignal(listener: SignalListener): () => void {
     this.signalListeners.add(listener);
     return () => this.signalListeners.delete(listener);
+  }
+
+  onIndicator(listener: IndicatorListener): () => void {
+    this.indicatorListeners.add(listener);
+    return () => this.indicatorListeners.delete(listener);
   }
 
   venueStatusFor(id: InstrumentId): VenueStatus {
@@ -81,6 +113,16 @@ export class MockMarketState {
         (from === undefined || s.time >= from) &&
         (to === undefined || s.time <= to) &&
         (strategyId === undefined || s.strategyId === strategyId),
+    );
+  }
+
+  indicatorsFor(id: InstrumentId, from?: number, to?: number, strategyId?: string): IndicatorPoint[] {
+    const list = this.indicators.get(id) ?? [];
+    return list.filter(
+      (p) =>
+        (from === undefined || p.time >= from) &&
+        (to === undefined || p.time <= to) &&
+        (strategyId === undefined || p.strategyId === strategyId),
     );
   }
 
@@ -131,10 +173,20 @@ export class MockMarketState {
 
         const signal = detectExampleCrossSignal(nextHistory);
         if (signal) {
-          const list = this.signals.get(instrument.id) ?? [];
-          list.push(signal);
-          this.signals.set(instrument.id, list);
-          this.emitSignal(signal);
+          this.pushSignal(signal);
+        }
+
+        if (supportsVwapBandMock(instrument.id)) {
+          const point = computeVwapBandPoint(closed);
+          const list = this.indicators.get(instrument.id) ?? [];
+          list.push(point);
+          this.indicators.set(instrument.id, list);
+          this.emitIndicator(point);
+
+          const researchSignal = detectVwapBandResearchSignal(closed);
+          if (researchSignal) {
+            this.pushSignal(researchSignal);
+          }
         }
       }
     }, formingTickMs);
@@ -147,6 +199,13 @@ export class MockMarketState {
     }
   }
 
+  private pushSignal(signal: Signal): void {
+    const list = this.signals.get(signal.instrument) ?? [];
+    list.push(signal);
+    this.signals.set(signal.instrument, list);
+    this.emitSignal(signal);
+  }
+
   private emitCandle(candle: Candle): void {
     for (const listener of this.candleListeners) {
       listener(candle);
@@ -156,6 +215,12 @@ export class MockMarketState {
   private emitSignal(signal: Signal): void {
     for (const listener of this.signalListeners) {
       listener(signal);
+    }
+  }
+
+  private emitIndicator(point: IndicatorPoint): void {
+    for (const listener of this.indicatorListeners) {
+      listener(point);
     }
   }
 }

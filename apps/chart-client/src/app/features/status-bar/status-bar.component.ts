@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
 import { ConnectionStore } from '../../core/state/connection.store';
 import { InstrumentsStore } from '../../core/state/instruments.store';
+import { StrategiesStore } from '../../core/state/strategies.store';
 
 @Component({
   selector: 'app-status-bar',
@@ -17,6 +18,11 @@ import { InstrumentsStore } from '../../core/state/instruments.store';
       }
       @if (instruments.selected(); as instrument) {
         <span class="instrument">{{ instrument.id }}</span>
+      }
+      @if (activeStrategies(); as list) {
+        @if (list.length > 0) {
+          <span class="strategies">strategies: {{ list }}</span>
+        }
       }
     </div>
   `,
@@ -51,6 +57,9 @@ import { InstrumentsStore } from '../../core/state/instruments.store';
       .venue-closed {
         color: #ef5350;
       }
+      .strategies {
+        color: #8b949e;
+      }
     `,
   ],
 })
@@ -58,11 +67,29 @@ export class StatusBarComponent {
   constructor(
     readonly connection: ConnectionStore,
     readonly instruments: InstrumentsStore,
+    private readonly strategies: StrategiesStore,
   ) {}
 
   readonly venueStatus = computed(() => {
     const instrument = this.instruments.selected();
     return instrument ? this.connection.statusFor(instrument.id) : null;
+  });
+
+  /**
+   * architecture/vwap-band-reversal-plugin.md §6 item 3: the strategy list
+   * must show tier/displayName clearly, e.g. `strategies: vwap-band-reversal
+   * (research)`, so a research-tier strategy is never mistaken for a live one.
+   */
+  readonly activeStrategies = computed(() => {
+    const instrument = this.instruments.selected();
+    if (!instrument) {
+      return '';
+    }
+    return this.strategies
+      .strategiesFor(instrument.id)
+      .filter((s) => s.enabled)
+      .map((s) => `${s.id} (${s.tier})`)
+      .join(', ');
   });
 
   ageLabel(lastClosedCandleTime: number): string {

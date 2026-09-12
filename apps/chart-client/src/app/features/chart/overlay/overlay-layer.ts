@@ -1,5 +1,5 @@
 import type { ISeriesApi, IChartApi, SeriesType } from 'lightweight-charts';
-import type { OverlayPrimitive } from '../../../core/contracts/contracts';
+import type { OverlayPrimitive } from '@trade-automation/contracts';
 
 /**
  * One renderer per `OverlayPrimitive.type` (§5.2). `attach` runs once when

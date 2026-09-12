@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { InstrumentId, VenueStatus } from '../contracts/contracts';
+import type { InstrumentId, VenueStatus } from '@trade-automation/contracts';
 import type { ConnectionState } from '../api/live.socket';
 
 @Injectable({ providedIn: 'root' })

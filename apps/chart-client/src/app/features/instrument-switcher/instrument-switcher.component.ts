@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InstrumentsStore } from '../../core/state/instruments.store';
-import type { InstrumentWithStatus } from '../../core/contracts/contracts';
+import type { InstrumentWithStatus } from '../../core/contracts/derived';
 
 @Component({
   selector: 'app-instrument-switcher',

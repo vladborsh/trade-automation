@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, HostListener, computed, viewChild } from '@angular/core';
 import { CandlesStore } from '../../core/state/candles.store';
 import { SignalsStore } from '../../core/state/signals.store';
+import { IndicatorsStore } from '../../core/state/indicators.store';
+import { StrategiesStore } from '../../core/state/strategies.store';
 import { TimeframeStore } from '../../core/state/timeframe.store';
 import { MarketFeedService } from '../../core/state/market-feed.service';
 import { InstrumentSwitcherComponent } from '../instrument-switcher/instrument-switcher.component';
 import { TimeframePickerComponent } from '../timeframe-picker/timeframe-picker.component';
 import { StatusBarComponent } from '../status-bar/status-bar.component';
+import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
 import { ChartComponent } from '../chart/chart.component';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
 
@@ -18,17 +21,31 @@ import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
 @Component({
   selector: 'app-terminal-shell',
   standalone: true,
-  imports: [InstrumentSwitcherComponent, TimeframePickerComponent, StatusBarComponent, ChartComponent],
+  imports: [
+    InstrumentSwitcherComponent,
+    TimeframePickerComponent,
+    StatusBarComponent,
+    ResearchBadgeComponent,
+    ChartComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="terminal">
       <div class="top-bar">
         <app-instrument-switcher #switcher />
         <app-timeframe-picker />
+        <app-research-badge />
       </div>
       <div class="body">
         <div class="chart-pane">
-          <app-chart [candles]="candles.candles()" [overlays]="overlays()" (loadOlderRequested)="onLoadOlder()" />
+          <app-chart
+            [candles]="candles.candles()"
+            [overlays]="overlays()"
+            [indicatorPoints]="indicators.points()"
+            [indicatorSpecs]="strategies.indicatorSpecs()"
+            [timeframe]="timeframe.selected()"
+            (loadOlderRequested)="onLoadOlder()"
+          />
         </div>
         <div class="side-panel">
           <!-- extension point: a future signal list/detail panel goes here -->
@@ -83,7 +100,9 @@ export class TerminalShellComponent {
   constructor(
     readonly candles: CandlesStore,
     private readonly signals: SignalsStore,
-    private readonly timeframe: TimeframeStore,
+    readonly indicators: IndicatorsStore,
+    readonly strategies: StrategiesStore,
+    readonly timeframe: TimeframeStore,
     private readonly feed: MarketFeedService,
   ) {
     this.feed.boot().catch((err) => console.error('[TerminalShell] boot failed', err));

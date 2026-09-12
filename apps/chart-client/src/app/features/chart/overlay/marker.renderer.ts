@@ -10,7 +10,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { OverlayRenderer } from './overlay-layer';
-import type { OverlayPrimitive } from '../../../core/contracts/contracts';
+import type { OverlayPrimitive } from '@trade-automation/contracts';
 
 type MarkerPrimitive = Extract<OverlayPrimitive, { type: 'marker' }>;
 

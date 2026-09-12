@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { Signal as TradeSignal } from '../contracts/contracts';
+import type { Signal as TradeSignal } from '@trade-automation/contracts';
 
 export function appendSignal(list: readonly TradeSignal[], incoming: TradeSignal): TradeSignal[] {
   if (list.some((s) => s.id === incoming.id)) {

@@ -1,5 +1,5 @@
 import { mergeCandle, prependHistory, CandlesStore } from './candles.store';
-import type { Candle } from '../contracts/contracts';
+import type { Candle } from '@trade-automation/contracts';
 
 function candle(openTime: number, close: number, closed = true): Candle {
   return {

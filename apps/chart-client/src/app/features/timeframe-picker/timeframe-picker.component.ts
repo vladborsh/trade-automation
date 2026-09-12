@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TimeframeStore } from '../../core/state/timeframe.store';
-import type { Timeframe } from '../../core/contracts/contracts';
+import type { Timeframe } from '@trade-automation/contracts';
 
 const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 

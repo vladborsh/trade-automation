@@ -1,5 +1,5 @@
 import type { CandlestickData, UTCTimestamp } from 'lightweight-charts';
-import type { Candle } from '../../core/contracts/contracts';
+import type { Candle } from '@trade-automation/contracts';
 
 /**
  * Candle → CandlestickData (§5.2), time in seconds UTC — lightweight-charts

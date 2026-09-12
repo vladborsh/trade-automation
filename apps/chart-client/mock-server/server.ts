@@ -2,16 +2,18 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { WebSocketServer, WebSocket } from 'ws';
 import type {
   Candle,
-  Health,
+  HealthResponse,
+  IndicatorPoint,
   InstrumentId,
-  InstrumentWithStatus,
+  InstrumentsResponse,
   Signal,
-  StrategyInfo,
+  StrategiesResponse,
   Timeframe,
-  WsClientFrame,
-  WsServerFrame,
-} from '../src/app/core/contracts/contracts';
+  WsClientMessage,
+  WsServerMessage,
+} from '@trade-automation/contracts';
 import { MockMarketState } from './state';
+import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
 
 const PORT = Number(process.env.MOCK_SERVER_PORT ?? 4300);
 const BAR_MS = Number(process.env.MOCK_BAR_MS ?? 2000);
@@ -41,6 +43,75 @@ function parseNumber(value: string | null): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function isCapitalCom(id: InstrumentId): boolean {
+  return id.startsWith('capitalcom:');
+}
+
+/**
+ * architecture/vwap-band-reversal-plugin.md §8.2 step 1 — strategies list
+ * with tier/displayName/description/minBars/indicators, mirroring §11.4 of
+ * live-signal-server.md. The mock ships the research strategy `enabled:
+ * true` (unlike the real server's `enabled: false` default) so the client's
+ * labelling and indicator plumbing have something to render against
+ * end-to-end without a config flip.
+ */
+function strategiesResponse(): StrategiesResponse {
+  const capitalComInstruments = state.instruments.filter((i) => isCapitalCom(i.id)).map((i) => i.id);
+  return [
+    {
+      id: 'example-cross',
+      enabled: true,
+      instruments: state.instruments.map((i) => i.id),
+      timeframe: '1m',
+      warmupBars: 20,
+      status: 'live',
+      tier: 'demo',
+      displayName: 'Example cross (demo)',
+      description: 'Proves the overlay pipeline end to end. Never a strategy of this project.',
+    },
+    {
+      id: VWAP_BAND_STRATEGY_ID,
+      enabled: true,
+      instruments: capitalComInstruments,
+      timeframe: '1m',
+      warmupBars: 1440,
+      status: 'live',
+      tier: 'research',
+      displayName: 'VWAP band reversal (cmc-bot port)',
+      description: 'Unvalidated. Port of the cmc-bot VWAP band-reversal mechanic; markers show where it fires, not trades.',
+      minBars: 1,
+      indicators: [
+        {
+          id: 'vwap-band',
+          label: 'VWAP band (research, unvalidated)',
+          scale: 'price',
+          keys: [
+            { key: 'vwap', label: 'VWAP', color: '#d29922' },
+            { key: 'vwapTop', label: 'VWAP +1σ', color: '#d29922', style: 'dashed' },
+            { key: 'vwapBottom', label: 'VWAP −1σ', color: '#d29922', style: 'dashed' },
+          ],
+        },
+      ],
+    },
+  ];
+}
+
+function healthResponse(): HealthResponse {
+  return {
+    status: 'ok',
+    uptimeSeconds: (Date.now() - state.bootTime) / 1000,
+    instruments: state.instruments.map((instrument) => {
+      const lastOpenTime = state.lastClosedOpenTime(instrument.id);
+      return {
+        instrument: instrument.id,
+        lastClosedCandleAge: lastOpenTime !== null ? Date.now() - lastOpenTime : null,
+        gapCount24h: 0,
+        feedLag: 0,
+      };
+    }),
+  };
+}
+
 function handleRequest(req: IncomingMessage, res: ServerResponse): void {
   if (req.method === 'OPTIONS') {
     setCors(res);
@@ -57,7 +128,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
   }
 
   if (url.pathname === '/api/instruments') {
-    const body: InstrumentWithStatus[] = state.instruments.map((instrument) => ({
+    const body: InstrumentsResponse = state.instruments.map((instrument) => ({
       ...instrument,
       venueStatus: state.venueStatusFor(instrument.id),
     }));
@@ -94,35 +165,27 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     return;
   }
 
-  if (url.pathname === '/api/strategies') {
-    const body: StrategyInfo[] = [
-      {
-        id: 'example-cross',
-        enabled: true,
-        instruments: state.instruments.map((i) => i.id),
-        timeframe: '1m',
-        warmupBars: 20,
-        status: 'live',
-      },
-    ];
+  if (url.pathname === '/api/indicators') {
+    const instrument = url.searchParams.get('instrument') as InstrumentId | null;
+    if (!instrument) {
+      sendJson(res, 400, { error: 'instrument is required' });
+      return;
+    }
+    const from = parseNumber(url.searchParams.get('from'));
+    const to = parseNumber(url.searchParams.get('to'));
+    const strategyId = url.searchParams.get('strategyId') ?? undefined;
+    const body: IndicatorPoint[] = state.indicatorsFor(instrument, from, to, strategyId);
     sendJson(res, 200, body);
     return;
   }
 
+  if (url.pathname === '/api/strategies') {
+    sendJson(res, 200, strategiesResponse());
+    return;
+  }
+
   if (url.pathname === '/api/health') {
-    const body: Health = {
-      ok: true,
-      instruments: state.instruments.map((instrument) => {
-        const lastOpenTime = state.lastClosedOpenTime(instrument.id);
-        return {
-          instrument: instrument.id,
-          lastClosedCandleAge: lastOpenTime !== null ? Date.now() - lastOpenTime : -1,
-          gapCount24h: 0,
-          feedLag: 0,
-        };
-      }),
-    };
-    sendJson(res, 200, body);
+    sendJson(res, 200, healthResponse());
     return;
   }
 
@@ -141,7 +204,7 @@ wss.on('connection', (socket: WebSocket) => {
   const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set() };
   const lastFormingSentAt = new Map<string, number>();
 
-  const send = (frame: WsServerFrame): void => {
+  const send = (frame: WsServerMessage): void => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(frame));
     }
@@ -169,8 +232,16 @@ wss.on('connection', (socket: WebSocket) => {
     }
   });
 
+  // `indicator` frames ride the same `signals` topic subscription — no new
+  // client→server verb (architecture/vwap-band-reversal-plugin.md §3.1).
+  const unsubscribeIndicators = state.onIndicator((point) => {
+    if (subscriptions.signals.has(point.instrument)) {
+      send({ type: 'indicator', point });
+    }
+  });
+
   socket.on('message', (raw: Buffer) => {
-    let frame: WsClientFrame;
+    let frame: WsClientMessage;
     try {
       frame = JSON.parse(raw.toString('utf-8'));
     } catch {
@@ -208,6 +279,7 @@ wss.on('connection', (socket: WebSocket) => {
   socket.on('close', () => {
     unsubscribeCandles();
     unsubscribeSignals();
+    unsubscribeIndicators();
   });
 });
 

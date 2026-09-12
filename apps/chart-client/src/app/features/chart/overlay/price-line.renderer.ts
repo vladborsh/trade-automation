@@ -1,6 +1,6 @@
 import type { IChartApi, IPriceLine, ISeriesApi, SeriesType } from 'lightweight-charts';
 import type { OverlayRenderer } from './overlay-layer';
-import type { OverlayPrimitive } from '../../../core/contracts/contracts';
+import type { OverlayPrimitive } from '@trade-automation/contracts';
 
 type PriceLinePrimitive = Extract<OverlayPrimitive, { type: 'priceLine' }>;
 

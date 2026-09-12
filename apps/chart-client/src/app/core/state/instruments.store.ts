@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
-import type { InstrumentId, InstrumentWithStatus } from '../contracts/contracts';
+import type { InstrumentId } from '@trade-automation/contracts';
+import type { InstrumentWithStatus } from '../contracts/derived';
 
 const LAST_SELECTED_KEY = 'chart-client:selected-instrument';
 

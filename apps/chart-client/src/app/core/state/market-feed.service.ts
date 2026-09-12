@@ -6,8 +6,10 @@ import { InstrumentsStore } from './instruments.store';
 import { TimeframeStore } from './timeframe.store';
 import { CandlesStore } from './candles.store';
 import { SignalsStore } from './signals.store';
+import { IndicatorsStore } from './indicators.store';
+import { StrategiesStore } from './strategies.store';
 import { ConnectionStore } from './connection.store';
-import type { InstrumentId, Timeframe } from '../contracts/contracts';
+import type { InstrumentId, Timeframe } from '@trade-automation/contracts';
 
 const HISTORY_LIMIT = 1500;
 const PAGE_LIMIT = 500;
@@ -36,6 +38,8 @@ export class MarketFeedService {
     private readonly timeframe: TimeframeStore,
     private readonly candles: CandlesStore,
     private readonly signals: SignalsStore,
+    private readonly indicators: IndicatorsStore,
+    private readonly strategies: StrategiesStore,
     private readonly connection: ConnectionStore,
   ) {
     effect(() => {
@@ -49,8 +53,9 @@ export class MarketFeedService {
 
   async boot(): Promise<void> {
     await this.config.load();
-    const instruments = await this.rest.getInstruments();
+    const [instruments, strategies] = await Promise.all([this.rest.getInstruments(), this.rest.getStrategies()]);
     this.instruments.setInstruments(instruments);
+    this.strategies.setStrategies(strategies);
 
     this.socket.connectionState.subscribe((state) => this.connection.setConnectionState(state));
     this.socket.statusFrames$.subscribe((frame) =>
@@ -78,16 +83,20 @@ export class MarketFeedService {
 
     this.candles.clear();
     this.signals.clear();
+    this.indicators.clear();
     this.active = { instrument, timeframe: tf };
 
-    const [candleHistory, signalHistory] = await Promise.all([
+    const [candleHistory, signalHistory, indicatorHistory] = await Promise.all([
       this.rest.getCandles(instrument, tf, undefined, undefined, HISTORY_LIMIT),
       this.rest.getSignals(instrument),
+      this.rest.getIndicators(instrument),
     ]);
     this.candles.setHistory(candleHistory);
     this.signals.setHistory(signalHistory);
+    this.indicators.setHistory(indicatorHistory);
 
     this.socket.subscribeCandles(instrument, tf);
+    // `indicator` frames ride the same `signals` topic subscription (§3.1).
     this.socket.subscribeSignals(instrument);
 
     this.frameSubscriptions.push(
@@ -95,6 +104,9 @@ export class MarketFeedService {
     );
     this.frameSubscriptions.push(
       this.socket.signalsFor(instrument).subscribe((frame) => this.signals.append(frame.signal)),
+    );
+    this.frameSubscriptions.push(
+      this.socket.indicatorsFor(instrument).subscribe((frame) => this.indicators.append(frame.point)),
     );
   }
 

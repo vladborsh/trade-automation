@@ -1,34 +1,41 @@
 import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
 import type { OverlayRenderer } from './overlay-layer';
-import type { OverlayPrimitive } from '../../../core/contracts/contracts';
+import type { OverlayPrimitive } from '@trade-automation/contracts';
+import { ShapesPrimitive } from './shapes.primitive';
 
 type LinePrimitive = Extract<OverlayPrimitive, { type: 'line' }>;
 
 /**
- * Deferred per architecture/live-signal-server.md §5.2/§3.4: type-complete
- * so `Signal.overlay` can carry `line` primitives (VWAP, bands) from day
- * one, but rendering (an additional line series, or a plugin-drawn
- * polyline) is not implemented yet — no strategy needs it in this
- * scaffold. Warns once per render call and skips instead of throwing.
+ * Thin adapter onto the shared `ShapesPrimitive` (architecture/vwap-band-reversal-plugin.md
+ * §3.2): converts `line` overlay primitives (a polyline through `points`,
+ * solid or dashed per the `style` field) into the primitive's shape
+ * vocabulary.
  */
 export class LineRenderer implements OverlayRenderer<'line'> {
   readonly type = 'line' as const;
+
+  constructor(private readonly shapes: ShapesPrimitive) {}
 
   supports(type: OverlayPrimitive['type']): boolean {
     return type === 'line';
   }
 
-  attach(_chart: IChartApi, _series: ISeriesApi<SeriesType>): void {
-    // no-op: nothing to attach until this renderer is implemented
+  attach(_chart: IChartApi, series: ISeriesApi<SeriesType>): void {
+    this.shapes.attachTo(series);
   }
 
   render(primitives: LinePrimitive[]): void {
-    if (primitives.length > 0) {
-      console.warn(`[OverlayLayer] 'line' overlay renderer is not implemented yet; skipping ${primitives.length} primitive(s).`);
-    }
+    this.shapes.setLines(
+      primitives.map((p) => ({
+        points: p.points,
+        color: p.color,
+        label: p.label,
+        style: p.style,
+      })),
+    );
   }
 
   clear(): void {
-    // no-op: nothing was ever drawn
+    this.shapes.setLines([]);
   }
 }

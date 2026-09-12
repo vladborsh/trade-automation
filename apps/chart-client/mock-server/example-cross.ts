@@ -1,4 +1,4 @@
-import type { Candle, Signal } from '../src/app/core/contracts/contracts';
+import type { Candle, Signal } from '@trade-automation/contracts';
 
 const SMA_PERIOD = 20;
 
@@ -55,6 +55,7 @@ export function detectExampleCrossSignal(closes: readonly Candle[]): Signal | nu
     instrument: current.instrument,
     timeframe: current.timeframe,
     time: current.openTime,
+    tier: 'demo',
     kind: 'info',
     direction,
     confidence: undefined,

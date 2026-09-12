@@ -1,34 +1,40 @@
 import type { IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
 import type { OverlayRenderer } from './overlay-layer';
-import type { OverlayPrimitive } from '../../../core/contracts/contracts';
+import type { OverlayPrimitive } from '@trade-automation/contracts';
+import { ShapesPrimitive } from './shapes.primitive';
 
 type RayPrimitive = Extract<OverlayPrimitive, { type: 'ray' }>;
 
 /**
- * Deferred per architecture/live-signal-server.md §5.2/§3.4: type-complete
- * so `Signal.overlay` can carry `ray` primitives (the bot's true-open
- * levels — a horizontal ray from (time, price) rightwards) from day one,
- * but rendering via the series-primitives/plugin API is not implemented
- * yet. Warns once per render call and skips instead of throwing.
+ * Thin adapter onto the shared `ShapesPrimitive` (architecture/vwap-band-reversal-plugin.md
+ * §3.2): converts `ray` overlay primitives (a horizontal ray from
+ * (time, price) to the right edge) into the primitive's shape vocabulary.
  */
 export class RayRenderer implements OverlayRenderer<'ray'> {
   readonly type = 'ray' as const;
+
+  constructor(private readonly shapes: ShapesPrimitive) {}
 
   supports(type: OverlayPrimitive['type']): boolean {
     return type === 'ray';
   }
 
-  attach(_chart: IChartApi, _series: ISeriesApi<SeriesType>): void {
-    // no-op: nothing to attach until this renderer is implemented
+  attach(_chart: IChartApi, series: ISeriesApi<SeriesType>): void {
+    this.shapes.attachTo(series);
   }
 
   render(primitives: RayPrimitive[]): void {
-    if (primitives.length > 0) {
-      console.warn(`[OverlayLayer] 'ray' overlay renderer is not implemented yet; skipping ${primitives.length} primitive(s).`);
-    }
+    this.shapes.setRays(
+      primitives.map((p) => ({
+        time: p.time,
+        price: p.price,
+        color: p.color,
+        label: p.label,
+      })),
+    );
   }
 
   clear(): void {
-    // no-op: nothing was ever drawn
+    this.shapes.setRays([]);
   }
 }

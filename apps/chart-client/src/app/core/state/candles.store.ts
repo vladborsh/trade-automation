@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { Candle } from '../contracts/contracts';
+import type { Candle } from '@trade-automation/contracts';
 
 /**
  * Merge a live candle frame into an ascending, `openTime`-sorted series
