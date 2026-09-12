@@ -143,6 +143,7 @@ note per system. They are role-to-role technical material.
 |---|---|
 | [`live-signal-server.md`](architecture/live-signal-server.md) | Live signal-generation server (NestJS) + chart terminal client (Angular); shared contracts; candle storage/backup requirements and S3 recommendation; routing to Software Engineer / DevOps / Integration Engineer |
 | [`vwap-band-reversal-plugin.md`](architecture/vwap-band-reversal-plugin.md) | The `cmc-bot` VWAP band-reversal strategy as a **research-tier, unvalidated, visualization-only** plug-in of the signal server; strategy tiers, indicator series, warm-up for session-anchored indicators; routing to Software Engineer |
+| [`chart-layouts.md`](architecture/chart-layouts.md) | Multi-panel layout-setups for the chart terminal (`layouts.yaml`, `GET /api/layouts`), open-interest ingestion as a metric series (`MetricAdapter`, `GET /api/metrics`, WS `metrics` topic), time-range panel sync, per-panel signal visibility; DXY epic (`DXY`, Capital.com) confirmed; routing to Software Engineer |
 
 ## Status
 
@@ -161,5 +162,12 @@ Roles and this context document were the first deliverable. Since then:
   mechanic ported into the server for chart visualization only, labelled
   unvalidated end to end; its Stage-1 verdict is still pending and is not
   affected by the build.
+- **Chart layout-setups designed 2026-09-12** —
+  `architecture/chart-layouts.md`: named multi-panel layouts (crypto: BTC/ETH/
+  BTC open interest/DXY; US indices: US100/US500/DXY) with one shared
+  timeframe and synchronized scrolling; open interest ingested as a new
+  metric series. Capital.com DXY epic confirmed (`DXY`); Software Engineer
+  build is the next step, sequenced after the VWAP plug-in build since both
+  touch the chart client's terminal shell/overlay layer.
 - The trading-idea intake format is still informal (backlog entry → Architect
   grilling → research package).
