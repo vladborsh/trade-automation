@@ -1,0 +1,43 @@
+# Multi-stage, Node 22, non-root. Unlike cmc-bot-main's Dockerfile (architecture/
+# live-signal-server.md §1, §9.1), secrets are NEVER baked in as build args — inject them as
+# runtime env vars (Secrets Manager / SSM in production; a local .env for dev).
+
+FROM node:22-slim AS build
+WORKDIR /workspace
+
+COPY package.json package-lock.json* ./
+COPY libs/contracts/package.json libs/contracts/package.json
+COPY apps/signal-server/package.json apps/signal-server/package.json
+RUN npm install
+
+COPY tsconfig.base.json ./
+COPY libs/contracts libs/contracts
+COPY apps/signal-server apps/signal-server
+
+RUN npm run build --workspace=@trade-automation/contracts
+RUN npm run build --workspace=@trade-automation/signal-server
+
+FROM node:22-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /workspace
+
+RUN groupadd --gid 1001 signalserver && useradd --uid 1001 --gid signalserver --shell /bin/false signalserver
+
+COPY package.json package-lock.json* ./
+COPY libs/contracts/package.json libs/contracts/package.json
+COPY apps/signal-server/package.json apps/signal-server/package.json
+RUN npm install --omit=dev
+
+COPY --from=build /workspace/libs/contracts/dist libs/contracts/dist
+COPY --from=build /workspace/apps/signal-server/dist apps/signal-server/dist
+COPY apps/signal-server/config apps/signal-server/config
+# Replay fixtures ship in the image so docker-compose's dev profile (MARKET_DATA_MODE=replay)
+# works without a live venue or an extra volume mount; harmless synthetic data, not a secret.
+COPY apps/signal-server/test/fixtures apps/signal-server/test/fixtures
+
+WORKDIR /workspace/apps/signal-server
+RUN chown -R signalserver:signalserver /workspace
+
+USER signalserver
+EXPOSE 3000
+CMD ["node", "dist/main.js"]

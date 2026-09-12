@@ -18,3 +18,10 @@ research/session-liquidity-bos/results/uncond_*.csv.gz
 
 research/session-liquidity-v5-ny/data
 research/session-liquidity-v5-ny/results/uncond_*.csv.gz
+
+# apps/signal-server, libs/contracts (architecture/live-signal-server.md)
+node_modules/
+dist/
+*.tsbuildinfo
+apps/signal-server/data/
+
