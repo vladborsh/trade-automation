@@ -820,3 +820,129 @@ would let a result on one be read as support for the other.
   US500/US100 in `cmc-bot-main/docs/backtesting.md` are the **vwap** strategy.
 - Partly overlaps `research/vwap-mr-indices/` on data sourcing — reuse that
   package's instrument/vendor findings rather than re-deriving them.
+
+## The `cmc-bot` VWAP band-reversal strategy (from `cmc-bot-main`, distinct from the smart-money ICT bot above)
+
+**Status:** **routed by Architect 2026-09-12** — approved for **one
+pre-registered, hypothesis-tested Researcher pass**, thresholds fixed in
+advance. **Data gate resolved same day**: user supplied Capital.com
+credentials (`cmc-bot-main/.env`, gitignored) and gave the US100/US500 timing
+windows directly (entry 09:40–11:40 NY, alive 09:40–14:30 NY — provisional,
+user flagged for revisiting after a first test) rather than granting AWS
+access to the bot's S3 config. Stage 0 is unblocked. Full ruling:
+`research/cmc-bot-vwap/ARCHITECT-NOTE.md`; mechanic pinned in
+`knowledge/vwap-band-reversal-ict.md`.
+
+**Idea:** the user's pre-existing `cmc-bot-main` also ships a second,
+separately-coded strategy — `VWapStrategy`
+(`cmc-bot-main/src/strategy/vwap-strategy.ts`) — live-traded (per
+`strategy-provider.ts`) on four Capital.com instruments: **US100** (Nasdaq,
+code `nasdaq`), **US500** (S&P, code `snp`), **EURCHF**, **GBPCHF**. The user
+wants this strategy's signals reproduced and its performance measured, same
+as the smart-money bot above.
+
+**What the code actually does** (read directly from
+`cmc-bot-main/src/strategy/vwap-strategy.ts`,
+`cmc-bot-main/src/indicator/tools/vwap.indicator.ts`,
+`cmc-bot-main/src/indicator/tools/range.indicator.ts`,
+`cmc-bot-main/src/indicator/tools/previous-hour-lh.indicator.ts`,
+`cmc-bot-main/src/strategy/risk-manager.ts`,
+`cmc-bot-main/src/strategy/strategy-provider.ts` — description of existing
+code, not a design proposal; full detail in the architecture note):
+
+- **Bias — a same-timeframe, session-anchored VWAP band, not an H1 bias
+  despite the method's name.** `getHighTimeFrameBias` (vwap-strategy.ts:268)
+  actually fetches **M1** candles from **UTC midnight** to now (not H1), runs
+  `VWAP()` over them, and reads a **contrarian** bias: price above the upper
+  band (`vwapTop`) → bias **sell** (fade the stretch); below `vwapBottom` →
+  bias **buy**. The band is an *expanding intraday* stdev band of
+  price-vs-VWAP deviation since the session reset (`vwap.indicator.ts:33-42`),
+  not a fixed rolling Bollinger-style window.
+- **Regime filter:** band width ÷ `ATR(20)` (`vwapAtrRatio`) must sit in
+  **[2.5, 11.5]** — identical thresholds on all four instruments
+  (`strategy-provider.ts:27-29,40-42,63-65,86-88`).
+- **Entry trigger — the same proximal-edge iFVG primitive already pinned in
+  `knowledge/smart-money-ict.md` §1**, but computed directly on the **M1**
+  window itself (not a separate H1 fetch): `calculateFVG` from
+  `fvg.indicator.ts`, same algorithm as the smart-money bot, same §1.3
+  sell-biased-default and `lastIFVG`-undefined-blocks-ATR-gate behavior
+  inherited verbatim.
+- **A different premium/discount than the smart-money bot's.** `range(v, 200)`
+  (`range.indicator.ts`) is a **plain rolling 200-bar high/low window**,
+  recomputed fresh each bar (no swing-anchoring, no trailing state) —
+  structurally different from smart-money-ict.md §3's 60-bar swing-anchored
+  *trailing* range. Sell requires **not** in discount (premium side); buy
+  requires discount side — same polarity convention as the smart-money bot.
+- **A sweep-style condition unique to this strategy:** sell additionally
+  requires price to have broken **above the previous clock-hour's high**
+  within the last 6 bars (`abovePrevHourHigh`); buy requires breaking
+  **below** the previous hour's low. This is the strategy's only
+  level-sweep-shaped component — the reference level is the **prior 1-hour
+  high/low** (`previous-hour-lh.indicator.ts`), not a session extreme
+  (`session-liquidity.md`) or a true-open level (`smart-money-ict.md` §2).
+- **Risk:** same shared `RiskManager` class as the smart-money bot — identical
+  stop-shrink table (`<2.5`→×0.5, `2.5–3`→×0.7, else ×1), identical trail
+  (`>1R`→breakeven, `>2R`→+1R), identical daily caps (max 2 losers / 1 winner,
+  1 open order per direction). **Target differs:** fixed **3.0R**
+  (`TARGET_RISK_REWARD_RATIO = 3`, vwap-strategy.ts:28) vs the smart-money
+  bot's 2.7R.
+- **Per-asset differences are in timing only**, not in mechanic or
+  thresholds. US100/US500 share one set of windows pulled from an **external,
+  not-in-repo dynamic config** (`config.FOREX_TIMINGS` /
+  `config.FOREX_ORDER_ALIVE_TIMINGS`, `strategy-provider.ts:25-26,38-39`) — an
+  S3 object (`ConfigClient.getObject`, `telegram-bot-config/dynamic_config.json`)
+  this project cannot currently read (no AWS credentials in this environment
+  either — see below). EURCHF/GBPCHF have hardcoded, asset-specific, very
+  narrow windows: EURCHF entry 03:02–03:20 NY / alive 03:00–04:00 NY; GBPCHF
+  entry 03:03–03:20 NY / alive 03:00–05:00 NY (`strategy-provider.ts:51-62,74-85`).
+- Confirmed: `StrategyProvider` injects **only `CapitalComClient`** — the
+  Binance client elsewhere in this bot is entirely irrelevant to this
+  strategy. All four instruments are Capital.com CFDs.
+
+**Why this needs an Architect decision before Researcher touches it:**
+
+1. **It reuses a primitive with a standing null (the proximal-edge iFVG,
+   `smc.md` §3 encoding #4) inside a third distinct composition** — not the
+   smart-money bot's H1-bias→M1-iFVG shape, and not session-liquidity's
+   session-extreme-sweep shape. It needs its own `knowledge/` entry, not a
+   silent variant of either.
+2. **Same "contests a standing null with hand-picked, unpublished-data
+   parameters" trigger `session-liquidity.md` §8 and the smart-money ruling
+   both used** — the VWAP-ratio band `[2.5, 11.5]`, the ATR-ratio cap `8`, and
+   all four timing windows were tuned by eye on the user's own unpublished
+   history, and the mechanic overlaps two already-closed/killed families
+   (proximal-edge iFVG entry; prior-hour sweep-and-reversal, the same shape
+   `session-liquidity-v5-ny` killed for session-level sweeps). One
+   pre-registered pass, one shot, same standard.
+3. **Direct overlap with the already-existing, currently-paused
+   `research/vwap-mr-indices/` package** — that package studies VWAP
+   mean-reversion on **CME index futures** (ES/NQ/YM), paused pending a paid
+   data-vendor decision, currently routed to a Pine-Script-manual-TradingView-test-only
+   path (no Python backtest, no spend). This bot's VWAP strategy trades
+   **US100/US500 as Capital.com CFDs**, not CME futures, and adds two forex
+   legs (EURCHF/GBPCHF) that package never touched. Same underlying anchor
+   (VWAP) and two shared instruments (Nasdaq/S&P), different venue, different
+   broker-vs-exchange cost structure, different entry mechanic entirely (this
+   bot fades VWAP-band stretches with an iFVG+sweep trigger;
+   `vwap-mr-indices` is a plainer band-touch mean-reversion). Architect
+   ruling: **keep separate, do not merge registrations** — a result on one
+   cannot support the other, but Researcher must reuse `vwap-mr-indices`'s
+   Capital.com/CME data-vendor findings rather than re-deriving them from
+   scratch (see data question below).
+
+**Data — resolved 2026-09-12:** user supplied `CAPITAL_COM_API_KEY`,
+`CAPITAL_COM_IDENTIFIER`, `CAPITAL_COM_CUSTOM_PASS` (now in
+`cmc-bot-main/.env`, gitignored, not committed) — Researcher pulls real
+historical CFD data through the bot's own `CapitalComClient` on all four
+instruments. Binance is irrelevant here (no crypto leg). The two index
+instruments' timing windows were given directly by the user rather than read
+from the bot's S3 config (user declined AWS access): entry **09:40–11:40
+NY**, alive **09:40–14:30 NY**, both provisional — user flagged these for
+revisiting after a first test, not a verified reading of the bot's live
+config. Capital.com's broker-specific spread/financing costs remain a
+standing caveat (non-exchange, not portable) for Stage 1's cost model
+regardless of credential access.
+
+**Dispatched to:** Architect, same session, for an architecture note +
+routing plan (new `knowledge/` entry, Researcher scope pending the data
+question, relationship to `vwap-mr-indices` and the smart-money bot).
