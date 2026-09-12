@@ -1,55 +1,31 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, viewChild } from '@angular/core';
-import { CandlesStore } from '../../core/state/candles.store';
-import { SignalsStore } from '../../core/state/signals.store';
-import { IndicatorsStore } from '../../core/state/indicators.store';
-import { StrategiesStore } from '../../core/state/strategies.store';
+import { ChangeDetectionStrategy, Component, HostListener } from '@angular/core';
+import { LayoutFeedService } from '../../core/state/layout-feed.service';
 import { TimeframeStore } from '../../core/state/timeframe.store';
-import { MarketFeedService } from '../../core/state/market-feed.service';
-import { InstrumentSwitcherComponent } from '../instrument-switcher/instrument-switcher.component';
+import { LayoutSwitcherComponent } from '../layout-switcher/layout-switcher.component';
 import { TimeframePickerComponent } from '../timeframe-picker/timeframe-picker.component';
 import { StatusBarComponent } from '../status-bar/status-bar.component';
-import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
-import { ChartComponent } from '../chart/chart.component';
-import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
+import { PanelGridComponent } from '../panel-grid/panel-grid.component';
 
 /**
- * Layout: top bar + chart pane + (future) side panel slot (§5.2). The side
- * panel and the OverlayLayer are the two extension points for showing
- * richer signal information later — nothing else here should need to
- * change when that lands.
+ * architecture/chart-layouts.md §6.1 — top bar (layout switcher + timeframe
+ * picker) + `<app-panel-grid>` body + status bar. Replaces the single-chart
+ * shell: the instrument switcher and the single `<app-chart>`/research-badge
+ * pairing are gone from here — each panel now hosts its own chart and its
+ * own (per-panel-scoped) research badge, see chart-panel.component.ts.
  */
 @Component({
   selector: 'app-terminal-shell',
   standalone: true,
-  imports: [
-    InstrumentSwitcherComponent,
-    TimeframePickerComponent,
-    StatusBarComponent,
-    ResearchBadgeComponent,
-    ChartComponent,
-  ],
+  imports: [LayoutSwitcherComponent, TimeframePickerComponent, StatusBarComponent, PanelGridComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="terminal">
       <div class="top-bar">
-        <app-instrument-switcher #switcher />
+        <app-layout-switcher />
         <app-timeframe-picker />
-        <app-research-badge />
       </div>
       <div class="body">
-        <div class="chart-pane">
-          <app-chart
-            [candles]="candles.candles()"
-            [overlays]="overlays()"
-            [indicatorPoints]="indicators.points()"
-            [indicatorSpecs]="strategies.indicatorSpecs()"
-            [timeframe]="timeframe.selected()"
-            (loadOlderRequested)="onLoadOlder()"
-          />
-        </div>
-        <div class="side-panel">
-          <!-- extension point: a future signal list/detail panel goes here -->
-        </div>
+        <app-panel-grid />
       </div>
       <app-status-bar />
     </div>
@@ -80,48 +56,21 @@ import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
         flex: 1;
         min-height: 0;
       }
-      .chart-pane {
-        flex: 1;
-        min-width: 0;
-      }
-      .side-panel {
-        width: 0;
-        overflow: hidden;
-        border-left: 1px solid #30363d;
-      }
     `,
   ],
 })
 export class TerminalShellComponent {
-  private readonly switcher = viewChild<InstrumentSwitcherComponent>('switcher');
-
-  readonly overlays = computed(() => signalsToOverlays(this.signals.signals()));
-
   constructor(
-    readonly candles: CandlesStore,
-    private readonly signals: SignalsStore,
-    readonly indicators: IndicatorsStore,
-    readonly strategies: StrategiesStore,
-    readonly timeframe: TimeframeStore,
-    private readonly feed: MarketFeedService,
+    private readonly feed: LayoutFeedService,
+    private readonly timeframe: TimeframeStore,
   ) {
-    this.feed.boot().catch((err) => console.error('[TerminalShell] boot failed', err));
-  }
-
-  onLoadOlder(): void {
-    void this.feed.loadOlderHistory();
+    this.feed.boot().catch((err: unknown) => console.error('[TerminalShell] boot failed', err));
   }
 
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
-    const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
-
-    if (event.key === '/' && !isTyping) {
-      event.preventDefault();
-      this.switcher()?.focusInput();
-      return;
-    }
+    const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
     if (isTyping) {
       return;
     }

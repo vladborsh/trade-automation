@@ -1,11 +1,12 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { Subject, Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
-import type { InstrumentId, Timeframe } from '@trade-automation/contracts';
+import type { InstrumentId, MetricKind, Timeframe } from '@trade-automation/contracts';
 import type {
   WsCandleFrame,
   WsClientFrame,
   WsIndicatorFrame,
+  WsMetricFrame,
   WsServerFrame,
   WsSignalFrame,
   WsStatusFrame,
@@ -25,10 +26,23 @@ interface SignalTopicKey {
   instrument: InstrumentId;
 }
 
-type TopicKey = CandleTopicKey | SignalTopicKey;
+interface MetricTopicKey {
+  topic: 'metrics';
+  instrument: InstrumentId;
+  metric: MetricKind;
+  timeframe: Timeframe;
+}
+
+type TopicKey = CandleTopicKey | SignalTopicKey | MetricTopicKey;
 
 function topicKeyId(key: TopicKey): string {
-  return key.topic === 'candles' ? `candles:${key.instrument}:${key.timeframe}` : `signals:${key.instrument}`;
+  if (key.topic === 'candles') {
+    return `candles:${key.instrument}:${key.timeframe}`;
+  }
+  if (key.topic === 'signals') {
+    return `signals:${key.instrument}`;
+  }
+  return `metrics:${key.instrument}:${key.metric}:${key.timeframe}`;
 }
 
 const PING_INTERVAL_MS = 20_000;
@@ -68,6 +82,9 @@ export class LiveSocket implements OnDestroy {
   );
   readonly indicatorFrames$: Observable<WsIndicatorFrame> = this.frames$.pipe(
     filter((f): f is WsIndicatorFrame => f.type === 'indicator'),
+  );
+  readonly metricFrames$: Observable<WsMetricFrame> = this.frames$.pipe(
+    filter((f): f is WsMetricFrame => f.type === 'metric'),
   );
   readonly statusFrames$: Observable<WsStatusFrame> = this.frames$.pipe(
     filter((f): f is WsStatusFrame => f.type === 'status'),
@@ -170,8 +187,16 @@ export class LiveSocket implements OnDestroy {
   private sendSubscribe(key: TopicKey): void {
     if (key.topic === 'candles') {
       this.send({ type: 'subscribe', topic: 'candles', instrument: key.instrument, timeframe: key.timeframe });
-    } else {
+    } else if (key.topic === 'signals') {
       this.send({ type: 'subscribe', topic: 'signals', instrument: key.instrument });
+    } else {
+      this.send({
+        type: 'subscribe',
+        topic: 'metrics',
+        instrument: key.instrument,
+        metric: key.metric,
+        timeframe: key.timeframe,
+      });
     }
   }
 
@@ -199,6 +224,18 @@ export class LiveSocket implements OnDestroy {
     this.send({ type: 'unsubscribe', topic: 'signals', instrument });
   }
 
+  subscribeMetrics(instrument: InstrumentId, metric: MetricKind, timeframe: Timeframe): void {
+    const key: TopicKey = { topic: 'metrics', instrument, metric, timeframe };
+    this.activeTopics.set(topicKeyId(key), key);
+    this.sendSubscribe(key);
+  }
+
+  unsubscribeMetrics(instrument: InstrumentId, metric: MetricKind, timeframe: Timeframe): void {
+    const key: TopicKey = { topic: 'metrics', instrument, metric, timeframe };
+    this.activeTopics.delete(topicKeyId(key));
+    this.send({ type: 'unsubscribe', topic: 'metrics', instrument, metric, timeframe });
+  }
+
   candlesFor(instrument: InstrumentId, timeframe: Timeframe): Observable<WsCandleFrame> {
     return this.candleFrames$.pipe(
       filter((f) => f.candle.instrument === instrument && f.candle.timeframe === timeframe),
@@ -219,6 +256,15 @@ export class LiveSocket implements OnDestroy {
    */
   indicatorsFor(instrument: InstrumentId): Observable<WsIndicatorFrame> {
     return this.indicatorFrames$.pipe(filter((f) => f.point.instrument === instrument));
+  }
+
+  metricsFor(instrument: InstrumentId, metric: MetricKind, timeframe: Timeframe): Observable<WsMetricFrame> {
+    return this.metricFrames$.pipe(
+      filter(
+        (f) =>
+          f.point.instrument === instrument && f.point.metric === metric && f.point.timeframe === timeframe,
+      ),
+    );
   }
 
   ngOnDestroy(): void {

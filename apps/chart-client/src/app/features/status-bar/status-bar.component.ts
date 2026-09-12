@@ -1,8 +1,21 @@
 import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
+import type { InstrumentId } from '@trade-automation/contracts';
 import { ConnectionStore } from '../../core/state/connection.store';
-import { InstrumentsStore } from '../../core/state/instruments.store';
+import { LayoutsStore } from '../../core/state/layouts.store';
 import { StrategiesStore } from '../../core/state/strategies.store';
 
+interface StatusRow {
+  instrument: InstrumentId;
+  venueStatus: string | null;
+  lastClosedCandleTime: number | null;
+  strategies: string;
+}
+
+/**
+ * architecture/chart-layouts.md §6.1 (SE-5 item 9) — iterates the active
+ * layout's distinct instruments instead of the one globally selected
+ * instrument the pre-layout terminal had.
+ */
 @Component({
   selector: 'app-status-bar',
   standalone: true,
@@ -10,19 +23,16 @@ import { StrategiesStore } from '../../core/state/strategies.store';
   template: `
     <div class="status-bar">
       <span class="conn" [class]="'conn-' + connection.connectionState()">{{ connection.connectionState() }}</span>
-      @if (venueStatus(); as vs) {
-        <span class="venue" [class]="'venue-' + vs.venueStatus">venue: {{ vs.venueStatus }}</span>
-        @if (vs.lastClosedCandleTime !== null) {
-          <span class="age">last bar: {{ ageLabel(vs.lastClosedCandleTime) }}</span>
-        }
-      }
-      @if (instruments.selected(); as instrument) {
-        <span class="instrument">{{ instrument.id }}</span>
-      }
-      @if (activeStrategies(); as list) {
-        @if (list.length > 0) {
-          <span class="strategies">strategies: {{ list }}</span>
-        }
+      @for (row of rows(); track row.instrument) {
+        <span class="instrument-status">
+          <span class="instrument">{{ row.instrument }}</span>
+          @if (row.venueStatus; as vs) {
+            <span class="venue" [class]="'venue-' + vs">{{ vs }}</span>
+          }
+          @if (row.strategies) {
+            <span class="strategies">{{ row.strategies }}</span>
+          }
+        </span>
       }
     </div>
   `,
@@ -30,12 +40,18 @@ import { StrategiesStore } from '../../core/state/strategies.store';
     `
       .status-bar {
         display: flex;
+        flex-wrap: wrap;
         gap: 16px;
         padding: 4px 12px;
         background: #0d1117;
         border-top: 1px solid #30363d;
         font-size: 11px;
         color: #8b949e;
+      }
+      .instrument-status {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
       }
       .conn-live {
         color: #26a69a;
@@ -66,34 +82,41 @@ import { StrategiesStore } from '../../core/state/strategies.store';
 export class StatusBarComponent {
   constructor(
     readonly connection: ConnectionStore,
-    readonly instruments: InstrumentsStore,
+    private readonly layouts: LayoutsStore,
     private readonly strategies: StrategiesStore,
   ) {}
 
-  readonly venueStatus = computed(() => {
-    const instrument = this.instruments.selected();
-    return instrument ? this.connection.statusFor(instrument.id) : null;
-  });
-
   /**
-   * architecture/vwap-band-reversal-plugin.md §6 item 3: the strategy list
-   * must show tier/displayName clearly, e.g. `strategies: vwap-band-reversal
-   * (research)`, so a research-tier strategy is never mistaken for a live one.
+   * architecture/vwap-band-reversal-plugin.md §6 item 3: still labelled
+   * `id (tier)` per instrument so a research-tier strategy is never
+   * mistaken for a live one, now repeated once per distinct instrument in
+   * the active layout rather than once for a single selection.
    */
-  readonly activeStrategies = computed(() => {
-    const instrument = this.instruments.selected();
-    if (!instrument) {
-      return '';
+  readonly rows = computed<StatusRow[]>(() => {
+    const layout = this.layouts.active();
+    if (!layout) {
+      return [];
     }
-    return this.strategies
-      .strategiesFor(instrument.id)
-      .filter((s) => s.enabled)
-      .map((s) => `${s.id} (${s.tier})`)
-      .join(', ');
+    const seen = new Set<InstrumentId>();
+    const result: StatusRow[] = [];
+    for (const panel of layout.panels) {
+      if (seen.has(panel.instrument)) {
+        continue;
+      }
+      seen.add(panel.instrument);
+      const status = this.connection.statusFor(panel.instrument);
+      const strategies = this.strategies
+        .strategiesFor(panel.instrument)
+        .filter((s) => s.enabled)
+        .map((s) => `${s.id} (${s.tier})`)
+        .join(', ');
+      result.push({
+        instrument: panel.instrument,
+        venueStatus: status?.venueStatus ?? null,
+        lastClosedCandleTime: status?.lastClosedCandleTime ?? null,
+        strategies,
+      });
+    }
+    return result;
   });
-
-  ageLabel(lastClosedCandleTime: number): string {
-    const ageSeconds = Math.max(0, Math.floor((Date.now() - lastClosedCandleTime) / 1000));
-    return `${ageSeconds}s ago`;
-  }
 }

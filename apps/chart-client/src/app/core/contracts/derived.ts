@@ -21,5 +21,6 @@ export type WsServerFrame = WsServerMessage;
 export type WsCandleFrame = Extract<WsServerMessage, { type: 'candle' }>;
 export type WsSignalFrame = Extract<WsServerMessage, { type: 'signal' }>;
 export type WsIndicatorFrame = Extract<WsServerMessage, { type: 'indicator' }>;
+export type WsMetricFrame = Extract<WsServerMessage, { type: 'metric' }>;
 export type WsStatusFrame = Extract<WsServerMessage, { type: 'status' }>;
 export type WsPongFrame = Extract<WsServerMessage, { type: 'pong' }>;

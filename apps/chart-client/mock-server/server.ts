@@ -6,13 +6,19 @@ import type {
   IndicatorPoint,
   InstrumentId,
   InstrumentsResponse,
+  Layout,
+  MetricKind,
+  MetricObservation,
+  MetricPoint,
   Signal,
   StrategiesResponse,
   Timeframe,
   WsClientMessage,
   WsServerMessage,
 } from '@trade-automation/contracts';
+import { bucketObservations } from '@trade-automation/contracts';
 import { MockMarketState } from './state';
+import { MOCK_LAYOUTS } from './layouts';
 import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
 
 const PORT = Number(process.env.MOCK_SERVER_PORT ?? 4300);
@@ -184,6 +190,28 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     return;
   }
 
+  if (url.pathname === '/api/layouts') {
+    const body: Layout[] = MOCK_LAYOUTS;
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (url.pathname === '/api/metrics') {
+    const instrument = url.searchParams.get('instrument') as InstrumentId | null;
+    const metric = url.searchParams.get('metric') as MetricKind | null;
+    const timeframe = url.searchParams.get('timeframe') as Timeframe | null;
+    if (!instrument || !metric || !timeframe || !TIMEFRAMES.includes(timeframe)) {
+      sendJson(res, 400, { error: 'instrument, metric and a valid timeframe are required' });
+      return;
+    }
+    const from = parseNumber(url.searchParams.get('from'));
+    const to = parseNumber(url.searchParams.get('to'));
+    const limit = Math.min(parseNumber(url.searchParams.get('limit')) ?? 1500, 5000);
+    const body: MetricPoint[] = state.metrics(instrument, metric, timeframe, from, to, limit);
+    sendJson(res, 200, body);
+    return;
+  }
+
   if (url.pathname === '/api/health') {
     sendJson(res, 200, healthResponse());
     return;
@@ -195,13 +223,24 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 const httpServer = createServer(handleRequest);
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
+interface MetricTopicKey {
+  instrument: InstrumentId;
+  metric: MetricKind;
+  timeframe: Timeframe;
+}
+
+function metricTopicId(key: MetricTopicKey): string {
+  return `${key.instrument}:${key.metric}:${key.timeframe}`;
+}
+
 interface ClientSubscriptions {
   candles: Set<string>; // `${instrument}:${timeframe}`
   signals: Set<InstrumentId>;
+  metrics: Map<string, MetricTopicKey>; // `${instrument}:${metric}:${timeframe}` -> key
 }
 
 wss.on('connection', (socket: WebSocket) => {
-  const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set() };
+  const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set(), metrics: new Map() };
   const lastFormingSentAt = new Map<string, number>();
 
   const send = (frame: WsServerMessage): void => {
@@ -240,6 +279,24 @@ wss.on('connection', (socket: WebSocket) => {
     }
   });
 
+  /**
+   * architecture/chart-layouts.md §4.5 — one frame per observation, bucketed
+   * to EACH subscriber's own requested timeframe (a client on '5m' and one
+   * on '1m' both subscribed to the same instrument/metric get their own
+   * correctly-bucketed point from the same raw observation).
+   */
+  const unsubscribeMetrics = state.onMetric((observation: MetricObservation) => {
+    for (const key of subscriptions.metrics.values()) {
+      if (key.instrument !== observation.instrument || key.metric !== observation.metric) {
+        continue;
+      }
+      const [point] = bucketObservations([observation], key.timeframe);
+      if (point) {
+        send({ type: 'metric', point });
+      }
+    }
+  });
+
   socket.on('message', (raw: Buffer) => {
     let frame: WsClientMessage;
     try {
@@ -273,6 +330,15 @@ wss.on('connection', (socket: WebSocket) => {
     }
     if (frame.type === 'unsubscribe' && frame.topic === 'signals') {
       subscriptions.signals.delete(frame.instrument);
+      return;
+    }
+    if (frame.type === 'subscribe' && frame.topic === 'metrics') {
+      const key: MetricTopicKey = { instrument: frame.instrument, metric: frame.metric, timeframe: frame.timeframe };
+      subscriptions.metrics.set(metricTopicId(key), key);
+      return;
+    }
+    if (frame.type === 'unsubscribe' && frame.topic === 'metrics') {
+      subscriptions.metrics.delete(metricTopicId({ instrument: frame.instrument, metric: frame.metric, timeframe: frame.timeframe }));
     }
   });
 
@@ -280,6 +346,7 @@ wss.on('connection', (socket: WebSocket) => {
     unsubscribeCandles();
     unsubscribeSignals();
     unsubscribeIndicators();
+    unsubscribeMetrics();
   });
 });
 

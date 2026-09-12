@@ -3,16 +3,22 @@ import type {
   IndicatorPoint,
   Instrument,
   InstrumentId,
+  MetricKind,
+  MetricObservation,
+  MetricPoint,
   Signal,
   Timeframe,
   VenueStatus,
 } from '@trade-automation/contracts';
+import { bucketObservations } from '@trade-automation/contracts';
 import {
   FIXTURE_INSTRUMENTS,
   advanceFormingCandle,
+  advanceOpenInterestObservation,
   closeCandle,
   generateSeedHistory,
   resample,
+  seedOpenInterestObservations,
   startFormingCandle,
 } from './fixtures';
 import { computeHistoricalSignals, detectExampleCrossSignal } from './example-cross';
@@ -26,6 +32,12 @@ import {
 export type CandleListener = (candle: Candle) => void;
 export type SignalListener = (signal: Signal) => void;
 export type IndicatorListener = (point: IndicatorPoint) => void;
+/** Raw observations, not yet bucketed — each subscriber buckets to its own subscribed timeframe (§4.5). */
+export type MetricListener = (observation: MetricObservation) => void;
+
+function metricStreamKey(metric: MetricKind, instrument: InstrumentId): string {
+  return `${metric}|${instrument}`;
+}
 
 /** The mock's synthetic VWAP band strategy (§8.2 step 1) only covers capitalcom instruments, as the real one does. */
 function supportsVwapBandMock(id: InstrumentId): boolean {
@@ -49,10 +61,13 @@ export class MockMarketState {
   private readonly oneMinuteHistory = new Map<InstrumentId, Candle[]>();
   private readonly signals = new Map<InstrumentId, Signal[]>();
   private readonly indicators = new Map<InstrumentId, IndicatorPoint[]>();
+  /** architecture/chart-layouts.md §4.2 — raw observations, keyed `${metric}|${instrument}`; bucketed to a timeframe on read. */
+  private readonly metricObservations = new Map<string, MetricObservation[]>();
 
   private readonly candleListeners = new Set<CandleListener>();
   private readonly signalListeners = new Set<SignalListener>();
   private readonly indicatorListeners = new Set<IndicatorListener>();
+  private readonly metricListeners = new Set<MetricListener>();
 
   private tickTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -73,6 +88,11 @@ export class MockMarketState {
       }
       signals.sort((a, b) => a.time - b.time);
       this.signals.set(instrument.id, signals);
+
+      const oi = seedOpenInterestObservations(instrument.id, history);
+      if (oi.length > 0) {
+        this.metricObservations.set(metricStreamKey('openInterest', instrument.id), oi);
+      }
     }
   }
 
@@ -89,6 +109,11 @@ export class MockMarketState {
   onIndicator(listener: IndicatorListener): () => void {
     this.indicatorListeners.add(listener);
     return () => this.indicatorListeners.delete(listener);
+  }
+
+  onMetric(listener: MetricListener): () => void {
+    this.metricListeners.add(listener);
+    return () => this.metricListeners.delete(listener);
   }
 
   venueStatusFor(id: InstrumentId): VenueStatus {
@@ -124,6 +149,14 @@ export class MockMarketState {
         (to === undefined || p.time <= to) &&
         (strategyId === undefined || p.strategyId === strategyId),
     );
+  }
+
+  /** `GET /api/metrics` (§4.5): bucketed to `timeframe`, same time-window filtering as `candles()`. */
+  metrics(id: InstrumentId, metric: MetricKind, timeframe: Timeframe, from?: number, to?: number, limit = 1500): MetricPoint[] {
+    const observations = this.metricObservations.get(metricStreamKey(metric, id)) ?? [];
+    const points = bucketObservations(observations, timeframe);
+    const filtered = points.filter((p) => (from === undefined || p.time >= from) && (to === undefined || p.time <= to));
+    return filtered.slice(Math.max(0, filtered.length - limit));
   }
 
   lastClosedOpenTime(id: InstrumentId): number | null {
@@ -188,6 +221,14 @@ export class MockMarketState {
             this.pushSignal(researchSignal);
           }
         }
+
+        const oiKey = metricStreamKey('openInterest', instrument.id);
+        const oiHistory = this.metricObservations.get(oiKey);
+        if (oiHistory && oiHistory.length > 0) {
+          const nextObservation = advanceOpenInterestObservation(instrument.id, oiHistory[oiHistory.length - 1], closed.openTime);
+          this.metricObservations.set(oiKey, [...oiHistory, nextObservation]);
+          this.emitMetric(nextObservation);
+        }
       }
     }, formingTickMs);
   }
@@ -209,6 +250,12 @@ export class MockMarketState {
   private emitCandle(candle: Candle): void {
     for (const listener of this.candleListeners) {
       listener(candle);
+    }
+  }
+
+  private emitMetric(observation: MetricObservation): void {
+    for (const listener of this.metricListeners) {
+      listener(observation);
     }
   }
 
