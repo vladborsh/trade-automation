@@ -80,6 +80,20 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** architecture/chart-layouts.md §4.4. */
+  readonly metricObservationsTotal = new client.Counter({
+    name: 'signal_server_metric_observations_total',
+    help: 'Metric observations ingested (backfill + live poll)',
+    labelNames: ['instrument', 'metric'],
+    registers: [this.registry],
+  });
+
+  readonly metricPollErrorsTotal = new client.Counter({
+    name: 'signal_server_metric_poll_errors_total',
+    help: 'Errors from a MetricAdapter.fetchLatest poll',
+    registers: [this.registry],
+  });
+
   constructor() {
     client.collectDefaultMetrics({ register: this.registry });
   }

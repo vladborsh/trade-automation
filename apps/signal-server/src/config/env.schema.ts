@@ -25,6 +25,10 @@ export const EnvSchema = z.object({
   BINANCE_WS_BASE_URL: z.string().default('wss://fstream.binance.com'),
   BINANCE_REST_BASE_URL: z.string().default('https://fapi.binance.com'),
 
+  // architecture/chart-layouts.md §4.4 — metric poll cadence, aligned to BarClock's 1m tick;
+  // an env value rather than hard-coded so it can be widened without a code change.
+  METRIC_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+
   CAPITAL_COM_BASE_URL: z.string().default('https://api-capital.backend-capital.com'),
   CAPITAL_COM_IDENTIFIER: z.string().optional(),
   CAPITAL_COM_PASSWORD: z.string().optional(),

@@ -12,14 +12,17 @@ import type { Server } from 'ws';
 import {
   Candle,
   InstrumentId,
+  MetricKind,
   Signal,
   Timeframe,
   WsClientMessage,
   WsClientMessageSchema,
   WsServerMessage,
+  bucketObservations,
 } from '@trade-automation/contracts';
 import { CandleClosedEvent, CandleFormingEvent, MarketDataEvents } from '../../market-data/market-data.events';
 import { MarketDataStatusService } from '../../market-data/market-data-status.service';
+import { MetricEvents, MetricObservedEvent } from '../../market-data/metrics/metric.events';
 import {
   IndicatorEmittedEvent,
   SignalEmittedEvent,
@@ -35,6 +38,8 @@ const FORMING_THROTTLE_MS = 250;
 interface ClientState {
   candleTopics: Set<string>; // `${instrument}|${timeframe}`
   signalTopics: Set<InstrumentId>;
+  /** architecture/chart-layouts.md §4.5 — `${instrument}|${metric}|${timeframe}`. */
+  metricTopics: Set<string>;
 }
 
 type WsSocket = {
@@ -76,7 +81,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }
 
-    this.clients.set(client, { candleTopics: new Set(), signalTopics: new Set() });
+    this.clients.set(client, { candleTopics: new Set(), signalTopics: new Set(), metricTopics: new Set() });
     this.metrics.wsClients.set(this.clients.size);
     client.on('message', (data) => this.onMessage(client, data));
     client.on('close', () => {
@@ -110,6 +115,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       case 'subscribe':
         if (parsed.topic === 'candles') {
           state.candleTopics.add(this.candleKey(parsed.instrument, parsed.timeframe));
+        } else if (parsed.topic === 'metrics') {
+          state.metricTopics.add(this.metricKey(parsed.instrument, parsed.metric, parsed.timeframe));
         } else {
           state.signalTopics.add(parsed.instrument);
         }
@@ -117,6 +124,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       case 'unsubscribe':
         if (parsed.topic === 'candles') {
           state.candleTopics.delete(this.candleKey(parsed.instrument, parsed.timeframe));
+        } else if (parsed.topic === 'metrics') {
+          state.metricTopics.delete(this.metricKey(parsed.instrument, parsed.metric, parsed.timeframe));
         } else {
           state.signalTopics.delete(parsed.instrument);
         }
@@ -126,6 +135,10 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private candleKey(instrument: InstrumentId, timeframe: Timeframe): string {
     return `${instrument}|${timeframe}`;
+  }
+
+  private metricKey(instrument: InstrumentId, metric: MetricKind, timeframe: Timeframe): string {
+    return `${instrument}|${metric}|${timeframe}`;
   }
 
   private send(client: WsSocket, message: WsServerMessage | { type: 'error'; message: string }): void {
@@ -185,6 +198,35 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const [client, state] of this.clients) {
       if (state.signalTopics.has(point.instrument)) {
         this.send(client, { type: 'indicator', point });
+      }
+    }
+  }
+
+  /**
+   * architecture/chart-layouts.md §4.5 — "ClientState gains metricTopics ... and
+   * onMetricObserved fans one bucketed point per subscribed timeframe." At <=1 observation/min
+   * no throttle is needed, unlike candle forming frames.
+   */
+  @OnEvent(MetricEvents.MetricObserved)
+  onMetricObserved(event: MetricObservedEvent): void {
+    const observation = event.observation;
+    const pointByTimeframe = new Map<Timeframe, ReturnType<typeof bucketObservations>[number]>();
+
+    for (const [client, state] of this.clients) {
+      for (const topic of state.metricTopics) {
+        const [topicInstrument, topicMetric, topicTimeframe] = topic.split('|') as [
+          InstrumentId,
+          MetricKind,
+          Timeframe,
+        ];
+        if (topicInstrument !== observation.instrument || topicMetric !== observation.metric) continue;
+
+        let point = pointByTimeframe.get(topicTimeframe);
+        if (!point) {
+          point = bucketObservations([observation], topicTimeframe)[0];
+          pointByTimeframe.set(topicTimeframe, point);
+        }
+        this.send(client, { type: 'metric', point });
       }
     }
   }

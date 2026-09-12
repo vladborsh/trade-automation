@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { HealthResponse } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { MarketDataStatusService } from '../market-data/market-data-status.service';
+import { MetricIngestionService } from '../market-data/metrics/metric-ingestion.service';
 
 const START_TIME = Date.now();
 
@@ -14,6 +15,7 @@ export class HealthController {
   constructor(
     private readonly config: AppConfigService,
     private readonly status: MarketDataStatusService,
+    private readonly metricIngestion: MetricIngestionService,
   ) {}
 
   @Get()
@@ -41,8 +43,7 @@ export class HealthController {
       status: degraded ? 'degraded' : 'ok',
       uptimeSeconds: (now - START_TIME) / 1000,
       instruments,
-      // architecture/chart-layouts.md §4.4 — populated once metric ingestion (SE-4) lands.
-      metrics: [],
+      metrics: this.metricIngestion.status(),
     };
   }
 }

@@ -17,6 +17,9 @@ services:
       REPLAY_FIXTURES_DIR: test/fixtures
       INSTRUMENTS_FILE: config/instruments.yaml
       STRATEGIES_FILE: config/strategies.yaml
+      LAYOUTS_FILE: config/layouts.yaml
       LOG_LEVEL: info
+      # architecture/chart-layouts.md §4.4 — open-interest poll cadence, aligned to BarClock.
+      METRIC_POLL_INTERVAL_MS: "60000"
     volumes:
       - ./data:/workspace/apps/signal-server/data

@@ -5,6 +5,8 @@ import {
   MetricPoint,
   MetricPointSchema,
   metricKey,
+  Timeframe,
+  TIMEFRAME_MS,
   WsMetricMessageSchema,
 } from '../src';
 
@@ -98,6 +100,24 @@ describe('bucketObservations (architecture/chart-layouts.md §4.2)', () => {
 
   it('returns an empty array for no observations', () => {
     expect(bucketObservations([], '1m')).toEqual([]);
+  });
+
+  it('buckets correctly at every timeframe (architecture/chart-layouts.md §9 SE-4)', () => {
+    const timeframes: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+    for (const tf of timeframes) {
+      const bucketMs = TIMEFRAME_MS[tf];
+      const obs: MetricObservation[] = [
+        { ...base, time: 0, value: 1 },
+        { ...base, time: bucketMs - 1, value: 2 }, // same bucket as time 0, should replace
+        { ...base, time: bucketMs, value: 3 }, // next bucket
+        { ...base, time: bucketMs + Math.floor(bucketMs / 2), value: 4 }, // same bucket as `bucketMs`
+      ];
+      const points = bucketObservations(obs, tf);
+      expect(points).toEqual([
+        { ...base, timeframe: tf, time: 0, value: 2, notional: undefined },
+        { ...base, timeframe: tf, time: bucketMs, value: 4, notional: undefined },
+      ]);
+    }
   });
 
   it('preserves notional through bucketing when present on the winning observation', () => {

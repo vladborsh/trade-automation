@@ -10,6 +10,7 @@ import { SignalsController } from './rest/signals.controller';
 import { StrategiesController } from './rest/strategies.controller';
 import { IndicatorsController } from './rest/indicators.controller';
 import { LayoutsController } from './rest/layouts.controller';
+import { MetricsController } from './rest/metrics.controller';
 import { LiveGateway } from './ws/live.gateway';
 
 @Module({
@@ -21,6 +22,7 @@ import { LiveGateway } from './ws/live.gateway';
     StrategiesController,
     IndicatorsController,
     LayoutsController,
+    MetricsController,
   ],
   providers: [LiveGateway],
 })

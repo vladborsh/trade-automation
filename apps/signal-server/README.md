@@ -74,9 +74,42 @@ failure. Key ones:
 | `BINANCE_REST_BASE_URL`, `BINANCE_WS_BASE_URL` | Binance USD-M futures endpoints; no API key needed for market data. |
 | `CAPITAL_COM_BASE_URL`, `CAPITAL_COM_IDENTIFIER`, `CAPITAL_COM_PASSWORD`, `CAPITAL_COM_API_KEY` | Required when `MARKET_DATA_MODE=live` and the universe includes a `capitalcom` instrument. |
 | `WS_SHARED_TOKEN` | Optional shared token gate on the WS endpoint (`?token=`). |
+| `METRIC_POLL_INTERVAL_MS` | Open-interest live poll cadence, aligned to `BarClock`'s 1m tick (default `60000`). See "Open interest ingestion" below. |
 
-The instrument universe (`config/instruments.yaml`) and strategy enablement
-(`config/strategies.yaml`) are separate files, also zod-validated at boot.
+The instrument universe (`config/instruments.yaml`), strategy enablement
+(`config/strategies.yaml`) and chart layouts (`config/layouts.yaml`) are separate files, also
+zod-validated at boot.
+
+## Open interest ingestion
+
+`architecture/chart-layouts.md` §4 — open interest is a **metric series** `(instrument,
+metric)`, not an instrument: `MetricAdapter` (parallel to `VenueAdapter`), `MetricCache`,
+`MetricStore` (file/S3, `metrics/` prefix), and `MetricIngestionService` (boot order: storage →
+`openInterestHist` backfill tail → poll loop, mirroring `IngestionService`'s candle boot
+order). Which `(instrument, metric)` pairs are ingested is driven entirely by `layouts.yaml`'s
+`kind: metric` panels — there is no second place to list "which metrics to ingest". A panel
+referencing a metric on a venue with no `MetricAdapter` (e.g. Capital.com — it has no OI) is
+logged and left down, not a boot failure.
+
+Only Binance is wired today (`BinanceMetricsAdapter`): history from `GET
+/futures/data/openInterestHist` (5m granularity, no API key), live snapshots from `GET
+/fapi/v1/openInterest` polled every `METRIC_POLL_INTERVAL_MS` (default 60s) on the existing
+`BarClock` tick — not a second timer. **`openInterestHist`'s retention window was confirmed
+live against `fapi.binance.com` at SE-4 build time (2026-09-12): a `startTime` more than ~30
+days in the past is rejected by the endpoint itself.** The adapter clamps backfill requests to
+that window and logs when it does; our own `MetricStore` is the long-term history beyond it.
+
+`GET /api/metrics?instrument&metric&timeframe&from&to&limit` serves bucketed points
+(`MetricCache` when in-window, else `MetricStore`); the WS `metrics` topic
+(`{ type: 'subscribe'|'unsubscribe', topic: 'metrics', instrument, metric, timeframe }`) pushes
+one bucketed point per observation, no throttling needed at ≤1/min. `GET /api/health.metrics`
+and `/metrics`' `signal_server_metric_observations_total{instrument,metric}` /
+`signal_server_metric_poll_errors_total` report ingestion health.
+
+To exercise this locally without live Binance, `MARKET_DATA_MODE=replay` reads
+`test/fixtures/<venue>/<symbol>/<metric>.jsonl` (one `MetricObservation` per line, ascending) —
+see `test/fixtures/binance/BTCUSDT/openInterest.jsonl`, a synthetic 5m walk covering the same
+window as the bundled candle fixture.
 
 ## Capital.com adapter — untested against live
 
@@ -122,6 +155,13 @@ isolation; `vwap-band-reversal`'s indicators (VWAP band, FVG/iFVG incl. the D-03
 range, ATR, prior-hour) each against a hand-computed case, the entry-window predicate across
 the 2025 DST transitions, and the parity test against the Researcher's fixture (currently
 skipping loudly — see below).
+
+Per §9 SE-4: open-interest payload mapping against realistic Binance response shapes; file/S3
+metric-store upsert idempotency at the `metrics/` prefix; WS `metrics` topic
+subscribe/unsubscribe and per-timeframe fan-out; and `MetricIngestionService`'s boot order
+(storage → backfill → poll, not just each step in isolation) against fixtures. Bucketing
+correctness at every timeframe, including a day boundary, is covered in
+`libs/contracts/test/metric.spec.ts`.
 
 ## Strategy plug-in: `vwap-band-reversal` (research tier, disabled by default)
 

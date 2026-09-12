@@ -5,11 +5,15 @@ import { AppConfigService } from '../config/config.service';
 import { ObservabilityModule } from '../observability/observability.module';
 import { CANDLE_STORE } from './candle-store.port';
 import { SIGNAL_STORE } from './signal-store.port';
+import { METRIC_STORE } from './metric-store.port';
 import { FileCandleStore } from './file/file-candle-store';
 import { FileSignalStore } from './file/file-signal-store';
+import { FileMetricStore } from './file/file-metric-store';
 import { S3CandleStore } from './s3/s3-candle-store';
 import { S3SignalStore } from './s3/s3-signal-store';
+import { S3MetricStore } from './s3/s3-metric-store';
 import { WriteBuffer } from './write-buffer.service';
+import { MetricWriteBuffer } from './metric-write-buffer.service';
 
 /**
  * architecture/live-signal-server.md §4.3, §6.3 — CandleStore/SignalStore selected by config
@@ -55,8 +59,27 @@ import { WriteBuffer } from './write-buffer.service';
         return new FileSignalStore(config.env.get('FILE_STORE_ROOT'));
       },
     },
+    {
+      provide: METRIC_STORE,
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => {
+        const mode = config.env.get('CANDLE_STORE');
+        if (mode === 's3') {
+          const bucket = config.env.get('S3_BUCKET');
+          if (!bucket) throw new Error('S3_BUCKET is required when CANDLE_STORE=s3');
+          const client = new S3Client({
+            region: config.env.get('S3_REGION'),
+            endpoint: config.env.get('S3_ENDPOINT') || undefined,
+            forcePathStyle: Boolean(config.env.get('S3_ENDPOINT')),
+          });
+          return new S3MetricStore(client, bucket);
+        }
+        return new FileMetricStore(config.env.get('FILE_STORE_ROOT'));
+      },
+    },
     WriteBuffer,
+    MetricWriteBuffer,
   ],
-  exports: [CANDLE_STORE, SIGNAL_STORE, WriteBuffer],
+  exports: [CANDLE_STORE, SIGNAL_STORE, METRIC_STORE, WriteBuffer, MetricWriteBuffer],
 })
 export class StorageModule {}
