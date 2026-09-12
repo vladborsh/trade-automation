@@ -142,6 +142,7 @@ note per system. They are role-to-role technical material.
 | File | Covers |
 |---|---|
 | [`live-signal-server.md`](architecture/live-signal-server.md) | Live signal-generation server (NestJS) + chart terminal client (Angular); shared contracts; candle storage/backup requirements and S3 recommendation; routing to Software Engineer / DevOps / Integration Engineer |
+| [`chart-layouts.md`](architecture/chart-layouts.md) | Multi-panel layout-setups for the chart terminal (`layouts.yaml`, `GET /api/layouts`), open-interest ingestion as a metric series (`MetricAdapter`, `GET /api/metrics`, WS `metrics` topic), time-range panel sync, per-panel signal visibility; DXY-on-Capital.com open question; routing to Software Engineer (SE-3/4/5) |
 
 ## Status
 
@@ -155,5 +156,11 @@ Roles and this context document were the first deliverable. Since then:
   terminal + candle backup. Designed as strategy-agnostic plumbing with a
   plug-in slot; Software Engineer scaffold and DevOps storage/hosting pin are
   the next steps. Specific AWS service choices remain DevOps Engineer's.
+- **Chart layout-setups designed 2026-09-12** —
+  `architecture/chart-layouts.md`: named multi-panel layouts (crypto: BTC/ETH/
+  BTC open interest/DXY; US indices: US100/US500/DXY) with one shared
+  timeframe and synchronized scrolling; open interest ingested as a new
+  metric series. Waiting on the user for the Capital.com DXY epic; SE units
+  3/4/5 are the next steps.
 - The trading-idea intake format is still informal (backlog entry → Architect
   grilling → research package).
