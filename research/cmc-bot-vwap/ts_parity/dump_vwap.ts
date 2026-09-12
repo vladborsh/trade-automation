@@ -42,7 +42,8 @@ import { OrderDirection } from '../../../cmc-bot-main/src/strategy/enum/order-di
 import { GeneralTimeIntervals } from '../../../cmc-bot-main/src/types/enums';
 import { VWAP } from '../../../cmc-bot-main/src/indicator/tools/vwap.indicator';
 
-const [startArg, endArg, symbol, files] = process.argv.slice(2);
+const [startArg, endArg, symbol, files, modeArg] = process.argv.slice(2);
+const mode = modeArg || 'native';   // native | win | all  (crypto extension, see crypto/README.md)
 
 const ratios = { MIN_VWAP_ATR_RATIO: 2.5, MAX_VWAP_ATR_RATIO: 11.5, MAX_IFVG_TO_ATR_RATIO: 8 };
 const HYPER: Record<string, Record<string, any>> = {
@@ -53,13 +54,25 @@ const HYPER: Record<string, Record<string, any>> = {
   EURCHF: { timings: [[{ hour: 3, minute: 2 }, { hour: 3, minute: 20 }]], orderAliveTimings: [[{ hour: 3, minute: 0 }, { hour: 4, minute: 0 }]], ...ratios },
   GBPCHF: { timings: [[{ hour: 3, minute: 3 }, { hour: 3, minute: 20 }]], orderAliveTimings: [[{ hour: 3, minute: 0 }, { hour: 5, minute: 0 }]], ...ratios },
 };
+// Crypto extension (not a configuration the bot ever shipped): mode `win` gives
+// BTCUSDT/ETHUSDT the US100/US500 windows verbatim; mode `all` subclasses the
+// strategy so BOTH clock predicates return true (every minute, every day, never
+// force-closed) — the only lines not taken from cmc-bot-main in that mode.
+const CRYPTO_WIN = HYPER.US100;
+class VWapStrategyAlways extends VWapStrategy {
+  public isValidTimeForNewOrders(_timestamp: number): boolean { return true; }
+  public canOrdersBeAlive(_timestamp: number): boolean { return true; }
+}
 
 const num = (x: any) => (typeof x === 'number' && Number.isFinite(x) ? x : x === Infinity ? 'inf' : x === -Infinity ? '-inf' : null);
 
 async function main() {
   const source = new StaticDataSource(files.split(','));
   await source.init();
-  const strategy = new VWapStrategy(source as any, symbol, symbol.toLowerCase(), HYPER[symbol], new RiskManager());
+  const hyper = mode === 'native' ? HYPER[symbol] : CRYPTO_WIN;
+  const Cls = mode === 'all' ? VWapStrategyAlways : VWapStrategy;
+  if (!hyper) throw new Error(`no hyper-parameters for ${symbol} in mode ${mode}`);
+  const strategy = new Cls(source as any, symbol, symbol.toLowerCase(), hyper, new RiskManager());
   const S = strategy as any;
   const emit = (o: Record<string, unknown>) => process.stdout.write(JSON.stringify(o) + '\n');
 

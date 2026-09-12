@@ -24,6 +24,12 @@ called out. Nothing here has been validated by this project — see §0.
   instruments). Still **no performance number** — that is Stage 1. The
   reproduction corrected several statements in this file; they are marked
   *(Stage 0)* below.
+- **Crypto extension 2026-09-13** (`research/cmc-bot-vwap/crypto/README.md`):
+  the unchanged mechanic reproduced on BTCUSDT/ETHUSDT perps (a configuration
+  the bot never shipped), under the indices' NY window and under no window.
+  Logs and counts only. On a 24/7 tape the daily 2-loss/1-win caps turn "no
+  window" into an implicit first-hours-after-00:00-UTC window. Capital.com's
+  1-minute history cannot be extended before 2024-01-01 (vendor retention).
 - **Family:** shares two primitives already pinned elsewhere in this project
   — the **proximal-edge iFVG** (`smart-money-ict.md` §1, `smc.md` §3 encoding
   #4, whose siblings #1–#3 are closed) as its entry trigger, and a

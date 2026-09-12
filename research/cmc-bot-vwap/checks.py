@@ -66,7 +66,8 @@ def c1_prefix(sym, P, ev, trades, log):
         t1 = trades[trades.signal_ts == T][["dir", "entry", "entry_ts", "stop0", "target"]].reset_index(drop=True)
         t2 = tr2[tr2.signal_ts == T][["dir", "entry", "entry_ts", "stop0", "target"]].reset_index(drop=True) \
             if len(tr2) else t1.iloc[0:0]
-        if not t1.equals(t2):
+        # dtype-insensitive: two EMPTY frames can carry int64 vs object dtypes
+        if len(t1) != len(t2) or (len(t1) and not np.array_equal(t1.to_numpy(dtype=float), t2.to_numpy(dtype=float))):
             diffs.append("order")
         if diffs:
             bad += 1

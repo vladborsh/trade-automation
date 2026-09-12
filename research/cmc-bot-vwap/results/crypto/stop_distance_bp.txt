@@ -1,0 +1,9 @@
+     stream  orders  stop_bp_p10  stop_bp_median  stop_bp_p90
+      US100     895          7.3            15.1         29.6
+      US500     947          4.2             9.5         20.6
+     EURCHF     239          1.4             2.7          5.1
+     GBPCHF     241          2.2             3.6          6.0
+BTCUSDT-win    1309         16.2            31.8         59.0
+BTCUSDT-all    2845          7.0            17.7         40.1
+ETHUSDT-win    1145         23.0            41.9         81.1
+ETHUSDT-all    2859         10.5            25.2         57.7

@@ -24,3 +24,4 @@ research/cmc-bot-vwap/ts_harness/node_modules
 research/cmc-bot-vwap/ts_parity/static
 research/cmc-bot-vwap/ts_parity/events/*.jsonl.gz
 research/cmc-bot-vwap/results/evals_*.parquet
+research/cmc-bot-vwap/results/crypto/evals_*.parquet

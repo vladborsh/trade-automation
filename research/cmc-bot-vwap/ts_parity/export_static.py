@@ -31,8 +31,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
 
 
-def chunk_bounds(month: str) -> tuple[pd.Timestamp, pd.Timestamp]:
-    a = pd.Timestamp(month + "-01", tz="UTC")
+def chunk_bounds(chunk: str) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """`YYYY-MM` = one calendar month; `YYYY-MM-DD+N` = N whole UTC days from that date."""
+    if "+" in chunk:
+        d, n = chunk.split("+")
+        a = pd.Timestamp(d, tz="UTC")
+        return a, a + pd.Timedelta(days=int(n)) - pd.Timedelta("1min")
+    a = pd.Timestamp(chunk + "-01", tz="UTC")
     b = a + pd.offsets.MonthBegin(1) - pd.Timedelta("1min")
     return a, b
 

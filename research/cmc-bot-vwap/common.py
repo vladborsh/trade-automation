@@ -60,6 +60,12 @@ TIMINGS = {
     "GBPCHF": dict(entry=(3, 3, 3, 20), alive=(3, 0, 5, 0)),
 }
 
+# ---- crypto extension (not a configuration the bot ever shipped) -----------
+# BTC/ETH USD-M perps from data.binance.vision (crypto/fetch_binance_1m.py).
+# "win": the US100/US500 windows applied verbatim; "all": every minute, 24/7.
+CRYPTO = ["BTCUSDT", "ETHUSDT"]
+CRYPTO_WINDOW = TIMINGS["US100"]
+
 BUY, SELL = 0, 1
 
 

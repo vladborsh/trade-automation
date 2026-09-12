@@ -842,6 +842,16 @@ its own backtest trades 2–3 h earlier than labelled), backtest-vs-live bar
 (L-01), the split, and the forex legs (~90 orders/yr each, underpowered for
 `n_holdout ≥ 150`). Package: `research/cmc-bot-vwap/HANDOFF.md`.
 
+**Extensions done 2026-09-13 (Researcher, `RESEARCH-LOG.md` Запись 21):**
+(1) "back to 2022" is **not possible** on the four Capital.com instruments —
+the broker's API serves no MINUTE/5m/15m bars before 2024-01-01 (hourly and
+daily do exist for 2022); (2) the unchanged mechanic was reproduced on
+**BTCUSDT/ETHUSDT** Binance perps 2022-08 → 2026-09 under two clock
+conditions — (a) the indices' NY window, (b) no window, 24/7 — with order
+logs and counts only, no performance number. Awaiting Architect: whether to
+route crypto at all, and which window (the caps turn (b) into an implicit
+00:00–06:00 UTC window unless removed).
+
 **Idea:** the user's pre-existing `cmc-bot-main` also ships a second,
 separately-coded strategy — `VWapStrategy`
 (`cmc-bot-main/src/strategy/vwap-strategy.ts`) — live-traded (per

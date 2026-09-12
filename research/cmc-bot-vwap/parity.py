@@ -36,7 +36,8 @@ sys.path.insert(0, HERE)
 from common import BUY, SELL, RESULTS, fmt, ms  # noqa: E402
 import engine  # noqa: E402
 sys.path.insert(0, os.path.join(HERE, "ts_parity"))
-from export_static import chunk_bytes  # noqa: E402
+from export_static import chunk_bounds, chunk_bytes  # noqa: E402
+from common import CRYPTO_WINDOW  # noqa: E402
 from common import load_1m  # noqa: E402
 
 DF: dict = {}
@@ -50,15 +51,22 @@ INT_F = ["n", "n_bull_ifvg", "n_bear_ifvg", "n_bias", "g_ts", "s_ts"]
 BOOL_F = ["in_disc", "bull_occ", "bear_occ", "has_ifvg", "prev_found"]
 
 
+MODE = "native"                     # native | win | all  (crypto extension)
+
+
+def tag(sym: str, chunk: str) -> str:
+    return f"{sym}-{chunk}" if MODE == "native" else f"{sym}-{chunk}-{MODE}"
+
+
 def load_ts(sym: str, month: str):
-    ev = [json.loads(x) for x in gzip.open(os.path.join(EV, f"{sym}-{month}.jsonl.gz"), "rt")]
+    ev = [json.loads(x) for x in gzip.open(os.path.join(EV, f"{tag(sym, month)}.jsonl.gz"), "rt")]
     return ev
 
 
 def py_side(P, month):
-    a = pd.Timestamp(month + "-01", tz="UTC")
-    b = a + pd.offsets.MonthBegin(1) - pd.Timedelta("1min")
-    trades, evals, events = engine.run(P, ms(a), ms(b))
+    a, b = chunk_bounds(month)
+    timing = {"native": None, "win": CRYPTO_WINDOW, "all": engine.ALWAYS}[MODE]
+    trades, evals, events = engine.run(P, ms(a), ms(b), timing=timing)
     return trades, evals, events
 
 
@@ -89,13 +97,17 @@ def compare_month(P, sym, month, out_rows):
 
     trades, evals, _ = py_side(P, month)
     problems = []
-    sha = open(os.path.join(EV, f"{sym}-{month}.sha256")).read().strip()
+    sha = open(os.path.join(EV, f"{tag(sym, month)}.sha256")).read().strip()
     if hashlib.sha256(chunk_bytes(sym, month, DF[sym])).hexdigest() != sha:
         problems.append("TAPE MISMATCH: the TypeScript ran on different bytes than the current parquet")
-    if end and end[0]["open"] != 0:
+    if MODE != "all" and end and end[0]["open"] != 0:
         problems.append(f"TS left {end[0]['open']} order(s) open at chunk end")
-    if len(trades) and not trades.closed.all():
+    n_open_py = int((~trades.closed.astype(bool)).sum()) if len(trades) else 0
+    n_open_ts = end[0]["open"] if end else None
+    if MODE != "all" and n_open_py:
         problems.append("Python left an order open at chunk end")
+    if MODE == "all" and n_open_ts != n_open_py:
+        problems.append(f"open orders at chunk end ts={n_open_ts} py={n_open_py}")
     # Exceptions are part of the behaviour under test (D-18): the TypeScript
     # throws `Cannot read properties of undefined (reading 'openTime')` inside
     # VWAP() when the bias window since UTC midnight is empty, and processStep
@@ -175,7 +187,8 @@ def compare_month(P, sym, month, out_rows):
                   ("dir", SELL if a["dir"] == "sell" else BUY, b.dir),
                   ("entry", a["entry"], b.entry), ("stop0", a["stop"], b.stop0), ("target", a["target"], b.target)]
         if c is None:
-            problems.append(f"order {k}: TS never closed it")
+            if bool(b.closed):
+                problems.append(f"order {k}: TS never closed it")
         else:
             checks += [("exit_ts", c["closeTime"], b.exit_ts), ("exit_price", c["closePrice"], b.exit_price),
                        ("why", c["why"], b.why), ("stop_at_exit", c["stop"], b.stop)]
@@ -195,11 +208,17 @@ def compare_month(P, sym, month, out_rows):
 
 
 def main() -> None:
-    sym = sys.argv[1]
-    months = sys.argv[2:]
+    global MODE
+    args = sys.argv[1:]
+    if "--mode" in args:
+        j = args.index("--mode"); MODE = args[j + 1]; del args[j:j + 2]
+    sym = args[0]
+    months = args[1:]
     if months == ["all"]:
-        months = sorted(os.path.basename(p)[len(sym) + 1:-len(".jsonl.gz")]
-                        for p in glob.glob(os.path.join(EV, f"{sym}-*.jsonl.gz")))
+        suf = ".jsonl.gz" if MODE == "native" else f"-{MODE}.jsonl.gz"
+        months = sorted(os.path.basename(p)[len(sym) + 1:-len(suf)]
+                        for p in glob.glob(os.path.join(EV, f"{sym}-*{suf}"))
+                        if MODE != "native" or not os.path.basename(p)[:-len(".jsonl.gz")].endswith(("-win", "-all")))
     DF[sym] = load_1m(sym)
     P = engine.prepare(sym, DF[sym])
     rows, allp = [], []
@@ -214,12 +233,13 @@ def main() -> None:
         allp += [f"{mo}: {p}" for p in pr]
     print(f"{sym}: exception bars (both sides identical) {EXC_N.get(sym, 0)}; TS messages {EXC.get(sym, set())}")
     df = pd.DataFrame(rows)
-    path = os.path.join(RESULTS, f"parity_{sym}.csv")
-    if os.path.exists(path) and months != sorted(df.month):
+    sfx = "" if MODE == "native" else f"_{MODE}"
+    path = os.path.join(RESULTS, f"parity_{sym}{sfx}.csv")
+    if os.path.exists(path):          # a partial run replaces only the chunks it re-ran
         old = pd.read_csv(path, dtype={"month": str})
         df = pd.concat([old[~old.month.isin(df.month)], df]).sort_values("month")
     df.to_csv(path, index=False)
-    with open(os.path.join(RESULTS, f"parity_{sym}_problems.txt"), "w") as fh:
+    with open(os.path.join(RESULTS, f"parity_{sym}{sfx}_problems.txt"), "w") as fh:
         fh.write("\n".join(allp) + ("\n" if allp else "0 discrepancies\n"))
     sys.exit(1 if allp else 0)
 

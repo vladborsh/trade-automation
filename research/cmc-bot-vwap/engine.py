@@ -250,9 +250,25 @@ def prepare(symbol: str, df: pd.DataFrame | None = None) -> dict:
                 v=np.ascontiguousarray(df.volume.values.astype(np.float64)))
 
 
-def alive_minutes(symbol: str, lo_ms: int, hi_ms: int):
-    """Chronological (T, is_entry) for every minute the bot is alive, Mon-Fri by UTC getDay."""
-    tm = TIMINGS[symbol]
+ALWAYS = "24/7"
+
+
+def alive_minutes(symbol: str, lo_ms: int, hi_ms: int, timing=None):
+    """Chronological (T, is_entry) for every minute the bot is alive.
+
+    `timing=None` -> the instrument's windows from `TIMINGS` (Mon-Fri by UTC
+    getDay, NY wall clock, both ends inclusive), plus the first non-alive
+    minute of each day flagged `None` (the forced flat). A dict with `entry`
+    and `alive` tuples applies those windows to any symbol (the crypto
+    "windowed" condition). `timing=ALWAYS` -> every minute, every day, always
+    entry-valid, never force-closed (the crypto "unrestricted" condition; the
+    TypeScript side overrides both predicates to `true`).
+    """
+    if timing == ALWAYS:
+        lo = ((lo_ms + MIN_MS - 1) // MIN_MS) * MIN_MS
+        Ts = np.arange(lo, hi_ms + 1, MIN_MS, dtype=np.int64)
+        return Ts, np.ones(len(Ts), np.int8)
+    tm = TIMINGS[symbol] if timing is None else timing
     out_t, out_e = [], []
     d = (lo_ms // DAY_MS) * DAY_MS
     while d <= hi_ms:
@@ -262,16 +278,19 @@ def alive_minutes(symbol: str, lo_ms: int, hi_ms: int):
             e0, e1 = ny_window_utc_ms(d, *tm["entry"])
             for T in range(a0, a1 + 1, MIN_MS):
                 if lo_ms <= T <= hi_ms:
-                    out_t.append(T); out_e.append(e0 <= T <= e1)
+                    out_t.append(T); out_e.append(1 if e0 <= T <= e1 else 0)
             # the first non-alive minute, where the forced flat happens
             if lo_ms <= a1 + MIN_MS <= hi_ms:
-                out_t.append(a1 + MIN_MS); out_e.append(None)
+                out_t.append(a1 + MIN_MS); out_e.append(-1)
         d += DAY_MS
-    return np.array(out_t, np.int64), out_e
+    return np.array(out_t, np.int64), np.array(out_e, np.int8)
+
+
+GATES = ["bias", "signal", "ifvg_ok", "above", "below", "caps_ok", "allowed", "placed"]
 
 
 def run(P: dict, lo_ms: int, hi_ms: int, daily_caps: bool = True, record_components: bool = True,
-        live_like: bool = False):
+        live_like: bool = False, timing=None):
     """The bot's bar loop over [lo_ms, hi_ms] (inclusive). Returns (trades, evals, events).
 
     `live_like=True` is NOT the parity target. It approximates what the deployed
@@ -280,74 +299,100 @@ def run(P: dict, lo_ms: int, hi_ms: int, daily_caps: bool = True, record_compone
     bar that opened at T-1 while the clock gates still use T. The forming candle
     the live bias request can include is not reproducible from history and is
     not modelled.
+
+    `timing`: see `alive_minutes`. Evaluated-bar records are stored column-wise
+    (int8 gates: -1 = not computed on that bar) so a 24/7 run over millions of
+    minutes stays in memory.
     """
     t, o, h, l, c, v = P["t"], P["o"], P["h"], P["l"], P["c"], P["v"]
-    Ts, is_entry = alive_minutes(P["symbol"], lo_ms, hi_ms)
+    Ts, is_entry = alive_minutes(P["symbol"], lo_ms, hi_ms, timing)
     G = np.searchsorted(t, Ts - (MIN_MS if live_like else 0), "right") - 1
     S = np.searchsorted(t, Ts - WINDOW_MS, "left")
     B0 = np.searchsorted(t, (Ts // DAY_MS) * DAY_MS + MIN_MS, "left")
 
+    ne = int((is_entry == 1).sum())
+    eT = np.empty(ne, np.int64); eg = np.full(ne, -1, np.int64); es = np.full(ne, -1, np.int64)
+    ecomp = np.full((ne, NCOMP), np.nan) if record_components else None
+    eerr = np.zeros(ne); en = np.zeros(ne)
+    egate = np.full((ne, len(GATES)), -1, np.int8)
+    eratio = np.full(ne, np.nan); estop = np.full(ne, np.nan); etarget = np.full(ne, np.nan)
+    k = 0
+
     orders: list[Order] = []
+    open_: list[Order] = []           # open orders, creation order
+    day_losses: dict = {}; day_wins: dict = {}
     last_g = None                     # lastCandles, as its last index (None = empty)
-    evals = []
     events = []
 
+    def do_close(od, ts, price, why):
+        od.close(ts, price, why)
+        events.append(("close", od))
+        dk = ts // DAY_MS
+        if od.profitable:
+            day_wins[dk] = day_wins.get(dk, 0) + 1
+        else:
+            day_losses[dk] = day_losses.get(dk, 0) + 1
+
     for i in range(len(Ts)):
-        T = int(Ts[i]); ent = is_entry[i]
-        if ent is None:               # !canOrdersBeAlive -> processOutOfValidTime(lastCandles)
+        T = int(Ts[i]); ent = int(is_entry[i])
+        if ent == -1:                 # !canOrdersBeAlive -> processOutOfValidTime(lastCandles)
             if last_g is not None:
-                for od in orders:
-                    if not od.closed:
-                        od.close(int(t[last_g]), float(c[last_g]), "STRATEGY")
-                        events.append(("close", od))
+                for od in open_:
+                    do_close(od, int(t[last_g]), float(c[last_g]), "STRATEGY")
+                open_ = []
             continue
         g = int(G[i]); s = int(S[i])
         n = g - s + 1
         if n <= 0:                    # getCandles -> []: lastCandles = [], no signal
             last_g = None
-            if ent and record_components:
-                evals.append(dict(T=T, n=0, err=1.0, bias=-1, signal=-1))
+            if ent == 1:
+                eT[k] = T; en[k] = 0; eerr[k] = 1.0
+                if record_components:
+                    ecomp[k, 0] = 0; ecomp[k, _C["err"]] = 1.0
+                k += 1
             continue
         last_g = g
-        cg = float(c[g])
+        cg = float(c[g]); tg = int(t[g])
         # ---- checkAndCloseOrders: close-only, strict (D-11) ---------------
-        for od in orders:
-            if od.closed:
-                continue
-            if od.dir == BUY:
-                if cg < od.stop: od.close(int(t[g]), cg, "STOP_LOSS"); events.append(("close", od))
-                elif cg > od.target: od.close(int(t[g]), cg, "TAKE_PROFIT"); events.append(("close", od))
-            else:
-                if cg > od.stop: od.close(int(t[g]), cg, "STOP_LOSS"); events.append(("close", od))
-                elif cg < od.target: od.close(int(t[g]), cg, "TAKE_PROFIT"); events.append(("close", od))
-        # ---- verifyExistingOrders ----------------------------------------
-        opened = [od for od in orders if not od.closed]
-        for od in opened:
-            prof = (cg - od.entry) if od.dir == BUY else (od.entry - cg)
-            r = prof / od.init if od.init != 0 else (math.copysign(math.inf, prof) if prof != 0 else math.nan)
-            moved = False
-            if r > 1 and r < 2:
-                moved = od.trail(0) or moved
-            if r > 2:
-                moved = od.trail(1) or moved
-            if moved:
-                od.n_trail += 1; events.append(("trail", od))
-        ob = [od for od in opened if od.dir == BUY]
-        osl = [od for od in opened if od.dir == SELL]
-        if ob and osl:
-            lst = ob + osl
-            acc = lst[0]
-            for cur in lst[1:]:
-                acc = acc if acc.entry_ts < cur.entry_ts else cur
-            acc.close(int(t[g]), cg, "STRATEGY"); events.append(("close", acc))
-        if not ent:
+        if open_:
+            still = []
+            for od in open_:
+                if od.dir == BUY:
+                    if cg < od.stop: do_close(od, tg, cg, "STOP_LOSS")
+                    elif cg > od.target: do_close(od, tg, cg, "TAKE_PROFIT")
+                    else: still.append(od)
+                else:
+                    if cg > od.stop: do_close(od, tg, cg, "STOP_LOSS")
+                    elif cg < od.target: do_close(od, tg, cg, "TAKE_PROFIT")
+                    else: still.append(od)
+            open_ = still
+            # ---- verifyExistingOrders ------------------------------------
+            for od in open_:
+                prof = (cg - od.entry) if od.dir == BUY else (od.entry - cg)
+                r = prof / od.init if od.init != 0 else (math.copysign(math.inf, prof) if prof != 0 else math.nan)
+                moved = False
+                if r > 1 and r < 2:
+                    moved = od.trail(0) or moved
+                if r > 2:
+                    moved = od.trail(1) or moved
+                if moved:
+                    od.n_trail += 1; events.append(("trail", od))
+            ob = [od for od in open_ if od.dir == BUY]
+            osl = [od for od in open_ if od.dir == SELL]
+            if ob and osl:
+                lst = ob + osl
+                acc = lst[0]
+                for cur in lst[1:]:
+                    acc = acc if acc.entry_ts < cur.entry_ts else cur
+                do_close(acc, tg, cg, "STRATEGY")
+                open_ = [od for od in open_ if od is not acc]
+        if ent != 1:
             continue
         # ---- processCharts ------------------------------------------------
         comp = components(t, o, h, l, c, v, s, g, int(B0[i]))
-        rec = dict(T=T, g_ts=int(t[g]), s_ts=int(t[s]))
+        eT[k] = T; eg[k] = tg; es[k] = int(t[s]); en[k] = n
         bias = None
-        err = comp[_C["err"]]
-        if err == 0:
+        if comp[_C["err"]] == 0:
             last_open = o[g]                              # lastCandle.open, not close (D-05)
             if last_open > comp[_C["vwap_top"]]:
                 bias = SELL
@@ -374,12 +419,8 @@ def run(P: dict, lo_ms: int, hi_ms: int, daily_caps: bool = True, record_compone
                 above = below = False
             ratio_ok = (ratio >= MIN_VWAP_ATR_RATIO) and (ratio <= MAX_VWAP_ATR_RATIO)
             if daily_caps:
-                day = (int(t[g]) // DAY_MS)
-                losses = sum(1 for od in orders if od.closed and od.close_ts is not None
-                             and od.close_ts // DAY_MS == day and not od.profitable)
-                wins = sum(1 for od in orders if od.closed and od.close_ts is not None
-                           and od.close_ts // DAY_MS == day and od.profitable)
-                caps_ok = losses < 2 and wins < 1
+                dk = tg // DAY_MS
+                caps_ok = day_losses.get(dk, 0) < 2 and day_wins.get(dk, 0) < 1
             else:
                 caps_ok = True
             in_disc = comp[_C["in_disc"]] == 1.0
@@ -387,32 +428,44 @@ def run(P: dict, lo_ms: int, hi_ms: int, daily_caps: bool = True, record_compone
                     and ifvg_ok and above and caps_ok)
             buy = (not sell) and (comp[_C["bull_occ"]] == 1.0 and ratio_ok and in_disc and bias == BUY
                                   and ifvg_ok and below and caps_ok)
-            rec.update(ratio=ratio, ifvg_ok=ifvg_ok, above=above, below=below, caps_ok=caps_ok)
+            eratio[k] = ratio
+            egate[k, 2] = ifvg_ok; egate[k, 3] = above; egate[k, 4] = below; egate[k, 5] = caps_ok
             if (sell or buy) and bias is not None:
                 d = SELL if sell else BUY
                 sig = d
-                lo_r, hi_r = comp[_C["range_bottom"]], comp[_C["range_top"]]
-                stop, target = stop_target(cg, lo_r, hi_r, d)
-                allowed = (len(orders) == 0) or not any((not od.closed) and od.dir == d for od in orders)
+                stop, target = stop_target(cg, comp[_C["range_bottom"]], comp[_C["range_top"]], d)
+                allowed = not any(od.dir == d for od in open_)
                 placed = False
                 if allowed and _truthy(stop) and _truthy(target):
-                    entry_ts = int(t[g]) + (int(t[g]) - int(t[g - 1]))   # openTime + getInterval
+                    entry_ts = tg + (tg - int(t[g - 1]))           # openTime + getInterval
                     od = Order(d, cg, entry_ts, stop, target, T)
-                    orders.append(od); placed = True
+                    orders.append(od); open_.append(od); placed = True
                     events.append(("signal", od))
-                rec.update(stop=stop, target=target, allowed=allowed, placed=placed)
-        rec["bias"] = -1 if bias is None else bias
-        rec["signal"] = -1 if sig is None else sig
+                estop[k] = stop; etarget[k] = target
+                egate[k, 6] = allowed; egate[k, 7] = placed
+        egate[k, 0] = -1 if bias is None else bias
+        egate[k, 1] = -1 if sig is None else sig
+        eerr[k] = comp[_C["err"]]
         if record_components:
-            for k, name in enumerate(COMP):
-                rec[name] = comp[k]
-        evals.append(rec)
+            ecomp[k] = comp
+        k += 1
 
     trades = pd.DataFrame([dict(signal_ts=od.signal_ts, entry_ts=od.entry_ts, dir=od.dir, entry=od.entry,
                                 stop0=od.stop0, target=od.target, exit_ts=od.close_ts,
                                 exit_price=od.close_price, stop=od.stop, n_trail=od.n_trail, why=od.why,
-                                closed=od.closed) for od in orders])
-    return trades, pd.DataFrame(evals), events
+                                closed=od.closed) for od in orders],
+                          columns=["signal_ts", "entry_ts", "dir", "entry", "stop0", "target", "exit_ts",
+                                   "exit_price", "stop", "n_trail", "why", "closed"])
+    cols = {"T": eT[:k], "g_ts": eg[:k], "s_ts": es[:k]}
+    if record_components:
+        for j, name in enumerate(COMP):
+            cols[name] = ecomp[:k, j]
+    else:
+        cols["n"] = en[:k]; cols["err"] = eerr[:k]
+    for j, name in enumerate(GATES):
+        cols[name] = egate[:k, j]
+    cols.update(ratio=eratio[:k], stop=estop[:k], target=etarget[:k])
+    return trades, pd.DataFrame(cols), events
 
 
 def _truthy(x) -> bool:
