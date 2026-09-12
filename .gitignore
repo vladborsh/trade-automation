@@ -18,3 +18,8 @@ research/session-liquidity-bos/results/uncond_*.csv.gz
 
 research/session-liquidity-v5-ny/data
 research/session-liquidity-v5-ny/results/uncond_*.csv.gz
+
+research/cmc-bot-smart-money/data
+research/cmc-bot-smart-money/ts_parity/*.json
+research/cmc-bot-smart-money/results/signals.parquet
+research/cmc-bot-smart-money/results/parity_py_*.csv

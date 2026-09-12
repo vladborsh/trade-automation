@@ -1,0 +1,20 @@
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/BTCUSDT-2024-11-01-2024-12-20-m1.json: 72721 bars  2024-10-30 12:00:00+00:00 .. 2024-12-20 00:00:00+00:00
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/BTCUSDT-2024-11-01-2024-12-20-h1.json: 1921 bars  2024-10-01 00:00:00+00:00 .. 2024-12-20 00:00:00+00:00
+      50 /Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/ts_events_BTCUSDT-2024-11-01-2024-12-20.jsonl
+
+=== BTCUSDT-2024-11-01-2024-12-20 ===
+TypeScript orders : 17
+Python orders     : 17
+
+PARITY: 0 discrepancies (signal time, entry time, direction, entry, stop, target, exit time, exit price)
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/ETHUSDT-2024-11-01-2024-12-20-m1.json: 72721 bars  2024-10-30 12:00:00+00:00 .. 2024-12-20 00:00:00+00:00
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/ETHUSDT-2024-11-01-2024-12-20-h1.json: 1921 bars  2024-10-01 00:00:00+00:00 .. 2024-12-20 00:00:00+00:00
+      50 /Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/ts_events_ETHUSDT-2024-11-01-2024-12-20.jsonl
+
+=== ETHUSDT-2024-11-01-2024-12-20 ===
+TypeScript orders : 17
+Python orders     : 17
+
+PARITY: 0 discrepancies (signal time, entry time, direction, entry, stop, target, exit time, exit price)
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/SOLUSDT-2023-02-20-2023-04-10-m1.json: 72721 bars  2023-02-18 12:00:00+00:00 .. 2023-04-10 00:00:00+00:00
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/SOLUSDT-2023-02-20-2023-04-10-h1.json: 1921 bars  2023-01-20 00:00:00+00:00 .. 2023-04-10 00:00:00+00:00
