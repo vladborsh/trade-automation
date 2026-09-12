@@ -78,8 +78,10 @@ def md_table(df: pd.DataFrame) -> str:
     df = df.reset_index()
     head = "| " + " | ".join(str(c) for c in df.columns) + " |"
     rule = "|" + "|".join("---" for _ in df.columns) + "|"
-    body = ["| " + " | ".join(f"{v:,}" if isinstance(v, (int, np.integer)) else str(v)
-                              for v in row) + " |" for row in df.itertuples(index=False)]
+    cols = list(df.columns)
+    body = ["| " + " | ".join(
+        f"{v:,}" if (isinstance(v, (int, np.integer)) and cols[j] != "year") else str(v)
+        for j, v in enumerate(row)) + " |" for row in df.itertuples(index=False)]
     return "\n".join([head, rule] + body)
 
 
@@ -163,9 +165,14 @@ def main() -> None:
         f"Trades (caps off): sell {int((pri['dir'] == SELL).sum()):,} / "
         f"buy {int((pri['dir'] == BUY).sum()):,}.",
         "",
-        "The sell lean is expected, not an artifact of this port: `getLastIfvgDirection`",
-        "returns **sell** as its default when the bullish iFVG list is empty",
-        "(`PARITY.md` D-02), so the H1 bias is structurally sell-leaning in quiet tape.",
+        f"H1 bias across all in-window bars: sell on {float((sig.bias == SELL).mean()):.1%}.",
+        "",
+        "`getLastIfvgDirection` returns **sell** as its default when the bullish iFVG",
+        "list is empty (`PARITY.md` D-02), so the bias is structurally sell-leaning —",
+        "but on 1h data over 720 hours both lists are almost always populated, so the",
+        "lean measures only a couple of points and the trade stream comes out close to",
+        "balanced. The default matters much more on the M1 side, where D-01 blocks",
+        f"{float((~sig.has_ifvg).mean()):.1%} of in-window bars outright.",
         "",
         "## 6. Exit-cause mix of the primary trade stream (a count, not a result)",
         "",

@@ -18,3 +18,19 @@ Python orders     : 17
 PARITY: 0 discrepancies (signal time, entry time, direction, entry, stop, target, exit time, exit price)
 /Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/SOLUSDT-2023-02-20-2023-04-10-m1.json: 72721 bars  2023-02-18 12:00:00+00:00 .. 2023-04-10 00:00:00+00:00
 /Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/SOLUSDT-2023-02-20-2023-04-10-h1.json: 1921 bars  2023-01-20 00:00:00+00:00 .. 2023-04-10 00:00:00+00:00
+      59 /Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/ts_events_SOLUSDT-2023-02-20-2023-04-10.jsonl
+
+=== SOLUSDT-2023-02-20-2023-04-10 ===
+TypeScript orders : 23
+Python orders     : 23
+
+PARITY: 0 discrepancies (signal time, entry time, direction, entry, stop, target, exit time, exit price)
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/BNBUSDT-2025-09-01-2025-10-20-m1.json: 72721 bars  2025-08-30 12:00:00+00:00 .. 2025-10-20 00:00:00+00:00
+/Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/BNBUSDT-2025-09-01-2025-10-20-h1.json: 1921 bars  2025-08-01 00:00:00+00:00 .. 2025-10-20 00:00:00+00:00
+      49 /Users/Vladyslav_Borsh/Documents/trade_automation/.claude/worktrees/agent-a021a1d70a05f5553/research/cmc-bot-smart-money/ts_parity/ts_events_BNBUSDT-2025-09-01-2025-10-20.jsonl
+
+=== BNBUSDT-2025-09-01-2025-10-20 ===
+TypeScript orders : 18
+Python orders     : 18
+
+PARITY: 0 discrepancies (signal time, entry time, direction, entry, stop, target, exit time, exit price)

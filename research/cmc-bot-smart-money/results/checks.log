@@ -1,0 +1,15 @@
+PASS  C1 literal transcription of indicatorScript  80 windows, 0 mismatches
+PASS  C2 ATR(20) matches the literal transcription  0 mismatches
+PASS  C3 every evaluated bar is 09:40-11:10 New York, Mon-Fri, 91 bars/day  95,095 bars, 91..91 per day
+PASS  C4 prefix-causality, M1 path (>=200 sampled signals, 0 lookahead)  240/240 re-derived identically from a truncated tape
+PASS  C5 D-06 measured: signals surviving a CAUSAL (partial-last-hour) H1 frame  195/240 unchanged, 45 changed -> see results/C5_h1_lookahead.txt
+PASS  C6 stop/target arithmetic re-derived from scratch  5,795 signals, R:R = 2.700000..2.700000
+PASS  C7 the {0.5, 0.7, 1.0} shrink table fires in all three branches  {0.5: 1621, 0.7: 1181, 1.0: 2993}
+PASS  C8 D-01: no signal is possible while either iFVG list is empty  69,335/380,380 in-window bars blocked by the undefined lastIFVG
+PASS  C9 D-02: the H1 bias default is sell-leaning  53.0% of in-window bars carry a sell bias
+PASS  C10 the two entry branches are mutually exclusive and fully gated  2,989 sell / 2,806 buy
+PASS  C11 at most one open order per direction at any time  
+PASS  C12 no position survives 11:10 New York  max hold 90 min, latest exit 670 min past midnight NY
+PASS  C13 every recorded TypeScript parity fixture reproduces  4 fixtures, 0 failing 
+
+13/13 PASS
