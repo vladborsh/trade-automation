@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CandleSchema } from './candle';
 import { InstrumentIdSchema, InstrumentSchema, VenueStatusSchema } from './instrument';
+import { MetricKindSchema, MetricPointSchema } from './metric';
 import { SignalSchema } from './signal';
 import { IndicatorPointSchema, IndicatorSeriesSpecSchema, StrategyTierSchema } from './strategy';
 import { TimeframeSchema } from './timeframe';
@@ -68,6 +69,20 @@ export type IndicatorsQuery = z.infer<typeof IndicatorsQuerySchema>;
 export const IndicatorsResponseSchema = z.array(IndicatorPointSchema);
 export type IndicatorsResponse = z.infer<typeof IndicatorsResponseSchema>;
 
+/** architecture/chart-layouts.md §4.5 — GET /api/metrics. */
+export const MetricsQuerySchema = z.object({
+  instrument: InstrumentIdSchema,
+  metric: MetricKindSchema,
+  timeframe: TimeframeSchema,
+  from: z.coerce.number().int().nonnegative(),
+  to: z.coerce.number().int().nonnegative(),
+  limit: z.coerce.number().int().min(1).max(5000).default(1500),
+});
+export type MetricsQuery = z.infer<typeof MetricsQuerySchema>;
+
+export const MetricsResponseSchema = z.array(MetricPointSchema);
+export type MetricsResponse = z.infer<typeof MetricsResponseSchema>;
+
 export const HealthResponseSchema = z.object({
   status: z.enum(['ok', 'degraded']),
   uptimeSeconds: z.number().nonnegative(),
@@ -79,6 +94,16 @@ export const HealthResponseSchema = z.object({
       feedLag: z.number().nonnegative().nullable(),
     }),
   ),
+  /** architecture/chart-layouts.md §4.4 — additive; default [] leaves DevOps' existing alarm design untouched. */
+  metrics: z
+    .array(
+      z.object({
+        instrument: InstrumentIdSchema,
+        metric: MetricKindSchema,
+        lastObservationAge: z.number().nonnegative().nullable(),
+      }),
+    )
+    .default([]),
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
@@ -110,15 +135,34 @@ export const WsUnsubscribeSignalsSchema = z.object({
   instrument: InstrumentIdSchema,
 });
 
+/** architecture/chart-layouts.md §4.5 — `metrics` WS topic. */
+export const WsSubscribeMetricsSchema = z.object({
+  type: z.literal('subscribe'),
+  topic: z.literal('metrics'),
+  instrument: InstrumentIdSchema,
+  metric: MetricKindSchema,
+  timeframe: TimeframeSchema,
+});
+
+export const WsUnsubscribeMetricsSchema = z.object({
+  type: z.literal('unsubscribe'),
+  topic: z.literal('metrics'),
+  instrument: InstrumentIdSchema,
+  metric: MetricKindSchema,
+  timeframe: TimeframeSchema,
+});
+
 export const WsPingSchema = z.object({ type: z.literal('ping') });
 
 const WsSubscribeSchema = z.discriminatedUnion('topic', [
   WsSubscribeCandlesSchema,
   WsSubscribeSignalsSchema,
+  WsSubscribeMetricsSchema,
 ]);
 const WsUnsubscribeSchema = z.discriminatedUnion('topic', [
   WsUnsubscribeCandlesSchema,
   WsUnsubscribeSignalsSchema,
+  WsUnsubscribeMetricsSchema,
 ]);
 
 export const WsClientMessageSchema = z.union([WsSubscribeSchema, WsUnsubscribeSchema, WsPingSchema]);
@@ -128,6 +172,8 @@ export const WsCandleMessageSchema = z.object({ type: z.literal('candle'), candl
 export const WsSignalMessageSchema = z.object({ type: z.literal('signal'), signal: SignalSchema });
 /** architecture/live-signal-server.md §11.5 — delivered to every client subscribed to `signals` for the instrument. */
 export const WsIndicatorMessageSchema = z.object({ type: z.literal('indicator'), point: IndicatorPointSchema });
+/** architecture/chart-layouts.md §4.5 — one frame per observation, already bucketed to the subscribed timeframe. */
+export const WsMetricMessageSchema = z.object({ type: z.literal('metric'), point: MetricPointSchema });
 export const WsStatusMessageSchema = z.object({
   type: z.literal('status'),
   instrument: InstrumentIdSchema,
@@ -140,6 +186,7 @@ export const WsServerMessageSchema = z.discriminatedUnion('type', [
   WsCandleMessageSchema,
   WsSignalMessageSchema,
   WsIndicatorMessageSchema,
+  WsMetricMessageSchema,
   WsStatusMessageSchema,
   WsPongMessageSchema,
 ]);

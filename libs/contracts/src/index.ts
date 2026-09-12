@@ -3,4 +3,6 @@ export * from './timeframe';
 export * from './candle';
 export * from './strategy';
 export * from './signal';
+export * from './layout';
+export * from './metric';
 export * from './wire';

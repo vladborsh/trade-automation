@@ -58,3 +58,16 @@ instruments:
     pricePrecision: 5
     quoteCurrency: CHF
     sessionTimezone: UTC
+
+  # architecture/chart-layouts.md §5 — epic confirmed against the live Capital.com API:
+  # instrumentType INDICES, streamingPricesAvailable true. Trading hours are near-continuous
+  # (Mon-Fri 00:00-21:00 UTC + Sun 22:00-00:00 UTC), NOT the US cash-session shape US100/US500
+  # have — sessionTimezone is UTC here, do not reuse America/New_York.
+  - id: "capitalcom:DXY"
+    venue: capitalcom
+    symbol: DXY
+    assetClass: index-cfd
+    displayName: "US Dollar Index"
+    pricePrecision: 2
+    quoteCurrency: USD
+    sessionTimezone: UTC

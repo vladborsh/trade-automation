@@ -10,6 +10,7 @@ export const EnvSchema = z.object({
 
   INSTRUMENTS_FILE: z.string().default('config/instruments.yaml'),
   STRATEGIES_FILE: z.string().default('config/strategies.yaml'),
+  LAYOUTS_FILE: z.string().default('config/layouts.yaml'),
 
   CANDLE_STORE: z.enum(['file', 's3']).default('file'),
   FILE_STORE_ROOT: z.string().default('data'),

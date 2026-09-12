@@ -1,0 +1,42 @@
+# architecture/chart-layouts.md §2 — named multi-panel layout-setups.
+# A layout references instruments from instruments.yaml by id; an unknown
+# id is a boot failure (same rule as every other config file, base §4.7).
+layouts:
+  - id: crypto
+    name: "Crypto trading"
+    grid: { columns: 2, rows: 2 }          # panels flow row-major into the grid
+    panels:
+      - id: btc
+        kind: candles
+        instrument: "binance:BTCUSDT"
+        signals: true
+      - id: eth
+        kind: candles
+        instrument: "binance:ETHUSDT"
+        signals: true
+      - id: btc-oi
+        kind: metric
+        instrument: "binance:BTCUSDT"
+        metric: openInterest
+        signals: false                      # must be false for kind: metric (schema-enforced)
+      - id: dxy
+        kind: candles
+        instrument: "capitalcom:DXY"
+        signals: false
+
+  - id: us-indices
+    name: "US indices"
+    grid: { columns: 1, rows: 3 }          # stacked: time axes line up vertically (§6.4)
+    panels:
+      - id: us100
+        kind: candles
+        instrument: "capitalcom:US100"
+        signals: false                      # see D8 — flip to true if VWAP signals are wanted here
+      - id: us500
+        kind: candles
+        instrument: "capitalcom:US500"
+        signals: false
+      - id: dxy
+        kind: candles
+        instrument: "capitalcom:DXY"
+        signals: false
