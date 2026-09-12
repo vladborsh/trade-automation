@@ -662,9 +662,39 @@ directionally, not the two-legged arb).
 
 ## Smart-money ICT strategy from `cmc-bot` (existing pre-built bot, user's own prior project)
 
-**Status:** logged 2026-09-12, dispatched to Architect same-session for a
-routing decision (not yet researched/backtested independently under this
-project's protocol).
+**Status:** **routed by Architect 2026-09-12** — approved for **one
+pre-registered, hypothesis-tested Researcher pass**, thresholds fixed in
+advance. Full ruling: `research/cmc-bot-smart-money/ARCHITECT-NOTE.md`;
+mechanic pinned in `knowledge/smart-money-ict.md`; `RESEARCH-LOG.md` Запись 19.
+
+- **Family:** *not* session-liquidity — the bot has **no sweep-detection step
+  at all**, and its iFVG inverts through the gap's **proximal** edge, not
+  §5.1's far edge. It is **encoding #4** in `knowledge/smc.md` §3 (HTF bias →
+  LTF entry trigger), whose encodings #1–#3 are all closed. The C3 reopen
+  trigger is untouched in either direction.
+- **Standard:** pre-registered, not descriptive — its parameters were chosen
+  by eye on unpublished data, and it contests a standing null. §8's own rule.
+  **One shot**: a miss is a kill, not a rework.
+- **Thresholds, fixed now:** kill if holdout mean net R **< +0.05R** or
+  placebo `p > 0.20`; build only if **all** of mean net R **≥ +0.10R**,
+  `p ≤ 0.0125` (Bonferroni /4), fit agrees in sign, `n_holdout ≥ 150`, the
+  90 % day-block bootstrap interval excludes 0, and gross expectancy > 0.
+- **Symbols/data:** BTC/ETH/SOL/BNB USD-M perp, **1m** (+1h and 5m resampled),
+  2022-08-01 .. 2026-07-31, pulled with this project's own
+  `research/intraday-mr-smc/fetch_data.py` — **not** the bot's `npm run scrap`.
+  Daily 2-loss/1-win caps removed from the primary population (capped version
+  a mandatory secondary row).
+- **Route:** Researcher, one package `research/cmc-bot-smart-money/`, two
+  stages with an Architect gate between — **Stage 0** Python reproduction +
+  bar-for-bar parity against the TypeScript + prefix-causality proof + signal
+  inventory (no performance number); **Stage 1** the pre-registered test.
+  Software Engineer / Backtesting engage only on a REAL EDGE verdict.
+- **Inadmissible:** the bot's own in-repo backtest results — it models no
+  costs/spread/slippage, checks exits on M1 closes only, and clamps a
+  gapped-through stop back to the exact stop price.
+- **Out of scope, explicitly:** `vwap-strategy`, `tech-analysis`/RSI,
+  `correlation-analyzer`, the Telegram bot, AWS/OTel plumbing,
+  `chart-visualizer`, and the bot's unused level machinery.
 
 **Idea:** The user has a pre-existing, already-coded trading bot at
 `cmc-bot-main/` (own prior project, not built by this team) implementing a
@@ -762,3 +792,31 @@ whatever sample size the Architect/Researcher pins for a fit/holdout split.
 routing plan (new `knowledge/` entry vs. extension of an existing one,
 Researcher scope, and whether/how this reopens or relates to the
 session-liquidity shelving ruling).
+
+## The `cmc-bot` ICT mechanic on cash-open indices (US500/US100) — spun off
+
+**Status:** logged 2026-09-12 by Architect as a **deliberate spin-off** from
+the entry above, so it does not ride along on that pass's pre-registration.
+Not routed; no Researcher work authorised.
+
+**Idea:** the same H1-bias → M1-iFVG composition
+(`knowledge/smart-money-ict.md`), but on equity-index instruments. The reason
+to separate it is not administrative: **a 09:40–11:10 New York window means
+something categorically different on an instrument that only trades
+09:30–16:00 New York.** On an index it is "the first hundred minutes after the
+cash open" — a different, and arguably more plausible, hypothesis than the
+same clock slice of a 24/7 crypto tape. Testing both under one registration
+would let a result on one be read as support for the other.
+
+**Blockers to resolve before this could be routed:**
+
+- `PROJECT.md` scopes to crypto/equities intraday; index CFDs sit at the edge
+  of that and the crypto pipeline is not yet proven.
+- The bot's index path is **Capital.com**, a CFD broker, not an exchange tape:
+  prices and costs (spread, financing) are broker-specific, so a result would
+  be neither reproducible nor portable, and this project has no honest cost
+  model for it. A real pass would need an exchange-sourced index/futures tape.
+- The bot's own documented smart-money backtests are BTCUSDT/ETHUSDT only;
+  US500/US100 in `cmc-bot-main/docs/backtesting.md` are the **vwap** strategy.
+- Partly overlaps `research/vwap-mr-indices/` on data sourcing — reuse that
+  package's instrument/vendor findings rather than re-deriving them.

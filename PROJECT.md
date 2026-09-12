@@ -131,6 +131,7 @@ the prose definition, for whoever reads this next.
 | [`session-liquidity.md`](knowledge/session-liquidity.md) | Session definitions, session liquidity, sweep detection (iFVG, BoS), PDH/PDL, measurement conventions |
 | [`smc.md`](knowledge/smc.md) | Order block, FVG, CHoCH, BoS mechanics; three tested entry-encodings, all closed |
 | [`derivatives-positioning.md`](knowledge/derivatives-positioning.md) | OI/top-trader-ratio/taker-flow definitions; redundancy-control methodology; all three hypotheses closed |
+| [`smart-money-ict.md`](knowledge/smart-money-ict.md) | ICT true-open levels, premium/discount, proximal-edge iFVG; the `cmc-bot` H1-bias → M1-iFVG strategy as coded |
 
 ## Status
 

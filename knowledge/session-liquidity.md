@@ -41,6 +41,15 @@ file updated whenever a definition changes during implementation.
   the session-level stream is not PDH/PDL-in-Asia; its `hypothesis.py` is
   reusable machinery if C3 is ever authorised. New definitions added in §6.3;
   no pinned definition changed.
+- **Not this family — `cmc-bot` smart-money ICT** (`knowledge/smart-money-ict.md`,
+  `research/cmc-bot-smart-money/`, Запись 19, 2026-09-12). It shares the word
+  "iFVG" and an almost identical New York window (09:40–11:10 wall clock vs
+  v5-NY's 09:40–11:20 fixed UTC−4) but has **no level-sweep detection step at
+  all**, and its iFVG inverts through the gap's **proximal** edge, not §5.1's
+  far edge — a different event. Its level machinery (PDH/PDL, London
+  high/low) is computed but never read by its signal. **The C3 reopen trigger
+  is untouched in either direction:** nothing that pass finds can burn C3, and
+  C3 does not bear on it.
 - **Phase 1** (`research/session-liquidity/`, fixed 2h horizon, session
   overlap, strict iFVG) — **rejected after user review**, kept on disk for
   reference only. Do not build on it. `RESEARCH-LOG.md` Запись 11.
