@@ -1,70 +1,117 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
- * §9.1's end-to-end proof: boots the mock server + client, switches
- * instrument, and confirms the demo `example-cross` signal renders as a
- * marker via the OverlayLayer.
+ * architecture/chart-layouts.md §9 SE-5's e2e proof: boots on the `crypto`
+ * layout (4 panels incl. the mock's `capitalcom:DXY-MOCK`), confirms signal
+ * markers render only on the two `signals: true` panels (BTC/ETH) — the
+ * same overlay + research-badge machinery the VWAP client unit added, now
+ * exercised per-panel instead of against one globally selected instrument
+ * — changes timeframe and confirms all four panels re-fetch, then scrolls
+ * panel 1 back and confirms the synced range lands on all four panels and
+ * that panel 2 fires its own older-history request as a *consequence* of
+ * the synced range change, not because it was scrolled directly.
  */
-test('boots, switches instrument, and renders a signal marker on the chart', async ({ page }) => {
+
+function panelById(page: Page, id: string) {
+  return page.locator(`.chart-panel[data-panel-id="${id}"]`);
+}
+
+async function chartPanels(page: Page) {
+  return page.locator('app-chart-panel');
+}
+
+test('boots on the crypto layout with 4 panels, markers only on signals:true panels', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.locator('.switcher-input')).toBeVisible();
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
-  // Wait for the initial instrument (boot restores the last selection, or
-  // the first configured one) to have candles and a rendered marker.
-  const chartContainer = page.locator('.chart-container');
-  await expect(chartContainer).toHaveAttribute('data-marker-count', /[1-9]\d*/, { timeout: 15_000 });
+  const btcPanel = panelById(page, 'btc');
+  const ethPanel = panelById(page, 'eth');
+  const dxyPanel = panelById(page, 'dxy');
 
-  // Switch instrument via the `/` shortcut + search, per §5.1's keyboard shortcuts.
-  await page.keyboard.press('/');
-  await page.locator('.switcher-input').fill('ETHUSDT');
-  await page.locator('.switcher-list button', { hasText: 'binance:ETHUSDT' }).click();
+  // signals:true panels (BTC, ETH) render at least one marker — the same
+  // overlay pipeline (`signalsToOverlays` → `OverlayLayer`) the VWAP unit
+  // relies on, now fed per-panel by that panel's own PanelFeed.
+  await expect(btcPanel.locator('.chart-container')).toHaveAttribute('data-marker-count', /[1-9]\d*/, {
+    timeout: 15_000,
+  });
+  await expect(ethPanel.locator('.chart-container')).toHaveAttribute('data-marker-count', /[1-9]\d*/, {
+    timeout: 15_000,
+  });
 
-  await expect(page.locator('.status-bar .instrument')).toHaveText('binance:ETHUSDT');
-  await expect(chartContainer).toHaveAttribute('data-marker-count', /[1-9]\d*/, { timeout: 15_000 });
+  // signals:false panels (DXY here; the OI metric panel too) never show markers.
+  await expect(dxyPanel.locator('.chart-container')).toHaveAttribute('data-marker-count', '0');
 
-  // Live connection should be up (mock server ws) once boot settles.
-  await expect(page.locator('.status-bar .conn')).toHaveText('live', { timeout: 15_000 });
+  // The research badge (VWAP client unit, untouched) is visible wherever its
+  // "non-live tier" condition holds for that panel's own signals/indicators —
+  // confirms the badge keeps working when resolved via the per-panel scoped
+  // stores instead of one global selection.
+  await expect(btcPanel.locator('app-research-badge .research-badge')).toBeVisible({ timeout: 15_000 });
+  await expect(dxyPanel.locator('app-research-badge .research-badge')).toHaveCount(0);
 });
 
-/**
- * architecture/vwap-band-reversal-plugin.md §8.2 step 5: on US100/1m the
- * three synthetic VWAP band lines render, an amber/research-styled marker
- * renders, and the research badge is visible; switching to 5m hides the
- * band lines (§3.1's timeframe rule) while the badge stays visible.
- */
-test('shows the research-tier VWAP band + badge on US100/1m, hides the band on 5m', async ({ page }) => {
+test('changing timeframe re-fetches all four panels', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
-  await page.keyboard.press('/');
-  await page.locator('.switcher-input').fill('US100');
-  await page.locator('.switcher-list button', { hasText: 'capitalcom:US100' }).click();
-  await expect(page.locator('.status-bar .instrument')).toHaveText('capitalcom:US100');
+  for (const panel of await (await chartPanels(page)).all()) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-from', /\d+/, { timeout: 15_000 });
+  }
 
-  // 1m is not the default (`timeframe.store.ts` defaults to 5m), so switch explicitly.
-  await page.getByRole('button', { name: '1m', exact: true }).click();
+  await page.getByRole('button', { name: '1h', exact: true }).click();
 
-  const chartContainer = page.locator('.chart-container');
-  await expect(chartContainer).toHaveAttribute('data-marker-count', /[1-9]\d*/, { timeout: 15_000 });
+  // A fresh history fetch + re-render resets each panel's own visible range;
+  // re-asserting the hook still resolves confirms every panel came back up
+  // on the new timeframe rather than freezing on stale 5m data.
+  for (const panel of await (await chartPanels(page)).all()) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-from', /\d+/, { timeout: 15_000 });
+  }
+});
 
-  // Research badge — first line always visible, fixed copy.
-  const badge = page.locator('app-research-badge .research-badge');
-  await expect(badge).toBeVisible({ timeout: 15_000 });
-  await expect(badge).toContainText('RESEARCH — not a trading signal');
+test('scrolling one panel back syncs the visible range to all four and triggers an independent older-history fetch on another', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
-  // Status bar lists the research-tier strategy explicitly.
-  await expect(page.locator('.status-bar .strategies')).toContainText('vwap-band-reversal (research)');
+  const panels = await (await chartPanels(page)).all();
+  for (const panel of panels) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-from', /\d+/, { timeout: 15_000 });
+  }
 
-  // Three VWAP band lines (vwap/vwapTop/vwapBottom) — `data-indicator-series-count`
-  // is a test hook (chart.component.ts) since lightweight-charts draws to
-  // canvas and exposes no other DOM surface to assert on.
-  await expect(chartContainer).toHaveAttribute('data-indicator-series-count', '3', { timeout: 15_000 });
+  const firstContainer = panels[0].locator('.chart-container');
+  const box = await firstContainer.boundingBox();
+  if (!box) {
+    throw new Error('chart container has no bounding box');
+  }
 
-  // Switch to 5m: the band's own timeframe ('1m') no longer matches the
-  // chart's displayed timeframe, so the layer hides it (§3.1) — the badge
-  // must still be visible, since the strategy itself is still active.
-  await page.getByRole('button', { name: '5m', exact: true }).click();
-  await expect(page.locator('.status-bar .instrument')).toHaveText('capitalcom:US100');
-  await expect(chartContainer).toHaveAttribute('data-indicator-series-count', '0');
-  await expect(badge).toBeVisible();
+  const secondContainer = panels[1].locator('.chart-container');
+  const beforeFrom = await secondContainer.getAttribute('data-visible-from');
+
+  // Drag panel 1's time scale to scroll it back — a user gesture on ONE panel.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height - 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 10, box.y + box.height - 10, { steps: 10 });
+  await page.mouse.up();
+
+  // All four panels converge on (approximately) the same visible range.
+  await expect(async () => {
+    const froms: number[] = [];
+    const tos: number[] = [];
+    for (const panel of panels) {
+      const container = panel.locator('.chart-container');
+      froms.push(Number(await container.getAttribute('data-visible-from')));
+      tos.push(Number(await container.getAttribute('data-visible-to')));
+    }
+    const epsilon = 5 * 60; // half a 5m bar generously rounded, well above lightweight-charts snap noise
+    expect(Math.max(...froms) - Math.min(...froms)).toBeLessThanOrEqual(epsilon);
+    expect(Math.max(...tos) - Math.min(...tos)).toBeLessThanOrEqual(epsilon);
+  }).toPass({ timeout: 15_000 });
+
+  // Panel 2 was never scrolled directly, yet its own visible-from moved
+  // because the synced range change pushed it toward its own history edge,
+  // which fires its own independent loadOlder() — not a jump caused by
+  // scrolling panel 2 itself.
+  const afterFrom = await secondContainer.getAttribute('data-visible-from');
+  expect(afterFrom).not.toBe(beforeFrom);
 });

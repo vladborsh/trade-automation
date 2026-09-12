@@ -1,6 +1,15 @@
 import { Injectable } from '@angular/core';
 import { AppConfigService } from '../config/app-config.service';
-import type { Candle, IndicatorPoint, InstrumentId, Signal, Timeframe } from '@trade-automation/contracts';
+import type {
+  Candle,
+  IndicatorPoint,
+  InstrumentId,
+  Layout,
+  MetricKind,
+  MetricPoint,
+  Signal,
+  Timeframe,
+} from '@trade-automation/contracts';
 import type { Health, InstrumentWithStatus, StrategyInfo } from '../contracts/derived';
 
 /**
@@ -59,5 +68,20 @@ export class RestClient {
 
   getHealth(): Promise<Health> {
     return this.getJson<Health>('/health');
+  }
+
+  getLayouts(): Promise<Layout[]> {
+    return this.getJson<Layout[]>('/layouts');
+  }
+
+  getMetrics(
+    instrument: InstrumentId,
+    metric: MetricKind,
+    timeframe: Timeframe,
+    from?: number,
+    to?: number,
+    limit = 1500,
+  ): Promise<MetricPoint[]> {
+    return this.getJson<MetricPoint[]>('/metrics', { instrument, metric, timeframe, from, to, limit });
   }
 }

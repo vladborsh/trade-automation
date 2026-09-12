@@ -2,8 +2,23 @@ import { Injectable, computed, signal } from '@angular/core';
 import type { InstrumentId } from '@trade-automation/contracts';
 import type { InstrumentWithStatus } from '../contracts/derived';
 
-const LAST_SELECTED_KEY = 'chart-client:selected-instrument';
-
+/**
+ * architecture/chart-layouts.md §6.1 — the universe (displayName/precision/
+ * status lookups), no longer paired with a single global "selected
+ * instrument" persisted to localStorage: layouts replace that concept
+ * (`LayoutsStore`, `chart-client:active-layout`) and the instrument switcher
+ * that used to write here is removed.
+ *
+ * The `selected`/`select` pair stays on the class (not deleted) because
+ * `ChartPanelComponent` provides a fresh, panel-scoped `InstrumentsStore`
+ * instance per panel (Angular hierarchical DI) and immediately calls
+ * `select(panel.instrument)` on it — that scoped instance is what the
+ * VWAP client unit's `ResearchBadgeComponent` resolves via ordinary
+ * constructor injection when rendered inside that panel, so it keeps
+ * working unmodified with exactly one instrument in view instead of a
+ * global one. This is a deliberate escalated deviation from this note's
+ * literal "drop `selected`" instruction — see HANDOFF.md.
+ */
 @Injectable({ providedIn: 'root' })
 export class InstrumentsStore {
   private readonly list = signal<InstrumentWithStatus[]>([]);
@@ -17,28 +32,10 @@ export class InstrumentsStore {
 
   setInstruments(instruments: InstrumentWithStatus[]): void {
     this.list.set(instruments);
-    if (!this.selectedId() && instruments.length > 0) {
-      const restored = this.readLastSelected();
-      const initial = instruments.find((i) => i.id === restored) ?? instruments[0];
-      this.select(initial.id);
-    }
   }
 
   select(id: InstrumentId): void {
     this.selectedId.set(id);
-    try {
-      localStorage.setItem(LAST_SELECTED_KEY, id);
-    } catch {
-      // localStorage unavailable (private mode, etc.) — selection still works in-memory
-    }
-  }
-
-  private readLastSelected(): string | null {
-    try {
-      return localStorage.getItem(LAST_SELECTED_KEY);
-    } catch {
-      return null;
-    }
   }
 
   updateVenueStatus(id: InstrumentId, venueStatus: InstrumentWithStatus['venueStatus']): void {

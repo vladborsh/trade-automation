@@ -1,4 +1,4 @@
-import type { Candle, Instrument, InstrumentId, Timeframe } from '@trade-automation/contracts';
+import type { Candle, Instrument, InstrumentId, MetricObservation, Timeframe } from '@trade-automation/contracts';
 
 /** Deterministic PRNG (mulberry32) so fixture runs are reproducible across boots. */
 function mulberry32(seed: number): () => number {
@@ -43,6 +43,32 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
     quoteCurrency: 'USD',
     sessionTimezone: 'America/New_York',
   },
+  /**
+   * architecture/chart-layouts.md §6.7 — the mock has no live Capital.com
+   * session to back the real `capitalcom:DXY`/`capitalcom:US500` epics
+   * (§5, §9 SE-3 notes), so it stands in with fixture-only ids purely so
+   * the client unit and its e2e build/run without the server unit.
+   */
+  {
+    id: 'capitalcom:DXY-MOCK',
+    venue: 'capitalcom',
+    symbol: 'DXY-MOCK',
+    assetClass: 'index-cfd',
+    displayName: 'US Dollar Index',
+    pricePrecision: 3,
+    quoteCurrency: 'USD',
+    sessionTimezone: 'UTC',
+  },
+  {
+    id: 'capitalcom:US500-MOCK',
+    venue: 'capitalcom',
+    symbol: 'US500-MOCK',
+    assetClass: 'index-cfd',
+    displayName: 'US 500',
+    pricePrecision: 1,
+    quoteCurrency: 'USD',
+    sessionTimezone: 'America/New_York',
+  },
 ];
 
 const ONE_MINUTE_MS = 60_000;
@@ -52,6 +78,12 @@ const STARTING_PRICE: Record<InstrumentId, number> = {
   'binance:BTCUSDT': 62_000,
   'binance:ETHUSDT': 3_200,
   'capitalcom:US100': 19_500,
+  'capitalcom:DXY-MOCK': 104.5,
+  'capitalcom:US500-MOCK': 5_600,
+};
+
+const STARTING_OPEN_INTEREST: Record<string, number> = {
+  'binance:BTCUSDT': 55_000, // BTC contracts outstanding, order-of-magnitude realistic
 };
 
 function seedFor(instrument: InstrumentId): number {
@@ -134,6 +166,41 @@ export function advanceFormingCandle(instrument: InstrumentId, forming: Candle, 
 /** Marks a forming bar closed — the version that gets persisted to history. */
 export function closeCandle(forming: Candle): Candle {
   return { ...forming, closed: true, source: 'venue-stream' };
+}
+
+/**
+ * architecture/chart-layouts.md §6.7 — a synthetic OI random walk, one
+ * observation per closed 1m candle, so `GET /api/metrics` and the `metrics`
+ * WS topic have something real to bucket/stream without a live Binance
+ * poller. Not a port of the real `BinanceMetricsAdapter` (§4.3) — same
+ * relationship `example-cross` has to a real `SignalStrategy`.
+ */
+export function seedOpenInterestObservations(instrument: InstrumentId, history: readonly Candle[]): MetricObservation[] {
+  const startValue = STARTING_OPEN_INTEREST[instrument];
+  if (startValue === undefined) {
+    return [];
+  }
+  const rng = mulberry32(seedFor(instrument) + 1); // +1: a different stream from the price walk
+  let value = startValue;
+  const observations: MetricObservation[] = [];
+  for (const candle of history) {
+    const drift = (rng() - 0.5) * startValue * 0.002;
+    value = Math.max(0, value + drift);
+    observations.push({ metric: 'openInterest', instrument, time: candle.openTime, value });
+  }
+  return observations;
+}
+
+/** One more OI observation following the last known value, for the live tick loop. */
+export function advanceOpenInterestObservation(
+  instrument: InstrumentId,
+  previous: MetricObservation,
+  time: number,
+): MetricObservation {
+  const startValue = STARTING_OPEN_INTEREST[instrument] ?? previous.value;
+  const rng = mulberry32(time + seedFor(instrument) + 1);
+  const drift = (rng() - 0.5) * startValue * 0.002;
+  return { metric: 'openInterest', instrument, time, value: Math.max(0, previous.value + drift) };
 }
 
 const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
