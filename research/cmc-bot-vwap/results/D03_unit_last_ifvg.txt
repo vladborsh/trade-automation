@@ -1,0 +1,2 @@
+{"case":"bullish-only","nBullishIFVG":1,"nBearishIFVG":0,"lastIFVG":{"low":97,"high":99,"x":3},"lastIFVGDirection":"buy"}
+{"case":"bearish-only","nBullishIFVG":0,"nBearishIFVG":1,"lastIFVG":"undefined","lastIFVGDirection":"sell"}

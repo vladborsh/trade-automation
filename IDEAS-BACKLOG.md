@@ -833,6 +833,15 @@ access to the bot's S3 config. Stage 0 is unblocked. Full ruling:
 `research/cmc-bot-vwap/ARCHITECT-NOTE.md`; mechanic pinned in
 `knowledge/vwap-band-reversal-ict.md`.
 
+**Stage 0 done 2026-09-12 (Researcher, `RESEARCH-LOG.md` Запись 20):** both
+gates PASS on the full Capital.com history (2024-01-01 .. 2026-09-11 — the
+API's 1-minute floor), 200,322 bars bit-identical to the TypeScript, 600/600
+prefix-causality. No performance number yet. **Awaiting Architect decision
+for Stage 1** on: tape timing (D-01 — the bot's candle times are broker-local,
+its own backtest trades 2–3 h earlier than labelled), backtest-vs-live bar
+(L-01), the split, and the forex legs (~90 orders/yr each, underpowered for
+`n_holdout ≥ 150`). Package: `research/cmc-bot-vwap/HANDOFF.md`.
+
 **Idea:** the user's pre-existing `cmc-bot-main` also ships a second,
 separately-coded strategy — `VWapStrategy`
 (`cmc-bot-main/src/strategy/vwap-strategy.ts`) — live-traded (per

@@ -18,6 +18,12 @@ called out. Nothing here has been validated by this project — see §0.
   `knowledge/smart-money-ict.md` §0/§4.6 (no costs/spread/slippage, close-only
   exits, gapped-through stops clamped to the exact stop price) — inadmissible
   here for the same reason.
+- **Stage 0 (reproduction) passed 2026-09-12** (`research/cmc-bot-vwap/PARITY.md`):
+  a Python port matches the bot's TypeScript bit-for-bit on every evaluated
+  bar of the full Capital.com history (2024-01 .. 2026-09, all four
+  instruments). Still **no performance number** — that is Stage 1. The
+  reproduction corrected several statements in this file; they are marked
+  *(Stage 0)* below.
 - **Family:** shares two primitives already pinned elsewhere in this project
   — the **proximal-edge iFVG** (`smart-money-ict.md` §1, `smc.md` §3 encoding
   #4, whose siblings #1–#3 are closed) as its entry trigger, and a
@@ -44,7 +50,11 @@ called out. Nothing here has been validated by this project — see §0.
 
 Source: `cmc-bot-main/src/indicator/tools/vwap.indicator.ts`.
 
-- Standard cumulative-volume VWAP, **reset at UTC midnight**
+- Standard cumulative-volume VWAP, **reset at UTC midnight**. *(Stage 0)* The
+  bias request starts at **00:01 UTC**, so the 00:00 bar is never in it; volume
+  is Capital.com `lastTradedVolume` (broker tick activity, not exchange
+  volume); for the indices the anchor is 19:00/20:00 New York — the overnight
+  CFD session, not the cash open. Day-reset test:
   (`startOfDay(candle.openTime)` — a host-timezone caveat identical to
   `smart-money-ict.md` §2's: correct on a UTC host, can slip a day elsewhere).
 - The bands are **not** a fixed-lookback Bollinger-style width. At each bar,
@@ -55,6 +65,8 @@ Source: `cmc-bot-main/src/indicator/tools/vwap.indicator.ts`.
   = `vwap ± that stdev`. The band therefore starts at zero width at the open
   and widens through the session as more deviations accumulate; it is not
   comparable bar-to-bar the way a fixed 20-bar Bollinger band is.
+  *(Stage 0)* Precisely: the **population** stdev (÷N) of `close − VWAP`, where
+  each bar's deviation is taken against the VWAP *as it stood at that bar*.
 
 ## 2. Bias — a same-timeframe, session VWAP fade (not H1 despite the method name)
 
@@ -64,6 +76,8 @@ Source: `vwap-strategy.ts:268` (`getHighTimeFrameBias`).
   midnight** to the current bar, and runs `VWAP()` over exactly that window —
   i.e. it recomputes the same-session VWAP band described in §1, at M1
   resolution, purely to read a bias off it.
+- *(Stage 0)* `lastPrice` is the evaluated bar's **open** (`lastCandle.open`),
+  compared against the band computed through that bar's close.
 - **Contrarian bias:** `lastPrice > vwapTop` → bias **sell** (price has
   stretched above the upper band — fade it); `lastPrice < vwapBottom` → bias
   **buy**. Inside the bands, no bias is set and the strategy returns no
@@ -86,11 +100,18 @@ Source: `vwap-strategy.ts:308-333` (`processCandles`), `fvg.indicator.ts`.
   fetch for bias only), this strategy runs it **directly on the M1 window
   it is already evaluating**, and reads `bearishIfvgOccurs`/
   `bullishIfvgOccurs` as the entry trigger itself.
-- Inherits the same §1.3 behaviour verbatim: `lastIFVG` is `undefined`
-  whenever either the bullish- or bearish-signal iFVG list is empty, which
-  makes the ATR-ratio gate below always block the trade in that state — so
-  entries require **both** iFVG lists non-empty simultaneously, same as the
-  smart-money bot.
+- **Corrected (Stage 0, PARITY.md D-03).** The earlier text here — "`lastIFVG`
+  is `undefined` whenever either iFVG list is empty, so entries require both
+  lists non-empty" — is **wrong**, and so is the same sentence in
+  `smart-money-ict.md` §1.3. `getLastIfvg` is asymmetric: with the **bullish**
+  list (bearish FVGs closed back up through their proximal edge) empty it
+  returns `bearish[-1]` → `undefined` and the ATR gate blocks; with the
+  **bearish** list empty it returns `bullish[bullish.length − 1]`, a valid
+  element, and the gate evaluates normally. Entries therefore require the
+  **bullish** iFVG list to be non-empty — for sells as well as buys. Verified
+  against the bot's own `calculateFVG` on a constructed tape
+  (`research/cmc-bot-vwap/ts_parity/unit_last_ifvg.ts`). Measured effect on
+  this strategy: 1 order in 2,322.
 
 ## 4. The ATR-ratio gate on iFVG size
 
@@ -109,7 +130,10 @@ Source: `cmc-bot-main/src/indicator/tools/range.indicator.ts`.
 - `range(candles, 200)`: a **plain rolling 200-bar high/low window**,
   recomputed fresh at every bar by sliding the window (no swing detection, no
   trailing/anchored state). `top`/`bottom` are simply
-  `max(high)`/`min(low)` over the trailing 200 bars.
+  `max(high)`/`min(low)` over the trailing 200 bars. *(Stage 0)* The slide
+  records the window **before** appending the current bar, so the 200 bars
+  are the ones **preceding** the evaluated bar; the evaluated bar's own
+  high/low is not in its range.
 - `priceInDiscount ≡ close[last] < (top + bottom) / 2` — same polarity
   convention as `smart-money-ict.md` §3 (below midpoint = discount), but a
   **structurally different range**: `smart-money-ict.md` §3's `rangeHigh`/
@@ -201,7 +225,29 @@ every evaluation and never read by any signal condition — the same
 machinery (`smart-money-ict.md` §5). Do not port it, and do not read its
 presence as evidence this strategy uses an opening-price reference.
 
-## 10. Out of scope of this concept file
+## 10. Timestamps, data and the live bot (Stage 0)
+
+Source: `research/cmc-bot-vwap/PARITY.md` D-01, D-18, §4.
+
+- **The bot's candle times are not UTC.** `mapMarketDataToChartData` uses
+  Capital.com's `snapshotTime` — broker-local wall-clock time, UTC+2 (EU
+  winter) / UTC+3 (EU summer), no offset suffix — which `Date.parse` reads as
+  UTC on a UTC host; the payload's `snapshotTimeUTC` is discarded. Request
+  `from`/`to` *are* UTC. Live, the clock gates use `Date.now()` so the right
+  bars are traded, only mislabelled. The bot's **own backtest on
+  `npm run scrap` files** gates on the labels and so evaluates bars 2–3 h
+  earlier than it claims (indices ≈ 06:xx–09:xx NY; forex ≈ 00:xx–01:xx NY);
+  it shares essentially no orders with the live stream. Research uses
+  `snapshotTimeUTC`.
+- **Capital.com 1-minute history starts 2024-01-01** for all four instruments.
+- **Live reads one bar earlier than the backtest**: at clock minute T the
+  live request returns bars through T−1 (`max: 720` drops the newest; the
+  forming minute is not yet served in the first seconds), while the backtest
+  reads the bar that opened at T. ~92–98 % of orders coincide.
+- `VWAP([])` throws when no bar exists since 00:01 UTC (forex on 25 Dec /
+  1 Jan): no signal live (caught), a crash in the bot's backtest CLI.
+
+## 11. Out of scope of this concept file
 
 `cmc-bot-main` also contains the smart-money ICT strategy
 (`knowledge/smart-money-ict.md`), a `tech-analysis`/RSI strategy, a
