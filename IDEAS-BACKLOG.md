@@ -657,3 +657,108 @@ any backtest); execution realism — basis trades in size are the domain of
 HFT/market-makers, so the pre-registered question is whether anything survives
 at taker fees on the *perp leg only* (this project trades the perp leg
 directionally, not the two-legged arb).
+
+---
+
+## Smart-money ICT strategy from `cmc-bot` (existing pre-built bot, user's own prior project)
+
+**Status:** logged 2026-09-12, dispatched to Architect same-session for a
+routing decision (not yet researched/backtested independently under this
+project's protocol).
+
+**Idea:** The user has a pre-existing, already-coded trading bot at
+`cmc-bot-main/` (own prior project, not built by this team) implementing a
+full ICT/"smart money concepts" strategy end to end — indicator engine,
+strategy logic, risk manager, backtester, live exchange clients (Binance +
+Capital.com), and a Telegram bot for control/notification. The user wants this
+specific, already-implemented strategy adopted into this project: reproduce
+its signals and collect performance metrics on it, i.e. treat it as a
+candidate strategy to validate and potentially operate here rather than a
+from-scratch idea.
+
+**What the code actually does** (read directly from
+`cmc-bot-main/src/strategy/smartmoney-strategy.ts`,
+`cmc-bot-main/src/indicator/main-indicator.ts`,
+`cmc-bot-main/src/strategy/risk-manager.ts` — this is a description of
+existing code, not a design proposal):
+
+- **Session filter:** trades only Mon–Fri, only within a **09:40–11:10
+  America/New_York wall-clock window** (`isValidTimeForNewOrders` /
+  `canOrdersBeAlive`) — note this is wall-clock (DST-aware), not a fixed UTC
+  offset, and it is a *narrower* window (09:40–11:10) than the one just tested
+  and killed in the session-liquidity family (09:40–11:20, fixed UTC−4) — see
+  "Coexistence" below.
+- **Bias (H1):** direction of the most recent inverted FVG on the H1 chart
+  over a trailing 720h lookback (`getHighTimeFrameBias` → `calculateFVG`) sets
+  a required trade direction (buy/sell) for the session.
+- **Entry (M1):** a same-direction M1 iFVG confirmation
+  (`bullishIfvgOccurs`/`bearishIfvgOccurs`, from a stateful FVG/iFVG
+  calculator run bar-by-bar, `FvgCalculator` in
+  `indicator/tools/fvg-element.ts`), gated on price being on the correct side
+  of the day's premium/discount midpoint (`priceInDiscount`, computed from a
+  60-bar high-timeframe swing range) **and** the correct side of the "NY AM
+  true open" (`aboveNYamTrueOpen` — the open price of the New York AM quarter,
+  a distinct concept from this project's PDH/PDL or session-liquidity levels).
+- **Filters:** an iFVG-size-to-ATR(20) ratio cap (`MAX_IFVG_TO_ATR_RATIO = 8`,
+  rejects abnormally large/illiquid gaps), and a daily risk gate (max 2 losing
+  orders/day, max 1 winning order/day, `RiskManager`).
+- **Risk:** stop-loss anchored to the high-timeframe swing range extreme
+  (`rangeHigh`/`rangeLow`), shrunk by a discrete ratio table
+  (`adjustStopLoss`) when the raw stop is small relative to that range; target
+  is a fixed **2.7R** (`TARGET_RISK_REWARD_RATIO`); a two-stage breakeven/1R
+  trail once the trade reaches 1R and 2R.
+- Also present in the repo, not part of this idea: a separate `vwap-strategy`
+  and a `tech-analysis`/RSI strategy, a `correlation-analyzer`, a Telegram bot
+  UI, AWS/OTel deploy plumbing. Out of scope unless the Architect decides
+  otherwise.
+
+**Why this needs an Architect decision before Researcher touches it, not just
+a straight port:**
+
+1. **It is not new to this repo's knowledge in spirit.** It reuses the same
+   primitive vocabulary this project has spent seven passes on (`H1 iFVG`,
+   `M1 iFVG`, premium/discount, a fixed NY-morning window) but combines them
+   into a materially different mechanic than anything in
+   `knowledge/session-liquidity.md`: there is no explicit "sweep" detection
+   step at all — entry is gated on iFVG + bias + premium/discount + a true-open
+   side, never on a level being taken out first. Calling it "the smart-money
+   strategy" and calling `session-liquidity` "smart-money" risks conflating
+   two different ideas under one name; an Architect read is needed to decide
+   whether this is a new `knowledge/` file or a variant section of an existing
+   one.
+2. **Direct overlap with a very recently killed result.** The
+   `session-liquidity-v5-ny` pass (`RESEARCH-LOG.md` Запись 18, this project,
+   2026-09-01) pre-registered and killed a 09:40–11:20-NY-window sweep+iFVG
+   idea on BTC/ETH — mean net R −0.26 (iFVG) / −0.02 (BoS) on holdout, iFVG
+   worse than a matched-time placebo in 91% of 1,000 draws. This bot's window
+   (09:40–11:10) and entry primitive (iFVG) sit close enough to that killed
+   result that an independent naive backtest risks re-discovering the same
+   null, or — worse — a p-hacked-looking positive from small changes in
+   filters (bias direction, premium/discount, true-open side, R:R target,
+   ATR-ratio cap) that were never tested against a placebo. The Architect
+   should decide up front whether this reopens under the same pre-registered
+   standard the shelving ruling (Запись 17) demands, treats it as a
+   sufficiently distinct mechanic to warrant a fresh descriptive pass first,
+   or something else.
+3. **It is untested by this project's protocol.** The bot has its own
+   in-repo backtester (`src/backtesting/`, see `cmc-bot-main/docs/backtesting.md`)
+   and was presumably run against it historically, but that is the user's own
+   prior tooling, not an independent Researcher validation under this
+   project's descriptive/pre-registered standards, and no result from it is
+   on record in `RESEARCH-LOG.md`.
+
+**What the user asked for:** reproduce this strategy's signals in this
+project and collect performance metrics on it — i.e. validate it as a
+candidate, not merely document it.
+
+**Data needed:** BTC/ETH (and whatever other symbols the user wants) 1m and
+1h candles — `cmc-bot-main` already has Binance/Capital.com clients and a
+scraper (`npm run scrap`) that can pull this independently of the
+`intraday-mtf-smc` data used by the session-liquidity family; H1 lookback
+needs ~720h (30 days) of history per bias calculation, full backtest needs
+whatever sample size the Architect/Researcher pins for a fit/holdout split.
+
+**Dispatched to:** Architect, same session, for an architecture note +
+routing plan (new `knowledge/` entry vs. extension of an existing one,
+Researcher scope, and whether/how this reopens or relates to the
+session-liquidity shelving ruling).
