@@ -69,8 +69,9 @@ text-only reader renders — `Read` the PNG path itself to view it).
 | 1 | Single-timeframe: bias + OB/FVG retest | `research/intraday-mr-smc/` (`smc()` in `strategies.py`) | **Statistically reliable zero.** Win rate 33–39% sits exactly on the 2R-target breakeven line — the entry has no directional content, not "unlucky." `RESEARCH-LOG.md` Запись 1. |
 | 2 | Multi-timeframe: 1h bias/BOS-freshness context → 5m OB/FVG retest (variant A) or 1h zone → 5m sweep-and-reclaim/CHoCH (variant B) | `research/intraday-mtf-smc/` (`mtf.py`) | All three pre-registered rule sets (A, B-sweep, B-choch) **failed stage-1** signal probe; A and B-choch significantly negative on short horizons. Holdout never read. `RESEARCH-LOG.md` Запись 5. |
 | 3 | Two-tier pivot structure: major pivot (k=15) sets bias, minor pivot (k=3-5) CHoCH flips it | `research/pivot-structure/` | All 48 pre-registered cells failed stage-1; the one novel axis (k-scale 2-5) measured and rejected — behaves identically to the old k=2 engine. Permutation control: real flips at the **0th percentile** of random null (worse than random, not neutral). `RESEARCH-LOG.md` Запись 6. |
+| 4 | ICT composition from the user's pre-built `cmc-bot`: H1 iFVG direction sets bias, M1 iFVG triggers entry, gated on premium/discount side **and** side of the 07:30-NY "true open", inside a 09:40–11:10 New York window | `research/cmc-bot-smart-money/` — mechanic pinned in `knowledge/smart-money-ict.md` | **Untested.** Routed 2026-09-12 as a **pre-registered** hypothesis test (thresholds fixed in `research/cmc-bot-smart-money/ARCHITECT-NOTE.md` §3.2 before any result), precisely because it contests the standing null of #1–#3 and its parameters were hand-picked on unpublished data. `RESEARCH-LOG.md` Запись 19. |
 
-**Common thread across all three:** none of the three found a payoff shape
+**Common thread across the first three:** none of the three found a payoff shape
 distinguishable from noise once tested rigorously (stage-1 signal probe +
 permutation null). `indicators.structure()` (the general bias/BOS/CHoCH
 engine) is closed for entry use — reusing its *primitives* (fractals, FVG
