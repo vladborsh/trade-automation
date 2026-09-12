@@ -1,0 +1,29 @@
+# architecture/live-signal-server.md §3.1, §4.7 — the configured universe.
+# Adding an instrument = adding an entry here, provided its venue adapter exists.
+instruments:
+  - id: "binance:BTCUSDT"
+    venue: binance
+    symbol: BTCUSDT
+    assetClass: crypto-perp
+    displayName: "BTC/USDT Perp"
+    pricePrecision: 2
+    quoteCurrency: USDT
+    sessionTimezone: UTC
+
+  - id: "binance:ETHUSDT"
+    venue: binance
+    symbol: ETHUSDT
+    assetClass: crypto-perp
+    displayName: "ETH/USDT Perp"
+    pricePrecision: 2
+    quoteCurrency: USDT
+    sessionTimezone: UTC
+
+  - id: "capitalcom:US100"
+    venue: capitalcom
+    symbol: US100
+    assetClass: index-cfd
+    displayName: "US Tech 100"
+    pricePrecision: 1
+    quoteCurrency: USD
+    sessionTimezone: America/New_York

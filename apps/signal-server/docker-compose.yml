@@ -1,0 +1,22 @@
+# Local dev: file-backed storage, ReplayAdapter fixtures (no venue credentials needed).
+# architecture/live-signal-server.md §9.1.
+services:
+  signal-server:
+    build:
+      context: ../..
+      dockerfile: apps/signal-server/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      CANDLE_STORE: file
+      FILE_STORE_ROOT: data
+      MARKET_DATA_MODE: replay
+      REPLAY_SPEED: realtime
+      REPLAY_FIXTURES_DIR: test/fixtures
+      INSTRUMENTS_FILE: config/instruments.yaml
+      STRATEGIES_FILE: config/strategies.yaml
+      LOG_LEVEL: info
+    volumes:
+      - ./data:/workspace/apps/signal-server/data

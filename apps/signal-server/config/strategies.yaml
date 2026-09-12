@@ -1,0 +1,10 @@
+# architecture/live-signal-server.md §4.4, §4.7 — enablement + per-strategy params keyed by instrument.
+# example-cross is a demo plug-in only, proving the plug-in slot works. It is NOT a
+# strategy of this project and must stay disabled unless explicitly exercising the demo.
+strategies:
+  - id: example-cross
+    enabled: false
+    instruments:
+      - "binance:BTCUSDT"
+    params:
+      smaPeriod: 20
