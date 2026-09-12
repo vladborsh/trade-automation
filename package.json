@@ -1,0 +1,8 @@
+{
+  "name": "trade-automation",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ]
+}

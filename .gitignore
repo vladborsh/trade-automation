@@ -1,5 +1,6 @@
 .venv/
 __pycache__/
+node_modules/
 research/session-liquidity/data
 research/session-liquidity/results/uncond_*.csv.gz
 research/session-liquidity-v2/data
