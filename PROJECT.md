@@ -133,9 +133,27 @@ the prose definition, for whoever reads this next.
 | [`derivatives-positioning.md`](knowledge/derivatives-positioning.md) | OI/top-trader-ratio/taker-flow definitions; redundancy-control methodology; all three hypotheses closed |
 | [`smart-money-ict.md`](knowledge/smart-money-ict.md) | ICT true-open levels, premium/discount, proximal-edge iFVG; the `cmc-bot` H1-bias → M1-iFVG strategy as coded |
 
+## Architecture
+
+System-design notes for **infrastructure** (as opposed to trading ideas, which
+live in `IDEAS-BACKLOG.md` / `research/`) live under `architecture/*.md`, one
+note per system. They are role-to-role technical material.
+
+| File | Covers |
+|---|---|
+| [`live-signal-server.md`](architecture/live-signal-server.md) | Live signal-generation server (NestJS) + chart terminal client (Angular); shared contracts; candle storage/backup requirements and S3 recommendation; routing to Software Engineer / DevOps / Integration Engineer |
+
 ## Status
 
-Roles and this context document are the current deliverable. Actual strategy
-implementation, the trading-idea intake format, and specific AWS service choices
-are deliberately **not** decided yet — that work starts once the team receives its
-first trading idea.
+Roles and this context document were the first deliverable. Since then:
+
+- **Research pipeline is live** — see `RESEARCH-LOG.md` (Записи 1–19) and
+  `IDEAS-BACKLOG.md`. No strategy has shipped; two `cmc-bot` strategies are
+  mid-pre-registration (smart-money ICT, VWAP band reversal).
+- **Live infrastructure design started 2026-09-12** —
+  `architecture/live-signal-server.md`: NestJS signal server + Angular chart
+  terminal + candle backup. Designed as strategy-agnostic plumbing with a
+  plug-in slot; Software Engineer scaffold and DevOps storage/hosting pin are
+  the next steps. Specific AWS service choices remain DevOps Engineer's.
+- The trading-idea intake format is still informal (backlog entry → Architect
+  grilling → research package).
