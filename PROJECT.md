@@ -142,6 +142,7 @@ note per system. They are role-to-role technical material.
 | File | Covers |
 |---|---|
 | [`live-signal-server.md`](architecture/live-signal-server.md) | Live signal-generation server (NestJS) + chart terminal client (Angular); shared contracts; candle storage/backup requirements and S3 recommendation; routing to Software Engineer / DevOps / Integration Engineer |
+| [`vwap-band-reversal-plugin.md`](architecture/vwap-band-reversal-plugin.md) | The `cmc-bot` VWAP band-reversal strategy as a **research-tier, unvalidated, visualization-only** plug-in of the signal server; strategy tiers, indicator series, warm-up for session-anchored indicators; routing to Software Engineer |
 
 ## Status
 
@@ -155,5 +156,10 @@ Roles and this context document were the first deliverable. Since then:
   terminal + candle backup. Designed as strategy-agnostic plumbing with a
   plug-in slot; Software Engineer scaffold and DevOps storage/hosting pin are
   the next steps. Specific AWS service choices remain DevOps Engineer's.
+- **First strategy plug-in designed 2026-09-12, at research tier** —
+  `architecture/vwap-band-reversal-plugin.md`: the VWAP band-reversal
+  mechanic ported into the server for chart visualization only, labelled
+  unvalidated end to end; its Stage-1 verdict is still pending and is not
+  affected by the build.
 - The trading-idea intake format is still informal (backlog entry → Architect
   grilling → research package).

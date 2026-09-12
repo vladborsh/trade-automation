@@ -891,3 +891,99 @@ Researcher) or a `RESEARCH-LOG.md` Запись (entries are Идея / Иссл
 "Architecture" pointer to this note and an updated "Status". If the team
 later wants a durable infra log, the right shape is an `architecture/`
 index, not a research entry.
+
+---
+
+## 11. Amendments — 2026-09-12, for the research-tier VWAP plug-in
+
+Driven by `architecture/vwap-band-reversal-plugin.md` (read that for the
+why; this section is the *what*, because `libs/contracts` is specified
+here). Each item is additive to §3/§4 unless marked as a change.
+
+### 11.1 Strategy tier — a required label on every strategy, signal and indicator point
+
+```ts
+type StrategyTier = 'demo' | 'research' | 'live';
+```
+
+- `demo` — proves the plumbing (`example-cross`). Never a strategy of this project.
+- `research` — a faithful port of a strategy that has **not** passed its
+  pre-registered test. Visualization only. May never emit `kind: 'entry'`.
+- `live` — passed its test; Architect ship ruling on record; Integration
+  Engineer owns execution.
+
+`Signal` gains a **required** `tier: StrategyTier`. `SignalStrategy` gains
+`readonly tier: StrategyTier`, `readonly displayName: string`,
+`readonly description: string` (plain-language, shown in the client). The
+tier is declared **in code**, never in `strategies.yaml` — promotion is a
+code change gated on an Architect ruling.
+
+### 11.2 Runner rules (change to §4.4)
+
+- `StrategyRunnerService` **overwrites** `tier`, `strategyId` and
+  `instrument` on every signal and indicator point a strategy returns.
+- A strategy whose `tier !== 'live'` returning a `kind: 'entry'` signal is a
+  **runner error** (thrown → caught by the existing per-runner isolation,
+  `status: 'error'`, error metric) — not coerced, not dropped silently.
+- `StrategyRequirements` gains optional `minBars: Partial<Record<Timeframe, number>>`.
+  `warmupBars` keeps its cache-sizing role; `isWarm` uses
+  `minBars[tf] ?? warmupBars[tf]`. Rationale in the plug-in note §4: a
+  session-anchored indicator's readiness is not a fixed bar count.
+
+### 11.3 Strategy output — indicators alongside signals (change to §4.4)
+
+```ts
+interface IndicatorSeriesSpec {
+  id: string;                       // e.g. 'vwap-band'
+  label: string;                    // plain-language; shown as the series title
+  scale: 'price';                   // only price-scale series now; a separate pane is a later addition
+  keys: Array<{ key: string; label: string; color?: string; style?: 'solid' | 'dashed' }>;
+}
+interface IndicatorPoint {
+  strategyId: string; instrument: InstrumentId; timeframe: Timeframe; tier: StrategyTier;
+  seriesId: string; time: number;   // openTime of the evaluated bar
+  values: Record<string, number | null>;
+}
+interface StrategyOutput {
+  signals: Signal[];
+  indicators?: Array<Pick<IndicatorPoint, 'seriesId' | 'time' | 'values'>>;   // the runner fills the rest
+}
+interface StrategyRequirements { …; indicators?: IndicatorSeriesSpec[] }
+interface SignalStrategy { …; onCandle(ctx: StrategyContext): StrategyOutput }   // was Signal[]
+```
+
+Indicator points are **not persisted** — they are a recomputable
+by-product of candles. `IndicatorCache` (strategy-engine) keeps a ring per
+`(strategyId, instrument, seriesId)` sized like the candle cache for that
+strategy's timeframe. Replay rebuilds them.
+
+### 11.4 REST (addition to §3.5)
+
+| Method / path | Returns |
+|---|---|
+| `GET /api/indicators?instrument&from&to&strategyId?` | `IndicatorPoint[]` ascending, from `IndicatorCache` |
+| `GET /api/strategies` | each item additionally: `tier`, `displayName`, `description`, `minBars` (max over timeframes, like `warmupBars`), `indicators: IndicatorSeriesSpec[]` |
+
+### 11.5 WebSocket (addition to §3.5)
+
+New server→client frame, delivered to every client subscribed to
+`topic: 'signals'` for the instrument — no new client→server verb:
+
+| Server → client |
+|---|
+| `{ type: 'indicator', point: IndicatorPoint }` |
+
+### 11.6 Overlay primitive tweak (addition to §3.4)
+
+`line` gains `style?: 'solid' | 'dashed'`, matching `priceLine`. The
+client's `rect`, `ray` and `line` renderers stop being stubs: one
+lightweight-charts series primitive draws all three on canvas.
+
+### 11.7 Amendment to §9.3
+
+"Integration Engineer — deferred until a strategy passes its pre-registered
+test" still holds for **execution**. The *port* of a strategy into a
+`SignalStrategy` may now happen earlier, at `research` tier, when — and
+only when — a Stage-0 bit-exact reproduction exists to test parity against.
+That is the case for the VWAP band-reversal strategy as of 2026-09-12 and
+is the subject of `architecture/vwap-band-reversal-plugin.md`.

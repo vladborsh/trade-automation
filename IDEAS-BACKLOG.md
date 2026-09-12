@@ -833,6 +833,17 @@ access to the bot's S3 config. Stage 0 is unblocked. Full ruling:
 `research/cmc-bot-vwap/ARCHITECT-NOTE.md`; mechanic pinned in
 `knowledge/vwap-band-reversal-ict.md`.
 
+**Status update 2026-09-12 (Architect, engineering only — verdict unchanged):**
+the user asked for this strategy's signals on the live chart before Stage 1.
+Architect ruled: build it as a **`research`-tier, visualization-only,
+disabled-by-default plug-in** of the signal server (`vwap-band-reversal`),
+ported from the mechanic and parity-tested against the Researcher's Stage-0
+bit-exact reproduction — labelled "unvalidated" on the wire, in the API and
+on the chart, unable to emit entry signals, and promotable to `live` only by
+a code change after a ship ruling. **Nothing about this build is evidence
+for or against the idea**; Stage 1's pre-registered test and thresholds
+stand verbatim. Design: `architecture/vwap-band-reversal-plugin.md`.
+
 **Idea:** the user's pre-existing `cmc-bot-main` also ships a second,
 separately-coded strategy — `VWapStrategy`
 (`cmc-bot-main/src/strategy/vwap-strategy.ts`) — live-traded (per
