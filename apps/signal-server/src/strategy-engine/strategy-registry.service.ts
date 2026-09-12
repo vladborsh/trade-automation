@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InstrumentId, Timeframe } from '@trade-automation/contracts';
+import { InstrumentId, Timeframe, Venue } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { CandleCache } from '../market-data/candle-cache.service';
+import { IndicatorCache } from './indicator-cache.service';
 import { SignalStrategy } from './signal-strategy.port';
 import { ExampleCrossStrategy } from './strategies/example-cross/example-cross.strategy';
+import { createVwapBandReversalStrategy } from './strategies/vwap-band-reversal/vwap-band-reversal.strategy';
 
 export interface ActiveStrategy {
   strategy: SignalStrategy;
@@ -19,6 +21,17 @@ export interface ActiveStrategy {
  */
 const PLUGIN_FACTORIES: Record<string, (params: Record<string, unknown>) => SignalStrategy> = {
   'example-cross': (params) => new ExampleCrossStrategy(Number(params.smaPeriod ?? 20)),
+  'vwap-band-reversal': (params) => createVwapBandReversalStrategy(params),
+};
+
+/**
+ * architecture/vwap-band-reversal-plugin.md §5.2 — strategies whose id is in this set only
+ * evaluate for instruments on the listed venue(s); a configured instrument on any other venue
+ * is a boot error (NY-window session semantics on a 24/7 perp would be a silent
+ * misconfiguration).
+ */
+const VENUE_RESTRICTED_PLUGINS: Record<string, readonly Venue[]> = {
+  'vwap-band-reversal': ['capitalcom'],
 };
 
 @Injectable()
@@ -29,6 +42,7 @@ export class StrategyRegistryService {
   constructor(
     private readonly config: AppConfigService,
     private readonly cache: CandleCache,
+    private readonly indicatorCache: IndicatorCache,
   ) {
     this.activeStrategies = this.build();
     this.sizeCache();
@@ -43,9 +57,24 @@ export class StrategyRegistryService {
         this.logger.warn(`Unknown strategy id in strategies.yaml: ${entry.id} (skipped)`);
         continue;
       }
+      this.assertVenueAllowed(entry.id, entry.instruments);
       out.push({ strategy: factory(entry.params), instruments: entry.instruments });
     }
     return out;
+  }
+
+  private assertVenueAllowed(strategyId: string, instruments: InstrumentId[]): void {
+    const allowedVenues = VENUE_RESTRICTED_PLUGINS[strategyId];
+    if (!allowedVenues) return;
+    for (const instrument of instruments) {
+      const venue = instrument.split(':')[0] as Venue;
+      if (!allowedVenues.includes(venue)) {
+        throw new Error(
+          `strategies.yaml: '${strategyId}' is restricted to venue(s) [${allowedVenues.join(', ')}] but ` +
+            `instrument '${instrument}' is on venue '${venue}' — refusing to boot with this configuration.`,
+        );
+      }
+    }
   }
 
   /** architecture/live-signal-server.md §4.1: cache depth "sized from the strategies'
@@ -56,6 +85,10 @@ export class StrategyRegistryService {
       for (const instrument of instruments) {
         for (const [tf, bars] of Object.entries(warmup)) {
           if (bars) this.cache.setMinDepth(instrument, tf as Timeframe, bars);
+        }
+        const depthBars = Math.max(0, ...Object.values(warmup).map((v) => v ?? 0));
+        for (const spec of strategy.requirements.indicators ?? []) {
+          this.indicatorCache.setMinDepth(strategy.id, instrument, spec.id, depthBars);
         }
       }
     }

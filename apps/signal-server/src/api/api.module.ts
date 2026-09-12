@@ -8,11 +8,12 @@ import { InstrumentsController } from './rest/instruments.controller';
 import { CandlesController } from './rest/candles.controller';
 import { SignalsController } from './rest/signals.controller';
 import { StrategiesController } from './rest/strategies.controller';
+import { IndicatorsController } from './rest/indicators.controller';
 import { LiveGateway } from './ws/live.gateway';
 
 @Module({
   imports: [AppConfigModule, MarketDataModule, StorageModule, StrategyEngineModule, ObservabilityModule],
-  controllers: [InstrumentsController, CandlesController, SignalsController, StrategiesController],
+  controllers: [InstrumentsController, CandlesController, SignalsController, StrategiesController, IndicatorsController],
   providers: [LiveGateway],
 })
 export class ApiModule {}

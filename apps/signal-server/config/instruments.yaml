@@ -27,3 +27,34 @@ instruments:
     pricePrecision: 1
     quoteCurrency: USD
     sessionTimezone: America/New_York
+
+  # architecture/vwap-band-reversal-plugin.md §5.1 — the cmc-bot VWAP band-reversal port's
+  # four instruments. sessionTimezone here is each instrument's own session convention; the
+  # vwap-band-reversal plug-in ignores it and reads its own `sessionTimezone` param (NY for
+  # all four, bug-faithfully — see the plug-in's README).
+  - id: "capitalcom:US500"
+    venue: capitalcom
+    symbol: US500
+    assetClass: index-cfd
+    displayName: "US 500"
+    pricePrecision: 1
+    quoteCurrency: USD
+    sessionTimezone: America/New_York
+
+  - id: "capitalcom:EURCHF"
+    venue: capitalcom
+    symbol: EURCHF
+    assetClass: forex-cfd
+    displayName: "EUR/CHF"
+    pricePrecision: 5
+    quoteCurrency: CHF
+    sessionTimezone: UTC
+
+  - id: "capitalcom:GBPCHF"
+    venue: capitalcom
+    symbol: GBPCHF
+    assetClass: forex-cfd
+    displayName: "GBP/CHF"
+    pricePrecision: 5
+    quoteCurrency: CHF
+    sessionTimezone: UTC

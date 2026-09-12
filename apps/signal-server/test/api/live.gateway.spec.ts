@@ -112,6 +112,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
         instrument: 'binance:BTCUSDT',
         timeframe: '1m',
         time: 0,
+        tier: 'demo',
         kind: 'info',
         direction: 'flat',
         overlay: [],
@@ -121,6 +122,30 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
 
     expect(subscribed.sent.some((m: unknown) => (m as { type: string }).type === 'signal')).toBe(true);
     expect(unsubscribed.sent.some((m: unknown) => (m as { type: string }).type === 'signal')).toBe(false);
+  });
+
+  it('routes indicator frames only to clients subscribed to that instrument, on the same signals topic (architecture/live-signal-server.md §11.5)', () => {
+    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const subscribed = new FakeSocket();
+    const unsubscribed = new FakeSocket();
+    gateway.handleConnection(subscribed as never, { url: '/' } as never);
+    gateway.handleConnection(unsubscribed as never, { url: '/' } as never);
+    subscribed.emitMessage({ type: 'subscribe', topic: 'signals', instrument: 'capitalcom:US100' });
+
+    gateway.onIndicatorEmitted({
+      point: {
+        strategyId: 'vwap-band-reversal',
+        instrument: 'capitalcom:US100',
+        timeframe: '1m',
+        tier: 'research',
+        seriesId: 'vwap-band',
+        time: 0,
+        values: { vwap: 19000, vwapTop: 19010, vwapBottom: 18990 },
+      },
+    } as never);
+
+    expect(subscribed.sent.some((m: unknown) => (m as { type: string }).type === 'indicator')).toBe(true);
+    expect(unsubscribed.sent.some((m: unknown) => (m as { type: string }).type === 'indicator')).toBe(false);
   });
 
   it('throttles forming-bar frames to at most ~4/s per topic', () => {

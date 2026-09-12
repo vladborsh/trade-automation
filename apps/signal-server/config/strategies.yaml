@@ -8,3 +8,30 @@ strategies:
       - "binance:BTCUSDT"
     params:
       smaPeriod: 20
+
+  # vwap-band-reversal: RESEARCH TIER — an unvalidated port of cmc-bot's VWapStrategy
+  # (knowledge/vwap-band-reversal-ict.md). Visualization only; it cannot emit 'entry'
+  # signals. Enabling it draws amber research markers/lines on the chart; it does not
+  # create a trading signal. Promotion to 'live' is a code change gated on an Architect
+  # ruling after research/cmc-bot-vwap Stage 1 — never a config edit.
+  - id: vwap-band-reversal
+    enabled: false
+    instruments:
+      - "capitalcom:US100"
+      - "capitalcom:US500"
+      - "capitalcom:EURCHF"
+      - "capitalcom:GBPCHF"
+    params:
+      sessionTimezone: America/New_York
+      minVwapAtrRatio: 2.5
+      maxVwapAtrRatio: 11.5
+      maxIfvgToAtrRatio: 8
+      targetRr: 3
+      rangeBars: 200
+      atrBars: 20
+      mainWindowMinutes: 720
+      entryWindow: # NY wall clock, inclusive; US100/US500 are user-supplied PROVISIONAL values
+        "capitalcom:US100": ["09:40", "11:40"]
+        "capitalcom:US500": ["09:40", "11:40"]
+        "capitalcom:EURCHF": ["03:02", "03:20"]
+        "capitalcom:GBPCHF": ["03:03", "03:20"]

@@ -5,6 +5,13 @@ import {
   Signal,
   SignalSchema,
   Candle,
+  IndicatorPoint,
+  IndicatorPointSchema,
+  IndicatorSeriesSpec,
+  IndicatorSeriesSpecSchema,
+  StrategyRequirements,
+  StrategyRequirementsSchema,
+  WsIndicatorMessageSchema,
 } from '../src';
 
 describe('contracts round-trip (architecture/live-signal-server.md §3)', () => {
@@ -66,16 +73,77 @@ describe('contracts round-trip (architecture/live-signal-server.md §3)', () => 
       instrument: 'binance:ETHUSDT',
       timeframe: '1m',
       time: 1_726_000_000_000,
+      tier: 'demo',
       kind: 'info',
       direction: 'flat',
       overlay: [
         { type: 'marker', time: 1_726_000_000_000, position: 'above', shape: 'circle' },
         { type: 'priceLine', price: 1800.5, style: 'dashed' },
+        { type: 'line', points: [{ time: 1, price: 2 }, { time: 3, price: 4 }], style: 'dashed' },
       ],
       meta: { crossedUp: true, smaPeriod: 20 },
     };
     const parsed = SignalSchema.parse(JSON.parse(JSON.stringify(signal)));
     expect(parsed).toEqual(signal);
+  });
+
+  it('rejects a Signal missing the required tier field (architecture/live-signal-server.md §11.1)', () => {
+    expect(() =>
+      SignalSchema.parse({
+        id: '11111111-1111-1111-1111-111111111111',
+        strategyId: 'example-cross',
+        instrument: 'binance:ETHUSDT',
+        timeframe: '1m',
+        time: 1,
+        kind: 'info',
+        direction: 'flat',
+        overlay: [],
+        meta: {},
+      }),
+    ).toThrow();
+  });
+
+  it('parses and re-serializes an IndicatorPoint (architecture/live-signal-server.md §11.3)', () => {
+    const point: IndicatorPoint = {
+      strategyId: 'vwap-band-reversal',
+      instrument: 'capitalcom:US100',
+      timeframe: '1m',
+      tier: 'research',
+      seriesId: 'vwap-band',
+      time: 1_726_000_000_000,
+      values: { vwap: 19000.5, vwapTop: 19010.2, vwapBottom: null },
+    };
+    const parsed = IndicatorPointSchema.parse(JSON.parse(JSON.stringify(point)));
+    expect(parsed).toEqual(point);
+
+    const frame = WsIndicatorMessageSchema.parse({ type: 'indicator', point });
+    expect(frame.point).toEqual(point);
+  });
+
+  it('parses an IndicatorSeriesSpec with per-key style', () => {
+    const spec: IndicatorSeriesSpec = {
+      id: 'vwap-band',
+      label: 'VWAP band (research, unvalidated)',
+      scale: 'price',
+      keys: [
+        { key: 'vwap', label: 'VWAP', color: '#d29922' },
+        { key: 'vwapTop', label: 'VWAP +1σ', color: '#d29922', style: 'dashed' },
+      ],
+    };
+    expect(IndicatorSeriesSpecSchema.parse(spec)).toEqual(spec);
+  });
+
+  it('StrategyRequirements accepts optional minBars distinct from warmupBars', () => {
+    const requirements: StrategyRequirements = {
+      instruments: ['capitalcom:US100'],
+      timeframe: '1m',
+      warmupBars: { '1m': 1440 },
+      minBars: { '1m': 1 },
+      indicators: [{ id: 'vwap-band', label: 'VWAP band', scale: 'price', keys: [{ key: 'vwap', label: 'VWAP' }] }],
+    };
+    const parsed = StrategyRequirementsSchema.parse(requirements);
+    expect(parsed.minBars).toEqual({ '1m': 1 });
+    expect(parsed.warmupBars).toEqual({ '1m': 1440 });
   });
 
   it('rejects a Candle missing required OHLC fields', () => {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { InstrumentIdSchema } from './instrument';
 import { TimeframeSchema } from './timeframe';
+import { StrategyTierSchema } from './strategy';
 
 export const SignalKindSchema = z.enum(['entry', 'exit', 'info']);
 export type SignalKind = z.infer<typeof SignalKindSchema>;
@@ -51,6 +52,8 @@ export const OverlayLineSchema = z.object({
   points: z.array(z.object({ time: z.number(), price: z.number() })),
   color: z.string().optional(),
   label: z.string().optional(),
+  /** architecture/live-signal-server.md §11.6 — matches priceLine's style field. */
+  style: z.enum(['solid', 'dashed']).optional(),
 });
 
 export const OverlayPrimitiveSchema = z.discriminatedUnion('type', [
@@ -70,6 +73,8 @@ export const SignalSchema = z.object({
   instrument: InstrumentIdSchema,
   timeframe: TimeframeSchema,
   time: z.number().int().nonnegative(),
+  /** architecture/live-signal-server.md §11.1 — required; a consumer cannot receive a signal without it. */
+  tier: StrategyTierSchema,
   kind: SignalKindSchema,
   direction: DirectionSchema,
   levels: z

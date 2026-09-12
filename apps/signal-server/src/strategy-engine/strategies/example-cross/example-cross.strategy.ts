@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { InstrumentId, Signal } from '@trade-automation/contracts';
-import { SignalStrategy, StrategyContext } from '../../signal-strategy.port';
+import { SignalStrategy, StrategyContext, StrategyOutput } from '../../signal-strategy.port';
 
 /**
  * architecture/live-signal-server.md §4.4 — "The scaffold ships one demo plug-in so the
@@ -13,6 +13,9 @@ import { SignalStrategy, StrategyContext } from '../../signal-strategy.port';
  */
 export class ExampleCrossStrategy implements SignalStrategy {
   readonly id = 'example-cross';
+  readonly tier = 'demo' as const;
+  readonly displayName = 'Example cross (demo)';
+  readonly description = 'Demo plug-in proving the strategy slot works. Not a strategy of this project.';
 
   constructor(private readonly smaPeriod: number = 20) {}
 
@@ -24,9 +27,9 @@ export class ExampleCrossStrategy implements SignalStrategy {
     };
   }
 
-  onCandle(ctx: StrategyContext): Signal[] {
+  onCandle(ctx: StrategyContext): StrategyOutput {
     const bars = ctx.window('1m');
-    if (bars.length < this.smaPeriod + 1) return [];
+    if (bars.length < this.smaPeriod + 1) return { signals: [] };
 
     const closes = bars.slice(-this.smaPeriod - 1).map((b) => b.close);
     const prevSma = average(closes.slice(0, this.smaPeriod));
@@ -36,30 +39,30 @@ export class ExampleCrossStrategy implements SignalStrategy {
 
     const crossedUp = prevClose <= prevSma && currClose > currSma;
     const crossedDown = prevClose >= prevSma && currClose < currSma;
-    if (!crossedUp && !crossedDown) return [];
+    if (!crossedUp && !crossedDown) return { signals: [] };
 
     const last = bars[bars.length - 1];
-    return [
-      {
-        id: uuid(),
-        strategyId: this.id,
-        instrument: ctx.instrument.id,
-        timeframe: '1m',
-        time: last.openTime,
-        kind: 'info',
-        direction: 'flat',
-        overlay: [
-          {
-            type: 'marker',
-            time: last.openTime,
-            position: crossedUp ? 'below' : 'above',
-            shape: crossedUp ? 'arrowUp' : 'arrowDown',
-            text: crossedUp ? 'cross up' : 'cross down',
-          },
-        ],
-        meta: { crossedUp, smaPeriod: this.smaPeriod, sma: currSma },
-      },
-    ];
+    const signal: Signal = {
+      id: uuid(),
+      strategyId: this.id,
+      instrument: ctx.instrument.id,
+      timeframe: '1m',
+      time: last.openTime,
+      tier: this.tier,
+      kind: 'info',
+      direction: 'flat',
+      overlay: [
+        {
+          type: 'marker',
+          time: last.openTime,
+          position: crossedUp ? 'below' : 'above',
+          shape: crossedUp ? 'arrowUp' : 'arrowDown',
+          text: crossedUp ? 'cross up' : 'cross down',
+        },
+      ],
+      meta: { crossedUp, smaPeriod: this.smaPeriod, sma: currSma },
+    };
+    return { signals: [signal] };
   }
 }
 

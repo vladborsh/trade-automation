@@ -20,7 +20,11 @@ import {
 } from '@trade-automation/contracts';
 import { CandleClosedEvent, CandleFormingEvent, MarketDataEvents } from '../../market-data/market-data.events';
 import { MarketDataStatusService } from '../../market-data/market-data-status.service';
-import { SignalEmittedEvent, StrategyEngineEvents } from '../../strategy-engine/strategy-engine.events';
+import {
+  IndicatorEmittedEvent,
+  SignalEmittedEvent,
+  StrategyEngineEvents,
+} from '../../strategy-engine/strategy-engine.events';
 import { AppConfigService } from '../../config/config.service';
 import { MetricsService } from '../../observability/metrics.service';
 
@@ -169,6 +173,18 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const [client, state] of this.clients) {
       if (state.signalTopics.has(signal.instrument)) {
         this.send(client, { type: 'signal', signal });
+      }
+    }
+  }
+
+  /** architecture/live-signal-server.md §11.5 — no new client->server verb: indicator points
+   * ride the existing `signals` topic subscription. */
+  @OnEvent(StrategyEngineEvents.IndicatorEmitted)
+  onIndicatorEmitted(event: IndicatorEmittedEvent): void {
+    const point = event.point;
+    for (const [client, state] of this.clients) {
+      if (state.signalTopics.has(point.instrument)) {
+        this.send(client, { type: 'indicator', point });
       }
     }
   }

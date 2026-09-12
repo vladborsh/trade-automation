@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CandleSchema } from './candle';
 import { InstrumentIdSchema, InstrumentSchema, VenueStatusSchema } from './instrument';
 import { SignalSchema } from './signal';
+import { IndicatorPointSchema, IndicatorSeriesSpecSchema, StrategyTierSchema } from './strategy';
 import { TimeframeSchema } from './timeframe';
 
 /** architecture/live-signal-server.md §3.5 — REST wire contract. */
@@ -45,9 +46,27 @@ export const StrategiesResponseSchema = z.array(
     timeframe: TimeframeSchema,
     warmupBars: z.number().int().nonnegative(),
     status: StrategyStatusSchema,
+    /** architecture/live-signal-server.md §11.4 — added for the research-tier VWAP plug-in. */
+    tier: StrategyTierSchema,
+    displayName: z.string().min(1),
+    description: z.string().min(1),
+    minBars: z.number().int().nonnegative().optional(),
+    indicators: z.array(IndicatorSeriesSpecSchema).optional(),
   }),
 );
 export type StrategiesResponse = z.infer<typeof StrategiesResponseSchema>;
+
+/** architecture/live-signal-server.md §11.4 — GET /api/indicators. */
+export const IndicatorsQuerySchema = z.object({
+  instrument: InstrumentIdSchema,
+  from: z.coerce.number().int().nonnegative(),
+  to: z.coerce.number().int().nonnegative(),
+  strategyId: z.string().optional(),
+});
+export type IndicatorsQuery = z.infer<typeof IndicatorsQuerySchema>;
+
+export const IndicatorsResponseSchema = z.array(IndicatorPointSchema);
+export type IndicatorsResponse = z.infer<typeof IndicatorsResponseSchema>;
 
 export const HealthResponseSchema = z.object({
   status: z.enum(['ok', 'degraded']),
@@ -107,6 +126,8 @@ export type WsClientMessage = z.infer<typeof WsClientMessageSchema>;
 
 export const WsCandleMessageSchema = z.object({ type: z.literal('candle'), candle: CandleSchema });
 export const WsSignalMessageSchema = z.object({ type: z.literal('signal'), signal: SignalSchema });
+/** architecture/live-signal-server.md §11.5 — delivered to every client subscribed to `signals` for the instrument. */
+export const WsIndicatorMessageSchema = z.object({ type: z.literal('indicator'), point: IndicatorPointSchema });
 export const WsStatusMessageSchema = z.object({
   type: z.literal('status'),
   instrument: InstrumentIdSchema,
@@ -118,6 +139,7 @@ export const WsPongMessageSchema = z.object({ type: z.literal('pong'), serverTim
 export const WsServerMessageSchema = z.discriminatedUnion('type', [
   WsCandleMessageSchema,
   WsSignalMessageSchema,
+  WsIndicatorMessageSchema,
   WsStatusMessageSchema,
   WsPongMessageSchema,
 ]);
