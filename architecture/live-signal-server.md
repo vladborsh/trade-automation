@@ -987,3 +987,226 @@ test" still holds for **execution**. The *port* of a strategy into a
 only when — a Stage-0 bit-exact reproduction exists to test parity against.
 That is the case for the VWAP band-reversal strategy as of 2026-09-12 and
 is the subject of `architecture/vwap-band-reversal-plugin.md`.
+
+---
+
+## 12. Amendments — 2026-09-13, per-timeframe historical backfill and retention depth
+
+Driven directly by the user: "for each timeframe we should fetch a
+correspondingly larger chunk of data [when backfilling/scrolling] — this
+should already work as a real feature, not something we patch around for a
+demo." Surfaced by the coordinator running server+client live end to end
+(commit `8546b90`) and finding that `DEFAULT_WARMUP_LOOKBACK_MS`
+(`ingestion.service.ts`) is a single flat 3-day 1m lookback applied at boot
+regardless of what timeframe is actually being viewed — so a `1d` chart,
+which a user expects to show months/years of daily bars, is capped at ~3
+daily candles today, because the resampler only ever has 3 days of 1m to
+resample from. Inputs read for this amendment, beyond the files already
+listed at the top of this note: `apps/signal-server/src/market-data/
+{ingestion.service.ts, candle-cache.service.ts, binance/binance.adapter.ts,
+capitalcom/capitalcom.adapter.ts}`; `research/cmc-bot-vwap/HANDOFF.md` §
+"Addendum 2026-09-13" and `research/cmc-bot-vwap/results/
+capital_com_floor_probe.txt` (read from the `researcher-cmc-bot-vwap`
+worktree, not modified).
+
+### 12.1 Shape decision: hybrid — deepen 1m resampling *and* build the venue-native accelerator, because the Capital.com floor makes the pure-1m-resampling approach factually unable to serve deep coarse-timeframe history for CFDs, not just inefficient
+
+§3.2 already specifies a venue-native coarse-bar accelerator ("fetched only
+as a backfill accelerator at boot when the M1 history in storage is
+shallower than a strategy's warm-up needs... marked `source: 'venue-native'`
+so a mismatch with resampled bars is diagnosable"). `grep -rn "venue-native"
+apps/signal-server/src` returns nothing — **it was only ever described in
+this note, never built.** `VenueAdapter.fetchCandles` on both adapters
+currently throws for any `tf !== '1m'`.
+
+Two shapes were on the table:
+
+- **A — always resample from an ever-deeper 1m store.** Simple (one data
+  path), but two problems: (1) reaching a 45-day 1h window or a 2-year 1d
+  window this way means pulling 45 days / 2 years of **1m** bars — tens of
+  thousands of bars per instrument, tens of REST pages, purely to produce a
+  few hundred coarse bars; (2) **it cannot work at all for Capital.com deep
+  history.** The VWAP research package already probed this exact question
+  for a different purpose (`HANDOFF.md` "Addendum 2026-09-13"): Capital.com's
+  `/prices` endpoint returns `error.prices.not-found` for `MINUTE`,
+  `MINUTE_5` and `MINUTE_15` resolution for any date before **2024-01-02**,
+  on all four probed instruments (US100, US500, EURCHF, GBPCHF) — "a
+  retention limit on Capital.com's side," confirmed by bisection, not a
+  research gap. But `HOUR` and `DAY` resolution **are** served back to at
+  least 2022-09-12 (the earliest date probed; the exact floor for those
+  resolutions was not fully bisected and is an open item, not this note's
+  claim). So for Capital.com instruments, a 1d or 4h chart resampled purely
+  from 1m can **never** show anything before 2024-01-02, while the venue's
+  own daily/hourly bars go back at least two more years. Resampling-only is
+  not a "less efficient" choice here, it is a **strictly worse ceiling** on
+  what the chart can ever show for CFD instruments.
+- **B — venue-native coarse fetch as the primary path for coarse
+  timeframes.** Solves the Capital.com ceiling and is far cheaper (one REST
+  page of native `1h`/`1d` bars vs. dozens of pages of `1m`), but on its own
+  loses cross-checkability against the resampled series where both exist,
+  and every strategy's `warmupBars` window is still specified in 1m-derived
+  terms (§4.4) — the strategy engine still needs deep 1m for its own
+  evaluation window, native coarse bars are a *chart-viewing* concern only
+  Binance's coarser intervals don't need this, since Binance's kline REST
+  has no meaningful depth limit at any resolution.
+
+**Decision: hybrid, matching the shape §3.2 already committed to.** Deepen
+the 1m backfill (bounded, background, see §12.3) so the strategy engine and
+the resampler get a genuinely deep 1m window where the venue allows it
+(effectively unbounded on Binance, capped at 2024-01-02 on Capital.com), and
+build the venue-native accelerator now, scoped to `1h`/`4h`/`1d` on both
+venues (5m/15m stay resampled-only everywhere — the 1m depths in §12.2
+already cover their targets cheaply). Where a resampled bar and a
+venue-native bar exist for the same `(instrument, timeframe, openTime)`,
+resampled wins (1m is the system's source of truth per §6.1) and the
+venue-native bar for that slot is dropped from the cache once the resampled
+one lands — venue-native is a depth extension *behind* where resampling
+reaches, not a replacement for it in the overlap window. A mismatch between
+the two in the overlap window is a metric (`venue_native_mismatch_count`,
+observability §4.8), never a silent pick — it means either the resampler or
+the venue's own aggregation disagrees, and that's diagnosable, not fatal.
+
+### 12.2 Per-timeframe depth policy
+
+"Fresh boot, before any user has scrolled" targets:
+
+| Timeframe | Target depth | Rationale | Source at boot |
+|---|---|---|---|
+| `1m` | 3 days (unchanged, 4320 bars) | Live/strategy hot path only; deep 1m is a background concern (§12.3), not a boot-blocking one | 1m REST backfill (existing path) |
+| `5m` | 10 days (2880 bars) | Matches existing `CandleCache` default depth; cheap — 10 days of 1m is ~10k bars, a handful of Binance pages, well inside Capital.com's post-2024 floor | resampled from a 10-day 1m pull |
+| `15m` | 10 days (960 bars) | Same 10-day 1m pull covers 5m and 15m together | resampled from the same pull |
+| `1h` | 45 days (1080 bars) | Matches existing `CandleCache` default depth; via native fetch this is **one** REST page per instrument on either venue (45×24=1080 < both venues' page limits) vs. dozens of 1m pages | venue-native (`source: 'venue-native'`) |
+| `4h` | 45 days (270 bars) | Same window as 1h; trivial page size either way | venue-native, or derived in-process from the native 1h pull if the venue lacks a 4h resolution |
+| `1d` | Binance: 2 years (730 bars); Capital.com: as deep as `DAY` resolution serves, provisionally ≥ 2022-09 (the probe's earliest tested date — **re-probe the actual floor before relying on an exact number**, this note only confirms it is deeper than the 1m floor) | A daily chart is exactly the case the user called out as broken (currently ~3 candles); years, not days, is the right expectation for `1d`, and it's cheap: one native `1d`-resolution REST page comfortably covers either target | venue-native |
+
+Bump `CandleCache`'s `DEFAULT_DEPTH_BARS['1d']` from 400 to ~800 (with
+margin) to actually hold the 2-year Binance target; 5m/15m/1h/4h defaults
+are already sized correctly in `candle-cache.service.ts` today — the bug was
+never the cache's configured depth, it was that nothing ever filled it.
+
+**Scroll-back pagination wall** (`GET /api/candles` with an old `from`,
+beyond what `CandleCache`/`CandleStore` already hold):
+
+- **Binance, any timeframe:** no hard wall by design. On a store-miss for a
+  range older than what's persisted, trigger an **on-demand fetch-and-persist**
+  from the venue (background — `BinanceAdapter.fetchCandles`/native fetch —
+  paginated, already-existing pagination logic in `binance.adapter.ts`),
+  write the result to `CandleStore`, and serve it once fetched. The wall is
+  "the symbol's own listing date on Binance," which is not a real UX
+  boundary in practice.
+- **Capital.com, `1m`/`5m`/`15m`:** hard wall at 2024-01-02 (or later, per
+  instrument — the probe found all four at the same date but that's the
+  probe's date choice, not a proven identical floor; SE should re-check per
+  instrument). A request older than the floor must return an **explicit**
+  "no earlier data — vendor limit" signal (a distinct field or error code on
+  `GET /api/candles`, not an empty 200), so the client stops trying to page
+  further back instead of silently showing nothing forever.
+- **Capital.com, `1h`/`4h`/`1d`:** wall is whatever `HOUR`/`DAY` resolution
+  actually serves (deeper than the intraday floor, exact depth unconfirmed —
+  flagged as an SE-time verification, §12.4). Same on-demand fetch-and-persist
+  pattern as Binance, scoped to native coarse fetch since 1m doesn't exist
+  that far back for these instruments.
+
+### 12.3 Boot sequence: sync for cheap native pulls, async for the deep 1m backfill
+
+Per-venue REST cost reality (`REST_PAGE_LIMIT` in `binance.adapter.ts` = 1500
+bars/page, `REST_PAGE_LIMIT_BARS` in `capitalcom.adapter.ts` = 720
+bars/page): reaching the existing 45-day `1h` cache depth via 1m resampling
+would be ~43 Binance pages (or many more Capital.com pages) **per
+instrument**, purely to produce 1080 coarse bars — not something to do
+synchronously before `app.listen()`.
+
+- **Phase 1 — synchronous (blocks `app.listen()`), during
+  `onApplicationBootstrap`:** the existing 3-day 1m backfill (unchanged,
+  already fast), plus the new native `1h`/`4h`/`1d` fetch for every
+  configured instrument — each is 1-2 REST calls per instrument per
+  timeframe, so a 10-instrument universe × 3 timeframes is on the order of
+  20-30 calls total, seconds not minutes. The chart is usable immediately at
+  full §12.2 depth for every timeframe on first boot.
+- **Phase 2 — asynchronous, kicked off right after `app.listen()`:**
+  progressively deepen the `1m` backfill per instrument beyond the 3-day
+  boot window (target: 45 days, matching the `1h` cache depth, so the
+  overlap window for the §12.1 cross-check actually exists) via the
+  existing paginated `fetchCandles`, feeding `CandleCache`, the resampler,
+  and `CandleStore` incrementally as pages arrive — same per-candle path the
+  boot warm-up already uses, just running after listen instead of before.
+  Extend **backwards in time** (oldest page last, growing the cache's
+  covered range down from the 3-day mark), never forwards, so
+  `CandleCache.covers()`'s "list[0].openTime <= from" contract stays correct
+  throughout — a request for the newest N bars is always satisfiable, a
+  request reaching into the still-backfilling range legitimately falls
+  through to whatever `CandleStore` already has, same as today's cache-miss
+  path.
+- Track backfill progress per `(instrument, timeframe)` — a `backfillStatus:
+  'deepening' | 'complete'` field surfaced on `/api/health` (§4.8) — so the
+  client can show "still loading full history" honestly instead of the chart
+  silently looking complete while the background job is still running.
+
+### 12.4 Capital.com-specific caveat, stated plainly for whoever builds this
+
+The intraday floor (2024-01-02, `MINUTE`/`MINUTE_5`/`MINUTE_15`) is
+confirmed by the VWAP research package's probe
+(`research/cmc-bot-vwap/HANDOFF.md`, `results/capital_com_floor_probe.txt`)
+for US100/US500/EURCHF/GBPCHF specifically — the same four instruments this
+server's `instruments.yaml` would configure for Capital.com. **Not
+re-derived here, cited.** The `HOUR`/`DAY` floor is not fully bisected by
+that probe (it only confirms "served at 2022-09-12," not "unavailable
+before X") — SE should run the equivalent probe (`ts_harness/
+probe_bisect.ts` pattern) against the actual coarse resolutions this feature
+needs before hardcoding a "2 years" claim anywhere user-facing for
+Capital.com instruments.
+
+### 12.5 Amendment to §9.1 — routing to Software Engineer
+
+Concrete, coherent extension of the existing modules — not a rewrite, no new
+modules:
+
+1. **`ingestion.service.ts`**: replace the single `DEFAULT_WARMUP_LOOKBACK_MS`
+   constant with a per-timeframe boot plan: keep the existing 3-day 1m
+   synchronous warm-up untouched; add a synchronous native-fetch step for
+   `1h`/`4h`/`1d` per instrument (§12.2/§12.3 Phase 1); add a new
+   `deepenHistoryAsync()` (or similar) fired after `app.listen()` in
+   `main.ts` that runs the existing backfill loop again with a deeper target
+   (45 days) and the "extend backwards" ordering from §12.3 Phase 2. Reuse
+   `resamplerService.feed()` exactly as the existing warm-up already does
+   (same reasoning as the `CandleClosed`-race fix in `8546b90` — do not
+   reintroduce the event-bus dependency for this new path either).
+2. **`candle-cache.service.ts`**: bump `DEFAULT_DEPTH_BARS['1d']` to ~800;
+   no other depth changes needed. Add whatever bookkeeping is needed to
+   support the "resampled wins over venue-native in the overlap window"
+   rule from §12.1 — e.g. an upsert-time check: if a `source: 'venue-native'`
+   candle's slot later receives a `source: 'resampled'`/`'storage'` candle
+   for the same key, the resampled one replaces it (the existing `upsert`
+   already replaces same-`openTime` entries; confirm/extend this to also
+   apply when the incoming source differs, and to *not* let a late-arriving
+   venue-native fetch overwrite an already-resampled slot).
+3. **`binance.adapter.ts`** / **`capitalcom.adapter.ts`**: remove the
+   `tf !== '1m'` throw in `fetchCandles`; implement native fetch for
+   `5m`/`15m`/`1h`/`4h`/`1d` (Binance: same `klines` endpoint, `interval`
+   param set to the requested timeframe, same pagination shape already
+   there; Capital.com: same `/prices` endpoint, `resolution` param set to
+   the matching `MINUTE_5`/`MINUTE_15`/`HOUR`/`HOUR_4`/`DAY` constant — verify
+   Capital.com's exact resolution enum values against current venue docs,
+   same discipline as the existing `CAP_COM_RESOLUTION_1M` constant).
+   Returned candles get `source: 'venue-native'` (per §3.2's existing
+   contract — no contract change needed, just an implementation that was
+   never written). Add the mismatch-detection metric from §12.1 where SE
+   finds it natural to compute the overlap (likely in the resampler or the
+   ingestion service, wherever both series are visible at once — SE's call).
+4. **`candles.controller.ts`**: on a store-miss for an out-of-range request,
+   implement the on-demand fetch-and-persist from §12.2 (Binance: always;
+   Capital.com: only for the timeframe/date ranges the venue actually
+   serves) instead of returning empty; return the explicit "vendor floor
+   reached" signal for the Capital.com intraday wall.
+5. **`/api/health`**: add `backfillStatus` per `(instrument, timeframe)`
+   per §12.3.
+6. **Tests**: resampler cross-check logic (resampled-wins-over-venue-native
+   at an overlapping `openTime`); `CandleCache` depth-bump regression;
+   adapter native-fetch payload mapping per venue (new fixtures); the
+   Capital.com "vendor floor reached" response shape; the backwards-extending
+   Phase 2 backfill not corrupting `covers()`'s contiguity assumption
+   mid-run.
+
+**Escalation rule, same as §9.1:** exact Capital.com resolution enum values
+and the real `HOUR`/`DAY` floor are venue facts to verify at build time
+(§12.4), not to guess from this note.
