@@ -64,6 +64,29 @@ describe('Binance payload mapping (architecture/live-signal-server.md §1, §4.1
     expect(candle.close).toBe(1801.25);
   });
 
+  it('§12.5 item 3: maps a native coarse-timeframe kline with source venue-native, not venue-rest', () => {
+    const row: BinanceRestKline = [
+      1699000000000,
+      '36000.10',
+      '36050.00',
+      '35990.50',
+      '36020.25',
+      '123.456',
+      1699003599999,
+      '4448000.00',
+      321,
+      '60.0',
+      '2160000.00',
+      '0',
+    ];
+
+    const candle = mapRestKline('binance:BTCUSDT', row, '1h');
+
+    expect(candle.timeframe).toBe('1h');
+    expect(candle.source).toBe('venue-native');
+    expect(candle.openTime).toBe(1699000000000);
+  });
+
   it('flips closed to true when the venue marks the kline final (x: true)', () => {
     const closed: BinanceWsKlineMessage = {
       e: 'kline',

@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthResponse } from '@trade-automation/contracts';
+import { HealthResponse, TIMEFRAME_MS } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { MarketDataStatusService } from '../market-data/market-data-status.service';
 import { MetricIngestionService } from '../market-data/metrics/metric-ingestion.service';
@@ -32,6 +32,10 @@ export class HealthController {
         lastClosedCandleAge,
         gapCount24h: s.gapCount24h.length,
         feedLag,
+        backfillStatus: (Object.keys(TIMEFRAME_MS) as (keyof typeof TIMEFRAME_MS)[]).map((timeframe) => ({
+          timeframe,
+          status: this.status.getBackfillStatus(instrument.id, timeframe),
+        })),
       };
     });
 

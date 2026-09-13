@@ -1,4 +1,4 @@
-import { Candle, InstrumentId } from '@trade-automation/contracts';
+import { Candle, InstrumentId, Timeframe } from '@trade-automation/contracts';
 
 /** One row of Binance's `GET /fapi/v1/klines` REST response (array-of-arrays). */
 export type BinanceRestKline = [
@@ -42,12 +42,17 @@ export interface BinanceWsKlineMessage {
  * `openTime: Date.now() - interval` instead of the exchange's kline start time — fine for a
  * Telegram alert bot, wrong for a server whose candles back-fill storage and are joined to
  * signals by timestamp. Every mapper below takes `openTime` from the venue payload only.
+ *
+ * `tf` defaults to `'1m'` (the only timeframe fetched before §12) with `source: 'venue-rest'`;
+ * §12.1/§12.5 item 3's native coarser fetch (`5m`/`15m`/`1h`/`4h`/`1d`) passes the requested `tf`
+ * and gets `source: 'venue-native'` instead, so the cache's overlap-window priority rule can
+ * tell a native pull apart from the 1m-resampled series it is a depth extension behind.
  */
-export function mapRestKline(instrument: InstrumentId, kline: BinanceRestKline): Candle {
+export function mapRestKline(instrument: InstrumentId, kline: BinanceRestKline, tf: Timeframe = '1m'): Candle {
   const [openTime, open, high, low, close, volume] = kline;
   return {
     instrument,
-    timeframe: '1m',
+    timeframe: tf,
     openTime,
     open: Number(open),
     high: Number(high),
@@ -55,7 +60,7 @@ export function mapRestKline(instrument: InstrumentId, kline: BinanceRestKline):
     close: Number(close),
     volume: Number(volume),
     closed: true,
-    source: 'venue-rest',
+    source: tf === '1m' ? 'venue-rest' : 'venue-native',
   };
 }
 

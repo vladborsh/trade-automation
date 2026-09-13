@@ -25,6 +25,19 @@ export type CandlesQuery = z.infer<typeof CandlesQuerySchema>;
 export const CandlesResponseSchema = z.array(CandleSchema);
 export type CandlesResponse = z.infer<typeof CandlesResponseSchema>;
 
+/**
+ * architecture/live-signal-server.md §12.2/§12.5 item 4 — "an explicit signal, not a silent
+ * empty 200" for a `GET /api/candles` request whose `from` predates a Capital.com vendor
+ * retention floor (§12.4). Kept as a response *header* rather than changing
+ * `CandlesResponseSchema`'s shape from an array to an object: the body stays a plain
+ * (possibly empty) `Candle[]` either way, so an unmodified client keeps working exactly as
+ * before — it just sees a legitimately-empty array, now accompanied by machine-readable
+ * metadata a future client update can read. `X-Vendor-Floor-Date` (ISO 8601, UTC) accompanies
+ * it when the specific floor date is known.
+ */
+export const VENDOR_FLOOR_REACHED_HEADER = 'x-vendor-floor-reached';
+export const VENDOR_FLOOR_DATE_HEADER = 'x-vendor-floor-date';
+
 export const SignalsQuerySchema = z.object({
   instrument: InstrumentIdSchema,
   from: z.coerce.number().int().nonnegative(),
@@ -83,6 +96,10 @@ export type MetricsQuery = z.infer<typeof MetricsQuerySchema>;
 export const MetricsResponseSchema = z.array(MetricPointSchema);
 export type MetricsResponse = z.infer<typeof MetricsResponseSchema>;
 
+/** architecture/live-signal-server.md §12.3 — Phase 2 async deepening progress per (instrument, timeframe). */
+export const BackfillStatusSchema = z.enum(['deepening', 'complete']);
+export type BackfillStatus = z.infer<typeof BackfillStatusSchema>;
+
 export const HealthResponseSchema = z.object({
   status: z.enum(['ok', 'degraded']),
   uptimeSeconds: z.number().nonnegative(),
@@ -92,6 +109,13 @@ export const HealthResponseSchema = z.object({
       lastClosedCandleAge: z.number().nonnegative().nullable(),
       gapCount24h: z.number().int().nonnegative(),
       feedLag: z.number().nonnegative().nullable(),
+      /**
+       * §12.3/§12.5 item 5 — one entry per configured `Timeframe`. Only `1m` currently tracks a
+       * real Phase 2 pass; every other timeframe reads `'complete'` (native coarse timeframes
+       * finish synchronously in Phase 1, and 5m/15m ride along with 1m's own deepening without
+       * separate tracking).
+       */
+      backfillStatus: z.array(z.object({ timeframe: TimeframeSchema, status: BackfillStatusSchema })),
     }),
   ),
   /** architecture/chart-layouts.md §4.4 — additive; default [] leaves DevOps' existing alarm design untouched. */

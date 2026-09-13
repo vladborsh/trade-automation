@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import WebSocket from 'ws';
-import { Candle, Instrument, Timeframe, VenueStatus } from '@trade-automation/contracts';
+import { Candle, Instrument, TIMEFRAME_MS, Timeframe, VenueStatus } from '@trade-automation/contracts';
 import { VenueAdapter } from '../venue-adapter.port';
 import { BinanceRestKline, BinanceWsKlineMessage, mapRestKline, mapWsKline } from './binance.mapper';
 
@@ -19,17 +19,21 @@ export class BinanceAdapter implements VenueAdapter {
     private readonly wsBaseUrl: string,
   ) {}
 
+  /**
+   * §12.5 item 3: `interval` is set to whatever `tf` is requested (Binance's kline interval
+   * strings are identical to this system's `Timeframe` literals for every value we use —
+   * `1m`/`5m`/`15m`/`1h`/`4h`/`1d`), same pagination shape as the original 1m-only path, just
+   * walking `REST_PAGE_LIMIT` bars of `tf` at a time instead of always 1m.
+   */
   async fetchCandles(instrument: Instrument, tf: Timeframe, from: number, to: number): Promise<Candle[]> {
-    if (tf !== '1m') {
-      throw new Error('BinanceAdapter.fetchCandles only supports 1m; coarser bars are resampled');
-    }
     const out: Candle[] = [];
+    const tfMs = TIMEFRAME_MS[tf];
     let cursor = from;
 
     while (cursor <= to) {
       const url = new URL('/fapi/v1/klines', this.restBaseUrl);
       url.searchParams.set('symbol', instrument.symbol);
-      url.searchParams.set('interval', '1m');
+      url.searchParams.set('interval', tf);
       url.searchParams.set('startTime', String(cursor));
       url.searchParams.set('endTime', String(to));
       url.searchParams.set('limit', String(REST_PAGE_LIMIT));
@@ -41,10 +45,10 @@ export class BinanceAdapter implements VenueAdapter {
       const rows = (await res.json()) as BinanceRestKline[];
       if (rows.length === 0) break;
 
-      out.push(...rows.map((row) => mapRestKline(instrument.id, row)));
+      out.push(...rows.map((row) => mapRestKline(instrument.id, row, tf)));
       const lastOpenTime = rows[rows.length - 1][0];
       if (rows.length < REST_PAGE_LIMIT || lastOpenTime >= to) break;
-      cursor = lastOpenTime + 60_000;
+      cursor = lastOpenTime + tfMs;
     }
 
     return out;

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { InstrumentId, VenueStatus } from '@trade-automation/contracts';
+import { InstrumentId, Timeframe, VenueStatus } from '@trade-automation/contracts';
 
 interface InstrumentStatus {
   venueStatus: VenueStatus;
@@ -7,10 +7,18 @@ interface InstrumentStatus {
   gapCount24h: { at: number }[];
 }
 
+/** architecture/live-signal-server.md §12.3 — per (instrument, timeframe) Phase 2 progress. */
+export type BackfillStatus = 'deepening' | 'complete';
+
+function backfillKey(id: InstrumentId, tf: Timeframe): string {
+  return `${id}|${tf}`;
+}
+
 /** Backs `GET /api/health` and the WS `status` frame (§3.5). */
 @Injectable()
 export class MarketDataStatusService {
   private readonly byInstrument = new Map<InstrumentId, InstrumentStatus>();
+  private readonly backfillByInstrumentTf = new Map<string, BackfillStatus>();
 
   private entry(id: InstrumentId): InstrumentStatus {
     let e = this.byInstrument.get(id);
@@ -42,5 +50,15 @@ export class MarketDataStatusService {
 
   all(): Map<InstrumentId, InstrumentStatus> {
     return this.byInstrument;
+  }
+
+  /** §12.3: `'deepening'` until `IngestionService.deepenHistoryAsync` finishes this pair's 1m walk. */
+  setBackfillStatus(id: InstrumentId, tf: Timeframe, status: BackfillStatus): void {
+    this.backfillByInstrumentTf.set(backfillKey(id, tf), status);
+  }
+
+  /** Defaults to `'complete'` for a pair that never had a Phase 2 deepening pass tracked (e.g. non-`1m`). */
+  getBackfillStatus(id: InstrumentId, tf: Timeframe): BackfillStatus {
+    return this.backfillByInstrumentTf.get(backfillKey(id, tf)) ?? 'complete';
   }
 }

@@ -16,6 +16,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module';
+import { IngestionService } from './market-data/ingestion.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -33,6 +34,13 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
   app.get(Logger).log(`signal-server listening on :${port} (TZ=${process.env.TZ})`);
+
+  // architecture/live-signal-server.md §12.3 Phase 2 — deliberately fire-and-forget: the chart
+  // is already usable at full §12.2 depth for every timeframe from Phase 1 alone (synchronous,
+  // above); this only deepens the 1m backfill (and, as a side effect, the derived timeframes
+  // resampled from it) further back in the background. `/api/health`'s `backfillStatus` reflects
+  // progress; a failure here is logged inside the service and never affects server liveness.
+  void app.get(IngestionService).deepenHistoryAsync();
 }
 
 bootstrap();

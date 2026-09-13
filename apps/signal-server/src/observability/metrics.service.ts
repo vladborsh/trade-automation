@@ -80,6 +80,19 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * architecture/live-signal-server.md §12.1/§12.5 item 3 — incremented whenever a resampled
+   * and a venue-native bar exist for the same (instrument, timeframe, openTime) in the §12.1
+   * overlap window and materially disagree. Diagnosable, never fatal: the resampled bar always
+   * wins the cache slot regardless (`CandleCache`'s source-priority rule).
+   */
+  readonly venueNativeMismatchCount = new client.Counter({
+    name: 'signal_server_venue_native_mismatch_count_total',
+    help: 'Resampled vs venue-native bar disagreements at the same (instrument, timeframe, openTime)',
+    labelNames: ['instrument', 'timeframe'],
+    registers: [this.registry],
+  });
+
   /** architecture/chart-layouts.md §4.4. */
   readonly metricObservationsTotal = new client.Counter({
     name: 'signal_server_metric_observations_total',
