@@ -7,6 +7,7 @@ import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { WriteBuffer } from '../storage/write-buffer.service';
 import { MetricsService } from '../observability/metrics.service';
 import { CandleCache } from './candle-cache.service';
+import { ResamplerService } from './resampler.service';
 import { GapRepairService } from './gap-repair.service';
 import { MarketDataStatusService } from './market-data-status.service';
 import { CandleClosedEvent, CandleFormingEvent, MarketDataEvents } from './market-data.events';
@@ -34,6 +35,7 @@ export class IngestionService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly config: AppConfigService,
     private readonly cache: CandleCache,
     private readonly events: EventEmitter2,
+    private readonly resamplerService: ResamplerService,
     private readonly gapRepair: GapRepairService,
     private readonly status: MarketDataStatusService,
     private readonly writeBuffer: WriteBuffer,
@@ -68,7 +70,16 @@ export class IngestionService implements OnApplicationBootstrap, OnModuleDestroy
       now - DEFAULT_WARMUP_LOOKBACK_MS,
       latestStored ?? now,
     );
-    for (const c of fromStorage) this.cache.upsert({ ...c, source: 'storage' });
+    for (const c of fromStorage) {
+      const stored = { ...c, source: 'storage' as const };
+      this.cache.upsert(stored);
+      // Same reasoning as the backfilled-candle loop below: rebuild derived-timeframe
+      // history directly on every boot, since it is never persisted and the resampler's
+      // own bucket state resets to empty each restart.
+      for (const derived of this.resamplerService.feed(stored).closed) {
+        this.cache.upsert(derived);
+      }
+    }
 
     const backfillFrom = latestStored !== null ? latestStored + 60_000 : now - DEFAULT_WARMUP_LOOKBACK_MS;
     if (backfillFrom <= lastClosedBoundary) {
@@ -76,7 +87,20 @@ export class IngestionService implements OnApplicationBootstrap, OnModuleDestroy
         const backfilled = await adapter.fetchCandles(instrument, '1m', backfillFrom, lastClosedBoundary);
         for (const c of backfilled) {
           this.cache.upsert(c);
-          this.events.emit(MarketDataEvents.CandleClosed, new CandleClosedEvent(c));
+          // Resample directly instead of via the CandleClosed event: this method runs from
+          // onApplicationBootstrap, and @nestjs/event-emitter's own listener-binding hook (also
+          // onApplicationBootstrap, in a different module) is not guaranteed to have run yet —
+          // ResamplerService's @OnEvent handler can have zero listeners registered at this
+          // point, silently dropping every derived-timeframe candle from backfilled history.
+          // Deliberately NOT emitting CandleClosed here (unlike the live path below): nothing
+          // else needs it during boot (no WS client can be connected yet, and StrategyRunner
+          // only reacts to *live* closes going forward, using the cache this warm-up already
+          // populated for its lookback window) — emitting it as well risks double-feeding the
+          // same candle into the resampler's stateful buckets if the listener happens to bind
+          // partway through this loop (there's an `await` between instruments).
+          for (const derived of this.resamplerService.feed(c).closed) {
+            this.cache.upsert(derived);
+          }
           this.status.recordClosedCandle(instrument.id, c.openTime);
         }
         if (backfilled.length > 0) {

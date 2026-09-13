@@ -53,12 +53,16 @@ import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
       :host {
         display: block;
         height: 100%;
+        width: 100%;
         min-height: 0;
+        min-width: 0;
       }
       .chart-panel {
         display: flex;
         flex-direction: column;
         height: 100%;
+        width: 100%;
+        min-width: 0;
         border: 1px solid #30363d;
       }
       .panel-header {
@@ -92,6 +96,7 @@ import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
       .panel-body {
         flex: 1;
         min-height: 0;
+        min-width: 0;
       }
     `,
   ],

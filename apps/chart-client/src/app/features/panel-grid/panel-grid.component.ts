@@ -61,13 +61,18 @@ import { ChartPanelComponent } from './chart-panel.component';
       :host {
         display: block;
         height: 100%;
+        width: 100%;
         min-height: 0;
+        min-width: 0;
+        flex: 1 1 auto;
       }
       .panel-grid {
         display: grid;
         gap: 4px;
         height: 100%;
+        width: 100%;
         min-height: 0;
+        min-width: 0;
       }
     `,
   ],

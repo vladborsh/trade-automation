@@ -21,9 +21,18 @@ export class MetricsController {
   async get(@Query() query: ReturnType<typeof MetricsQuerySchema.parse>): Promise<MetricsResponse> {
     const { instrument, metric, timeframe, from, to, limit } = query;
 
-    const observations = this.cache.covers(instrument, metric, from)
-      ? [...this.cache.query(instrument, metric, from, to)]
-      : await this.store.query(instrument, metric, from, to);
+    // Same fix as CandlesController: prefer whatever tail the cache actually holds and
+    // fall back to the store only for the older portion, rather than requiring the
+    // cache to cover the entire [from, to] range (too strict for a wide-open `from`).
+    const cached = this.cache.query(instrument, metric, from, to);
+    let observations: typeof cached;
+    if (cached.length > 0) {
+      const storeTo = cached[0].time - 1;
+      const older = from <= storeTo ? await this.store.query(instrument, metric, from, storeTo) : [];
+      observations = [...older, ...cached];
+    } else {
+      observations = await this.store.query(instrument, metric, from, to);
+    }
 
     const points = bucketObservations(observations, timeframe);
     return points.slice(Math.max(0, points.length - limit));

@@ -23,6 +23,13 @@ async function bootstrap() {
   app.useWebSocketAdapter(new WsAdapter(app));
   app.enableShutdownHooks();
 
+  // Dev convenience only: when the client is served separately (e.g. `ng serve` on :4200)
+  // instead of by this server's ServeStaticModule, the browser enforces CORS across ports.
+  // Unset in production, where the client is same-origin.
+  if (process.env.CORS_ORIGIN) {
+    app.enableCors({ origin: process.env.CORS_ORIGIN });
+  }
+
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
   app.get(Logger).log(`signal-server listening on :${port} (TZ=${process.env.TZ})`);
