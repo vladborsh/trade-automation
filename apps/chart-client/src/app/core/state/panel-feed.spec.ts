@@ -95,9 +95,11 @@ describe('PanelFeed', () => {
     await feed.start();
 
     // from/to are required by the real server's wire contract (no `.default()` on either
-    // field) - PanelFeed always sends a concrete [0, now] range for the initial history load.
-    expect(rest.getSignals).toHaveBeenCalledWith('binance:BTCUSDT', 0, expect.any(Number));
-    expect(rest.getIndicators).toHaveBeenCalledWith('binance:BTCUSDT', 0, expect.any(Number));
+    // field) - PanelFeed always sends a concrete, bounded range for the initial history load
+    // (a literal `from: 0` would trigger the server's on-demand fetch-and-persist all the way
+    // back to epoch — see panel-feed.ts's `boundedFrom`).
+    expect(rest.getSignals).toHaveBeenCalledWith('binance:BTCUSDT', expect.any(Number), expect.any(Number));
+    expect(rest.getIndicators).toHaveBeenCalledWith('binance:BTCUSDT', expect.any(Number), expect.any(Number));
     const sent = sockets[0].sent.map((s) => JSON.parse(s));
     expect(sent).toContainEqual({ type: 'subscribe', topic: 'signals', instrument: 'binance:BTCUSDT' });
     expect(sent).toContainEqual({ type: 'subscribe', topic: 'candles', instrument: 'binance:BTCUSDT', timeframe: '1m' });
@@ -113,7 +115,7 @@ describe('PanelFeed', () => {
       'binance:BTCUSDT',
       'openInterest',
       '1m',
-      0,
+      expect.any(Number),
       expect.any(Number),
       1500,
     );
