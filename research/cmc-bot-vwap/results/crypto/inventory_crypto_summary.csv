@@ -1,0 +1,5 @@
+symbol,condition,months,orders,sells,buys,per12m,orders_nocaps,per12m_nocaps,signal_bars,blocked_by_caps,blocked_same_dir,weekend_orders,open_at_end,vwap_empty_throw_bars
+BTCUSDT,win,49.4,1309,636,673,318,1677,408,2143,629,834,0,0,0
+BTCUSDT,all,49.4,2845,1439,1406,691,17095,4154,5612,28248,2764,818,0,1503
+ETHUSDT,win,49.4,1145,546,599,278,1377,335,1819,388,674,0,0,0
+ETHUSDT,all,49.4,2859,1478,1381,695,15567,3783,5470,24643,2606,824,0,1503
