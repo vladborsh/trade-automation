@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ChartSyncService, sameRange } from './chart-sync.service';
 
 describe('sameRange', () => {
@@ -61,5 +62,155 @@ describe('ChartSyncService', () => {
     sync.reset();
     expect(sync.range()).toBeNull();
     expect(sync.origin()).toBeNull();
+  });
+});
+
+// architecture/scroll-back-freeze-diagnosis.md: a follower whose own data
+// has a real gap gets its requested range snapped by lightweight-charts to
+// something far outside epsilon. Without the read-back fix in
+// ChartComponent's Follow effect, this produces an unbounded bounce: the
+// follower keeps re-proposing its snapped range, the driver's range keeps
+// changing in response, and the *origin* of the shared range keeps
+// ping-ponging between panels forever ("ping-ponging between btc, eth,
+// btc-oi, and dxy" per the diagnosis file's repro). These tests exercise
+// ChartSyncService's circuit breaker directly — the backstop that must trip
+// on that origin-ping-pong signature even if some other, not-yet-discovered
+// case causes the same kind of bounce, while never tripping on a real
+// single-panel drag (verified live: an early volume-based design, counting
+// raw propose() calls per panel, falsely tripped on one continuous drag,
+// since lightweight-charts fires a range-change on every animation frame
+// while panning — see REPORT.md).
+describe('ChartSyncService circuit breaker', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('never trips on a real continuous single-panel drag, no matter how many range-change events it fires', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // lightweight-charts fires visibleTimeRangeChange on every animation
+    // frame while the user pans — dozens of propose() calls from the SAME
+    // panel, all within a few hundred ms, is normal for one drag gesture.
+    for (let i = 0; i < 30; i++) {
+      sync.propose('dxy', { from: 1000 + i * 100, to: 2000 + i * 100 }, 30); // step > epsilon: each one is a real change, not drift-guarded
+    }
+
+    expect(sync.range()).toEqual({ from: 1000 + 29 * 100, to: 2000 + 29 * 100 });
+    expect(sync.origin()).toBe('dxy');
+    expect(warn).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
+  it('normal 4-panel negotiation (one drive + 3 follow settle-echoes, ~4 takeovers) never trips the breaker', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // One user drag on "btc", each of the other 3 panels follows and
+    // settle-echoes back once — a realistic ~4-takeover negotiation for a
+    // single legitimate gesture on a 4-panel grid (this is what the
+    // TRIP_THRESHOLD=8 was calibrated against; a threshold of 3 tripped on
+    // exactly this shape during live verification).
+    sync.propose('btc', { from: 1000, to: 2000 }, 30);
+    sync.propose('eth', { from: 1010, to: 2010 }, 30);
+    sync.propose('btc-oi', { from: 1020, to: 2020 }, 30);
+    sync.propose('dxy', { from: 1030, to: 2030 }, 30);
+    sync.propose('btc', { from: 1040, to: 2040 }, 30);
+
+    expect(sync.range()).toEqual({ from: 1040, to: 2040 });
+    expect(warn).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
+  it('trips after more than 8 origin takeovers within 750ms and drops further proposals from any panel', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Simulate the diagnosed cascade: the shared-range "owner" ping-pongs
+    // between panels well beyond what a single legitimate 4-panel gesture
+    // ever produces — 10 alternating proposals is 9 takeovers, tripping
+    // after the 9th.
+    const panels = ['btc', 'eth'];
+    for (let i = 0; i < 9; i++) {
+      sync.propose(panels[i % 2], { from: 1000 + i * 100, to: 2000 + i * 100 }, 30);
+    }
+    const lastAccepted = { from: 1000 + 8 * 100, to: 2000 + 8 * 100 };
+    expect(sync.range()).toEqual(lastAccepted);
+
+    // 10th proposal is the 9th takeover: trips the breaker, dropped.
+    sync.propose('eth', { from: 2000, to: 3000 }, 30);
+    expect(sync.range()).toEqual(lastAccepted); // breaker dropped it
+    expect(warn).toHaveBeenCalledOnce();
+
+    // Further proposals — from any panel — are dropped during cooldown, so
+    // the range stops changing: the loop converges instead of continuing
+    // indefinitely.
+    sync.propose('btc', { from: 2100, to: 3100 }, 30);
+    sync.propose('eth', { from: 2200, to: 3200 }, 30);
+    expect(sync.range()).toEqual(lastAccepted);
+
+    warn.mockRestore();
+  });
+
+  it('does not trip the breaker for a legitimate rapid sequence of real gestures across a handful of panels', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // A human switching gestures between panels a couple of times inside
+    // 750ms — well under the takeover threshold that only a machine-speed
+    // bounce reaches.
+    sync.propose('btc', { from: 1000, to: 2000 }, 30);
+    sync.propose('eth', { from: 1100, to: 2100 }, 30);
+    sync.propose('dxy', { from: 1300, to: 2300 }, 30);
+
+    expect(sync.range()).toEqual({ from: 1300, to: 2300 });
+    expect(warn).not.toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
+  it('recovers after the cooldown window: a proposal from any panel is accepted again', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const panels = ['btc', 'eth'];
+    for (let i = 0; i < 9; i++) {
+      sync.propose(panels[i % 2], { from: 1000 + i * 100, to: 2000 + i * 100 }, 30);
+    }
+    sync.propose('eth', { from: 2000, to: 3000 }, 30); // trips
+    const lastAccepted = { from: 1000 + 8 * 100, to: 2000 + 8 * 100 };
+    expect(sync.range()).toEqual(lastAccepted);
+
+    vi.advanceTimersByTime(751); // past COOLDOWN_MS
+
+    sync.propose('btc', { from: 1500, to: 2500 }, 30);
+    expect(sync.range()).toEqual({ from: 1500, to: 2500 });
+
+    warn.mockRestore();
+  });
+
+  it('a stable, converged range (no further meaningful proposals) never trips the breaker', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Fix scenario: after the Follow effect's read-back fix, a follower that
+    // snapped once settles — its next proposal (if any) is within epsilon of
+    // the current shared range and is dropped by the pre-existing drift
+    // guard before it ever counts as a takeover.
+    sync.propose('btc', { from: 1000, to: 2000 }, 30);
+    sync.propose('dxy', { from: 1005, to: 1995 }, 30); // within epsilon: settled
+    sync.propose('dxy', { from: 1005, to: 1995 }, 30);
+    sync.propose('dxy', { from: 1005, to: 1995 }, 30);
+
+    expect(sync.range()).toEqual({ from: 1000, to: 2000 }); // drift guard held, no bounce
+    expect(warn).not.toHaveBeenCalled();
+
+    warn.mockRestore();
   });
 });

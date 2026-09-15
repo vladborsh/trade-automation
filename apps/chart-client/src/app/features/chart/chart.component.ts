@@ -163,15 +163,34 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       this.applying = true;
       try {
         this.chart.timeScale().setVisibleRange({ from: range.from as UTCTimestamp, to: range.to as UTCTimestamp });
-        this.lastApplied = range;
       } catch {
         // lightweight-charts can still reject a range outside this panel's
         // data domain (e.g. a market-hours instrument during a synced
         // window it has no bars for) — never let one panel's chart crash
         // the shared sync effect for the rest of the grid.
-      } finally {
         this.applying = false;
+        return;
       }
+      // Read back what lightweight-charts actually rendered, not what we
+      // asked for — but only on the NEXT animation frame, not synchronously.
+      // A requested range landing inside this panel's own data gap (real
+      // market data, e.g. a session closure) doesn't finish its snap-to-grid
+      // settle inside setVisibleRange() itself; reading getVisibleRange()
+      // right away can still capture a stale intermediate value, so the
+      // later real async echo would still fail sameRange() against a
+      // wrong lastApplied and re-propose (see
+      // architecture/scroll-back-freeze-diagnosis.md). Deferring both the
+      // read-back and clearing `applying` to the next frame keeps the Drive
+      // handler suppressed until the settle has actually finished.
+      requestAnimationFrame(() => {
+        if (!this.chart) {
+          this.applying = false;
+          return;
+        }
+        const applied = this.chart.timeScale().getVisibleRange();
+        this.lastApplied = applied ? { from: applied.from as number, to: applied.to as number } : range;
+        this.applying = false;
+      });
     });
   }
 
