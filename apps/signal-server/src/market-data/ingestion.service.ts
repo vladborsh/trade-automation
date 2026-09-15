@@ -358,7 +358,13 @@ export class IngestionService implements OnApplicationBootstrap, OnModuleDestroy
         to: gap.to,
         count: gap.count,
       });
-      this.logger.warn(`Repaired gap for ${instrument.id}: ${gap.count} bars [${gap.from}, ${gap.to}]`);
+      if (gap.error) {
+        this.logger.warn(
+          `Gap unrepaired for ${instrument.id} [${gap.from}, ${gap.to}]: ${gap.error} — continuing with a hole rather than crashing`,
+        );
+      } else {
+        this.logger.warn(`Repaired gap for ${instrument.id}: ${gap.count} bars [${gap.from}, ${gap.to}]`);
+      }
     }
   }
 
