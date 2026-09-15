@@ -18,7 +18,6 @@ import {
   LineSeries,
   type IChartApi,
   type ISeriesApi,
-  type LogicalRange,
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { createChart } from 'lightweight-charts';
@@ -42,7 +41,34 @@ import { ShapesPrimitive } from './overlay/shapes.primitive';
 import { IndicatorLayer } from './indicator/indicator-layer';
 import { ChartSyncService, sameRange, type TimeRange } from './chart-sync.service';
 
-const NEAR_START_LOGICAL_INDEX = 10;
+// How close (in bars' worth of calendar time) the visible range's `from` must get to the
+// panel's own oldest loaded bar before `loadOlder()` is requested. A time-based proximity
+// check rather than an absolute bar-index one: see the "loadOlder() pagination trigger
+// unreachable at real-data buffer depth" follow-up in
+// architecture/scroll-back-freeze-diagnosis.md — an index threshold assumes the visible
+// viewport can always reach it via zoom or pan, which lightweight-charts' own
+// `minBarSpacing` zoom floor breaks once a panel's loaded buffer (HISTORY_LIMIT) exceeds
+// roughly panelWidthPx / 0.5 bars, as it now routinely does against real backfilled data.
+const NEAR_START_BAR_MULTIPLIER = 5;
+
+/**
+ * Pure form of the near-start check, exported for direct unit testing (no chart/DI needed):
+ * true once `visibleFromSec` (UTC seconds, lightweight-charts scale) is within
+ * `barMultiplier` bars' worth of calendar time — at the given `timeframe` — of `oldestMs`
+ * (ms-epoch, wire scale). `oldestMs === null` (nothing loaded yet) is never near.
+ */
+export function isNearOldestLoaded(
+  visibleFromSec: number,
+  oldestMs: number | null,
+  timeframe: Timeframe,
+  barMultiplier: number,
+): boolean {
+  if (oldestMs === null) {
+    return false;
+  }
+  const thresholdMs = TIMEFRAME_MS[timeframe] * barMultiplier;
+  return visibleFromSec * 1000 - oldestMs <= thresholdMs;
+}
 
 /**
  * Owns the lightweight-charts instance (§5.2, extended by §6.6). Pure
@@ -233,12 +259,6 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     }
     this.indicatorLayer.attach(this.chart);
 
-    this.chart.timeScale().subscribeVisibleLogicalRangeChange((range: LogicalRange | null) => {
-      if (range && range.from <= NEAR_START_LOGICAL_INDEX) {
-        this.loadOlderRequested.emit();
-      }
-    });
-
     // Drive (§6.4 step 1): a USER-driven (or library-initiated, e.g. autofit on
     // first data) range change proposes the new shared range, unless it is
     // this component's own programmatic setVisibleRange() echoing back.
@@ -250,6 +270,14 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       }
       this.visibleFrom.set(range.from as number);
       this.visibleTo.set(range.to as number);
+
+      // Pagination trigger: fires on ANY range change that gets close to the oldest loaded
+      // bar, regardless of `applying`/sync origin, exactly like the logical-range trigger it
+      // replaces — a follower panel snapping to a proposed range near its own start still
+      // needs to page in more history.
+      if (this.isNearThisPanelsOldestLoaded(range.from as number)) {
+        this.loadOlderRequested.emit();
+      }
 
       if (this.applying) {
         return;
@@ -276,6 +304,26 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   /** Half a bar of the current timeframe, in seconds — larger than any bar-grid snap (§6.4). */
   private syncEpsilonSec(): number {
     return TIMEFRAME_MS[this.timeframe()] / 1000 / 2;
+  }
+
+  /** Oldest loaded bar's open/point time, ms-epoch (wire scale) — null if nothing's loaded yet. */
+  private oldestLoadedTimeMs(): number | null {
+    if (this.kind() === 'candles') {
+      const candles = this.candles();
+      return candles.length > 0 ? candles[0].openTime : null;
+    }
+    const points = this.points();
+    return points.length > 0 ? points[0].time : null;
+  }
+
+  /**
+   * Time-based near-start check (replaces the old absolute logical-index one) for this panel's
+   * own oldest loaded bar. Invariant to total buffer size and to which gesture (zoom vs. pan)
+   * produced the range change, unlike a bar-index threshold — see `isNearOldestLoaded`'s
+   * comment.
+   */
+  private isNearThisPanelsOldestLoaded(visibleFromSec: number): boolean {
+    return isNearOldestLoaded(visibleFromSec, this.oldestLoadedTimeMs(), this.timeframe(), NEAR_START_BAR_MULTIPLIER);
   }
 
   /** Captures the visible range before a full `setData()`, restores it after, under the `applying` guard. */

@@ -74,6 +74,25 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
 const ONE_MINUTE_MS = 60_000;
 const SEED_HISTORY_MINUTES = 60 * 24 * 2; // 2 days of 1m bars per instrument
 
+// architecture/scroll-back-freeze-diagnosis.md's "loadOlder() pagination trigger unreachable
+// at real-data buffer depth" follow-up: the default 2-day seed only produces ~576 5m bars per
+// instrument, well under lightweight-charts' zoom-out floor (~1260-1300 bars at typical panel
+// widths) — every panel's oldest bar is reachable via a single zoom-drag, which is why this
+// class of bug shipped unnoticed. One instrument (opt-in via env vars, so the default mock
+// server e2e/dev instances are unaffected) can be seeded far deeper than that floor — e.g.
+// ≥7500 minutes for ≥1500 5m bars, matching PanelFeed's real HISTORY_LIMIT — to reproduce a
+// real-data-depth buffer in a dedicated e2e scenario without touching the shallow default the
+// rest of the suite relies on.
+const DEEP_SEED_INSTRUMENT = process.env['MOCK_DEEP_HISTORY_INSTRUMENT'] as InstrumentId | undefined;
+const DEEP_SEED_MINUTES = Number(process.env['MOCK_DEEP_HISTORY_MINUTES'] ?? NaN);
+
+function seedMinutesFor(instrument: InstrumentId): number {
+  if (DEEP_SEED_INSTRUMENT && instrument === DEEP_SEED_INSTRUMENT && Number.isFinite(DEEP_SEED_MINUTES)) {
+    return DEEP_SEED_MINUTES;
+  }
+  return SEED_HISTORY_MINUTES;
+}
+
 const STARTING_PRICE: Record<InstrumentId, number> = {
   'binance:BTCUSDT': 62_000,
   'binance:ETHUSDT': 3_200,
@@ -100,14 +119,15 @@ function seedFor(instrument: InstrumentId): number {
  * SE-1's adapters land. `source: 'storage'` because this plays the role of
  * "what the CandleStore would return".
  */
-export function generateSeedHistory(instrument: InstrumentId, endOpenTime: number, count = SEED_HISTORY_MINUTES): Candle[] {
+export function generateSeedHistory(instrument: InstrumentId, endOpenTime: number, count?: number): Candle[] {
+  const barCount = count ?? seedMinutesFor(instrument);
   const rng = mulberry32(seedFor(instrument));
   const startPrice = STARTING_PRICE[instrument] ?? 100;
-  const startOpenTime = endOpenTime - count * ONE_MINUTE_MS;
+  const startOpenTime = endOpenTime - barCount * ONE_MINUTE_MS;
 
   const candles: Candle[] = [];
   let price = startPrice;
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < barCount; i++) {
     const openTime = startOpenTime + i * ONE_MINUTE_MS;
     const drift = (rng() - 0.5) * startPrice * 0.0015;
     const open = price;

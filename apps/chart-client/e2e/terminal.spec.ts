@@ -115,3 +115,62 @@ test('scrolling one panel back syncs the visible range to all four and triggers 
   const afterFrom = await secondContainer.getAttribute('data-visible-from');
   expect(afterFrom).not.toBe(beforeFrom);
 });
+
+// architecture/scroll-back-freeze-diagnosis.md's "loadOlder() pagination trigger unreachable
+// at real-data buffer depth" follow-up: the test above runs against the default mock server
+// (:4300), whose ~576-5m-bar-per-instrument fixture is comfortably under lightweight-charts'
+// zoom-out floor (~1260-1300 bars) — every panel's own oldest bar is reachable in a single
+// zoom-drag there, which is exactly why the old absolute-bar-index trigger's unreachability at
+// real HISTORY_LIMIT=1500 depth shipped without any test catching it. This test instead points
+// its page at the dedicated :4301 mock server instance (see playwright.config.ts), which seeds
+// `binance:BTCUSDT` to HISTORY_LIMIT-comparable depth (1500 5m bars) while leaving the other
+// instruments at the default shallow depth — the same asymmetry the real repro found between
+// `btc` and `btc-oi` — and asserts a REAL follow-up `/api/candles` network request fires from a
+// single zoom-drag, not just a DOM attribute change (which, per the diagnosis, stays true
+// whether or not loadOlder()'s fetch actually ran).
+test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a follow-up /api/candles request', async ({
+  page,
+}) => {
+  await page.route('**/config.json', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4301/api', wsUrl: 'ws://localhost:4301/ws' }),
+    }),
+  );
+
+  const candlesRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/candles')) {
+      candlesRequests.push(request.url());
+    }
+  });
+
+  await page.goto('/');
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
+
+  const panels = await (await chartPanels(page)).all();
+  for (const panel of panels) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-from', /\d+/, { timeout: 15_000 });
+  }
+
+  const requestCountBeforeDrag = candlesRequests.length;
+
+  const firstContainer = panels[0].locator('.chart-container');
+  const box = await firstContainer.boundingBox();
+  if (!box) {
+    throw new Error('chart container has no bounding box');
+  }
+
+  // A single time-axis zoom-drag on btc (the deep, 1500-bar panel) — per the diagnosis, this
+  // gesture alone cannot reach anywhere near btc's own oldest bar once its buffer exceeds the
+  // zoom floor, so a follow-up fetch (if one fires) comes from another, shallower-buffered
+  // panel receiving the synced range, exactly like the real repro's btc/btc-oi asymmetry.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height - 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 10, box.y + box.height - 10, { steps: 10 });
+  await page.mouse.up();
+
+  await expect(async () => {
+    expect(candlesRequests.length).toBeGreaterThan(requestCountBeforeDrag);
+  }).toPass({ timeout: 15_000 });
+});
