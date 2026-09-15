@@ -178,3 +178,196 @@ preference — SE should pick based on what's cleanest against
   running, since they predate this investigation and the coordinator may
   still want them for interactive verification. Not started by me; I did not
   stop them.
+
+## Follow-up (2026-09-15): `loadOlder()` pagination trigger is unreachable at real-data buffer depth
+
+This is the "second, separate bug" `238d6e6`'s commit message flagged as found-but-out-of-scope, reported again independently by the SE who verified that fix: even with the sync-loop freeze gone, dragging the BTC panel repeatedly never fires a second `/api/candles` request, despite confirmed older history existing server-side.
+
+### Reproduction
+
+Real signal-server (already running, PID 9567, `:3000`) + a fresh `ng serve
+--port 4200` from this worktree (`apps/chart-client`), `config.json`
+temporarily pointed at `localhost:3000`/`ws://localhost:3000/ws`, reverted
+after. Ad hoc Playwright scripts (not committed —
+`architecture/scratch/repro{,2,3}.mjs`, left in place for SE/reviewer
+reference since the task allowed keeping scratch scripts here) drove real
+`page.mouse.down/move/up` gestures against the `btc` panel's chart container
+and captured both `/api/candles` network requests and temporary
+`console.log` instrumentation added to `chart.component.ts`'s
+`subscribeVisibleLogicalRangeChange` and `panel-feed.ts`'s `loadOlder()`
+(reverted via `git checkout --` immediately after capturing evidence — not
+part of this diff).
+
+Observed, with the crypto layout's 4 panels (`btc`, `eth`, `dxy` candles +
+`btc-oi` a metric/points panel):
+
+1. **Dragging on the chart's time-axis strip** (`y ≈ container height − 10px`
+   — the exact gesture `e2e/terminal.spec.ts`'s existing scroll test uses,
+   and the most visually "scrollbar-like," discoverable part of the widget)
+   is a **zoom/rescale** in `lightweight-charts`, not a pan: `to` stays
+   pinned at the last loaded bar while `from` shrinks. Repeating this
+   gesture on `btc` (whose loaded buffer is the real `HISTORY_LIMIT = 1500`
+   bars — confirmed via network capture, `limit=1500` on the initial
+   `/api/candles` call, and real Binance 5m data has no gaps so the store
+   actually fills all 1500) drove `btc`'s own logical `from` down to ~388
+   and then **completely stopped responding to further identical drags** —
+   zero further range-change events of any kind, on any panel, for the rest
+   of the session (confirmed over 6+ additional repeats).
+2. This is **not a resurgence of the sync-loop freeze** `238d6e6` fixed: no
+   `console.warn` from `ChartSyncService`'s circuit breaker ever fired, no
+   cascade of ping-ponging range-change events appeared, and — critically —
+   dragging **inside the chart's plot body** (a genuine pan, not the axis
+   strip) at the same point in the same session immediately started
+   responding again, with `btc`'s own logical `from` decreasing smoothly and
+   monotonically on every single one of 20 repeated pan gestures, no stalls.
+3. The floor hit in (1) is `lightweight-charts`' own `timeScale.minBarSpacing`
+   (default `0.5`px/bar): at this panel's rendered width (~630-650px), the
+   widest possible zoomed-out view is roughly `width / 0.5 ≈ 1260-1300` bars.
+   With `to` pinned at index 1499 (last loaded bar) and 1500 total bars
+   loaded, the zoom-drag can reach down to roughly index `1499 − 1300 ≈ 200`,
+   nowhere near `NEAR_START_LOGICAL_INDEX = 10`. Past that floor, the library
+   itself produces no further range-change event for that gesture — this
+   is a real, load-bearing limit of the widget, not an app bug, and it's
+   exactly why repeating the *same* drag looks totally dead to the user.
+4. The `btc-oi` panel (a `metric`/points panel riding the same synced time
+   range) DID correctly fire `loadOlderRequested` → `PanelFeed.loadOlder()`
+   during the very same drag, with clean guard state
+   (`loadingOlder=false, noMoreOlderHistory=false`), and its fetch
+   (`/api/metrics?...&from=...&to=...&limit=500`) genuinely landed. Its own
+   loaded buffer is smaller than `btc`'s (visible logical range topped out
+   around index ~1000 rather than ~1500 for the same synced time window),
+   so the same zoom-drag's floor happened to land close enough to its start
+   to cross the threshold. This directly confirms `e49d5e9`'s
+   `loadingOlder`/`MAX_EMPTY_GAP_HOPS`/`noMoreOlderHistory` guards are
+   **not** the culprit — once the trigger genuinely fires, the fetch path
+   works exactly as designed, including against real (non-uniform) data.
+
+### Root cause
+
+`NEAR_START_LOGICAL_INDEX` (`chart.component.ts:45`, value `10`) is compared
+against the panel's *bar index* in its full loaded buffer
+(`HISTORY_LIMIT = 1500`, `panel-feed.ts:9`) — a buffer size that only became
+routinely fillable end-to-end once `a364e59`/`ffdd3bd`'s per-timeframe
+backfill/retention policy landed and gapless real data (BTC 5m on Binance)
+became available deep enough to actually satisfy a 1500-bar initial request.
+
+The single most discoverable "scroll back" gesture on this widget — dragging
+the time-axis strip — is a zoom, not a pan, and is hard-capped by
+`lightweight-charts`' `minBarSpacing` to showing at most roughly
+`panelWidthPx / 0.5` bars at once. For any panel whose loaded bar count
+exceeds that cap (as `HISTORY_LIMIT = 1500` now routinely does against real
+backfilled data, at ordinary panel widths), **the near-start threshold is
+structurally unreachable via that gesture** — the zoom floor is hit first,
+and the gesture then produces literally zero further events, which is
+indistinguishable, from a user's perspective, from "scrolling does nothing."
+
+Panning (drag inside the plot body) does not have this problem and
+correctly approaches index 0 with repeated gestures — but each realistic
+small pan only advances the logical index by a handful of bars (~3-4 in this
+repro), so reaching index 10 from a freshly-loaded 1500-bar buffer would
+require on the order of 150-400+ repeated pan gestures. That's not "the
+pagination doesn't work," but it is a UX/threshold-scaling problem: the
+`10`-bar-from-start check was calibrated when a panel's buffer was small
+enough (mock: ~576 bars) for either gesture to reach it in one or two
+tries; it does not scale with `HISTORY_LIMIT`, and `HISTORY_LIMIT` is a
+policy value from §12 that both is already 1500 and is expected to only
+grow, not shrink, as backfill/retention policy matures.
+
+### Why the existing e2e test didn't catch it
+
+`apps/chart-client/mock-server/fixtures.ts`'s `SEED_HISTORY_MINUTES = 60 * 24
+* 2` (2 days of 1m bars) generates only ~576 5m bars total per instrument —
+roughly a third of `minBarSpacing`'s zoom-out cap at typical panel widths, so
+the existing scroll e2e test's single time-axis zoom-drag comfortably
+reaches every mock panel's own bar-index-0 in one gesture. The test's
+assertion (`terminal.spec.ts` lines 111-116) also only checks that panel 2's
+`data-visible-from` attribute changed after panel 1 is dragged — which is
+true whether or not panel 2's `loadOlder()` fetch actually ran, since the
+*synced range itself* moving is sufficient to change `data-visible-from`.
+The test never asserts a second `/api/candles`/`/api/metrics` request
+actually fired, so it would still pass even in a world where `loadOlder()`
+silently never triggered at all. Both of these — a fixture far shallower
+than the real `HISTORY_LIMIT`, and an assertion that doesn't confirm the
+network request it's nominally testing for — mean this class of bug has no
+current test coverage, mock or e2e.
+
+### Routing plan → Software Engineer
+
+**Files:**
+- `apps/chart-client/src/app/features/chart/chart.component.ts` — the
+  `subscribeVisibleLogicalRangeChange` callback (~lines 236-240) and
+  `NEAR_START_LOGICAL_INDEX` (line 45).
+- `apps/chart-client/src/app/core/state/panel-feed.ts` — `HISTORY_LIMIT`
+  (line 9); no guard-logic changes needed here (see finding 4 above), but SE
+  should re-read `loadOlder()` since the fix will likely need it to expose
+  `firstOpenTime()`/timeframe info the trigger can use.
+- Tests: `apps/chart-client/e2e/terminal.spec.ts` (scroll test's assertion
+  gap), `apps/chart-client/mock-server/fixtures.ts`
+  (`SEED_HISTORY_MINUTES`), and a new/extended
+  `apps/chart-client/src/app/features/chart/chart.component.spec.ts` if one
+  gets added (none currently exists for `ChartComponent`).
+
+**Problem to fix:** make the "near start" trigger invariant to how many bars
+happen to be loaded and to which gesture (zoom-drag vs. pan) the user used,
+instead of an absolute bar-index count that assumes the visible viewport can
+always reach index ~10 through ordinary interaction.
+
+**Recommended fix:** change the trigger to a **time-based** proximity check
+instead of (or in addition to) the logical-index one: in the
+`subscribeVisibleLogicalRangeChange` (or better, also/instead in the
+existing `subscribeVisibleTimeRangeChange`) handler, convert the visible
+range's `from` to a timestamp (`chart.timeScale().coordinateToTime()` or use
+the time range callback's own `range.from`, which is already a UTC
+timestamp) and compare it against the panel's own `firstOpenTime()` (or an
+equivalent "oldest loaded bar" time), e.g. "visible `from` is within N bars'
+worth of calendar time of the oldest loaded bar" (reuse the same
+`TIMEFRAME_MS[tf] * someSmallMultiplier` shape already used for
+`boundedFrom()`). This fires correctly regardless of total buffer size and
+regardless of whether the user reached the edge by zooming or panning, since
+it's anchored to actual data availability, not to how many bars fit on
+screen. `PanelFeed` already exposes `firstOpenTime()`
+(candles)/`firstTime()` (points) internally — SE will need to surface
+whichever one `ChartComponent` doesn't already have visibility into (it
+currently only holds candle/point *arrays* as inputs, not the store), most
+simply by computing "oldest loaded time" from the `candles()`/`points()`
+input signals it already has (e.g. `candles()[0]?.openTime`) rather than
+reaching into `PanelFeed` directly, keeping `ChartComponent` free of feed
+knowledge as documented at the top of the file.
+
+**Alternative (weaker, not recommended as primary):** detect "a zoom gesture
+happened but the range didn't move" as a proxy trigger. More fragile (harder
+to distinguish "hit the zoom floor" from "user didn't actually drag much"),
+and doesn't fix the underlying scaling mismatch for pan-only reachability
+either.
+
+**Do not** fix this by shrinking `HISTORY_LIMIT` — that value exists to
+serve §12's backfill/retention depth policy; making it smaller to keep it
+under the zoom-floor cap defeats the point of that work and would just
+recreate this bug the next time a panel gets wider or `HISTORY_LIMIT` grows
+again.
+
+**Regression tests to add:**
+1. Bump `apps/chart-client/mock-server/fixtures.ts`'s `SEED_HISTORY_MINUTES`
+   (or add a second, opt-in fixture profile) so at least one e2e scenario
+   generates a buffer comparable in bar-count to the real `HISTORY_LIMIT`
+   (≥1500 5m bars ⇒ ≥5.2 days of 1m seed), and extend
+   `terminal.spec.ts`'s scroll test (or add a new test) to perform a
+   *single* time-axis zoom-drag against that deep fixture and assert a
+   second `/api/candles` (or `/api/metrics`) request is actually observed
+   (via Playwright's `page.on('request')`, not just a DOM attribute
+   change) — this is the concrete gap that let this bug ship unnoticed.
+2. Keep the existing shallow-fixture scroll test as-is (regression guard
+   that the original, already-passing scenario doesn't regress).
+3. A focused unit test (new `chart.component.spec.ts`, or extend
+   `chart-sync.service.spec.ts` if `ChartComponent` is hard to instantiate
+   standalone) asserting `loadOlderRequested` fires when the visible time
+   range's `from` is within the time-based proximity window of the panel's
+   oldest loaded data point, independent of how many total bars are loaded
+   — i.e., directly tests the fix's invariant, not just the old
+   bar-index-10 case.
+
+**Verification SE should do before calling it fixed:** re-run this
+investigation's repro (real server + real client, `btc` panel, both the
+time-axis zoom-drag *and* plain panning) and confirm a second
+`/api/candles` request fires within a small, realistic number of gestures
+either way — not just via extensive panning.
