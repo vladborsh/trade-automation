@@ -152,4 +152,64 @@ describe('PanelFeed', () => {
 
     expect(feed.candles.firstOpenTime()).toBe(500);
   });
+
+  it('concurrent loadOlder() calls collapse into a single in-flight fetch (no race)', async () => {
+    let resolveFetch: (v: Candle[]) => void;
+    const pending = new Promise<Candle[]>((resolve) => {
+      resolveFetch = resolve;
+    });
+    const getCandles = vi.fn().mockResolvedValueOnce([candle(1000)]).mockReturnValueOnce(pending);
+    const rest = fakeRest({ getCandles });
+    const feed = new PanelFeed(candlesPanel(false), '1m', { rest, socket: live });
+    await feed.start();
+
+    // Simulates ChartComponent's subscribeVisibleLogicalRangeChange firing on every frame
+    // while dragging near the start, before the first fetch has resolved.
+    const first = feed.loadOlder();
+    const second = feed.loadOlder();
+    const third = feed.loadOlder();
+
+    expect(getCandles).toHaveBeenCalledTimes(2); // the initial start() call, plus exactly one loadOlder fetch
+    resolveFetch!([candle(500)]);
+    await Promise.all([first, second, third]);
+
+    expect(getCandles).toHaveBeenCalledTimes(2); // still one — the queued calls were no-ops, not queued retries
+    expect(feed.candles.firstOpenTime()).toBe(500);
+  });
+
+  // Realistic epoch-scale timestamps, not small integers: `boundedFrom` sizes its window off
+  // the real TIMEFRAME_MS constant, so a tiny `openTime` like 10_000 clamps straight to the
+  // `from <= 0` floor on the very first hop, never exercising the actual hop-past-a-gap logic.
+  const REALISTIC_NOW = 1_800_000_000_000;
+
+  it('loadOlder hops past an empty page (a real gap) instead of giving up immediately', async () => {
+    const getCandles = vi
+      .fn()
+      .mockResolvedValueOnce([candle(REALISTIC_NOW)]) // start()
+      .mockResolvedValueOnce([]) // first hop: lands in a gap
+      .mockResolvedValueOnce([candle(REALISTIC_NOW - 1_000_000)]); // second hop: finds real data
+    const rest = fakeRest({ getCandles });
+    const feed = new PanelFeed(candlesPanel(false), '1m', { rest, socket: live });
+    await feed.start();
+
+    await feed.loadOlder();
+
+    expect(getCandles).toHaveBeenCalledTimes(3);
+    expect(feed.candles.firstOpenTime()).toBe(REALISTIC_NOW - 1_000_000);
+  });
+
+  it('loadOlder gives up after exhausting its hop budget on all-empty pages, and stops retrying', async () => {
+    const getCandles = vi.fn().mockResolvedValueOnce([candle(REALISTIC_NOW)]).mockResolvedValue([]);
+    const rest = fakeRest({ getCandles });
+    const feed = new PanelFeed(candlesPanel(false), '1m', { rest, socket: live });
+    await feed.start();
+
+    await feed.loadOlder();
+    const callsAfterFirstGiveUp = getCandles.mock.calls.length;
+    expect(callsAfterFirstGiveUp).toBeGreaterThan(1); // it actually hopped, not just tried once
+
+    await feed.loadOlder(); // a later scroll-frame trigger, after giving up
+
+    expect(getCandles).toHaveBeenCalledTimes(callsAfterFirstGiveUp); // no new calls — noMoreOlderHistory latched
+  });
 });

@@ -21,6 +21,10 @@ const PAGE_LIMIT = 500;
 // (§12.2's Capital.com sessions included) while never asking for more than a
 // bounded, reasonable page of history in a single request.
 const HISTORY_LOOKBACK_MULTIPLIER = 3;
+// How many consecutive empty pages loadOlder() will hop past (widening the search further
+// back each time) before concluding there is genuinely no more history, rather than having
+// simply landed inside a real gap (a market closure, say).
+const MAX_EMPTY_GAP_HOPS = 5;
 
 function boundedFrom(to: number, tf: Timeframe, limit: number): number {
   return Math.max(0, to - TIMEFRAME_MS[tf] * limit * HISTORY_LOOKBACK_MULTIPLIER);
@@ -52,6 +56,17 @@ export class PanelFeed {
   readonly indicators = new IndicatorsStore();
 
   private frameSubscriptions: Array<{ unsubscribe: () => void }> = [];
+  // `ChartComponent.subscribeVisibleLogicalRangeChange` fires `loadOlderRequested` on every
+  // frame while the visible range's `from` stays near the start (not once per "reached the
+  // edge" event) — an active drag/zoom near the edge can emit it dozens of times before any
+  // one fetch resolves. Without this guard, every one of those becomes its own concurrent
+  // GET, each computed from the same not-yet-updated `firstOpenTime()`, so they all fetch the
+  // *same* range and race to `prepend()` it — no net progress scrolling back, and the
+  // overlapping `withPreservedRangeOnPrepend()` calls each fight over the chart's visible
+  // range, which is the jitter. Once genuinely out of older history, stop asking — the venue
+  // floor doesn't move within a session, so retrying it every frame is pure waste too.
+  private loadingOlder = false;
+  private noMoreOlderHistory = false;
 
   constructor(
     readonly panel: Panel,
@@ -138,38 +153,62 @@ export class PanelFeed {
     this.frameSubscriptions = [];
   }
 
-  /** Per-panel scroll-back pagination (§6.4's interaction with pagination). */
+  /**
+   * Per-panel scroll-back pagination (§6.4's interaction with pagination). An empty page does
+   * not necessarily mean "no older history exists" — it can just as easily mean this
+   * particular bounded window landed entirely inside a real gap (a Capital.com weekend/
+   * session closure, say). Hop the window further back a few times within this one call
+   * before concluding there is genuinely nothing more; only that gives up too eagerly on a
+   * page that happened to land in a closed period.
+   */
   async loadOlder(): Promise<void> {
-    const { rest } = this.deps;
-    const instrument = this.panel.instrument;
+    if (this.loadingOlder || this.noMoreOlderHistory) {
+      return;
+    }
+    this.loadingOlder = true;
+    try {
+      const { rest } = this.deps;
+      const instrument = this.panel.instrument;
 
-    if (this.panel.kind === 'candles') {
-      const oldest = this.candles.firstOpenTime();
-      if (oldest === null) {
-        return;
+      if (this.panel.kind === 'candles') {
+        let to = this.candles.firstOpenTime();
+        if (to === null) {
+          return;
+        }
+        for (let hop = 0; hop < MAX_EMPTY_GAP_HOPS; hop++) {
+          const from = boundedFrom(to, this.timeframe, PAGE_LIMIT);
+          const older = await rest.getCandles(instrument, this.timeframe, from, to, PAGE_LIMIT);
+          if (older.length > 0) {
+            this.candles.prepend(older);
+            return;
+          }
+          if (from <= 0) {
+            break;
+          }
+          to = from; // empty window: hop further back and try again, don't just give up
+        }
+        this.noMoreOlderHistory = true;
+      } else {
+        let to = this.points.firstTime();
+        if (to === null) {
+          return;
+        }
+        for (let hop = 0; hop < MAX_EMPTY_GAP_HOPS; hop++) {
+          const from = boundedFrom(to, this.timeframe, PAGE_LIMIT);
+          const older = await rest.getMetrics(instrument, this.panel.metric!, this.timeframe, from, to, PAGE_LIMIT);
+          if (older.length > 0) {
+            this.points.prepend(older);
+            return;
+          }
+          if (from <= 0) {
+            break;
+          }
+          to = from;
+        }
+        this.noMoreOlderHistory = true;
       }
-      const older = await rest.getCandles(
-        instrument,
-        this.timeframe,
-        boundedFrom(oldest, this.timeframe, PAGE_LIMIT),
-        oldest,
-        PAGE_LIMIT,
-      );
-      this.candles.prepend(older);
-    } else {
-      const oldest = this.points.firstTime();
-      if (oldest === null) {
-        return;
-      }
-      const older = await rest.getMetrics(
-        instrument,
-        this.panel.metric!,
-        this.timeframe,
-        boundedFrom(oldest, this.timeframe, PAGE_LIMIT),
-        oldest,
-        PAGE_LIMIT,
-      );
-      this.points.prepend(older);
+    } finally {
+      this.loadingOlder = false;
     }
   }
 
