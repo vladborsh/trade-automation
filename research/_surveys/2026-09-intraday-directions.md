@@ -10,6 +10,11 @@ registration.** Nothing here is dispatched; the coordinator routes.
 from an external source is that source's claim, not this project's finding.
 Where a source could not be read in full (paywall, bot wall) that is said.
 
+**See also** `2026-09-lightgbm-role.md` (Architect, 2026-09-16): where
+LightGBM / ML fits relative to §4.1 and §4.2 — a ranker as the conditional
+second step of §4.1, Stage B as a standard clause after any REAL EDGE, no
+standalone regime classifier.
+
 ---
 
 ## 0. The one-paragraph answer

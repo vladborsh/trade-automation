@@ -1258,3 +1258,41 @@ regardless of credential access.
 **Dispatched to:** Architect, same session, for an architecture note +
 routing plan (new `knowledge/` entry, Researcher scope pending the data
 question, relationship to `vwap-mr-indices` and the smart-money bot).
+
+---
+
+## LightGBM ranker inside the cross-sectional "instruments in play" family (conditional follow-up)
+
+**Status:** logged (Architect, 2026-09-16), **conditional — not to be dispatched
+before the cross-sectional package (survey §4.1) has a holdout verdict, and
+only if ≥ 1 of its two pre-registered selectors reaches REAL EDGE.** If both
+selectors are killed this entry closes with them. Full specification:
+`research/_surveys/2026-09-lightgbm-role.md` §2.
+
+**Idea:** replace the single hand-picked selector (opening relative volume /
+trailing return) with a LightGBM ranker over ≤ 15 pre-registered within-day-
+ranked features (RVOL, trailing returns, realised vol, funding rate and its
+percentile, ΔOI, taker imbalance, dollar-volume rank, days since listing, BTC
+beta, BTC realised-vol rank) to pick the top-k instruments each day. Target =
+the 4.1 direction-reader trade's `netR` on every eligible instrument-day
+(meta-labeling framing: primary = the registered rule, secondary = the ranker).
+Walk-forward fit, fixed Study B hyper-parameters, ridge baseline mandatory,
+within-day target-shuffle null (200 refits), bottom-k / random-k nulls, RVOL
+top-k as the baseline it must beat by a pre-registered margin (≥ +0.05R per
+leg net, day-block bootstrap interval on the difference), one frozen read on a
+**later** holdout (2026-08-01 .. 2027-07-31) or a declared re-use.
+
+**Why this is the one place gradient boosting fits:** ~50–70k instrument-days
+in the fit period (vs ~1,400 trades in ORB's Study B, where the model
+early-stopped into a stump ensemble); day-grouped ranking removes the market
+factor by construction; the nulls and the baseline already exist in 4.1.
+
+**Prerequisite the running 4.1 Researcher can satisfy now at no cost:** persist
+the direction-reader outcome and decision-time observables for **every**
+eligible instrument-day (`results/instrument_days.parquet`, `period` column),
+not only the selected top-k — it is the random-k null's raw material anyway.
+
+Also logged in the same note, as standing discipline rather than research:
+a Stage B clause (fit-only ML feature study + "filter can only subtract"
+economics row + price-shadow control) for every future family after a REAL
+EDGE; an ML leakage check in `checks.py`; no standalone regime classifier.
