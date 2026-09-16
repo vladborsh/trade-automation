@@ -443,7 +443,30 @@ kill messages (flagged there, not yet done — this is where they land):**
 
 ## Funding-rate signals: carry and funding-extreme continuation (crypto perps)
 
-**Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
+**Status:** **prioritized** (user review, 2026-08-26) → **designed, 2026-09-16
+— pre-registration written, awaiting Researcher dispatch by the coordinator.**
+Binding note: `research/funding-rate-signals/ARCHITECT-NOTE.md`. What the
+design pinned beyond this entry: (a) carry = extreme at two consecutive
+settlements (rolling 90-settlement percentile ≥ 90 / ≤ 10 **and** |rate| ≥
+0.03 %/8h), paid side, 1.5 × daily-ATR stop, exit on funding lapse to ≤
+baseline or 30 settlements; (b) continuation = same extreme state + trailing
+24h return with the crowd + 1h close through the prior 12-bar extreme
+against it, project-standard +1R template (3R as a no-verdict secondary) —
+explicitly a re-test of the squeeze shape `deriv-positioning` (b1) killed
+with the quantity sensor, prior ≤ 10 %. Funding is a P&L leg with a strict
+`t_entry < t_j < t_exit` collection rule, no minimum-settlement requirement,
+mandatory `priceR / fundingR / costR` decomposition. Universe = the 8-perp
+universe in two pooled tiers (majors, alts) → **4 arms, α = 0.05/4**; fit
+from archive start (2020-01 for BTC/ETH; later listings for BNB/DOGE/SOL)
+to 2025-07-31, holdout 2025-08 .. 2026-07 (prior reads by four intraday
+crypto lines declared; none on funding), fit-period screen before any
+holdout read. **The "beyond price momentum" control is a gating shadow:**
+the identical pipeline with funding replaced by the trailing-24h-return
+percentile on the same window, same template, same funding accounting, with
+a pre-registered +0.05R margin — an arm that clears the ladder but not the
+margin is "DOMINATED — no second signal". Coverage verified 2026-09-16 on
+`data.binance.vision` (columns, intervals, listing months); gap rule fixed
+in the note §3.3.
 **2026-09-16 (Architect survey §4.2, §5): ranked #2 of the post-ORB
 directions — dispatch next or in parallel with the cross-sectional package.**
 It is the only mean-reversion-adjacent idea that uses, rather than fights,

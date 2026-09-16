@@ -42,3 +42,6 @@ research/orb-ny-open-exit/results/trades_all.parquet
 research/orb-ny-open-exit/results/null_draws.json
 
 research/orb-utc0-crypto/data
+
+research/funding-rate-signals/data
+research/funding-rate-signals/cache
