@@ -1,0 +1,62 @@
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ViewStore } from '../../core/state/view.store';
+
+/**
+ * §7 D9 — a two-button segmented control for the top-level charts⇄calendar
+ * view switch. Not a router link: there is no router in this app.
+ */
+@Component({
+  selector: 'app-view-switcher',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div class="view-switcher" role="group" aria-label="View">
+      <button
+        type="button"
+        class="view-btn"
+        [class.active]="view.activeView() === 'charts'"
+        (click)="view.set('charts')"
+      >
+        Charts
+      </button>
+      <button
+        type="button"
+        class="view-btn"
+        [class.active]="view.activeView() === 'calendar'"
+        (click)="view.set('calendar')"
+      >
+        Calendar
+      </button>
+    </div>
+  `,
+  styles: [
+    `
+      .view-switcher {
+        display: inline-flex;
+        border: 1px solid #30363d;
+      }
+      .view-btn {
+        background: #0d1117;
+        color: #8b949e;
+        border: none;
+        padding: 4px 10px;
+        font-family: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .view-btn + .view-btn {
+        border-left: 1px solid #30363d;
+      }
+      .view-btn.active {
+        background: #161b22;
+        color: #c9d1d9;
+      }
+      .view-btn:focus {
+        outline: 1px solid #58a6ff;
+      }
+    `,
+  ],
+})
+export class ViewSwitcherComponent {
+  constructor(readonly view: ViewStore) {}
+}

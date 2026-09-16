@@ -11,9 +11,14 @@ import type {
   WsSignalFrame,
   WsStatusFrame,
 } from '../contracts/derived';
+import type { CalendarClientFrame, CalendarServerFrame, WsCalendarEventFrame, WsNotificationFrame } from '../contracts/calendar';
 import { browserSocketFactory, SOCKET_OPEN, type SocketFactory, type SocketLike } from './socket-factory';
 
 export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline';
+
+/** §6.2 — every frame this socket can receive, base union plus the calendar addition. */
+type AnyServerFrame = WsServerFrame | CalendarServerFrame;
+type AnyClientFrame = WsClientFrame | CalendarClientFrame;
 
 interface CandleTopicKey {
   topic: 'candles';
@@ -33,7 +38,12 @@ interface MetricTopicKey {
   timeframe: Timeframe;
 }
 
-type TopicKey = CandleTopicKey | SignalTopicKey | MetricTopicKey;
+/** §6.2 — one stream for the whole calendar, no parameters. */
+interface CalendarTopicKey {
+  topic: 'calendar';
+}
+
+type TopicKey = CandleTopicKey | SignalTopicKey | MetricTopicKey | CalendarTopicKey;
 
 function topicKeyId(key: TopicKey): string {
   if (key.topic === 'candles') {
@@ -41,6 +51,9 @@ function topicKeyId(key: TopicKey): string {
   }
   if (key.topic === 'signals') {
     return `signals:${key.instrument}`;
+  }
+  if (key.topic === 'calendar') {
+    return 'calendar';
   }
   return `metrics:${key.instrument}:${key.metric}:${key.timeframe}`;
 }
@@ -70,7 +83,7 @@ export class LiveSocket implements OnDestroy {
   private destroyed = false;
   private hasConnectedBefore = false;
 
-  private readonly frames$ = new Subject<WsServerFrame>();
+  private readonly frames$ = new Subject<AnyServerFrame>();
   private readonly connectionState$$ = new Subject<ConnectionState>();
   private readonly reconnected$$ = new Subject<void>();
 
@@ -88,6 +101,12 @@ export class LiveSocket implements OnDestroy {
   );
   readonly statusFrames$: Observable<WsStatusFrame> = this.frames$.pipe(
     filter((f): f is WsStatusFrame => f.type === 'status'),
+  );
+  readonly calendarEventFrames$: Observable<WsCalendarEventFrame> = this.frames$.pipe(
+    filter((f): f is WsCalendarEventFrame => f.type === 'calendarEvent'),
+  );
+  readonly notificationFrames$: Observable<WsNotificationFrame> = this.frames$.pipe(
+    filter((f): f is WsNotificationFrame => f.type === 'notification'),
   );
   readonly connectionState: Observable<ConnectionState> = this.connectionState$$.asObservable();
   /** Emits once a reconnect finishes re-subscribing; a cue to re-fetch and heal gaps. */
@@ -125,7 +144,7 @@ export class LiveSocket implements OnDestroy {
 
     socket.onmessage = (event: { data: string }) => {
       try {
-        const frame = JSON.parse(event.data) as WsServerFrame;
+        const frame = JSON.parse(event.data) as AnyServerFrame;
         this.frames$.next(frame);
       } catch {
         // malformed frame from server: drop it, do not crash the client
@@ -172,7 +191,7 @@ export class LiveSocket implements OnDestroy {
     }
   }
 
-  private send(frame: WsClientFrame): void {
+  private send(frame: AnyClientFrame): void {
     if (this.socket && this.socket.readyState === SOCKET_OPEN) {
       this.socket.send(JSON.stringify(frame));
     }
@@ -189,6 +208,8 @@ export class LiveSocket implements OnDestroy {
       this.send({ type: 'subscribe', topic: 'candles', instrument: key.instrument, timeframe: key.timeframe });
     } else if (key.topic === 'signals') {
       this.send({ type: 'subscribe', topic: 'signals', instrument: key.instrument });
+    } else if (key.topic === 'calendar') {
+      this.send({ type: 'subscribe', topic: 'calendar' });
     } else {
       this.send({
         type: 'subscribe',
@@ -234,6 +255,23 @@ export class LiveSocket implements OnDestroy {
     const key: TopicKey = { topic: 'metrics', instrument, metric, timeframe };
     this.activeTopics.delete(topicKeyId(key));
     this.send({ type: 'unsubscribe', topic: 'metrics', instrument, metric, timeframe });
+  }
+
+  /**
+   * §7 — subscribed once at boot regardless of which view is active
+   * (charts/calendar), so notifications reach the user everywhere. Survives
+   * reconnect like every other topic (`resubscribeAll`).
+   */
+  subscribeCalendar(): void {
+    const key: TopicKey = { topic: 'calendar' };
+    this.activeTopics.set(topicKeyId(key), key);
+    this.sendSubscribe(key);
+  }
+
+  unsubscribeCalendar(): void {
+    const key: TopicKey = { topic: 'calendar' };
+    this.activeTopics.delete(topicKeyId(key));
+    this.send({ type: 'unsubscribe', topic: 'calendar' });
   }
 
   candlesFor(instrument: InstrumentId, timeframe: Timeframe): Observable<WsCandleFrame> {

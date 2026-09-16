@@ -3,6 +3,7 @@ import type { InstrumentId } from '@trade-automation/contracts';
 import { ConnectionStore } from '../../core/state/connection.store';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { StrategiesStore } from '../../core/state/strategies.store';
+import { CalendarStore } from '../../core/state/calendar.store';
 
 interface StatusRow {
   instrument: InstrumentId;
@@ -33,6 +34,9 @@ interface StatusRow {
             <span class="strategies">{{ row.strategies }}</span>
           }
         </span>
+      }
+      @if (nextEventChip(); as chip) {
+        <span class="next-event">{{ chip }}</span>
       }
     </div>
   `,
@@ -76,6 +80,10 @@ interface StatusRow {
       .strategies {
         color: #8b949e;
       }
+      .next-event {
+        margin-left: auto;
+        color: #58a6ff;
+      }
     `,
   ],
 })
@@ -84,7 +92,23 @@ export class StatusBarComponent {
     readonly connection: ConnectionStore,
     private readonly layouts: LayoutsStore,
     private readonly strategies: StrategiesStore,
+    private readonly calendar: CalendarStore,
   ) {}
+
+  /** §7.1 — "next event" chip: the nearest future medium/high-impact event, visible on either view. */
+  readonly nextEventChip = computed<string | null>(() => {
+    const now = Date.now();
+    const next = this.calendar
+      .events()
+      .filter((e) => e.status === 'scheduled' && e.scheduledAt > now && (e.impact === 'high' || e.impact === 'medium'))
+      .sort((a, b) => a.scheduledAt - b.scheduledAt)[0];
+    if (!next) {
+      return null;
+    }
+    const minutesAway = Math.round((next.scheduledAt - now) / 60_000);
+    const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(next.scheduledAt));
+    return `next: ${time} ${next.country} ${next.title} (in ${minutesAway}m)`;
+  });
 
   /**
    * architecture/vwap-band-reversal-plugin.md §6 item 3: still labelled

@@ -11,6 +11,7 @@ import type {
   Timeframe,
 } from '@trade-automation/contracts';
 import type { Health, InstrumentWithStatus, StrategyInfo } from '../contracts/derived';
+import type { CalendarNotification, CalendarWeekResponse, EconomicEvent, EventDetailResponse } from '../contracts/calendar';
 
 /**
  * Typed fetchers for the REST surface in §3.5. Plain `fetch`, no RxJS here —
@@ -83,5 +84,22 @@ export class RestClient {
     limit = 1500,
   ): Promise<MetricPoint[]> {
     return this.getJson<MetricPoint[]>('/metrics', { instrument, metric, timeframe, from, to, limit });
+  }
+
+  /** §6.1 `GET /api/calendar/week?at?` — the ET Sun–Sat window containing `at` (default now). */
+  getCalendarWeek(at?: number): Promise<CalendarWeekResponse> {
+    return this.getJson<CalendarWeekResponse>('/calendar/week', { at });
+  }
+
+  getCalendarEvents(from: number, to: number): Promise<EconomicEvent[]> {
+    return this.getJson<EconomicEvent[]>('/calendar/events', { from, to });
+  }
+
+  getCalendarEvent(id: string): Promise<EventDetailResponse> {
+    return this.getJson<EventDetailResponse>(`/calendar/events/${encodeURIComponent(id)}`);
+  }
+
+  getCalendarNotifications(from?: number, limit = 50): Promise<CalendarNotification[]> {
+    return this.getJson<CalendarNotification[]>('/calendar/notifications', { from, limit });
   }
 }

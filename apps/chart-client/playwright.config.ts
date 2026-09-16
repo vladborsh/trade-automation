@@ -12,6 +12,14 @@ export default defineConfig({
     {
       command: 'npx tsx mock-server/server.ts',
       port: 4300,
+      // architecture/economic-calendar.md §7.2's synthetic notification defaults to a
+      // dev-friendly "every few minutes" cadence; e2e needs the first one to land well
+      // inside a single test's timeout, so it's sped up here only, the same way the
+      // :4301 instance below overrides history depth for its own scenario.
+      env: {
+        MOCK_CALENDAR_NOTIFICATION_FIRST_DELAY_MS: '1000',
+        MOCK_CALENDAR_NOTIFICATION_INTERVAL_MS: '10000',
+      },
       reuseExistingServer: !process.env['CI'],
       timeout: 20_000,
     },
