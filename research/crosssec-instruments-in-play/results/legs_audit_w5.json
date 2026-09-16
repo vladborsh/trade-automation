@@ -1,0 +1,20 @@
+{
+ "tag": "w5",
+ "panel": "w5",
+ "stop": 0.5,
+ "horizon": 240,
+ "window": 5,
+ "rt": 0.001,
+ "side": "reader",
+ "n_instrument_days": 165877,
+ "n_tradable_days": 1148,
+ "dropped_r30_zero": 4520,
+ "dropped_path_missing_gt_30": 0,
+ "by_period": {
+  "fit": 165877
+ },
+ "exit_cause": {
+  "time-exit": 147677,
+  "stop": 18200
+ }
+}

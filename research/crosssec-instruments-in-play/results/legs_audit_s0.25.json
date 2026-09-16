@@ -1,0 +1,20 @@
+{
+ "tag": "s0.25",
+ "panel": "ny0930",
+ "stop": 0.25,
+ "horizon": 240,
+ "window": 30,
+ "rt": 0.001,
+ "side": "reader",
+ "n_instrument_days": 167913,
+ "n_tradable_days": 1148,
+ "dropped_r30_zero": 2484,
+ "dropped_path_missing_gt_30": 0,
+ "by_period": {
+  "fit": 167913
+ },
+ "exit_cause": {
+  "time-exit": 115205,
+  "stop": 52708
+ }
+}

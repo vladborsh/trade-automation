@@ -1,0 +1,21 @@
+{
+ "tag": "base",
+ "panel": "ny0930",
+ "stop": 0.5,
+ "horizon": 240,
+ "window": 30,
+ "rt": 0.001,
+ "side": "reader",
+ "n_instrument_days": 206820,
+ "n_tradable_days": 1397,
+ "dropped_r30_zero": 3154,
+ "dropped_path_missing_gt_30": 0,
+ "by_period": {
+  "fit": 167913,
+  "holdout": 38907
+ },
+ "exit_cause": {
+  "time-exit": 186800,
+  "stop": 20020
+ }
+}

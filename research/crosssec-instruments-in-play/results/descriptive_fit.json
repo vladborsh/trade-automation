@@ -1,0 +1,160 @@
+{
+ "weekend": [
+  {
+   "row": "RVOL-top5-s0.5 \u2014 weekend (Sat/Sun) (descriptive)",
+   "n_legs": 2400,
+   "n_days": 480,
+   "mean_netR": 0.016367225011409553,
+   "mean_grossR": 0.03926191069434909,
+   "mean_costR": 0.02289468568293953,
+   "mean_dATR": 0.008183612505704776,
+   "sd_netR": 1.0579710894400431,
+   "hit": 0.46458333333333335,
+   "boot_lo": -0.023626653598078546,
+   "boot_hi": 0.05535009531955582,
+   "stop_share": 0.21375,
+   "arm": "RVOL-top5-s0.5"
+  },
+  {
+   "row": "TR24-top5-s0.5 \u2014 weekend (Sat/Sun) (descriptive)",
+   "n_legs": 2400,
+   "n_days": 480,
+   "mean_netR": 0.0030680981850042745,
+   "mean_grossR": 0.023158527094245984,
+   "mean_costR": 0.02009042890924171,
+   "mean_dATR": 0.0015340490925021372,
+   "sd_netR": 0.8941378941824341,
+   "hit": 0.46875,
+   "boot_lo": -0.031421829770840855,
+   "boot_hi": 0.036858685439711665,
+   "stop_share": 0.1825,
+   "arm": "TR24-top5-s0.5"
+  },
+  {
+   "row": "RVOL-top5-s0.5 \u2014 weekdays, all-calendar panel (descriptive)",
+   "n_legs": 6015,
+   "n_days": 1203,
+   "mean_netR": 0.0026358396452193945,
+   "mean_grossR": 0.02567325084422998,
+   "mean_costR": 0.023037411199010586,
+   "mean_dATR": 0.0013179198226096972,
+   "sd_netR": 1.02993028402468,
+   "hit": 0.4472152950955943,
+   "boot_lo": -0.022475828210138174,
+   "boot_hi": 0.026573187806239042,
+   "stop_share": 0.2487115544472153,
+   "arm": "RVOL-top5-s0.5"
+  },
+  {
+   "row": "TR24-top5-s0.5 \u2014 weekdays, all-calendar panel (descriptive)",
+   "n_legs": 6015,
+   "n_days": 1203,
+   "mean_netR": -0.027044704133016177,
+   "mean_grossR": -0.007247955782763678,
+   "mean_costR": 0.019796748350252497,
+   "mean_dATR": -0.013522352066508089,
+   "sd_netR": 0.8754587320894415,
+   "hit": 0.4485453034081463,
+   "boot_lo": -0.048754416330248136,
+   "boot_hi": -0.006275017521641168,
+   "stop_share": 0.21562759767248546,
+   "arm": "TR24-top5-s0.5"
+  }
+ ],
+ "exclusions": {
+  "nyse_full_days": 1641,
+  "tradable_days": 1397,
+  "days_lost_to_N_elig_lt_50": 244,
+  "panel_rows": 406042,
+  "eligible_A": 215084,
+  "eligible_B": 215084,
+  "eligibility_rule_failures": {
+   "rule 1": 12752,
+   "rule 2": 120651,
+   "rule 3": 127554,
+   "rule 4": 6332,
+   "rule 5": 184625,
+   "rule 6": 24,
+   "rule 7": 121606
+  },
+  "legs_dropped_r30_zero": 3154,
+  "legs_dropped_path_missing_gt_30": 0,
+  "instrument_days": 206820,
+  "exit_cause": {
+   "time-exit": 186800,
+   "stop": 20020
+  }
+ },
+ "baskets": {
+  "dollar_neutral": {
+   "n_days": 1148,
+   "mean_ret_bp": -2.182255799287807,
+   "mean_gross_bp": 7.817744200712195,
+   "sd_bp": 150.66699884753086,
+   "mean_ret_in_sd_units": -0.009600075982776055,
+   "annualised_sharpe": -0.22992584386260143,
+   "by_year": {
+    "2020": {
+     "n": 8,
+     "mean_ret_bp": 4.248201852732265
+    },
+    "2021": {
+     "n": 250,
+     "mean_ret_bp": -11.636193941105308
+    },
+    "2022": {
+     "n": 250,
+     "mean_ret_bp": 9.468900029099975
+    },
+    "2023": {
+     "n": 248,
+     "mean_ret_bp": -6.721159539209624
+    },
+    "2024": {
+     "n": 249,
+     "mean_ret_bp": 8.88021103194789
+    },
+    "2025": {
+     "n": 143,
+     "mean_ret_bp": -17.774243186251518
+    }
+   }
+  },
+  "beta_hedged": {
+   "RVOL-top5-s0.5": {
+    "n": 5740,
+    "mean_netR_unhedged": -0.002291450141664136,
+    "mean_netR_hedged": -0.0328433124329159,
+    "n_hedge_missing": 0
+   },
+   "TR24-top5-s0.5": {
+    "n": 5740,
+    "mean_netR_unhedged": -0.025690588817841115,
+    "mean_netR_hedged": -0.048142070105010835,
+    "n_hedge_missing": 0
+   }
+  },
+  "portfolio_risk": {
+   "RVOL-top5-s0.5": {
+    "n_days": 1148,
+    "mean_day_sumR": -0.0114572507083207,
+    "sd_day_sumR": 2.536798580708492,
+    "worst_day_sumR": -5.152423074094417,
+    "best_day_sumR": 15.191814806919986,
+    "p05_day_sumR": -3.5507110478664634,
+    "worst_20day_sumR": -41.03150958897095,
+    "mean_pairwise_leg_corr": 0.06524754046087262
+   },
+   "TR24-top5-s0.5": {
+    "n_days": 1148,
+    "mean_day_sumR": -0.1284529440892056,
+    "sd_day_sumR": 2.298644725131806,
+    "worst_day_sumR": -5.1860237004110425,
+    "best_day_sumR": 13.691202882091392,
+    "p05_day_sumR": -3.5539418416406514,
+    "worst_20day_sumR": -35.61706753748938,
+    "mean_pairwise_leg_corr": 0.09214810716333012
+   }
+  }
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "tag": "sidetr",
+ "panel": "ny0930",
+ "stop": 0.5,
+ "horizon": 240,
+ "window": 30,
+ "rt": 0.001,
+ "side": "tr24",
+ "n_instrument_days": 167530,
+ "n_tradable_days": 1148,
+ "dropped_r30_zero": 2307,
+ "dropped_path_missing_gt_30": 0,
+ "by_period": {
+  "fit": 167530
+ },
+ "exit_cause": {
+  "time-exit": 151619,
+  "stop": 15911
+ }
+}

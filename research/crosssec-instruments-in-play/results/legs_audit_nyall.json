@@ -1,0 +1,20 @@
+{
+ "tag": "nyall",
+ "panel": "nyall",
+ "stop": 0.5,
+ "horizon": 240,
+ "window": 30,
+ "rt": 0.001,
+ "side": "reader",
+ "n_instrument_days": 246299,
+ "n_tradable_days": 1683,
+ "dropped_r30_zero": 4079,
+ "dropped_path_missing_gt_30": 0,
+ "by_period": {
+  "fit": 246299
+ },
+ "exit_cause": {
+  "time-exit": 226298,
+  "stop": 20001
+ }
+}

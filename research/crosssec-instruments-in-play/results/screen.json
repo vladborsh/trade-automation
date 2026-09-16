@@ -1,0 +1,12 @@
+{
+ "RVOL-top5-s0.5": {
+  "fit_mean_netR": -0.002291450141664136,
+  "fit_random5_p": 0.0,
+  "screened_in": false
+ },
+ "TR24-top5-s0.5": {
+  "fit_mean_netR": -0.025690588817841115,
+  "fit_random5_p": 0.321,
+  "screened_in": false
+ }
+}

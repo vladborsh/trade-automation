@@ -542,7 +542,23 @@ belongs in the protocol from day one.
 
 ## Cross-sectional "instruments in play" — RVOL + trailing-return selection on a wide Binance perp universe (merges: cross-sectional relative momentum, 8-perp universe; relative volume as a filter, from the ORB line)
 
-**Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
+**Status:** **CLOSED — both pre-registered arms killed at the fit screen
+(Researcher, 2026-09-16, Запись 28).** `RVOL-top5-s0.5` −0.0023R and
+`TR24-top5-s0.5` −0.0257R on 5,740 legs / 1,148 trade-days each, against a
+screen of ≥ +0.05R and random-5 `p` ≤ 0.05; the holdout was therefore **not
+read for anything** and this family's α ledger closes at **2 registered / 0
+read**. The forward-confirmation window was neither read nor needed.
+Substantive finding: the RVOL ranking is **real but an order too small** —
+top-5 beats random-5 by +0.026R (`p` = 0.000) and bottom-5 by `Δ_tb` =
++0.0135R (90 % interval [−0.0118, +0.0387], includes 0) — gross +0.0206R
+against a 0.0228R round trip. The Architect's §6.3 honest prior asked for ~2×
+the source paper's top tier; realised was ~0.25× it. `|TR24|` does not rank at
+all (`p` = 0.321). 19 fit-only sensitivities, two placebo anchors and four
+basket rows all run and reported; best cell +0.0114R (maker fees, not a
+tradable configuration). **Also struck by this pass:** the dollar-neutral
+signed-`TR24` basket that this entry merged in — annualised Sharpe **−0.23**
+on 1,148 days. Full grid `research/crosssec-instruments-in-play/REPORT.md`;
+what is left for a successor registration is `HANDOFF.md` §4.
 **2026-09-16 — REGISTERED by Architect, routed to Researcher (coordinator
 dispatches): `research/crosssec-instruments-in-play/ARCHITECT-NOTE.md`.**
 One package, exactly **two pre-registered arms** — `RVOL-top5-s0.5` and
@@ -1329,11 +1345,33 @@ question, relationship to `vwap-mr-indices` and the smart-money bot).
 
 ## LightGBM ranker inside the cross-sectional "instruments in play" family (conditional follow-up)
 
-**Status:** logged (Architect, 2026-09-16), **conditional — not to be dispatched
-before the cross-sectional package (survey §4.1) has a holdout verdict, and
-only if ≥ 1 of its two pre-registered selectors reaches REAL EDGE.** If both
-selectors are killed this entry closes with them. Full specification:
-`research/_surveys/2026-09-lightgbm-role.md` §2.
+**Status:** **its stated condition has FAILED — both selectors were killed at
+the fit screen (Researcher, 2026-09-16, Запись 28), so by this entry's own
+wording it closes with them. Awaiting an Architect ruling on whether it stays
+closed.** The entry's condition was "only if ≥ 1 of the two pre-registered
+selectors reaches REAL EDGE"; neither did, and the holdout was never read.
+
+**The measurement that bears on the ruling, now that it exists:** a ranker can
+only *reorder* the cross-section, and the entire spread between the best and
+the worst deterministic ordering of this panel is `Δ_tb` = **+0.0135R with a
+90 % interval of [−0.0118, +0.0387] — it includes 0.** A perfect ranker on
+these features therefore has under ~+0.03R of headroom against the +0.05R kill
+bar, before anything is given back to overfitting. Researcher's reading
+(`research/crosssec-instruments-in-play/HANDOFF.md` §3): a ranker pass on
+*this* reader and *this* 4-hour horizon is not worth a dispatch; a successor
+registration on a **1–5 day** horizon would change that arithmetic and is the
+only version worth reconsidering.
+
+**What was nevertheless delivered, at zero cost, as the survey asked:**
+`research/crosssec-instruments-in-play/results/instrument_days.parquet` —
+**206,820 rows**, the direction-reader outcome **and** the decision-time
+observables (`rvol`, `tr24`, `tr12`, `tr48`, `v30`, `r30`, `datr14`,
+`liq_med`) for **every** eligible instrument-day, not only the selected ones.
+It is a by-product of the "evaluate the whole panel once, select afterwards"
+design and costs nothing to keep. Note the realised sample is ~207k
+instrument-days, well above the ~50–70k this entry projected.
+
+Full specification: `research/_surveys/2026-09-lightgbm-role.md` §2.
 
 **Idea:** replace the single hand-picked selector (opening relative volume /
 trailing return) with a LightGBM ranker over ≤ 15 pre-registered within-day-
