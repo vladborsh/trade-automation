@@ -602,6 +602,13 @@ clock-hours, and nothing tested conditioned on them.
 **Data:** kline data already on disk (5m, 8 perps). Release calendar:
 historical CPI/FOMC/NFP timestamps are public and small (BLS/Fed schedules) —
 Researcher assembles a dated event table as part of the pass, no vendor needed.
+*Annotation 2026-09-16 (Architect):* `architecture/economic-calendar.md`
+designs a persistent economic-event table (ForexFactory weekly feed, all
+currencies/impacts, forecast/previous, actuals backfilled with lag) inside the
+signal server. Once built it accumulates forward from deployment; it does not
+supply history before that date, so the BLS/Fed hand-assembly above still
+covers the backtest window. Infrastructure only — this entry's status is
+unchanged.
 
 **Open questions:** sample size is the honest worry — ~12 CPI + ~8 FOMC + ~12
 NFP per year × 4 years ≈ 120–130 events; a per-event-type split will be

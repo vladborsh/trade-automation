@@ -145,6 +145,7 @@ note per system. They are role-to-role technical material.
 | [`live-signal-server.md`](architecture/live-signal-server.md) | Live signal-generation server (NestJS) + chart terminal client (Angular); shared contracts; candle storage/backup requirements and S3 recommendation; routing to Software Engineer / DevOps / Integration Engineer |
 | [`vwap-band-reversal-plugin.md`](architecture/vwap-band-reversal-plugin.md) | The `cmc-bot` VWAP band-reversal strategy as a **research-tier, unvalidated, visualization-only** plug-in of the signal server; strategy tiers, indicator series, warm-up for session-anchored indicators; routing to Software Engineer |
 | [`chart-layouts.md`](architecture/chart-layouts.md) | Multi-panel layout-setups for the chart terminal (`layouts.yaml`, `GET /api/layouts`), open-interest ingestion as a metric series (`MetricAdapter`, `GET /api/metrics`, WS `metrics` topic), time-range panel sync, per-panel signal visibility; DXY epic (`DXY`, Capital.com) confirmed; routing to Software Engineer |
+| [`economic-calendar.md`](architecture/economic-calendar.md) | Economic calendar / news events: ForexFactory weekly feed ingestion (`ff_calendar_thisweek`, no actuals in the feed — next-occurrence backfill), `EventStore` (File/S3 JSONL, indefinite retention), `GET /api/calendar/*`, WS `calendar` topic, daily digest + at-event-time in-app notifications, calendar view in the chart terminal; infrastructure that unblocks the backlog's "Scheduled-macro-event reaction" idea; routing to Software Engineer |
 
 ## Status
 
@@ -170,5 +171,13 @@ Roles and this context document were the first deliverable. Since then:
   metric series. Capital.com DXY epic confirmed (`DXY`); Software Engineer
   build is the next step, sequenced after the VWAP plug-in build since both
   touch the chart client's terminal shell/overlay layer.
+- **Economic calendar designed 2026-09-16** —
+  `architecture/economic-calendar.md`: ForexFactory weekly feed polled into a
+  persistent `EventStore` (every event and every revision kept forever; the
+  feed carries no actuals, so results are backfilled from the next
+  occurrence's `previous` until a provider is chosen), weekly calendar view
+  and in-app daily/at-event notifications over the existing WebSocket.
+  Infrastructure only — it makes the backlog's scheduled-macro-event idea
+  testable later; Software Engineer build is the next step.
 - The trading-idea intake format is still informal (backlog entry → Architect
   grilling → research package).
