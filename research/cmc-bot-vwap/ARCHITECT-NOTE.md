@@ -1,5 +1,10 @@
 # Architect note — `cmc-bot`'s VWAP band-reversal strategy
 
+> **Stage 1 gate ruling (2026-09-16): `ARCHITECT-NOTE-STAGE1.md`** — tape, bar
+> convention, split, forex/crypto scope and thresholds for the pre-registered
+> pass are fixed there. This note remains the routing record and holds
+> wherever that one is silent.
+
 ## 1. What this idea is, and what it is not
 
 The user's pre-existing `cmc-bot-main` ships a second, independently coded

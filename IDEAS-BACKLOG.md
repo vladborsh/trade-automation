@@ -863,6 +863,27 @@ logs and counts only, no performance number. Awaiting Architect: whether to
 route crypto at all, and which window (the caps turn (b) into an implicit
 00:00–06:00 UTC window unless removed).
 
+**Stage 1 ruled 2026-09-16 (Architect, `research/cmc-bot-vwap/ARCHITECT-NOTE-STAGE1.md`)
+— approved, scope and numbers fixed, Researcher dispatch pending (coordinator):**
+(1) tape = `snapshotTimeUTC`, the live bot's bars; the bot's mislabelled
+backtest hours are not run. (2) primary = backtest bar (`live_like=False`),
+`live_like=True` a mandatory secondary that can veto a build (needs
+≥ +0.05R, same sign). (3) pre-registered arms **US100, US500** only, fit
+2024-01-01..2025-07-31 / holdout 2025-08-01..2026-07-31 (project-standard
+holdout year); **EURCHF/GBPCHF descriptive-only** (≈ 90 orders/yr, stop
+2.7–3.6 bp vs spread — underpowered by construction; earliest honest
+re-registration ~2027-09 on this vendor). (4) **crypto routed as two more
+pre-registered arms, BTCUSDT/ETHUSDT under the NY window (a)**, fit
+2022-08-01..2025-07-31 / same holdout, 0.10 % costs; **24/7 condition (b)
+descriptive-only, caps off** (its window is a caps artefact). Crypto arms
+contest the same standing nulls as the index arms, one shot each; no
+cross-reading with Запись 18 in either direction. (5) **thresholds carried
+verbatim** (kill < +0.05R or p > 0.20; build ≥ +0.10R, p ≤ 0.0125, fit same
+sign, n_holdout ≥ 150, 90 % day-block bootstrap excludes 0, gross > 0), per
+arm, Bonferroni /4 = the four arms, plus the live-like veto. Costs on
+Capital.com = one full tape spread per round trip (candles are bid/ask mids).
+`DESIGN.md` before any R; four verdicts, no pooling.
+
 **Idea:** the user's pre-existing `cmc-bot-main` also ships a second,
 separately-coded strategy — `VWapStrategy`
 (`cmc-bot-main/src/strategy/vwap-strategy.ts`) — live-traded (per
