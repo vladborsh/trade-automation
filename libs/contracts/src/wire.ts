@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { CandleSchema } from './candle';
+import {
+  CalendarNotificationSchema,
+  EconomicEventSchema,
+  EventImpactSchema,
+  EventRevisionSchema,
+} from './calendar';
 import { InstrumentIdSchema, InstrumentSchema, VenueStatusSchema } from './instrument';
 import { MetricKindSchema, MetricPointSchema } from './metric';
 import { SignalSchema } from './signal';
@@ -128,8 +134,75 @@ export const HealthResponseSchema = z.object({
       }),
     )
     .default([]),
+  /** architecture/economic-calendar.md §6.1 — additive; null fields when the module is disabled. */
+  calendar: z
+    .object({
+      lastSuccessfulPollAge: z.number().nonnegative().nullable(),
+      eventsInWindow: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .default(null),
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
+
+/** architecture/economic-calendar.md §6.1 — GET /api/calendar/events. */
+export const CalendarEventsQuerySchema = z.object({
+  from: z.coerce.number().int().nonnegative(),
+  to: z.coerce.number().int().nonnegative(),
+  country: z.union([z.string(), z.array(z.string())]).optional(),
+  impact: EventImpactSchema.optional(), // minimum level (low|medium|high)
+  status: z.enum(['scheduled', 'released', 'removed']).optional(),
+  seriesId: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(10_000).default(2000),
+});
+export type CalendarEventsQuery = z.infer<typeof CalendarEventsQuerySchema>;
+
+export const CalendarEventsResponseSchema = z.array(EconomicEventSchema);
+export type CalendarEventsResponse = z.infer<typeof CalendarEventsResponseSchema>;
+
+/** architecture/economic-calendar.md §6.1 — GET /api/calendar/week. */
+export const CalendarWeekQuerySchema = z.object({
+  at: z.coerce.number().int().nonnegative().optional(),
+});
+export type CalendarWeekQuery = z.infer<typeof CalendarWeekQuerySchema>;
+
+export const CalendarWeekResponseSchema = z.object({
+  from: z.number().int(),
+  to: z.number().int(),
+  day: z.array(z.string()).length(7),
+  events: z.array(EconomicEventSchema),
+});
+export type CalendarWeekResponse = z.infer<typeof CalendarWeekResponseSchema>;
+
+/** architecture/economic-calendar.md §6.1 — GET /api/calendar/events/:id. */
+export const CalendarEventDetailResponseSchema = z.object({
+  event: EconomicEventSchema,
+  revisions: z.array(EventRevisionSchema),
+});
+export type CalendarEventDetailResponse = z.infer<typeof CalendarEventDetailResponseSchema>;
+
+/** architecture/economic-calendar.md §6.1 — GET /api/calendar/notifications. */
+export const CalendarNotificationsQuerySchema = z.object({
+  from: z.coerce.number().int().nonnegative().optional(),
+  to: z.coerce.number().int().nonnegative().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type CalendarNotificationsQuery = z.infer<typeof CalendarNotificationsQuerySchema>;
+
+export const CalendarNotificationsResponseSchema = z.array(CalendarNotificationSchema);
+export type CalendarNotificationsResponse = z.infer<typeof CalendarNotificationsResponseSchema>;
+
+/** architecture/economic-calendar.md §6.1 — GET /api/calendar/status. */
+export const CalendarStatusResponseSchema = z.object({
+  lastPollAt: z.number().int().nullable(),
+  lastSuccessAt: z.number().int().nullable(),
+  lastEtag: z.string().nullable(),
+  weekWindow: z.object({ from: z.number().int(), to: z.number().int() }),
+  eventsInWindow: z.number().int().nonnegative(),
+  nextPollAt: z.number().int().nullable(),
+  hot: z.boolean(),
+});
+export type CalendarStatusResponse = z.infer<typeof CalendarStatusResponseSchema>;
 
 /** architecture/live-signal-server.md §3.5 — WebSocket wire contract, JSON frames discriminated by `type`. */
 
@@ -176,17 +249,30 @@ export const WsUnsubscribeMetricsSchema = z.object({
   timeframe: TimeframeSchema,
 });
 
+/** architecture/economic-calendar.md §6.2 — `calendar` WS topic; no parameters, one stream for the whole calendar. */
+export const WsSubscribeCalendarSchema = z.object({
+  type: z.literal('subscribe'),
+  topic: z.literal('calendar'),
+});
+
+export const WsUnsubscribeCalendarSchema = z.object({
+  type: z.literal('unsubscribe'),
+  topic: z.literal('calendar'),
+});
+
 export const WsPingSchema = z.object({ type: z.literal('ping') });
 
 const WsSubscribeSchema = z.discriminatedUnion('topic', [
   WsSubscribeCandlesSchema,
   WsSubscribeSignalsSchema,
   WsSubscribeMetricsSchema,
+  WsSubscribeCalendarSchema,
 ]);
 const WsUnsubscribeSchema = z.discriminatedUnion('topic', [
   WsUnsubscribeCandlesSchema,
   WsUnsubscribeSignalsSchema,
   WsUnsubscribeMetricsSchema,
+  WsUnsubscribeCalendarSchema,
 ]);
 
 export const WsClientMessageSchema = z.union([WsSubscribeSchema, WsUnsubscribeSchema, WsPingSchema]);
@@ -206,6 +292,18 @@ export const WsStatusMessageSchema = z.object({
 });
 export const WsPongMessageSchema = z.object({ type: z.literal('pong'), serverTime: z.number() });
 
+/** architecture/economic-calendar.md §6.2 — pushed on any created/updated/removed/actual change. */
+export const WsCalendarEventMessageSchema = z.object({
+  type: z.literal('calendarEvent'),
+  event: EconomicEventSchema,
+  change: z.enum(['created', 'updated', 'removed', 'actual']),
+});
+/** architecture/economic-calendar.md §6.2, §5 — a fired daily-digest or event-due notification. */
+export const WsNotificationMessageSchema = z.object({
+  type: z.literal('notification'),
+  notification: CalendarNotificationSchema,
+});
+
 export const WsServerMessageSchema = z.discriminatedUnion('type', [
   WsCandleMessageSchema,
   WsSignalMessageSchema,
@@ -213,5 +311,7 @@ export const WsServerMessageSchema = z.discriminatedUnion('type', [
   WsMetricMessageSchema,
   WsStatusMessageSchema,
   WsPongMessageSchema,
+  WsCalendarEventMessageSchema,
+  WsNotificationMessageSchema,
 ]);
 export type WsServerMessage = z.infer<typeof WsServerMessageSchema>;

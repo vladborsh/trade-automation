@@ -42,6 +42,9 @@ import { VENUE_ADAPTERS_MAP, buildVenueAdapters } from './venue-adapters.provide
     MetricIngestionService,
     VENUE_ADAPTERS_MAP,
     IngestionService,
+    // architecture/economic-calendar.md §3.2 — CalendarIngestionService/NotificationSchedulerService
+    // ride this same BarClock tick, mirroring MetricIngestionService's own use of it.
+    BarClock,
   ],
 })
 export class MarketDataModule {}

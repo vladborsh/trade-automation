@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from '../config/config.module';
+import { CalendarModule } from '../calendar/calendar.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { ObservabilityModule } from '../observability/observability.module';
 import { StorageModule } from '../storage/storage.module';
@@ -11,10 +12,18 @@ import { StrategiesController } from './rest/strategies.controller';
 import { IndicatorsController } from './rest/indicators.controller';
 import { LayoutsController } from './rest/layouts.controller';
 import { MetricsController } from './rest/metrics.controller';
+import { CalendarController } from './rest/calendar.controller';
 import { LiveGateway } from './ws/live.gateway';
 
 @Module({
-  imports: [AppConfigModule, MarketDataModule, StorageModule, StrategyEngineModule, ObservabilityModule],
+  imports: [
+    AppConfigModule,
+    MarketDataModule,
+    StorageModule,
+    StrategyEngineModule,
+    ObservabilityModule,
+    CalendarModule,
+  ],
   controllers: [
     InstrumentsController,
     CandlesController,
@@ -23,6 +32,7 @@ import { LiveGateway } from './ws/live.gateway';
     IndicatorsController,
     LayoutsController,
     MetricsController,
+    CalendarController,
   ],
   providers: [LiveGateway],
 })

@@ -107,6 +107,52 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /** architecture/economic-calendar.md §8. */
+  readonly calendarPollsTotal = new client.Counter({
+    name: 'signal_server_calendar_polls_total',
+    help: 'ForexFactory feed polls',
+    labelNames: ['result'],
+    registers: [this.registry],
+  });
+
+  readonly calendarPollErrorsTotal = new client.Counter({
+    name: 'signal_server_calendar_poll_errors_total',
+    help: 'ForexFactory feed poll errors',
+    registers: [this.registry],
+  });
+
+  readonly calendarLastSuccessfulPollAgeSeconds = new client.Gauge({
+    name: 'signal_server_calendar_last_successful_poll_age_seconds',
+    help: 'Seconds since the last successful calendar feed poll',
+    registers: [this.registry],
+  });
+
+  readonly calendarEventsInWindow = new client.Gauge({
+    name: 'signal_server_calendar_events_in_window',
+    help: 'Events currently in the calendar cache lookback window',
+    registers: [this.registry],
+  });
+
+  readonly calendarEventChangesTotal = new client.Counter({
+    name: 'signal_server_calendar_event_changes_total',
+    help: 'Calendar events created/updated/removed/actual-backfilled',
+    labelNames: ['change'],
+    registers: [this.registry],
+  });
+
+  readonly calendarUnjoinedRowsTotal = new client.Counter({
+    name: 'signal_server_calendar_unjoined_rows_total',
+    help: 'Feed rows that could not be joined to a series id (ffx: fallback)',
+    registers: [this.registry],
+  });
+
+  readonly calendarNotificationsTotal = new client.Counter({
+    name: 'signal_server_calendar_notifications_total',
+    help: 'Calendar notifications fired',
+    labelNames: ['kind'],
+    registers: [this.registry],
+  });
+
   constructor() {
     client.collectDefaultMetrics({ register: this.registry });
   }
