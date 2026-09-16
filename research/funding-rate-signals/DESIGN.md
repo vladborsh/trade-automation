@@ -806,4 +806,7 @@ to post-date. `results/screen.json` records the four `false` decisions.
 | `mechanic_proof.py` | the 20 hand-checked trades with settlement ledgers |
 | `stage1.py` | fit-period numbers, shadows, sensitivities, the screen |
 | `controls.py` | Null A, Null B, bootstraps, §6.4, §6.5, §6.7, §6.8 |
-| `holdout.py` | the single holdout read |
+| `harness.py` | §6.7 `momentum_breakout` re-implementation, §6.5 overlap mask |
+| `extras.py` | §6.5, §6.7 and the SOL-blackout exclusion count |
+| `backfill_klines.py` | the authorised daily-prefix fill (§5.6.2) |
+| ~~`holdout.py`~~ | **never written — no arm screened in, so the holdout was never read.** The only code that names the holdout window at all is `data_audit.py`, which counts missing settlement slots per window and computes no return, no trade and no R. |
