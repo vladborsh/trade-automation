@@ -21,7 +21,6 @@ research/session-liquidity-v5-ny/data
 research/session-liquidity-v5-ny/results/uncond_*.csv.gz
 
 # apps/signal-server, libs/contracts (architecture/live-signal-server.md)
-node_modules/
 dist/
 *.tsbuildinfo
 apps/signal-server/data/
@@ -47,14 +46,13 @@ research/funding-rate-signals/data
 research/funding-rate-signals/cache
 
 research/crosssec-instruments-in-play/data
-<<<<<<< HEAD
 research/_calibration/data
-=======
 
-research/crosssec-instruments-in-play/data
 research/crosssec-instruments-in-play/results/panel*.parquet
 research/crosssec-instruments-in-play/results/legs_*.parquet
 research/crosssec-instruments-in-play/results/instrument_days_funded.parquet
 research/crosssec-instruments-in-play/results/daily_flags.parquet
 research/crosssec-instruments-in-play/results/instrument_days.parquet
->>>>>>> researcher-crosssec
+
+research/hedged-carry/data
+research/hedged-carry/cache
