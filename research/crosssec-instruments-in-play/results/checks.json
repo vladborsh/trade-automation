@@ -1,0 +1,71 @@
+{
+ "lookahead": {
+  "n": 50,
+  "mismatches": []
+ },
+ "d1_vs_1m": {
+  "n": 30,
+  "mismatches": []
+ },
+ "dst": {
+  "observed": [
+   810,
+   870
+  ]
+ },
+ "funding_crossing": {
+  "share_nominal_crossing": 1.0,
+  "share_realised_crossing": 0.9622183541243593,
+  "n_closed_before_settlement": 7814,
+  "stop_share_among_them": 1.0
+ },
+ "delisting_out_of_primary": {
+  "n_legs_delisted_within_30d": 215,
+  "share": 0.0010395513006479064
+ },
+ "window_identity": {
+  "ok": true,
+  "n_checked": 215084
+ },
+ "identity_check": {
+  "BTCUSDT": {
+   "checked": true,
+   "span": [
+    "2022-08-01 00:00:00+00:00",
+    "2026-07-31 23:59:00+00:00"
+   ],
+   "rows_audited": 2103840,
+   "rows_new": 2103840,
+   "same_row_count": true,
+   "same_timestamps": true,
+   "identical": true,
+   "per_column": {
+    "open": true,
+    "high": true,
+    "low": true,
+    "close": true,
+    "volume": true
+   }
+  },
+  "ETHUSDT": {
+   "checked": true,
+   "span": [
+    "2022-08-01 00:00:00+00:00",
+    "2026-07-31 23:59:00+00:00"
+   ],
+   "rows_audited": 2103840,
+   "rows_new": 2103840,
+   "same_row_count": true,
+   "same_timestamps": true,
+   "identical": true,
+   "per_column": {
+    "open": true,
+    "high": true,
+    "low": true,
+    "close": true,
+    "volume": true
+   }
+  }
+ },
+ "failures": []
+}

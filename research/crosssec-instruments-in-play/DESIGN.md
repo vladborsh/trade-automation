@@ -457,6 +457,21 @@ and the family's ledger stays at 2 registered / 0 read.
 
 <!-- SCREEN -->
 
+### FIT SCREEN DECISION — COMMITTED
+
+Fit period `2020-01-01 .. 2025-07-31` (effective start as in §2.3). Screen rule: **mean net R ≥ +0.05R and random-5 `p` ≤ 0.05.**
+
+| arm | fit legs | fit trade-days | fit mean net R | fit mean, dATR units | random-5 `p` | decision |
+|---|---|---|---|---|---|---|
+| `RVOL-top5-s0.5` | 5,740 | 1,148 | **-0.0023R** | -0.0011 dATR | 0.0000 | **SCREENED OUT — NO EDGE — KILL (fit screen)** |
+| `TR24-top5-s0.5` | 5,740 | 1,148 | **-0.0257R** | -0.0128 dATR | 0.3210 | **SCREENED OUT — NO EDGE — KILL (fit screen)** |
+
+Both arms are screened out. **Per §13, the holdout is not computed for anything and the family's ledger stays at 2 registered / 0 read.**
+
+This decision is committed before `analysis.py holdout` is run; `analysis.py:_design_has_screen()` refuses to compute the holdout until this section exists in a clean commit.
+
+<!-- /SCREEN -->
+
 ---
 
 ## 14. Stop rules — return to Architect immediately (note §11.8)

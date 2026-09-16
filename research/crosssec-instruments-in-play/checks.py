@@ -12,8 +12,10 @@
    must equal the aggregate of that day's 1m bars within float tolerance.
 3. **DST.** The anchor must fall on 13:30 or 14:30 UTC on every anchor day and
    on no other UTC time.
-4. **Funding crossing.** Every leg must be open across exactly one 16:00 UTC
-   settlement timestamp (§6.2's premise).
+4. **Funding crossing.** The §6.2 premise: every leg's NOMINAL position window
+   (entry `A + 30 min` to the fixed horizon `A + 4 h 30 min`) must contain the
+   16:00 UTC settlement. A leg whose stop fires before the settlement closes
+   before it and owes no funding; that share is reported, not asserted.
 5. **Delisting exclusion is OUT of the primary.** Asserts that the primary leg
    table contains legs whose symbol delisted within 30 days after the trade —
    i.e. that the non-causal §9 exclusion was not silently applied.
@@ -157,15 +159,26 @@ def check_dst(pan: pd.DataFrame) -> dict:
 # ------------------------------------------------------------------ check 4
 def check_funding_crossing(legs: pd.DataFrame) -> dict:
     entry = legs.anchor_ms.values + C.WINDOW_MIN * C.MIN_MS
+    nominal = entry + C.HORIZON_MIN * C.MIN_MS
     ex = legs.exit_ms.values
     day0 = (entry // C.DAY_MS) * C.DAY_MS
     settle = day0 + C.FUNDING_UTC_HOUR * 3_600_000
-    crosses = (settle > entry) & (settle <= ex)
     # exits are at most 4 h after entry, so at most one settlement can fall in
-    share = float(crosses.mean())
-    ck("4. every leg is open across the 16:00 UTC funding settlement",
-       share > 0.98, f"share crossing = {share:.4f}")
-    return dict(share_crossing=share)
+    nom = (settle > entry) & (settle <= nominal)
+    real = (settle > entry) & (settle <= ex)
+    early = ~real
+    stopped = float((legs.exit_cause.values[early] == 1).mean()) if early.any() else 1.0
+    ck("4. the NOMINAL position window of every leg contains the 16:00 UTC "
+       "funding settlement (the §6.2 premise)", bool(nom.all()),
+       f"share = {nom.mean():.4f}")
+    ck("4b. every leg that does NOT reach the settlement exited on its stop "
+       "first (and so owes no funding)", stopped == 1.0,
+       f"{int(early.sum())} legs ({100*early.mean():.2f} %) close before the "
+       f"settlement; stop-exit share among them = {stopped:.4f}")
+    return dict(share_nominal_crossing=float(nom.mean()),
+                share_realised_crossing=float(real.mean()),
+                n_closed_before_settlement=int(early.sum()),
+                stop_share_among_them=stopped)
 
 
 # ------------------------------------------------------------------ check 5
@@ -180,10 +193,14 @@ def check_delisting_in_primary(legs: pd.DataFrame) -> dict:
 
 # ------------------------------------------------------------------ check 6
 def check_window_identity(pan: pd.DataFrame) -> dict:
-    ok = bool((pan.i_entry.values < pan.i_path0.values).all())
+    # only eligible rows carry meaningful indices; a non-eligible row's window
+    # is absent and its clipped indices degenerate
+    e = pan[pan.elig_A]
+    ok = bool((e.i_entry.values < e.i_path0.values).all())
     ck("6. the selector window and the reader window are the same "
-       "[A, A+30) and the path starts strictly after the entry bar", ok)
-    return dict(ok=ok)
+       "[A, A+30) and the path starts strictly after the entry bar", ok,
+       f"checked on all {len(e):,} eligible instrument-days")
+    return dict(ok=ok, n_checked=int(len(e)))
 
 
 def main() -> None:
