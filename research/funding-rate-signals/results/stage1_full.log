@@ -1,0 +1,75 @@
+A_majors_real              n=   89 excl=  0 meanNetR=-0.1294
+A_majors_shadow24          n=  669 excl=  0 meanNetR=-0.0061
+A_alts_real                n=  394 excl=  0 meanNetR=-0.0201
+A_alts_shadow24            n= 1831 excl=  0 meanNetR=-0.0249
+B_majors_real              n=   32 excl=  0 meanNetR=+0.0852
+B_majors_shadow24          n=  329 excl=  0 meanNetR=-0.0764
+B_alts_real                n=  196 excl=  0 meanNetR=-0.0144
+B_alts_shadow24            n=  974 excl=  0 meanNetR=-0.0488
+
+=== §6.3 frequency parity ===
+     arm  n_real  n_shadow24  parity_ok
+A_majors      89         669       True
+  A_alts     394        1831       True
+B_majors      32         329       True
+  B_alts     196         974       True
+
+=== nulls and the gating margin ===
+A_majors: n=89 mean=-0.1294 pA=0.891 pB=0.880 shadow=A_majors_shadow24(669) margin=-0.1233 [-0.3050,+0.0750]
+A_alts: n=394 mean=-0.0201 pA=0.572 pB=0.696 shadow=A_alts_shadow24(1831) margin=+0.0048 [-0.0729,+0.0809]
+B_majors: n=32 mean=+0.0852 pA=0.209 pB=0.228 shadow=B_majors_shadow24(329) margin=+0.1616 [-0.0929,+0.4192]
+B_alts: n=196 mean=-0.0144 pA=0.448 pB=0.540 shadow=B_alts_shadow24(974) margin=+0.0344 [-0.0999,+0.1699]
+
+=== fit-only sensitivities (never promoted) ===
+  A_majors pct=0.95                            n=   58 netR=-0.2214
+  B_majors pct=0.95                            n=   26 netR=-0.0183
+  A_majors pct=0.8                             n=  115 netR=-0.0890
+  B_majors pct=0.8                             n=   44 netR=+0.0624
+  A_majors floor=0.0                           n= 1506 netR=-0.0236
+  B_majors floor=0.0                           n=  251 netR=+0.0347
+  A_majors floor=0.0005                        n=   60 netR=-0.0647
+  B_majors floor=0.0005                        n=   24 netR=+0.0155
+  A_majors persist=1                           n=  163 netR=-0.0414
+  A_majors persist=3                           n=   49 netR=-0.1444
+  A_majors stop=1.0dATR                        n=   94 netR=-0.0913
+  A_majors stop=2.5dATR                        n=   75 netR=-0.0387
+  A_majors maker0.04%                          n=   89 netR=-0.1211
+  B_majors maker0.04%                          n=   32 netR=+0.0996
+  B_majors template2 +3R                       n=   32 netR=+0.4635
+  A_alts pct=0.95                              n=  286 netR=+0.0094
+  B_alts pct=0.95                              n=  132 netR=-0.1052
+  A_alts pct=0.8                               n=  483 netR=-0.0206
+  B_alts pct=0.8                               n=  236 netR=-0.0105
+  A_alts floor=0.0                             n= 5327 netR=-0.0201
+  B_alts floor=0.0                             n= 1085 netR=-0.0408
+  A_alts floor=0.0005                          n=  271 netR=+0.0013
+  B_alts floor=0.0005                          n=  117 netR=+0.0284
+  A_alts persist=1                             n=  795 netR=-0.0059
+  A_alts persist=3                             n=  236 netR=-0.0650
+  A_alts stop=1.0dATR                          n=  419 netR=-0.0475
+  A_alts stop=2.5dATR                          n=  378 netR=-0.0447
+  A_alts maker0.04%                            n=  394 netR=-0.0144
+  B_alts maker0.04%                            n=  196 netR=-0.0014
+  B_alts template2 +3R                         n=  194 netR=+0.0198
+
+=== §6.8 funding persistence (fit-only, descriptive) ===
+  tier  n_ext_pos  mean_f_next9  median_f_next9  surv_1  surv_3  surv_6  surv_9  surv_15  surv_30
+majors        524       0.00057         0.00044 0.53377 0.41872 0.32640 0.29098  0.19205  0.15008
+  alts       1637       0.00058         0.00040 0.52438 0.39958 0.31066 0.27551  0.21410  0.15638
+
+=== §6.4 incremental control (non-promotable) ===
+  tier tercile  n_ext  n_nonext  mean_ext  mean_nonext    diff  welch_t
+majors     low    137      2351   -0.4012      -0.1294 -0.2718  -3.1822
+majors     mid    128      2389   -0.1979      -0.1065 -0.0914  -0.9531
+majors    high    255      2119   -0.3932      -0.0751 -0.3180  -5.0446
+  alts     low    411      7008   -0.2527      -0.0781 -0.1745  -3.6329
+  alts     mid    462      7048   -0.1564      -0.0267 -0.1298  -2.8162
+  alts    high    764      6496   -0.2810      -0.1281 -0.1529  -4.0360
+cells with funding split positive: 0/6 (bar: >=4 AND pooled Welch t>2; pooled t=-4.32)
+
+=== SCREEN (§8.3) ===
+     arm   n  mean_netR  nullA_p  floor_arm_ok  floor_shadow_ok  margin  margin_lo  margin_ok  screen_in
+A_majors  89    -0.1294    0.891         False             True -0.1233    -0.3050      False      False
+  A_alts 394    -0.0201    0.572          True             True  0.0048    -0.0729      False      False
+B_majors  32     0.0852    0.209         False             True  0.1616    -0.0929      False      False
+  B_alts 196    -0.0144    0.448         False             True  0.0344    -0.0999      False      False

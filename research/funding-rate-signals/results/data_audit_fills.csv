@@ -1,0 +1,11 @@
+symbol,dataset,day,status,rows
+SOLUSDT,klines_daily_backfill,2022-02-26,ok,24
+SOLUSDT,klines_daily_backfill,2022-02-27,ok,24
+SOLUSDT,klines_daily_backfill,2022-02-28,ok,24
+SOLUSDT,klines_daily_backfill,2022-04-01,ok,24
+SOLUSDT,klines_daily_backfill,2022-04-02,ok,24
+XRPUSDT,klines_daily_backfill,2022-02-26,ok,24
+XRPUSDT,klines_daily_backfill,2022-02-27,ok,24
+XRPUSDT,klines_daily_backfill,2022-02-28,ok,24
+XRPUSDT,klines_daily_backfill,2022-04-01,ok,24
+XRPUSDT,klines_daily_backfill,2022-04-02,ok,24
