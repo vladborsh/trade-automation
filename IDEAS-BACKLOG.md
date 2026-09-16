@@ -503,7 +503,32 @@ holdout, with 207–236 trades per arm. The companion LightGBM study flagged
 `RESEARCH-LOG.md` Запись 23. Two things stay open and are *not* claims: the
 forward lift is above 1.00 on every arm (direction is selected, the trade
 construction does not convert it), and template 2 (pure ORB) reached the build
-bar on the two ETH arms without any null or interval behind it. Scope changed from the entry
+bar on the two ETH arms without any null or interval behind it.
+**2026-09-16 — Architect follow-up ruling (`research/orb-ny-open/
+ARCHITECT-NOTE-FOLLOWUP.md`): GO, narrowly, one family, second and last shot
+on the width/timing axis.** Family `orb-ny-open-short`: {US100, US500} × OR
+width {5, 10, 15} min, 5m trigger bar, trigger from the range's end to 12:00
+NY, same stop/template/costs/nulls. **Cumulative Bonferroni over every look at
+the re-used holdout: 8 + 6 = 14 arms → α = 0.05/14 ≈ 0.00357**; a fit-period
+screen (≥ +0.05R and fit Null-A p ≤ 0.05) decides which arms may touch the
+holdout at all, committed before any holdout number; a pre-committed
+dose-response reading (5 → 10 → 15 → 30) labels an isolated passing cell
+"suspect" by rule; full grid always printed, no "best cell". **Crypto is
+out** (its own pre-ETF control falsified the imported-anchor story; Записи 2,
+18). **ETH template-2 straddle: one deferred registration on future tape
+only** — `ETHUSDT-{5m,15m}-t2`, holdout 2026-08-01 .. 2027-07-31, α = 0.025,
+script frozen now, run once when the tape exists. **Not registered, with
+reasons in the note:** volatility-scaled width (Study B carried it as two
+features and flagged neither), other anchors (London / 08:30 ET / UTC
+midnight — different hypotheses), 15m trigger bars for short ranges. Honest
+prior stated to the user: low; the likeliest outcome is six kills. **If this
+family dies, the next principled ORB registration is an exit-construction
+family** (the forward lift > 1.00 on every arm is post-trigger information the
++1R / full-range-stop construction does not harvest; the published short-ORB
+result pairs a 5-min range with a tight stop and a multi-R target), not another
+minute count. Also logged, not registered: the crypto weekend row at −0.29R
+… −0.41R on every arm (same clock, no cash open) as a note for the
+crypto-reversal pillar. Scope changed from the entry
 below in three ways: (a) instruments are the Capital.com CFDs US100/US500 plus
 **BTCUSDT/ETHUSDT** (crypto routed as pre-registered arms under the *imported*
 09:30 NY cash-open anchor, ETF-era fit, with weekend and pre-ETF descriptive
