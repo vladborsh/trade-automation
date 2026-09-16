@@ -509,8 +509,32 @@ Stop and escalate if:
 | `mechanic_proof.py` | `MECHANIC-PROOF.md`, ten fit trades per arm |
 | `prep/extend_history.py` | §7.2 history extension and its audit |
 
-### 13.1 The §7.4 screen decision
+### 13.1 The §7.4 screen decision — **BOTH ARMS SCREENED OUT**
 
-*(To be appended here, with its commit hash, after `analysis.py screen` runs
-and before `analysis.py holdout` is run. Empty at the time of this commit —
-no fit number exists yet.)*
+Run on 2026-09-16 by `python analysis.py screen`, against the pre-registration
+committed in `1f2a3c9`. Written here, and committed, **before
+`analysis.py holdout` was run**. Source: `results/fit_screen.csv`.
+
+| arm | `n_fit` | fit mean net R (t1) | fit gross R | fit mean `cost_R` | fit-period Null-A `p` | screen |
+|---|---|---|---|---|---|---|
+| `BTCUSDT-5m` | 1,885 | **−0.2330R** | −0.0319R | 0.2011R | 0.899 | **SCREENED OUT** |
+| `ETHUSDT-5m` | 1,901 | **−0.1519R** | −0.0074R | 0.1444R | 0.670 | **SCREENED OUT** |
+
+Both arms fail **both** limbs of the screen: mean net R is far below the
++0.05R bar (it is negative, not merely small), and the fit-period Null A puts
+the observed mean **below** the placebo mean (`p` = 0.899 and 0.670 — the
+matched-time placebo does *better* than the real breakout).
+
+**Consequence, applied mechanically per §7.4 and §9.3:**
+
+- both arms are verdicted **NO EDGE — KILL (fit screen)**;
+- **the 2025-08-01 .. 2026-07-31 holdout is NEVER computed for either arm.**
+  It was not read, and `analysis.py holdout` refuses to compute it. The
+  cumulative α of §9.1 is therefore **not spent** by this family: the count of
+  pre-registered arms judged on that holdout remains **14**, not 16, and the
+  next registration that reaches the holdout inherits 14 + its own arms, not
+  16. This is a tightening relative to the note's arithmetic and is recorded
+  here so the next Architect uses the right number;
+- the §8.1 weekend reading cannot fire (it applies only to a REAL EDGE), so
+  the weekday/weekend split is **reported and nothing is inferred from it**,
+  exactly as §8.1 pre-committed for the kill branch.

@@ -1,0 +1,78 @@
+{
+  "grid": {
+    "days": 2446,
+    "violations": 0,
+    "utc_offsets_of_anchor_seen_h": [
+      0
+    ],
+    "examples": [],
+    "pass": true
+  },
+  "funding": {
+    "table": [
+      {
+        "symbol": "BTCUSDT",
+        "n": 2269,
+        "first_entry_utc": "2020-01-01 01:29 UTC",
+        "last_exit_utc": "2026-09-11 07:54 UTC",
+        "funding_stamps_crossed": 0
+      },
+      {
+        "symbol": "ETHUSDT",
+        "n": 2287,
+        "first_entry_utc": "2020-01-01 01:19 UTC",
+        "last_exit_utc": "2026-09-11 07:54 UTC",
+        "funding_stamps_crossed": 0
+      }
+    ],
+    "pass": true
+  },
+  "fills": {
+    "table": [
+      {
+        "arm": "BTCUSDT-5m",
+        "n": 2269,
+        "agreement_n": 2269,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "ETHUSDT-5m",
+        "n": 2287,
+        "agreement_n": 2286,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 1,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 1,
+        "excluded_1m_kinder": 0
+      }
+    ],
+    "pass": true
+  },
+  "session": {
+    "table": [
+      {
+        "symbol": "BTCUSDT",
+        "n": 2269,
+        "past_flat": 0,
+        "crossed_midnight": 0
+      },
+      {
+        "symbol": "ETHUSDT",
+        "n": 2287,
+        "past_flat": 0,
+        "crossed_midnight": 0
+      }
+    ],
+    "pass": true
+  }
+}
