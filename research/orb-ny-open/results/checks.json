@@ -8,5 +8,148 @@
     ],
     "examples": [],
     "pass": true
+  },
+  "lookahead": {
+    "n_checked": 56,
+    "n_cells_compared": 1315,
+    "n_cells_nan_both": 29,
+    "max_rel_diff": 0.0,
+    "n_violations": 0,
+    "examples": [],
+    "pass": true
+  },
+  "fills": {
+    "table": [
+      {
+        "arm": "BTCUSDT-5m",
+        "n": 622,
+        "agreement_n": 622,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "BTCUSDT-15m",
+        "n": 599,
+        "agreement_n": 599,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "ETHUSDT-5m",
+        "n": 603,
+        "agreement_n": 603,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "ETHUSDT-15m",
+        "n": 570,
+        "agreement_n": 570,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "US100-5m",
+        "n": 618,
+        "agreement_n": 618,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "US100-15m",
+        "n": 580,
+        "agreement_n": 580,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "US500-5m",
+        "n": 641,
+        "agreement_n": 636,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 2,
+        "gapped_1m": 5,
+        "both_touch_1m": 0,
+        "excluded": 5,
+        "excluded_1m_kinder": 0
+      },
+      {
+        "arm": "US500-15m",
+        "n": 618,
+        "agreement_n": 613,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 2,
+        "gapped_1m": 5,
+        "both_touch_1m": 0,
+        "excluded": 5,
+        "excluded_1m_kinder": 0
+      }
+    ],
+    "pass": true
+  },
+  "session": {
+    "table": [
+      {
+        "symbol": "BTCUSDT",
+        "n": 1221,
+        "crossings": 0
+      },
+      {
+        "symbol": "ETHUSDT",
+        "n": 1173,
+        "crossings": 0
+      },
+      {
+        "symbol": "US100",
+        "n": 1198,
+        "crossings": 0
+      },
+      {
+        "symbol": "US500",
+        "n": 1259,
+        "crossings": 0
+      }
+    ],
+    "pass": true
   }
 }

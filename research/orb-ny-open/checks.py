@@ -55,32 +55,57 @@ def check_lookahead(n_sample=50, seed=C.SEED) -> dict:
     rng = np.random.default_rng(seed)
     q = pd.read_parquet(os.path.join(C.RESULTS, "trades_all.parquet"))
     q = q[q.period.isin(["fit"])].reset_index(drop=True)
-    pick = rng.choice(len(q), size=min(n_sample, len(q)), replace=False)
+    # sample across all eight arms, not by luck of the draw
+    pick = []
+    per = max(1, -(-n_sample // q.arm.nunique()))   # ceil: at least n_sample overall
+    for _, g in q.groupby("arm"):
+        pick += list(rng.choice(g.index.values, size=min(per, len(g)), replace=False))
     worst = 0.0
     bad = []
     checked = 0
+    cmp_cells = 0
+    nan_cells = 0
     for i in pick:
         r = q.iloc[int(i)]
         full = {n: r[n] for n in F.FEATURES}
-        trunc = _features_truncated(r)
+        trunc = _features_truncated(q, r)
         if trunc is None:
+            bad.append(dict(arm=r["arm"], date=r["date"], feature="<harness>",
+                            full=float("nan"), truncated=float("nan")))
             continue
         checked += 1
         for n in F.FEATURES:
             a, b = full[n], trunc[n]
-            if pd.isna(a) and pd.isna(b):
+            na, nb = pd.isna(a), pd.isna(b)
+            if na and nb:
+                nan_cells += 1
+                continue
+            cmp_cells += 1
+            # a NaN on exactly one side is a VIOLATION, not a skip.
+            if na != nb:
+                bad.append(dict(arm=r["arm"], date=r["date"], feature=n,
+                                full=float(a) if not na else None,
+                                truncated=float(b) if not nb else None))
                 continue
             d = abs(float(a) - float(b)) / max(1.0, abs(float(a)))
             worst = max(worst, d)
             if d > 1e-9:
                 bad.append(dict(arm=r["arm"], date=r["date"], feature=n,
                                 full=float(a), truncated=float(b)))
-    return dict(n_checked=checked, max_rel_diff=worst, n_violations=len(bad),
-                examples=bad[:10], **{"pass": len(bad) == 0})
+    return dict(n_checked=checked, n_cells_compared=cmp_cells,
+                n_cells_nan_both=nan_cells, max_rel_diff=worst,
+                n_violations=len(bad), examples=bad[:10],
+                **{"pass": len(bad) == 0 and checked >= 40 and cmp_cells > 0})
 
 
-def _features_truncated(r) -> dict | None:
-    """Rebuild the trade's features from a 1m tape cut at its entry minute."""
+def _features_truncated(q_all: pd.DataFrame, r) -> dict | None:
+    """Rebuild the trade's features from a 1m tape cut at its entry minute.
+
+    The arm's EARLIER trades are passed in alongside it so that the `or_rvol`
+    and `bar_rvol` rolling histories (DESIGN §7.2) are reproduced exactly; they
+    read only prior sessions, so including them tests the same thing the full
+    build does. Nothing after the entry minute exists on this tape at all.
+    """
     sym, tf = r["symbol"], int(r["tf"])
     src = E.Tape.get(sym)
     cut = int(r["i_entry_min"])
@@ -113,13 +138,17 @@ def _features_truncated(r) -> dict | None:
         E.Tape._cache[sym] = tp
         F.Ind._cache.pop(key, None)
         F.DayBars._cache.pop(sym, None)
-        row = pd.DataFrame([{k: r[k] for k in
-                             ["date", "symbol", "tf", "j", "side", "t_sig", "entry", "stop",
-                              "stop_dist", "i_entry_min", "i_flat", "or_high", "or_low",
-                              "i_or0", "i_or1", "or_vol", "or_open", "or_close"]}])
-        row["j"] = len(tp.bars[tf]["t"]) - 1
+        cols = ["date", "symbol", "tf", "j", "side", "t_sig", "entry", "stop",
+                "stop_dist", "i_entry_min", "i_flat", "or_high", "or_low",
+                "i_or0", "i_or1", "or_vol", "or_open", "or_close"]
+        prior = q_all[(q_all["arm"] == r["arm"]) &
+                      (q_all["i_entry_min"] <= cut)].sort_values("i_entry_min")
+        row = prior[cols].reset_index(drop=True)
+        # the trade under test is the last row, and its trigger bar is by
+        # construction the last bar of the truncated sequence
+        row.loc[row.index[-1], "j"] = len(tp.bars[tf]["t"]) - 1
         out = F.build(row.copy())
-        return {n: out.iloc[0][n] for n in F.FEATURES}
+        return {n: out.iloc[-1][n] for n in F.FEATURES}
     finally:
         E.Tape._cache[sym] = save_t
         F.Ind._cache.pop(key, None)
@@ -151,19 +180,37 @@ def check_fills() -> dict:
         xi, xp, xc = E.walk_bar_many(B["o"], B["h"], B["l"], B["c"], b0, b1, side,
                                      entry, stop, tgt)
         bar_gross = side * (xp - entry) / dist
-        agree = (both == 0) & (gapped == 0) & (b1 >= b0)
+        # "gaps its stop" is a property of the trade, not of a chosen bar size:
+        # a MINUTE can open through the stop inside an arm bar whose own open is
+        # not through it, and that is exactly the case the 1m path exists to
+        # resolve. Flag the gap at 1-minute granularity as well, and exclude
+        # those trades from the agreement set (DESIGN §3.5).
+        m0 = (g.i_entry_min.values + 1).astype(np.int64)
+        m1 = g.i_flat.values.astype(np.int64)
+        both1m, gapped1m = E.path_flags(tp.o, tp.h, tp.l, tp.c, m0, m1, side, stop, tgt)
+        agree = (both == 0) & (gapped == 0) & (gapped1m == 0) & (both1m == 0) & (b1 >= b0)
         # the two conventions must also find the same CAUSE for this to be a
         # like-for-like comparison; a cause difference on a non-gapping,
         # non-both-touch trade is itself a violation and is counted.
         same_cause = np.array([EN(c1) == c2 for c1, c2 in zip(xc, g.exit_1.values)])
         d = np.abs(bar_gross - g.grossR_1.values)
         v = agree & ((d > 1e-9) | (~same_cause))
+        # STRONGER than §3.5 asks: on the excluded (gapping / both-touch)
+        # trades the 1m-path fill must be no BETTER than the bar-OHLC fill.
+        # If the finer path were systematically kinder, the fill convention
+        # would be flattering the result; it must only ever be harsher.
+        ex = ~agree & (b1 >= b0)
+        kinder = int((g.grossR_1.values[ex] - bar_gross[ex] > 1e-9).sum())
         rows.append(dict(arm=f"{sym}-{tf}m", n=len(g), agreement_n=int(agree.sum()),
                          max_absdiff=float(d[agree].max()) if agree.any() else 0.0,
                          violations=int(v.sum()),
-                         both_touch=int(both.sum()), gapped=int(gapped.sum())))
+                         both_touch_bar=int(both.sum()), gapped_bar=int(gapped.sum()),
+                         gapped_1m=int(gapped1m.sum()), both_touch_1m=int(both1m.sum()),
+                         excluded=int(ex.sum()), excluded_1m_kinder=kinder))
     t = pd.DataFrame(rows)
-    return dict(table=t.to_dict("records"), **{"pass": int(t.violations.sum()) == 0})
+    return dict(table=t.to_dict("records"),
+                **{"pass": int(t.violations.sum()) == 0
+                   and int(t.excluded_1m_kinder.sum()) == 0})
 
 
 def EN(x):
