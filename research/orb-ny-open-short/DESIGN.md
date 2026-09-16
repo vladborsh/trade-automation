@@ -410,18 +410,29 @@ contains **no R, no win rate and no expectancy**, and reads no holdout outcome.
 If a screened-in arm nevertheless realises `n_holdout < 150`, that is a **§11
 stop**, not a widened window.
 
-> **PLACEHOLDER at the pre-registration commit.** This table is filled in by
-> `projection.py`'s output in a later commit, before the screen is run. It
-> contains no R.
+**Recorded 2026-09-16 from `projection.py`, fit period only, before the screen
+was run and before any holdout number existed for any arm.**
 
-| arm | trigger opens | fit eligible days | fit triggered | trigger share | projected n_holdout | median lag from range end |
-|---|---|---|---|---|---|---|
-| `US100-OR5` | 09:35 | — | — | — | — | — |
-| `US100-OR10` | 09:40 | — | — | — | — | — |
-| `US100-OR15` | 09:45 | — | — | — | — | — |
-| `US500-OR5` | 09:35 | — | — | — | — | — |
-| `US500-OR10` | 09:40 | — | — | — | — | — |
-| `US500-OR15` | 09:45 | — | — | — | — | — |
+| arm | trigger opens | fit eligible days | fit triggered | trigger share | projected n_holdout | median lag from range end | p90 lag | % triggered within 30 min of range end |
+|---|---|---|---|---|---|---|---|---|
+| `US100-OR5` | 09:35 | 392 | 391 | 0.997 | 247.4 | 5 min | 20 min | 96.9 % |
+| `US100-OR10` | 09:40 | 392 | 391 | 0.997 | 247.4 | 5 min | 30 min | 92.3 % |
+| `US100-OR15` | 09:45 | 392 | 387 | 0.987 | 244.8 | 5 min | 35 min | 88.9 % |
+| `US500-OR5` | 09:35 | 392 | 392 | 1.000 | 249.0 | 5 min | 25 min | 93.9 % |
+| `US500-OR10` | 09:40 | 392 | 392 | 1.000 | 249.0 | 5 min | 30 min | 91.1 % |
+| `US500-OR15` | 09:45 | 392 | 389 | 0.992 | 247.1 | 10 min | 40 min | 88.2 % |
+
+The projection confirms the note's §4.4 assumption: the trigger share
+approaches 100 % on every arm (0.987–1.000), the trigger lands within a very
+few bars of the range's end (median lag 5–10 minutes, p90 well inside the
+window), and every arm projects ~245–249 holdout trades against the 150-trade
+floor. The 12:00 NY cutoff is therefore inert for this family, as the note
+predicted, and the retired widened-cutoff contingency could not have fired.
+
+**No decision follows from this table.** It contains no R, no win rate and no
+expectancy, and reads no holdout outcome.
+
+Exclusions behind the eligible-day counts are in `results/exclusions.csv`.
 
 ### 8.2 THE FIT-PERIOD SCREEN — §5.3 of the note
 
@@ -446,21 +457,44 @@ and computes nothing for a screened-out arm.
 
 #### 8.2.1 Screen decision — DECIDED 2026-09-16 on the fit period, before any holdout number existed
 
-> **PLACEHOLDER at the pre-registration commit.** This subsection is written
-> from `analysis.py screen`'s output and **committed before `analysis.py
-> holdout` is run for the first time**. At the pre-registration commit no
-> fit-period screen number and no holdout number exists for any arm of this
-> family. The commit hash of the filled-in screen decision is recorded in §12
-> and in `HANDOFF.md`.
+**DECIDED 2026-09-16 from `analysis.py screen`'s output, on the fit period
+alone. No holdout number existed for any arm of this family when this table was
+written and committed.** `analysis.py holdout` had not been run.
 
 | arm | n_fit | fit mean net R | fit gross R | fit mean cost_R | fit Null-A p | >= +0.05R? | p <= 0.05? | **screen** |
 |---|---|---|---|---|---|---|---|---|
-| `US100-OR5` | — | — | — | — | — | — | — | — |
-| `US100-OR10` | — | — | — | — | — | — | — | — |
-| `US100-OR15` | — | — | — | — | — | — | — | — |
-| `US500-OR5` | — | — | — | — | — | — | — | — |
-| `US500-OR10` | — | — | — | — | — | — | — | — |
-| `US500-OR15` | — | — | — | — | — | — | — | — |
+| `US100-OR5` | 391 | +0.0481R | +0.0764R | 0.0283R | 0.049 | no | yes | **SCREENED OUT** |
+| `US100-OR10` | 391 | +0.0776R | +0.1009R | 0.0233R | 0.015 | yes | yes | **PASS** |
+| `US100-OR15` | 387 | +0.0920R | +0.1131R | 0.0210R | 0.007 | yes | yes | **PASS** |
+| `US500-OR5` | 392 | -0.0295R | +0.0225R | 0.0520R | 0.476 | no | no | **SCREENED OUT** |
+| `US500-OR10` | 392 | -0.0462R | -0.0025R | 0.0436R | 0.612 | no | no | **SCREENED OUT** |
+| `US500-OR15` | 389 | +0.0154R | +0.0535R | 0.0381R | 0.162 | no | no | **SCREENED OUT** |
+
+**Screened in — may touch the holdout: `US100-OR10`, `US100-OR15`.**
+**Screened out — holdout NEVER computed: `US100-OR5`, `US500-OR5`,
+`US500-OR10`, `US500-OR15`.** These four carry the verdict **"NO EDGE — KILL
+(fit screen)"** and a blank holdout column in `REPORT.md`.
+
+**`US100-OR5` is a genuinely marginal removal and is labelled as one.** Its
+fit-period Null-A p = 0.049 clears the screen's second condition, and its fit
+mean net R of **+0.0481R misses the +0.05R bar by 0.0019R** — about one part in
+26. The screen is mechanical and pre-registered and it removes the arm; that is
+the whole point of deciding the rule before seeing the number. It is recorded
+here, and will be recorded in `REPORT.md`, as a near-miss rather than a
+comfortable kill, so that nobody later reads "screened out" as "clearly
+worthless". It is **not** reinstated, and no holdout number is computed for it.
+
+The three US500 arms fail on **both** conditions with room to spare (fit means
+−0.046R to +0.015R, Null-A p from 0.162 to 0.612). `US100-OR10` and
+`US100-OR15` clear both conditions on both counts.
+
+**Note the shape this screen already shows, before any holdout read.** On
+US100 the fit-period mean net R runs **+0.048R (OR5) → +0.078R (OR10) →
++0.092R (OR15)**, against the closed pass's quoted **+0.057R at OR30**. That is
+*increasing* with width across 5→10→15 — the opposite direction from the
+"shorter is better" hypothesis this family was registered to test — and it then
+falls again at 30. The §9.2 dose-response reading is applied to the holdout
+verdicts, not to these fit numbers, but the fit shape is reported as it stands.
 
 ---
 

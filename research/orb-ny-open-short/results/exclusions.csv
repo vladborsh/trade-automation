@@ -1,0 +1,13 @@
+arm,period,calendar_days,eligible,excl_incomplete_or,excl_no_session
+US100-OR5,fit,392,392,0,0
+US100-OR5,holdout,249,248,1,0
+US100-OR10,fit,392,392,0,0
+US100-OR10,holdout,249,248,1,0
+US100-OR15,fit,392,392,0,0
+US100-OR15,holdout,249,248,1,0
+US500-OR5,fit,392,392,0,0
+US500-OR5,holdout,249,249,0,0
+US500-OR10,fit,392,392,0,0
+US500-OR10,holdout,249,249,0,0
+US500-OR15,fit,392,392,0,0
+US500-OR15,holdout,249,249,0,0
