@@ -443,8 +443,42 @@ kill messages (flagged there, not yet done — this is where they land):**
 
 ## Funding-rate signals: carry and funding-extreme continuation (crypto perps)
 
-**Status:** **prioritized** (user review, 2026-08-26) → **designed, 2026-09-16
-— pre-registration written, awaiting Researcher dispatch by the coordinator.**
+**Status:** **prioritized** (user review, 2026-08-26) → designed, 2026-09-16
+→ **CLOSED, 2026-09-16 — all four registered arms killed on the fit period;
+the holdout was never read.** Package: `research/funding-rate-signals/`
+(`REPORT.md`, `HANDOFF.md`); log Запись 28.
+
+**Result.** A carry: −0.129R (majors, n=89) and −0.020R (alts, n=394);
+B continuation: +0.085R (majors, n=32, Null-A p=0.209) and −0.014R (alts,
+n=196). No arm satisfies two of the four screen conditions. Three arms are
+also UNMEASURABLE below the 300-event floor, but the floors are not
+load-bearing — each arm independently fails a criterion unrelated to sample
+size. **α ledger: 4 arms registered, 0 holdout reads; the 2025-08..2026-07
+year remains clean.**
+
+**Why it died, which is not what the design expected.** The redundancy
+control exonerates the sensor instead of killing it: funding-selected entries
+collect **25–37× more carry** than the trailing-24h-return shadow (+0.0353R
+vs +0.0014R on alts), so funding is **not price in disguise** — unlike
+`deriv-positioning`'s OI signal. The §6.8 mechanism prerequisite **passes**
+(the extreme state survives 3 settlements 40 % of the time, 9 settlements
+28 %; forward rate +0.058 %/8h ≈ 63 % annualised). It dies because the
+**unhedged price leg costs more than the carry pays**: −0.046R of price
+against +0.035R of funding on the alts. The 5 of 394 trades that ran the full
+30 settlements collected +0.197R — the carry is real, you just rarely get to
+hold it. §6.4 is worse than null: 0/6 cells, pooled Welch t = −4.32 — inside a
+fixed price bucket, extreme funding marks the *worse* settlements to short.
+**The squeeze shape is now closed on both sensors** (b1 quantity, B price).
+
+**Two things this pass hands forward.** (i) A **measured** promotion blocker:
+turning funding accounting on costs a 1h continuation strategy 0.0009–0.0033
+R/trade, always negative, **1.4–24 % of its edge** — future 1h crypto
+candidates should carry funding in P&L from stage 1. (ii) An argument for the
+**hedged carry** (short perp / long spot) below, which this pass never tested:
+the leg that killed A is exactly the leg a hedge removes.
+
+<details><summary>Original design record (kept for provenance)</summary>
+
 Binding note: `research/funding-rate-signals/ARCHITECT-NOTE.md`. What the
 design pinned beyond this entry: (a) carry = extreme at two consecutive
 settlements (rolling 90-settlement percentile ≥ 90 / ≤ 10 **and** |rate| ≥
@@ -472,6 +506,7 @@ directions — dispatch next or in parallel with the cross-sectional package.**
 It is the only mean-reversion-adjacent idea that uses, rather than fights,
 the diagnosed perp mechanics, and the only non-OHLCV input that is free.
 Design unchanged; the "beyond price momentum" comparison stays mandatory.
+</details>
 
 **Idea:** Use the perp **funding rate itself as the signal input**, not just as
 an unmodelled cost. Two distinct sub-hypotheses, probed separately:
