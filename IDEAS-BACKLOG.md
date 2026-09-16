@@ -496,7 +496,14 @@ judge accordingly).
 **Status:** logged (Architect idea-generation pass, 2026-08-26); **not
 prioritized** at the 2026-08-26 user review (not rejected — just not picked).
 **2026-09-16 — prioritised by the user and dispatched to Researcher.** Ruling
-in `research/orb-ny-open/ARCHITECT-NOTE.md`. Scope changed from the entry
+in `research/orb-ny-open/ARCHITECT-NOTE.md`. **2026-09-16 — CLOSED: all eight
+pre-registered arms KILLED (NO EDGE)**; none reaches the +0.05R kill bar on the
+holdout, with 207–236 trades per arm. The companion LightGBM study flagged
+**zero** of 24 features. See `research/orb-ny-open/REPORT.md` and
+`RESEARCH-LOG.md` Запись 23. Two things stay open and are *not* claims: the
+forward lift is above 1.00 on every arm (direction is selected, the trade
+construction does not convert it), and template 2 (pure ORB) reached the build
+bar on the two ETH arms without any null or interval behind it. Scope changed from the entry
 below in three ways: (a) instruments are the Capital.com CFDs US100/US500 plus
 **BTCUSDT/ETHUSDT** (crypto routed as pre-registered arms under the *imported*
 09:30 NY cash-open anchor, ETF-era fit, with weekend and pre-ETF descriptive

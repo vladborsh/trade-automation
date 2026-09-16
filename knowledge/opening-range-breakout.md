@@ -1,14 +1,48 @@
 # Opening-range breakout (ORB) — session-anchored momentum
 
 Canonical definitions for the ORB family as this project tests it. Design
-ruling and pre-registration: `research/orb-ny-open/ARCHITECT-NOTE.md`
-(2026-09-16). **Not validated** — no number in this project's record supports
-or refutes it; the first pre-registered pass is the `orb-ny-open` package.
+ruling and pre-registration: `research/orb-ny-open/ARCHITECT-NOTE.md` and
+`research/orb-ny-open/DESIGN.md` (2026-09-16). **Tested and killed** —
+see `research/orb-ny-open/REPORT.md`.
 
 ## 0. Status
 
 - **Mechanic pinned 2026-09-16 by Architect.** Eight pre-registered arms
-  ({US100, US500, BTCUSDT, ETHUSDT} × {5m, 15m}); verdicts pending.
+  ({US100, US500, BTCUSDT, ETHUSDT} × {5m, 15m}).
+- **2026-09-16 — all eight arms KILLED (NO EDGE)** on the pre-registered
+  holdout 2025-08-01 .. 2026-07-31, template 1 (+1R, flat 16:00 NY),
+  α = 0.05/8 = 0.00625. Holdout mean net R: US100-5m +0.033, US100-15m +0.042,
+  US500-5m −0.018, US500-15m +0.006, BTCUSDT-5m −0.123, BTCUSDT-15m −0.065,
+  ETHUSDT-5m +0.013, ETHUSDT-15m +0.047. **Not one arm reaches the +0.05R kill
+  bar.** Well powered: n_holdout 207–236 per arm against a floor of 150; the
+  pre-registered power contingency never fired.
+- **Costs are not the cause.** With the stop at the full opening range,
+  `cost_R` is 0.016–0.030R on the indices and 0.076–0.096R on crypto (the
+  cmc-bot pass, by contrast, paid 0.25–0.40R). Gross expectancy is itself near
+  zero. The edge is **absent, not eaten** — a different failure mode from
+  Запись 22.
+- **But the mechanic does select direction.** The non-circular forward lift is
+  **above 1.00 on all eight arms** (1.035–1.234): price does travel further in
+  the breakout's direction than from a random comparable bar in the same
+  window. The pre-registered trade construction simply does not convert it.
+  Whether some *other* exit does is open, and untested.
+- **Companion LightGBM study: 0 of 24 features flagged** on either timeframe,
+  against a 200-refit target-shuffle max-statistic null (FWER-controlled). The
+  frozen-model holdout read carries no out-of-sample skill either (Spearman
+  +0.051 / +0.011, both 90 % intervals spanning 0). No conditioned-ORB
+  proposal follows. A null here is weaker than Test A's: 24 features on ~1,400
+  trades per timeframe cannot exclude a small conditional effect.
+- **Crypto controls.** Weekend rows are far worse than the arms (−0.29R to
+  −0.41R) — but nothing is inferred, because the pre-registered reading only
+  bites on a *passing* arm and none passed. The pre-ETF row (2022-08 .. 2023-12)
+  is **not weaker** than the ETF era, so **the ETF-transmission story gets no
+  support from the tape**.
+- **Open, not settled:** template 2 (pure ORB, no target) reached +0.106R
+  (ETHUSDT-5m) and +0.138R (ETHUSDT-15m) on the holdout, at or above the build
+  bar — but it is the secondary template, was never run through the nulls or
+  the bootstrap, and disagrees with its own fit period. It is grounds for at
+  most one Architect-authorised fresh registration, never a re-labelling of
+  these arms.
 - **Family.** Continuation-shaped, session-structure momentum. Not a variant
   of `session-liquidity.md` (sweep-then-confirm, reversal-shaped) nor of
   `smc.md`/`smart-money-ict.md` (iFVG/order-block triggers). Shares the

@@ -74,19 +74,29 @@ def main() -> None:
     A("")
     items = []
     t2max = v.mean_netR_holdout_t2.max()
-    t2arm = v.loc[v.mean_netR_holdout_t2.idxmax(), "arm"]
-    if t2max >= C.BUILD_MEAN:
+    strad = v[v.mean_netR_holdout_t2 >= C.BUILD_MEAN]
+    if len(strad):
+        names = ", ".join(f"`{a}` ({f(m)}R)" for a, m in
+                          zip(strad.arm, strad.mean_netR_holdout_t2))
         items.append(
-            f"**Template 2 (pure ORB) on `{t2arm}`** reached {f(t2max)}R on the "
-            f"holdout, at or above the +{C.BUILD_MEAN:.2f}R build bar, while its "
-            "template-1 verdict is not a build. Per `DESIGN.md` §3.4 the arm's "
-            "verdict stays template 1's and this is grounds for **one** "
-            "Architect-authorised follow-up registration of template 2 as its own "
-            "arm, with its own α, its own ladder and its own nulls — never a "
-            "re-labelling of this arm. **Your call whether to register it.** Note "
-            "the conflict honestly: that number comes from a holdout this pass has "
-            "now read, so a registration should test on a later holdout or declare "
-            "the re-use explicitly.")
+            f"**A §3.4 straddle, and it needs your ruling.** {len(strad)} arm(s) "
+            f"reach or exceed the +{C.BUILD_MEAN:.2f}R build bar on **template 2** "
+            f"(pure ORB, no target, flat at 16:00 NY) while their template-1 "
+            f"verdict is a kill: {names}. Per the pre-registration I have **not** "
+            "revised those arms' verdicts and have **not** re-labelled anything; "
+            "the option this opens is exactly one Architect-authorised follow-up "
+            "registration of template 2 as its own arm, own α, own ladder, own "
+            "nulls. **I recommend against registering it, and I want to be clear "
+            "why**, because the number looks better than the evidence behind it: "
+            "template 2 was never run through Null A, Null B or the bootstrap — "
+            "the pre-registration applies those to the gating template only — so "
+            "there is no p-value and no interval supporting it; and the same arms "
+            f"sit at {f(v.loc[strad.index, 'mean_netR_fit_t2'].min())}R to "
+            f"{f(v.loc[strad.index, 'mean_netR_fit_t2'].max())}R on the fit "
+            "period, so fit and holdout disagree in magnitude. It is a "
+            "single unreplicated holdout number on a template that was the "
+            "secondary for a reason. If you do register it, it should test on a "
+            "**later** holdout, since this one has now been read.")
     if not flagged:
         items.append(
             "**No Study B proposal.** Not one of the 24 features cleared the "

@@ -106,14 +106,29 @@ def main() -> None:
           f"{f(r.mean_netR_holdout)}R |")
     A("")
     t2max = v.mean_netR_holdout_t2.max()
-    if t2max >= C.BUILD_MEAN:
-        A(f"**Straddle notice (§3.4).** `{v.loc[v.mean_netR_holdout_t2.idxmax(),'arm']}`'s "
-          f"template-2 holdout mean of {f(t2max)}R is at or above the +0.10R build "
-          "bar while its template-1 verdict is not a build. Per the "
-          "pre-registration the arm's verdict remains template 1's, and this is "
-          "grounds for **one** Architect-authorised follow-up registration of "
-          "template 2 as its own arm with its own α — never a re-labelling of "
-          "this one. It is raised in `HANDOFF.md`.")
+    strad = v[v.mean_netR_holdout_t2 >= C.BUILD_MEAN]
+    if len(strad):
+        names = ", ".join(f"`{a}` ({f(m)}R)" for a, m in
+                          zip(strad.arm, strad.mean_netR_holdout_t2))
+        A(f"**Straddle notice (§3.4).** {len(strad)} arm(s) reach or exceed the "
+          f"+{C.BUILD_MEAN:.2f}R build bar on **template 2** while their "
+          f"template-1 verdict is a kill: {names}. Per the pre-registration each "
+          "arm's verdict remains **template 1's** — stated here in the first "
+          "section and not revised — and this is grounds for **one** "
+          "Architect-authorised follow-up registration of template 2 as its own "
+          "arm, with its own α, its own ladder and its own nulls. It is **never** "
+          "a re-labelling of these arms. Raised in `HANDOFF.md`.")
+        A("")
+        A("Two cautions belong with that number, so it is not read as a result. "
+          "Template 2's holdout figures were **not** subjected to Null A, Null B "
+          "or the bootstrap — the pre-registration runs those on the gating "
+          "template only, so there is no p-value and no interval behind "
+          f"{f(t2max)}R. And on the fit period the same arms were at "
+          f"{f(v.loc[strad.index, 'mean_netR_fit_t2'].min())}R to "
+          f"{f(v.loc[strad.index, 'mean_netR_fit_t2'].max())}R, i.e. the fit and "
+          "holdout do not agree in magnitude. A fresh registration is exactly the "
+          "right way to find out whether it is anything; reading it off this "
+          "table is not.")
     else:
         A(f"No template-2 holdout number reaches the +{C.BUILD_MEAN:.2f}R build bar "
           f"(highest: {f(t2max)}R), so the §3.4 straddle clause is not triggered.")
@@ -417,6 +432,14 @@ def main() -> None:
         A("")
         A("Tercile cut-points come from the **fit-period** prediction "
           "distribution, fixed before the holdout was read.")
+        A("")
+    if not len(sbf):
+        A("There are **no flagged features**, so §9.4's per-feature holdout read "
+          "has nothing to report. The score-tercile and Spearman rows above are "
+          "still shown because the pre-registration asked for them regardless; "
+          "both intervals span 0 on both timeframes, so the frozen model carries "
+          "**no out-of-sample skill** either. That is consistent with the "
+          "flagging result rather than an additional finding.")
         A("")
     if len(sbf):
         A("Per flagged feature, holdout terciles with fit-period cut-points:")
