@@ -15,6 +15,13 @@ question — `research/orb-ny-open/results/` (`trades_all.parquet`,
 which is where §1 comes from. Numbers from external sources are that
 source's claim; numbers from the results files were recomputed here.
 
+> **Correction, 2026-09-16 (Architect), after `_calibration/REPORT.md`:** §0 item 2's and §8 item 3's
+> "~40× observations" is **withdrawn** — five same-day crypto legs at ρ ≈ 0.5 are worth 1.7 draws, so the
+> cross-sectional family has 1.4–2.6× the ORB arms' effective sample on one holdout year, not 40×. §1's table
+> is superseded by one that includes the ±1R bracket attenuation (a measured +0.10R needs a true drift ≈ +0.20R).
+> §6.3's `t ≥ 2` bar for Test C is withdrawn as a certification criterion. The recommendation to back the
+> cross-sectional family stands on the corrected figures. Ruling and amendments: `2026-09-power-correction.md`.
+
 Correction of the premise as stated to me: the repository's first commit is
 2026-08-26. This is **three weeks** of research, not three months.
 

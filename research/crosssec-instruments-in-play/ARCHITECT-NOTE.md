@@ -25,6 +25,16 @@ comparison between them.
 
 ---
 
+> **Amendment, 2026-09-16 (Architect) — binding, applies before any R is computed.** Per
+> `research/_surveys/2026-09-power-correction.md` §4: **A1** holdout becomes **two years, 2024-08-01 .. 2026-07-31**,
+> fit **2020-01-01 .. 2024-07-31** (declaration of the first holdout year's prior use as BTC/ETH *fit* in §7.1);
+> **A2** `DESIGN.md` carries a power statement in trade-days with the *measured* same-day leg correlation and the
+> *measured* stop-only attenuation; **A3** Stage 0 = a planted selection effect of known size through the portfolio
+> harness (gates P0–P7), Test C lifted as a descriptive sign check with no certification role; **A4** the §10.2 floor
+> becomes ≥ 150 legs **and ≥ 300 trade-days**; **A5** §6.3's target is ≈ 0.10 dATR gross per 4 h, ≈ 2.6× the paper's
+> top tier. Arms, k, stop, hold, anchor, selectors, nulls, α, tightenings and sensitivities are **unchanged**. Where
+> the text below conflicts with the amendment, the amendment governs.
+
 ## 0. Summary of rulings
 
 | # | question | ruling |
