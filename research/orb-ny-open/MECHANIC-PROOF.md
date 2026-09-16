@@ -49,7 +49,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 59.0362 | `pd_level_d` | -2.7158 |
 | `rsi20` | 57.8582 | `range200_pos` | 0.3781 |
 | `vwap_sess_d` | 1.1217 | `or_rvol` | 0.9318 |
-| `vwap_day_d` | 1.6210 | `bar_rvol` | — |
+| `vwap_day_d` | 1.6210 | `bar_rvol` | 0.7938 |
 | `tod_min` | 45.0000 | `atr_regime` | 2.2579 |
 | `dow` | 0.0000 | `datr_pct` | 1.1069 |
 
@@ -93,8 +93,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | -0.1429 | `prev_day_ret` | 0.1270 |
 | `rsi15` | 60.0625 | `pd_level_d` | -0.1154 |
 | `rsi20` | 56.8038 | `range200_pos` | 0.3066 |
-| `vwap_sess_d` | 2.9141 | `or_rvol` | 0.8298 |
-| `vwap_day_d` | 1.6604 | `bar_rvol` | 1.8033 |
+| `vwap_sess_d` | 2.9141 | `or_rvol` | 0.9014 |
+| `vwap_day_d` | 1.6604 | `bar_rvol` | 2.5181 |
 | `tod_min` | 45.0000 | `atr_regime` | 1.6321 |
 | `dow` | 0.0000 | `datr_pct` | 4.0461 |
 
@@ -136,8 +136,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | 0.4449 | `prev_day_ret` | -1.1770 |
 | `rsi15` | 67.3892 | `pd_level_d` | 7.2616 |
 | `rsi20` | 66.1578 | `range200_pos` | 0.5069 |
-| `vwap_sess_d` | 1.2139 | `or_rvol` | 0.8500 |
-| `vwap_day_d` | 4.9223 | `bar_rvol` | 0.5988 |
+| `vwap_sess_d` | 1.2139 | `or_rvol` | 0.7637 |
+| `vwap_day_d` | 4.9223 | `bar_rvol` | 0.6961 |
 | `tod_min` | 35.0000 | `atr_regime` | 1.6743 |
 | `dow` | 3.0000 | `datr_pct` | 4.4780 |
 
@@ -181,7 +181,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 75.5194 | `pd_level_d` | -3.0371 |
 | `rsi20` | 72.5854 | `range200_pos` | 1.2082 |
 | `vwap_sess_d` | 4.0650 | `or_rvol` | 1.1795 |
-| `vwap_day_d` | 4.7399 | `bar_rvol` | — |
+| `vwap_day_d` | 4.7399 | `bar_rvol` | 2.0036 |
 | `tod_min` | 40.0000 | `atr_regime` | 2.6458 |
 | `dow` | 0.0000 | `datr_pct` | 0.7140 |
 
@@ -224,7 +224,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 56.7410 | `pd_level_d` | 9.2202 |
 | `rsi20` | 54.7034 | `range200_pos` | -0.1270 |
 | `vwap_sess_d` | 1.6430 | `or_rvol` | 0.6246 |
-| `vwap_day_d` | -0.2791 | `bar_rvol` | 0.5881 |
+| `vwap_day_d` | -0.2791 | `bar_rvol` | 0.9180 |
 | `tod_min` | 35.0000 | `atr_regime` | 1.8948 |
 | `dow` | 1.0000 | `datr_pct` | 2.7523 |
 
@@ -271,7 +271,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 69.0403 | `pd_level_d` | 10.0402 |
 | `rsi20` | 67.2987 | `range200_pos` | 0.0286 |
 | `vwap_sess_d` | 1.5675 | `or_rvol` | 1.1990 |
-| `vwap_day_d` | 1.8083 | `bar_rvol` | — |
+| `vwap_day_d` | 1.8083 | `bar_rvol` | 1.1889 |
 | `tod_min` | 55.0000 | `atr_regime` | 1.8532 |
 | `dow` | 0.0000 | `datr_pct` | 1.3611 |
 
@@ -328,7 +328,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 58.3547 | `pd_level_d` | 9.3190 |
 | `rsi20` | 56.0379 | `range200_pos` | 0.1560 |
 | `vwap_sess_d` | 1.8516 | `or_rvol` | 1.5574 |
-| `vwap_day_d` | 0.7889 | `bar_rvol` | — |
+| `vwap_day_d` | 0.7889 | `bar_rvol` | 1.0510 |
 | `tod_min` | 105.0000 | `atr_regime` | 2.2953 |
 | `dow` | 4.0000 | `datr_pct` | 0.7654 |
 
@@ -372,7 +372,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 57.4363 | `pd_level_d` | -8.2312 |
 | `rsi20` | 56.9416 | `range200_pos` | 0.4213 |
 | `vwap_sess_d` | 1.2219 | `or_rvol` | 0.9376 |
-| `vwap_day_d` | 3.0668 | `bar_rvol` | 0.8689 |
+| `vwap_day_d` | 3.0668 | `bar_rvol` | 0.8885 |
 | `tod_min` | 40.0000 | `atr_regime` | 2.6355 |
 | `dow` | 2.0000 | `datr_pct` | 1.1757 |
 
@@ -427,7 +427,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 64.8739 | `pd_level_d` | -3.9950 |
 | `rsi20` | 63.4210 | `range200_pos` | 0.5628 |
 | `vwap_sess_d` | 2.1040 | `or_rvol` | 1.0364 |
-| `vwap_day_d` | 4.3804 | `bar_rvol` | — |
+| `vwap_day_d` | 4.3804 | `bar_rvol` | 1.1485 |
 | `tod_min` | 95.0000 | `atr_regime` | 1.9935 |
 | `dow` | 3.0000 | `datr_pct` | 0.8593 |
 
@@ -469,7 +469,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 70.0734 | `pd_level_d` | -2.9797 |
 | `rsi20` | 66.5054 | `range200_pos` | 0.6495 |
 | `vwap_sess_d` | 3.3606 | `or_rvol` | 0.9350 |
-| `vwap_day_d` | 3.6963 | `bar_rvol` | 0.8808 |
+| `vwap_day_d` | 3.6963 | `bar_rvol` | 0.9205 |
 | `tod_min` | 30.0000 | `atr_regime` | 2.4800 |
 | `dow` | 0.0000 | `datr_pct` | 0.7082 |
 
@@ -515,8 +515,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | -0.5111 | `prev_day_ret` | -0.5057 |
 | `rsi15` | 68.0307 | `pd_level_d` | 9.3973 |
 | `rsi20` | 61.6729 | `range200_pos` | -0.1977 |
-| `vwap_sess_d` | 1.3902 | `or_rvol` | 1.0370 |
-| `vwap_day_d` | 1.1758 | `bar_rvol` | 0.8664 |
+| `vwap_sess_d` | 1.3902 | `or_rvol` | 0.9391 |
+| `vwap_day_d` | 1.1758 | `bar_rvol` | 1.0997 |
 | `tod_min` | 45.0000 | `atr_regime` | 1.2213 |
 | `dow` | 3.0000 | `datr_pct` | 3.6153 |
 
@@ -558,8 +558,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | -0.7346 | `prev_day_ret` | -2.1899 |
 | `rsi15` | 51.5950 | `pd_level_d` | 25.9595 |
 | `rsi20` | 50.0217 | `range200_pos` | -0.3785 |
-| `vwap_sess_d` | 1.8915 | `or_rvol` | 0.9899 |
-| `vwap_day_d` | 0.2650 | `bar_rvol` | — |
+| `vwap_sess_d` | 1.8915 | `or_rvol` | 0.9833 |
+| `vwap_day_d` | 0.2650 | `bar_rvol` | 1.0188 |
 | `tod_min` | 45.0000 | `atr_regime` | 1.0771 |
 | `dow` | 4.0000 | `datr_pct` | 1.3079 |
 
@@ -600,8 +600,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | 0.4173 | `prev_day_ret` | -0.5082 |
 | `rsi15` | 64.3132 | `pd_level_d` | 0.6295 |
 | `rsi20` | 63.1451 | `range200_pos` | 0.4083 |
-| `vwap_sess_d` | 1.2619 | `or_rvol` | 0.9276 |
-| `vwap_day_d` | 3.3023 | `bar_rvol` | 0.6251 |
+| `vwap_sess_d` | 1.2619 | `or_rvol` | 0.8349 |
+| `vwap_day_d` | 3.3023 | `bar_rvol` | 0.8890 |
 | `tod_min` | 30.0000 | `atr_regime` | 1.0533 |
 | `dow` | 4.0000 | `datr_pct` | 5.5413 |
 
@@ -644,7 +644,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 61.8855 | `pd_level_d` | 3.3928 |
 | `rsi20` | 58.0041 | `range200_pos` | 0.2939 |
 | `vwap_sess_d` | 0.7280 | `or_rvol` | 1.5954 |
-| `vwap_day_d` | 1.1599 | `bar_rvol` | 1.4051 |
+| `vwap_day_d` | 1.1599 | `bar_rvol` | 2.0130 |
 | `tod_min` | 45.0000 | `atr_regime` | 1.1736 |
 | `dow` | 1.0000 | `datr_pct` | 0.8440 |
 
@@ -689,8 +689,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | 0.0608 | `prev_day_ret` | -0.4092 |
 | `rsi15` | 72.5361 | `pd_level_d` | 0.3495 |
 | `rsi20` | 69.8930 | `range200_pos` | 0.3706 |
-| `vwap_sess_d` | 2.2186 | `or_rvol` | 2.9660 |
-| `vwap_day_d` | 3.2133 | `bar_rvol` | — |
+| `vwap_sess_d` | 2.2186 | `or_rvol` | 2.8970 |
+| `vwap_day_d` | 3.2133 | `bar_rvol` | 2.6713 |
 | `tod_min` | 90.0000 | `atr_regime` | 1.9536 |
 | `dow` | 3.0000 | `datr_pct` | 4.1857 |
 
@@ -733,8 +733,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | -0.0350 | `prev_day_ret` | -0.2835 |
 | `rsi15` | 66.2297 | `pd_level_d` | 7.8268 |
 | `rsi20` | 62.3739 | `range200_pos` | -0.0660 |
-| `vwap_sess_d` | 0.7626 | `or_rvol` | 0.7212 |
-| `vwap_day_d` | 1.4651 | `bar_rvol` | — |
+| `vwap_sess_d` | 0.7626 | `or_rvol` | 0.7398 |
+| `vwap_day_d` | 1.4651 | `bar_rvol` | 0.2760 |
 | `tod_min` | 60.0000 | `atr_regime` | 0.9093 |
 | `dow` | 3.0000 | `datr_pct` | 5.9998 |
 
@@ -775,8 +775,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | 0.1494 | `prev_day_ret` | -0.0177 |
 | `rsi15` | 67.1171 | `pd_level_d` | 1.3836 |
 | `rsi20` | 63.4481 | `range200_pos` | 0.4025 |
-| `vwap_sess_d` | 2.0549 | `or_rvol` | 1.0064 |
-| `vwap_day_d` | 2.0646 | `bar_rvol` | 1.0597 |
+| `vwap_sess_d` | 2.0549 | `or_rvol` | 1.0236 |
+| `vwap_day_d` | 2.0646 | `bar_rvol` | 1.1097 |
 | `tod_min` | 30.0000 | `atr_regime` | 1.0860 |
 | `dow` | 2.0000 | `datr_pct` | 1.4031 |
 
@@ -817,8 +817,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | 0.1132 | `prev_day_ret` | -0.4386 |
 | `rsi15` | 77.4186 | `pd_level_d` | 0.4796 |
 | `rsi20` | 74.1601 | `range200_pos` | 0.4370 |
-| `vwap_sess_d` | 1.4098 | `or_rvol` | 0.7709 |
-| `vwap_day_d` | 4.3044 | `bar_rvol` | 1.2037 |
+| `vwap_sess_d` | 1.4098 | `or_rvol` | 0.7636 |
+| `vwap_day_d` | 4.3044 | `bar_rvol` | 1.6547 |
 | `tod_min` | 30.0000 | `atr_regime` | 1.2575 |
 | `dow` | 3.0000 | `datr_pct` | 3.5361 |
 
@@ -863,8 +863,8 @@ The 24-feature vector at the entry bar's close:
 | `ema200_slope` | -0.3652 | `prev_day_ret` | -0.0379 |
 | `rsi15` | 57.5001 | `pd_level_d` | -1.5063 |
 | `rsi20` | 55.4655 | `range200_pos` | -0.2988 |
-| `vwap_sess_d` | 1.1987 | `or_rvol` | 0.9340 |
-| `vwap_day_d` | 0.8404 | `bar_rvol` | — |
+| `vwap_sess_d` | 1.1987 | `or_rvol` | 0.9121 |
+| `vwap_day_d` | 0.8404 | `bar_rvol` | 0.8786 |
 | `tod_min` | 90.0000 | `atr_regime` | 1.2518 |
 | `dow` | 0.0000 | `datr_pct` | 3.2055 |
 
@@ -906,7 +906,7 @@ The 24-feature vector at the entry bar's close:
 | `rsi15` | 58.8598 | `pd_level_d` | 11.8753 |
 | `rsi20` | 56.0528 | `range200_pos` | -0.2527 |
 | `vwap_sess_d` | 1.8175 | `or_rvol` | 1.3506 |
-| `vwap_day_d` | 1.2961 | `bar_rvol` | 1.1887 |
+| `vwap_day_d` | 1.2961 | `bar_rvol` | 1.2015 |
 | `tod_min` | 30.0000 | `atr_regime` | 1.2621 |
 | `dow` | 4.0000 | `datr_pct` | 1.6391 |
 
