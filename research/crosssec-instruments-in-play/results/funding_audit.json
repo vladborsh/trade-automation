@@ -1,0 +1,3537 @@
+[
+ {
+  "symbol": "0GUSDT",
+  "months": 7,
+  "settlements": 2524
+ },
+ {
+  "symbol": "1000000BOBUSDT",
+  "months": 3,
+  "settlements": 526
+ },
+ {
+  "symbol": "1000000MOGUSDT",
+  "months": 13,
+  "settlements": 2330
+ },
+ {
+  "symbol": "1000BONKUSDT",
+  "months": 33,
+  "settlements": 5893
+ },
+ {
+  "symbol": "1000BTTCUSDT",
+  "months": 2,
+  "settlements": 134
+ },
+ {
+  "symbol": "1000CATUSDT",
+  "months": 13,
+  "settlements": 2252
+ },
+ {
+  "symbol": "1000CHEEMSUSDT",
+  "months": 9,
+  "settlements": 1491
+ },
+ {
+  "symbol": "1000FLOKIUSDT",
+  "months": 37,
+  "settlements": 3364
+ },
+ {
+  "symbol": "1000LUNCUSDT",
+  "months": 45,
+  "settlements": 4087
+ },
+ {
+  "symbol": "1000PEPEUSDT",
+  "months": 39,
+  "settlements": 3550
+ },
+ {
+  "symbol": "1000RATSUSDT",
+  "months": 21,
+  "settlements": 3746
+ },
+ {
+  "symbol": "1000SATSUSDT",
+  "months": 24,
+  "settlements": 4316
+ },
+ {
+  "symbol": "1000SHIBUSDT",
+  "months": 63,
+  "settlements": 5725
+ },
+ {
+  "symbol": "1000WHYUSDT",
+  "months": 4,
+  "settlements": 573
+ },
+ {
+  "symbol": "1000XECUSDT",
+  "months": 37,
+  "settlements": 3563
+ },
+ {
+  "symbol": "1000XUSDT",
+  "months": 6,
+  "settlements": 1010
+ },
+ {
+  "symbol": "1INCHUSDT",
+  "months": 63,
+  "settlements": 5674
+ },
+ {
+  "symbol": "1MBABYDOGEUSDT",
+  "months": 14,
+  "settlements": 2463
+ },
+ {
+  "symbol": "2ZUSDT",
+  "months": 3,
+  "settlements": 543
+ },
+ {
+  "symbol": "4USDT",
+  "months": 6,
+  "settlements": 1059
+ },
+ {
+  "symbol": "A2ZUSDT",
+  "months": 3,
+  "settlements": 376
+ },
+ {
+  "symbol": "AAOIUSDT",
+  "months": 2,
+  "settlements": 161
+ },
+ {
+  "symbol": "AAPLUSDT",
+  "months": 2,
+  "settlements": 183
+ },
+ {
+  "symbol": "AAVEUSDT",
+  "months": 70,
+  "settlements": 6344
+ },
+ {
+  "symbol": "ACEUSDT",
+  "months": 18,
+  "settlements": 3401
+ },
+ {
+  "symbol": "ACHUSDT",
+  "months": 36,
+  "settlements": 3224
+ },
+ {
+  "symbol": "ACTUSDT",
+  "months": 14,
+  "settlements": 2492
+ },
+ {
+  "symbol": "ACUUSDT",
+  "months": 2,
+  "settlements": 230
+ },
+ {
+  "symbol": "ACXUSDT",
+  "months": 3,
+  "settlements": 506
+ },
+ {
+  "symbol": "ADAUSDT",
+  "months": 78,
+  "settlements": 7119
+ },
+ {
+  "symbol": "AERGOUSDT",
+  "months": 11,
+  "settlements": 2063
+ },
+ {
+  "symbol": "AEROUSDT",
+  "months": 17,
+  "settlements": 3091
+ },
+ {
+  "symbol": "AEVOUSDT",
+  "months": 20,
+  "settlements": 3584
+ },
+ {
+  "symbol": "AGIXUSDT",
+  "months": 18,
+  "settlements": 1597
+ },
+ {
+  "symbol": "AGLDUSDT",
+  "months": 23,
+  "settlements": 2094
+ },
+ {
+  "symbol": "AGTUSDT",
+  "months": 6,
+  "settlements": 987
+ },
+ {
+  "symbol": "AI16ZUSDT",
+  "months": 11,
+  "settlements": 1847
+ },
+ {
+  "symbol": "AIAUSDT",
+  "months": 10,
+  "settlements": 2485
+ },
+ {
+  "symbol": "AIGENSYNUSDT",
+  "months": 4,
+  "settlements": 559
+ },
+ {
+  "symbol": "AINUSDT",
+  "months": 4,
+  "settlements": 669
+ },
+ {
+  "symbol": "AIOTUSDT",
+  "months": 11,
+  "settlements": 1838
+ },
+ {
+  "symbol": "AIOUSDT",
+  "months": 2,
+  "settlements": 291
+ },
+ {
+  "symbol": "AIUSDT",
+  "months": 20,
+  "settlements": 3608
+ },
+ {
+  "symbol": "AIXBTUSDT",
+  "months": 18,
+  "settlements": 3163
+ },
+ {
+  "symbol": "AKEUSDT",
+  "months": 4,
+  "settlements": 731
+ },
+ {
+  "symbol": "AKROUSDT",
+  "months": 17,
+  "settlements": 1480
+ },
+ {
+  "symbol": "AKTUSDT",
+  "months": 9,
+  "settlements": 1533
+ },
+ {
+  "symbol": "ALCHUSDT",
+  "months": 14,
+  "settlements": 2505
+ },
+ {
+  "symbol": "ALGOUSDT",
+  "months": 74,
+  "settlements": 6756
+ },
+ {
+  "symbol": "ALICEUSDT",
+  "months": 54,
+  "settlements": 4888
+ },
+ {
+  "symbol": "ALLOUSDT",
+  "months": 8,
+  "settlements": 1394
+ },
+ {
+  "symbol": "ALPACAUSDT",
+  "months": 10,
+  "settlements": 2359
+ },
+ {
+  "symbol": "ALPHAUSDT",
+  "months": 52,
+  "settlements": 4727
+ },
+ {
+  "symbol": "ALPINEUSDT",
+  "months": 4,
+  "settlements": 738
+ },
+ {
+  "symbol": "ALTUSDT",
+  "months": 25,
+  "settlements": 4417
+ },
+ {
+  "symbol": "AMBUSDT",
+  "months": 20,
+  "settlements": 3077
+ },
+ {
+  "symbol": "AMDUSDT",
+  "months": 3,
+  "settlements": 260
+ },
+ {
+  "symbol": "AMZNUSDT",
+  "months": 2,
+  "settlements": 183
+ },
+ {
+  "symbol": "ANCUSDT",
+  "months": 3,
+  "settlements": 198
+ },
+ {
+  "symbol": "ANIMEUSDT",
+  "months": 11,
+  "settlements": 2107
+ },
+ {
+  "symbol": "ANKRUSDT",
+  "months": 49,
+  "settlements": 4556
+ },
+ {
+  "symbol": "ANTUSDT",
+  "months": 27,
+  "settlements": 2387
+ },
+ {
+  "symbol": "APEUSDT",
+  "months": 52,
+  "settlements": 4699
+ },
+ {
+  "symbol": "API3USDT",
+  "months": 48,
+  "settlements": 7528
+ },
+ {
+  "symbol": "APRUSDT",
+  "months": 6,
+  "settlements": 952
+ },
+ {
+  "symbol": "APTUSDT",
+  "months": 46,
+  "settlements": 4147
+ },
+ {
+  "symbol": "ARBUSDT",
+  "months": 41,
+  "settlements": 3680
+ },
+ {
+  "symbol": "ARCUSDT",
+  "months": 15,
+  "settlements": 2630
+ },
+ {
+  "symbol": "ARIAUSDT",
+  "months": 6,
+  "settlements": 1186
+ },
+ {
+  "symbol": "ARKMUSDT",
+  "months": 32,
+  "settlements": 2842
+ },
+ {
+  "symbol": "ARKUSDT",
+  "months": 24,
+  "settlements": 2723
+ },
+ {
+  "symbol": "ARMUSDT",
+  "months": 3,
+  "settlements": 199
+ },
+ {
+  "symbol": "ARPAUSDT",
+  "months": 42,
+  "settlements": 3773
+ },
+ {
+  "symbol": "ARUSDT",
+  "months": 57,
+  "settlements": 5120
+ },
+ {
+  "symbol": "ARXUSDT",
+  "months": 2,
+  "settlements": 232
+ },
+ {
+  "symbol": "ASRUSDT",
+  "months": 3,
+  "settlements": 552
+ },
+ {
+  "symbol": "ASTERUSDT",
+  "months": 11,
+  "settlements": 1892
+ },
+ {
+  "symbol": "ASTRUSDT",
+  "months": 26,
+  "settlements": 2339
+ },
+ {
+  "symbol": "ATAUSDT",
+  "months": 38,
+  "settlements": 3386
+ },
+ {
+  "symbol": "ATHUSDT",
+  "months": 10,
+  "settlements": 1802
+ },
+ {
+  "symbol": "ATOMUSDT",
+  "months": 76,
+  "settlements": 6919
+ },
+ {
+  "symbol": "ATUSDT",
+  "months": 3,
+  "settlements": 552
+ },
+ {
+  "symbol": "AUCTIONUSDT",
+  "months": 26,
+  "settlements": 4714
+ },
+ {
+  "symbol": "AUDIOUSDT",
+  "months": 32,
+  "settlements": 2867
+ },
+ {
+  "symbol": "AUSDT",
+  "months": 6,
+  "settlements": 940
+ },
+ {
+  "symbol": "AVAAIUSDT",
+  "months": 8,
+  "settlements": 1358
+ },
+ {
+  "symbol": "AVAUSDT",
+  "months": 4,
+  "settlements": 650
+ },
+ {
+  "symbol": "AVAXUSDT",
+  "months": 71,
+  "settlements": 6415
+ },
+ {
+  "symbol": "AVGOUSDT",
+  "months": 3,
+  "settlements": 285
+ },
+ {
+  "symbol": "AVNTUSDT",
+  "months": 9,
+  "settlements": 1586
+ },
+ {
+  "symbol": "AWEUSDT",
+  "months": 5,
+  "settlements": 906
+ },
+ {
+  "symbol": "AXLUSDT",
+  "months": 24,
+  "settlements": 5072
+ },
+ {
+  "symbol": "AXSUSDT",
+  "months": 69,
+  "settlements": 6980
+ },
+ {
+  "symbol": "AZTECUSDT",
+  "months": 2,
+  "settlements": 410
+ },
+ {
+  "symbol": "B2USDT",
+  "months": 5,
+  "settlements": 878
+ },
+ {
+  "symbol": "B3USDT",
+  "months": 2,
+  "settlements": 279
+ },
+ {
+  "symbol": "BABAUSDT",
+  "months": 2,
+  "settlements": 192
+ },
+ {
+  "symbol": "BABYUSDT",
+  "months": 10,
+  "settlements": 1849
+ },
+ {
+  "symbol": "BADGERUSDT",
+  "months": 11,
+  "settlements": 1959
+ },
+ {
+  "symbol": "BAKEUSDT",
+  "months": 52,
+  "settlements": 4609
+ },
+ {
+  "symbol": "BALUSDT",
+  "months": 40,
+  "settlements": 3651
+ },
+ {
+  "symbol": "BANANAS31USDT",
+  "months": 14,
+  "settlements": 2433
+ },
+ {
+  "symbol": "BANANAUSDT",
+  "months": 13,
+  "settlements": 2293
+ },
+ {
+  "symbol": "BANDUSDT",
+  "months": 54,
+  "settlements": 4850
+ },
+ {
+  "symbol": "BANKUSDT",
+  "months": 11,
+  "settlements": 1935
+ },
+ {
+  "symbol": "BANUSDT",
+  "months": 8,
+  "settlements": 1355
+ },
+ {
+  "symbol": "BARDUSDT",
+  "months": 8,
+  "settlements": 1999
+ },
+ {
+  "symbol": "BASEDUSDT",
+  "months": 5,
+  "settlements": 740
+ },
+ {
+  "symbol": "BASUSDT",
+  "months": 11,
+  "settlements": 1849
+ },
+ {
+  "symbol": "BATUSDT",
+  "months": 57,
+  "settlements": 5205
+ },
+ {
+  "symbol": "BBUSDT",
+  "months": 20,
+  "settlements": 3584
+ },
+ {
+  "symbol": "BCHUSDT",
+  "months": 80,
+  "settlements": 7212
+ },
+ {
+  "symbol": "BDXNUSDT",
+  "months": 5,
+  "settlements": 903
+ },
+ {
+  "symbol": "BEAMXUSDT",
+  "months": 24,
+  "settlements": 4287
+ },
+ {
+  "symbol": "BEATUSDT",
+  "months": 9,
+  "settlements": 1904
+ },
+ {
+  "symbol": "BELUSDT",
+  "months": 63,
+  "settlements": 5699
+ },
+ {
+  "symbol": "BERAUSDT",
+  "months": 17,
+  "settlements": 3055
+ },
+ {
+  "symbol": "BEUSDT",
+  "months": 2,
+  "settlements": 183
+ },
+ {
+  "symbol": "BICOUSDT",
+  "months": 14,
+  "settlements": 1281
+ },
+ {
+  "symbol": "BIDUSDT",
+  "months": 4,
+  "settlements": 738
+ },
+ {
+  "symbol": "BIGTIMEUSDT",
+  "months": 23,
+  "settlements": 4136
+ },
+ {
+  "symbol": "BILLUSDT",
+  "months": 3,
+  "settlements": 513
+ },
+ {
+  "symbol": "BIOUSDT",
+  "months": 19,
+  "settlements": 4257
+ },
+ {
+  "symbol": "BLESSUSDT",
+  "months": 9,
+  "settlements": 1514
+ },
+ {
+  "symbol": "BLUAIUSDT",
+  "months": 2,
+  "settlements": 243
+ },
+ {
+  "symbol": "BLURUSDT",
+  "months": 34,
+  "settlements": 3259
+ },
+ {
+  "symbol": "BLZUSDT",
+  "months": 47,
+  "settlements": 5524
+ },
+ {
+  "symbol": "BMTUSDT",
+  "months": 5,
+  "settlements": 818
+ },
+ {
+  "symbol": "BNBUSDT",
+  "months": 78,
+  "settlements": 7091
+ },
+ {
+  "symbol": "BNTUSDT",
+  "months": 8,
+  "settlements": 729
+ },
+ {
+  "symbol": "BNXUSDT",
+  "months": 34,
+  "settlements": 2335
+ },
+ {
+  "symbol": "BOBUSDT",
+  "months": 2,
+  "settlements": 243
+ },
+ {
+  "symbol": "BOMEUSDT",
+  "months": 26,
+  "settlements": 4672
+ },
+ {
+  "symbol": "BONDUSDT",
+  "months": 15,
+  "settlements": 2660
+ },
+ {
+  "symbol": "BRETTUSDT",
+  "months": 17,
+  "settlements": 2991
+ },
+ {
+  "symbol": "BREVUSDT",
+  "months": 3,
+  "settlements": 363
+ },
+ {
+  "symbol": "BROCCOLI714USDT",
+  "months": 10,
+  "settlements": 1755
+ },
+ {
+  "symbol": "BROCCOLIF3BUSDT",
+  "months": 6,
+  "settlements": 1722
+ },
+ {
+  "symbol": "BRUSDT",
+  "months": 9,
+  "settlements": 1514
+ },
+ {
+  "symbol": "BSBUSDT",
+  "months": 5,
+  "settlements": 770
+ },
+ {
+  "symbol": "BSVUSDT",
+  "months": 16,
+  "settlements": 2823
+ },
+ {
+  "symbol": "BSWUSDT",
+  "months": 7,
+  "settlements": 1272
+ },
+ {
+  "symbol": "BTCDOMUSDT",
+  "months": 32,
+  "settlements": 2916
+ },
+ {
+  "symbol": "BTCUSDT",
+  "months": 80,
+  "settlements": 7212
+ },
+ {
+  "symbol": "BTRUSDT",
+  "months": 8,
+  "settlements": 1317
+ },
+ {
+  "symbol": "BTSUSDT",
+  "months": 19,
+  "settlements": 1730
+ },
+ {
+  "symbol": "BTTUSDT",
+  "months": 10,
+  "settlements": 892
+ },
+ {
+  "symbol": "BTWUSDT",
+  "months": 2,
+  "settlements": 343
+ },
+ {
+  "symbol": "BULLAUSDT",
+  "months": 8,
+  "settlements": 1617
+ },
+ {
+  "symbol": "BUSDT",
+  "months": 11,
+  "settlements": 1891
+ },
+ {
+  "symbol": "BZRXUSDT",
+  "months": 16,
+  "settlements": 1445
+ },
+ {
+  "symbol": "BZUSDT",
+  "months": 4,
+  "settlements": 731
+ },
+ {
+  "symbol": "C98USDT",
+  "months": 43,
+  "settlements": 3848
+ },
+ {
+  "symbol": "CAKEUSDT",
+  "months": 29,
+  "settlements": 5282
+ },
+ {
+  "symbol": "CAPUSDT",
+  "months": 2,
+  "settlements": 207
+ },
+ {
+  "symbol": "CATIUSDT",
+  "months": 10,
+  "settlements": 1707
+ },
+ {
+  "symbol": "CBRSUSDT",
+  "months": 3,
+  "settlements": 221
+ },
+ {
+  "symbol": "CCUSDT",
+  "months": 6,
+  "settlements": 1086
+ },
+ {
+  "symbol": "CELOUSDT",
+  "months": 54,
+  "settlements": 4847
+ },
+ {
+  "symbol": "CELRUSDT",
+  "months": 40,
+  "settlements": 3572
+ },
+ {
+  "symbol": "CETUSUSDT",
+  "months": 10,
+  "settlements": 1790
+ },
+ {
+  "symbol": "CFGUSDT",
+  "months": 4,
+  "settlements": 637
+ },
+ {
+  "symbol": "CFXUSDT",
+  "months": 36,
+  "settlements": 3227
+ },
+ {
+  "symbol": "CGPTUSDT",
+  "months": 8,
+  "settlements": 1339
+ },
+ {
+  "symbol": "CHESSUSDT",
+  "months": 8,
+  "settlements": 1470
+ },
+ {
+  "symbol": "CHILLGUYUSDT",
+  "months": 11,
+  "settlements": 1844
+ },
+ {
+  "symbol": "CHIPUSDT",
+  "months": 4,
+  "settlements": 639
+ },
+ {
+  "symbol": "CHRUSDT",
+  "months": 47,
+  "settlements": 4265
+ },
+ {
+  "symbol": "CHZUSDT",
+  "months": 67,
+  "settlements": 6114
+ },
+ {
+  "symbol": "CKBUSDT",
+  "months": 22,
+  "settlements": 1922
+ },
+ {
+  "symbol": "CLANKERUSDT",
+  "months": 2,
+  "settlements": 354
+ },
+ {
+  "symbol": "CLOUSDT",
+  "months": 9,
+  "settlements": 1668
+ },
+ {
+  "symbol": "CLUSDT",
+  "months": 4,
+  "settlements": 731
+ },
+ {
+  "symbol": "COAIUSDT",
+  "months": 7,
+  "settlements": 1927
+ },
+ {
+  "symbol": "COCOSUSDT",
+  "months": 5,
+  "settlements": 389
+ },
+ {
+  "symbol": "COINUSDT",
+  "months": 6,
+  "settlements": 526
+ },
+ {
+  "symbol": "COLLECTUSDT",
+  "months": 6,
+  "settlements": 908
+ },
+ {
+  "symbol": "COMBOUSDT",
+  "months": 14,
+  "settlements": 1274
+ },
+ {
+  "symbol": "COMMONUSDT",
+  "months": 2,
+  "settlements": 207
+ },
+ {
+  "symbol": "COMPUSDT",
+  "months": 71,
+  "settlements": 6392
+ },
+ {
+  "symbol": "COOKIEUSDT",
+  "months": 11,
+  "settlements": 1965
+ },
+ {
+  "symbol": "COPPERUSDT",
+  "months": 2,
+  "settlements": 365
+ },
+ {
+  "symbol": "COSUSDT",
+  "months": 5,
+  "settlements": 987
+ },
+ {
+  "symbol": "COTIUSDT",
+  "months": 53,
+  "settlements": 4814
+ },
+ {
+  "symbol": "COWUSDT",
+  "months": 12,
+  "settlements": 2156
+ },
+ {
+  "symbol": "CRCLUSDT",
+  "months": 6,
+  "settlements": 526
+ },
+ {
+  "symbol": "CROSSUSDT",
+  "months": 2,
+  "settlements": 315
+ },
+ {
+  "symbol": "CRVUSDT",
+  "months": 71,
+  "settlements": 6479
+ },
+ {
+  "symbol": "CRWVUSDT",
+  "months": 2,
+  "settlements": 131
+ },
+ {
+  "symbol": "CTKUSDT",
+  "months": 35,
+  "settlements": 3134
+ },
+ {
+  "symbol": "CTSIUSDT",
+  "months": 40,
+  "settlements": 3578
+ },
+ {
+  "symbol": "CUDISUSDT",
+  "months": 2,
+  "settlements": 249
+ },
+ {
+  "symbol": "CUSDT",
+  "months": 7,
+  "settlements": 1313
+ },
+ {
+  "symbol": "CVCUSDT",
+  "months": 28,
+  "settlements": 2659
+ },
+ {
+  "symbol": "CVXUSDT",
+  "months": 14,
+  "settlements": 1235
+ },
+ {
+  "symbol": "CYBERUSDT",
+  "months": 25,
+  "settlements": 4332
+ },
+ {
+  "symbol": "CYSUSDT",
+  "months": 5,
+  "settlements": 837
+ },
+ {
+  "symbol": "DAMUSDT",
+  "months": 3,
+  "settlements": 447
+ },
+ {
+  "symbol": "DARUSDT",
+  "months": 29,
+  "settlements": 2570
+ },
+ {
+  "symbol": "DASHUSDT",
+  "months": 64,
+  "settlements": 5834
+ },
+ {
+  "symbol": "DEEPUSDT",
+  "months": 6,
+  "settlements": 975
+ },
+ {
+  "symbol": "DEFIUSDT",
+  "months": 18,
+  "settlements": 1565
+ },
+ {
+  "symbol": "DEGENUSDT",
+  "months": 8,
+  "settlements": 1365
+ },
+ {
+  "symbol": "DEGOUSDT",
+  "months": 10,
+  "settlements": 1776
+ },
+ {
+  "symbol": "DELLUSDT",
+  "months": 2,
+  "settlements": 181
+ },
+ {
+  "symbol": "DENTUSDT",
+  "months": 44,
+  "settlements": 3947
+ },
+ {
+  "symbol": "DEXEUSDT",
+  "months": 17,
+  "settlements": 3146
+ },
+ {
+  "symbol": "DFUSDT",
+  "months": 5,
+  "settlements": 729
+ },
+ {
+  "symbol": "DGBUSDT",
+  "months": 26,
+  "settlements": 2317
+ },
+ {
+  "symbol": "DIAUSDT",
+  "months": 6,
+  "settlements": 1094
+ },
+ {
+  "symbol": "DMCUSDT",
+  "months": 3,
+  "settlements": 411
+ },
+ {
+  "symbol": "DODOUSDT",
+  "months": 16,
+  "settlements": 1386
+ },
+ {
+  "symbol": "DODOXUSDT",
+  "months": 14,
+  "settlements": 2358
+ },
+ {
+  "symbol": "DOGEUSDT",
+  "months": 70,
+  "settlements": 6390
+ },
+ {
+  "symbol": "DOGSUSDT",
+  "months": 18,
+  "settlements": 3133
+ },
+ {
+  "symbol": "DOLOUSDT",
+  "months": 8,
+  "settlements": 1470
+ },
+ {
+  "symbol": "DOODUSDT",
+  "months": 7,
+  "settlements": 2424
+ },
+ {
+  "symbol": "DOTECOUSDT",
+  "months": 2,
+  "settlements": 119
+ },
+ {
+  "symbol": "DOTUSDT",
+  "months": 72,
+  "settlements": 6515
+ },
+ {
+  "symbol": "DRAMUSDT",
+  "months": 3,
+  "settlements": 224
+ },
+ {
+  "symbol": "DRIFTUSDT",
+  "months": 14,
+  "settlements": 2660
+ },
+ {
+  "symbol": "DUSDT",
+  "months": 5,
+  "settlements": 855
+ },
+ {
+  "symbol": "DUSKUSDT",
+  "months": 42,
+  "settlements": 4206
+ },
+ {
+  "symbol": "DYDXUSDT",
+  "months": 59,
+  "settlements": 5359
+ },
+ {
+  "symbol": "DYMUSDT",
+  "months": 23,
+  "settlements": 4155
+ },
+ {
+  "symbol": "EDENUSDT",
+  "months": 6,
+  "settlements": 915
+ },
+ {
+  "symbol": "EDGEUSDT",
+  "months": 5,
+  "settlements": 805
+ },
+ {
+  "symbol": "EDUUSDT",
+  "months": 26,
+  "settlements": 2296
+ },
+ {
+  "symbol": "EGLDUSDT",
+  "months": 59,
+  "settlements": 5385
+ },
+ {
+  "symbol": "EIGENUSDT",
+  "months": 23,
+  "settlements": 4011
+ },
+ {
+  "symbol": "ENAUSDT",
+  "months": 28,
+  "settlements": 5101
+ },
+ {
+  "symbol": "ENJUSDT",
+  "months": 55,
+  "settlements": 5507
+ },
+ {
+  "symbol": "ENSOUSDT",
+  "months": 8,
+  "settlements": 1519
+ },
+ {
+  "symbol": "ENSUSDT",
+  "months": 50,
+  "settlements": 4474
+ },
+ {
+  "symbol": "EOSUSDT",
+  "months": 65,
+  "settlements": 5912
+ },
+ {
+  "symbol": "EPICUSDT",
+  "months": 12,
+  "settlements": 2171
+ },
+ {
+  "symbol": "EPTUSDT",
+  "months": 3,
+  "settlements": 422
+ },
+ {
+  "symbol": "ERAUSDT",
+  "months": 7,
+  "settlements": 1442
+ },
+ {
+  "symbol": "ESPORTSUSDT",
+  "months": 9,
+  "settlements": 1865
+ },
+ {
+  "symbol": "ESPUSDT",
+  "months": 2,
+  "settlements": 469
+ },
+ {
+  "symbol": "ETCUSDT",
+  "months": 79,
+  "settlements": 7166
+ },
+ {
+  "symbol": "ETHFIUSDT",
+  "months": 29,
+  "settlements": 5191
+ },
+ {
+  "symbol": "ETHUSDT",
+  "months": 80,
+  "settlements": 7212
+ },
+ {
+  "symbol": "ETHWUSDT",
+  "months": 10,
+  "settlements": 1658
+ },
+ {
+  "symbol": "EULUSDT",
+  "months": 4,
+  "settlements": 645
+ },
+ {
+  "symbol": "EVAAUSDT",
+  "months": 7,
+  "settlements": 1274
+ },
+ {
+  "symbol": "EWYUSDT",
+  "months": 5,
+  "settlements": 422
+ },
+ {
+  "symbol": "FARTCOINUSDT",
+  "months": 20,
+  "settlements": 3528
+ },
+ {
+  "symbol": "FETUSDT",
+  "months": 43,
+  "settlements": 3878
+ },
+ {
+  "symbol": "FFUSDT",
+  "months": 8,
+  "settlements": 1292
+ },
+ {
+  "symbol": "FHEUSDT",
+  "months": 11,
+  "settlements": 1934
+ },
+ {
+  "symbol": "FIDAUSDT",
+  "months": 16,
+  "settlements": 2844
+ },
+ {
+  "symbol": "FIGHTUSDT",
+  "months": 2,
+  "settlements": 219
+ },
+ {
+  "symbol": "FILUSDT",
+  "months": 70,
+  "settlements": 6344
+ },
+ {
+  "symbol": "FIOUSDT",
+  "months": 5,
+  "settlements": 801
+ },
+ {
+  "symbol": "FISUSDT",
+  "months": 3,
+  "settlements": 552
+ },
+ {
+  "symbol": "FLMUSDT",
+  "months": 59,
+  "settlements": 7944
+ },
+ {
+  "symbol": "FLNCUSDT",
+  "months": 2,
+  "settlements": 131
+ },
+ {
+  "symbol": "FLOWUSDT",
+  "months": 50,
+  "settlements": 5188
+ },
+ {
+  "symbol": "FLUXUSDT",
+  "months": 4,
+  "settlements": 732
+ },
+ {
+  "symbol": "FOGOUSDT",
+  "months": 3,
+  "settlements": 482
+ },
+ {
+  "symbol": "FOLKSUSDT",
+  "months": 8,
+  "settlements": 1794
+ },
+ {
+  "symbol": "FOOTBALLUSDT",
+  "months": 10,
+  "settlements": 921
+ },
+ {
+  "symbol": "FORMUSDT",
+  "months": 12,
+  "settlements": 2080
+ },
+ {
+  "symbol": "FRONTUSDT",
+  "months": 12,
+  "settlements": 1033
+ },
+ {
+  "symbol": "FTMUSDT",
+  "months": 50,
+  "settlements": 4569
+ },
+ {
+  "symbol": "FTTUSDT",
+  "months": 8,
+  "settlements": 727
+ },
+ {
+  "symbol": "FUNUSDT",
+  "months": 7,
+  "settlements": 1644
+ },
+ {
+  "symbol": "FUSDT",
+  "months": 6,
+  "settlements": 1389
+ },
+ {
+  "symbol": "FXSUSDT",
+  "months": 30,
+  "settlements": 2681
+ },
+ {
+  "symbol": "GALAUSDT",
+  "months": 58,
+  "settlements": 5242
+ },
+ {
+  "symbol": "GALUSDT",
+  "months": 27,
+  "settlements": 2455
+ },
+ {
+  "symbol": "GASUSDT",
+  "months": 23,
+  "settlements": 4100
+ },
+ {
+  "symbol": "GENIUSUSDT",
+  "months": 3,
+  "settlements": 454
+ },
+ {
+  "symbol": "GHSTUSDT",
+  "months": 3,
+  "settlements": 552
+ },
+ {
+  "symbol": "GIGGLEUSDT",
+  "months": 9,
+  "settlements": 1587
+ },
+ {
+  "symbol": "GLMRUSDT",
+  "months": 6,
+  "settlements": 546
+ },
+ {
+  "symbol": "GLMUSDT",
+  "months": 22,
+  "settlements": 3892
+ },
+ {
+  "symbol": "GLWUSDT",
+  "months": 2,
+  "settlements": 152
+ },
+ {
+  "symbol": "GMTUSDT",
+  "months": 46,
+  "settlements": 4325
+ },
+ {
+  "symbol": "GMXUSDT",
+  "months": 28,
+  "settlements": 2507
+ },
+ {
+  "symbol": "GOATUSDT",
+  "months": 13,
+  "settlements": 2234
+ },
+ {
+  "symbol": "GOOGLUSDT",
+  "months": 4,
+  "settlements": 375
+ },
+ {
+  "symbol": "GPSUSDT",
+  "months": 12,
+  "settlements": 2415
+ },
+ {
+  "symbol": "GRASSUSDT",
+  "months": 20,
+  "settlements": 3595
+ },
+ {
+  "symbol": "GRIFFAINUSDT",
+  "months": 10,
+  "settlements": 1814
+ },
+ {
+  "symbol": "GRTUSDT",
+  "months": 60,
+  "settlements": 5423
+ },
+ {
+  "symbol": "GTCUSDT",
+  "months": 46,
+  "settlements": 4178
+ },
+ {
+  "symbol": "GUAUSDT",
+  "months": 4,
+  "settlements": 831
+ },
+ {
+  "symbol": "GUNUSDT",
+  "months": 12,
+  "settlements": 2006
+ },
+ {
+  "symbol": "GUSDT",
+  "months": 6,
+  "settlements": 1103
+ },
+ {
+  "symbol": "GWEIUSDT",
+  "months": 6,
+  "settlements": 1406
+ },
+ {
+  "symbol": "HAEDALUSDT",
+  "months": 4,
+  "settlements": 738
+ },
+ {
+  "symbol": "HANAUSDT",
+  "months": 6,
+  "settlements": 2415
+ },
+ {
+  "symbol": "HBARUSDT",
+  "months": 65,
+  "settlements": 5888
+ },
+ {
+  "symbol": "HEIUSDT",
+  "months": 9,
+  "settlements": 1576
+ },
+ {
+  "symbol": "HEMIUSDT",
+  "months": 5,
+  "settlements": 751
+ },
+ {
+  "symbol": "HFTUSDT",
+  "months": 19,
+  "settlements": 1726
+ },
+ {
+  "symbol": "HIFIUSDT",
+  "months": 25,
+  "settlements": 4246
+ },
+ {
+  "symbol": "HIGHUSDT",
+  "months": 28,
+  "settlements": 2552
+ },
+ {
+  "symbol": "HIPPOUSDT",
+  "months": 12,
+  "settlements": 2540
+ },
+ {
+  "symbol": "HIVEUSDT",
+  "months": 5,
+  "settlements": 771
+ },
+ {
+  "symbol": "HMSTRUSDT",
+  "months": 15,
+  "settlements": 2587
+ },
+ {
+  "symbol": "HNTUSDT",
+  "months": 27,
+  "settlements": 2474
+ },
+ {
+  "symbol": "HOLOUSDT",
+  "months": 3,
+  "settlements": 484
+ },
+ {
+  "symbol": "HOMEUSDT",
+  "months": 8,
+  "settlements": 1751
+ },
+ {
+  "symbol": "HOODUSDT",
+  "months": 6,
+  "settlements": 539
+ },
+ {
+  "symbol": "HOOKUSDT",
+  "months": 30,
+  "settlements": 2687
+ },
+ {
+  "symbol": "HOTUSDT",
+  "months": 45,
+  "settlements": 4019
+ },
+ {
+  "symbol": "HUMAUSDT",
+  "months": 9,
+  "settlements": 1484
+ },
+ {
+  "symbol": "HUSDT",
+  "months": 14,
+  "settlements": 2824
+ },
+ {
+  "symbol": "HYPERUSDT",
+  "months": 9,
+  "settlements": 1670
+ },
+ {
+  "symbol": "HYPEUSDT",
+  "months": 15,
+  "settlements": 2564
+ },
+ {
+  "symbol": "IBMUSDT",
+  "months": 2,
+  "settlements": 176
+ },
+ {
+  "symbol": "ICNTUSDT",
+  "months": 6,
+  "settlements": 1095
+ },
+ {
+  "symbol": "ICPUSDT",
+  "months": 61,
+  "settlements": 4290
+ },
+ {
+  "symbol": "ICXUSDT",
+  "months": 46,
+  "settlements": 4200
+ },
+ {
+  "symbol": "IDEXUSDT",
+  "months": 5,
+  "settlements": 449
+ },
+ {
+  "symbol": "IDOLUSDT",
+  "months": 5,
+  "settlements": 917
+ },
+ {
+  "symbol": "IDUSDT",
+  "months": 30,
+  "settlements": 2939
+ },
+ {
+  "symbol": "ILVUSDT",
+  "months": 16,
+  "settlements": 2876
+ },
+ {
+  "symbol": "IMXUSDT",
+  "months": 48,
+  "settlements": 6880
+ },
+ {
+  "symbol": "INITUSDT",
+  "months": 9,
+  "settlements": 1604
+ },
+ {
+  "symbol": "INJUSDT",
+  "months": 48,
+  "settlements": 4336
+ },
+ {
+  "symbol": "INTCUSDT",
+  "months": 6,
+  "settlements": 539
+ },
+ {
+  "symbol": "INUSDT",
+  "months": 8,
+  "settlements": 1444
+ },
+ {
+  "symbol": "IOSTUSDT",
+  "months": 53,
+  "settlements": 4839
+ },
+ {
+  "symbol": "IOTAUSDT",
+  "months": 60,
+  "settlements": 5481
+ },
+ {
+  "symbol": "IOTXUSDT",
+  "months": 44,
+  "settlements": 3991
+ },
+ {
+  "symbol": "IOUSDT",
+  "months": 20,
+  "settlements": 3589
+ },
+ {
+  "symbol": "IPUSDT",
+  "months": 18,
+  "settlements": 3569
+ },
+ {
+  "symbol": "IRUSDT",
+  "months": 2,
+  "settlements": 249
+ },
+ {
+  "symbol": "IRYSUSDT",
+  "months": 5,
+  "settlements": 987
+ },
+ {
+  "symbol": "JASMYUSDT",
+  "months": 47,
+  "settlements": 4235
+ },
+ {
+  "symbol": "JCTUSDT",
+  "months": 7,
+  "settlements": 1210
+ },
+ {
+  "symbol": "JELLYJELLYUSDT",
+  "months": 13,
+  "settlements": 2235
+ },
+ {
+  "symbol": "JOEUSDT",
+  "months": 16,
+  "settlements": 1381
+ },
+ {
+  "symbol": "JTOUSDT",
+  "months": 32,
+  "settlements": 5798
+ },
+ {
+  "symbol": "JUPUSDT",
+  "months": 30,
+  "settlements": 5470
+ },
+ {
+  "symbol": "KAIAUSDT",
+  "months": 10,
+  "settlements": 1808
+ },
+ {
+  "symbol": "KAITOUSDT",
+  "months": 17,
+  "settlements": 2971
+ },
+ {
+  "symbol": "KASUSDT",
+  "months": 26,
+  "settlements": 4657
+ },
+ {
+  "symbol": "KATUSDT",
+  "months": 3,
+  "settlements": 544
+ },
+ {
+  "symbol": "KAVAUSDT",
+  "months": 66,
+  "settlements": 6571
+ },
+ {
+  "symbol": "KDAUSDT",
+  "months": 10,
+  "settlements": 1671
+ },
+ {
+  "symbol": "KEEPUSDT",
+  "months": 9,
+  "settlements": 714
+ },
+ {
+  "symbol": "KERNELUSDT",
+  "months": 10,
+  "settlements": 1748
+ },
+ {
+  "symbol": "KEYUSDT",
+  "months": 19,
+  "settlements": 1672
+ },
+ {
+  "symbol": "KGENUSDT",
+  "months": 4,
+  "settlements": 699
+ },
+ {
+  "symbol": "KITEUSDT",
+  "months": 9,
+  "settlements": 1637
+ },
+ {
+  "symbol": "KLAYUSDT",
+  "months": 35,
+  "settlements": 3163
+ },
+ {
+  "symbol": "KMNOUSDT",
+  "months": 9,
+  "settlements": 1531
+ },
+ {
+  "symbol": "KNCUSDT",
+  "months": 54,
+  "settlements": 4868
+ },
+ {
+  "symbol": "KOMAUSDT",
+  "months": 8,
+  "settlements": 1400
+ },
+ {
+  "symbol": "KORUUSDT",
+  "months": 2,
+  "settlements": 117
+ },
+ {
+  "symbol": "KSMUSDT",
+  "months": 50,
+  "settlements": 4529
+ },
+ {
+  "symbol": "LABUSDT",
+  "months": 9,
+  "settlements": 1944
+ },
+ {
+  "symbol": "LAUSDT",
+  "months": 12,
+  "settlements": 3916
+ },
+ {
+  "symbol": "LAYERUSDT",
+  "months": 11,
+  "settlements": 4030
+ },
+ {
+  "symbol": "LDOUSDT",
+  "months": 47,
+  "settlements": 4226
+ },
+ {
+  "symbol": "LENDUSDT",
+  "months": 4,
+  "settlements": 243
+ },
+ {
+  "symbol": "LEVERUSDT",
+  "months": 27,
+  "settlements": 2469
+ },
+ {
+  "symbol": "LIGHTUSDT",
+  "months": 8,
+  "settlements": 1364
+ },
+ {
+  "symbol": "LINAUSDT",
+  "months": 50,
+  "settlements": 4511
+ },
+ {
+  "symbol": "LINEAUSDT",
+  "months": 6,
+  "settlements": 1083
+ },
+ {
+  "symbol": "LINKUSDT",
+  "months": 79,
+  "settlements": 7163
+ },
+ {
+  "symbol": "LISTAUSDT",
+  "months": 17,
+  "settlements": 2990
+ },
+ {
+  "symbol": "LITEUSDT",
+  "months": 3,
+  "settlements": 236
+ },
+ {
+  "symbol": "LITUSDT",
+  "months": 56,
+  "settlements": 5558
+ },
+ {
+  "symbol": "LOKAUSDT",
+  "months": 2,
+  "settlements": 303
+ },
+ {
+  "symbol": "LOOMUSDT",
+  "months": 15,
+  "settlements": 2685
+ },
+ {
+  "symbol": "LPTUSDT",
+  "months": 49,
+  "settlements": 7867
+ },
+ {
+  "symbol": "LQTYUSDT",
+  "months": 29,
+  "settlements": 2626
+ },
+ {
+  "symbol": "LRCUSDT",
+  "months": 49,
+  "settlements": 4917
+ },
+ {
+  "symbol": "LSKUSDT",
+  "months": 14,
+  "settlements": 3332
+ },
+ {
+  "symbol": "LTCUSDT",
+  "months": 79,
+  "settlements": 7187
+ },
+ {
+  "symbol": "LUMIAUSDT",
+  "months": 6,
+  "settlements": 987
+ },
+ {
+  "symbol": "LUNA2USDT",
+  "months": 38,
+  "settlements": 4348
+ },
+ {
+  "symbol": "LUNAUSDT",
+  "months": 16,
+  "settlements": 1399
+ },
+ {
+  "symbol": "LYNUSDT",
+  "months": 8,
+  "settlements": 1925
+ },
+ {
+  "symbol": "MAGICUSDT",
+  "months": 32,
+  "settlements": 3623
+ },
+ {
+  "symbol": "MAGMAUSDT",
+  "months": 5,
+  "settlements": 917
+ },
+ {
+  "symbol": "MANAUSDT",
+  "months": 60,
+  "settlements": 5435
+ },
+ {
+  "symbol": "MANTAUSDT",
+  "months": 22,
+  "settlements": 3914
+ },
+ {
+  "symbol": "MASKUSDT",
+  "months": 50,
+  "settlements": 5588
+ },
+ {
+  "symbol": "MATICUSDT",
+  "months": 46,
+  "settlements": 4200
+ },
+ {
+  "symbol": "MAVIAUSDT",
+  "months": 15,
+  "settlements": 2619
+ },
+ {
+  "symbol": "MAVUSDT",
+  "months": 26,
+  "settlements": 2299
+ },
+ {
+  "symbol": "MBLUSDT",
+  "months": 3,
+  "settlements": 540
+ },
+ {
+  "symbol": "MBOXUSDT",
+  "months": 9,
+  "settlements": 1638
+ },
+ {
+  "symbol": "MDTUSDT",
+  "months": 9,
+  "settlements": 822
+ },
+ {
+  "symbol": "MEGAUSDT",
+  "months": 4,
+  "settlements": 731
+ },
+ {
+  "symbol": "MELANIAUSDT",
+  "months": 11,
+  "settlements": 1887
+ },
+ {
+  "symbol": "MEMEFIUSDT",
+  "months": 2,
+  "settlements": 220
+ },
+ {
+  "symbol": "MEMEUSDT",
+  "months": 27,
+  "settlements": 4915
+ },
+ {
+  "symbol": "MERLUSDT",
+  "months": 9,
+  "settlements": 1940
+ },
+ {
+  "symbol": "METAUSDT",
+  "months": 3,
+  "settlements": 285
+ },
+ {
+  "symbol": "METISUSDT",
+  "months": 8,
+  "settlements": 1398
+ },
+ {
+  "symbol": "METUSDT",
+  "months": 5,
+  "settlements": 843
+ },
+ {
+  "symbol": "MEUSDT",
+  "months": 14,
+  "settlements": 3195
+ },
+ {
+  "symbol": "MEWUSDT",
+  "months": 15,
+  "settlements": 2642
+ },
+ {
+  "symbol": "MINAUSDT",
+  "months": 37,
+  "settlements": 3365
+ },
+ {
+  "symbol": "MIRAUSDT",
+  "months": 4,
+  "settlements": 777
+ },
+ {
+  "symbol": "MITOUSDT",
+  "months": 3,
+  "settlements": 387
+ },
+ {
+  "symbol": "MKRUSDT",
+  "months": 62,
+  "settlements": 5557
+ },
+ {
+  "symbol": "MLNUSDT",
+  "months": 3,
+  "settlements": 546
+ },
+ {
+  "symbol": "MMTUSDT",
+  "months": 3,
+  "settlements": 531
+ },
+ {
+  "symbol": "MOCAUSDT",
+  "months": 7,
+  "settlements": 1185
+ },
+ {
+  "symbol": "MONUSDT",
+  "months": 8,
+  "settlements": 1451
+ },
+ {
+  "symbol": "MOODENGUSDT",
+  "months": 20,
+  "settlements": 3501
+ },
+ {
+  "symbol": "MORPHOUSDT",
+  "months": 17,
+  "settlements": 2935
+ },
+ {
+  "symbol": "MOVEUSDT",
+  "months": 15,
+  "settlements": 2714
+ },
+ {
+  "symbol": "MOVRUSDT",
+  "months": 17,
+  "settlements": 2966
+ },
+ {
+  "symbol": "MRVLUSDT",
+  "months": 3,
+  "settlements": 240
+ },
+ {
+  "symbol": "MSFTUSDT",
+  "months": 3,
+  "settlements": 298
+ },
+ {
+  "symbol": "MSTRUSDT",
+  "months": 6,
+  "settlements": 526
+ },
+ {
+  "symbol": "MTLUSDT",
+  "months": 45,
+  "settlements": 4030
+ },
+ {
+  "symbol": "MUBARAKUSDT",
+  "months": 10,
+  "settlements": 1742
+ },
+ {
+  "symbol": "MUSDT",
+  "months": 13,
+  "settlements": 3266
+ },
+ {
+  "symbol": "MUUSDT",
+  "months": 4,
+  "settlements": 352
+ },
+ {
+  "symbol": "MVLLUSDT",
+  "months": 2,
+  "settlements": 112
+ },
+ {
+  "symbol": "MYROUSDT",
+  "months": 14,
+  "settlements": 2548
+ },
+ {
+  "symbol": "MYXUSDT",
+  "months": 14,
+  "settlements": 3917
+ },
+ {
+  "symbol": "NAORISUSDT",
+  "months": 8,
+  "settlements": 1458
+ },
+ {
+  "symbol": "NATGASUSDT",
+  "months": 4,
+  "settlements": 731
+ },
+ {
+  "symbol": "NBISUSDT",
+  "months": 3,
+  "settlements": 199
+ },
+ {
+  "symbol": "NEARUSDT",
+  "months": 70,
+  "settlements": 6349
+ },
+ {
+  "symbol": "NEIROETHUSDT",
+  "months": 13,
+  "settlements": 2309
+ },
+ {
+  "symbol": "NEIROUSDT",
+  "months": 21,
+  "settlements": 3735
+ },
+ {
+  "symbol": "NEOUSDT",
+  "months": 67,
+  "settlements": 6120
+ },
+ {
+  "symbol": "NEWTUSDT",
+  "months": 4,
+  "settlements": 1052
+ },
+ {
+  "symbol": "NFPUSDT",
+  "months": 14,
+  "settlements": 2408
+ },
+ {
+  "symbol": "NIGHTUSDT",
+  "months": 5,
+  "settlements": 849
+ },
+ {
+  "symbol": "NILUSDT",
+  "months": 14,
+  "settlements": 2426
+ },
+ {
+  "symbol": "NKNUSDT",
+  "months": 39,
+  "settlements": 3664
+ },
+ {
+  "symbol": "NMRUSDT",
+  "months": 22,
+  "settlements": 3839
+ },
+ {
+  "symbol": "NOKUSDT",
+  "months": 2,
+  "settlements": 182
+ },
+ {
+  "symbol": "NOMUSDT",
+  "months": 4,
+  "settlements": 923
+ },
+ {
+  "symbol": "NOTUSDT",
+  "months": 21,
+  "settlements": 3746
+ },
+ {
+  "symbol": "NTRNUSDT",
+  "months": 14,
+  "settlements": 2475
+ },
+ {
+  "symbol": "NULSUSDT",
+  "months": 4,
+  "settlements": 580
+ },
+ {
+  "symbol": "NUUSDT",
+  "months": 5,
+  "settlements": 357
+ },
+ {
+  "symbol": "NVDAUSDT",
+  "months": 4,
+  "settlements": 375
+ },
+ {
+  "symbol": "NXPCUSDT",
+  "months": 8,
+  "settlements": 1384
+ },
+ {
+  "symbol": "OBOLUSDT",
+  "months": 4,
+  "settlements": 699
+ },
+ {
+  "symbol": "OCEANUSDT",
+  "months": 44,
+  "settlements": 4017
+ },
+ {
+  "symbol": "OGNUSDT",
+  "months": 48,
+  "settlements": 4388
+ },
+ {
+  "symbol": "OGUSDT",
+  "months": 8,
+  "settlements": 1458
+ },
+ {
+  "symbol": "OMGUSDT",
+  "months": 53,
+  "settlements": 4846
+ },
+ {
+  "symbol": "OMNIUSDT",
+  "months": 18,
+  "settlements": 3371
+ },
+ {
+  "symbol": "OMUSDT",
+  "months": 26,
+  "settlements": 4623
+ },
+ {
+  "symbol": "ONDOUSDT",
+  "months": 31,
+  "settlements": 5539
+ },
+ {
+  "symbol": "ONEUSDT",
+  "months": 47,
+  "settlements": 4241
+ },
+ {
+  "symbol": "ONGUSDT",
+  "months": 14,
+  "settlements": 2562
+ },
+ {
+  "symbol": "ONTUSDT",
+  "months": 62,
+  "settlements": 6500
+ },
+ {
+  "symbol": "ONUSDT",
+  "months": 4,
+  "settlements": 732
+ },
+ {
+  "symbol": "OPENUSDT",
+  "months": 6,
+  "settlements": 1069
+ },
+ {
+  "symbol": "OPGUSDT",
+  "months": 4,
+  "settlements": 601
+ },
+ {
+  "symbol": "OPNUSDT",
+  "months": 6,
+  "settlements": 961
+ },
+ {
+  "symbol": "OPUSDT",
+  "months": 50,
+  "settlements": 4565
+ },
+ {
+  "symbol": "ORBSUSDT",
+  "months": 14,
+  "settlements": 2470
+ },
+ {
+  "symbol": "ORCAUSDT",
+  "months": 16,
+  "settlements": 3900
+ },
+ {
+  "symbol": "ORCLUSDT",
+  "months": 3,
+  "settlements": 241
+ },
+ {
+  "symbol": "ORDERUSDT",
+  "months": 2,
+  "settlements": 107
+ },
+ {
+  "symbol": "ORDIUSDT",
+  "months": 33,
+  "settlements": 5983
+ },
+ {
+  "symbol": "OXTUSDT",
+  "months": 10,
+  "settlements": 886
+ },
+ {
+  "symbol": "PARTIUSDT",
+  "months": 13,
+  "settlements": 2233
+ },
+ {
+  "symbol": "PAXGUSDT",
+  "months": 17,
+  "settlements": 2949
+ },
+ {
+  "symbol": "PENDLEUSDT",
+  "months": 37,
+  "settlements": 3307
+ },
+ {
+  "symbol": "PENGUUSDT",
+  "months": 20,
+  "settlements": 3547
+ },
+ {
+  "symbol": "PEOPLEUSDT",
+  "months": 50,
+  "settlements": 4501
+ },
+ {
+  "symbol": "PERPUSDT",
+  "months": 14,
+  "settlements": 2345
+ },
+ {
+  "symbol": "PHAROSUSDT",
+  "months": 2,
+  "settlements": 285
+ },
+ {
+  "symbol": "PHAUSDT",
+  "months": 7,
+  "settlements": 1083
+ },
+ {
+  "symbol": "PHBUSDT",
+  "months": 27,
+  "settlements": 2416
+ },
+ {
+  "symbol": "PIEVERSEUSDT",
+  "months": 7,
+  "settlements": 1191
+ },
+ {
+  "symbol": "PIPPINUSDT",
+  "months": 19,
+  "settlements": 4657
+ },
+ {
+  "symbol": "PIXELUSDT",
+  "months": 21,
+  "settlements": 3743
+ },
+ {
+  "symbol": "PLAYUSDT",
+  "months": 8,
+  "settlements": 1476
+ },
+ {
+  "symbol": "PLTRUSDT",
+  "months": 5,
+  "settlements": 433
+ },
+ {
+  "symbol": "PLUMEUSDT",
+  "months": 14,
+  "settlements": 3053
+ },
+ {
+  "symbol": "PNUTUSDT",
+  "months": 19,
+  "settlements": 3398
+ },
+ {
+  "symbol": "POLUSDT",
+  "months": 23,
+  "settlements": 4117
+ },
+ {
+  "symbol": "POLYXUSDT",
+  "months": 18,
+  "settlements": 3262
+ },
+ {
+  "symbol": "PONKEUSDT",
+  "months": 7,
+  "settlements": 1250
+ },
+ {
+  "symbol": "POPCATUSDT",
+  "months": 18,
+  "settlements": 3164
+ },
+ {
+  "symbol": "PORT3USDT",
+  "months": 5,
+  "settlements": 872
+ },
+ {
+  "symbol": "PORTALUSDT",
+  "months": 20,
+  "settlements": 3659
+ },
+ {
+  "symbol": "POWERUSDT",
+  "months": 5,
+  "settlements": 1058
+ },
+ {
+  "symbol": "POWRUSDT",
+  "months": 14,
+  "settlements": 2419
+ },
+ {
+  "symbol": "PRLUSDT",
+  "months": 2,
+  "settlements": 398
+ },
+ {
+  "symbol": "PROMPTUSDT",
+  "months": 5,
+  "settlements": 850
+ },
+ {
+  "symbol": "PROMUSDT",
+  "months": 11,
+  "settlements": 1921
+ },
+ {
+  "symbol": "PROVEUSDT",
+  "months": 7,
+  "settlements": 1282
+ },
+ {
+  "symbol": "PTBUSDT",
+  "months": 8,
+  "settlements": 1465
+ },
+ {
+  "symbol": "PUMPBTCUSDT",
+  "months": 3,
+  "settlements": 552
+ },
+ {
+  "symbol": "PUMPUSDT",
+  "months": 14,
+  "settlements": 2430
+ },
+ {
+  "symbol": "PUNDIXUSDT",
+  "months": 3,
+  "settlements": 369
+ },
+ {
+  "symbol": "PYTHUSDT",
+  "months": 31,
+  "settlements": 5527
+ },
+ {
+  "symbol": "QCOMUSDT",
+  "months": 3,
+  "settlements": 269
+ },
+ {
+  "symbol": "QNTUSDT",
+  "months": 33,
+  "settlements": 2957
+ },
+ {
+  "symbol": "QQQUSDT",
+  "months": 4,
+  "settlements": 368
+ },
+ {
+  "symbol": "QTUMUSDT",
+  "months": 59,
+  "settlements": 5388
+ },
+ {
+  "symbol": "QUSDT",
+  "months": 7,
+  "settlements": 1264
+ },
+ {
+  "symbol": "RADUSDT",
+  "months": 9,
+  "settlements": 808
+ },
+ {
+  "symbol": "RAREUSDT",
+  "months": 13,
+  "settlements": 2288
+ },
+ {
+  "symbol": "RAVEUSDT",
+  "months": 8,
+  "settlements": 1585
+ },
+ {
+  "symbol": "RAYSOLUSDT",
+  "months": 12,
+  "settlements": 2128
+ },
+ {
+  "symbol": "RAYUSDT",
+  "months": 16,
+  "settlements": 1406
+ },
+ {
+  "symbol": "RDNTUSDT",
+  "months": 26,
+  "settlements": 2365
+ },
+ {
+  "symbol": "RECALLUSDT",
+  "months": 2,
+  "settlements": 280
+ },
+ {
+  "symbol": "REDUSDT",
+  "months": 8,
+  "settlements": 1835
+ },
+ {
+  "symbol": "REEFUSDT",
+  "months": 46,
+  "settlements": 4459
+ },
+ {
+  "symbol": "REIUSDT",
+  "months": 6,
+  "settlements": 1104
+ },
+ {
+  "symbol": "RENDERUSDT",
+  "months": 25,
+  "settlements": 4412
+ },
+ {
+  "symbol": "RENUSDT",
+  "months": 49,
+  "settlements": 4436
+ },
+ {
+  "symbol": "RESOLVUSDT",
+  "months": 14,
+  "settlements": 3275
+ },
+ {
+  "symbol": "REUSDT",
+  "months": 2,
+  "settlements": 259
+ },
+ {
+  "symbol": "REZUSDT",
+  "months": 19,
+  "settlements": 3296
+ },
+ {
+  "symbol": "RIFUSDT",
+  "months": 15,
+  "settlements": 2654
+ },
+ {
+  "symbol": "RIVERUSDT",
+  "months": 10,
+  "settlements": 2756
+ },
+ {
+  "symbol": "RKLBUSDT",
+  "months": 3,
+  "settlements": 224
+ },
+ {
+  "symbol": "RLCUSDT",
+  "months": 54,
+  "settlements": 4844
+ },
+ {
+  "symbol": "RLSUSDT",
+  "months": 2,
+  "settlements": 363
+ },
+ {
+  "symbol": "RNDRUSDT",
+  "months": 18,
+  "settlements": 1634
+ },
+ {
+  "symbol": "ROBOUSDT",
+  "months": 5,
+  "settlements": 740
+ },
+ {
+  "symbol": "RONINUSDT",
+  "months": 10,
+  "settlements": 1793
+ },
+ {
+  "symbol": "ROSEUSDT",
+  "months": 52,
+  "settlements": 4658
+ },
+ {
+  "symbol": "RPLUSDT",
+  "months": 8,
+  "settlements": 1458
+ },
+ {
+  "symbol": "RSRUSDT",
+  "months": 62,
+  "settlements": 5606
+ },
+ {
+  "symbol": "RUNEUSDT",
+  "months": 62,
+  "settlements": 5661
+ },
+ {
+  "symbol": "RVNUSDT",
+  "months": 44,
+  "settlements": 4986
+ },
+ {
+  "symbol": "RVVUSDT",
+  "months": 4,
+  "settlements": 638
+ },
+ {
+  "symbol": "SAFEUSDT",
+  "months": 11,
+  "settlements": 1862
+ },
+ {
+  "symbol": "SAGAUSDT",
+  "months": 23,
+  "settlements": 4150
+ },
+ {
+  "symbol": "SAHARAUSDT",
+  "months": 13,
+  "settlements": 3051
+ },
+ {
+  "symbol": "SAMSUNGUSDT",
+  "months": 2,
+  "settlements": 237
+ },
+ {
+  "symbol": "SANDUSDT",
+  "months": 66,
+  "settlements": 5948
+ },
+ {
+  "symbol": "SANTOSUSDT",
+  "months": 7,
+  "settlements": 1112
+ },
+ {
+  "symbol": "SAPIENUSDT",
+  "months": 6,
+  "settlements": 985
+ },
+ {
+  "symbol": "SCRTUSDT",
+  "months": 3,
+  "settlements": 429
+ },
+ {
+  "symbol": "SCRUSDT",
+  "months": 7,
+  "settlements": 1149
+ },
+ {
+  "symbol": "SCUSDT",
+  "months": 15,
+  "settlements": 1334
+ },
+ {
+  "symbol": "SEIUSDT",
+  "months": 36,
+  "settlements": 3241
+ },
+ {
+  "symbol": "SENTUSDT",
+  "months": 4,
+  "settlements": 1205
+ },
+ {
+  "symbol": "SFPUSDT",
+  "months": 43,
+  "settlements": 3851
+ },
+ {
+  "symbol": "SHELLUSDT",
+  "months": 9,
+  "settlements": 1537
+ },
+ {
+  "symbol": "SIGNUSDT",
+  "months": 10,
+  "settlements": 3239
+ },
+ {
+  "symbol": "SIRENUSDT",
+  "months": 13,
+  "settlements": 2721
+ },
+ {
+  "symbol": "SKATEUSDT",
+  "months": 2,
+  "settlements": 315
+ },
+ {
+  "symbol": "SKHYNIXUSDT",
+  "months": 2,
+  "settlements": 231
+ },
+ {
+  "symbol": "SKLUSDT",
+  "months": 53,
+  "settlements": 5021
+ },
+ {
+  "symbol": "SKRUSDT",
+  "months": 2,
+  "settlements": 457
+ },
+ {
+  "symbol": "SKYAIUSDT",
+  "months": 9,
+  "settlements": 1649
+ },
+ {
+  "symbol": "SKYUSDT",
+  "months": 2,
+  "settlements": 316
+ },
+ {
+  "symbol": "SLERFUSDT",
+  "months": 2,
+  "settlements": 243
+ },
+ {
+  "symbol": "SLPUSDT",
+  "months": 6,
+  "settlements": 1092
+ },
+ {
+  "symbol": "SLXUSDT",
+  "months": 2,
+  "settlements": 554
+ },
+ {
+  "symbol": "SNDKUSDT",
+  "months": 4,
+  "settlements": 347
+ },
+ {
+  "symbol": "SNTUSDT",
+  "months": 2,
+  "settlements": 360
+ },
+ {
+  "symbol": "SNXUSDT",
+  "months": 68,
+  "settlements": 6167
+ },
+ {
+  "symbol": "SOLUSDT",
+  "months": 71,
+  "settlements": 6517
+ },
+ {
+  "symbol": "SOLVUSDT",
+  "months": 11,
+  "settlements": 1898
+ },
+ {
+  "symbol": "SOMIUSDT",
+  "months": 8,
+  "settlements": 1311
+ },
+ {
+  "symbol": "SONICUSDT",
+  "months": 5,
+  "settlements": 862
+ },
+ {
+  "symbol": "SOONUSDT",
+  "months": 11,
+  "settlements": 2949
+ },
+ {
+  "symbol": "SOPHUSDT",
+  "months": 7,
+  "settlements": 2036
+ },
+ {
+  "symbol": "SOXLUSDT",
+  "months": 3,
+  "settlements": 235
+ },
+ {
+  "symbol": "SPACEUSDT",
+  "months": 3,
+  "settlements": 405
+ },
+ {
+  "symbol": "SPCXUSDT",
+  "months": 3,
+  "settlements": 214
+ },
+ {
+  "symbol": "SPELLUSDT",
+  "months": 23,
+  "settlements": 2094
+ },
+ {
+  "symbol": "SPKUSDT",
+  "months": 9,
+  "settlements": 1551
+ },
+ {
+  "symbol": "SPXUSDT",
+  "months": 18,
+  "settlements": 3224
+ },
+ {
+  "symbol": "SPYUSDT",
+  "months": 4,
+  "settlements": 368
+ },
+ {
+  "symbol": "SQDUSDT",
+  "months": 7,
+  "settlements": 1700
+ },
+ {
+  "symbol": "SRMUSDT",
+  "months": 26,
+  "settlements": 2373
+ },
+ {
+  "symbol": "SSVUSDT",
+  "months": 33,
+  "settlements": 2945
+ },
+ {
+  "symbol": "STABLEUSDT",
+  "months": 7,
+  "settlements": 1255
+ },
+ {
+  "symbol": "STBLUSDT",
+  "months": 4,
+  "settlements": 634
+ },
+ {
+  "symbol": "STEEMUSDT",
+  "months": 14,
+  "settlements": 2652
+ },
+ {
+  "symbol": "STGUSDT",
+  "months": 41,
+  "settlements": 3895
+ },
+ {
+  "symbol": "STMXUSDT",
+  "months": 47,
+  "settlements": 5688
+ },
+ {
+  "symbol": "STORJUSDT",
+  "months": 56,
+  "settlements": 5535
+ },
+ {
+  "symbol": "STOUSDT",
+  "months": 11,
+  "settlements": 2016
+ },
+ {
+  "symbol": "STPTUSDT",
+  "months": 3,
+  "settlements": 540
+ },
+ {
+  "symbol": "STRAXUSDT",
+  "months": 6,
+  "settlements": 1039
+ },
+ {
+  "symbol": "STRKUSDT",
+  "months": 29,
+  "settlements": 5167
+ },
+ {
+  "symbol": "STXUSDT",
+  "months": 37,
+  "settlements": 3311
+ },
+ {
+  "symbol": "SUIUSDT",
+  "months": 39,
+  "settlements": 3556
+ },
+ {
+  "symbol": "SUNUSDT",
+  "months": 9,
+  "settlements": 1526
+ },
+ {
+  "symbol": "SUPERUSDT",
+  "months": 26,
+  "settlements": 5897
+ },
+ {
+  "symbol": "SUSDT",
+  "months": 16,
+  "settlements": 2816
+ },
+ {
+  "symbol": "SUSHIUSDT",
+  "months": 63,
+  "settlements": 5741
+ },
+ {
+  "symbol": "SWARMSUSDT",
+  "months": 11,
+  "settlements": 1970
+ },
+ {
+  "symbol": "SWELLUSDT",
+  "months": 8,
+  "settlements": 1406
+ },
+ {
+  "symbol": "SXPUSDT",
+  "months": 56,
+  "settlements": 5051
+ },
+ {
+  "symbol": "SXTUSDT",
+  "months": 4,
+  "settlements": 730
+ },
+ {
+  "symbol": "SYNUSDT",
+  "months": 16,
+  "settlements": 2833
+ },
+ {
+  "symbol": "SYRUPUSDT",
+  "months": 10,
+  "settlements": 1788
+ },
+ {
+  "symbol": "SYSUSDT",
+  "months": 4,
+  "settlements": 621
+ },
+ {
+  "symbol": "TACUSDT",
+  "months": 6,
+  "settlements": 1016
+ },
+ {
+  "symbol": "TAGUSDT",
+  "months": 6,
+  "settlements": 956
+ },
+ {
+  "symbol": "TAIKOUSDT",
+  "months": 2,
+  "settlements": 430
+ },
+ {
+  "symbol": "TAKEUSDT",
+  "months": 6,
+  "settlements": 1077
+ },
+ {
+  "symbol": "TANSSIUSDT",
+  "months": 2,
+  "settlements": 321
+ },
+ {
+  "symbol": "TAOUSDT",
+  "months": 28,
+  "settlements": 5047
+ },
+ {
+  "symbol": "TAUSDT",
+  "months": 8,
+  "settlements": 1347
+ },
+ {
+  "symbol": "THETAUSDT",
+  "months": 65,
+  "settlements": 5937
+ },
+ {
+  "symbol": "THEUSDT",
+  "months": 14,
+  "settlements": 2395
+ },
+ {
+  "symbol": "TIAUSDT",
+  "months": 34,
+  "settlements": 6024
+ },
+ {
+  "symbol": "TLMUSDT",
+  "months": 28,
+  "settlements": 1649
+ },
+ {
+  "symbol": "TNSRUSDT",
+  "months": 19,
+  "settlements": 4221
+ },
+ {
+  "symbol": "TOKENUSDT",
+  "months": 15,
+  "settlements": 2732
+ },
+ {
+  "symbol": "TOMOUSDT",
+  "months": 34,
+  "settlements": 3102
+ },
+ {
+  "symbol": "TONUSDT",
+  "months": 28,
+  "settlements": 5064
+ },
+ {
+  "symbol": "TOSHIUSDT",
+  "months": 2,
+  "settlements": 268
+ },
+ {
+  "symbol": "TOWNSUSDT",
+  "months": 3,
+  "settlements": 524
+ },
+ {
+  "symbol": "TQQQUSDT",
+  "months": 2,
+  "settlements": 112
+ },
+ {
+  "symbol": "TRADOORUSDT",
+  "months": 9,
+  "settlements": 1527
+ },
+ {
+  "symbol": "TRBUSDT",
+  "months": 68,
+  "settlements": 8992
+ },
+ {
+  "symbol": "TREEUSDT",
+  "months": 5,
+  "settlements": 806
+ },
+ {
+  "symbol": "TRIAUSDT",
+  "months": 6,
+  "settlements": 1052
+ },
+ {
+  "symbol": "TROYUSDT",
+  "months": 6,
+  "settlements": 1210
+ },
+ {
+  "symbol": "TRUMPUSDT",
+  "months": 19,
+  "settlements": 3355
+ },
+ {
+  "symbol": "TRUSTUSDT",
+  "months": 2,
+  "settlements": 884
+ },
+ {
+  "symbol": "TRUTHUSDT",
+  "months": 7,
+  "settlements": 1102
+ },
+ {
+  "symbol": "TRUUSDT",
+  "months": 25,
+  "settlements": 2247
+ },
+ {
+  "symbol": "TRXUSDT",
+  "months": 79,
+  "settlements": 7169
+ },
+ {
+  "symbol": "TSLAUSDT",
+  "months": 7,
+  "settlements": 565
+ },
+ {
+  "symbol": "TSMUSDT",
+  "months": 3,
+  "settlements": 285
+ },
+ {
+  "symbol": "TSTUSDT",
+  "months": 11,
+  "settlements": 1952
+ },
+ {
+  "symbol": "TURBOUSDT",
+  "months": 22,
+  "settlements": 4014
+ },
+ {
+  "symbol": "TURTLEUSDT",
+  "months": 2,
+  "settlements": 277
+ },
+ {
+  "symbol": "TUSDT",
+  "months": 31,
+  "settlements": 3711
+ },
+ {
+  "symbol": "TUTUSDT",
+  "months": 8,
+  "settlements": 1353
+ },
+ {
+  "symbol": "TWTUSDT",
+  "months": 14,
+  "settlements": 2547
+ },
+ {
+  "symbol": "UAIUSDT",
+  "months": 5,
+  "settlements": 1221
+ },
+ {
+  "symbol": "UBUSDT",
+  "months": 8,
+  "settlements": 1394
+ },
+ {
+  "symbol": "UMAUSDT",
+  "months": 23,
+  "settlements": 3960
+ },
+ {
+  "symbol": "UNFIUSDT",
+  "months": 46,
+  "settlements": 5444
+ },
+ {
+  "symbol": "UNIUSDT",
+  "months": 71,
+  "settlements": 6431
+ },
+ {
+  "symbol": "USDCUSDT",
+  "months": 12,
+  "settlements": 1098
+ },
+ {
+  "symbol": "USELESSUSDT",
+  "months": 11,
+  "settlements": 1916
+ },
+ {
+  "symbol": "USTCUSDT",
+  "months": 18,
+  "settlements": 3123
+ },
+ {
+  "symbol": "USUALUSDT",
+  "months": 11,
+  "settlements": 1904
+ },
+ {
+  "symbol": "USUSDT",
+  "months": 2,
+  "settlements": 365
+ },
+ {
+  "symbol": "UXLINKUSDT",
+  "months": 12,
+  "settlements": 2102
+ },
+ {
+  "symbol": "VANAUSDT",
+  "months": 12,
+  "settlements": 2096
+ },
+ {
+  "symbol": "VANRYUSDT",
+  "months": 18,
+  "settlements": 3292
+ },
+ {
+  "symbol": "VELODROMEUSDT",
+  "months": 2,
+  "settlements": 296
+ },
+ {
+  "symbol": "VELVETUSDT",
+  "months": 7,
+  "settlements": 1202
+ },
+ {
+  "symbol": "VETUSDT",
+  "months": 70,
+  "settlements": 6390
+ },
+ {
+  "symbol": "VFYUSDT",
+  "months": 2,
+  "settlements": 190
+ },
+ {
+  "symbol": "VICUSDT",
+  "months": 5,
+  "settlements": 1121
+ },
+ {
+  "symbol": "VIDTUSDT",
+  "months": 9,
+  "settlements": 1634
+ },
+ {
+  "symbol": "VINEUSDT",
+  "months": 10,
+  "settlements": 1683
+ },
+ {
+  "symbol": "VIRTUALUSDT",
+  "months": 20,
+  "settlements": 3589
+ },
+ {
+  "symbol": "VOXELUSDT",
+  "months": 9,
+  "settlements": 2828
+ },
+ {
+  "symbol": "VTHOUSDT",
+  "months": 5,
+  "settlements": 777
+ },
+ {
+  "symbol": "VVVUSDT",
+  "months": 16,
+  "settlements": 2745
+ },
+ {
+  "symbol": "WALUSDT",
+  "months": 9,
+  "settlements": 1490
+ },
+ {
+  "symbol": "WAVESUSDT",
+  "months": 47,
+  "settlements": 4256
+ },
+ {
+  "symbol": "WAXPUSDT",
+  "months": 10,
+  "settlements": 1725
+ },
+ {
+  "symbol": "WCTUSDT",
+  "months": 9,
+  "settlements": 2430
+ },
+ {
+  "symbol": "WDCUSDT",
+  "months": 3,
+  "settlements": 208
+ },
+ {
+  "symbol": "WETUSDT",
+  "months": 4,
+  "settlements": 994
+ },
+ {
+  "symbol": "WIFUSDT",
+  "months": 31,
+  "settlements": 5551
+ },
+ {
+  "symbol": "WLDUSDT",
+  "months": 37,
+  "settlements": 3310
+ },
+ {
+  "symbol": "WLFIUSDT",
+  "months": 12,
+  "settlements": 2054
+ },
+ {
+  "symbol": "WOOUSDT",
+  "months": 33,
+  "settlements": 2998
+ },
+ {
+  "symbol": "WUSDT",
+  "months": 23,
+  "settlements": 4178
+ },
+ {
+  "symbol": "XAGUSDT",
+  "months": 7,
+  "settlements": 1233
+ },
+ {
+  "symbol": "XAIUSDT",
+  "months": 22,
+  "settlements": 3968
+ },
+ {
+  "symbol": "XANUSDT",
+  "months": 6,
+  "settlements": 915
+ },
+ {
+  "symbol": "XAUTUSDT",
+  "months": 5,
+  "settlements": 763
+ },
+ {
+  "symbol": "XAUUSDT",
+  "months": 8,
+  "settlements": 1395
+ },
+ {
+  "symbol": "XCNUSDT",
+  "months": 3,
+  "settlements": 482
+ },
+ {
+  "symbol": "XEMUSDT",
+  "months": 46,
+  "settlements": 4199
+ },
+ {
+  "symbol": "XLMUSDT",
+  "months": 79,
+  "settlements": 7156
+ },
+ {
+  "symbol": "XMRUSDT",
+  "months": 74,
+  "settlements": 6756
+ },
+ {
+  "symbol": "XNYUSDT",
+  "months": 5,
+  "settlements": 843
+ },
+ {
+  "symbol": "XPINUSDT",
+  "months": 3,
+  "settlements": 478
+ },
+ {
+  "symbol": "XPLUSDT",
+  "months": 12,
+  "settlements": 2060
+ },
+ {
+  "symbol": "XPTUSDT",
+  "months": 5,
+  "settlements": 899
+ },
+ {
+  "symbol": "XRPUSDT",
+  "months": 79,
+  "settlements": 7196
+ },
+ {
+  "symbol": "XTZUSDT",
+  "months": 71,
+  "settlements": 7102
+ },
+ {
+  "symbol": "XVGUSDT",
+  "months": 21,
+  "settlements": 1911
+ },
+ {
+  "symbol": "XVSUSDT",
+  "months": 16,
+  "settlements": 1458
+ },
+ {
+  "symbol": "YALAUSDT",
+  "months": 4,
+  "settlements": 692
+ },
+ {
+  "symbol": "YBUSDT",
+  "months": 3,
+  "settlements": 494
+ },
+ {
+  "symbol": "YFIIUSDT",
+  "months": 20,
+  "settlements": 1765
+ },
+ {
+  "symbol": "YFIUSDT",
+  "months": 56,
+  "settlements": 5021
+ },
+ {
+  "symbol": "YGGUSDT",
+  "months": 24,
+  "settlements": 4167
+ },
+ {
+  "symbol": "ZAMAUSDT",
+  "months": 7,
+  "settlements": 1220
+ },
+ {
+  "symbol": "ZBTUSDT",
+  "months": 9,
+  "settlements": 1940
+ },
+ {
+  "symbol": "ZECUSDT",
+  "months": 77,
+  "settlements": 7032
+ },
+ {
+  "symbol": "ZENUSDT",
+  "months": 65,
+  "settlements": 5931
+ },
+ {
+  "symbol": "ZEREBROUSDT",
+  "months": 13,
+  "settlements": 2360
+ },
+ {
+  "symbol": "ZETAUSDT",
+  "months": 16,
+  "settlements": 2908
+ },
+ {
+  "symbol": "ZILUSDT",
+  "months": 64,
+  "settlements": 6184
+ },
+ {
+  "symbol": "ZKCUSDT",
+  "months": 5,
+  "settlements": 814
+ },
+ {
+  "symbol": "ZKJUSDT",
+  "months": 4,
+  "settlements": 663
+ },
+ {
+  "symbol": "ZKPUSDT",
+  "months": 3,
+  "settlements": 799
+ },
+ {
+  "symbol": "ZKUSDT",
+  "months": 21,
+  "settlements": 3774
+ },
+ {
+  "symbol": "ZORAUSDT",
+  "months": 6,
+  "settlements": 957
+ },
+ {
+  "symbol": "ZROUSDT",
+  "months": 26,
+  "settlements": 4627
+ },
+ {
+  "symbol": "ZRXUSDT",
+  "months": 60,
+  "settlements": 5711
+ }
+]

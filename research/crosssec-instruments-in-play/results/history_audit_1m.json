@@ -1,0 +1,6407 @@
+{
+ "symbols": [
+  {
+   "symbol": "0GUSDT",
+   "months": 7,
+   "rows": 281295,
+   "first_bar": "2025-09-17 15:45:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000000BOBUSDT",
+   "months": 3,
+   "rows": 126210,
+   "first_bar": "2025-06-05 08:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000000MOGUSDT",
+   "months": 13,
+   "rows": 559410,
+   "first_bar": "2024-11-07 12:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000BONKUSDT",
+   "months": 33,
+   "rows": 1414680,
+   "first_bar": "2023-11-22 14:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000BTTCUSDT",
+   "months": 2,
+   "rows": 59581,
+   "first_bar": "2022-03-01 00:00:00+00:00",
+   "last_bar": "2022-04-11 09:00:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000CATUSDT",
+   "months": 13,
+   "rows": 540690,
+   "first_bar": "2024-10-21 12:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000CHEEMSUSDT",
+   "months": 9,
+   "rows": 357855,
+   "first_bar": "2024-11-25 11:45:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "1000FLOKIUSDT",
+   "months": 37,
+   "rows": 1614690,
+   "first_bar": "2023-05-06 16:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000LUNCUSDT",
+   "months": 45,
+   "rows": 1961940,
+   "first_bar": "2022-09-09 13:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "1000PEPEUSDT",
+   "months": 39,
+   "rows": 1703970,
+   "first_bar": "2023-05-05 16:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000RATSUSDT",
+   "months": 21,
+   "rows": 899160,
+   "first_bar": "2023-12-15 14:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "1000SATSUSDT",
+   "months": 24,
+   "rows": 1035960,
+   "first_bar": "2023-12-12 14:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000SHIBUSDT",
+   "months": 63,
+   "rows": 2747903,
+   "first_bar": "2021-05-10 17:37:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000WHYUSDT",
+   "months": 4,
+   "rows": 137549,
+   "first_bar": "2024-11-25 11:31:00+00:00",
+   "last_bar": "2025-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1000XECUSDT",
+   "months": 37,
+   "rows": 1601070,
+   "first_bar": "2021-09-17 03:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 960480
+  },
+  {
+   "symbol": "1000XUSDT",
+   "months": 6,
+   "rows": 242610,
+   "first_bar": "2024-11-13 12:30:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1INCHUSDT",
+   "months": 63,
+   "rows": 2723880,
+   "first_bar": "2020-12-25 10:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "1MBABYDOGEUSDT",
+   "months": 14,
+   "rows": 591145,
+   "first_bar": "2024-09-16 11:35:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "2ZUSDT",
+   "months": 3,
+   "rows": 130287,
+   "first_bar": "2025-10-02 12:33:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "4USDT",
+   "months": 6,
+   "rows": 254190,
+   "first_bar": "2025-10-08 11:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "A2ZUSDT",
+   "months": 3,
+   "rows": 90240,
+   "first_bar": "2025-07-30 08:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AAOIUSDT",
+   "months": 2,
+   "rows": 77195,
+   "first_bar": "2026-06-08 09:25:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AAPLUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AAVEUSDT",
+   "months": 70,
+   "rows": 3045180,
+   "first_bar": "2020-10-16 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ACEUSDT",
+   "months": 18,
+   "rows": 766920,
+   "first_bar": "2023-12-18 10:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 610560
+  },
+  {
+   "symbol": "ACHUSDT",
+   "months": 36,
+   "rows": 1547130,
+   "first_bar": "2023-02-22 14:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ACTUSDT",
+   "months": 14,
+   "rows": 598305,
+   "first_bar": "2024-11-11 12:15:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "ACUUSDT",
+   "months": 2,
+   "rows": 55395,
+   "first_bar": "2026-01-21 12:45:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ACXUSDT",
+   "months": 3,
+   "rows": 121500,
+   "first_bar": "2024-12-06 15:00:00+00:00",
+   "last_bar": "2025-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ADAUSDT",
+   "months": 78,
+   "rows": 3417120,
+   "first_bar": "2020-02-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AERGOUSDT",
+   "months": 11,
+   "rows": 481740,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 660
+  },
+  {
+   "symbol": "AEROUSDT",
+   "months": 17,
+   "rows": 742185,
+   "first_bar": "2024-12-04 14:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 128160
+  },
+  {
+   "symbol": "AEVOUSDT",
+   "months": 20,
+   "rows": 860310,
+   "first_bar": "2024-03-13 13:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AGIXUSDT",
+   "months": 18,
+   "rows": 765225,
+   "first_bar": "2023-02-16 14:15:00+00:00",
+   "last_bar": "2024-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AGLDUSDT",
+   "months": 23,
+   "rows": 1005120,
+   "first_bar": "2023-08-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 573120
+  },
+  {
+   "symbol": "AGTUSDT",
+   "months": 6,
+   "rows": 236970,
+   "first_bar": "2025-05-20 10:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AI16ZUSDT",
+   "months": 11,
+   "rows": 478695,
+   "first_bar": "2025-01-02 13:45:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AIAUSDT",
+   "months": 10,
+   "rows": 410655,
+   "first_bar": "2025-09-18 08:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 675
+  },
+  {
+   "symbol": "AIGENSYNUSDT",
+   "months": 4,
+   "rows": 134505,
+   "first_bar": "2026-04-29 14:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AINUSDT",
+   "months": 4,
+   "rows": 160635,
+   "first_bar": "2025-07-10 10:45:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 220320
+  },
+  {
+   "symbol": "AIOTUSDT",
+   "months": 11,
+   "rows": 441330,
+   "first_bar": "2025-04-30 12:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 129600
+  },
+  {
+   "symbol": "AIOUSDT",
+   "months": 2,
+   "rows": 69870,
+   "first_bar": "2025-08-13 11:30:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AIUSDT",
+   "months": 20,
+   "rows": 866130,
+   "first_bar": "2024-01-08 12:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "AIXBTUSDT",
+   "months": 18,
+   "rows": 759209,
+   "first_bar": "2024-12-20 18:31:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AKEUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2026-03-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "AKROUSDT",
+   "months": 17,
+   "rows": 710057,
+   "first_bar": "2021-01-19 07:00:00+00:00",
+   "last_bar": "2022-05-27 09:16:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AKTUSDT",
+   "months": 9,
+   "rows": 367950,
+   "first_bar": "2024-11-18 11:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 437760
+  },
+  {
+   "symbol": "ALCHUSDT",
+   "months": 14,
+   "rows": 601215,
+   "first_bar": "2025-01-07 11:45:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ALGOUSDT",
+   "months": 74,
+   "rows": 3220739,
+   "first_bar": "2020-06-16 09:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ALICEUSDT",
+   "months": 54,
+   "rows": 2345580,
+   "first_bar": "2021-03-16 03:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 177120
+  },
+  {
+   "symbol": "ALLOUSDT",
+   "months": 8,
+   "rows": 334679,
+   "first_bar": "2025-11-11 14:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "ALPACAUSDT",
+   "months": 10,
+   "rows": 406890,
+   "first_bar": "2024-08-22 10:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ALPHAUSDT",
+   "months": 52,
+   "rows": 2279520,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "ALPINEUSDT",
+   "months": 4,
+   "rows": 177120,
+   "first_bar": "2025-07-01 00:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ALTUSDT",
+   "months": 25,
+   "rows": 1060440,
+   "first_bar": "2024-01-25 14:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "AMBUSDT",
+   "months": 20,
+   "rows": 878400,
+   "first_bar": "2023-04-01 00:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "AMDUSDT",
+   "months": 3,
+   "rows": 124470,
+   "first_bar": "2026-05-06 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AMZNUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ANCUSDT",
+   "months": 3,
+   "rows": 95231,
+   "first_bar": "2022-03-08 03:30:00+00:00",
+   "last_bar": "2022-05-13 06:40:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ANIMEUSDT",
+   "months": 11,
+   "rows": 449700,
+   "first_bar": "2025-01-23 17:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "ANKRUSDT",
+   "months": 49,
+   "rows": 2107740,
+   "first_bar": "2021-01-26 07:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 658080
+  },
+  {
+   "symbol": "ANTUSDT",
+   "months": 27,
+   "rows": 1145999,
+   "first_bar": "2021-12-27 04:01:00+00:00",
+   "last_bar": "2024-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "APEUSDT",
+   "months": 52,
+   "rows": 2255580,
+   "first_bar": "2022-03-17 15:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "API3USDT",
+   "months": 48,
+   "rows": 2073389,
+   "first_bar": "2022-02-22 03:31:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "APRUSDT",
+   "months": 6,
+   "rows": 228330,
+   "first_bar": "2025-10-23 10:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "APTUSDT",
+   "months": 46,
+   "rows": 1989960,
+   "first_bar": "2022-10-19 02:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ARBUSDT",
+   "months": 41,
+   "rows": 1765979,
+   "first_bar": "2023-03-23 15:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ARCUSDT",
+   "months": 15,
+   "rows": 631380,
+   "first_bar": "2025-01-17 13:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ARIAUSDT",
+   "months": 6,
+   "rows": 257100,
+   "first_bar": "2025-09-03 11:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "ARKMUSDT",
+   "months": 32,
+   "rows": 1363515,
+   "first_bar": "2023-07-28 02:45:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ARKUSDT",
+   "months": 24,
+   "rows": 1025757,
+   "first_bar": "2023-09-19 16:03:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ARMUSDT",
+   "months": 3,
+   "rows": 95660,
+   "first_bar": "2026-05-26 13:40:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ARPAUSDT",
+   "months": 42,
+   "rows": 1811310,
+   "first_bar": "2021-10-19 03:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 483840
+  },
+  {
+   "symbol": "ARUSDT",
+   "months": 57,
+   "rows": 2456430,
+   "first_bar": "2021-09-28 03:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "ARXUSDT",
+   "months": 2,
+   "rows": 55875,
+   "first_bar": "2026-06-23 04:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ASRUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2025-07-01 00:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ASTERUSDT",
+   "months": 11,
+   "rows": 454320,
+   "first_bar": "2025-09-19 12:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ASTRUSDT",
+   "months": 26,
+   "rows": 1121610,
+   "first_bar": "2023-02-14 02:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "ATAUSDT",
+   "months": 38,
+   "rows": 1624110,
+   "first_bar": "2021-08-31 03:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "ATHUSDT",
+   "months": 10,
+   "rows": 432495,
+   "first_bar": "2025-04-02 15:45:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 133920
+  },
+  {
+   "symbol": "ATOMUSDT",
+   "months": 76,
+   "rows": 3319909,
+   "first_bar": "2020-02-07 12:11:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "ATUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2025-11-01 00:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AUCTIONUSDT",
+   "months": 26,
+   "rows": 1116660,
+   "first_bar": "2023-12-15 13:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "AUDIOUSDT",
+   "months": 32,
+   "rows": 1376430,
+   "first_bar": "2021-08-19 03:30:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "AUSDT",
+   "months": 6,
+   "rows": 225599,
+   "first_bar": "2025-05-28 08:01:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AVAAIUSDT",
+   "months": 8,
+   "rows": 326085,
+   "first_bar": "2025-01-17 13:15:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AVAUSDT",
+   "months": 4,
+   "rows": 156180,
+   "first_bar": "2024-12-13 13:00:00+00:00",
+   "last_bar": "2025-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "months": 71,
+   "rows": 3078300,
+   "first_bar": "2020-09-23 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AVGOUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2026-05-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AVNTUSDT",
+   "months": 9,
+   "rows": 380700,
+   "first_bar": "2025-09-09 15:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AWEUSDT",
+   "months": 5,
+   "rows": 217440,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "AXLUSDT",
+   "months": 24,
+   "rows": 1051710,
+   "first_bar": "2024-03-01 15:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 131040
+  },
+  {
+   "symbol": "AXSUSDT",
+   "months": 69,
+   "rows": 2994776,
+   "first_bar": "2020-11-20 07:04:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "AZTECUSDT",
+   "months": 2,
+   "rows": 70291,
+   "first_bar": "2026-02-11 04:29:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "B2USDT",
+   "months": 5,
+   "rows": 210870,
+   "first_bar": "2025-05-06 13:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "B3USDT",
+   "months": 2,
+   "rows": 66990,
+   "first_bar": "2025-02-13 11:30:00+00:00",
+   "last_bar": "2025-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BABAUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BABYUSDT",
+   "months": 10,
+   "rows": 432630,
+   "first_bar": "2025-04-05 13:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "BADGERUSDT",
+   "months": 11,
+   "rows": 470130,
+   "first_bar": "2023-11-09 12:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 177120
+  },
+  {
+   "symbol": "BAKEUSDT",
+   "months": 52,
+   "rows": 2253180,
+   "first_bar": "2021-05-19 07:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "BALUSDT",
+   "months": 40,
+   "rows": 1752480,
+   "first_bar": "2020-10-01 00:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 483840
+  },
+  {
+   "symbol": "BANANAS31USDT",
+   "months": 14,
+   "rows": 582645,
+   "first_bar": "2025-03-22 09:15:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "BANANAUSDT",
+   "months": 13,
+   "rows": 549960,
+   "first_bar": "2024-08-15 02:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BANDUSDT",
+   "months": 54,
+   "rows": 2328060,
+   "first_bar": "2020-07-29 07:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 393120
+  },
+  {
+   "symbol": "BANKUSDT",
+   "months": 11,
+   "rows": 458250,
+   "first_bar": "2025-04-18 18:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "BANUSDT",
+   "months": 8,
+   "rows": 320430,
+   "first_bar": "2024-11-18 11:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 440640
+  },
+  {
+   "symbol": "BARDUSDT",
+   "months": 8,
+   "rows": 323340,
+   "first_bar": "2025-09-18 11:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BASEDUSDT",
+   "months": 5,
+   "rows": 177960,
+   "first_bar": "2026-03-30 10:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BASUSDT",
+   "months": 11,
+   "rows": 444150,
+   "first_bar": "2025-08-26 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "BATUSDT",
+   "months": 57,
+   "rows": 2498400,
+   "first_bar": "2020-05-01 00:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 483840
+  },
+  {
+   "symbol": "BBUSDT",
+   "months": 20,
+   "rows": 860370,
+   "first_bar": "2024-05-13 12:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BCHUSDT",
+   "months": 80,
+   "rows": 3461760,
+   "first_bar": "2020-01-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BDXNUSDT",
+   "months": 5,
+   "rows": 216810,
+   "first_bar": "2025-06-03 10:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "BEAMXUSDT",
+   "months": 24,
+   "rows": 1028790,
+   "first_bar": "2023-11-17 13:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BEATUSDT",
+   "months": 9,
+   "rows": 376545,
+   "first_bar": "2025-11-12 12:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BELUSDT",
+   "months": 63,
+   "rows": 2735580,
+   "first_bar": "2020-11-18 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "BERAUSDT",
+   "months": 17,
+   "rows": 733500,
+   "first_bar": "2025-02-06 15:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BEUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BICOUSDT",
+   "months": 14,
+   "rows": 614880,
+   "first_bar": "2023-11-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 830880
+  },
+  {
+   "symbol": "BIDUSDT",
+   "months": 4,
+   "rows": 177120,
+   "first_bar": "2025-05-01 00:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BIGTIMEUSDT",
+   "months": 23,
+   "rows": 992730,
+   "first_bar": "2023-10-12 14:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BILLUSDT",
+   "months": 3,
+   "rows": 123345,
+   "first_bar": "2026-05-07 08:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BIOUSDT",
+   "months": 19,
+   "rows": 827265,
+   "first_bar": "2025-01-03 12:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BLESSUSDT",
+   "months": 9,
+   "rows": 363750,
+   "first_bar": "2025-09-23 09:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "BLUAIUSDT",
+   "months": 2,
+   "rows": 58350,
+   "first_bar": "2025-10-21 11:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BLURUSDT",
+   "months": 34,
+   "rows": 1455120,
+   "first_bar": "2023-04-28 12:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 171360
+  },
+  {
+   "symbol": "BLZUSDT",
+   "months": 47,
+   "rows": 2060640,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "BMTUSDT",
+   "months": 5,
+   "rows": 196470,
+   "first_bar": "2025-03-17 13:30:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BNBUSDT",
+   "months": 78,
+   "rows": 3403679,
+   "first_bar": "2020-02-10 08:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BNTUSDT",
+   "months": 8,
+   "rows": 349920,
+   "first_bar": "2023-09-01 00:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BNXUSDT",
+   "months": 34,
+   "rows": 1450425,
+   "first_bar": "2022-04-01 03:30:00+00:00",
+   "last_bar": "2025-03-31 23:59:00+00:00",
+   "n_gaps": 6,
+   "missing_minutes": 127605
+  },
+  {
+   "symbol": "BOBUSDT",
+   "months": 2,
+   "rows": 58395,
+   "first_bar": "2025-11-21 10:45:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BOMEUSDT",
+   "months": 26,
+   "rows": 1121010,
+   "first_bar": "2024-03-16 12:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "BONDUSDT",
+   "months": 15,
+   "rows": 638490,
+   "first_bar": "2023-10-15 14:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BRETTUSDT",
+   "months": 17,
+   "rows": 717925,
+   "first_bar": "2024-08-20 10:35:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BREVUSDT",
+   "months": 3,
+   "rows": 87195,
+   "first_bar": "2025-12-30 10:45:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BROCCOLI714USDT",
+   "months": 10,
+   "rows": 412740,
+   "first_bar": "2025-03-21 09:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "BROCCOLIF3BUSDT",
+   "months": 6,
+   "rows": 234165,
+   "first_bar": "2025-03-21 09:15:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "BRUSDT",
+   "months": 9,
+   "rows": 363555,
+   "first_bar": "2025-03-21 12:45:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 264960
+  },
+  {
+   "symbol": "BSBUSDT",
+   "months": 5,
+   "rows": 185055,
+   "first_bar": "2026-03-25 11:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BSVUSDT",
+   "months": 16,
+   "rows": 677490,
+   "first_bar": "2023-10-20 12:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 171360
+  },
+  {
+   "symbol": "BSWUSDT",
+   "months": 7,
+   "rows": 305280,
+   "first_bar": "2025-01-01 00:00:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BTCDOMUSDT",
+   "months": 32,
+   "rows": 1399680,
+   "first_bar": "2021-08-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 879840
+  },
+  {
+   "symbol": "BTCUSDT",
+   "months": 80,
+   "rows": 3461760,
+   "first_bar": "2020-01-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BTRUSDT",
+   "months": 8,
+   "rows": 311850,
+   "first_bar": "2025-08-27 10:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "BTSUSDT",
+   "months": 19,
+   "rows": 830460,
+   "first_bar": "2021-02-01 07:00:00+00:00",
+   "last_bar": "2022-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BTTUSDT",
+   "months": 10,
+   "rows": 425075,
+   "first_bar": "2021-04-06 07:00:00+00:00",
+   "last_bar": "2022-01-26 11:34:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BTWUSDT",
+   "months": 2,
+   "rows": 82665,
+   "first_bar": "2026-06-04 14:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BULLAUSDT",
+   "months": 8,
+   "rows": 345060,
+   "first_bar": "2025-07-04 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 220320
+  },
+  {
+   "symbol": "BUSDT",
+   "months": 11,
+   "rows": 454050,
+   "first_bar": "2025-05-22 16:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "BZRXUSDT",
+   "months": 16,
+   "rows": 676751,
+   "first_bar": "2020-09-05 03:00:00+00:00",
+   "last_bar": "2021-12-19 02:10:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "BZUSDT",
+   "months": 4,
+   "rows": 175130,
+   "first_bar": "2026-04-01 09:10:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "C98USDT",
+   "months": 43,
+   "rows": 1847310,
+   "first_bar": "2021-08-24 03:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 528480
+  },
+  {
+   "symbol": "CAKEUSDT",
+   "months": 29,
+   "rows": 1267875,
+   "first_bar": "2023-11-02 12:45:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CAPUSDT",
+   "months": 2,
+   "rows": 49695,
+   "first_bar": "2026-06-27 11:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CATIUSDT",
+   "months": 10,
+   "rows": 408270,
+   "first_bar": "2024-09-20 11:30:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CBRSUSDT",
+   "months": 3,
+   "rows": 105990,
+   "first_bar": "2026-05-19 09:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CCUSDT",
+   "months": 6,
+   "rows": 260640,
+   "first_bar": "2025-11-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "CELOUSDT",
+   "months": 54,
+   "rows": 2326830,
+   "first_bar": "2021-09-27 03:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CELRUSDT",
+   "months": 40,
+   "rows": 1714620,
+   "first_bar": "2021-03-29 07:00:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 308160
+  },
+  {
+   "symbol": "CETUSUSDT",
+   "months": 10,
+   "rows": 429720,
+   "first_bar": "2024-11-06 14:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CFGUSDT",
+   "months": 4,
+   "rows": 153300,
+   "first_bar": "2026-03-16 13:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CFXUSDT",
+   "months": 36,
+   "rows": 1548570,
+   "first_bar": "2023-02-20 14:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "CGPTUSDT",
+   "months": 8,
+   "rows": 321405,
+   "first_bar": "2024-12-20 19:15:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 437760
+  },
+  {
+   "symbol": "CHESSUSDT",
+   "months": 8,
+   "rows": 352800,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "CHILLGUYUSDT",
+   "months": 11,
+   "rows": 442635,
+   "first_bar": "2024-11-27 14:45:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CHIPUSDT",
+   "months": 4,
+   "rows": 153645,
+   "first_bar": "2026-04-16 07:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CHRUSDT",
+   "months": 47,
+   "rows": 2047260,
+   "first_bar": "2021-03-12 07:00:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CHZUSDT",
+   "months": 67,
+   "rows": 2905500,
+   "first_bar": "2021-01-21 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CKBUSDT",
+   "months": 22,
+   "rows": 922320,
+   "first_bar": "2023-02-28 12:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 396000
+  },
+  {
+   "symbol": "CLANKERUSDT",
+   "months": 2,
+   "rows": 84960,
+   "first_bar": "2026-01-01 00:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CLOUSDT",
+   "months": 9,
+   "rows": 375150,
+   "first_bar": "2025-10-14 11:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "CLUSDT",
+   "months": 4,
+   "rows": 175140,
+   "first_bar": "2026-04-01 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COAIUSDT",
+   "months": 7,
+   "rows": 273150,
+   "first_bar": "2025-09-25 07:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 128160
+  },
+  {
+   "symbol": "COCOSUSDT",
+   "months": 5,
+   "rows": 186315,
+   "first_bar": "2023-02-21 14:45:00+00:00",
+   "last_bar": "2023-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COINUSDT",
+   "months": 6,
+   "rows": 248220,
+   "first_bar": "2026-02-09 15:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COLLECTUSDT",
+   "months": 6,
+   "rows": 218085,
+   "first_bar": "2025-12-31 13:15:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COMBOUSDT",
+   "months": 14,
+   "rows": 611280,
+   "first_bar": "2023-06-02 12:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 221760
+  },
+  {
+   "symbol": "COMMONUSDT",
+   "months": 2,
+   "rows": 49650,
+   "first_bar": "2025-10-27 12:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COMPUSDT",
+   "months": 71,
+   "rows": 3068100,
+   "first_bar": "2020-06-30 09:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COOKIEUSDT",
+   "months": 11,
+   "rows": 471630,
+   "first_bar": "2025-01-07 11:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COPPERUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-05-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "COSUSDT",
+   "months": 5,
+   "rows": 217440,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 570240
+  },
+  {
+   "symbol": "COTIUSDT",
+   "months": 53,
+   "rows": 2310780,
+   "first_bar": "2021-03-10 07:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "COWUSDT",
+   "months": 12,
+   "rows": 517590,
+   "first_bar": "2024-11-06 13:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CRCLUSDT",
+   "months": 6,
+   "rows": 248230,
+   "first_bar": "2026-02-09 14:50:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CROSSUSDT",
+   "months": 2,
+   "rows": 75690,
+   "first_bar": "2025-07-10 10:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CRVUSDT",
+   "months": 71,
+   "rows": 3109979,
+   "first_bar": "2020-09-01 07:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CRWVUSDT",
+   "months": 2,
+   "rows": 62550,
+   "first_bar": "2026-05-18 13:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CTKUSDT",
+   "months": 35,
+   "rows": 1504380,
+   "first_bar": "2020-11-19 07:00:00+00:00",
+   "last_bar": "2024-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 264960
+  },
+  {
+   "symbol": "CTSIUSDT",
+   "months": 40,
+   "rows": 1717710,
+   "first_bar": "2021-10-26 03:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 655200
+  },
+  {
+   "symbol": "CUDISUSDT",
+   "months": 2,
+   "rows": 59805,
+   "first_bar": "2025-08-20 11:15:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "CUSDT",
+   "months": 7,
+   "rows": 284580,
+   "first_bar": "2025-07-15 09:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "CVCUSDT",
+   "months": 28,
+   "rows": 1210110,
+   "first_bar": "2020-11-11 07:00:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 1227390
+  },
+  {
+   "symbol": "CVXUSDT",
+   "months": 14,
+   "rows": 583215,
+   "first_bar": "2022-09-22 12:15:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 964050
+  },
+  {
+   "symbol": "CYBERUSDT",
+   "months": 25,
+   "rows": 1067760,
+   "first_bar": "2023-08-21 12:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "CYSUSDT",
+   "months": 5,
+   "rows": 200940,
+   "first_bar": "2025-12-12 11:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DAMUSDT",
+   "months": 3,
+   "rows": 107250,
+   "first_bar": "2025-08-18 12:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DARUSDT",
+   "months": 29,
+   "rows": 1233870,
+   "first_bar": "2022-04-29 03:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "DASHUSDT",
+   "months": 64,
+   "rows": 2800314,
+   "first_bar": "2020-02-04 08:06:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 612000
+  },
+  {
+   "symbol": "DEEPUSDT",
+   "months": 6,
+   "rows": 234210,
+   "first_bar": "2025-04-22 08:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "DEFIUSDT",
+   "months": 18,
+   "rows": 749820,
+   "first_bar": "2020-08-28 07:00:00+00:00",
+   "last_bar": "2022-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "DEGENUSDT",
+   "months": 8,
+   "rows": 327630,
+   "first_bar": "2024-11-15 11:30:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DEGOUSDT",
+   "months": 10,
+   "rows": 432000,
+   "first_bar": "2025-02-01 00:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 221760
+  },
+  {
+   "symbol": "DELLUSDT",
+   "months": 2,
+   "rows": 84420,
+   "first_bar": "2026-06-03 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DENTUSDT",
+   "months": 44,
+   "rows": 1894799,
+   "first_bar": "2021-03-24 04:01:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 745920
+  },
+  {
+   "symbol": "DEXEUSDT",
+   "months": 17,
+   "rows": 709230,
+   "first_bar": "2024-12-24 11:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "DFUSDT",
+   "months": 5,
+   "rows": 174975,
+   "first_bar": "2024-12-30 11:45:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DGBUSDT",
+   "months": 26,
+   "rows": 1111470,
+   "first_bar": "2021-04-21 03:30:00+00:00",
+   "last_bar": "2024-03-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 437760
+  },
+  {
+   "symbol": "DIAUSDT",
+   "months": 6,
+   "rows": 262770,
+   "first_bar": "2024-10-02 12:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "DMCUSDT",
+   "months": 3,
+   "rows": 98580,
+   "first_bar": "2025-06-24 13:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DODOUSDT",
+   "months": 16,
+   "rows": 665058,
+   "first_bar": "2021-02-19 13:00:00+00:00",
+   "last_bar": "2022-05-27 09:17:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DODOXUSDT",
+   "months": 14,
+   "rows": 604080,
+   "first_bar": "2023-08-08 12:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 963360
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "months": 70,
+   "rows": 3067200,
+   "first_bar": "2020-10-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DOGSUSDT",
+   "months": 18,
+   "rows": 752370,
+   "first_bar": "2024-08-26 12:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "DOLOUSDT",
+   "months": 8,
+   "rows": 352800,
+   "first_bar": "2025-06-01 00:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DOODUSDT",
+   "months": 7,
+   "rows": 295830,
+   "first_bar": "2025-05-09 13:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "DOTECOUSDT",
+   "months": 2,
+   "rows": 43358,
+   "first_bar": "2021-01-20 07:00:00+00:00",
+   "last_bar": "2021-02-19 09:37:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DOTUSDT",
+   "months": 72,
+   "rows": 3124380,
+   "first_bar": "2020-08-22 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DRAMUSDT",
+   "months": 3,
+   "rows": 107160,
+   "first_bar": "2026-05-18 14:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DRIFTUSDT",
+   "months": 14,
+   "rows": 602415,
+   "first_bar": "2024-11-08 15:45:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "DUSDT",
+   "months": 5,
+   "rows": 205320,
+   "first_bar": "2025-01-09 10:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 525600
+  },
+  {
+   "symbol": "DUSKUSDT",
+   "months": 42,
+   "rows": 1831470,
+   "first_bar": "2022-01-07 03:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 436320
+  },
+  {
+   "symbol": "DYDXUSDT",
+   "months": 59,
+   "rows": 2571630,
+   "first_bar": "2021-09-10 03:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "DYMUSDT",
+   "months": 23,
+   "rows": 997500,
+   "first_bar": "2024-02-07 07:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "EDENUSDT",
+   "months": 6,
+   "rows": 219660,
+   "first_bar": "2025-09-30 11:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "EDGEUSDT",
+   "months": 5,
+   "rows": 193560,
+   "first_bar": "2026-03-19 14:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "EDUUSDT",
+   "months": 26,
+   "rows": 1099440,
+   "first_bar": "2023-04-30 12:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "EGLDUSDT",
+   "months": 59,
+   "rows": 2584800,
+   "first_bar": "2020-11-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "EIGENUSDT",
+   "months": 23,
+   "rows": 963000,
+   "first_bar": "2024-10-01 06:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ENAUSDT",
+   "months": 28,
+   "rows": 1224690,
+   "first_bar": "2024-04-02 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ENJUSDT",
+   "months": 55,
+   "rows": 2406240,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 485280
+  },
+  {
+   "symbol": "ENSOUSDT",
+   "months": 8,
+   "rows": 330660,
+   "first_bar": "2025-10-14 09:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ENSUSDT",
+   "months": 50,
+   "rows": 2146830,
+   "first_bar": "2021-11-30 03:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "EOSUSDT",
+   "months": 65,
+   "rows": 2822464,
+   "first_bar": "2020-01-08 08:00:00+00:00",
+   "last_bar": "2025-05-21 09:03:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "EPICUSDT",
+   "months": 12,
+   "rows": 510720,
+   "first_bar": "2025-03-13 08:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "EPTUSDT",
+   "months": 3,
+   "rows": 101460,
+   "first_bar": "2025-04-21 13:00:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ERAUSDT",
+   "months": 7,
+   "rows": 284190,
+   "first_bar": "2025-07-17 15:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "ESPORTSUSDT",
+   "months": 9,
+   "rows": 356520,
+   "first_bar": "2025-07-29 10:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "ESPUSDT",
+   "months": 2,
+   "rows": 71510,
+   "first_bar": "2026-02-10 08:10:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ETCUSDT",
+   "months": 79,
+   "rows": 3439679,
+   "first_bar": "2020-01-16 08:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ETHFIUSDT",
+   "months": 29,
+   "rows": 1246110,
+   "first_bar": "2024-03-18 15:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "months": 80,
+   "rows": 3461760,
+   "first_bar": "2020-01-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ETHWUSDT",
+   "months": 10,
+   "rows": 398130,
+   "first_bar": "2023-11-28 12:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 177120
+  },
+  {
+   "symbol": "EULUSDT",
+   "months": 4,
+   "rows": 154650,
+   "first_bar": "2025-10-13 14:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "EVAAUSDT",
+   "months": 7,
+   "rows": 306088,
+   "first_bar": "2025-10-03 10:32:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 128160
+  },
+  {
+   "symbol": "EWYUSDT",
+   "months": 5,
+   "rows": 197910,
+   "first_bar": "2026-03-16 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FARTCOINUSDT",
+   "months": 20,
+   "rows": 847035,
+   "first_bar": "2024-12-20 18:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FETUSDT",
+   "months": 43,
+   "rows": 1860330,
+   "first_bar": "2023-01-17 02:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FFUSDT",
+   "months": 8,
+   "rows": 310230,
+   "first_bar": "2025-09-29 13:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "FHEUSDT",
+   "months": 11,
+   "rows": 464220,
+   "first_bar": "2025-04-12 15:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "FIDAUSDT",
+   "months": 16,
+   "rows": 673170,
+   "first_bar": "2024-09-19 12:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "FIGHTUSDT",
+   "months": 2,
+   "rows": 52545,
+   "first_bar": "2026-01-23 12:15:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FILUSDT",
+   "months": 70,
+   "rows": 3038040,
+   "first_bar": "2020-10-16 06:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "FIOUSDT",
+   "months": 5,
+   "rows": 192270,
+   "first_bar": "2024-09-20 11:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FISUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2025-06-01 00:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FLMUSDT",
+   "months": 59,
+   "rows": 2581920,
+   "first_bar": "2020-10-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 135360
+  },
+  {
+   "symbol": "FLNCUSDT",
+   "months": 2,
+   "rows": 62525,
+   "first_bar": "2026-05-18 13:55:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FLOWUSDT",
+   "months": 50,
+   "rows": 2168430,
+   "first_bar": "2022-02-10 03:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "FLUXUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2024-11-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 393120
+  },
+  {
+   "symbol": "FOGOUSDT",
+   "months": 3,
+   "rows": 115800,
+   "first_bar": "2026-01-10 14:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FOLKSUSDT",
+   "months": 8,
+   "rows": 344850,
+   "first_bar": "2025-11-06 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "FOOTBALLUSDT",
+   "months": 10,
+   "rows": 441900,
+   "first_bar": "2022-09-01 03:00:00+00:00",
+   "last_bar": "2023-08-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 83520
+  },
+  {
+   "symbol": "FORMUSDT",
+   "months": 12,
+   "rows": 499200,
+   "first_bar": "2025-03-19 08:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "FRONTUSDT",
+   "months": 12,
+   "rows": 495930,
+   "first_bar": "2023-09-22 14:30:00+00:00",
+   "last_bar": "2024-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FTMUSDT",
+   "months": 50,
+   "rows": 2185920,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "FTTUSDT",
+   "months": 8,
+   "rows": 330990,
+   "first_bar": "2022-04-15 03:30:00+00:00",
+   "last_bar": "2022-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FUNUSDT",
+   "months": 7,
+   "rows": 264450,
+   "first_bar": "2025-03-31 08:30:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FUSDT",
+   "months": 6,
+   "rows": 264960,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "FXSUSDT",
+   "months": 30,
+   "rows": 1287180,
+   "first_bar": "2023-01-20 03:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "GALAUSDT",
+   "months": 58,
+   "rows": 2515470,
+   "first_bar": "2021-09-18 03:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GALUSDT",
+   "months": 27,
+   "rows": 1176017,
+   "first_bar": "2022-05-05 14:00:00+00:00",
+   "last_bar": "2024-07-30 06:16:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GASUSDT",
+   "months": 23,
+   "rows": 974715,
+   "first_bar": "2023-10-25 02:45:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "GENIUSUSDT",
+   "months": 3,
+   "rows": 109230,
+   "first_bar": "2026-04-16 03:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GHSTUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GIGGLEUSDT",
+   "months": 9,
+   "rows": 381015,
+   "first_bar": "2025-10-09 09:45:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GLMRUSDT",
+   "months": 6,
+   "rows": 262080,
+   "first_bar": "2023-11-01 00:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GLMUSDT",
+   "months": 22,
+   "rows": 933960,
+   "first_bar": "2024-02-22 10:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "GLWUSDT",
+   "months": 2,
+   "rows": 72870,
+   "first_bar": "2026-06-11 09:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GMTUSDT",
+   "months": 46,
+   "rows": 1997040,
+   "first_bar": "2022-03-15 04:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 46080
+  },
+  {
+   "symbol": "GMXUSDT",
+   "months": 28,
+   "rows": 1202970,
+   "first_bar": "2023-02-17 14:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 218880
+  },
+  {
+   "symbol": "GOATUSDT",
+   "months": 13,
+   "rows": 536310,
+   "first_bar": "2024-10-24 13:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GOOGLUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2026-04-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GPSUSDT",
+   "months": 12,
+   "rows": 498660,
+   "first_bar": "2025-02-17 17:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "GRASSUSDT",
+   "months": 20,
+   "rows": 863070,
+   "first_bar": "2024-11-08 15:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "GRIFFAINUSDT",
+   "months": 10,
+   "rows": 435510,
+   "first_bar": "2025-01-02 13:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "GRTUSDT",
+   "months": 60,
+   "rows": 2595900,
+   "first_bar": "2020-12-19 07:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "GTCUSDT",
+   "months": 46,
+   "rows": 1998510,
+   "first_bar": "2021-06-11 03:30:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 266400
+  },
+  {
+   "symbol": "GUAUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2026-04-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "GUNUSDT",
+   "months": 12,
+   "rows": 481620,
+   "first_bar": "2025-03-31 13:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "GUSDT",
+   "months": 6,
+   "rows": 264960,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 698400
+  },
+  {
+   "symbol": "GWEIUSDT",
+   "months": 6,
+   "rows": 260640,
+   "first_bar": "2026-02-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HAEDALUSDT",
+   "months": 4,
+   "rows": 176925,
+   "first_bar": "2025-05-01 03:15:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HANAUSDT",
+   "months": 6,
+   "rows": 223950,
+   "first_bar": "2025-09-26 11:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HBARUSDT",
+   "months": 65,
+   "rows": 2819100,
+   "first_bar": "2021-03-17 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "HEIUSDT",
+   "months": 9,
+   "rows": 375300,
+   "first_bar": "2025-02-13 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 393120
+  },
+  {
+   "symbol": "HEMIUSDT",
+   "months": 5,
+   "rows": 179730,
+   "first_bar": "2025-08-29 04:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HFTUSDT",
+   "months": 19,
+   "rows": 827280,
+   "first_bar": "2023-04-06 12:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 480960
+  },
+  {
+   "symbol": "HIFIUSDT",
+   "months": 25,
+   "rows": 1077690,
+   "first_bar": "2023-09-16 14:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "HIGHUSDT",
+   "months": 28,
+   "rows": 1219530,
+   "first_bar": "2023-02-07 02:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 522720
+  },
+  {
+   "symbol": "HIPPOUSDT",
+   "months": 12,
+   "rows": 506130,
+   "first_bar": "2024-11-13 12:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "HIVEUSDT",
+   "months": 5,
+   "rows": 185070,
+   "first_bar": "2024-12-23 11:30:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HMSTRUSDT",
+   "months": 15,
+   "rows": 621330,
+   "first_bar": "2024-09-26 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 348480
+  },
+  {
+   "symbol": "HNTUSDT",
+   "months": 27,
+   "rows": 1180800,
+   "first_bar": "2021-01-01 00:00:00+00:00",
+   "last_bar": "2023-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HOLOUSDT",
+   "months": 3,
+   "rows": 115920,
+   "first_bar": "2025-09-11 12:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HOMEUSDT",
+   "months": 8,
+   "rows": 337710,
+   "first_bar": "2025-06-10 11:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 262080
+  },
+  {
+   "symbol": "HOODUSDT",
+   "months": 6,
+   "rows": 258315,
+   "first_bar": "2026-02-02 14:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HOOKUSDT",
+   "months": 30,
+   "rows": 1285740,
+   "first_bar": "2023-01-23 03:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "HOTUSDT",
+   "months": 45,
+   "rows": 1921980,
+   "first_bar": "2021-03-30 07:00:00+00:00",
+   "last_bar": "2025-02-28 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 139680
+  },
+  {
+   "symbol": "HUMAUSDT",
+   "months": 9,
+   "rows": 356340,
+   "first_bar": "2025-05-26 13:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "HUSDT",
+   "months": 14,
+   "rows": 578310,
+   "first_bar": "2025-06-25 09:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "HYPERUSDT",
+   "months": 9,
+   "rows": 364980,
+   "first_bar": "2025-04-22 13:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "HYPEUSDT",
+   "months": 15,
+   "rows": 615690,
+   "first_bar": "2025-05-30 10:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "IBMUSDT",
+   "months": 2,
+   "rows": 84415,
+   "first_bar": "2026-06-03 09:05:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ICNTUSDT",
+   "months": 6,
+   "rows": 262740,
+   "first_bar": "2025-07-03 13:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "ICPUSDT",
+   "months": 61,
+   "rows": 2620470,
+   "first_bar": "2021-05-11 03:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 126870
+  },
+  {
+   "symbol": "ICXUSDT",
+   "months": 46,
+   "rows": 2016000,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 393120
+  },
+  {
+   "symbol": "IDEXUSDT",
+   "months": 5,
+   "rows": 213840,
+   "first_bar": "2023-05-03 12:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 309600
+  },
+  {
+   "symbol": "IDOLUSDT",
+   "months": 5,
+   "rows": 220320,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "IDUSDT",
+   "months": 30,
+   "rows": 1285050,
+   "first_bar": "2023-03-23 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 480960
+  },
+  {
+   "symbol": "ILVUSDT",
+   "months": 16,
+   "rows": 690210,
+   "first_bar": "2023-11-10 16:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 260640
+  },
+  {
+   "symbol": "IMXUSDT",
+   "months": 48,
+   "rows": 2082029,
+   "first_bar": "2022-02-11 03:31:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "INITUSDT",
+   "months": 9,
+   "rows": 371130,
+   "first_bar": "2025-04-16 06:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "INJUSDT",
+   "months": 48,
+   "rows": 2080635,
+   "first_bar": "2022-08-17 02:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "INTCUSDT",
+   "months": 6,
+   "rows": 258331,
+   "first_bar": "2026-02-02 14:29:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "INUSDT",
+   "months": 8,
+   "rows": 342090,
+   "first_bar": "2025-08-07 10:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "IOSTUSDT",
+   "months": 53,
+   "rows": 2322720,
+   "first_bar": "2020-05-01 00:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 659520
+  },
+  {
+   "symbol": "IOTAUSDT",
+   "months": 60,
+   "rows": 2623680,
+   "first_bar": "2020-07-01 00:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 182880
+  },
+  {
+   "symbol": "IOTXUSDT",
+   "months": 44,
+   "rows": 1914990,
+   "first_bar": "2021-08-12 03:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "IOUSDT",
+   "months": 20,
+   "rows": 861720,
+   "first_bar": "2024-06-11 14:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "IPUSDT",
+   "months": 18,
+   "rows": 767940,
+   "first_bar": "2025-02-13 17:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "IRUSDT",
+   "months": 2,
+   "rows": 59850,
+   "first_bar": "2025-12-21 10:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "IRYSUSDT",
+   "months": 5,
+   "rows": 220320,
+   "first_bar": "2025-12-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "JASMYUSDT",
+   "months": 47,
+   "rows": 2031630,
+   "first_bar": "2022-04-20 03:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "JCTUSDT",
+   "months": 7,
+   "rows": 290250,
+   "first_bar": "2025-11-10 10:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "JELLYJELLYUSDT",
+   "months": 13,
+   "rows": 533280,
+   "first_bar": "2025-03-26 16:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "JOEUSDT",
+   "months": 16,
+   "rows": 661668,
+   "first_bar": "2023-03-29 12:12:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 264960
+  },
+  {
+   "symbol": "JTOUSDT",
+   "months": 32,
+   "rows": 1391879,
+   "first_bar": "2023-12-08 10:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "JUPUSDT",
+   "months": 30,
+   "rows": 1313280,
+   "first_bar": "2024-02-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KAIAUSDT",
+   "months": 10,
+   "rows": 434040,
+   "first_bar": "2024-12-04 14:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 216000
+  },
+  {
+   "symbol": "KAITOUSDT",
+   "months": 17,
+   "rows": 713460,
+   "first_bar": "2025-02-20 13:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "KASUSDT",
+   "months": 26,
+   "rows": 1117320,
+   "first_bar": "2023-11-17 02:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KATUSDT",
+   "months": 3,
+   "rows": 130740,
+   "first_bar": "2026-03-02 05:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KAVAUSDT",
+   "months": 66,
+   "rows": 2850775,
+   "first_bar": "2020-07-28 07:05:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 133920
+  },
+  {
+   "symbol": "KDAUSDT",
+   "months": 10,
+   "rows": 436320,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 177120
+  },
+  {
+   "symbol": "KEEPUSDT",
+   "months": 9,
+   "rows": 342634,
+   "first_bar": "2021-06-22 03:30:00+00:00",
+   "last_bar": "2022-02-15 02:03:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KERNELUSDT",
+   "months": 10,
+   "rows": 419760,
+   "first_bar": "2025-04-14 12:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 129600
+  },
+  {
+   "symbol": "KEYUSDT",
+   "months": 19,
+   "rows": 801360,
+   "first_bar": "2023-05-24 12:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "KGENUSDT",
+   "months": 4,
+   "rows": 167610,
+   "first_bar": "2025-10-07 14:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KITEUSDT",
+   "months": 9,
+   "rows": 393120,
+   "first_bar": "2025-11-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KLAYUSDT",
+   "months": 35,
+   "rows": 1517550,
+   "first_bar": "2021-10-12 03:30:00+00:00",
+   "last_bar": "2024-09-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "KMNOUSDT",
+   "months": 9,
+   "rows": 367500,
+   "first_bar": "2024-12-20 19:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 129600
+  },
+  {
+   "symbol": "KNCUSDT",
+   "months": 54,
+   "rows": 2329386,
+   "first_bar": "2020-06-22 08:54:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 401760
+  },
+  {
+   "symbol": "KOMAUSDT",
+   "months": 8,
+   "rows": 336225,
+   "first_bar": "2024-12-10 12:15:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "KORUUSDT",
+   "months": 2,
+   "rows": 56765,
+   "first_bar": "2026-06-22 13:55:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "KSMUSDT",
+   "months": 50,
+   "rows": 2166780,
+   "first_bar": "2020-10-14 07:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 531360
+  },
+  {
+   "symbol": "LABUSDT",
+   "months": 9,
+   "rows": 373530,
+   "first_bar": "2025-10-17 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "LAUSDT",
+   "months": 12,
+   "rows": 519300,
+   "first_bar": "2025-06-05 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "LAYERUSDT",
+   "months": 11,
+   "rows": 465615,
+   "first_bar": "2025-02-11 15:45:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "LDOUSDT",
+   "months": 47,
+   "rows": 2028240,
+   "first_bar": "2022-09-22 12:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LENDUSDT",
+   "months": 4,
+   "rows": 144900,
+   "first_bar": "2020-07-23 09:00:00+00:00",
+   "last_bar": "2020-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LEVERUSDT",
+   "months": 27,
+   "rows": 1185120,
+   "first_bar": "2023-05-01 00:00:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LIGHTUSDT",
+   "months": 8,
+   "rows": 310350,
+   "first_bar": "2025-09-27 11:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LINAUSDT",
+   "months": 50,
+   "rows": 2158140,
+   "first_bar": "2021-03-19 07:00:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "LINEAUSDT",
+   "months": 6,
+   "rows": 260130,
+   "first_bar": "2025-09-01 08:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LINKUSDT",
+   "months": 79,
+   "rows": 3438240,
+   "first_bar": "2020-01-17 08:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LISTAUSDT",
+   "months": 17,
+   "rows": 717810,
+   "first_bar": "2024-06-20 12:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LITEUSDT",
+   "months": 3,
+   "rows": 111510,
+   "first_bar": "2026-05-15 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LITUSDT",
+   "months": 56,
+   "rows": 2419170,
+   "first_bar": "2021-02-18 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 446010
+  },
+  {
+   "symbol": "LOKAUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2025-06-01 00:00:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LOOMUSDT",
+   "months": 15,
+   "rows": 644250,
+   "first_bar": "2023-10-11 14:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LPTUSDT",
+   "months": 49,
+   "rows": 2129550,
+   "first_bar": "2021-11-11 03:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "LQTYUSDT",
+   "months": 29,
+   "rows": 1259280,
+   "first_bar": "2023-03-10 12:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "LRCUSDT",
+   "months": 49,
+   "rows": 2141280,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 6,
+   "missing_minutes": 532800
+  },
+  {
+   "symbol": "LSKUSDT",
+   "months": 14,
+   "rows": 580905,
+   "first_bar": "2024-01-25 14:15:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 436320
+  },
+  {
+   "symbol": "LTCUSDT",
+   "months": 79,
+   "rows": 3442551,
+   "first_bar": "2020-01-09 08:09:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "LUMIAUSDT",
+   "months": 6,
+   "rows": 236910,
+   "first_bar": "2024-12-18 11:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "LUNA2USDT",
+   "months": 38,
+   "rows": 1652940,
+   "first_bar": "2022-09-10 03:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "LUNAUSDT",
+   "months": 16,
+   "rows": 664250,
+   "first_bar": "2021-02-01 00:00:00+00:00",
+   "last_bar": "2022-05-13 06:49:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "LYNUSDT",
+   "months": 8,
+   "rows": 342270,
+   "first_bar": "2025-10-06 07:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MAGICUSDT",
+   "months": 32,
+   "rows": 1370700,
+   "first_bar": "2023-01-25 03:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "MAGMAUSDT",
+   "months": 5,
+   "rows": 220320,
+   "first_bar": "2026-03-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MANAUSDT",
+   "months": 60,
+   "rows": 2601660,
+   "first_bar": "2021-03-15 07:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "MANTAUSDT",
+   "months": 22,
+   "rows": 939480,
+   "first_bar": "2024-01-18 14:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "MASKUSDT",
+   "months": 50,
+   "rows": 2146830,
+   "first_bar": "2021-08-27 03:30:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "MATICUSDT",
+   "months": 46,
+   "rows": 1987783,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2024-09-11 09:42:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MAVIAUSDT",
+   "months": 15,
+   "rows": 627660,
+   "first_bar": "2024-02-21 10:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 306300
+  },
+  {
+   "symbol": "MAVUSDT",
+   "months": 26,
+   "rows": 1102320,
+   "first_bar": "2023-06-29 12:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "MBLUSDT",
+   "months": 3,
+   "rows": 129600,
+   "first_bar": "2024-02-01 00:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MBOXUSDT",
+   "months": 9,
+   "rows": 393120,
+   "first_bar": "2024-09-01 00:00:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MDTUSDT",
+   "months": 9,
+   "rows": 394560,
+   "first_bar": "2023-08-01 00:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MEGAUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2026-04-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MELANIAUSDT",
+   "months": 11,
+   "rows": 453030,
+   "first_bar": "2025-01-20 09:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MEMEFIUSDT",
+   "months": 2,
+   "rows": 52845,
+   "first_bar": "2025-04-25 07:15:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MEMEUSDT",
+   "months": 27,
+   "rows": 1180080,
+   "first_bar": "2023-11-03 12:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "MERLUSDT",
+   "months": 9,
+   "rows": 393120,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "METAUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2026-05-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "METISUSDT",
+   "months": 8,
+   "rows": 335010,
+   "first_bar": "2024-03-12 08:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "METUSDT",
+   "months": 5,
+   "rows": 202290,
+   "first_bar": "2025-10-11 12:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MEUSDT",
+   "months": 14,
+   "rows": 598020,
+   "first_bar": "2024-12-10 17:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "MEWUSDT",
+   "months": 15,
+   "rows": 634200,
+   "first_bar": "2024-06-17 14:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MINAUSDT",
+   "months": 37,
+   "rows": 1609260,
+   "first_bar": "2023-02-07 11:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MIRAUSDT",
+   "months": 4,
+   "rows": 138960,
+   "first_bar": "2025-09-26 12:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MITOUSDT",
+   "months": 3,
+   "rows": 92610,
+   "first_bar": "2025-08-28 16:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MKRUSDT",
+   "months": 62,
+   "rows": 2692380,
+   "first_bar": "2020-08-13 07:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "MLNUSDT",
+   "months": 3,
+   "rows": 131040,
+   "first_bar": "2025-09-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MMTUSDT",
+   "months": 3,
+   "rows": 127440,
+   "first_bar": "2025-11-04 12:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MOCAUSDT",
+   "months": 7,
+   "rows": 284430,
+   "first_bar": "2024-12-16 11:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "MONUSDT",
+   "months": 8,
+   "rows": 348480,
+   "first_bar": "2025-11-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MOODENGUSDT",
+   "months": 20,
+   "rows": 840360,
+   "first_bar": "2024-10-25 10:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MORPHOUSDT",
+   "months": 17,
+   "rows": 704730,
+   "first_bar": "2024-11-27 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "MOVEUSDT",
+   "months": 15,
+   "rows": 642840,
+   "first_bar": "2024-12-09 14:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MOVRUSDT",
+   "months": 17,
+   "rows": 712050,
+   "first_bar": "2023-12-26 12:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 565920
+  },
+  {
+   "symbol": "MRVLUSDT",
+   "months": 3,
+   "rows": 111475,
+   "first_bar": "2026-05-15 14:05:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MSFTUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2026-05-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MSTRUSDT",
+   "months": 6,
+   "rows": 248250,
+   "first_bar": "2026-02-09 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MTLUSDT",
+   "months": 45,
+   "rows": 1932060,
+   "first_bar": "2021-03-31 07:00:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "MUBARAKUSDT",
+   "months": 10,
+   "rows": 418215,
+   "first_bar": "2025-03-17 13:45:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "MUSDT",
+   "months": 13,
+   "rows": 561030,
+   "first_bar": "2025-07-07 09:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MUUSDT",
+   "months": 4,
+   "rows": 166231,
+   "first_bar": "2026-04-07 13:29:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MVLLUSDT",
+   "months": 2,
+   "rows": 46705,
+   "first_bar": "2026-06-29 13:35:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "MYROUSDT",
+   "months": 14,
+   "rows": 611490,
+   "first_bar": "2024-03-05 08:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "MYXUSDT",
+   "months": 14,
+   "rows": 588210,
+   "first_bar": "2025-06-18 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NAORISUSDT",
+   "months": 8,
+   "rows": 349920,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "NATGASUSDT",
+   "months": 4,
+   "rows": 175120,
+   "first_bar": "2026-04-01 09:20:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NBISUSDT",
+   "months": 3,
+   "rows": 95670,
+   "first_bar": "2026-05-26 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NEARUSDT",
+   "months": 70,
+   "rows": 3039360,
+   "first_bar": "2020-10-15 08:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "NEIROETHUSDT",
+   "months": 13,
+   "rows": 560760,
+   "first_bar": "2024-09-06 14:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NEIROUSDT",
+   "months": 21,
+   "rows": 896428,
+   "first_bar": "2024-09-16 11:32:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NEOUSDT",
+   "months": 67,
+   "rows": 2937600,
+   "first_bar": "2020-05-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NEWTUSDT",
+   "months": 4,
+   "rows": 148890,
+   "first_bar": "2025-06-19 14:30:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NFPUSDT",
+   "months": 14,
+   "rows": 578070,
+   "first_bar": "2023-12-27 13:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NIGHTUSDT",
+   "months": 5,
+   "rows": 203820,
+   "first_bar": "2025-12-10 11:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NILUSDT",
+   "months": 14,
+   "rows": 582420,
+   "first_bar": "2025-03-24 13:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "NKNUSDT",
+   "months": 39,
+   "rows": 1698780,
+   "first_bar": "2021-04-09 07:00:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 480960
+  },
+  {
+   "symbol": "NMRUSDT",
+   "months": 22,
+   "rows": 967680,
+   "first_bar": "2023-08-01 00:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "NOKUSDT",
+   "months": 2,
+   "rows": 87015,
+   "first_bar": "2026-06-01 13:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NOMUSDT",
+   "months": 4,
+   "rows": 172800,
+   "first_bar": "2026-01-01 00:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NOTUSDT",
+   "months": 21,
+   "rows": 899160,
+   "first_bar": "2024-05-16 14:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "NTRNUSDT",
+   "months": 14,
+   "rows": 594000,
+   "first_bar": "2023-11-14 12:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 394560
+  },
+  {
+   "symbol": "NULSUSDT",
+   "months": 4,
+   "rows": 139170,
+   "first_bar": "2024-08-26 08:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "NUUSDT",
+   "months": 5,
+   "rows": 168394,
+   "first_bar": "2021-10-21 03:30:00+00:00",
+   "last_bar": "2022-02-15 02:03:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NVDAUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2026-04-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "NXPCUSDT",
+   "months": 8,
+   "rows": 332250,
+   "first_bar": "2025-05-15 06:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OBOLUSDT",
+   "months": 4,
+   "rows": 167850,
+   "first_bar": "2025-05-07 10:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OCEANUSDT",
+   "months": 44,
+   "rows": 1920960,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2024-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "OGNUSDT",
+   "months": 48,
+   "rows": 2099100,
+   "first_bar": "2021-04-01 07:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 267840
+  },
+  {
+   "symbol": "OGUSDT",
+   "months": 8,
+   "rows": 349920,
+   "first_bar": "2025-07-01 00:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OMGUSDT",
+   "months": 53,
+   "rows": 2314978,
+   "first_bar": "2020-07-02 09:02:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 51840
+  },
+  {
+   "symbol": "OMNIUSDT",
+   "months": 18,
+   "rows": 765240,
+   "first_bar": "2024-04-17 14:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OMUSDT",
+   "months": 26,
+   "rows": 1119480,
+   "first_bar": "2024-02-13 14:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ONDOUSDT",
+   "months": 31,
+   "rows": 1329780,
+   "first_bar": "2024-01-20 13:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ONEUSDT",
+   "months": 47,
+   "rows": 2028540,
+   "first_bar": "2021-03-18 07:00:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 182880
+  },
+  {
+   "symbol": "ONGUSDT",
+   "months": 14,
+   "rows": 614880,
+   "first_bar": "2024-02-01 00:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 565920
+  },
+  {
+   "symbol": "ONTUSDT",
+   "months": 62,
+   "rows": 2714400,
+   "first_bar": "2020-05-01 00:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 440640
+  },
+  {
+   "symbol": "ONUSDT",
+   "months": 4,
+   "rows": 175680,
+   "first_bar": "2026-03-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "OPENUSDT",
+   "months": 6,
+   "rows": 251220,
+   "first_bar": "2025-09-08 13:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "OPGUSDT",
+   "months": 4,
+   "rows": 144510,
+   "first_bar": "2026-04-22 15:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OPNUSDT",
+   "months": 6,
+   "rows": 230940,
+   "first_bar": "2026-02-21 15:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OPUSDT",
+   "months": 50,
+   "rows": 2190839,
+   "first_bar": "2022-06-01 14:01:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ORBSUSDT",
+   "months": 14,
+   "rows": 592920,
+   "first_bar": "2023-10-17 06:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "ORCAUSDT",
+   "months": 16,
+   "rows": 691740,
+   "first_bar": "2024-12-06 15:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "ORCLUSDT",
+   "months": 3,
+   "rows": 111505,
+   "first_bar": "2026-05-15 13:35:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ORDERUSDT",
+   "months": 2,
+   "rows": 51075,
+   "first_bar": "2025-09-26 12:45:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ORDIUSDT",
+   "months": 33,
+   "rows": 1436370,
+   "first_bar": "2023-11-07 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "OXTUSDT",
+   "months": 10,
+   "rows": 424080,
+   "first_bar": "2023-08-11 12:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 308160
+  },
+  {
+   "symbol": "PARTIUSDT",
+   "months": 13,
+   "rows": 536340,
+   "first_bar": "2025-03-25 13:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 129600
+  },
+  {
+   "symbol": "PAXGUSDT",
+   "months": 17,
+   "rows": 707850,
+   "first_bar": "2025-03-27 10:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PENDLEUSDT",
+   "months": 37,
+   "rows": 1583850,
+   "first_bar": "2023-07-28 02:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PENGUUSDT",
+   "months": 20,
+   "rows": 851505,
+   "first_bar": "2024-12-17 16:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PEOPLEUSDT",
+   "months": 50,
+   "rows": 2152560,
+   "first_bar": "2021-12-24 04:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "PERPUSDT",
+   "months": 14,
+   "rows": 614880,
+   "first_bar": "2023-08-01 00:00:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 349920
+  },
+  {
+   "symbol": "PHAROSUSDT",
+   "months": 2,
+   "rows": 68805,
+   "first_bar": "2026-05-14 05:15:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PHAUSDT",
+   "months": 7,
+   "rows": 259950,
+   "first_bar": "2024-12-30 11:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 397440
+  },
+  {
+   "symbol": "PHBUSDT",
+   "months": 27,
+   "rows": 1158330,
+   "first_bar": "2023-02-16 14:30:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "PIEVERSEUSDT",
+   "months": 7,
+   "rows": 285870,
+   "first_bar": "2025-11-14 11:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PIPPINUSDT",
+   "months": 19,
+   "rows": 797145,
+   "first_bar": "2025-01-24 10:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PIXELUSDT",
+   "months": 21,
+   "rows": 889020,
+   "first_bar": "2024-02-19 15:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 264960
+  },
+  {
+   "symbol": "PLAYUSDT",
+   "months": 8,
+   "rows": 348480,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "PLTRUSDT",
+   "months": 5,
+   "rows": 203570,
+   "first_bar": "2026-02-09 15:10:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "PLUMEUSDT",
+   "months": 14,
+   "rows": 582420,
+   "first_bar": "2025-03-21 13:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "PNUTUSDT",
+   "months": 19,
+   "rows": 815730,
+   "first_bar": "2024-11-11 12:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "POLUSDT",
+   "months": 23,
+   "rows": 988545,
+   "first_bar": "2024-09-13 12:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "POLYXUSDT",
+   "months": 18,
+   "rows": 758730,
+   "first_bar": "2023-10-25 02:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 436320
+  },
+  {
+   "symbol": "PONKEUSDT",
+   "months": 7,
+   "rows": 300210,
+   "first_bar": "2024-11-04 12:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "POPCATUSDT",
+   "months": 18,
+   "rows": 759540,
+   "first_bar": "2024-08-22 13:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PORT3USDT",
+   "months": 5,
+   "rows": 220320,
+   "first_bar": "2025-07-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PORTALUSDT",
+   "months": 20,
+   "rows": 878400,
+   "first_bar": "2024-03-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 393120
+  },
+  {
+   "symbol": "POWERUSDT",
+   "months": 5,
+   "rows": 209700,
+   "first_bar": "2025-12-06 09:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "POWRUSDT",
+   "months": 14,
+   "rows": 580170,
+   "first_bar": "2023-10-27 02:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 86400
+  },
+  {
+   "symbol": "PRLUSDT",
+   "months": 2,
+   "rows": 87210,
+   "first_bar": "2026-04-01 10:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PROMPTUSDT",
+   "months": 5,
+   "rows": 204090,
+   "first_bar": "2025-04-11 06:30:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "PROMUSDT",
+   "months": 11,
+   "rows": 461490,
+   "first_bar": "2025-01-15 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 348480
+  },
+  {
+   "symbol": "PROVEUSDT",
+   "months": 7,
+   "rows": 299940,
+   "first_bar": "2025-08-05 17:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "PTBUSDT",
+   "months": 8,
+   "rows": 344850,
+   "first_bar": "2025-09-03 12:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PUMPBTCUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2025-08-01 00:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PUMPUSDT",
+   "months": 14,
+   "rows": 612990,
+   "first_bar": "2025-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 450
+  },
+  {
+   "symbol": "PUNDIXUSDT",
+   "months": 3,
+   "rows": 88680,
+   "first_bar": "2025-04-30 10:00:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "PYTHUSDT",
+   "months": 31,
+   "rows": 1326810,
+   "first_bar": "2023-11-22 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "QCOMUSDT",
+   "months": 3,
+   "rows": 124465,
+   "first_bar": "2026-05-06 13:35:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "QNTUSDT",
+   "months": 33,
+   "rows": 1419690,
+   "first_bar": "2022-10-20 02:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 263520
+  },
+  {
+   "symbol": "QQQUSDT",
+   "months": 4,
+   "rows": 167670,
+   "first_bar": "2026-04-06 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "QTUMUSDT",
+   "months": 59,
+   "rows": 2586240,
+   "first_bar": "2020-06-01 00:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 263520
+  },
+  {
+   "symbol": "QUSDT",
+   "months": 7,
+   "rows": 303390,
+   "first_bar": "2025-09-02 07:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "RADUSDT",
+   "months": 9,
+   "rows": 380880,
+   "first_bar": "2023-05-10 12:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "RAREUSDT",
+   "months": 13,
+   "rows": 549300,
+   "first_bar": "2024-08-15 13:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RAVEUSDT",
+   "months": 8,
+   "rows": 330270,
+   "first_bar": "2025-12-14 15:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RAYSOLUSDT",
+   "months": 12,
+   "rows": 511920,
+   "first_bar": "2024-12-10 12:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RAYUSDT",
+   "months": 16,
+   "rows": 673710,
+   "first_bar": "2021-08-20 03:30:00+00:00",
+   "last_bar": "2022-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RDNTUSDT",
+   "months": 26,
+   "rows": 1134000,
+   "first_bar": "2023-04-05 12:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 220320
+  },
+  {
+   "symbol": "RECALLUSDT",
+   "months": 2,
+   "rows": 66930,
+   "first_bar": "2025-10-15 12:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "REDUSDT",
+   "months": 8,
+   "rows": 344640,
+   "first_bar": "2025-03-06 16:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 260640
+  },
+  {
+   "symbol": "REEFUSDT",
+   "months": 46,
+   "rows": 1985332,
+   "first_bar": "2021-02-22 07:08:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "REIUSDT",
+   "months": 6,
+   "rows": 264960,
+   "first_bar": "2024-10-01 00:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "RENDERUSDT",
+   "months": 25,
+   "rows": 1059240,
+   "first_bar": "2024-07-26 10:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RENUSDT",
+   "months": 49,
+   "rows": 2129340,
+   "first_bar": "2020-10-13 07:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 89280
+  },
+  {
+   "symbol": "RESOLVUSDT",
+   "months": 14,
+   "rows": 599670,
+   "first_bar": "2025-06-10 13:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "REUSDT",
+   "months": 2,
+   "rows": 62520,
+   "first_bar": "2026-06-18 14:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "REZUSDT",
+   "months": 19,
+   "rows": 791160,
+   "first_bar": "2024-04-30 14:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RIFUSDT",
+   "months": 15,
+   "rows": 629970,
+   "first_bar": "2023-10-21 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 830880
+  },
+  {
+   "symbol": "RIVERUSDT",
+   "months": 10,
+   "rows": 413835,
+   "first_bar": "2025-10-17 14:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RKLBUSDT",
+   "months": 3,
+   "rows": 107155,
+   "first_bar": "2026-05-18 14:05:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RLCUSDT",
+   "months": 54,
+   "rows": 2317980,
+   "first_bar": "2020-07-31 07:00:00+00:00",
+   "last_bar": "2025-09-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 400320
+  },
+  {
+   "symbol": "RLSUSDT",
+   "months": 2,
+   "rows": 87240,
+   "first_bar": "2025-12-02 10:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RNDRUSDT",
+   "months": 18,
+   "rows": 782147,
+   "first_bar": "2023-02-03 02:30:00+00:00",
+   "last_bar": "2024-07-30 06:16:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ROBOUSDT",
+   "months": 5,
+   "rows": 178035,
+   "first_bar": "2026-02-27 08:45:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RONINUSDT",
+   "months": 10,
+   "rows": 430290,
+   "first_bar": "2024-02-06 04:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 830880
+  },
+  {
+   "symbol": "ROSEUSDT",
+   "months": 52,
+   "rows": 2227470,
+   "first_bar": "2021-12-31 03:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "RPLUSDT",
+   "months": 8,
+   "rows": 349920,
+   "first_bar": "2024-11-01 00:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "RSRUSDT",
+   "months": 62,
+   "rows": 2683735,
+   "first_bar": "2020-10-19 07:05:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "RUNEUSDT",
+   "months": 62,
+   "rows": 2717280,
+   "first_bar": "2020-10-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "RVNUSDT",
+   "months": 44,
+   "rows": 1888860,
+   "first_bar": "2021-02-23 07:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 5,
+   "missing_minutes": 488160
+  },
+  {
+   "symbol": "RVVUSDT",
+   "months": 4,
+   "rows": 151830,
+   "first_bar": "2025-10-18 13:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SAFEUSDT",
+   "months": 11,
+   "rows": 447090,
+   "first_bar": "2024-10-25 12:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 220320
+  },
+  {
+   "symbol": "SAGAUSDT",
+   "months": 23,
+   "rows": 995850,
+   "first_bar": "2024-04-09 10:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "SAHARAUSDT",
+   "months": 13,
+   "rows": 532080,
+   "first_bar": "2025-06-26 12:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "SAMSUNGUSDT",
+   "months": 2,
+   "rows": 86210,
+   "first_bar": "2026-06-02 03:10:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SANDUSDT",
+   "months": 66,
+   "rows": 2847900,
+   "first_bar": "2021-01-25 07:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "SANTOSUSDT",
+   "months": 7,
+   "rows": 267000,
+   "first_bar": "2024-10-28 14:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "SAPIENUSDT",
+   "months": 6,
+   "rows": 236550,
+   "first_bar": "2025-08-20 17:30:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SCRTUSDT",
+   "months": 3,
+   "rows": 102990,
+   "first_bar": "2024-11-21 11:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SCRUSDT",
+   "months": 7,
+   "rows": 275880,
+   "first_bar": "2024-10-22 10:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "SCUSDT",
+   "months": 15,
+   "rows": 640380,
+   "first_bar": "2021-04-12 07:00:00+00:00",
+   "last_bar": "2022-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SEIUSDT",
+   "months": 36,
+   "rows": 1555050,
+   "first_bar": "2023-08-17 02:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SENTUSDT",
+   "months": 4,
+   "rows": 174240,
+   "first_bar": "2025-12-01 00:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SFPUSDT",
+   "months": 43,
+   "rows": 1848540,
+   "first_bar": "2021-02-24 07:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 177120
+  },
+  {
+   "symbol": "SHELLUSDT",
+   "months": 9,
+   "rows": 369045,
+   "first_bar": "2025-02-17 17:15:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "SIGNUSDT",
+   "months": 10,
+   "rows": 396780,
+   "first_bar": "2025-04-28 11:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "SIRENUSDT",
+   "months": 13,
+   "rows": 539460,
+   "first_bar": "2025-03-22 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "SKATEUSDT",
+   "months": 2,
+   "rows": 75690,
+   "first_bar": "2025-06-09 10:30:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SKHYNIXUSDT",
+   "months": 2,
+   "rows": 86220,
+   "first_bar": "2026-06-02 03:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SKLUSDT",
+   "months": 53,
+   "rows": 2315520,
+   "first_bar": "2021-01-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 7,
+   "missing_minutes": 619200
+  },
+  {
+   "symbol": "SKRUSDT",
+   "months": 2,
+   "rows": 84960,
+   "first_bar": "2026-02-01 00:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SKYAIUSDT",
+   "months": 9,
+   "rows": 396000,
+   "first_bar": "2025-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "SKYUSDT",
+   "months": 2,
+   "rows": 75900,
+   "first_bar": "2025-09-09 07:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SLERFUSDT",
+   "months": 2,
+   "rows": 58350,
+   "first_bar": "2024-11-21 11:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SLPUSDT",
+   "months": 6,
+   "rows": 262080,
+   "first_bar": "2023-11-01 00:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SLXUSDT",
+   "months": 2,
+   "rows": 87390,
+   "first_bar": "2026-06-01 07:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SNDKUSDT",
+   "months": 4,
+   "rows": 166220,
+   "first_bar": "2026-04-07 13:40:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SNTUSDT",
+   "months": 2,
+   "rows": 86400,
+   "first_bar": "2024-02-01 00:00:00+00:00",
+   "last_bar": "2024-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SNXUSDT",
+   "months": 68,
+   "rows": 2960218,
+   "first_bar": "2020-08-14 07:02:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SOLUSDT",
+   "months": 71,
+   "rows": 3084060,
+   "first_bar": "2020-09-14 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "SOLVUSDT",
+   "months": 11,
+   "rows": 455745,
+   "first_bar": "2025-01-17 12:15:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 218880
+  },
+  {
+   "symbol": "SOMIUSDT",
+   "months": 8,
+   "rows": 314790,
+   "first_bar": "2025-08-25 09:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SONICUSDT",
+   "months": 5,
+   "rows": 206939,
+   "first_bar": "2025-01-08 07:01:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SOONUSDT",
+   "months": 11,
+   "rows": 453090,
+   "first_bar": "2025-05-23 08:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "SOPHUSDT",
+   "months": 7,
+   "rows": 268500,
+   "first_bar": "2025-05-28 13:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SOXLUSDT",
+   "months": 3,
+   "rows": 111480,
+   "first_bar": "2026-05-15 14:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SPACEUSDT",
+   "months": 3,
+   "rows": 97215,
+   "first_bar": "2026-01-23 11:45:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SPCXUSDT",
+   "months": 3,
+   "rows": 103395,
+   "first_bar": "2026-05-21 04:45:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SPELLUSDT",
+   "months": 23,
+   "rows": 1005120,
+   "first_bar": "2022-10-01 00:00:00+00:00",
+   "last_bar": "2025-03-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 309600
+  },
+  {
+   "symbol": "SPKUSDT",
+   "months": 9,
+   "rows": 372420,
+   "first_bar": "2025-06-17 09:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 129600
+  },
+  {
+   "symbol": "SPXUSDT",
+   "months": 18,
+   "rows": 773955,
+   "first_bar": "2024-12-10 12:45:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SPYUSDT",
+   "months": 4,
+   "rows": 167660,
+   "first_bar": "2026-04-06 13:40:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SQDUSDT",
+   "months": 7,
+   "rows": 309600,
+   "first_bar": "2025-07-01 00:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SRMUSDT",
+   "months": 26,
+   "rows": 1139040,
+   "first_bar": "2020-10-01 00:00:00+00:00",
+   "last_bar": "2022-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SSVUSDT",
+   "months": 33,
+   "rows": 1411920,
+   "first_bar": "2023-02-24 12:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STABLEUSDT",
+   "months": 7,
+   "rows": 297360,
+   "first_bar": "2025-11-06 12:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STBLUSDT",
+   "months": 4,
+   "rows": 152295,
+   "first_bar": "2025-09-17 05:45:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STEEMUSDT",
+   "months": 14,
+   "rows": 596730,
+   "first_bar": "2023-11-08 14:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 662400
+  },
+  {
+   "symbol": "STGUSDT",
+   "months": 41,
+   "rows": 1760400,
+   "first_bar": "2022-08-25 12:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 308160
+  },
+  {
+   "symbol": "STMXUSDT",
+   "months": 47,
+   "rows": 2032860,
+   "first_bar": "2021-03-22 07:00:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STORJUSDT",
+   "months": 56,
+   "rows": 2448000,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 443520
+  },
+  {
+   "symbol": "STOUSDT",
+   "months": 11,
+   "rows": 464235,
+   "first_bar": "2025-04-12 14:45:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "STPTUSDT",
+   "months": 3,
+   "rows": 129600,
+   "first_bar": "2024-02-01 00:00:00+00:00",
+   "last_bar": "2024-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STRAXUSDT",
+   "months": 6,
+   "rows": 248970,
+   "first_bar": "2023-10-11 02:30:00+00:00",
+   "last_bar": "2024-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STRKUSDT",
+   "months": 29,
+   "rows": 1240260,
+   "first_bar": "2024-02-20 17:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "STXUSDT",
+   "months": 37,
+   "rows": 1588890,
+   "first_bar": "2023-02-21 14:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SUIUSDT",
+   "months": 39,
+   "rows": 1706880,
+   "first_bar": "2023-05-03 16:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SUNUSDT",
+   "months": 9,
+   "rows": 366415,
+   "first_bar": "2024-08-22 13:05:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 260640
+  },
+  {
+   "symbol": "SUPERUSDT",
+   "months": 26,
+   "rows": 1103700,
+   "first_bar": "2023-11-26 13:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SUSDT",
+   "months": 16,
+   "rows": 676200,
+   "first_bar": "2025-01-16 10:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 132480
+  },
+  {
+   "symbol": "SUSHIUSDT",
+   "months": 63,
+   "rows": 2748540,
+   "first_bar": "2020-09-04 07:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "SWARMSUSDT",
+   "months": 11,
+   "rows": 473025,
+   "first_bar": "2025-01-07 12:15:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 260640
+  },
+  {
+   "symbol": "SWELLUSDT",
+   "months": 8,
+   "rows": 337440,
+   "first_bar": "2024-11-08 16:00:00+00:00",
+   "last_bar": "2025-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "SXPUSDT",
+   "months": 56,
+   "rows": 2424420,
+   "first_bar": "2020-07-21 09:00:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "SXTUSDT",
+   "months": 4,
+   "rows": 175170,
+   "first_bar": "2025-05-02 08:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SYNUSDT",
+   "months": 16,
+   "rows": 680370,
+   "first_bar": "2024-08-16 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 348480
+  },
+  {
+   "symbol": "SYRUPUSDT",
+   "months": 10,
+   "rows": 428610,
+   "first_bar": "2025-05-07 08:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "SYSUSDT",
+   "months": 4,
+   "rows": 149010,
+   "first_bar": "2024-08-19 12:30:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "TACUSDT",
+   "months": 6,
+   "rows": 244170,
+   "first_bar": "2025-07-15 10:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "TAGUSDT",
+   "months": 6,
+   "rows": 229725,
+   "first_bar": "2025-07-25 11:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "TAIKOUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TAKEUSDT",
+   "months": 6,
+   "rows": 258525,
+   "first_bar": "2025-09-03 11:15:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "TANSSIUSDT",
+   "months": 2,
+   "rows": 77070,
+   "first_bar": "2025-07-09 11:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TAOUSDT",
+   "months": 28,
+   "rows": 1211610,
+   "first_bar": "2024-04-11 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TAUSDT",
+   "months": 8,
+   "rows": 323550,
+   "first_bar": "2025-07-21 07:30:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 172800
+  },
+  {
+   "symbol": "THETAUSDT",
+   "months": 65,
+   "rows": 2849760,
+   "first_bar": "2020-07-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "THEUSDT",
+   "months": 14,
+   "rows": 575265,
+   "first_bar": "2024-11-27 12:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 305280
+  },
+  {
+   "symbol": "TIAUSDT",
+   "months": 34,
+   "rows": 1446120,
+   "first_bar": "2023-10-31 18:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TLMUSDT",
+   "months": 28,
+   "rows": 1207950,
+   "first_bar": "2021-07-16 03:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 1444320
+  },
+  {
+   "symbol": "TNSRUSDT",
+   "months": 19,
+   "rows": 824100,
+   "first_bar": "2024-04-08 17:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 391680
+  },
+  {
+   "symbol": "TOKENUSDT",
+   "months": 15,
+   "rows": 655740,
+   "first_bar": "2023-11-03 15:00:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TOMOUSDT",
+   "months": 34,
+   "rows": 1488960,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2023-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 87840
+  },
+  {
+   "symbol": "TONUSDT",
+   "months": 28,
+   "rows": 1226129,
+   "first_bar": "2024-03-01 12:31:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TOSHIUSDT",
+   "months": 2,
+   "rows": 64470,
+   "first_bar": "2025-09-17 05:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TOWNSUSDT",
+   "months": 3,
+   "rows": 125850,
+   "first_bar": "2025-08-05 14:30:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TQQQUSDT",
+   "months": 2,
+   "rows": 46700,
+   "first_bar": "2026-06-29 13:40:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TRADOORUSDT",
+   "months": 9,
+   "rows": 366450,
+   "first_bar": "2025-09-19 12:30:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TRBUSDT",
+   "months": 68,
+   "rows": 2967419,
+   "first_bar": "2020-09-03 07:01:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "TREEUSDT",
+   "months": 5,
+   "rows": 179160,
+   "first_bar": "2025-07-29 14:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TRIAUSDT",
+   "months": 6,
+   "rows": 252705,
+   "first_bar": "2026-02-06 12:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TROYUSDT",
+   "months": 6,
+   "rows": 260640,
+   "first_bar": "2024-11-01 00:00:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "months": 19,
+   "rows": 805620,
+   "first_bar": "2025-01-18 13:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TRUSTUSDT",
+   "months": 2,
+   "rows": 81510,
+   "first_bar": "2025-11-05 09:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TRUTHUSDT",
+   "months": 7,
+   "rows": 264239,
+   "first_bar": "2025-10-01 12:01:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "TRUUSDT",
+   "months": 25,
+   "rows": 1090800,
+   "first_bar": "2023-03-07 12:00:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 565920
+  },
+  {
+   "symbol": "TRXUSDT",
+   "months": 79,
+   "rows": 3433915,
+   "first_bar": "2020-01-15 08:05:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "TSLAUSDT",
+   "months": 7,
+   "rows": 265530,
+   "first_bar": "2026-01-28 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TSMUSDT",
+   "months": 3,
+   "rows": 132480,
+   "first_bar": "2026-05-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TSTUSDT",
+   "months": 11,
+   "rows": 468660,
+   "first_bar": "2025-02-09 13:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 217440
+  },
+  {
+   "symbol": "TURBOUSDT",
+   "months": 22,
+   "rows": 963360,
+   "first_bar": "2024-06-01 00:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TURTLEUSDT",
+   "months": 2,
+   "rows": 56700,
+   "first_bar": "2025-10-22 15:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TUSDT",
+   "months": 31,
+   "rows": 1361460,
+   "first_bar": "2023-02-01 13:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 476640
+  },
+  {
+   "symbol": "TUTUSDT",
+   "months": 8,
+   "rows": 324900,
+   "first_bar": "2025-03-20 09:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "TWTUSDT",
+   "months": 14,
+   "rows": 611130,
+   "first_bar": "2023-11-03 14:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 480960
+  },
+  {
+   "symbol": "UAIUSDT",
+   "months": 5,
+   "rows": 208110,
+   "first_bar": "2025-11-06 11:30:00+00:00",
+   "last_bar": "2026-04-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "UBUSDT",
+   "months": 8,
+   "rows": 334890,
+   "first_bar": "2025-09-12 10:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 129600
+  },
+  {
+   "symbol": "UMAUSDT",
+   "months": 23,
+   "rows": 1008000,
+   "first_bar": "2023-11-01 00:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "UNFIUSDT",
+   "months": 46,
+   "rows": 1981020,
+   "first_bar": "2021-02-19 07:00:00+00:00",
+   "last_bar": "2024-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "UNIUSDT",
+   "months": 71,
+   "rows": 3085500,
+   "first_bar": "2020-09-18 07:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "USDCUSDT",
+   "months": 12,
+   "rows": 527040,
+   "first_bar": "2024-02-01 00:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 436320
+  },
+  {
+   "symbol": "USELESSUSDT",
+   "months": 11,
+   "rows": 460065,
+   "first_bar": "2025-08-15 12:15:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "USTCUSDT",
+   "months": 18,
+   "rows": 749490,
+   "first_bar": "2023-11-27 12:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 352800
+  },
+  {
+   "symbol": "USUALUSDT",
+   "months": 11,
+   "rows": 457140,
+   "first_bar": "2024-12-18 13:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "USUSDT",
+   "months": 2,
+   "rows": 87840,
+   "first_bar": "2026-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "UXLINKUSDT",
+   "months": 12,
+   "rows": 504540,
+   "first_bar": "2024-09-15 15:00:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VANAUSDT",
+   "months": 12,
+   "rows": 503190,
+   "first_bar": "2024-12-16 13:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VANRYUSDT",
+   "months": 18,
+   "rows": 770790,
+   "first_bar": "2024-03-13 17:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 482400
+  },
+  {
+   "symbol": "VELODROMEUSDT",
+   "months": 2,
+   "rows": 71025,
+   "first_bar": "2024-12-13 16:15:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VELVETUSDT",
+   "months": 7,
+   "rows": 288885,
+   "first_bar": "2025-07-15 09:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 260640
+  },
+  {
+   "symbol": "VETUSDT",
+   "months": 70,
+   "rows": 3060000,
+   "first_bar": "2020-05-01 00:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "VFYUSDT",
+   "months": 2,
+   "rows": 45360,
+   "first_bar": "2025-09-30 12:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VICUSDT",
+   "months": 5,
+   "rows": 220320,
+   "first_bar": "2025-06-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 348480
+  },
+  {
+   "symbol": "VIDTUSDT",
+   "months": 9,
+   "rows": 360870,
+   "first_bar": "2024-08-23 09:30:00+00:00",
+   "last_bar": "2025-04-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VINEUSDT",
+   "months": 10,
+   "rows": 404040,
+   "first_bar": "2025-01-24 10:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VIRTUALUSDT",
+   "months": 20,
+   "rows": 861810,
+   "first_bar": "2024-12-10 12:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VOXELUSDT",
+   "months": 9,
+   "rows": 368010,
+   "first_bar": "2024-08-20 10:30:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 84960
+  },
+  {
+   "symbol": "VTHOUSDT",
+   "months": 5,
+   "rows": 186630,
+   "first_bar": "2025-01-22 09:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "VVVUSDT",
+   "months": 16,
+   "rows": 659025,
+   "first_bar": "2025-01-29 08:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 131040
+  },
+  {
+   "symbol": "WALUSDT",
+   "months": 9,
+   "rows": 357630,
+   "first_bar": "2025-03-27 15:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WAVESUSDT",
+   "months": 47,
+   "rows": 2035739,
+   "first_bar": "2020-08-12 07:01:00+00:00",
+   "last_bar": "2024-06-30 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "WAXPUSDT",
+   "months": 10,
+   "rows": 413835,
+   "first_bar": "2023-10-18 14:45:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 264960
+  },
+  {
+   "symbol": "WCTUSDT",
+   "months": 9,
+   "rows": 375180,
+   "first_bar": "2025-04-15 11:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WDCUSDT",
+   "months": 3,
+   "rows": 95665,
+   "first_bar": "2026-05-26 13:35:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WETUSDT",
+   "months": 4,
+   "rows": 160860,
+   "first_bar": "2025-12-10 07:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WIFUSDT",
+   "months": 31,
+   "rows": 1332585,
+   "first_bar": "2024-01-18 14:15:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WLDUSDT",
+   "months": 37,
+   "rows": 1589040,
+   "first_bar": "2023-07-24 12:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WLFIUSDT",
+   "months": 12,
+   "rows": 493410,
+   "first_bar": "2025-08-23 08:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "WOOUSDT",
+   "months": 33,
+   "rows": 1438350,
+   "first_bar": "2022-04-08 03:30:00+00:00",
+   "last_bar": "2025-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "WUSDT",
+   "months": 23,
+   "rows": 1002750,
+   "first_bar": "2024-04-03 15:30:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XAGUSDT",
+   "months": 7,
+   "rows": 296040,
+   "first_bar": "2026-01-07 10:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XAIUSDT",
+   "months": 22,
+   "rows": 952440,
+   "first_bar": "2024-01-09 14:00:00+00:00",
+   "last_bar": "2025-10-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XANUSDT",
+   "months": 6,
+   "rows": 219690,
+   "first_bar": "2025-09-29 10:30:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "XAUTUSDT",
+   "months": 5,
+   "rows": 183480,
+   "first_bar": "2026-03-26 14:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XAUUSDT",
+   "months": 8,
+   "rows": 335035,
+   "first_bar": "2025-12-11 08:05:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XCNUSDT",
+   "months": 3,
+   "rows": 115710,
+   "first_bar": "2025-04-11 15:30:00+00:00",
+   "last_bar": "2025-06-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XEMUSDT",
+   "months": 46,
+   "rows": 2008380,
+   "first_bar": "2021-03-03 07:00:00+00:00",
+   "last_bar": "2024-12-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "XLMUSDT",
+   "months": 79,
+   "rows": 3426717,
+   "first_bar": "2020-01-20 08:03:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "XMRUSDT",
+   "months": 74,
+   "rows": 3242880,
+   "first_bar": "2020-06-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XNYUSDT",
+   "months": 5,
+   "rows": 202335,
+   "first_bar": "2025-08-13 11:45:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XPINUSDT",
+   "months": 3,
+   "rows": 114720,
+   "first_bar": "2025-09-12 08:00:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XPLUSDT",
+   "months": 12,
+   "rows": 494790,
+   "first_bar": "2025-08-22 09:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "XPTUSDT",
+   "months": 5,
+   "rows": 216000,
+   "first_bar": "2026-02-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "XRPUSDT",
+   "months": 79,
+   "rows": 3446859,
+   "first_bar": "2020-01-06 08:21:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "XTZUSDT",
+   "months": 71,
+   "rows": 3105600,
+   "first_bar": "2020-02-06 08:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 43200
+  },
+  {
+   "symbol": "XVGUSDT",
+   "months": 21,
+   "rows": 909360,
+   "first_bar": "2023-07-05 12:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 486720
+  },
+  {
+   "symbol": "XVSUSDT",
+   "months": 16,
+   "rows": 699840,
+   "first_bar": "2023-08-01 00:00:00+00:00",
+   "last_bar": "2025-03-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 177120
+  },
+  {
+   "symbol": "YALAUSDT",
+   "months": 4,
+   "rows": 166050,
+   "first_bar": "2025-08-07 16:30:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "YBUSDT",
+   "months": 3,
+   "rows": 118635,
+   "first_bar": "2025-10-10 14:45:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "YFIIUSDT",
+   "months": 20,
+   "rows": 836762,
+   "first_bar": "2020-09-03 07:01:00+00:00",
+   "last_bar": "2022-04-12 09:02:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "YFIUSDT",
+   "months": 56,
+   "rows": 2402940,
+   "first_bar": "2020-08-31 07:00:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 95040
+  },
+  {
+   "symbol": "YGGUSDT",
+   "months": 24,
+   "rows": 1046670,
+   "first_bar": "2023-08-05 03:30:00+00:00",
+   "last_bar": "2025-11-30 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 175680
+  },
+  {
+   "symbol": "ZAMAUSDT",
+   "months": 7,
+   "rows": 293220,
+   "first_bar": "2026-01-09 09:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZBTUSDT",
+   "months": 9,
+   "rows": 373710,
+   "first_bar": "2025-10-17 11:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 40320
+  },
+  {
+   "symbol": "ZECUSDT",
+   "months": 77,
+   "rows": 3368160,
+   "first_bar": "2020-03-01 00:00:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 2,
+   "missing_minutes": 7200
+  },
+  {
+   "symbol": "ZENUSDT",
+   "months": 65,
+   "rows": 2839680,
+   "first_bar": "2020-12-01 00:00:00+00:00",
+   "last_bar": "2026-06-30 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 95040
+  },
+  {
+   "symbol": "ZEREBROUSDT",
+   "months": 13,
+   "rows": 566520,
+   "first_bar": "2025-01-02 14:00:00+00:00",
+   "last_bar": "2026-05-31 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 174240
+  },
+  {
+   "symbol": "ZETAUSDT",
+   "months": 16,
+   "rows": 697890,
+   "first_bar": "2024-02-02 08:30:00+00:00",
+   "last_bar": "2025-05-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZILUSDT",
+   "months": 64,
+   "rows": 2797920,
+   "first_bar": "2020-07-01 00:00:00+00:00",
+   "last_bar": "2026-03-31 23:59:00+00:00",
+   "n_gaps": 4,
+   "missing_minutes": 226080
+  },
+  {
+   "symbol": "ZKCUSDT",
+   "months": 5,
+   "rows": 195000,
+   "first_bar": "2025-09-15 14:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 1,
+   "missing_minutes": 44640
+  },
+  {
+   "symbol": "ZKJUSDT",
+   "months": 4,
+   "rows": 159270,
+   "first_bar": "2025-05-13 09:30:00+00:00",
+   "last_bar": "2025-08-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZKPUSDT",
+   "months": 3,
+   "rows": 100200,
+   "first_bar": "2025-12-21 10:00:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZKUSDT",
+   "months": 21,
+   "rows": 895013,
+   "first_bar": "2024-06-17 11:07:00+00:00",
+   "last_bar": "2026-02-28 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZORAUSDT",
+   "months": 6,
+   "rows": 229740,
+   "first_bar": "2025-07-25 11:00:00+00:00",
+   "last_bar": "2025-12-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZROUSDT",
+   "months": 26,
+   "rows": 1110810,
+   "first_bar": "2024-06-20 14:30:00+00:00",
+   "last_bar": "2026-07-31 23:59:00+00:00",
+   "n_gaps": 0,
+   "missing_minutes": 0
+  },
+  {
+   "symbol": "ZRXUSDT",
+   "months": 60,
+   "rows": 2630880,
+   "first_bar": "2020-07-01 00:00:00+00:00",
+   "last_bar": "2026-01-31 23:59:00+00:00",
+   "n_gaps": 3,
+   "missing_minutes": 308160
+  }
+ ],
+ "identity_check": {
+  "BTCUSDT": {
+   "checked": true,
+   "span": [
+    "2022-08-01 00:00:00+00:00",
+    "2026-07-31 23:59:00+00:00"
+   ],
+   "rows_audited": 2103840,
+   "rows_new": 2103840,
+   "same_row_count": true,
+   "same_timestamps": true,
+   "identical": true,
+   "per_column": {
+    "open": true,
+    "high": true,
+    "low": true,
+    "close": true,
+    "volume": true
+   }
+  },
+  "ETHUSDT": {
+   "checked": true,
+   "span": [
+    "2022-08-01 00:00:00+00:00",
+    "2026-07-31 23:59:00+00:00"
+   ],
+   "rows_audited": 2103840,
+   "rows_new": 2103840,
+   "same_row_count": true,
+   "same_timestamps": true,
+   "identical": true,
+   "per_column": {
+    "open": true,
+    "high": true,
+    "low": true,
+    "close": true,
+    "volume": true
+   }
+  }
+ }
+}

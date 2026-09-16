@@ -47,3 +47,10 @@ research/funding-rate-signals/data
 research/funding-rate-signals/cache
 
 research/crosssec-instruments-in-play/data
+
+research/crosssec-instruments-in-play/data
+research/crosssec-instruments-in-play/results/panel*.parquet
+research/crosssec-instruments-in-play/results/legs_*.parquet
+research/crosssec-instruments-in-play/results/instrument_days_funded.parquet
+research/crosssec-instruments-in-play/results/daily_flags.parquet
+research/crosssec-instruments-in-play/results/instrument_days.parquet
