@@ -22,7 +22,11 @@ from engine import Cfg
 _CACHE = {}
 
 
-def tape(sym):
+def tape(sym, window=None):
+    """`window` != None returns an UNCACHED tape whose f9 uses that window
+    (the §9.4 f-window sensitivity); the primary 9-settlement tape is cached."""
+    if window is not None:
+        return engine.bars(sym), engine.settlements(sym, window)
     if sym not in _CACHE:
         _CACHE[sym] = (engine.bars(sym), engine.settlements(sym))
     return _CACHE[sym]
@@ -49,7 +53,8 @@ def daily_from_bars(eqf: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_tier(tier: str, gate: str, cfg: Cfg, start: pd.Timestamp,
-             end: pd.Timestamp, gate_kw=None, state_override=None):
+             end: pd.Timestamp, gate_kw=None, state_override=None,
+             f9_window=None):
     """Returns (daily DataFrame indexed by UTC date, positions, events)."""
     gate_kw = gate_kw or {}
     syms = TIERS[tier]
@@ -57,7 +62,7 @@ def run_tier(tier: str, gate: str, cfg: Cfg, start: pd.Timestamp,
     cfg = replace(cfg, c_slot=c_slot)
     eqs, allpos, allev = [], [], []
     for sym in syms:
-        b, f = tape(sym)
+        b, f = tape(sym, f9_window)
         if state_override is not None:
             st = state_override[sym]
         elif gate == "hysteresis":

@@ -596,21 +596,106 @@ the primary is the conservative side of the published table.
 
 ## 12. Power with measured inputs, and the fit-period screen
 
-**RESERVED. Filled and committed as its own commit after the fit numbers exist
-and BEFORE any holdout number is computed** (note §9 step 4). It will carry:
-fit days per tier; measured `sd_daily`, `ρ₁`, utilisation, round trips per
-symbol-year, mean rate while ON; the projected holdout SE from §5's formula
-with those numbers; the 80 %-power edge; the §5.1 table with the measured
-"what the arm needs" row beside the literature row; and, per arm, the screen
-decision.
+**COMMITTED AFTER THE FIT NUMBERS AND BEFORE ANY HOLDOUT NUMBER EXISTS**
+(note §9 step 4). Sources: `results/fit_arms.csv`, `results/fit_persistence.csv`,
+`results/fit_margin.csv`, `results/liquidations.csv`. No holdout window has been
+run; `stage2_holdout.py` refuses to execute until this section's
+`results/screen.json` exists, and refuses to run twice.
 
-**Screen (note §7.3).** An arm reads the holdout **only if** fit net
-**≥ +5 % p.a. on capital**, fit `p_boot ≤ 0.05`, the §9.7 fit floors are met,
-and there are **0 liquidations at `L = 2`**. Arms that fail are **SCREENED OUT
-— fit-period kill** and their holdout is never computed. **No parameter moves
-for power or for a liquidation.**
+### 12.1 Measured inputs, replacing the assumptions of §5
 
----
+| measured on fit | H_majors | H_alts | note's assumption |
+|---|---|---|---|
+| fit days (Reading-A tier series) | **1,671** (2020-01-04 .. 2024-07-31) | **1,414** (2020-09-17 .. 2024-07-31) | ≈ 1,640 |
+| `sd_daily` of `r_d` | **0.0608 %** | **0.0563 %** | 0.06–0.12 % base case |
+| `ρ₁` of `r_d` | **0.478** | **0.560** | 0.3 |
+| utilisation (share of slot-days ON) | **0.373** | **0.308** | 0.35–0.50 |
+| round trips per symbol-year | **5.13** | **7.14** | 4–10 |
+| mean settlements per position | 79.6 | 47.2 | — |
+| median hold | 21.6 days | 5.9 days | "weeks" |
+| mean funding rate while ON | **0.0324 %/8 h** (35.5 % p.a.) | **0.0395 %/8 h** (43.2 % p.a.) | ≈ 0.035 % needed |
+
+`sd_daily` came in at the **bottom** of the note's band on both tiers, and `ρ₁`
+came in **higher** than the assumed 0.3 — the two move the SE in opposite
+directions and roughly cancel.
+
+### 12.2 Standard errors and the 80 %-power edge
+
+`SE = 365 · sd_daily / sqrt(n_eff)`, `n_eff = n(1 − ρ₁)/(1 + ρ₁)`, holdout
+`n = 730` (§11 (f)).
+
+| | H_majors | H_alts |
+|---|---|---|
+| fit `n_eff` | 591 | 399 |
+| **fit SE** | **0.91 % p.a.** | **1.03 % p.a.** |
+| holdout `n_eff` | 258 | 206 |
+| **holdout SE** | **1.38 % p.a.** | **1.43 % p.a.** |
+| α = 0.025 one-sided threshold on the mean | 2.71 % p.a. | 2.81 % p.a. |
+| **80 %-power edge** (bar + 0.84 SE) | **+11.16 % p.a.** | **+11.20 % p.a.** |
+
+**The α gate does not bind and the +10 % p.a. LEVEL bar decides alone**, exactly
+as §5 pre-registered: a 2.7–2.8 % threshold sits far below a 10 % bar. The
+measured `sd_daily` is well under the 0.3 %/day line, so this family is **not**
+in the directional families' Sharpe regime. The 80 %-power edge is **+11.2 %
+p.a.**, below the +15 % that would require the bold statement of §5.
+
+Fit-screen power: at a fit SE of 0.91–1.03 % p.a., a true +10 % p.a. edge sits
+**4.9–5.5 σ above the +5 % screen bar**, so screen power at a build-sized edge
+exceeds 99 % on both tiers. The screen cannot lose an edge of the size this
+family is registered to find, and it kills a family without one for free. The
+Reading-A shortening of the alt series cost calendar, not the screen.
+
+### 12.3 §5.1's honest-gap table with the MEASURED row
+
+| object | on notional | on capital, L = 2 | vs ladder |
+|---|---|---|---|
+| passive premium, literature average | ≈ 10 % | 6.7 % | above kill, below build |
+| what the arm needed (note's projection: 0.035 %/8 h while ON × 0.45 utilisation) | ≈ 15–17 % | ≈ 10 % | = build bar |
+| **H_majors, MEASURED** (0.0324 %/8 h × 0.373) | **13.2 % gross** | **8.8 % gross → 7.89 % NET** | **above kill, below build** |
+| **H_alts, MEASURED** (0.0395 %/8 h × 0.308) | **13.3 % gross** | **8.9 % gross → 6.90 % NET** | **above kill, below build** |
+
+**The gap did not close, and the measured reason is utilisation, not rate.**
+The alt tier's funding rate while ON, 0.0395 %/8 h, **beat** the 0.035 %/8 h the
+note said the arm needed. Utilisation came in at **0.308 against the 0.45
+assumed** — the premium regime covers under a third of the tape, not the
+35–50 % projected — and 13.3 % of notional at 0.308 utilisation is 8.9 % on
+capital before costs. Both arms therefore land, on fit, exactly where §5.1
+predicted the *passive* trade would land: **between the kill bar and the build
+bar.** The pre-registered "real but too small by ≈ 1.5×" statement is
+confirmed on the fit period rather than refuted by it.
+
+### 12.4 THE SCREEN DECISION (committed; `results/screen.json`)
+
+Screen (note §7.3): fit net ≥ +5 % p.a. on capital, fit `p_boot ≤ 0.05`, the
+§9.7 floors met (≥ 300 ON slot-days, ≥ 20 round trips), and **0 liquidations at
+L = 2**.
+
+| arm | fit net p.a. | `p_boot` | 90 % CI | ON slot-days | round trips | **liquidations at L = 2** | **DECISION** |
+|---|---|---|---|---|---|---|---|
+| **H_majors** | **+7.89 %** ✓ | 0.000 ✓ | [+5.93, +10.06] | 1,247 ✓ | 47 ✓ | **0** ✓ | **SCREENED IN — holdout is read** |
+| **H_alts** | +6.90 % ✓ | 0.000 ✓ | [+4.93, +9.16] | 2,610 ✓ | 166 ✓ | **1** ✗ | **SCREENED OUT — fit-period kill** |
+
+**H_alts fails on the margin path, not on the return.** One liquidation:
+DOGEUSDT, position entered 2021-01-02 19:00 UTC (itself a re-centre re-entry
+after six survived re-centres) at `P_e = 0.011731`, `F/N = 0.0279` so
+`x_liq = 51.28 %`, liquidated at the bar opening **2021-01-28 14:00** — the
+WallStreetBets DOGE squeeze. That bar opened at 0.012852 and printed a high of
+0.018275: **+42 % inside one hour**, `x_bar_high = +55.78 %` against
+`x_liq = +51.28 %`. The re-centre rule could not help, because the same bar
+crossed `x_rc` (+24.26 %) and `x_liq` — precisely the §2.4 case the note names.
+The position's own P&L was **+0.081 USDT** (77 settlements collected), so this
+is a **survivability kill, not a loss kill**, and the REPORT says so.
+
+Per the §10 ladder this makes H_alts **NOT SURVIVABLE — kill at this
+leverage**, and per §7.3 its holdout is **never computed**. **No parameter was
+moved to avoid it.** The leverage, the mmr, the re-centre fraction, the gate and
+the cost model are exactly as committed in §1–§4 before any number existed.
+
+Recorded for the REPORT, not used to re-open anything: the always-on benchmark
+takes **three** liquidations at L = 2 on the alts, so the gate reduces but does
+not remove the exposure; at L = 3 the alts take 8 and at L = 5 16; the majors
+take 0 at L = 2 and L = 3 and 1 at L = 5. The alts' survivable-leverage
+distribution is min `L* = 1.74`, p1 `2.19`, median `3.73`.
 
 ## 13. Forward confirmation (frozen now, run later)
 

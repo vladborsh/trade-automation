@@ -1,0 +1,4 @@
+row,capital_basis,net_pa,funding_pa,hedge_pa,cost_pa,n_closed,n_recentre
+"primary L=2, isolated USDT, spot NOT collateral",C_slot = 1.5 N,7.886,9.0854,0.101,1.3004,47,31
+"same, re-centres removed (x_liq unbounded)",C_slot = 1.5 N,20.8235,21.0704,0.1957,0.4427,16,0
+spot as collateral at a 90% haircut: N = C_slot/1.1,C_slot = 1.1 N,28.396,28.732,0.267,0.604,16,0

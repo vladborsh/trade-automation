@@ -1,0 +1,2 @@
+blackout_span,blackout_rows,interval_hours,rate_min,rate_max,n_rows_at_minus2pct_cap,sol_position_open_at_blackout_start,unwound_at,counterfactual_funding_usdt,counterfactual_pct_of_C_tier,note
+2022-11-09 20:00:00+00:00 .. 2022-11-18 16:00:00+00:00,101,"{2: 99, 4: 2}",-0.02,2.5e-05,7,0,"n/a — the gate was OFF on SOL at 2022-11-09 19:00, so no position was unwound",-4.027881,-4.02788,"A SHORT perp PAYS when the rate is negative; the blackout rates are overwhelmingly negative and part of them sit at the -2% cap, so holding through would have COST this much."

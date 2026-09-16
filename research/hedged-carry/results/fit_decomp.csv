@@ -1,0 +1,9 @@
+tier,label,net_pa,funding_pa,hedge_pa,cost_pa,cost_carry_ratio,utilisation,rt_per_symyear,mean_settle,median_hold_days,zero_settle_share
+majors,H_majors (REGISTERED ARM),7.886,9.0854,0.101,1.3004,0.1431,0.3733,5.133,79.64,21.62,0.0213
+majors,always-on benchmark (§9.1),9.4492,6.6429,-0.0594,0.8577,0.1291,1.0,3.386,89.65,19.75,0.0323
+majors,"price-gated shadow, no margin (§9.2)",-2.7841,7.745,0.185,10.7075,1.3825,0.3983,42.267,10.29,3.0,0.0
+majors,"extreme-state overlay, fit-only (§9.3)",2.3534,3.7457,0.2401,1.6324,0.4358,0.078,6.444,13.25,3.71,0.0
+alts,H_alts (REGISTERED ARM),6.8969,8.3836,0.3492,1.8359,0.219,0.3077,7.142,47.18,5.94,0.0602
+alts,always-on benchmark (§9.1),5.5919,4.7613,0.4159,1.2571,0.264,0.9989,4.646,101.08,4.21,0.1111
+alts,"price-gated shadow, no margin (§9.2)",-5.2914,6.2972,0.4824,12.0651,1.9159,0.3871,47.626,8.9,2.67,0.0
+alts,"extreme-state overlay, fit-only (§9.3)",2.1872,3.7817,0.4871,2.0817,0.5505,0.0637,8.217,8.49,2.0,0.0157

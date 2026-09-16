@@ -1,0 +1,32 @@
+{
+  "committed_utc": "2026-09-16",
+  "rule": "DESIGN \u00a712.4 / ARCHITECT-NOTE \u00a77.3: fit net >= +5% p.a. on capital, fit p_boot <= 0.05, >=300 ON slot-days, >=20 round trips, 0 liquidations at L=2",
+  "arms": {
+    "H_majors": {
+      "decision": "SCREENED IN",
+      "fit_net_pa": 7.886,
+      "p_boot": 0.0,
+      "ci90": [
+        5.933,
+        10.057
+      ],
+      "on_slot_days": 1247,
+      "round_trips": 47,
+      "liquidations_L2": 0
+    },
+    "H_alts": {
+      "decision": "SCREENED OUT - fit-period kill (1 liquidation at L=2)",
+      "fit_net_pa": 6.897,
+      "p_boot": 0.0,
+      "ci90": [
+        4.933,
+        9.156
+      ],
+      "on_slot_days": 2610,
+      "round_trips": 166,
+      "liquidations_L2": 1,
+      "liquidation": "DOGEUSDT entry 2021-01-02 19:00, liquidated 2021-01-28 14:00, x_bar_high 55.78% vs x_liq 51.28%"
+    }
+  },
+  "holdout_windows_touched_before_this_commit": "none"
+}

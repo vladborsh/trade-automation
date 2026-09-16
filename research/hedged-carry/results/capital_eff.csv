@@ -1,0 +1,8 @@
+tier,L,capital_pa,notional_pa,n_liq
+majors,2.0,7.886,11.829,0
+majors,3.0,8.137,10.849,0
+majors,5.0,6.789,8.147,1
+majors,"spot-as-collateral (N=C/1.1, no re-centres)",28.396,31.235,0
+alts,2.0,6.897,10.345,1
+alts,3.0,5.328,7.104,8
+alts,5.0,4.097,4.917,16

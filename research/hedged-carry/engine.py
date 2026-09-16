@@ -70,14 +70,14 @@ def bars(symbol: str) -> pd.DataFrame:
     return df.sort_values("ts").reset_index(drop=True)
 
 
-def settlements(symbol: str) -> pd.DataFrame:
+def settlements(symbol: str, window: int = F9_WINDOW) -> pd.DataFrame:
     """Present, non-blackout settlement rows with f9 (§1.2, §3.3 rule 3)."""
     f = load_funding(symbol)[["ts", "last_funding_rate"]].rename(
         columns={"last_funding_rate": "f"})
     if symbol == "SOLUSDT":
         a, b = SOL_BLACKOUT
         f = f[~((f.ts >= a) & (f.ts < b))].reset_index(drop=True)
-    f["f9"] = f.f.rolling(F9_WINDOW, min_periods=F9_WINDOW).mean()
+    f["f9"] = f.f.rolling(window, min_periods=window).mean()
     return f.reset_index(drop=True)
 
 
@@ -108,7 +108,7 @@ def gate_price(f: pd.DataFrame, bar: pd.DataFrame, on=0.03, off=0.0) -> np.ndarr
     """§6.5 shadow: the identical hysteresis on the trailing 3-day SPOT return
     in place of f9."""
     s = bar.set_index("ts").S_close
-    r3 = (s / s.shift(72) - 1.0).reindex(f.ts.values).values
+    r3 = (s / s.shift(72) - 1.0).reindex(pd.DatetimeIndex(f.ts)).values
     st, cur = np.zeros(len(f), bool), False
     for i, v in enumerate(r3):
         if not np.isnan(v):
