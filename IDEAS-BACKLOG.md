@@ -446,7 +446,16 @@ kill messages (flagged there, not yet done — this is where they land):**
 **Status:** **prioritized** (user review, 2026-08-26) → designed, 2026-09-16
 → **CLOSED, 2026-09-16 — all four registered arms killed on the fit period;
 the holdout was never read.** Package: `research/funding-rate-signals/`
-(`REPORT.md`, `HANDOFF.md`); log Запись 28.
+(`REPORT.md`, `HANDOFF.md`); log Запись 29.
+
+**Mirror arms (Architect, 2026-09-16, later): WITHDRAWN, never run.** The
+mirror ruling (`ARCHITECT-RULING-2026-09-16-mirror.md`, option A, six arms at
+α = 0.05/6) arrived while the REPORT was being drafted; the pass closed with
+four arms. Their fit outcome is foreknown from REPORT §3.1 (price leg = −B,
+funding leg = −B, same cost): `Bm_alts ≈ −0.029R`, `Bm_majors ≈ −0.133R`,
+both below the +0.05R screen and the 300-event floor. **Ledger final: 4
+registered / 0 holdout reads; α = 0.05/4.** Superseded by the hedged
+spot–perp carry family (below). Log Запись 31.
 
 **Result.** A carry: −0.129R (majors, n=89) and −0.020R (alts, n=394);
 B continuation: +0.085R (majors, n=32, Null-A p=0.209) and −0.014R (alts,
@@ -965,9 +974,61 @@ yesterday's return in disguise is not a second signal).
 
 ---
 
+## Hedged spot–perp carry (long spot / short USD-M perp, funding-gated) — the Schmeling trade
+
+**Status:** **DESIGNED by Architect, 2026-09-16 — pre-registration
+`research/hedged-carry/ARCHITECT-NOTE.md`, awaiting Researcher dispatch by
+the coordinator.** Log Запись 31. First non-intraday, non-directional
+registration, under the user's 1–5-day horizon ruling (PROJECT.md).
+
+**Why now — three lines converged.** (1) The funding family (Запись 29)
+killed the *directional* carry but exonerated the sensor: funding-selected
+entries collect 25–37× more carry than a price shadow, the extreme state
+persists (forward rate ≈ 63 % annualised), and the only leg that lost was the
+unhedged price leg (−0.046R vs +0.035R of carry on the alts). (2) Red team
+§5.2 / §8 item 7: hedged carry is the one structural premium reachable with
+this project's accounts, on condition of an explicit margin-path model.
+(3) The user opened the horizon to 1–5 days and made crypto the primary tape.
+
+**What the design pins.** Long spot / short perp, equal USDT notional, one
+slot per symbol, two tier portfolios (majors BTC/ETH; alts SOL/BNB/XRP/DOGE/
+ADA/LINK) → **2 arms, α = 0.05/2**. Hysteresis gate on the trailing 9-
+settlement mean funding: ON ≥ 0.02 %/8 h, OFF ≤ 0.005 %; no price stop.
+**Margin path is a gate, not a footnote:** isolated USDT margin, spot not
+postable, perp leverage 2× (capital = 1.5 × notional), mmr 1 %, liquidation
+at ≈ +48.5 % perp rally, a re-centre rule at half that buffer, liquidation
+mechanics modelled, **any liquidation at 2× fails the build**. Costs: taker
+on all four fills, 0.30 % fees + 0.08 % spread allowance = 0.38 % per round
+trip; basis at entry/unwind is P&L; maker is a fit-only sensitivity, not
+admissible in the primary. Data: spot 1 h klines verified on
+`data.binance.vision` (all eight list before their perps, so funding start
+binds); funding/perp rules and the SOL FTX blackout carried over verbatim.
+**Two-year holdout adopted** (fit .. 2024-07-31; holdout 2024-08 .. 2026-07;
+prior exposure of the first year declared; forward confirmation
+2026-08..10 on any pass). **Ladder in annualised net return on allocated
+capital**, converted from +0.05R/+0.10R at the funding family's own frequency
+and risk unit (≈ 4.8 %/9.5 % p.a. of notional) and applied on capital: kill
+< 5 %, build ≥ 10 % p.a. with block-bootstrap p ≤ 0.025, 0 liquidations,
+max drawdown ≤ 10 %. Observation unit = one UTC day of the tier portfolio.
+
+**Honest prior, stated before any pull.** The literature's ≥ 10 % p.a. is on
+notional → ≈ 6.7 % on capital at 2× — between the kill and build bars. So
+the passive trade is expected to be "real but too small" by ≈ 1.5× (not the
+4–10× of the last three families); the gated alt-tier arm is where the gap
+can close (needs ≈ 0.035 %/8 h while ON at ≈ 45 % utilisation). Prior:
+majors 15 %, alts 30–35 %. The α gate is not expected to bind at any
+plausible daily sd (SE ≈ 1–2 % p.a. on two years); the level bar is.
+
+---
+
 ## Spot–perp basis and spot-lead signals (Binance spot vs USD-M perp)
 
-**Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
+**Status:** **prioritized** (user review, 2026-08-26); **2026-09-16 — the
+hedged carry became its own family** (`research/hedged-carry/`, next entry),
+taking the spot-data pull and the funding-adjusted basis accounting with it.
+What stays parked here: (a) basis-extreme convergence traded on the perp leg
+alone and (b) spot-lead confirmation — neither dispatched, both explicitly
+outside the hedged-carry registration (its note §10).
 
 **Idea:** Pull Binance **spot** klines (same free bulk archive, same symbols)
 alongside the existing perp data and trade the **relationship between the two

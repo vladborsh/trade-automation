@@ -1,5 +1,20 @@
 # Architect ruling — the mirror of hypothesis B (funding-rate-signals)
 
+> **STATUS 2026-09-16 (later the same day): SUPERSEDED — the mirror arms
+> `Bm_majors` / `Bm_alts` are WITHDRAWN before computation and were never
+> run.** This ruling arrived while the Researcher was drafting `REPORT.md`;
+> the pass closed with the original four arms. Ruling recorded in
+> `research/hedged-carry/ARCHITECT-NOTE.md` §0 row S and Запись 31: the
+> mirror's fit-period screen outcome is arithmetically foreknown from
+> REPORT §3.1 (price leg = −B's, funding leg = −B's, cost identical):
+> `Bm_alts ≈ +0.0208 − 0.0280 − 0.0216 = −0.029R`,
+> `Bm_majors ≈ −0.0702 − 0.0390 − 0.0240 = −0.133R`, both below the +0.05R
+> screen and below the 300-event floor B already failed. A registration
+> whose screen result is known before it runs is not a test. **The family's
+> ledger is final at 4 registered / 0 holdout reads; §0–§6 below were never
+> applied and α stays 0.05/4.** The hedged spot–perp carry family supersedes
+> the directional squeeze/mirror line on this venue.
+
 **Date:** 2026-09-16 · **Trigger:** red-team survey §5.4 (`research/_surveys/2026-09-red-team.md`, commit 0fad533) · **Binding on:** `research/funding-rate-signals/` (ARCHITECT-NOTE 61a2058, DESIGN.md af89ea7 → 31a9c0e) · **Status:** binding amendment to the registration; supersedes note §7.4 and DESIGN §9 on α.
 
 ## 0. Ruling in one paragraph
