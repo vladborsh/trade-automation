@@ -22,6 +22,37 @@ built to route each idea through only the roles it actually needs.
 - **Timeframe**: intraday-first. Swing/longer-horizon strategies are a possible
   future expansion, not a current requirement.
 
+### User rulings, 2026-09-16 (in response to `research/_surveys/2026-09-red-team.md` §8 items 5 and 6)
+
+The red team established that this project's binding constraint is **statistical
+power, not cost or mechanic**: a one-year holdout of ~220 trades on one
+instrument can only certify an annualised Sharpe of roughly 2+, while the best
+published single-instrument intraday mechanics sit at 0.87–1.73. Two scope
+questions followed from that and were put to the user. Both are now decided and
+are binding on every future design until the user revises them.
+
+1. **Paid index history: NO.** The user declined the ~$100 CME/FirstRate ES
+   minute tape (2008+). Consequence, accepted knowingly: **the single-instrument
+   index line (US100/US500 on the Capital.com 2024-01+ tape) is closed** — not
+   because its mechanics are disproven, but because on 2.6 years of tape it
+   cannot produce a certifiable result for *any* honestly-sized edge. Do not
+   register a new single-instrument index family without first reopening this
+   decision. Index tapes remain in use for *engine calibration* (the
+   `_calibration` package) and as descriptive/control rows, which is unaffected.
+2. **Horizon: opened to 1–5 days.** The "intraday only" framing is **no longer a
+   hard constraint** — the user is willing to consider multi-day holds. This
+   matters mechanically, not cosmetically: cost is roughly fixed per round trip
+   while the move scales with horizon, so a 0.15R cost at an intraday stop
+   becomes ≈0.05R at a 3× wider multi-day stop, and on the 2020+ crypto tape a
+   longer horizon also supplies the sample size intraday lacks. Intraday remains
+   welcome; it is no longer mandatory, and a design that chooses intraday should
+   now say *why* rather than assume it.
+
+**Net effect on where work goes:** crypto, where history is free to 2020 and the
+universe is 400+ instruments, is now the primary tape; horizon is a free design
+variable. The two families in flight (cross-sectional instruments-in-play;
+funding-rate signals) are both already crypto and both unaffected.
+
 ## Infrastructure
 
 - Hosting and runtime infrastructure **must be built on AWS**. Specific services
