@@ -552,7 +552,7 @@ belongs in the protocol from day one.
 ## Cross-sectional "instruments in play" — RVOL + trailing-return selection on a wide Binance perp universe (merges: cross-sectional relative momentum, 8-perp universe; relative volume as a filter, from the ORB line)
 
 **Status:** **CLOSED — both pre-registered arms killed at the fit screen
-(Researcher, 2026-09-16, Запись 28).** `RVOL-top5-s0.5` −0.0023R and
+(Researcher, 2026-09-16, Запись 30).** `RVOL-top5-s0.5` −0.0023R and
 `TR24-top5-s0.5` −0.0257R on 5,740 legs / 1,148 trade-days each, against a
 screen of ≥ +0.05R and random-5 `p` ≤ 0.05; the holdout was therefore **not
 read for anything** and this family's α ledger closes at **2 registered / 0
@@ -1407,7 +1407,7 @@ question, relationship to `vwap-mr-indices` and the smart-money bot).
 ## LightGBM ranker inside the cross-sectional "instruments in play" family (conditional follow-up)
 
 **Status:** **its stated condition has FAILED — both selectors were killed at
-the fit screen (Researcher, 2026-09-16, Запись 28), so by this entry's own
+the fit screen (Researcher, 2026-09-16, Запись 30), so by this entry's own
 wording it closes with them. Awaiting an Architect ruling on whether it stays
 closed.** The entry's condition was "only if ≥ 1 of the two pre-registered
 selectors reaches REAL EDGE"; neither did, and the holdout was never read.
