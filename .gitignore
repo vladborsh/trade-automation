@@ -33,3 +33,7 @@ research/cmc-bot-vwap/ts_parity/events/*.jsonl.gz
 research/cmc-bot-vwap/results/evals_*.parquet
 research/cmc-bot-vwap/results/crypto/evals_*.parquet
 research/orb-ny-open/data
+
+research/orb-ny-open-short/data
+research/orb-ny-open-short/results/trades_all.parquet
+research/orb-ny-open-short/results/null_draws.json
