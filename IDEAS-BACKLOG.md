@@ -528,7 +528,47 @@ family** (the forward lift > 1.00 on every arm is post-trigger information the
 result pairs a 5-min range with a tight stop and a multi-R target), not another
 minute count. Also logged, not registered: the crypto weekend row at −0.29R
 … −0.41R on every arm (same clock, no cash open) as a note for the
-crypto-reversal pillar. Scope changed from the entry
+crypto-reversal pillar.
+**2026-09-16 — `orb-ny-open-short` CLOSED: six of six arms dead (four on the
+fit screen, two on the holdout; `RESEARCH-LOG.md` Запись 24). The ORB
+width/timing axis on these tapes is CLOSED — 5, 10, 15 and 30 minutes, trigger
+from the range's end — and is not to be re-opened for another minute count.**
+Forward lift was above 1.00 on all six arms (1.44–1.65, higher than at 30
+minutes): direction is selected, the +1R / full-range-stop exit is what fails.
+**2026-09-16 — Architect exit-construction ruling
+(`research/orb-ny-open/ARCHITECT-NOTE-EXIT-CONSTRUCTION.md`): GO, one family,
+`orb-ny-open-exit`, the exit as the only axis on the proven trigger.**
+Zarattini–Aziz 2023 (QQQ: 5-min range, stop at the first candle's extreme,
+10R-or-EoD, 24 % win rate, +0.13R/trade) and Zarattini–Barbon–Aziz 2024 (US
+stocks: stop 10 % of the 14-day ATR, no target, EoD) were read in full and
+used as the external design point. Family: {US100, US500} × 5-minute range ×
+three constructions — **E0** range stop, no target, flat 16:00 (the 2023 base
+shape on our trigger); **E1** range stop, no target, **1R ratchet** (stop
+trails 1R behind the best price, parameter-free); **E2** stop at **0.10 ×
+dATR14**, no target, flat 16:00 (the 2024 exit verbatim). Each is one distinct
+hypothesis about where the lift is lost (the cap / the give-back / the stop
+width), E1 nests E0 so the pair attributes. The +1R corner is the killed
+`OR5` template 1, quoted on fit, holdout never computed. Fixed 2R/3R/5R/10R
+targets on both stops, a 0.05/0.15/0.25-dATR stop ladder, time exits at
+11:00/12:00/14:00, trail distances 0.5R/2R and a derived scale-out row are
+**fit-only descriptive ladders**, not arms; the 5 %-ATR stop of the 2023 paper
+is not registered because at Capital.com spreads it is a cost test (projected
+`cost_R` 0.09R on US100, 0.12–0.15R on US500). **The holdout is re-used a
+third and last time: cumulative α = 0.05/(8 + 6 + 6 = 20) = 0.0025**, fit
+screen before any holdout number, full 2 × 4 grid always printed, a
+"one-sided — flagged" label, and — because it is a third look — **a REAL
+EDGE earns a frozen forward confirmation on tape from 2026-08-01 (≥ 150
+trades, ≈ 2027-03), not a build.** After this family, any ORB registration on
+these instruments must use tape from 2026-08-01 onward. Crypto is not in the
+family: it waits on the parallel crypto-anchor investigation and, if that
+comes back positive, gets its own exit family on the deferred 2026-08 ..
+2027-07 window. Logged, not registered: the papers' *entry* (second candle's
+open in the first candle's direction / stop order at the range edge) — the
+one untested ORB entry variant; relative volume as a filter (cross-sectional
+in the paper; `or_rvol` was a Study B feature and was not flagged). Honest
+prior: low-to-moderate, higher than the width family's; the likeliest outcome
+is still six kills, and a full kill closes the ORB line on the exit axis too.
+Scope changed from the entry
 below in three ways: (a) instruments are the Capital.com CFDs US100/US500 plus
 **BTCUSDT/ETHUSDT** (crypto routed as pre-registered arms under the *imported*
 09:30 NY cash-open anchor, ETF-era fit, with weekend and pre-ETF descriptive
