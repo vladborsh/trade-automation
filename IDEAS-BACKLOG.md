@@ -495,6 +495,22 @@ judge accordingly).
 
 **Status:** logged (Architect idea-generation pass, 2026-08-26); **not
 prioritized** at the 2026-08-26 user review (not rejected — just not picked).
+**2026-09-16 — prioritised by the user and dispatched to Researcher.** Ruling
+in `research/orb-ny-open/ARCHITECT-NOTE.md`. Scope changed from the entry
+below in three ways: (a) instruments are the Capital.com CFDs US100/US500 plus
+**BTCUSDT/ETHUSDT** (crypto routed as pre-registered arms under the *imported*
+09:30 NY cash-open anchor, ETF-era fit, with weekend and pre-ETF descriptive
+controls — a weaker, separately framed hypothesis, see the note §2); (b) a
+**per-trade LightGBM feature study** is added as a hypothesis-generating
+companion (fit-only, permutation/SHAP importance, target-shuffle max-statistic
+null, frozen-model holdout read, no verdict — note §6); (c) the data route is
+neither Pine nor a free-source hunt: the audited Capital.com/Binance 1m tapes
+already on disk are resampled to 5m/15m. Open questions below are resolved in
+the note: OR = fixed 30 min (09:30–10:00 NY); close-beyond on the arm's bar;
+one trade/day, no re-entry; +1R project-standard template gates, pure-ORB
+(no target, flat 16:00 NY) is a mandatory secondary; eight pre-registered
+arms (4 instruments × {5m, 15m}), α = 0.05/8, standard ladder, holdout
+2025-08-01..2026-07-31.
 
 **Idea:** Classic session-structure momentum on equity index products (ES/NQ
 futures, or SPY/QQQ): define the opening range as the first 15–30 minutes after
