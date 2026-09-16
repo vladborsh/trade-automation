@@ -37,3 +37,6 @@ research/orb-ny-open/data
 research/orb-ny-open-short/data
 research/orb-ny-open-short/results/trades_all.parquet
 research/orb-ny-open-short/results/null_draws.json
+research/orb-ny-open-exit/data
+research/orb-ny-open-exit/results/trades_all.parquet
+research/orb-ny-open-exit/results/null_draws.json

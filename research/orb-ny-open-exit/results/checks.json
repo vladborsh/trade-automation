@@ -1,0 +1,741 @@
+{
+  "grid": {
+    "days": 670,
+    "violations": 0,
+    "clock_points_5m": [
+      "09:30",
+      "09:35",
+      "12:00",
+      "16:00",
+      "11:00",
+      "12:00",
+      "14:00"
+    ],
+    "utc_offsets_of_0930_seen_h": [
+      13,
+      14
+    ],
+    "examples": [],
+    "pass": true
+  },
+  "tradelist": {
+    "table": [
+      {
+        "arm": "US100-E0",
+        "n": 668,
+        "n_short_or5": 668,
+        "triples_identical": true,
+        "n_excluded": 0,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "",
+        "pass": true
+      },
+      {
+        "arm": "US100-E1",
+        "n": 668,
+        "n_short_or5": 668,
+        "triples_identical": true,
+        "n_excluded": 0,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "",
+        "pass": true
+      },
+      {
+        "arm": "US100-E2",
+        "n": 656,
+        "n_short_or5": 668,
+        "triples_identical": true,
+        "n_excluded": 12,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "2024-01-02;2024-01-03;2024-01-04;2024-01-05;2024-01-08;2024-01-09;2024-01-10;2024-01-11;2024-01-12;2024-01-16;2024-01-17;2024-01-18",
+        "pass": true
+      },
+      {
+        "arm": "US100-E0 vs E1 (stop identity)",
+        "n": 668,
+        "n_short_or5": 668,
+        "triples_identical": true,
+        "n_excluded": 0,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "",
+        "pass": true
+      },
+      {
+        "arm": "US500-E0",
+        "n": 670,
+        "n_short_or5": 670,
+        "triples_identical": true,
+        "n_excluded": 0,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "",
+        "pass": true
+      },
+      {
+        "arm": "US500-E1",
+        "n": 670,
+        "n_short_or5": 670,
+        "triples_identical": true,
+        "n_excluded": 0,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "",
+        "pass": true
+      },
+      {
+        "arm": "US500-E2",
+        "n": 658,
+        "n_short_or5": 670,
+        "triples_identical": true,
+        "n_excluded": 12,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "2024-01-02;2024-01-03;2024-01-04;2024-01-05;2024-01-08;2024-01-09;2024-01-10;2024-01-11;2024-01-12;2024-01-16;2024-01-17;2024-01-18",
+        "pass": true
+      },
+      {
+        "arm": "US500-E0 vs E1 (stop identity)",
+        "n": 670,
+        "n_short_or5": 670,
+        "triples_identical": true,
+        "n_excluded": 0,
+        "excluded_are_exactly_datr_warmup": true,
+        "n_unexpected_extra_days": 0,
+        "excluded_days": "",
+        "pass": true
+      }
+    ],
+    "pass": true
+  },
+  "fills": {
+    "table": [
+      {
+        "arm": "US100-E0",
+        "n": 668,
+        "agreement_n": 667,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 1,
+        "both_touch_1m": 0,
+        "excluded": 1,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US100-E2",
+        "n": 656,
+        "agreement_n": 651,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 1,
+        "gapped_1m": 5,
+        "both_touch_1m": 0,
+        "excluded": 5,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US500-E0",
+        "n": 670,
+        "agreement_n": 659,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 4,
+        "gapped_1m": 11,
+        "both_touch_1m": 0,
+        "excluded": 11,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US500-E2",
+        "n": 658,
+        "agreement_n": 646,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 7,
+        "gapped_1m": 12,
+        "both_touch_1m": 0,
+        "excluded": 12,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      }
+    ],
+    "pass": true
+  },
+  "trail": {
+    "table": [
+      {
+        "arm": "US100-E1",
+        "n": 668,
+        "ref_disagreements": 0,
+        "n_ratchet_unmoved": 4,
+        "n_ratchet_moved": 664,
+        "n_ratchet_moved_under_001R": 8,
+        "unmoved_not_equal_E0": 0,
+        "unmoved_labelled_trail": 0,
+        "pct_E1_beat_E0": 68.26347305389223,
+        "pct_E1_worse_than_E0": 23.502994011976046,
+        "pct_E1_equal_E0": 8.233532934131736,
+        "mean_E1_minus_E0_R": -0.03434094512009956,
+        "exit_causes": "{\"trail-stop\": 614, \"time-exit\": 50, \"stop\": 4}",
+        "pass": true
+      },
+      {
+        "arm": "US500-E1",
+        "n": 670,
+        "ref_disagreements": 0,
+        "n_ratchet_unmoved": 19,
+        "n_ratchet_moved": 651,
+        "n_ratchet_moved_under_001R": 1,
+        "unmoved_not_equal_E0": 0,
+        "unmoved_labelled_trail": 0,
+        "pct_E1_beat_E0": 70.44776119402985,
+        "pct_E1_worse_than_E0": 22.83582089552239,
+        "pct_E1_equal_E0": 6.7164179104477615,
+        "mean_E1_minus_E0_R": 0.0013963726421059232,
+        "exit_causes": "{\"trail-stop\": 627, \"time-exit\": 24, \"stop\": 19}",
+        "pass": true
+      }
+    ],
+    "examples": [],
+    "pass": true
+  },
+  "datr": {
+    "table": [
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-08-12",
+        "datr14_used": 430.3219682882971,
+        "datr14_recomputed": 430.3219682882971,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 43.03219682882971,
+        "stop_dist_recomputed": 43.03219682882971,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2025-01-15",
+        "datr14_used": 311.6116676298607,
+        "datr14_recomputed": 311.6116676298607,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 31.16116676298607,
+        "stop_dist_recomputed": 31.16116676298607,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-12-20",
+        "datr14_used": 297.8430402110883,
+        "datr14_recomputed": 297.8430402110883,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 29.78430402110883,
+        "stop_dist_recomputed": 29.78430402110883,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-07-19",
+        "datr14_used": 263.8177624152437,
+        "datr14_recomputed": 263.8177624152437,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 26.38177624152437,
+        "stop_dist_recomputed": 26.38177624152437,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2025-02-20",
+        "datr14_used": 273.86427733174844,
+        "datr14_recomputed": 273.86427733174844,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 27.386427733174845,
+        "stop_dist_recomputed": 27.386427733174845,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-04-22",
+        "datr14_used": 252.31960150800006,
+        "datr14_recomputed": 252.31960150800006,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 25.231960150800006,
+        "stop_dist_recomputed": 25.231960150800006,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2025-07-29",
+        "datr14_used": 190.92562519749785,
+        "datr14_recomputed": 190.92562519749785,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 19.092562519749787,
+        "stop_dist_recomputed": 19.092562519749787,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-04-09",
+        "datr14_used": 207.97867455956722,
+        "datr14_recomputed": 207.97867455956722,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 20.797867455956723,
+        "stop_dist_recomputed": 20.797867455956723,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-10-21",
+        "datr14_used": 245.2993937341164,
+        "datr14_recomputed": 245.2993937341164,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 24.52993937341164,
+        "stop_dist_recomputed": 24.52993937341164,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "fit",
+        "date": "2024-07-18",
+        "datr14_used": 253.1575902933398,
+        "datr14_recomputed": 253.1575902933398,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 25.315759029333982,
+        "stop_dist_recomputed": 25.315759029333982,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2026-03-27",
+        "datr14_used": 462.0754268408728,
+        "datr14_recomputed": 462.0754268408728,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 46.20754268408729,
+        "stop_dist_recomputed": 46.20754268408729,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2025-08-08",
+        "datr14_used": 271.4045494946503,
+        "datr14_recomputed": 271.4045494946503,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 27.140454949465035,
+        "stop_dist_recomputed": 27.140454949465035,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2026-07-01",
+        "datr14_used": 653.7894197468329,
+        "datr14_recomputed": 653.7894197468329,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 65.37894197468329,
+        "stop_dist_recomputed": 65.37894197468329,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2025-11-20",
+        "datr14_used": 435.85161118165945,
+        "datr14_recomputed": 435.85161118165945,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 43.58516111816595,
+        "stop_dist_recomputed": 43.58516111816595,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2026-03-31",
+        "datr14_used": 461.09468395386267,
+        "datr14_recomputed": 461.09468395386267,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 46.10946839538627,
+        "stop_dist_recomputed": 46.10946839538627,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2026-06-02",
+        "datr14_used": 392.26362463457133,
+        "datr14_recomputed": 392.26362463457133,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 39.226362463457136,
+        "stop_dist_recomputed": 39.226362463457136,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2025-08-15",
+        "datr14_used": 249.46705638192384,
+        "datr14_recomputed": 249.46705638192384,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 24.946705638192384,
+        "stop_dist_recomputed": 24.946705638192384,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2026-03-03",
+        "datr14_used": 387.6675307939991,
+        "datr14_recomputed": 387.6675307939991,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 38.76675307939991,
+        "stop_dist_recomputed": 38.76675307939991,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2025-10-14",
+        "datr14_used": 322.7991356124015,
+        "datr14_recomputed": 322.7991356124015,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 32.27991356124016,
+        "stop_dist_recomputed": 32.27991356124016,
+        "pass": true
+      },
+      {
+        "symbol": "US100",
+        "period": "holdout",
+        "date": "2025-10-03",
+        "datr14_used": 231.79274328792735,
+        "datr14_recomputed": 231.79274328792735,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 23.179274328792737,
+        "stop_dist_recomputed": 23.179274328792737,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2024-05-06",
+        "datr14_used": 56.55953302113374,
+        "datr14_recomputed": 56.55953302113374,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 546,
+        "stop_dist_used": 5.6559533021133745,
+        "stop_dist_recomputed": 5.6559533021133745,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2024-04-19",
+        "datr14_used": 56.035280452403505,
+        "datr14_recomputed": 56.035280452403505,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 5.603528045240351,
+        "stop_dist_recomputed": 5.603528045240351,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2025-01-31",
+        "datr14_used": 68.66364611764445,
+        "datr14_recomputed": 68.66364611764445,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 568,
+        "stop_dist_used": 6.866364611764445,
+        "stop_dist_recomputed": 6.866364611764445,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2024-05-14",
+        "datr14_used": 45.684581700639626,
+        "datr14_recomputed": 45.684581700639626,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 515,
+        "stop_dist_used": 4.568458170063963,
+        "stop_dist_recomputed": 4.568458170063963,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2025-01-13",
+        "datr14_used": 64.3281584141303,
+        "datr14_recomputed": 64.3281584141303,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 6.4328158414130305,
+        "stop_dist_recomputed": 6.4328158414130305,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2024-02-16",
+        "datr14_used": 41.454037189012965,
+        "datr14_recomputed": 41.454037189012965,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 539,
+        "stop_dist_used": 4.145403718901297,
+        "stop_dist_recomputed": 4.145403718901297,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2025-01-02",
+        "datr14_used": 61.81926974027448,
+        "datr14_recomputed": 61.81926974027448,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 6.181926974027448,
+        "stop_dist_recomputed": 6.181926974027448,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2024-09-27",
+        "datr14_used": 57.43945607964631,
+        "datr14_recomputed": 57.43945607964631,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 569,
+        "stop_dist_used": 5.743945607964632,
+        "stop_dist_recomputed": 5.743945607964632,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2024-08-27",
+        "datr14_used": 65.99488512101506,
+        "datr14_recomputed": 65.99488512101506,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 566,
+        "stop_dist_used": 6.599488512101506,
+        "stop_dist_recomputed": 6.599488512101506,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "fit",
+        "date": "2025-04-15",
+        "datr14_used": 185.3611396388628,
+        "datr14_recomputed": 185.3611396388628,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 18.53611396388628,
+        "stop_dist_recomputed": 18.53611396388628,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2026-06-23",
+        "datr14_used": 93.46083039889997,
+        "datr14_recomputed": 93.46083039889997,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 9.346083039889997,
+        "stop_dist_recomputed": 9.346083039889997,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2026-07-24",
+        "datr14_used": 79.44991669658235,
+        "datr14_recomputed": 79.44991669658235,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 7.9449916696582354,
+        "stop_dist_recomputed": 7.9449916696582354,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2026-05-21",
+        "datr14_used": 75.89851612704345,
+        "datr14_recomputed": 75.89851612704345,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 7.589851612704345,
+        "stop_dist_recomputed": 7.589851612704345,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2025-11-21",
+        "datr14_used": 94.81317567052899,
+        "datr14_recomputed": 94.81317567052899,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 9.4813175670529,
+        "stop_dist_recomputed": 9.4813175670529,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2025-10-15",
+        "datr14_used": 69.80018991523282,
+        "datr14_recomputed": 69.80018991523282,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 6.980018991523282,
+        "stop_dist_recomputed": 6.980018991523282,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2026-04-07",
+        "datr14_used": 108.31186418633786,
+        "datr14_recomputed": 108.31186418633786,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 10.831186418633786,
+        "stop_dist_recomputed": 10.831186418633786,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2025-10-20",
+        "datr14_used": 76.05479290319037,
+        "datr14_recomputed": 76.05479290319037,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 7.605479290319038,
+        "stop_dist_recomputed": 7.605479290319038,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2025-08-08",
+        "datr14_used": 60.27466717124669,
+        "datr14_recomputed": 60.27466717124669,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 6.027466717124669,
+        "stop_dist_recomputed": 6.027466717124669,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2025-09-10",
+        "datr14_used": 49.23491600579562,
+        "datr14_recomputed": 49.23491600579562,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 561,
+        "stop_dist_used": 4.923491600579562,
+        "stop_dist_recomputed": 4.923491600579562,
+        "pass": true
+      },
+      {
+        "symbol": "US500",
+        "period": "holdout",
+        "date": "2025-09-02",
+        "datr14_used": 47.83583260886621,
+        "datr14_recomputed": 47.83583260886621,
+        "absdiff": 0.0,
+        "minutes_of_trade_day_visible": 570,
+        "stop_dist_used": 4.783583260886622,
+        "stop_dist_recomputed": 4.783583260886622,
+        "pass": true
+      }
+    ],
+    "n_sampled": 40,
+    "max_absdiff": 0.0,
+    "pass": true
+  },
+  "session": {
+    "table": [
+      {
+        "arm": "US100-E0",
+        "n": 668,
+        "crossings": 0,
+        "max_exit_ny": "2026-09-11 10:46 EDT"
+      },
+      {
+        "arm": "US100-E1",
+        "n": 668,
+        "crossings": 0,
+        "max_exit_ny": "2026-09-11 09:52 EDT"
+      },
+      {
+        "arm": "US100-E2",
+        "n": 656,
+        "crossings": 0,
+        "max_exit_ny": "2026-09-11 09:52 EDT"
+      },
+      {
+        "arm": "US500-E0",
+        "n": 670,
+        "crossings": 0,
+        "max_exit_ny": "2026-09-11 10:38 EDT"
+      },
+      {
+        "arm": "US500-E1",
+        "n": 670,
+        "crossings": 0,
+        "max_exit_ny": "2026-09-11 10:38 EDT"
+      },
+      {
+        "arm": "US500-E2",
+        "n": 658,
+        "crossings": 0,
+        "max_exit_ny": "2026-09-11 10:01 EDT"
+      }
+    ],
+    "pass": true
+  }
+}
