@@ -158,6 +158,59 @@ describe('LiveSocket', () => {
     expect(sentFrames.filter((f) => f.type === 'subscribe')).toEqual([]);
   });
 
+  it('survives a reconnect: calendar topic is re-subscribed and its frames keep routing', () => {
+    const live = new LiveSocket();
+    live.useSocketFactory(factory);
+    const first = connectAndOpen(live);
+
+    live.subscribeCalendar();
+    const initialFrames = first.sent.map((s) => JSON.parse(s));
+    expect(initialFrames).toContainEqual({ type: 'subscribe', topic: 'calendar' });
+    first.sent = [];
+
+    first.simulateDrop();
+    vi.advanceTimersByTime(500);
+    const second = sockets[1];
+    second.simulateOpen();
+
+    const resentFrames = second.sent.map((s) => JSON.parse(s));
+    expect(resentFrames).toContainEqual({ type: 'subscribe', topic: 'calendar' });
+
+    const events: unknown[] = [];
+    const notifications: unknown[] = [];
+    live.calendarEventFrames$.subscribe((f) => events.push(f));
+    live.notificationFrames$.subscribe((f) => notifications.push(f));
+
+    second.simulateServerMessage({
+      type: 'calendarEvent',
+      change: 'updated',
+      event: { id: 'ff:832:2026-09-16', title: 'ECB President Lagarde Speaks' },
+    });
+    second.simulateServerMessage({
+      type: 'notification',
+      notification: { id: 'due:1', kind: 'event-due', at: 1, events: [], title: 'USD · High · Federal Funds Rate' },
+    });
+
+    expect(events).toHaveLength(1);
+    expect(notifications).toHaveLength(1);
+  });
+
+  it('unsubscribing calendar stops it from being re-subscribed after a reconnect', () => {
+    const live = new LiveSocket();
+    live.useSocketFactory(factory);
+    const first = connectAndOpen(live);
+    live.subscribeCalendar();
+    live.unsubscribeCalendar();
+
+    first.simulateDrop();
+    vi.advanceTimersByTime(500);
+    const second = sockets[1];
+    second.simulateOpen();
+
+    const sentFrames = second.sent.map((s) => JSON.parse(s));
+    expect(sentFrames.filter((f) => f.type === 'subscribe')).toEqual([]);
+  });
+
   it('routes candle and signal frames only to matching instrument/timeframe subscribers', () => {
     const live = new LiveSocket();
     live.useSocketFactory(factory);

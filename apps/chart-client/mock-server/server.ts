@@ -20,6 +20,8 @@ import { bucketObservations } from '@trade-automation/contracts';
 import { MockMarketState } from './state';
 import { MOCK_LAYOUTS } from './layouts';
 import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
+import { MockCalendarState } from './calendar-state';
+import type { CalendarServerFrame } from './calendar-types';
 
 const PORT = Number(process.env.MOCK_SERVER_PORT ?? 4300);
 const BAR_MS = Number(process.env.MOCK_BAR_MS ?? 2000);
@@ -28,6 +30,9 @@ const FORMING_FRAME_MIN_INTERVAL_MS = 250; // ~4/s per topic, per §4.5
 const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
 const state = new MockMarketState(BAR_MS);
+const calendarNotificationIntervalMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_INTERVAL_MS ?? 180_000);
+const calendarNotificationFirstDelayMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_FIRST_DELAY_MS ?? 20_000);
+const calendarState = new MockCalendarState(Date.now(), calendarNotificationIntervalMs, calendarNotificationFirstDelayMs);
 
 function setCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -217,6 +222,37 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     return;
   }
 
+  if (url.pathname === '/api/calendar/week') {
+    const at = parseNumber(url.searchParams.get('at'));
+    sendJson(res, 200, calendarState.weekResponse(at));
+    return;
+  }
+
+  if (url.pathname === '/api/calendar/events') {
+    const from = parseNumber(url.searchParams.get('from')) ?? calendarState.weekFrom;
+    const to = parseNumber(url.searchParams.get('to')) ?? calendarState.weekTo;
+    sendJson(res, 200, calendarState.eventsInRange(from, to));
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/calendar/events/')) {
+    const id = decodeURIComponent(url.pathname.slice('/api/calendar/events/'.length));
+    const detail = calendarState.eventDetail(id);
+    if (!detail) {
+      sendJson(res, 404, { error: 'event not found' });
+      return;
+    }
+    sendJson(res, 200, detail);
+    return;
+  }
+
+  if (url.pathname === '/api/calendar/notifications') {
+    const from = parseNumber(url.searchParams.get('from')) ?? 0;
+    const limit = Math.min(parseNumber(url.searchParams.get('limit')) ?? 50, 200);
+    sendJson(res, 200, calendarState.notificationsSince(from, limit));
+    return;
+  }
+
   sendJson(res, 404, { error: 'not found' });
 }
 
@@ -237,13 +273,14 @@ interface ClientSubscriptions {
   candles: Set<string>; // `${instrument}:${timeframe}`
   signals: Set<InstrumentId>;
   metrics: Map<string, MetricTopicKey>; // `${instrument}:${metric}:${timeframe}` -> key
+  calendar: boolean;
 }
 
 wss.on('connection', (socket: WebSocket) => {
-  const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set(), metrics: new Map() };
+  const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set(), metrics: new Map(), calendar: false };
   const lastFormingSentAt = new Map<string, number>();
 
-  const send = (frame: WsServerMessage): void => {
+  const send = (frame: WsServerMessage | CalendarServerFrame): void => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(frame));
     }
@@ -297,8 +334,20 @@ wss.on('connection', (socket: WebSocket) => {
     }
   });
 
+  const unsubscribeCalendarEvents = calendarState.onCalendarEvent((event, change) => {
+    if (subscriptions.calendar) {
+      send({ type: 'calendarEvent', event, change });
+    }
+  });
+
+  const unsubscribeCalendarNotifications = calendarState.onNotification((notification) => {
+    if (subscriptions.calendar) {
+      send({ type: 'notification', notification });
+    }
+  });
+
   socket.on('message', (raw: Buffer) => {
-    let frame: WsClientMessage;
+    let frame: WsClientMessage | { type: 'subscribe' | 'unsubscribe'; topic: 'calendar' };
     try {
       frame = JSON.parse(raw.toString('utf-8'));
     } catch {
@@ -339,6 +388,14 @@ wss.on('connection', (socket: WebSocket) => {
     }
     if (frame.type === 'unsubscribe' && frame.topic === 'metrics') {
       subscriptions.metrics.delete(metricTopicId({ instrument: frame.instrument, metric: frame.metric, timeframe: frame.timeframe }));
+      return;
+    }
+    if (frame.type === 'subscribe' && frame.topic === 'calendar') {
+      subscriptions.calendar = true;
+      return;
+    }
+    if (frame.type === 'unsubscribe' && frame.topic === 'calendar') {
+      subscriptions.calendar = false;
     }
   });
 
@@ -347,10 +404,13 @@ wss.on('connection', (socket: WebSocket) => {
     unsubscribeSignals();
     unsubscribeIndicators();
     unsubscribeMetrics();
+    unsubscribeCalendarEvents();
+    unsubscribeCalendarNotifications();
   });
 });
 
 state.start();
+calendarState.start();
 
 httpServer.listen(PORT, () => {
   console.log(`[mock-server] listening on http://localhost:${PORT} (REST) and ws://localhost:${PORT}/ws (WS)`);
