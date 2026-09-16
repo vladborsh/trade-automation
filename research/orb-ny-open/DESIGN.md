@@ -455,7 +455,38 @@ runs anyway on the widened window and the UNDERPOWERED row applies.
 
 **No other parameter moves for power, ever.**
 
-#### 8.2.1 Cutoff decision — *filled in by the amendment commit, §12*
+#### 8.2.1 Cutoff decision — DECIDED 2026-09-16 on the fit period, before any R
+
+Computed by `projection.py` from **fit-period trigger counts and calendar day
+counts only**. No R, no win rate and no expectancy existed when this was run.
+
+| arm | fit eligible days | triggered by 12:00 | share | **projected n_holdout** | triggered by 13:30 | share | projected n_holdout | **cutoff** |
+|---|---|---|---|---|---|---|---|---|
+| US100-5m | 392 | 370 | 0.944 | **234.1** | 383 | 0.977 | 242.3 | **12:00** |
+| US100-15m | 392 | 348 | 0.888 | **220.2** | 372 | 0.949 | 235.3 | **12:00** |
+| US500-5m | 391 | 378 | 0.967 | **240.7** | 385 | 0.985 | 245.2 | **12:00** |
+| US500-15m | 391 | 368 | 0.941 | **234.4** | 383 | 0.980 | 243.9 | **12:00** |
+| BTCUSDT-5m | 392 | 367 | 0.936 | **233.1** | 381 | 0.972 | 242.0 | **12:00** |
+| BTCUSDT-15m | 392 | 351 | 0.895 | **223.0** | 376 | 0.959 | 238.8 | **12:00** |
+| ETHUSDT-5m | 392 | 358 | 0.913 | **227.4** | 382 | 0.974 | 242.6 | **12:00** |
+| ETHUSDT-15m | 392 | 339 | 0.865 | **215.3** | 372 | 0.949 | 236.3 | **12:00** |
+
+Eligible holdout days from the calendar alone: 248 (US100, BTCUSDT, ETHUSDT),
+249 (US500).
+
+**DECISION: the contingency does NOT fire. All eight arms run on the
+pre-registered [10:00, 12:00) NY trigger window.** Every projection is
+comfortably above the 150 floor (lowest: 215.3 on ETHUSDT-15m). The widened
+13:30 window is **not used by any arm** and no number in this package is ever
+computed on it again.
+
+The Architect's §3.3 projection assumed 60–80 % of eligible days would produce
+a breakout by 12:00; the realised fit-period share is **86.5–96.7 %**. That is
+a data note, not a change: a *close* beyond a 30-minute range within the next
+two hours is a common event, and the mechanic is unchanged by it. The
+15-minute arms trigger less often than the 5-minute arms on every instrument,
+as a coarser confirmation bar should.
+
 
 ---
 
@@ -599,4 +630,5 @@ recorded here with its commit hash and its reason.
 
 | # | date | what | commit |
 |---|---|---|---|
-| 0 | 2026-09-16 | pre-registration, committed before any R | *(this commit)* |
+| 0 | 2026-09-16 | pre-registration, committed before any R | `82d6c0b` |
+| 1 | 2026-09-16 | §8.2.1 filled in from fit-period trigger counts: contingency does NOT fire, all eight arms keep the 12:00 NY cutoff. No R existed at this commit. | *(this commit)* |

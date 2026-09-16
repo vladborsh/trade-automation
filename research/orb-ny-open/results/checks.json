@@ -1,0 +1,12 @@
+{
+  "grid": {
+    "days": 1024,
+    "violations": 0,
+    "utc_offsets_of_0930_seen_h": [
+      13,
+      14
+    ],
+    "examples": [],
+    "pass": true
+  }
+}

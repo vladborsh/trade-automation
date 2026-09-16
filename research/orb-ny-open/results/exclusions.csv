@@ -1,0 +1,17 @@
+arm,period,calendar_days,eligible,excl_incomplete_or,excl_no_session
+US100-5m,fit,392,392,0,0
+US100-5m,holdout,249,248,1,0
+US100-15m,fit,392,392,0,0
+US100-15m,holdout,249,248,1,0
+US500-5m,fit,392,391,1,0
+US500-5m,holdout,249,249,0,0
+US500-15m,fit,392,391,1,0
+US500-15m,holdout,249,249,0,0
+BTCUSDT-5m,fit,392,392,0,0
+BTCUSDT-5m,holdout,249,249,0,0
+BTCUSDT-15m,fit,392,392,0,0
+BTCUSDT-15m,holdout,249,249,0,0
+ETHUSDT-5m,fit,392,392,0,0
+ETHUSDT-5m,holdout,249,249,0,0
+ETHUSDT-15m,fit,392,392,0,0
+ETHUSDT-15m,holdout,249,249,0,0
