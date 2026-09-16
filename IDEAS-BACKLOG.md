@@ -482,9 +482,36 @@ belongs in the protocol from day one.
 
 ---
 
-## Cross-sectional relative momentum, dollar-neutral, 8-perp universe
+## Cross-sectional "instruments in play" — RVOL + trailing-return selection on a wide Binance perp universe (merges: cross-sectional relative momentum, 8-perp universe; relative volume as a filter, from the ORB line)
 
 **Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
+**2026-09-16 — REGISTERED by Architect, routed to Researcher (coordinator
+dispatches): `research/crosssec-instruments-in-play/ARCHITECT-NOTE.md`.**
+One package, exactly **two pre-registered arms** — `RVOL-top5-s0.5` and
+`TR24-top5-s0.5` — α = 0.05/2 = 0.025 per arm, on its own α count for the
+2025-08 .. 2026-07 window (the 22-registered / 11-read ORB use and the 2
+cmc-bot crypto reads are declared; the argument for a fresh count is in the
+note §7.2, paid for by a mandatory frozen forward confirmation on
+2026-08-01 .. 2026-10-31 before any build and by reading no tail row).
+Universe = every USDT-quoted USD-M perp the `data.binance.vision` archive
+lists, delisted ones included (864 today, verified), eligible per day by a
+mechanical rule (listed ≥ 30 d, full window, 14-day median daily quote
+volume ≥ 10 M USDT, tape through exit), day tradable iff ≥ 50 eligible; fit
+2020-01 .. 2025-07 from the first such day. Anchor **09:30 NY DST-aware**
+(not 00:00 UTC — Запись 26 showed it selects no direction), NYSE full days;
+selector A = 30-min quote volume ÷ 14-anchor-day median, top 5; selector B =
+|24 h trailing return|, top 5; direction = sign of the anchor→+30 min return,
+nothing else; stop 0.5 × daily ATR14 (0.25/1.0/0.10 fit-only), exit +4 h or
+stop; 0.10 % RT, funding row with veto, 0.20 % cost row. Nulls: **random-5
+draw = Null A (the p)**, bottom-5 with a top-minus-bottom interval that must
+exclude 0, selection day-shift as Null B. Pre-registered A-vs-B comparison
+(descriptive). Dollar-neutral basket (the entry below) is a **descriptive
+secondary row**, not the verdict. Honest target worked in dATR units (note
+§6.3): the paper's top RVOL tier transplanted at these costs sits at or below
+this project's kill bar, so a pass needs roughly twice the paper's top-tier
+effect — stated so nobody chases the +0.08R tier. New small portfolio
+harness scoped in §8 (evaluate the whole eligible panel once, select
+afterwards); two-stage archive pull.
 **2026-09-16 (Architect survey §4.1, §5): ranked #1 — dispatch now, merged
 with a second selector.** The strongest ORB paper's own attribution
 (Zarattini–Barbon–Aziz 2024) is that the plain breakout did nothing and the
@@ -685,7 +712,11 @@ and on this project's own tapes the entry variant would trade the same
 direction reader may return is as the *direction component* of a
 cross-sectional "instruments in play" family on a wide crypto perp universe,
 where the relative-volume selection exists — see
-`research/_surveys/2026-09-intraday-directions.md` §4.1. **Not to be
+`research/_surveys/2026-09-intraday-directions.md` §4.1. **2026-09-16 —
+that family is now registered** (`research/crosssec-instruments-in-play/
+ARCHITECT-NOTE.md`; backlog entry "Cross-sectional 'instruments in play'"
+above): item (b) leaves this entry and lives there as selector A; nothing
+else from this entry moves. **Not to be
 reopened without a materially different mechanic:** any minute count, any
 stop/target/trail/time-exit shape, any anchor (NY / London / 08:30 / UTC
 midnight / 04:00 placebo), volatility-scaled width (Study B carried it as two
