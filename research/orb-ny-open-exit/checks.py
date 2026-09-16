@@ -290,7 +290,18 @@ def check_trail() -> dict:
         # --- (b) unmoved ratchet == E0 ----------------------------------
         m = g.merge(e0[["date", "i_exit", "exit_px", "exit", "netR", "grossR"]],
                     on="date", suffixes=("", "_e0"))
-        unmoved = np.isclose(m.stop_at_exit.values, m.stop.values)
+        # "the ratchet never moved" is EXACT equality, which is the predicate
+        # the note states the identity on ("`stop == stop_0` at exit") and the
+        # predicate the walker itself uses to choose between the `stop` and
+        # `trail-stop` causes. A tolerance would be a LOOSER predicate than
+        # the specification: it admits trades where the ratchet did move, by a
+        # tick, and those trades legitimately fill at the tightened stop on the
+        # same minute as E0. `n_ratchet_moved_under_0.01R` records how near
+        # that boundary the moved trades get, so the near-identity is visible
+        # without weakening the assertion.
+        unmoved = m.stop_at_exit.values == m.stop.values
+        tiny = int(((~unmoved) & (np.abs(m.stop_at_exit.values - m.stop.values)
+                                  < 0.01 * m.stop_dist.values)).sum())
         u = m[unmoved]
         bad_id = u[(u.i_exit.values != u.i_exit_e0.values)
                    | (u.exit_px.values != u.exit_px_e0.values)
@@ -304,6 +315,7 @@ def check_trail() -> dict:
             ref_disagreements=len(bad_ref),
             n_ratchet_unmoved=int(unmoved.sum()),
             n_ratchet_moved=int((~unmoved).sum()),
+            n_ratchet_moved_under_001R=tiny,
             unmoved_not_equal_E0=len(bad_id),
             unmoved_labelled_trail=len(bad_cause),
             pct_E1_beat_E0=float(100 * (diff > 1e-12).mean()),

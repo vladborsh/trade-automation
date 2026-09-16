@@ -522,11 +522,51 @@ The trade list is the `OR5` list: fit 391–392 trades, projected `n_holdout`
 exists or is needed; a screened-in arm realising `n_holdout < 150` is a §11
 stop.
 
-### 8.2 Screen decision — to be written into this file, with the numbers, BEFORE the holdout is touched
+### 8.2 Screen decision — DECIDED 2026-09-16 on the fit period, before any holdout number existed
 
-*(This subsection is filled in by the same dispatch, from
-`results/fit_screen.csv`, and committed before `analysis.py holdout` is run.
-It is empty in the commit that precedes any R.)*
+From `results/fit_screen.csv`. **No holdout number existed for any arm of this
+family when this table was written and committed**, and none had been computed
+by any script in this package: `analysis.py fit` and `analysis.py screen` read
+only `period == "fit"`, and `analysis.py holdout` refuses to run without this
+committed file.
+
+| arm | n fit | fit mean net R | fit Null-A p | ≥ +0.05R? | p ≤ 0.05? | decision |
+|---|---|---|---|---|---|---|
+| `US100-E0` | 391 | **+0.1220** | **0.022** | yes | yes | **PASS — the holdout will be read for this arm** |
+| `US100-E1` | 391 | +0.0397 | 0.098 | no | no | **SCREENED OUT** |
+| `US100-E2` | 379 | +0.1037 | 0.126 | yes | **no** | **SCREENED OUT** |
+| `US500-E0` | 392 | −0.0489 | 0.702 | no | no | **SCREENED OUT** |
+| `US500-E1` | 392 | −0.0542 | 0.742 | no | no | **SCREENED OUT** |
+| `US500-E2` | 380 | −0.0537 | 0.652 | no | no | **SCREENED OUT** |
+
+**Screened in: `US100-E0` only. The holdout is read for that one arm and for
+nothing else.** The other five arms are verdicted **"NO EDGE — KILL (fit
+screen)"**, their holdout is **never computed**, and their holdout columns in
+`REPORT.md` are blank.
+
+Three observations, recorded now so they cannot be recruited later:
+
+- `US500-E0`'s −0.0489R is **exactly** the short pass's committed `US500-OR5`
+  no-target number, and `US100-E0`'s +0.1220R is exactly its `US100-OR5`
+  no-target number. E0 *is* that construction on that trigger, so this is the
+  cross-pass correctness check passing to every printed digit, not a
+  coincidence.
+- `US100-E2` clears the mean bar (+0.1037R) and fails only on the null
+  (p = 0.126). Its placebo is exited by E2's own template, i.e. the same tight
+  volatility stop and the same no-target hold, so the comparison is
+  like-for-like and the arm is removed for the right reason: at that stop
+  width, a random bar in the same window does nearly as well. **This is a
+  screened-out arm and it stays screened out — the fit screen only ever
+  removes, never reinstates.**
+- `US100-E1` fails both conditions, and its fit mean is **below** `US100-E0`'s.
+  The ratchet's effect on the fit period is therefore already negative before
+  any holdout number exists; §9.2's attribution has nothing to attribute.
+
+The §3.6 erratum is provably immaterial to this table:
+`results/fit_erratum_annex.csv` recomputes all six arms' fit means under both
+readings of the note's exclusion clause, and **no arm's screen mean-R condition
+flips** (largest movement 0.0116R, on an arm that fails by 0.088R). The
+erratum's resolution cannot have changed which arms touched the holdout.
 
 ---
 
