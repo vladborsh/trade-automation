@@ -1,0 +1,5 @@
+arm,n,mean_netR,mean_priceR,mean_fundingR,mean_costR,mean_grossR,t,nullA_p,nullB_p,boot_lo,boot_hi,shadow,n_shadow,shadow_netR,margin,margin_lo,margin_hi,floor_arm_ok,floor_shadow_ok,margin_ok,screen_in
+A_majors,89,-0.1294,-0.1707,0.0552,0.0139,-0.1155,-1.3026,0.891,0.88,-0.3055,0.058,A_majors_shadow24,669,-0.0061,-0.1233,-0.305,0.075,False,True,False,False
+A_alts,394,-0.0203,-0.0461,0.0352,0.0094,-0.0109,-0.552,0.553,0.684,-0.09,0.0497,A_alts_shadow24,1831,-0.0249,0.0046,-0.0731,0.0809,True,True,False,False
+B_majors,32,0.0852,0.0702,0.039,0.024,0.1092,0.6076,0.209,0.228,-0.1459,0.3401,B_majors_shadow24,329,-0.0764,0.1616,-0.0929,0.4192,False,True,False,False
+B_alts,196,-0.0144,-0.0208,0.028,0.0216,0.0072,-0.2378,0.447,0.54,-0.1312,0.1057,B_alts_shadow24,974,-0.0488,0.0344,-0.0999,0.1699,False,True,False,False

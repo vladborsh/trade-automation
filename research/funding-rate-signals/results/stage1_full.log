@@ -1,0 +1,29 @@
+A_majors_real              n=   89 excl=  0 meanNetR=-0.1294
+A_majors_shadow24          n=  669 excl=  0 meanNetR=-0.0061
+A_alts_real                n=  394 excl=  0 meanNetR=-0.0203
+A_alts_shadow24            n= 1831 excl=  0 meanNetR=-0.0249
+B_majors_real              n=   32 excl=  0 meanNetR=+0.0852
+B_majors_shadow24          n=  329 excl=  0 meanNetR=-0.0764
+B_alts_real                n=  196 excl=  0 meanNetR=-0.0144
+B_alts_shadow24            n=  974 excl=  0 meanNetR=-0.0488
+
+=== §6.3 frequency parity ===
+     arm  n_real  n_shadow24  parity_ok
+A_majors      89         669       True
+  A_alts     394        1831       True
+B_majors      32         329       True
+  B_alts     196         974       True
+
+=== nulls and the gating margin ===
+A_majors: n=89 mean=-0.1294 pA=0.891 pB=0.880 shadow=A_majors_shadow24(669) margin=-0.1233 [-0.3050,+0.0750]
+A_alts: n=394 mean=-0.0203 pA=0.553 pB=0.684 shadow=A_alts_shadow24(1831) margin=+0.0046 [-0.0731,+0.0809]
+B_majors: n=32 mean=+0.0852 pA=0.209 pB=0.228 shadow=B_majors_shadow24(329) margin=+0.1616 [-0.0929,+0.4192]
+B_alts: n=196 mean=-0.0144 pA=0.447 pB=0.540 shadow=B_alts_shadow24(974) margin=+0.0344 [-0.0999,+0.1699]
+
+=== fit-only sensitivities (never promoted) ===
+  A_majors pct=0.95                            n=   58 netR=-0.2214
+  B_majors pct=0.95                            n=   26 netR=-0.0183
+  A_majors pct=0.8                             n=  115 netR=-0.0890
+  B_majors pct=0.8                             n=   44 netR=+0.0624
+  A_majors floor=0.0                           n= 1506 netR=-0.0236
+  B_majors floor=0.0                           n=  251 netR=+0.0347

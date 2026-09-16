@@ -20,7 +20,15 @@ from common import (DATA, CACHE, SYMBOLS, PCT_WINDOW, PCT_MINP, PCT_HI, PCT_LO,
 # Architect ruling of 2026-09-16 (DESIGN §5.6): SOLUSDT ran on a 4h then 2h
 # funding interval during the FTX week.  The span is an interval-anomaly
 # blackout; it is filled in from the ruling, never guessed.
-BLACKOUT = {}          # symbol -> (start, end) inclusive, set by ruling
+BLACKOUT = {
+    # SOLUSDT ran a 4h then 2h funding interval across the FTX week (8->4->2->8,
+    # rate pinned at the -2.0% cap for part of it).  ARCHITECT-RULING
+    # 2026-09-16 §1, option B: interval-anomaly blackout on [a, b).  The
+    # 2022-11-18 16:00 row (interval back to 8h) is the first normal row.
+    "SOLUSDT": (pd.Timestamp("2022-11-09 20:00", tz="UTC"),
+                pd.Timestamp("2022-11-18 16:00", tz="UTC")),
+}
+BLACKOUT_ON = True
 
 
 def build_symbol(sym: str, shadow_ret_bars: int = RET_BARS):
@@ -65,6 +73,19 @@ def build_symbol(sym: str, shadow_ret_bars: int = RET_BARS):
     # funding notional mark: OPEN of the 1h bar opening at t_j (DESIGN §4.1)
     s["mark"] = bars["open"].reindex(grid).values
 
+    # interval-anomaly blackout (ARCHITECT-RULING-2026-09-16-stage0 §1):
+    # blackout rows are removed from the settlement stream for ALL signal
+    # purposes and do NOT enter the percentile window.  They are masked BEFORE
+    # the rolling rank, so a 90-slot window spanning the blackout loses 27
+    # slots and still clears min_periods = 45.  The shadow is masked with the
+    # SAME rows, because §6.3 requires an identical pipeline with exactly one
+    # input changed.
+    s["blackout"] = False
+    if BLACKOUT_ON and sym in BLACKOUT:
+        a, b = BLACKOUT[sym]
+        s.loc[(s.index >= a) & (s.index < b), "blackout"] = True   # [a, b)
+    s.loc[s["blackout"], ["f", "ret_shadow"]] = np.nan
+
     s["fpct"] = rolling_pct_rank(s["f"], PCT_WINDOW, PCT_MINP)
     s["spct"] = rolling_pct_rank(s["ret_shadow"], PCT_WINDOW, PCT_MINP)
 
@@ -76,12 +97,6 @@ def build_symbol(sym: str, shadow_ret_bars: int = RET_BARS):
     # coverage start = max(first funding row, first 1h bar); warm-up 15 days
     cov = max(fu["ts"].iloc[0], bars.index[0])
     s["warm"] = s.index >= cov + pd.Timedelta(days=WARMUP_DAYS)
-
-    # interval-anomaly blackout (Architect ruling, DESIGN §5.6)
-    s["blackout"] = False
-    if sym in BLACKOUT:
-        a, b = BLACKOUT[sym]
-        s.loc[(s.index >= a) & (s.index <= b), "blackout"] = True
 
     s.attrs["symbol"] = sym
     bars.attrs["symbol"] = sym

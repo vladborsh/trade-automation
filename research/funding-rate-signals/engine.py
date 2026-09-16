@@ -62,6 +62,15 @@ def _finish(side, entry, stop_px, exit_px, t_entry, t_exit, sett, **extra):
     return t
 
 
+def _spans_blackout(sett, t_entry, t_exit):
+    """ARCHITECT-RULING §1: any A/B trade whose (t_entry, t_exit) span
+    intersects the interval-anomaly blackout is excluded and counted."""
+    if "blackout" not in sett.columns:
+        return False
+    return bool(sett.loc[(sett.index > t_entry) & (sett.index < t_exit),
+                         "blackout"].any())
+
+
 def _bars_absent(bars, t0, t1):
     """True if any 1h bar in [t0, t1] is absent from the tape (DESIGN §5.2)."""
     seg = bars.loc[t0:t1]
@@ -174,6 +183,8 @@ def run_A(bars, sett, symbol, win_start, win_end, state=("ext_pos", "ext_neg"),
             t["netR"] = t["priceR"] + t["fundingR"] - t["costR"]
         if t["n_missing_slots"] > 1:            # DESIGN §5.3 rule 5(iii)
             t["excluded"] = "missing_slots"
+        elif _spans_blackout(sett, t_entry, t_exit):
+            t["excluded"] = "blackout_span"
         trades.append(t)
         # advance past the exit; cooldown only after a stop
         j = int(np.searchsorted(idx, t_exit, side="right"))
@@ -287,6 +298,8 @@ def run_B(bars, sett, symbol, win_start, win_end, state=("ext_pos", "ext_neg"),
             t["netR"] = t["priceR"] + t["fundingR"] - t["costR"]
         if t["n_missing_slots"] > 1:
             t["excluded"] = "missing_slots"
+        elif _spans_blackout(sett, t_entry, t_exit):
+            t["excluded"] = "blackout_span"
         trades.append(t)
     return trades
 

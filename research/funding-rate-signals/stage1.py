@@ -40,19 +40,23 @@ def main():
     ap.add_argument("--draws", type=int, default=1000)
     ap.add_argument("--boot", type=int, default=2000)
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--tiers", default="majors,alts")
+    ap.add_argument("--tag", default="")
     a = ap.parse_args()
     if a.quick:
         a.draws, a.boot = 50, 200
 
-    frames = prep.build_all()
-    tapes = {s: controls.Tape(*frames[s]) for s in SYMBOLS}
+    tiers = {k: v for k, v in TIERS.items() if k in a.tiers.split(",")}
+    syms_all = [s for v in tiers.values() for s in v]
+    frames = prep.build_all(syms_all)
+    tapes = {s: controls.Tape(*frames[s]) for s in syms_all}
 
     W0, W1 = START, FIT_END
     arms = {}
     rows_decomp, rows_arm = [], []
 
     for arm in ("A", "B"):
-        for tier, syms in TIERS.items():
+        for tier, syms in tiers.items():
             for kind, state, lapse in (("real", ("ext_pos", "ext_neg"), "funding"),
                                        ("shadow24", ("sh_pos", "sh_neg"), "shadow")):
                 key = f"{arm}_{tier}_{kind}"
@@ -70,7 +74,7 @@ def main():
     parity = []
     need_72h = False
     for arm in ("A", "B"):
-        for tier in TIERS:
+        for tier in tiers:
             nr = len(arms[f"{arm}_{tier}_real"]["df"])
             ns = len(arms[f"{arm}_{tier}_shadow24"]["df"])
             ok = ns >= 0.5 * nr
@@ -83,9 +87,9 @@ def main():
     if need_72h:
         print("\nshadow24 starved on >=1 arm -> adding the ONE pre-committed "
               "fallback shadow (trailing 72h return)", flush=True)
-        frames72 = prep.build_all(shadow_ret_bars=72)
+        frames72 = prep.build_all(syms_all, shadow_ret_bars=72)
         for arm in ("A", "B"):
-            for tier, syms in TIERS.items():
+            for tier, syms in tiers.items():
                 key = f"{arm}_{tier}_shadow72"
                 keep, excl = run_arm(frames72, syms, arm, W0, W1,
                                      ("sh_pos", "sh_neg"), lapse_mode="shadow")
@@ -100,7 +104,7 @@ def main():
     # ---- nulls + bootstraps + shadow margin -------------------------------
     print("\n=== nulls and the gating margin ===", flush=True)
     for arm in ("A", "B"):
-        for tier in TIERS:
+        for tier in tiers:
             rk = f"{arm}_{tier}_real"
             R = arms[rk]
             p_a, _ = controls.null_A(R["trades"], tapes, arm, W0, W1,
@@ -140,8 +144,8 @@ def main():
     arm_df["screen_in"] = (
         (arm_df["mean_netR"] >= 0.05) & (arm_df["nullA_p"] <= 0.20)
         & arm_df["floor_arm_ok"] & arm_df["floor_shadow_ok"] & arm_df["margin_ok"])
-    arm_df.round(4).to_csv(os.path.join(OUT, "fit_arms.csv"), index=False)
-    summarize.fmt(rows_decomp).to_csv(os.path.join(OUT, "fit_decomp.csv"),
+    arm_df.round(4).to_csv(os.path.join(OUT, f"fit_arms{a.tag}.csv"), index=False)
+    summarize.fmt(rows_decomp).to_csv(os.path.join(OUT, f"fit_decomp{a.tag}.csv"),
                                       index=False)
 
     # ---- sensitivities (fit-only, never promoted) -------------------------
@@ -155,7 +159,7 @@ def main():
 
     print("\n=== fit-only sensitivities (never promoted) ===", flush=True)
     import common as C
-    for tier, syms in TIERS.items():
+    for tier, syms in tiers.items():
         # §1.2 percentile 0.95 / 0.80 and floor 0 / 0.0005
         for pct in (0.95, 0.80):
             for arm in ("A", "B"):
@@ -199,13 +203,13 @@ def main():
                        target_R=3.0)
         add(f"B_{tier} template2 +3R", k)
 
-    summarize.fmt(sens).to_csv(os.path.join(OUT, "fit_sensitivities.csv"),
+    summarize.fmt(sens).to_csv(os.path.join(OUT, f"fit_sensitivities{a.tag}.csv"),
                                index=False)
 
     # ---- §6.8 mechanism prerequisite --------------------------------------
     print("\n=== §6.8 funding persistence (fit-only, descriptive) ===")
     pers = []
-    for tier, syms in TIERS.items():
+    for tier, syms in tiers.items():
         fs, surv = [], {h: [] for h in (1, 3, 6, 9, 15, 30)}
         for s in syms:
             _, st = frames[s]
@@ -226,13 +230,13 @@ def main():
             mean_f_next9=float(allf.mean()), median_f_next9=float(allf.median()),
             **{f"surv_{h}": float(np.nanmean(v)) for h, v in surv.items()}))
     pdf = pd.DataFrame(pers)
-    pdf.round(6).to_csv(os.path.join(OUT, "fit_persistence.csv"), index=False)
+    pdf.round(6).to_csv(os.path.join(OUT, f"fit_persistence{a.tag}.csv"), index=False)
     print(pdf.round(5).to_string(index=False))
 
     # ---- §6.4 incremental control -----------------------------------------
     print("\n=== §6.4 incremental control (non-promotable) ===")
     inc = []
-    for tier, syms in TIERS.items():
+    for tier, syms in tiers.items():
         rows = []
         for s in syms:
             bars, st = frames[s]
@@ -262,7 +266,7 @@ def main():
                             welch_t=welch_t(e, ne)))
     idf = pd.DataFrame(inc)
     if len(idf):
-        idf.round(4).to_csv(os.path.join(OUT, "fit_incremental.csv"), index=False)
+        idf.round(4).to_csv(os.path.join(OUT, f"fit_incremental{a.tag}.csv"), index=False)
         print(idf.round(4).to_string(index=False))
         ok = int(((idf["diff"] > 0)).sum())
         pooled_t = welch_t(idf["mean_ext"], idf["mean_nonext"])
@@ -273,7 +277,7 @@ def main():
     print(arm_df[["arm", "n", "mean_netR", "nullA_p", "floor_arm_ok",
                   "floor_shadow_ok", "margin", "margin_lo", "margin_ok",
                   "screen_in"]].round(4).to_string(index=False))
-    with open(os.path.join(OUT, "screen.json"), "w") as fh:
+    with open(os.path.join(OUT, f"screen{a.tag}.json"), "w") as fh:
         json.dump({r["arm"]: bool(r["screen_in"])
                    for _, r in arm_df.iterrows()}, fh, indent=2)
 

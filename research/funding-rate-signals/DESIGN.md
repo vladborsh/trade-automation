@@ -342,50 +342,141 @@ binding, and no symbol is dropped.
 \* 75 **extra, off-8 h-grid** rows — see (1) below.
 
 Three anomalies were found and **escalated to the Architect before stage 1**,
-per note §9 point 1. **At the time of this commit the ruling is OPEN and no R
-has been computed on any arm.** The escalation, verbatim in substance:
+per note §9 point 1. **The ruling landed 2026-09-16 and is binding:**
+`research/funding-rate-signals/ARCHITECT-RULING-2026-09-16-stage0.md`
+(commit `a393ffc`). All three went the Researcher's way. The records the
+ruling requires this document to carry:
 
-**(1) STOP-RULE TRIP — `SOLUSDT` funding interval changes mid-sample.** 101 of
-6,610 SOL rows (1.53 % overall, ≈ 1.9 % of fit rows) carry
+#### 5.6.1 `SOLUSDT` interval change — ruling: **option B, blackout**
+
+101 of 6,610 SOL rows (1.53 % overall, ≈ 1.9 % of fit rows) carry
 `funding_interval_hours ≠ 8`: **8 h → 4 h at 2022-11-09 20:00 UTC, → 2 h from
 2022-11-10 04:00, back to 8 h at 2022-11-18 16:00** — the FTX week, with the
-rate pinned at the −2.0 % cap for part of it. **No other symbol has a single
-non-8 h row.** The 00/08/16 grid slots are all *present* through the span; the
-75 extra rows are intermediate slots, which is why `slots_missing = 0`. §5.3
-rule 2 fires on **both** its clauses. Options put to the Architect:
-**(A)** the note's pre-committed fallback — restate §2.1/§2.3's counts in hours
-(16 h persistence, 240 h time stop, 24 h cooldown) and run SOL on its native
-row stream, interval-invariant, which also forces §1's 90-settlement window to
-be read as its 30-day equivalent; **(B)** *(the Researcher's recommendation —
-the narrowest change)* declare SOL 2022-11-09 20:00 .. 2022-11-18 16:00 an
-**interval-anomaly blackout**: no trigger evaluated inside it, any trade whose
-span crosses it excluded and counted (the §5.3 rule 5(iii) treatment), 8 h grid
-and every pre-registered count untouched for all 8 symbols — 9 days of 6 years
-on 1 of 8 symbols, entirely inside the fit window, zero holdout impact;
-**(C)** map the span onto the 8 h grid and ignore the interval column —
-**rejected by the Researcher**, it would credit ≈ ¼ of the funding actually
-exchanged.
+rate **pinned at the −2.0 % cap** for part of it. **No other symbol has a
+single non-8 h row.** The 00/08/16 grid slots are all *present* through the
+span; the 75 extra rows are intermediate slots, which is why
+`slots_missing = 0`. §5.3 rule 2 fired on **both** its clauses.
 
-**(2) 1 h kline gaps.** `SOLUSDT` and `XRPUSDT` each miss 120 bars
-(0.21–0.23 %) on **identical** calendar spans: 2022-02-26..28 (72 bars) and
-2022-04-01..02 (48 bars). The **monthly** archive zips are truncated; the
-**daily** kline prefix of the same archive returns HTTP 200 with 24 rows for
-all 10 day-files. Proposal: backfill those 10 days from the daily prefix
-(`backfill_klines.py`), logged per day in `results/data_audit_fills.csv` — the
-same data at finer granularity, **not** interpolation and **not** a second
-source. Alternative: leave them absent and exclude trades whose path crosses
-them (§5.2), costing ~5 days on 2 alts.
+**Ruling: an interval-anomaly blackout on `SOLUSDT` only, over
+`[2022-11-09 20:00, 2022-11-18 16:00)` UTC.** The 8 h grid and every
+pre-registered count stay exactly as written for all 8 symbols. The
+Architect's reasoning, recorded for the REPORT: rule 2's hours-restatement
+was written for a symbol that *lives* on a non-8 h grid; restating in hours
+would have re-defined §1's window for all eight symbols to accommodate 101
+rows and would **still** have left `fpct` ranking 2 h-period rates against
+8 h-period rates, which is not one distribution. Option C is rejected for
+the reason the Researcher gave.
 
-**(3) `ADAUSDT` funding precedes its kline listing.** 35 settlements from
-2020-01-19 16:00 to 2020-01-31 00:00 exist with no 1 h bar (ADA perp klines
-start 2020-01-31 08:00; SOL has 2 such rows, DOGE 1). Proposal, purely
-mechanical and already implemented in `prep.py`: the §5.4 warm-up clock starts
-at `max(first funding row, first 1 h bar)`, so the pre-listing rows feed `fpct`
-history only — they cannot produce a signal, having no bar to trade on — and
-every entry still requires a present bar.
+**Blackout mechanics, as implemented (`prep.py`, `engine.py`):**
+
+- Blackout rows are every SOL funding row with `calc_time` in
+  `[2022-11-09 20:00, 2022-11-18 16:00)`, grid slots and intermediate slots
+  alike. **The 2022-11-18 16:00 row is the first normal row.** On the 8 h
+  grid this is **26 slots** (the 27th, 2022-11-09 20:00, is not a grid slot).
+- Blackout rows are removed from the SOL settlement stream **for all signal
+  purposes**: no A or B trigger is evaluated on them, **and they do not enter
+  the `fpct` window** — they are masked to `NaN` *before* the rolling rank.
+  A 90-slot window spanning the blackout keeps **64 valid rows**, clearing
+  `min_periods = 45`. `checks.py` **1b** asserts this and confirms `fpct` is
+  defined on 90 of the 90 slots following the span.
+- **The shadow is masked with the same rows.** §6.3 demands an identical
+  pipeline with exactly one input changed, so `ret_shadow` is blacked out on
+  the same slots; otherwise the shadow would be given data the real rule is
+  denied.
+- First possible post-blackout **B** trigger: the bar opening 2022-11-18
+  16:00. First possible **A** trigger: the 2022-11-19 00:00 settlement
+  (`k−1` must itself be present and non-blackout).
+- **Any SOL A or B trade whose `(t_entry, t_exit)` span intersects the
+  blackout is excluded and counted** (`excluded = "blackout_span"`), per arm.
+  No trade is entered inside it.
+- **1 h klines inside the span are normal bars** — they feed `dATR14`,
+  `ATR14` and every B price condition as usual. This is a funding-stream
+  blackout, **not** a price blackout. The other seven symbols are untouched.
+- The pre-committed hours fallback remains the rule for a **structural**
+  interval regime. **Any further non-8 h episode on any symbol goes back to
+  escalation; this blackout is not extended on the Researcher's own reading.**
+
+**REPORT must disclose:** the span, the 8→4→2→8 sequence, the cap pinning,
+the excluded-and-counted SOL trade count **per arm** (fit only — the audit
+shows **zero** non-8 h rows in the holdout, so the holdout is unaffected and
+the REPORT says so), and — in the doubts section — that the FTX week is a
+candidate for the most extreme funding observations in the sample and is
+deliberately outside the SOL evidence, while remaining fully in-sample for
+the other seven symbols: the information cost is **1 of 8 symbols for 9 days
+of ~6 years, all in fit**.
+
+#### 5.6.2 The 1 h kline gaps — ruling: **daily-prefix backfill authorised**
+
+`SOLUSDT` and `XRPUSDT` each missed 120 bars (0.21–0.23 %) on **identical**
+spans — 2022-02-26..28 (72 bars) and 2022-04-01..02 (48 bars). The identical
+spans on two symbols identify a **truncated monthly zip**, not an exchange
+outage; all 10 daily files return HTTP 200 with 24 rows.
+
+**Ruling: fill the 10 day-spans (240 bars) from
+`data/futures/um/daily/klines/<SYM>/1h/` of the same archive.** Same
+exchange, same series, same archive at a finer partition — **not** a §5.3
+rule-4 secondary source (whose purpose is to stop a *different endpoint*
+substituting silently) and **not** interpolation. Authorised **for this
+pull's truncated months only**; it does not become a general fallback.
+
+Implemented in `backfill_klines.py`; every filled day is a row in
+`results/data_audit_fills.csv`. `checks.py` **1c** asserts, as the ruling
+requires, that (a) the filled open times are exactly the missing ones with no
+overlap or duplicate against monthly rows, and (b) for a neighbouring day per
+gap present in **both** monthly and daily files, the two are identical
+row-for-row on open time and OHLCV. **Four neighbouring days match exactly.**
+A disagreement would have been an escalation, not a fix-and-continue.
+
+#### 5.6.3 Funding rows before the first 1 h bar — ruling: **confirmed**
+
+**38 settlements** across three symbols predate their first 1 h bar (ADA 35,
+SOL 2, DOGE 1). **Ruling: the warm-up clock starts at `max(first funding row,
+first 1 h bar)`; fit start = that timestamp's date + 15 days.** Pre-listing
+settlements are genuine exchange prints and feed `fpct` **history only**; they
+may satisfy `min_periods` early, which is harmless because no trade is
+evaluated before the fit start and every trade requires a present bar at the
+decision close. `checks.py` **1** scopes the "every settlement lands on a bar
+open" assertion to settlements at or after the first bar and **counts the 38
+exempt rows rather than dropping them silently**.
+
+**Computed per-symbol coverage, which governs** (`results/fit_starts.csv`):
+
+| symbol | first funding row | first 1 h bar | coverage start | **computed fit start** | note §3.1 table |
+|---|---|---|---|---|---|
+| BTCUSDT | 2020-01-01 00:00 | 2020-01-01 00:00 | 2020-01-01 00:00 | **2020-01-16** | 2020-01-16 ✓ |
+| ETHUSDT | 2020-01-01 00:00 | 2020-01-01 00:00 | 2020-01-01 00:00 | **2020-01-16** | 2020-01-16 ✓ |
+| XRPUSDT | 2020-01-06 08:00 | 2020-01-06 08:00 | 2020-01-06 08:00 | **2020-01-21** | 2020-01-16 ✗ |
+| LINKUSDT | 2020-01-17 08:00 | 2020-01-17 08:00 | 2020-01-17 08:00 | **2020-02-01** | 2020-01-16 ✗ |
+| ADAUSDT | 2020-01-19 16:00 | 2020-01-31 08:00 | 2020-01-31 08:00 | **2020-02-15** | 2020-02-15 ✓ |
+| BNBUSDT | 2020-02-10 08:00 | 2020-02-10 08:00 | 2020-02-10 08:00 | **2020-02-25** | 2020-02-25 ✓ |
+| DOGEUSDT | 2020-07-10 08:00 | 2020-07-10 09:00 | 2020-07-10 09:00 | **2020-07-25** | 2020-07-25 ✓ |
+| SOLUSDT | 2020-09-13 16:00 | 2020-09-14 07:00 | 2020-09-14 07:00 | **2020-09-29** | 2020-09-29 ✓ |
+
+**Two differences, and the computed date governs** (the ruling says so, and
+§3.1 of the note calls its table a pre-pull expectation): the note grouped
+BTC/ETH/XRP/LINK as "first funding month 2020-01 → fit start 2020-01-16", but
+**XRP actually listed 2020-01-06 and LINK 2020-01-17**, so their warm-ups end
+2020-01-21 and 2020-02-01. This costs XRP 5 days and LINK 16 days of fit
+sample and changes nothing else.
 
 **§5.3 rule 6 is not engaged anywhere**: no symbol is dropped, both tiers keep
 all their symbols.
+
+### 5.7 `checks.py` — run, and green
+
+All ten assertions of §11 pass (`results/checks.csv`). The mirror check is
+decomposed into three exact parts because three quantities in this design are
+not equivariant under any single price transform — the trailing **ratio**
+return, the funding **notional** (a price level times a rate) and `costR` (a
+price level over a distance) — and a naive "reflect the tape" mirror silently
+tests the wrong thing. §11.5 records what each part proves.
+
+One property is worth recording because it is a real, if tiny, asymmetry in
+the **pre-registered** definition rather than in this implementation: §1
+computes `fpct` with `<=` **including the current value**, so
+`fpct(−x) = 1 − fpct(x) + 1/n` exactly. `ext_neg` is therefore stricter than
+`ext_pos` by **exactly one rank in 90 (0.0111)**. Inherited from
+ARCHITECT-NOTE §1.2, **reported, not corrected.**
 
 ---
 
@@ -621,15 +712,31 @@ sensitivity actually run on fit, including the ones that came out worse**.
 
 ## 11. `checks.py` — the wiring assertions that must pass before any number is believed
 
-1. Every settlement timestamp lands **exactly on a 1 h bar open**.
+1. Every settlement timestamp lands **exactly on a 1 h bar open**, scoped to
+   settlements at or after the first 1 h bar; the 38 pre-listing rows are
+   exempt and **counted**.
+1b. The SOL blackout leaves `min_periods` met (64 valid rows in a 90-slot
+   window) and `fpct` defined on all 90 slots after the span.
+1c. The authorised daily-prefix backfill: filled opens are exactly the missing
+   ones, no duplicates, and four neighbouring days present in both the monthly
+   and daily files match **row-for-row** on open time and OHLCV.
 2. `fpct` and `spct` **prefix stability**: recomputing on a tape truncated at
    any `k` reproduces the value at `k`.
 3. **No settlement counted outside `(t_entry, t_exit)`** — neither at/before
    entry nor at/after exit, on every trade of every arm.
 4. **No trigger fires on a missing slot** (A's `k−1`/`k`, B's last settlement).
-5. **Long/short mirror symmetry**: on a sign-flipped synthetic tape (prices
-   inverted, funding negated) the engine produces sign-flipped trades with
-   equal magnitudes.
+5. **Long/short mirror symmetry**, decomposed into three EXACT parts, because
+   the trailing **ratio** return, the funding **notional** and `costR` are not
+   equivariant under any single price transform:
+   **5a** — on an additively reflected tape (high↔low swapped, every absolute
+   distance and ATR preserved), with the funding state booleans swapped, `f`
+   negated, the notional zeroed and costs zeroed, a short must become a long
+   with the **same** `stop_dist`, the **same** `priceR` and the **same** exit
+   cause;
+   **5b** — the funding sign convention algebraically:
+   `collect(side, f) == collect(−side, −f)` exactly;
+   **5c** — the percentile definition's own symmetry, **measured**:
+   `fpct(−x) == 1 − fpct(x) + 1/n` exactly.
 6. No signal on a bar absent from the kline tape; no indicator uses a future
    bar.
 
