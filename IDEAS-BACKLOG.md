@@ -543,6 +543,33 @@ one trade/day, no re-entry; +1R project-standard template gates, pure-ORB
 (no target, flat 16:00 NY) is a mandatory secondary; eight pre-registered
 arms (4 instruments × {5m, 15m}), α = 0.05/8, standard ladder, holdout
 2025-08-01..2026-07-31.
+**2026-09-16 — Architect crypto-anchor investigation (`research/orb-ny-open/
+ARCHITECT-NOTE-CRYPTO-INVESTIGATION.md`): the crypto ORB line is re-opened on
+ONE crypto-native anchor, one shot.** The user did not accept "crypto is closed"
+and asked for a researched alternative to the imported NY anchor. External
+research (CME hours/settlement and the 2026-05-28 move to 24/7 trading; the
+BRRNY 15:00–16:00 NY ETF fixing; funding settlement 00/08/16 UTC; Deribit
+08:00 UTC settlement; the intraday-periodicity literature incl. a 2026 paper
+showing **no structural break at the ETF launch** — independent confirmation
+of the pre-ETF control) found exactly one defensible crypto-native "open":
+**00:00 UTC**, where the daily-candle boundary, perp funding settlement and the
+Tokyo open coincide every day of the week, and which is measured as the day's
+volatility peak. Family **`orb-utc0-crypto`**: `BTCUSDT-UTC0`, `ETHUSDT-UTC0`,
+the closed pass's mechanic **verbatim** with only the clock substituted (OR
+00:00–00:30 UTC, trigger 00:30–02:30 UTC, 5m bar, flat 07:55 UTC so no funding
+timestamp is ever crossed), **all seven days**, fit extended to the earliest
+Binance USD-M month (expected 2020-01), holdout unchanged. **Cumulative
+Bonferroni 8 + 6 + 2 = 16 → α = 0.05/16 = 0.003125**, fit-period screen before
+any holdout look. Built-in falsifications: weekday/weekend split with a
+pre-committed "the Tokyo open, not the reset" reading; Tokyo-holiday row;
+fit-only placebo-anchor rows at 08:00, 16:00 and **04:00 UTC** (no-story
+placebo). **Not registered, with reasons in the note:** CME open (anchor ceased
+to exist inside the holdout), the ETF fixing (a close, not an open), 08:00 UTC
+as an arm (DST-shifting London leg; fit-only row instead), volume-defined open
+(= US hours, already tested), forex Asian-range/London breakout. The Stage-1
+sentence "UTC midnight is the daily-candle boundary and nothing more" is
+withdrawn on the evidence. **Honest prior: low; likeliest outcome two kills; a
+kill closes the crypto ORB line on every anchor.** Not yet dispatched.
 
 **Idea:** Classic session-structure momentum on equity index products (ES/NQ
 futures, or SPY/QQQ): define the opening range as the first 15–30 minutes after
@@ -575,6 +602,31 @@ S&P-side positive, Nasdaq-side flat — test both, expect divergence); overlap
 with the paused VWAP-MR item (same instruments, opposite mechanism — running
 both against the same tape is a feature, not a conflict: they cannot both be
 right on the same days, which is a useful mutual control).
+
+---
+
+## US-hours vs off-hours drift in BTC (time-of-day carry, ETF era) — logged, not registered
+
+**Status:** logged (Architect crypto-anchor investigation, 2026-09-16); not
+prioritized; not an ORB family.
+
+**Idea:** Since the January 2024 spot-ETF launch, bitcoin has reportedly
+gained close-to-open (16:00 → 09:30 NY) and lost open-to-close, to the point
+that an ETF issuer filed a fund holding BTC only outside US hours (Bespoke via
+CNBC 2025-12; Velo data via CoinDesk). An earlier academic version: 22:00–24:00
+UTC returns are the day's most significant positive hours, 2015–2021 (Padyšák &
+Vojtko, SSRN 4081000). The ETF NAV fixing (CME CF BRRNY, 15:00–16:00 NY) is the
+crypto-native event at the close end. A **time-of-day carry** — hold a fixed
+window, no range, no breakout, no trigger.
+
+**Why logged and not registered:** it contests Запись 2 (clock filters on
+crypto do not survive a holdout) head-on and has no trigger, so its only
+defence is the seasonality itself; and the 2026 periodicity paper (J. Risk
+Financial Manag. 19(9):707) finds **no** structural break at the ETF launch,
+which weakens the ETF-flow story behind it. If ever registered: fixed window,
+fixed sign, pre-registered on tape after the registration date, α accounted
+with the crypto seasonality family, costs from bar one, and an explicit
+pre-2024 control row.
 
 ---
 
