@@ -179,5 +179,14 @@ Roles and this context document were the first deliverable. Since then:
   and in-app daily/at-event notifications over the existing WebSocket.
   Infrastructure only — it makes the backlog's scheduled-macro-event idea
   testable later; Software Engineer build is the next step.
+- **ORB line closed and post-ORB directions surveyed 2026-09-16** —
+  22 pre-registered ORB arms (four families, three axes, two anchors) closed
+  with no edge; `research/_surveys/2026-09-intraday-directions.md` answers
+  why the published ORB papers find an edge this project did not (cross-
+  section + costs, regime, no holdout discipline) and ranks four candidate
+  directions: a cross-sectional "instruments in play" package on a wide
+  crypto perp universe first, the prioritised funding-rate family second,
+  two fit-only probes (market intraday momentum; macro-event continuation)
+  after. VWAP mean reversion and any ORB form are not proposed.
 - The trading-idea intake format is still informal (backlog entry → Architect
   grilling → research package).

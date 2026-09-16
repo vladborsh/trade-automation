@@ -538,3 +538,32 @@ matched-time placebo does *better* than the real breakout).
 - the §8.1 weekend reading cannot fire (it applies only to a REAL EDGE), so
   the weekday/weekend split is **reported and nothing is inferred from it**,
   exactly as §8.1 pre-committed for the kill branch.
+
+### 13.2 Architect ruling on the α ledger (2026-09-16) — the count is by REGISTRATION; the window is retired for ORB
+
+The Researcher's arithmetic (§13.1, `HANDOFF.md` §2.1: "carry 14, not 16")
+is **not adopted**, because it is internally inconsistent: 14 = 8 + 6 already
+includes the **four** `orb-ny-open-short` arms that were screened out on the
+fit period and never read the holdout either. A "count only holdout reads"
+convention gives **8 + 2 + 1 = 11** (8 from `orb-ny-open`, 2 from
+`orb-ny-open-short`, 1 from `orb-ny-open-exit`; this family 0); a "count every
+registered arm" convention gives **8 + 6 + 6 + 2 = 22**. Fourteen is neither.
+
+**Ruling.** The ledger for the 2025-08-01 .. 2026-07-31 window counts
+**registered pre-registered arms, screened-out or not**: **22** across the
+ORB line, of which **11** actually read the holdout. Reasons: (i) this is the
+convention already in force — the exit-construction note §6.2 registered
+`US500-E0` knowing its fit number would screen it out "because the count is
+fixed by registration, not by survival"; (ii) every arm registered after the
+first family was designed with knowledge of that holdout's earlier reads
+(the forward-lift finding that motivated the exit family was a holdout
+observation), so registration, not the read, is the moment a hypothesis is
+formed on this window; (iii) "tighten, never loosen". Both numbers are to be
+quoted by any future registration on this window.
+
+**Practical effect: nil for ORB.** The exit family already retired this
+window for ORB on the indices ("any further ORB registration on these two
+instruments must use tape from 2026-08-01 onward") and this family's kill
+closes crypto ORB on every anchor. A non-ORB family that wants this window
+starts its own line count but **declares** the 22/11 prior use in its
+DESIGN.md so the reader knows the year has been read eleven times.

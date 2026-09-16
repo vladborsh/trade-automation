@@ -240,6 +240,14 @@ of the fixed design (RTH-anchored session VWAP, VWAP±k·σ bands trigger,
 revert-to-VWAP target, session-end flat) for the user to hand-test on
 TradingView and report back with results. No Python backtest, no credentials,
 no spend until the user decides otherwise based on that manual test.
+**2026-09-16 (Architect survey §4.5): stays paused; not proposed for
+registration.** No academic evidence of index-level intraday reversion to
+VWAP was found (the practitioner evidence is cross-sectional stocks; the
+Zarattini VWAP paper is a *trend* rule); the cmc-bot pass's placebo beat a
+VWAP-band mechanic on both indices; and the Capital.com tape cannot host the
+mechanism claim at all because its volume is broker tick count. If VWAP
+returns it is as a regime/side classifier or trailing reference inside
+another family, never as the trigger.
 
 **Idea:** Intraday mean-reversion off session VWAP (not a rolling mean/z-score
 like the crypto MR candidate) on CME index futures — ES (S&P 500), NQ (Nasdaq
@@ -349,6 +357,17 @@ for direct-dispatch-to-Implementation (see "Direct dispatch authority" in
 ## Momentum (trend-continuation) intraday, BTC/ETH/SOL perps
 
 **Status:** logged, not dispatched.
+**2026-09-16 (Architect survey, `research/_surveys/2026-09-intraday-directions.md`
+§3–§4):** the well-documented non-ORB intraday momentum — the first-half-hour /
+rest-of-day return predicting the last half-hour (Gao et al. 2018; Baltussen et
+al. 2021, 60+ futures) — is **flat every year 2022–2026 on the S&P in the
+0DTE era** (independent retest, 1,085 sessions) and survives only on
+dealer-short-gamma days (paid data). Its crypto analogue with a
+volume-defined trading day (Shen et al. 2022) is positive but pre-ETF and
+gross. Routed as a **fit-only one-day probe** (survey §4.3: no stop, fixed
+window, conditional rows, registration only on pooled t ≥ 3.0 net of costs),
+not as this full momentum family; the K=20 swing-breakout and 4h-strength
+hypotheses above remain logged for a per-asset family if that probe earns it.
 
 **Idea:** A standalone momentum/trend-continuation strategy for the same three
 assets and interval sweep as the original research (BTC/ETH/SOL USDT perps,
@@ -425,6 +444,11 @@ kill messages (flagged there, not yet done — this is where they land):**
 ## Funding-rate signals: carry and funding-extreme continuation (crypto perps)
 
 **Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
+**2026-09-16 (Architect survey §4.2, §5): ranked #2 of the post-ORB
+directions — dispatch next or in parallel with the cross-sectional package.**
+It is the only mean-reversion-adjacent idea that uses, rather than fights,
+the diagnosed perp mechanics, and the only non-OHLCV input that is free.
+Design unchanged; the "beyond price momentum" comparison stays mandatory.
 
 **Idea:** Use the perp **funding rate itself as the signal input**, not just as
 an unmodelled cost. Two distinct sub-hypotheses, probed separately:
@@ -461,6 +485,21 @@ belongs in the protocol from day one.
 ## Cross-sectional relative momentum, dollar-neutral, 8-perp universe
 
 **Status:** **prioritized** (user review, 2026-08-26), not yet dispatched.
+**2026-09-16 (Architect survey §4.1, §5): ranked #1 — dispatch now, merged
+with a second selector.** The strongest ORB paper's own attribution
+(Zarattini–Barbon–Aziz 2024) is that the plain breakout did nothing and the
+cross-sectional *opening relative-volume* selection did all the work
+(−0.02R → +0.08R → +0.38R per trade across RVOL tiers). This project has
+never run a cross-sectional hypothesis. One package, two pre-registered
+selectors on the same wide universe (≥ 50 Binance USD-M perps, survivorship-
+free membership incl. delistings, free archive): (i) **opening relative
+volume at the 13:30 UTC anchor** — top-k "coins in play", direction = sign of
+the first 30 minutes, ATR-fraction stop ladder printed in full, fixed-horizon
+exit, bottom-k and random-k as the pre-registered nulls; (ii) the trailing-
+return rank described below, dollar-neutral. Pre-registered comparison
+between the two; portfolio harness scoped honestly; cost_R 0.1–0.3R stated
+up front so only the paper's top tier would clear it; pump-and-dump /
+delisting exclusion mandatory. Full spec: survey §4.1.
 
 **Idea:** Rank the existing 8-perp universe by trailing return (e.g. 12–48h),
 go **long the top 2 / short the bottom 2**, dollar-neutral, rebalance on a fixed
@@ -610,6 +649,49 @@ as an arm (DST-shifting London leg; fit-only row instead), volume-defined open
 sentence "UTC midnight is the daily-candle boundary and nothing more" is
 withdrawn on the evidence. **Honest prior: low; likeliest outcome two kills; a
 kill closes the crypto ORB line on every anchor.** Not yet dispatched.
+**2026-09-16 — `orb-utc0-crypto` CLOSED: both arms killed on the fit screen,
+holdout never read (`RESEARCH-LOG.md` Запись 26).** Weekend half worse than
+weekday on both arms; all three placebo anchors in the same negative band,
+ordered by `cost_R` not by story; forward lift **0.978 on BTC** — the
+UTC-midnight range does not even select direction. Lift > 1 is a property of
+the NY anchor on the indices, not of the ORB mechanic.
+
+**2026-09-16 — ARCHITECT: THE ORB LINE IS CLOSED. Final status.** Three
+registered families on the indices — `orb-ny-open` (8 arms, width 30 min),
+`orb-ny-open-short` (6 arms, width 5/10/15 min), `orb-ny-open-exit` (6 arms,
+exit construction: no target / 1R ratchet / 0.10-dATR stop) — plus the crypto
+anchor family `orb-utc0-crypto` (2 arms, 00:00 UTC, seven days, with a
+weekday/weekend falsification control that came back negative): **22
+pre-registered arms, 11 holdout reads, NO EDGE on every one.** The surviving
+sentence: *at the NY open on US100/US500 the breakout selects direction
+(forward lift 1.04–1.65 on every arm) and no exit construction with a
+mechanism — capped, uncapped, ratcheted, volatility-stopped — converts it at
+Capital.com costs; on crypto no anchor selects direction at all.* Ledger for
+the 2025-08 .. 2026-07 window: 22 registered / 11 read, retired for ORB
+(`research/orb-utc0-crypto/DESIGN.md` §13.2).
+**Left unexplored, on the record:** (a) the papers' own *entry* — second
+5-minute candle's open in the first candle's direction (Zarattini–Aziz 2023)
+or a resting stop order at the range edge (Zarattini–Barbon–Aziz 2024); (b)
+relative volume as a filter, which is cross-sectional in the 2024 paper and
+has no meaning on a single index. **Neither is to be reopened on a single
+index:** the 2024 paper's own attribution says the plain 5-minute ORB on
+liquid US stocks returned 29 % total 2016–2023 against 198 % for the S&P and
+that the relative-volume *selection* did all the work; the independent MNQ
+falsification study (Mesfin 2026, 947 days 2021–2025) tested immediate,
+delayed and pullback entries and killed all of them after a 2-point friction;
+and on this project's own tapes the entry variant would trade the same
+5-minute range whose tight stops are cost-dead at CFD spreads (projected
+`cost_R` 0.09–0.15R for a 5 %-ATR stop). The only form in which the ORB
+direction reader may return is as the *direction component* of a
+cross-sectional "instruments in play" family on a wide crypto perp universe,
+where the relative-volume selection exists — see
+`research/_surveys/2026-09-intraday-directions.md` §4.1. **Not to be
+reopened without a materially different mechanic:** any minute count, any
+stop/target/trail/time-exit shape, any anchor (NY / London / 08:30 / UTC
+midnight / 04:00 placebo), volatility-scaled width (Study B carried it as two
+features and flagged neither), a 15-minute trigger bar, gap-conditioned ORB.
+Full reasoning and the literature answer to "why do the papers find an edge"
+in the survey note §2.
 
 **Idea:** Classic session-structure momentum on equity index products (ES/NQ
 futures, or SPY/QQQ): define the opening range as the first 15–30 minutes after
@@ -674,6 +756,15 @@ pre-2024 control row.
 
 **Status:** logged (Architect idea-generation pass, 2026-08-26); **not
 prioritized** at the 2026-08-26 user review (not rejected — just not picked).
+**2026-09-16 (Architect survey §4.4): downgraded to a fit-only probe, BTC/ETH
+only, after the cross-sectional and funding packages.** An independent MNQ
+study (Mesfin 2026, 2021–2025) finds post-release "drift" entirely inside
+the first five 5-minute bars, T 0.14–0.69 from bar 6 — the first-N-minute
+continuation this entry proposes does not continue on the Nasdaq. BTC's
+reaction to CPI has grown large but contemporaneous (a latency race). Probe:
+~180 events 2020–2025, bar-6+ continuation vs the spike, registration only on
+t ≥ 3.0; indices descriptive only (32 events/yr on a 2024-01 tape cannot
+reach n ≥ 150 before ~2029). Calendar infrastructure proceeds regardless.
 
 **Idea:** Trade the **first directional reaction after scheduled US macro
 releases** (CPI, FOMC statement/press conference, NFP) on BTC/ETH perps: at a
