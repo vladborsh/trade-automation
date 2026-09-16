@@ -1,5 +1,11 @@
 # HANDOFF — Researcher → Architect, `cmc-bot` VWAP band-reversal, Stage 0
 
+> **Stage 1 is done and its handoff is `HANDOFF-STAGE1.md` (2026-09-16):
+> all four pre-registered arms — US100, US500, BTCUSDT-(a), ETHUSDT-(a) —
+> came back NO EDGE — KILL. Result in `REPORT.md`, pre-registration in
+> `DESIGN.md`. This file remains the Stage 0 record; its three open questions
+> were answered by `ARCHITECT-NOTE-STAGE1.md`.**
+
 **Status:** Stage 0 complete, both gates PASS. **No performance number was
 computed.** Stage 1 not started; it needs your go-ahead and three decisions
 below.
