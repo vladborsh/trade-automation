@@ -97,18 +97,26 @@ def check_fills() -> dict:
         same_cause = np.array([EN(c1) == c2 for c1, c2 in zip(xc, g.exit_1.values)])
         d = np.abs(bar_gross - g.grossR_1.values)
         v = agree & ((d > 1e-9) | (~same_cause))
-        # STRONGER than §3.5 asks: on the excluded (gapping / both-touch)
-        # trades the 1m-path fill must be no BETTER than the bar-OHLC fill.
-        # If the finer path were systematically kinder, the fill convention
-        # would be flattering the result; it must only ever be harsher.
+        # DESIGN §11 rule 3, as NARROWED by the §12 amendment of 2026-09-16
+        # (Architect ruling at the fill-check stage, before any fit or holdout
+        # R existed). On an excluded trade the 1m-path fill may legitimately be
+        # KINDER than the bar-OHLC fill: the coarse convention takes the stop
+        # first on a bar spanning both levels, and resolving that order is
+        # exactly what the 1m path exists for. It is only a violation when the
+        # 1m tape ITSELF cannot resolve the order — i.e. a single 1-MINUTE bar
+        # touches both levels — and the finer path still comes out kinder.
         ex = ~agree & (b1 >= b0)
-        kinder = int((g.grossR_1.values[ex] - bar_gross[ex] > 1e-9).sum())
+        unresolvable = ex & (both1m == 1)
+        kinder = int((g.grossR_1.values[unresolvable]
+                      - bar_gross[unresolvable] > 1e-9).sum())
+        kinder_resolved = int((g.grossR_1.values[ex] - bar_gross[ex] > 1e-9).sum()) - kinder
         rows.append(dict(arm=C.arm_name(sym, int(orm)), n=len(g), agreement_n=int(agree.sum()),
                          max_absdiff=float(d[agree].max()) if agree.any() else 0.0,
                          violations=int(v.sum()),
                          both_touch_bar=int(both.sum()), gapped_bar=int(gapped.sum()),
                          gapped_1m=int(gapped1m.sum()), both_touch_1m=int(both1m.sum()),
-                         excluded=int(ex.sum()), excluded_1m_kinder=kinder))
+                         excluded=int(ex.sum()), excluded_1m_kinder=kinder,
+                         excluded_1m_kinder_resolved_on_1m=kinder_resolved))
     t = pd.DataFrame(rows)
     return dict(table=t.to_dict("records"),
                 **{"pass": int(t.violations.sum()) == 0

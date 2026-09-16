@@ -1,0 +1,125 @@
+{
+  "grid": {
+    "days": 670,
+    "violations": 0,
+    "clock_points_5m": [
+      "09:30",
+      "12:00",
+      "11:00",
+      "16:00",
+      "09:35",
+      "09:40",
+      "09:45"
+    ],
+    "utc_offsets_of_0930_seen_h": [
+      13,
+      14
+    ],
+    "examples": [],
+    "pass": true
+  },
+  "fills": {
+    "table": [
+      {
+        "arm": "US100-OR5",
+        "n": 668,
+        "agreement_n": 667,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 1,
+        "both_touch_1m": 0,
+        "excluded": 1,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US100-OR10",
+        "n": 667,
+        "agreement_n": 667,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US100-OR15",
+        "n": 662,
+        "agreement_n": 662,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 0,
+        "gapped_1m": 0,
+        "both_touch_1m": 0,
+        "excluded": 0,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US500-OR5",
+        "n": 670,
+        "agreement_n": 660,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 1,
+        "gapped_bar": 4,
+        "gapped_1m": 9,
+        "both_touch_1m": 0,
+        "excluded": 10,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 1
+      },
+      {
+        "arm": "US500-OR10",
+        "n": 670,
+        "agreement_n": 664,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 4,
+        "gapped_1m": 6,
+        "both_touch_1m": 0,
+        "excluded": 6,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      },
+      {
+        "arm": "US500-OR15",
+        "n": 665,
+        "agreement_n": 660,
+        "max_absdiff": 0.0,
+        "violations": 0,
+        "both_touch_bar": 0,
+        "gapped_bar": 3,
+        "gapped_1m": 5,
+        "both_touch_1m": 0,
+        "excluded": 5,
+        "excluded_1m_kinder": 0,
+        "excluded_1m_kinder_resolved_on_1m": 0
+      }
+    ],
+    "pass": true
+  },
+  "session": {
+    "table": [
+      {
+        "symbol": "US100",
+        "n": 1997,
+        "crossings": 0
+      },
+      {
+        "symbol": "US500",
+        "n": 2005,
+        "crossings": 0
+      }
+    ],
+    "pass": true
+  }
+}

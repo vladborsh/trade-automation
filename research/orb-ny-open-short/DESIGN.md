@@ -560,8 +560,10 @@ Any of the following stops the pass:
 2. the grid check fails on any session day for any of
    09:30 / 09:35 / 09:40 / 09:45 / 11:00 / 12:00 / 16:00 NY;
 3. the 1m-path and bar-OHLC fills disagree on a trade that neither gaps nor
-   touches both levels within a bar, or the 1m path is *kinder* than the bar
-   fill on an excluded trade;
+   touches both levels within a bar (**a hard stop, unchanged**), or the 1m
+   path is *kinder* than the bar fill on an excluded trade **whose order the 1m
+   tape itself cannot resolve — i.e. a single 1-minute bar touches both levels**
+   (narrowed by the §12 amendment of 2026-09-16);
 4. any trade's exit crosses 16:00 NY;
 5. **`n_holdout < 150` on a screened-in arm** (the widened-cutoff contingency
    is retired; there is no local fix);
@@ -585,3 +587,54 @@ must say which numbers it could have seen.)*
   commits named below, in that order, each before the next step ran.
 - *(§8.1 and §8.2.1 are filled in by the two later commits named above, each
   before the next step ran. Their hashes are appended here as they are made.)*
+- **2026-09-16, §11 rule 3 narrowed — AMENDMENT MADE AT THE FILL-CHECK STAGE,
+  BEFORE ANY FIT OR HOLDOUT R EXISTED.** Architect ruling, requested by the
+  Researcher under §11 rule 6 rather than decided locally.
+
+  **What the amendment could have seen.** Only the outputs of `checks.py fills`
+  — agreement counts, `max_absdiff`, the excluded-trade flags, and the one 1m
+  path printed below. **No fit-period and no holdout-period expectancy, mean R,
+  p-value or verdict existed for any arm of this family at the time it was
+  made.** `analysis.py fit`, `analysis.py screen` and `analysis.py holdout` had
+  not been run.
+
+  **The ambiguity.** `ARCHITECT-NOTE-FOLLOWUP.md` §10 stop rule 7 names only
+  the *disagreement* condition. This document's §11 rule 3 additionally carried
+  over an assertion that lives in the closed pass's `checks.py` as a
+  deliberately over-strict extra ("STRONGER than §3.5 asks"): that on an
+  *excluded* trade the 1m-path fill must never be kinder than the bar-OHLC
+  fill. The pre-registered condition passed perfectly — **0 violations on all
+  six arms, `max_absdiff` = 0.0 across all 3,977 agreeing trades** — while the
+  carried-over extra assertion fired on exactly one trade in 4,002.
+
+  **The narrowing, as ruled.** The clause now reads: the 1m path is kinder than
+  the bar fill on an excluded trade **where the 1m tape itself touches both
+  levels within one 1m bar** (i.e. where the order is genuinely unresolvable).
+  A bar-level both-touch that the 1-minute tape resolves cleanly is **not** a
+  violation: the bar-OHLC convention takes the stop first on any bar spanning
+  both levels, and resolving that order is precisely what the 1m path exists
+  for. The finer path coming out kinder there is the coarse convention's
+  pessimism, not a flattered result. This case is near-absent at a 30-minute
+  range and appears here only because 1R is several times tighter — by
+  construction, not by accident.
+
+  **Nothing else is relaxed.** The disagreement condition of rule 3 remains a
+  hard stop, and no other stop rule, fill convention, cost, null, bootstrap or
+  ladder number is touched.
+
+  **The one case, and its period — stated explicitly, not implied.** Trips of
+  the *old, unnarrowed* clause, by period, over all 4,002 trades of the six
+  arms:
+
+  | period | trades | trips of the old clause |
+  |---|---|---|
+  | fit (2024-01-01 .. 2025-07-31) | 2,342 | **0** |
+  | holdout (2025-08-01 .. 2026-07-31) | 1,487 | **0** |
+  | tail (2026-08-01 .. 2026-09-11, descriptive only) | 173 | **1** |
+
+  **Zero fit-period and zero holdout-period trades trip the old clause.** The
+  single case is `US500-OR5`, 2026-08-28, in the **tail** — a descriptive
+  period that carries no verdict and feeds no screen and no ladder. Its
+  minute-by-minute path is printed in `REPORT.md`. Under the narrowed clause it
+  is not a violation (its 1-minute both-touch flag is 0 — the 1m tape resolves
+  the order unambiguously), and `checks.py fills` now passes on all six arms.
