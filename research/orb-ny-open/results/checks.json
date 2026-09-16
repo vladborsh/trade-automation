@@ -11,8 +11,8 @@
   },
   "lookahead": {
     "n_checked": 56,
-    "n_cells_compared": 1315,
-    "n_cells_nan_both": 29,
+    "n_cells_compared": 1344,
+    "n_cells_nan_both": 0,
     "max_rel_diff": 0.0,
     "n_violations": 0,
     "examples": [],

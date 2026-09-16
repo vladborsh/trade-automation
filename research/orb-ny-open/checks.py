@@ -132,12 +132,15 @@ def _features_truncated(q_all: pd.DataFrame, r) -> dict | None:
     if tp.bars[tf]["t"][-1] != r["t_sig"]:
         return None
     key = (sym, tf)
-    save_i, save_t, save_d = F.Ind._cache.pop(key, None), E.Tape._cache.pop(sym), \
-        F.DayBars._cache.pop(sym, None)
+    save_i = F.Ind._cache.pop(key, None)
+    save_t = E.Tape._cache.pop(sym)
+    save_d = F.DayBars._cache.pop(sym, None)
+    save_s = F.SessionStats._cache.pop(key, None)
     try:
         E.Tape._cache[sym] = tp
         F.Ind._cache.pop(key, None)
         F.DayBars._cache.pop(sym, None)
+        F.SessionStats._cache.pop(key, None)
         cols = ["date", "symbol", "tf", "j", "side", "t_sig", "entry", "stop",
                 "stop_dist", "i_entry_min", "i_flat", "or_high", "or_low",
                 "i_or0", "i_or1", "or_vol", "or_open", "or_close"]
@@ -153,10 +156,13 @@ def _features_truncated(q_all: pd.DataFrame, r) -> dict | None:
         E.Tape._cache[sym] = save_t
         F.Ind._cache.pop(key, None)
         F.DayBars._cache.pop(sym, None)
+        F.SessionStats._cache.pop(key, None)
         if save_i is not None:
             F.Ind._cache[key] = save_i
         if save_d is not None:
             F.DayBars._cache[sym] = save_d
+        if save_s is not None:
+            F.SessionStats._cache[key] = save_s
 
 
 def check_fills() -> dict:

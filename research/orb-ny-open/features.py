@@ -148,6 +148,69 @@ class Ind:
         return cls._cache[key]
 
 
+class SessionStats:
+    """Per-**eligible-session** volume statistics, for `or_rvol` and
+    `bar_rvol` (DESIGN §7.2 / ARCHITECT-NOTE §5.2 #21-#22).
+
+    Both features are defined over "the prior 20 **eligible** sessions" — not
+    the prior 20 *triggered* ones. A clock slot is a property of the session's
+    bar grid and exists whether or not a breakout happened that day, so the
+    denominators are built over every eligible session in span. Nothing here
+    reads a session at or after the trade's own: `lookup` takes only sessions
+    strictly before the trade's date.
+    """
+
+    _cache: dict = {}
+
+    def __init__(self, symbol: str, tf: int):
+        import engine as _E                      # local: avoid a circular import
+        tp = Tape.get(symbol)
+        B = tp.bars[tf]
+        days = C.nyse_days("2022-08-01", "2026-09-11")
+        self.dates: list[str] = []
+        self.or_vol: list[float] = []
+        self.slots: list[dict] = []
+        for d in days:
+            orr = _E.opening_range(tp, d)
+            if orr is None:
+                continue
+            a = np.searchsorted(B["t"], C.ny_ms(d, *C.TRIG_START), "left")
+            b = np.searchsorted(B["t"], C.ny_ms(d, *C.TRIG_END_BASE), "left")
+            t0 = C.ny_ms(d, *C.OR_START)
+            self.dates.append(d)
+            self.or_vol.append(orr["or_vol"])
+            self.slots.append({int((B["t"][k] - t0) // C.MIN_MS): float(B["v"][k])
+                               for k in range(a, b)})
+        self.pos = {d: i for i, d in enumerate(self.dates)}
+
+    def lookup(self, date: str, slot: int) -> tuple[float, float]:
+        """(median OR volume, mean slot volume) over the prior 20 eligible
+        sessions. NaN when fewer than 20 are available."""
+        i = self.pos.get(date)
+        if i is None:
+            i = int(np.searchsorted(np.asarray(self.dates), date, "left"))
+        if i < 20:
+            return np.nan, np.nan
+        m_or = float(np.median(self.or_vol[i - 20:i]))
+        # the 20 most recent prior eligible sessions that carry this slot
+        vals = []
+        for k in range(i - 1, -1, -1):
+            v = self.slots[k].get(slot)
+            if v is not None:
+                vals.append(v)
+                if len(vals) == 20:
+                    break
+        m_slot = float(np.mean(vals)) if len(vals) == 20 else np.nan
+        return m_or, m_slot
+
+    @classmethod
+    def get(cls, symbol, tf):
+        k = (symbol, int(tf))
+        if k not in cls._cache:
+            cls._cache[k] = SessionStats(symbol, int(k[1]))
+        return cls._cache[k]
+
+
 class DayBars:
     """'Session-day' bars, 16:00 NY -> 16:00 NY (full 24 h, same definition on
     all four tapes). The bar labelled `d` spans [16:00 NY of the previous
@@ -215,15 +278,8 @@ def build(q: pd.DataFrame) -> pd.DataFrame:
         B = tp.bars[tf]
         I = Ind.get(symbol, tf)
         D = DayBars.get(symbol)
-        # rolling per-session history for or_rvol / bar_rvol
-        or_hist: list[float] = []
-        slot_hist: dict[int, list[float]] = {}
-        seen_dates: set = set()
+        S = SessionStats.get(symbol, tf)
         rows = g.sort_values(["date", "j"])
-        # the per-session OR volume of EVERY eligible session (not only the
-        # triggered ones) is what §7.2 asks for; the caller passes a table of
-        # triggered days, so the rolling windows are built over triggered
-        # sessions and the column is documented as such in DESIGN §7.2.
         for pos, r in zip(rows.index, rows.itertuples()):
             j = r.j
             side = r.side
@@ -274,26 +330,17 @@ def build(q: pd.DataFrame) -> pd.DataFrame:
             top, bot = I.top200[j - 1] if j >= 1 else np.nan, I.bot200[j - 1] if j >= 1 else np.nan
             if np.isfinite(top) and np.isfinite(bot) and top > bot:
                 out["range200_pos"][pos] = side * (c_t - (top + bot) / 2.0) / (top - bot)
-            # --- 21-22 relative volume ------------------------------------
-            if len(or_hist) >= 20:
-                m = np.median(or_hist[-20:])
-                if m > 0:
-                    out["or_rvol"][pos] = r.or_vol / m
+            # --- 21-22 relative volume, over prior ELIGIBLE sessions ------
             slot = int(out["tod_min"][pos])
-            hs = slot_hist.get(slot, [])
-            if len(hs) >= 20:
-                m = float(np.mean(hs[-20:]))
-                if m > 0:
-                    out["bar_rvol"][pos] = B["v"][j] / m
+            m_or, m_slot = S.lookup(r.date, slot)
+            if np.isfinite(m_or) and m_or > 0:
+                out["or_rvol"][pos] = r.or_vol / m_or
+            if np.isfinite(m_slot) and m_slot > 0:
+                out["bar_rvol"][pos] = B["v"][j] / m_slot
             # --- 23 volatility regime -------------------------------------
             s200 = I.atr_sma200[j]
             if np.isfinite(s200) and s200 > 0:
                 out["atr_regime"][pos] = atr / s200
-            # --- update the rolling histories AFTER using them ------------
-            if r.date not in seen_dates:
-                or_hist.append(r.or_vol)
-                seen_dates.add(r.date)
-            slot_hist.setdefault(slot, []).append(B["v"][j])
     for n, v in out.items():
         q[n] = v
     return q

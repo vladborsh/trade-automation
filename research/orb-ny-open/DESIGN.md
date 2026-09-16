@@ -394,14 +394,16 @@ Fixed seed `20260916`, `numpy.random.default_rng`.
 `rsi14` is computed but is **not a model column**; only its Pearson
 correlation with `rsi15` is reported (collinear, conventional period).
 
-**Mechanical note on 21/22, stated here rather than discovered later.** The
-Architect's note says "prior 20 eligible sessions". The rolling histories are
-built over the sessions present in that arm's trade table, i.e. **prior
-triggered sessions**, because an untriggered session has no entry bar and
-therefore no clock slot for `bar_rvol`. `or_rvol` could have been built over
-all eligible sessions; it is built over the same set as `bar_rvol` so the two
-columns share one definition. Both are features, neither is a signal
-component, and the choice is fixed here before any model saw them.
+**Mechanical note on 21/22 — CORRECTED, see amendment 2.** Both denominators
+are built over the **prior 20 eligible sessions**, exactly as
+`ARCHITECT-NOTE.md` §5.2 #21–#22 words it: a clock slot is a property of the
+session's bar grid and exists whether or not a breakout happened that day, so
+an untriggered eligible session still contributes to the denominator.
+`features.py:SessionStats` enumerates every eligible session in span for this
+purpose and `lookup` reads only sessions strictly before the trade's own date.
+Where a session is missing that particular slot bin, the mean is taken over
+the 20 most recent prior eligible sessions that carry it. Both remain
+features; neither is a signal component.
 
 **Not included, with the reason:** iFVG / sweep primitives (reversal-shaped,
 no argued role in a breakout's outcome); cross-instrument features (couples two
@@ -631,4 +633,5 @@ recorded here with its commit hash and its reason.
 | # | date | what | commit |
 |---|---|---|---|
 | 0 | 2026-09-16 | pre-registration, committed before any R | `82d6c0b` |
-| 1 | 2026-09-16 | §8.2.1 filled in from fit-period trigger counts: contingency does NOT fire, all eight arms keep the 12:00 NY cutoff. No R existed at this commit. | *(this commit)* |
+| 1 | 2026-09-16 | §8.2.1 filled in from fit-period trigger counts: contingency does NOT fire, all eight arms keep the 12:00 NY cutoff. No R existed at this commit. | `290260e` |
+| 2 | 2026-09-16 | **§7.2 `or_rvol` / `bar_rvol` corrected to match the binding note.** The pre-registration commit's mechanical note built both denominators over prior *triggered* sessions; `ARCHITECT-NOTE.md` §5.2 says prior **eligible** sessions, and this file's own preamble makes the Architect's note binding where the two disagree. The original reading was not merely narrower, it was destructive: `bar_rvol` needs 20 prior observations at the *same clock slot*, and triggers concentrate at early slots, so it silently dropped 846 of 1,473 (5m) and 508 of 1,406 (15m) fit trades from Study B — and dropped them non-randomly, discarding precisely the late breakouts. Corrected before any model was trained. Warm-up drops fall to 37 per timeframe (genuine: the first 20 eligible sessions of 2024 and the first 14 session-day bars). **Test A is untouched: the trade tables rebuilt bit-identically in `netR_1` and `grossR_1` on all 4,851 rows**, because no feature enters the signal. | *(this commit)* |
