@@ -26,6 +26,31 @@ see `research/orb-ny-open/REPORT.md`.
   the breakout's direction than from a random comparable bar in the same
   window. The pre-registered trade construction simply does not convert it.
   Whether some *other* exit does is open, and untested.
+- **2026-09-16 — the crypto line is closed on EVERY anchor.** A third family,
+  `research/orb-utc0-crypto/`, re-opened crypto on the one crypto-native
+  anchor (00:00 UTC — the daily-candle reset, the perpetual funding
+  settlement and the Tokyo open coinciding, seven days a week, no DST), with
+  the closed pass's mechanic verbatim and only the clock changed. **Both arms
+  (`BTCUSDT-5m`, `ETHUSDT-5m`) were KILLED on the fit-period screen and never
+  reached the holdout**: fit mean net R −0.233R and −0.152R over
+  2020-01-01 .. 2025-07-31 (1,885 / 1,901 trades on the deepest available
+  Binance history), fit-period Null-A p = 0.899 and 0.670 — the matched-time
+  placebo beats the real breakout. Three fit-only placebo anchors (08:00,
+  16:00, **04:00 UTC = no story at all**) are all in the same negative band,
+  ordered by `cost_R` rather than by story; 08:00 is not promoted. The
+  weekend half is **worse** than the weekday half on both arms, gross as well
+  as net — the opposite of what a crypto-native reset predicts. See
+  `research/orb-utc0-crypto/REPORT.md`.
+- **Forward lift > 1 is a property of the NY anchor, not of the mechanic.**
+  At 00:00 UTC median lift is **0.978** on BTC (below 1) and 1.073 on ETH,
+  against 1.227 / 1.162 for the same instruments at 09:30 NY. Any
+  exit-construction follow-up inherits "direction is selected" **on the
+  indices at the NY anchor only**.
+- **Cost structure of the Asian block, for any R-normalised mechanic.**
+  `cost_R` at the 00:00 UTC anchor is 0.14–0.20R against 0.08–0.10R at
+  09:30 NY — same instruments, same 0.10 % fee, same 30-minute width. The
+  00:00–00:30 UTC range is narrower relative to price, so the stop is tighter
+  and the same fee costs twice as much in R.
 - **Companion LightGBM study: 0 of 24 features flagged** on either timeframe,
   against a 200-refit target-shuffle max-statistic null (FWER-controlled). The
   frozen-model holdout read carries no out-of-sample skill either (Spearman
