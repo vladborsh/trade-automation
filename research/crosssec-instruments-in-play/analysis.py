@@ -337,8 +337,6 @@ def sens_rows(period: str = "fit") -> list[dict]:
     rows = []
 
     # -- index-lookup sensitivities on the gating table
-    for selector, arm in ARMS.items():
-        pass
     for arm, selector in ARMS.items():
         sub = legs[legs.period == period].reset_index(drop=True)
         if selector == "TR24":

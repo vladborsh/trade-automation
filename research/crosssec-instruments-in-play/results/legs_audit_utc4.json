@@ -1,0 +1,20 @@
+{
+ "tag": "utc4",
+ "panel": "utc4",
+ "stop": 0.5,
+ "horizon": 240,
+ "window": 30,
+ "rt": 0.001,
+ "side": "reader",
+ "n_instrument_days": 245150,
+ "n_tradable_days": 1683,
+ "dropped_r30_zero": 5243,
+ "dropped_path_missing_gt_30": 1,
+ "by_period": {
+  "fit": 245150
+ },
+ "exit_cause": {
+  "time-exit": 231779,
+  "stop": 13371
+ }
+}

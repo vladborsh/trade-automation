@@ -22,19 +22,21 @@ RT = C.BINANCE_RT
 
 
 def _unstopped_ret(legs: pd.DataFrame) -> np.ndarray:
-    """Return over the fixed horizon with NO stop: needs the close at the
-    horizon, which is the time-exit price. For legs whose stop fired we must
-    re-read the horizon close from the tape."""
+    """Return over the fixed horizon with NO stop — the §6.4(a) basket has no
+    per-leg stop, so the exit is the close of the bar opening at
+    A + 4 h 29 min whatever the path did. Re-read from the tape."""
     out = np.full(len(legs), np.nan)
+    pos = {k: i for i, k in enumerate(legs.index)}
     for sym, g in legs.groupby("symbol", sort=False):
         p = os.path.join(C.DATA_1M, f"{sym}.parquet")
         tp = pd.read_parquet(p).drop_duplicates("t_ms").sort_values("t_ms").reset_index(drop=True)
-        c = tp.close.values
-        i1 = g.i_path1.values.astype(int)
-        ok = i1 >= 0
+        t, c = tp.t_ms.values.astype(np.int64), tp.close.values
+        end = g.anchor_ms.values.astype(np.int64) + (C.WINDOW_MIN + C.HORIZON_MIN) * C.MIN_MS
+        i1 = np.searchsorted(t, end, "left") - 1
         v = np.full(len(g), np.nan)
-        v[ok] = c[np.clip(i1[ok], 0, len(c) - 1)]
-        out[legs.index.get_indexer(g.index)] = v / g.entry.values - 1.0
+        ok = i1 >= 0
+        v[ok] = c[i1[ok]]
+        out[[pos[k] for k in g.index]] = v / g.entry.values - 1.0
     return out
 
 

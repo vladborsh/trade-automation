@@ -38,7 +38,10 @@ VARIANTS = {
     "w5":      (C.ANCHOR_NY, "ny", 5, "nyse"),      # fit-only 5-minute reader/RVOL
     "utc0":    ((0, 0), "utc", 30, "all"),          # fit-only placebo anchor
     "utc4":    ((4, 0), "utc", 30, "all"),          # fit-only placebo anchor
-    "weekend": (C.ANCHOR_NY, "ny", 30, "weekend"),  # descriptive control
+    # The weekend row (§4.3) takes its RVOL denominator over the prior 14
+    # CALENDAR days' same window, so the panel is built over every calendar
+    # day with the NY anchor and the weekend rows are filtered out afterwards.
+    "nyall": (C.ANCHOR_NY, "ny", 30, "all"),        # descriptive control
 }
 
 
@@ -58,7 +61,7 @@ def _uni():
 
 def build_panel(a) -> None:
     hhmm, tz, win, dayset = VARIANTS[a.tag]
-    end = C.HOLD_END if a.tag in ("ny0930", "weekend") else C.FIT_END
+    end = C.HOLD_END if a.tag in ("ny0930", "nyall") else C.FIT_END
     if dayset == "nyse":
         dates = C.nyse_days(C.FIT_START, end)
     elif dayset == "weekend":

@@ -97,6 +97,7 @@ def legs_for_symbol(sym: str, pan: pd.DataFrame, stop_mult: float = C.STOP_GATE,
         exit_cause=xc, grossR=grossR, cost_R=cR, netR=grossR - cR,
         datr14=pan.datr14.values, r30=pan.r30.values,
         rvol=pan.rvol.values, tr24=pan.tr24.values,
+        tr12=pan.tr12.values, tr48=pan.tr48.values,   # fit-only §11 sensitivities
         v30=pan.v30.values, liq_med=pan.liq_med.values,
         path_missing=horizon_min - np.maximum(b1 - b0 + 1, 0),
         delist_days_after=pan.delist_days_after.values,
