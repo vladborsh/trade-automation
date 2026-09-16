@@ -270,11 +270,14 @@ def selftests(legs) -> dict:
         p = q[(~q.caps) & (~q.live_like)]
         # (1) the walker reproduces the engine's bot-native exits
         same = np.isclose(p.w_gross_1.values, p.grossR_1.values, atol=1e-9)
-        xdir = (p.exit_1.values == "both-directions close")
+        # excluded: closed by the cross-order rule (not reproducible per-trade),
+        # and still open at the last bar of the tape (no R at all)
+        xdir = (p.exit_1.values == "both-directions close") | (~p.closed.values)
         res[name] = dict(
             n=len(p),
             walk_vs_engine_mismatch=int((~same & ~xdir).sum()),
-            cross_order_closes=int(xdir.sum()),
+            cross_order_closes=int((p.exit_1.values == "both-directions close").sum()),
+            unclosed_at_tape_end=int((~p.closed.values).sum()),
             # (2) DESIGN §8 agreement set: bot-native vs realistic fill must be
             #     bit-identical where no bar touches both levels, the realistic
             #     exit does not gap, and both conventions find the same level
@@ -414,8 +417,14 @@ def boot_days(netR: np.ndarray, date: np.ndarray, n_draws: int, rng) -> np.ndarr
 def describe(g: pd.DataFrame, num=1) -> dict:
     if not len(g):
         return dict(n=0)
+    # An order still open at the last bar of the tape has no R (only possible
+    # on the never-force-closed (b) legs). It is excluded and counted.
+    n_open = int((~np.isfinite(g[f"netR_{num}"].values)).sum())
+    g = g[np.isfinite(g[f"netR_{num}"].values)]
+    if not len(g):
+        return dict(n=0, n_unclosed=n_open)
     net = g[f"netR_{num}"]
-    return dict(n=len(g), mean_netR=net.mean(), median_netR=net.median(),
+    return dict(n=len(g), n_unclosed=n_open, mean_netR=net.mean(), median_netR=net.median(),
                 mean_grossR=g[f"grossR_{num}"].mean(), mean_cost_R=g[f"cost_R_{num}"].mean(),
                 median_cost_R=g[f"cost_R_{num}"].median(),
                 win_rate=100 * (net > 0).mean(), n_days=g.date.nunique(),

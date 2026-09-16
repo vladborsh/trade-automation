@@ -37,7 +37,7 @@ def prim(q, caps=False, ll=False) -> pd.DataFrame:
 # ==========================================================================
 def fit_pass(names=None):
     legs = [lg for lg in S.LEGS if names is None or lg.name in names]
-    desc, four, abl, lift, exits = [], [], [], [], []
+    desc, four, abl, lift, exits, capson = [], [], [], [], [], []
     for lg in legs:
         q = load(lg.name)
         tp = S.Tape.get(lg)
@@ -74,11 +74,20 @@ def fit_pass(names=None):
             r = ablate_R(lg, tp, tr)
             abl.append(dict(leg=lg.name, dropped=drop or "nothing (the bot)", **r))
             print(f"   ablate {drop}: n={r['n']}", flush=True)
+        # ---- DESIGN §3: the (b) caps-ON population, a count + clock
+        #      histogram only, to document the artefact. Nothing else is
+        #      computed on it.
+        if not lg.windowed:
+            con = prim(q, True, False)
+            hh = pd.to_datetime(tp.t[con.b_sig.values], unit="ms", utc=True).hour
+            capson.append(dict(leg=lg.name, n_caps_on=len(con), n_caps_off=len(g),
+                               **{f"h{k:02d}": int((hh == k).sum()) for k in range(24)}))
+
         # ---- non-circular forward lift (DESIGN §5) ----------------------
         lift.append(dict(leg=lg.name, **forward_lift(lg, tp, f)))
     for tab, nm in ((desc, "fit_describe"), (four, "fit_four_numbers"),
                     (abl, "fit_ablation"), (lift, "fit_forward_lift"),
-                    (exits, "fit_exit_causes")):
+                    (exits, "fit_exit_causes"), (capson, "b_legs_capson_clock")):
         pd.DataFrame(tab).to_csv(os.path.join(S.OUT, f"{nm}.csv"), index=False)
         print("wrote", nm)
 
@@ -232,7 +241,7 @@ def holdout_pass(names=None):
             continue
         m_hold = float(h.netR_1.mean())
         # --- the nulls, on the holdout, template 1 -----------------------
-        nA_draws = S.N_PERM_A if lg.windowed else 250
+        nA_draws = S.N_PERM_A          # DESIGN §5: 1,000 draws, every leg
         nA, clash = S.null_A(lg, h, nA_draws, rng)
         pA = float(np.nanmean(nA >= m_hold))
         nB, dropr = S.null_B(lg, h, S.N_PERM_B, rng)
