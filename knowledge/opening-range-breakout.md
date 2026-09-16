@@ -43,6 +43,18 @@ see `research/orb-ny-open/REPORT.md`.
   the bootstrap, and disagrees with its own fit period. It is grounds for at
   most one Architect-authorised fresh registration, never a re-labelling of
   these arms.
+- **2026-09-16 — crypto re-opened on one crypto-native anchor, one shot.**
+  `ARCHITECT-NOTE-CRYPTO-INVESTIGATION.md` researched the alternatives
+  (CME open — gone since CME's 2026-05-28 move to 24/7; BRRNY 15:00–16:00 NY
+  ETF fixing — a close, not an open; funding 00/08/16 UTC; Deribit 08:00 UTC;
+  the periodicity literature, which finds no structural break at the ETF
+  launch) and registered family **`orb-utc0-crypto`**: `BTCUSDT-UTC0`,
+  `ETHUSDT-UTC0`, the same mechanic with the clock substituted (OR 00:00–00:30
+  UTC, trigger 00:30–02:30 UTC, 5m, flat 07:55 UTC, seven days, fit from the
+  earliest Binance month), cumulative α = 0.05/16, fit screen, with a
+  pre-committed weekday/weekend reading and fit-only placebo anchors at
+  08:00/16:00/04:00 UTC. Prior stated low; a kill closes crypto ORB on every
+  anchor.
 - **Family.** Continuation-shaped, session-structure momentum. Not a variant
   of `session-liquidity.md` (sweep-then-confirm, reversal-shaped) nor of
   `smc.md`/`smart-money-ict.md` (iFVG/order-block triggers). Shares the
