@@ -752,13 +752,46 @@ sensitivity actually run on fit, including the ones that came out worse**.
 
 ---
 
-## 13. The §8.3 screen decision
+## 13. The §8.3 screen decision — **ALL FOUR ARMS SCREENED OUT**
 
-*Not yet computed. This section is filled in, and committed, before any
-holdout number exists (§8.3). At the time of this commit it is empty because
-no R exists.*
+**Decided on the fit period, recorded here, and committed before any holdout
+number existed. The holdout (2025-08-01 .. 2026-07-31) was never read by this
+package and remains clean.**
 
----
+| arm | `n` fit | mean netR | Null-A `p` | floor ≥ 300 | shadow floor ≥ 150 | §6.3 margin | margin CI (90 %) | **screen** |
+|---|---|---|---|---|---|---|---|---|
+| `A_majors` | 89 | **−0.1294** | 0.891 | **NO** | yes (669) | −0.1233 | [−0.305, +0.075] | **OUT** |
+| `A_alts` | 394 | **−0.0201** | 0.572 | yes | yes (1831) | +0.0048 | [−0.073, +0.081] | **OUT** |
+| `B_majors` | 32 | +0.0852 | **0.209** | **NO** | yes (329) | +0.1616 | [−0.093, +0.419] | **OUT** |
+| `B_alts` | 196 | **−0.0144** | 0.448 | **NO** | yes (974) | +0.0344 | [−0.100, +0.170] | **OUT** |
+
+Screen-in requires **all** of: fit mean netR ≥ +0.05R, Null-A `p` ≤ 0.20,
+both §6.6 floors, and the §6.3 margin on fit. **No arm satisfies even two of
+the four.**
+
+**The frequency floors are not load-bearing.** Three arms fall below the
+300-event floor and are therefore also **"unmeasurable at the pre-committed
+definition"** under §6.6 — but every one of the four independently fails a
+criterion that has nothing to do with sample size: `A_majors`, `A_alts` and
+`B_alts` on **mean netR** (all three are negative, not merely small), and
+`B_majors` on **Null-A `p` = 0.209 > 0.20**. The conclusion does not rest on
+the floors, and **no threshold was loosened to manufacture sample** — the
+fit-only floor sensitivities in `results/fit_sensitivities.csv` show what
+loosening would have produced, and it does not rescue anything (best variant
+anywhere: `A_alts` at percentile 0.95, **+0.0094R**, still a fifth of the
++0.05R screen bar).
+
+**The §6.3 margin never gets to bind.** It is the gating condition for
+DOMINATED vs REAL EDGE, and it only matters for an arm that first clears the
+ladder. None does. The margins are recorded above for completeness and one of
+them is informative in its own right (§6.3 discussion in `REPORT.md` §5):
+`A_alts` beats its price shadow by **+0.005R**, a twentieth of the required
+margin, with a CI straddling zero.
+
+**Consequence, per §9.1 row 1: all four arms are `NO EDGE — fit-period kill`.
+The holdout is not read for any of them.** The tail row (2026-08) is likewise
+not computed: §5.4 scopes it to "post-holdout", and there is no holdout read
+to post-date. `results/screen.json` records the four `false` decisions.
 
 ## 14. Machinery map
 

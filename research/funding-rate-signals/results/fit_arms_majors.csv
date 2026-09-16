@@ -1,3 +1,0 @@
-arm,n,mean_netR,mean_priceR,mean_fundingR,mean_costR,mean_grossR,t,nullA_p,nullB_p,boot_lo,boot_hi,shadow,n_shadow,shadow_netR,margin,margin_lo,margin_hi,floor_arm_ok,floor_shadow_ok,margin_ok,screen_in
-A_majors,89,-0.1294,-0.1707,0.0552,0.0139,-0.1155,-1.3026,0.86,0.9,-0.3253,0.0611,A_majors_shadow24,669,-0.0061,-0.1233,-0.3314,0.0807,False,True,False,False
-B_majors,32,0.0852,0.0702,0.039,0.024,0.1092,0.6076,0.32,0.16,-0.138,0.357,B_majors_shadow24,329,-0.0764,0.1616,-0.0886,0.4379,False,True,False,False
