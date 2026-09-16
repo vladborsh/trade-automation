@@ -1,0 +1,2 @@
+tier,label,days,years,net_pa,sharpe,sd_daily_pct,rho1,maxdd_pct,utilisation,on_slot_days,n_positions,n_closed,rt_per_symyear,n_recentre,n_liquidation
+majors,H_majors TAIL 2026-08,31,0.085,0.0,,0.0,,0.0,0.0,0,0,0,0.0,0,0

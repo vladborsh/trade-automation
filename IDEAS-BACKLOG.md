@@ -976,10 +976,52 @@ yesterday's return in disguise is not a second signal).
 
 ## Hedged spot–perp carry (long spot / short USD-M perp, funding-gated) — the Schmeling trade
 
-**Status:** **DESIGNED by Architect, 2026-09-16 — pre-registration
-`research/hedged-carry/ARCHITECT-NOTE.md`, awaiting Researcher dispatch by
-the coordinator.** Log Запись 31. First non-intraday, non-directional
-registration, under the user's 1–5-day horizon ruling (PROJECT.md).
+**Status:** **CLOSED, 2026-09-16 — BOTH ARMS DEAD.** Run in full by the
+Researcher; `research/hedged-carry/REPORT.md`, `HANDOFF.md`, log Запись 32.
+Ledger: 2 registered arms, 1 holdout read, α = 0.05/2. First non-intraday,
+non-directional registration, under the user's 1–5-day horizon ruling.
+
+**Outcome.** `H_alts` **NOT SURVIVABLE — kill at this leverage**: screened out
+on fit by **one liquidation at L = 2** (DOGEUSDT, 2021-01-28 14:00, +42 % in a
+single hour, bar high +55.8 % against `x_liq` +51.3 %; the same bar crossed the
+re-centre and the liquidation level, the §2.5 case the note named in advance).
+Its holdout was never computed and nothing was re-tuned to avoid the event.
+`H_majors` passed the fit screen at +7.89 % p.a. on capital with zero
+liquidations; its holdout, read once, returned **+0.885 % p.a. on 143 ON
+slot-days**, below the pre-registered 150 floor → **UNDERPOWERED —
+inconclusive**, with the measured number 4.1 points under the kill bar and the
+always-on benchmark at ten times the exposure returning only +2.60 % on the
+same window. The perpetual premium on BTC/ETH essentially vanished in
+2024-08 .. 2026-07.
+
+**The honest prior below was right, to within a rounding.** Fit: majors
++7.89 %, alts +6.90 % p.a. on capital — inside the predicted "between the 5 %
+kill bar and the 10 % build bar" band. **The binding constraint was
+utilisation, not rate**: the alts' funding rate while ON (0.0395 %/8 h) *beat*
+the 0.035 % the design said the arm needed, but utilisation came in at 0.308
+against the 0.45 assumed. No sensitivity reaches the build bar — every gate,
+cost, window and leverage row lands between +4.1 % and +9.2 %, and even a
+**zero-cost** counterfactual only reaches +9.2 %.
+
+**What was exonerated.** The funding sensor, again and decisively: Null A
+(1,000 draws, exposure/turnover/cost/margin held fixed) gives observed
++7.89 %/+6.90 % against null means +3.16 %/+1.40 %, `p_A = 0.000` on both —
+**TIMED CARRY**, hedged as well as directional. A price gate in its place loses
+2.8–5.3 % p.a. on 42–48 round trips per symbol-year.
+
+**What is left for a future ruling** (each needs its own registration; see
+`HANDOFF.md`): the **account-type question** — spot posted as collateral at a
+90 % haircut reads +28.4 % p.a. on the majors against +7.89 % on the primary
+account, and the decomposition shows the lift is the perp notional compounding
+with price on an un-re-centred position (one ETH position collected 46.70 USDT
+on a 50 USDT slot riding 397 → 2,856), not the capital denominator — so the
+account type is worth more to this trade than the gate is; and a **duty-cycle
+question** — is there a wider universe on which utilisation at the same rate
+threshold is materially higher? Do **not** re-run this family at lower leverage
+to make the liquidation go away: the alts' survivable leverage bottoms at
+`L* = 1.74` and L = 3 / L = 5 are worse on both axes (8 and 16 liquidations).
+
+**As designed (unchanged, for the record):**
 
 **Why now — three lines converged.** (1) The funding family (Запись 29)
 killed the *directional* carry but exonerated the sensor: funding-selected

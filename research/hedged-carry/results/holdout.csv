@@ -1,0 +1,4 @@
+tier,label,days,years,net_pa,sharpe,sd_daily_pct,rho1,maxdd_pct,utilisation,on_slot_days,n_positions,n_closed,rt_per_symyear,funding_pa,hedge_pa,cost_pa,mean_settle,median_hold_days,zero_settle_share,cost_carry_ratio,x_max_mean,x_max_p90,x_max_p99,x_max_max,n_recentre,n_liquidation,p_boot,ci90_lo,ci90_hi
+majors,H_majors,730,2.0,0.8852,4.384,0.01057,0.5988,0.07,0.0982,143,2,2,0.5,0.9374,0.0745,0.1267,215.0,71.67,0.0,0.1351,0.2054,0.21,0.2111,0.2112,0,0,0.0005,0.346,1.562
+majors,always-on benchmark (§9.1),730,2.0,2.6004,8.708,0.01563,0.2268,0.191,0.9999,1459,6,4,1.0,1.8355,-0.0258,0.2533,419.25,114.67,0.0,0.138,0.255,0.2678,0.2743,0.275,4,0,0.0,2.118,3.234
+majors,price-gated shadow (§9.2),730,2.0,-9.1239,-10.213,0.04676,-0.0611,18.248,0.3523,514,166,166,41.5,1.3835,0.0059,10.5133,9.3,2.67,0.0,7.5993,0.0,0.0,0.0,0.0,0,0,1.0,-10.215,-8.155

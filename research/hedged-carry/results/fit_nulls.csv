@@ -1,0 +1,5 @@
+tier,null,draws,observed_pa,null_mean_pa,null_p95_pa,p_value,label
+majors,A,1000,7.886,3.1625,4.4962,0.0,TIMED CARRY
+majors,B,250,7.886,4.1935,6.0823,0.0,
+alts,A,1000,6.8969,1.4011,2.3998,0.0,TIMED CARRY
+alts,B,250,6.8969,3.2326,4.2622,0.0,

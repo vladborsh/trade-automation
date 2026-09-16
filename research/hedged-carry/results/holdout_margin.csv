@@ -1,0 +1,4 @@
+tier,L,capital_pa,notional_pa,n_positions,n_recentre,n_liquidation,x_max_mean,x_max_p90,x_max_p99,x_max_max,Lstar_min,Lstar_p1
+majors,2.0,0.885,1.328,2,0,0,0.2054,0.21,0.2111,0.2112,4.478,4.481
+majors,3.0,0.777,1.036,4,2,0,0.1039,0.1679,0.1693,0.1694,5.521,5.526
+majors,5.0,0.685,0.822,6,4,0,0.0708,0.0964,0.0969,0.097,9.264,9.269
