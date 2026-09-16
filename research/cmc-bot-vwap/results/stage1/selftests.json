@@ -1,0 +1,90 @@
+{
+  "US100": {
+    "n": 1150,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 13,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 0,
+    "agreement_n": 586,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "US500": {
+    "n": 1298,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 20,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 1,
+    "agreement_n": 576,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "BTCUSDT-(a)": {
+    "n": 1677,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 27,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 0,
+    "agreement_n": 840,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "ETHUSDT-(a)": {
+    "n": 1377,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 16,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 0,
+    "agreement_n": 657,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "EURCHF": {
+    "n": 240,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 0,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 0,
+    "agreement_n": 128,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "GBPCHF": {
+    "n": 243,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 0,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 0,
+    "agreement_n": 122,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "BTCUSDT-(b)": {
+    "n": 17095,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 1233,
+    "unclosed_at_tape_end": 1,
+    "undefined_R": 1,
+    "agreement_n": 9168,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  },
+  "ETHUSDT-(b)": {
+    "n": 15567,
+    "walk_vs_engine_mismatch": 0,
+    "cross_order_closes": 1193,
+    "unclosed_at_tape_end": 0,
+    "undefined_R": 0,
+    "agreement_n": 7733,
+    "agreement_max_absdiff": 0.0,
+    "agreement_violations": 0,
+    "atr_ok": true
+  }
+}

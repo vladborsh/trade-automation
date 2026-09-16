@@ -109,8 +109,15 @@ def ablate_R(lg, tp, tr) -> dict:
     cst = S.cost_R(lg, tp, b_sig, ex, tr.entry.values, dist)
     net = gross - cst
     ok = np.isfinite(net)
+    # A handful of ablation orders have a shrunk stop a fraction of a tick
+    # wide, so cost_R (a price-denominated cost over that stop) explodes and
+    # the MEAN stops being readable. The median is reported beside it, and the
+    # count of orders whose cost exceeds 5R is shown so the reader can see how
+    # many drive the gap. Descriptive rows either way — DESIGN §5.
+    deg = int((cst[ok] > 5.0).sum())
     return dict(n=int(ok.sum()), mean_netR=float(net[ok].mean()),
-                mean_grossR=float(gross[ok].mean()))
+                median_netR=float(np.median(net[ok])),
+                mean_grossR=float(gross[ok].mean()), n_cost_gt_5R=deg)
 
 
 HZ_CAP = 290          # bars: the indices' alive window (09:40-14:30 NY) in minutes.

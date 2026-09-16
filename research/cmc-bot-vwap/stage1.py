@@ -272,19 +272,21 @@ def selftests(legs) -> dict:
         same = np.isclose(p.w_gross_1.values, p.grossR_1.values, atol=1e-9)
         # excluded: closed by the cross-order rule (not reproducible per-trade),
         # and still open at the last bar of the tape (no R at all)
-        xdir = (p.exit_1.values == "both-directions close") | (~p.closed.values)
+        undef = ~np.isfinite(p.grossR_1.values)      # zero-size stop, or still open
+        xdir = (p.exit_1.values == "both-directions close") | (~p.closed.values) | undef
         res[name] = dict(
             n=len(p),
             walk_vs_engine_mismatch=int((~same & ~xdir).sum()),
             cross_order_closes=int((p.exit_1.values == "both-directions close").sum()),
             unclosed_at_tape_end=int((~p.closed.values).sum()),
+            undefined_R=int(undef.sum()),
             # (2) DESIGN §8 agreement set: bot-native vs realistic fill must be
             #     bit-identical where no bar touches both levels, the realistic
             #     exit does not gap, and both conventions find the same level
             #     on the same bar.
         )
         agree = (p.touch_both.values == 0) & (p.gapped_stop.values == 0) \
-            & (p.b_exit_1.values == p.w_b_exit_2.values) \
+            & (p.b_exit_1.values == p.w_b_exit_2.values) & (~undef) \
             & np.isin(p.exit_1.values, ["target", "stop", "trailed stop"])
         d = np.abs(p.grossR_1.values[agree] - p.w_gross_2.values[agree])
         res[name]["agreement_n"] = int(agree.sum())
@@ -417,14 +419,17 @@ def boot_days(netR: np.ndarray, date: np.ndarray, n_draws: int, rng) -> np.ndarr
 def describe(g: pd.DataFrame, num=1) -> dict:
     if not len(g):
         return dict(n=0)
-    # An order still open at the last bar of the tape has no R (only possible
-    # on the never-force-closed (b) legs). It is excluded and counted.
+    # Two kinds of order have no defined R and are excluded and counted, never
+    # silently imputed: one still open at the last bar of the tape (possible
+    # only on the never-force-closed (b) legs), and one whose shrunk stop
+    # landed exactly on the entry price, so R has a zero denominator
+    # (`results/INVENTORY.md`: 1 of 1,298 on US500, 0 everywhere else).
     n_open = int((~np.isfinite(g[f"netR_{num}"].values)).sum())
     g = g[np.isfinite(g[f"netR_{num}"].values)]
     if not len(g):
-        return dict(n=0, n_unclosed=n_open)
+        return dict(n=0, n_excluded=n_open)
     net = g[f"netR_{num}"]
-    return dict(n=len(g), n_unclosed=n_open, mean_netR=net.mean(), median_netR=net.median(),
+    return dict(n=len(g), n_excluded=n_open, mean_netR=net.mean(), median_netR=net.median(),
                 mean_grossR=g[f"grossR_{num}"].mean(), mean_cost_R=g[f"cost_R_{num}"].mean(),
                 median_cost_R=g[f"cost_R_{num}"].median(),
                 win_rate=100 * (net > 0).mean(), n_days=g.date.nunique(),

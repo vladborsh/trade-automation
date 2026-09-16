@@ -224,6 +224,20 @@ def main():
       "a different day. **A placebo mean close to the observed mean means the "
       "mechanic is not adding anything the window and the trade geometry do "
       "not already give you.**\n")
+    A("**On both index arms the placebo beat the strategy.** US100: the "
+      "mechanic returned +0.029R where a random bar in the same window, same "
+      "side, same stop, same target and same costs returned +0.052R on "
+      "average. US500: −0.053R against the placebo's +0.043R. That is why "
+      "`p_A` is 0.63 and 0.91 — the pre-registered comparison is not "
+      "\"is this positive?\" but \"does picking the bar this way beat picking "
+      "it at random?\", and on the indices the answer is no. On the two "
+      "crypto arms the placebo is also negative (−0.33 / −0.22), so the "
+      "mechanic is not worse than random there — it is merely, like the "
+      "placebo, well below the kill bar.\n")
+    A("The day-block bootstrap intervals say the same thing from the other "
+      "side: US100's 90 % interval [−0.089, +0.149] and US500's [−0.157, "
+      "+0.057] both straddle zero, and both crypto arms' intervals sit "
+      "entirely below it.\n")
     A("### 3.4 The other three numbers (template × fill), fit period\n")
     A(md(four[four.leg.isin(pre.leg)][
         ["leg", "number", "template_fill", "n", "mean_grossR", "mean_cost_R",
@@ -248,7 +262,9 @@ def main():
       "assumes every entry and exit is a resting limit fill, which a "
       "stop-loss exit is not.\n")
     A("### 3.7 Component ablation, FIT PERIOD ONLY\n")
-    A(md(abl[abl.leg.isin(pre.leg)]))
+    A(md(abl[abl.leg.isin(pre.leg)][
+        ["leg", "dropped", "n", "mean_grossR", "mean_netR", "median_netR",
+         "n_cost_gt_5R"]]))
     A()
     A("Each row drops one component and re-runs the bot's whole loop. "
       "`dropped = bias` removes the VWAP-band bias and the band-width/ATR "
@@ -259,6 +275,11 @@ def main():
       "**These are descriptive: a component whose removal improves the number "
       "is not thereby a licence to remove it** — that would be a new "
       "strategy and a new registration.\n")
+    A("`n_cost_gt_5R` counts orders whose shrunk stop came out a fraction of a "
+      "tick wide, so a price-denominated cost over that stop explodes. Those "
+      "orders make the `drop = ifvg` **mean** unreadable; the **median** is "
+      "printed beside it. The bot itself never places them — the gate that "
+      "the row removes is what keeps them out.\n")
     A("### 3.8 Non-circular forward lift\n")
     A(md(lift[lift.leg.isin(pre.leg)]))
     A()
@@ -269,6 +290,15 @@ def main():
       "than a random one.** Horizon capped at 290 bars (the indices' alive "
       "window) because the 24/7 legs have no alive window; reference pool a "
       "seeded 20,000-bar subsample.\n")
+    A("**The index arms land at 0.99 and 1.05 — dead on 1.00.** The signals "
+      "pick stretches of tape that are neither better nor worse than random "
+      "comparable stretches: whatever the three components are selecting, it "
+      "is not future movement in the signal's own direction. The crypto arms "
+      "land at 0.86 and 0.80, i.e. **below** random. Combined with the gross "
+      "expectancies in §3.2 — small and positive on every arm, and smaller "
+      "than the costs on three of four — the picture is a mechanic that "
+      "selects a roughly average stretch of tape and then pays a spread or a "
+      "taker fee for the privilege.\n")
     cr = lift[lift.leg.isin(["BTCUSDT-(a)", "ETHUSDT-(a)"])]
     if len(cr) and (np.abs(cr.lift_median - 1.0) < 0.10).any():
         A("**Pre-registered interpretation (`ARCHITECT-NOTE-STAGE1.md` §4.2, "
@@ -281,7 +311,10 @@ def main():
          "mean_cost_R", "mean_netR", "win_rate"]]))
     A()
     A("The tail rows (2026-08-01..2026-09-11) are **non-gating** and enter no "
-      "verdict.\n")
+      "verdict. US100's tail row is strongly positive on 40 trades; six weeks "
+      "of one instrument is noise at this sample size, the row was "
+      "pre-registered as non-gating precisely so that it could not be read as "
+      "a reprieve, and it is not one. It is printed because it was run.\n")
 
     # ---------------- descriptive --------------------------------------
     A("---\n")
@@ -306,12 +339,27 @@ def main():
         ["leg", "n", "mean_grossR", "mean_cost_R", "median_cost_R", "mean_netR",
          "win_rate", "median_stop_atr"]]))
     A()
+    A("Two things in those rows are worth saying out loud, as description "
+      "rather than verdict. **On EURCHF and GBPCHF one round-trip spread is "
+      "roughly 0.8–1.0R** — the median `cost_R` is 0.90 and 0.74. The stop "
+      "this strategy places on a CHF cross is so tight that a single spread "
+      "costs about as much as the whole risk unit; a mechanic would have to be "
+      "extraordinary to survive that, and the gross expectancies here "
+      "(+0.22R, +0.13R) are not extraordinary. **On the (b) legs the "
+      "matched-time placebo comes out far worse than the real signals** "
+      "(−0.96 vs −0.59 on BTC, −0.54 vs −0.26 on ETH, so `p_A` rounds to "
+      "0.000). That is not evidence of an edge: it says the mechanic's own "
+      "gates avoid some of the worst 24/7 entries a random draw would take, "
+      "while still leaving the result deep below the level at which anything "
+      "would be built. No verdict attaches to either observation.\n")
     A("Four numbers, ablation and forward lift, fit period:\n")
     A(md(four[four.leg.isin(desc.leg)][
         ["leg", "number", "n", "mean_grossR", "mean_cost_R", "mean_netR",
          "win_rate"]]))
     A()
-    A(md(abl[abl.leg.isin(desc.leg)]))
+    A(md(abl[abl.leg.isin(desc.leg)][
+        ["leg", "dropped", "n", "mean_grossR", "mean_netR", "median_netR",
+         "n_cost_gt_5R"]]))
     A()
     A(md(lift[lift.leg.isin(desc.leg)]))
     A()
