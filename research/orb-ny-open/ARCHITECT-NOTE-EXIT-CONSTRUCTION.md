@@ -369,7 +369,7 @@ look-ahead-free, already used by `gap_datr` / `or_width_datr`. `stop = entry
 ∓ 0.10 × dATR14`; `R = 0.10 × dATR14`; `target = ±∞`; `walk1m` verbatim. The
 stop is **not** clipped to the range in either direction. A day on which
 `DayBars.prior` returns `None` is excluded and counted (it cannot happen after
-2022-08 on these tapes). `stop_atr = R / ATR14` at the entry bar is recorded
+2022-08 on these tapes). **[ERRATUM, Architect, 2026-09-16 — the parenthetical is wrong.** The Capital.com tapes begin 2024-01-01, not 2022-08, so Wilder ATR(14) over session days is first finite on 2024-01-18 and `DayBars.prior()` returns `None` on 12 triggered fit-period days per instrument, all in January 2024. The operative clause — *excluded and counted* — is the specification and stands; the Researcher applied it as amendment A-01 (`research/orb-ny-open-exit/DESIGN.md` §3.6, §12), which is **ratified**. Counterfactual in `results/fit_erratum_annex.csv`: no screen decision flips.**] `stop_atr = R / ATR14` at the entry bar is recorded
 as before, because Null A sizes placebo stops in that unit.
 
 **The fraction 0.10 is the 2024 paper's number and is not tuned here.** It is

@@ -89,6 +89,15 @@ see `research/orb-ny-open/REPORT.md`.
   `vwap-band-reversal-ict.md` §1/§5 only as **features** in the companion
   LightGBM study, not as signal components.
 
+- **2026-09-16 — LINE CLOSED (Architect).** 22 pre-registered arms across four
+  families (30-min width; 5/10/15-min width; exit construction E0/E1/E2; the
+  00:00 UTC crypto anchor), 11 holdout reads, no edge anywhere; the 2025-08 ..
+  2026-07 window is retired for ORB (`research/orb-utc0-crypto/DESIGN.md`
+  §13.2). What stays unexplored and why it is not reopened on a single index —
+  the papers' second-candle-open / resting-stop entry, relative volume as a
+  cross-sectional selector — is written in `IDEAS-BACKLOG.md` (ORB entry,
+  final status) and `research/_surveys/2026-09-intraday-directions.md` §2.
+
 ## 1. Definitions
 
 - **Session open.** 09:30 America/New_York, DST-aware. **Eligible days = NYSE
