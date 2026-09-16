@@ -407,7 +407,10 @@ def build_arm(symbol: str, construction: str, days: list[str], tf: int = C.TF,
     tp = Tape.get(symbol)
     B = tp.bars[tf]
     t_start = C.trig_start(or_minutes)
-    db = _daybars(symbol) if stop_mode == "datr" else None
+    # dATR14 is E2's stop SOURCE; for every other arm it is only the §8.1
+    # common-scale DENOMINATOR, so it is read for all of them but can never
+    # exclude a day on an arm whose stop does not depend on it.
+    db = _daybars(symbol)
     rows = []
     for date in days:
         orr = opening_range(tp, date, or_minutes)
@@ -419,12 +422,10 @@ def build_arm(symbol: str, construction: str, days: list[str], tf: int = C.TF,
         t_trig1 = C.ny_ms(date, *trig_end)
         j_from = np.searchsorted(B["t"], C.ny_ms(date, *t_start), "left")
         j_to = np.searchsorted(B["t"], t_trig1, "left")
-        datr = np.nan
-        if stop_mode == "datr":
-            d = db.prior(date)
-            if d is None:
-                continue                      # excluded and counted, note §5.3
-            datr = d["datr14"]
+        d = db.prior(date)
+        if d is None and stop_mode == "datr":
+            continue                          # excluded and counted, note §5.3
+        datr = d["datr14"] if d is not None else np.nan
         j = j_from
         while j < j_to:
             cl = B["c"][j]
