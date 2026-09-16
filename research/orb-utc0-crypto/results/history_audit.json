@@ -1,0 +1,30 @@
+{
+  "BTCUSDT": {
+    "first_month_available": "2020-01",
+    "first_bar": "2020-01-01 00:00:00+00:00",
+    "last_bar": "2026-09-11 23:59:00+00:00",
+    "rows_extension": 1357920,
+    "rows_audited_segment": 2164320,
+    "rows_total": 3522240,
+    "duplicates": 0,
+    "monotonic": true,
+    "audited_segment_reproduces_byte_identical": true,
+    "n_gaps": 0,
+    "missing_minutes_total": 0,
+    "gaps": []
+  },
+  "ETHUSDT": {
+    "first_month_available": "2020-01",
+    "first_bar": "2020-01-01 00:00:00+00:00",
+    "last_bar": "2026-09-11 23:59:00+00:00",
+    "rows_extension": 1357920,
+    "rows_audited_segment": 2164320,
+    "rows_total": 3522240,
+    "duplicates": 0,
+    "monotonic": true,
+    "audited_segment_reproduces_byte_identical": true,
+    "n_gaps": 0,
+    "missing_minutes_total": 0,
+    "gaps": []
+  }
+}

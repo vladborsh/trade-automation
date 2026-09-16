@@ -1,0 +1,5 @@
+arm,period,calendar_days,eligible,excl_incomplete_or,excl_no_session
+BTCUSDT-5m,fit,2039,2039,0,0
+BTCUSDT-5m,holdout,365,365,0,0
+ETHUSDT-5m,fit,2039,2039,0,0
+ETHUSDT-5m,holdout,365,365,0,0
