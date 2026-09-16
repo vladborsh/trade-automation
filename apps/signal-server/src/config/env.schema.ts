@@ -4,6 +4,16 @@ import { z } from 'zod';
  * architecture/live-signal-server.md §4.7 — env for secrets and storage selection.
  * Validated at boot with zod; an invalid config is a boot failure, not a warning.
  */
+// z.coerce.boolean() would map the string 'false' to `true` (Boolean('false') === true) — an
+// explicit preprocess avoids that classic zod footgun for CALENDAR_ENABLED (§8).
+function booleanFlag(defaultValue: boolean) {
+  return z.preprocess((v) => {
+    if (v === undefined) return defaultValue;
+    if (typeof v === 'boolean') return v;
+    return String(v).toLowerCase() === 'true' || String(v) === '1';
+  }, z.boolean());
+}
+
 export const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -36,6 +46,19 @@ export const EnvSchema = z.object({
 
   WS_SHARED_TOKEN: z.string().optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+
+  // architecture/economic-calendar.md §8 — CALENDAR_ENABLED=false cleanly disables the module:
+  // no poll loop, no notification scheduler, REST returns 503 (§6.1, calendar.controller.ts).
+  CALENDAR_ENABLED: booleanFlag(true),
+  CALENDAR_FEED_BASE_URL: z.string().default('https://nfs.faireconomy.media/ff_calendar_thisweek'),
+  CALENDAR_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
+  CALENDAR_POLL_HOT_INTERVAL_MS: z.coerce.number().int().positive().default(120_000),
+  CALENDAR_CACHE_LOOKBACK_DAYS: z.coerce.number().int().positive().default(400),
+  CALENDAR_DIGEST_TIME: z.string().regex(/^\d{2}:\d{2}$/).default('00:00'),
+  CALENDAR_DIGEST_TZ: z.string().default('America/New_York'),
+  CALENDAR_NOTIFY_MIN_IMPACT: z.enum(['low', 'medium', 'high']).default('low'),
+  CALENDAR_NOTIFY_COUNTRIES: z.string().default(''), // empty = all; else 'USD,EUR,GBP'
+  CALENDAR_DUE_CATCHUP_MS: z.coerce.number().int().positive().default(900_000),
 });
 export type Env = z.infer<typeof EnvSchema>;
 

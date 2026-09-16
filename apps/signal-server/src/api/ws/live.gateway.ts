@@ -30,6 +30,11 @@ import {
 } from '../../strategy-engine/strategy-engine.events';
 import { AppConfigService } from '../../config/config.service';
 import { MetricsService } from '../../observability/metrics.service';
+import {
+  CalendarEventChangedEvent,
+  CalendarEvents,
+  CalendarNotificationFiredEvent,
+} from '../../calendar/calendar.events';
 
 // architecture/live-signal-server.md §3.5 — "Forming-bar frames are throttled server-side to
 // at most ~4/s per topic; the chart does not need every Binance kline tick."
@@ -40,6 +45,8 @@ interface ClientState {
   signalTopics: Set<InstrumentId>;
   /** architecture/chart-layouts.md §4.5 — `${instrument}|${metric}|${timeframe}`. */
   metricTopics: Set<string>;
+  /** architecture/economic-calendar.md §6.2 — no parameters, one stream for the whole calendar. */
+  calendar: boolean;
 }
 
 type WsSocket = {
@@ -81,7 +88,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }
 
-    this.clients.set(client, { candleTopics: new Set(), signalTopics: new Set(), metricTopics: new Set() });
+    this.clients.set(client, {
+      candleTopics: new Set(),
+      signalTopics: new Set(),
+      metricTopics: new Set(),
+      calendar: false,
+    });
     this.metrics.wsClients.set(this.clients.size);
     client.on('message', (data) => this.onMessage(client, data));
     client.on('close', () => {
@@ -117,6 +129,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
           state.candleTopics.add(this.candleKey(parsed.instrument, parsed.timeframe));
         } else if (parsed.topic === 'metrics') {
           state.metricTopics.add(this.metricKey(parsed.instrument, parsed.metric, parsed.timeframe));
+        } else if (parsed.topic === 'calendar') {
+          state.calendar = true;
         } else {
           state.signalTopics.add(parsed.instrument);
         }
@@ -126,6 +140,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
           state.candleTopics.delete(this.candleKey(parsed.instrument, parsed.timeframe));
         } else if (parsed.topic === 'metrics') {
           state.metricTopics.delete(this.metricKey(parsed.instrument, parsed.metric, parsed.timeframe));
+        } else if (parsed.topic === 'calendar') {
+          state.calendar = false;
         } else {
           state.signalTopics.delete(parsed.instrument);
         }
@@ -235,6 +251,26 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const [client, state] of this.clients) {
       if (state.candleTopics.has(topic)) {
         this.send(client, { type: 'candle', candle });
+      }
+    }
+  }
+
+  /** architecture/economic-calendar.md §6.2 — fans a created/updated/removed/actual change to every `calendar`-subscribed client. */
+  @OnEvent(CalendarEvents.EventChanged)
+  onCalendarEventChanged(event: CalendarEventChangedEvent): void {
+    for (const [client, state] of this.clients) {
+      if (state.calendar) {
+        this.send(client, { type: 'calendarEvent', event: event.event, change: event.change });
+      }
+    }
+  }
+
+  /** architecture/economic-calendar.md §5, §6.2 — a fired daily-digest or event-due notification. */
+  @OnEvent(CalendarEvents.NotificationFired)
+  onCalendarNotificationFired(event: CalendarNotificationFiredEvent): void {
+    for (const [client, state] of this.clients) {
+      if (state.calendar) {
+        this.send(client, { type: 'notification', notification: event.notification });
       }
     }
   }

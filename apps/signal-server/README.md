@@ -75,6 +75,13 @@ failure. Key ones:
 | `CAPITAL_COM_BASE_URL`, `CAPITAL_COM_IDENTIFIER`, `CAPITAL_COM_PASSWORD`, `CAPITAL_COM_API_KEY` | Required when `MARKET_DATA_MODE=live` and the universe includes a `capitalcom` instrument. |
 | `WS_SHARED_TOKEN` | Optional shared token gate on the WS endpoint (`?token=`). |
 | `METRIC_POLL_INTERVAL_MS` | Open-interest live poll cadence, aligned to `BarClock`'s 1m tick (default `60000`). See "Open interest ingestion" below. |
+| `CALENDAR_ENABLED` | `true` (default) or `false`. `false` cleanly disables the calendar module: no poll, no notifications, and every `/api/calendar/*` route returns `503 calendar disabled`. See "Economic calendar" below. |
+| `CALENDAR_FEED_BASE_URL` | ForexFactory weekly-feed base URL (`.json`/`.xml` appended); default is the live public feed. |
+| `CALENDAR_POLL_INTERVAL_MS`, `CALENDAR_POLL_HOT_INTERVAL_MS` | Default (`600000` = 10 min) and hot (`120000` = 2 min) poll cadence. Hot applies within ±20 min of a high-impact event and through the Sunday ET-midnight week-roll window. |
+| `CALENDAR_CACHE_LOOKBACK_DAYS` | How much history `CalendarCache` loads into memory at boot (default `400`), so `next-previous` actuals backfill can find prior monthly/quarterly occurrences. |
+| `CALENDAR_DIGEST_TIME`, `CALENDAR_DIGEST_TZ` | Daily-digest fire time (default `00:00` `America/New_York` — the feed's own day). |
+| `CALENDAR_NOTIFY_MIN_IMPACT`, `CALENDAR_NOTIFY_COUNTRIES` | Notification filters: minimum impact (default `low` = everything) and a comma-separated country allowlist (default empty = all). |
+| `CALENDAR_DUE_CATCHUP_MS` | How late an event-due notification can still fire after a restart (default `900000` = 15 min); older than this, the event is marked released silently. |
 
 The instrument universe (`config/instruments.yaml`), strategy enablement
 (`config/strategies.yaml`) and chart layouts (`config/layouts.yaml`) are separate files, also
@@ -110,6 +117,46 @@ To exercise this locally without live Binance, `MARKET_DATA_MODE=replay` reads
 `test/fixtures/<venue>/<symbol>/<metric>.jsonl` (one `MetricObservation` per line, ascending) —
 see `test/fixtures/binance/BTCUSDT/openInterest.jsonl`, a synthetic 5m walk covering the same
 window as the bundled candle fixture.
+
+## Economic calendar
+
+`architecture/economic-calendar.md` — a Nest module (`src/calendar/`) that ingests
+ForexFactory's public weekly feed (`ff_calendar_thisweek.{json,xml}`), stores every event
+forever (an `EventStore` port, file/S3, `calendar/` prefix, mirroring `MetricStore`), and
+notifies over the existing WS.
+
+- **Ingestion** (`calendar-ingestion.service.ts`) polls on the existing `BarClock` 1m tick — no
+  second timer — at `CALENDAR_POLL_INTERVAL_MS` normally, `CALENDAR_POLL_HOT_INTERVAL_MS` near a
+  high-impact event or the Sunday week-roll window, with `If-None-Match` conditional requests
+  and exponential backoff (capped at 30 min) on a feed error. Each poll's diff is scoped to the
+  snapshot's own ET week (Sun 00:00 → Sat 24:00 `America/New_York`) — a rolled-over week never
+  touches a prior week's stored rows, and nothing is ever deleted (a vanished row is marked
+  `status: 'removed'`).
+- **Identity**: `id = 'ff:<seriesId>:<scheduledDay>'`, the series id read from the XML/CSV `url`;
+  a synthetic `ffx:<sha1(...)>` id when a row can't be joined to its XML counterpart (rare —
+  logged via `calendar_unjoined_rows_total`).
+- **Actuals** (`actuals-backfill.service.ts`): the feed itself never carries a result. The only
+  built-in source is `NextPreviousActualsSource` — when a series' next occurrence appears, its
+  `previous` becomes the *prior* occurrence's `actual`, tagged `actualSource: 'next-previous'`
+  (lag = one release cycle). A real-time provider is a deliberate non-goal here — it needs a key
+  and a user decision on which paid provider to use (see `architecture/economic-calendar.md`
+  §1.3); the `ActualsSource` port is ready for one to be added as a second adapter with no
+  schema change.
+- **Notifications** (`notification-scheduler.service.ts`): a daily digest at
+  `CALENDAR_DIGEST_TIME`/`CALENDAR_DIGEST_TZ`, and one push per distinct event instant (several
+  events at the same timestamp, e.g. FOMC, collapse into a single notification). Both are
+  persisted to an append-only ledger before they're emitted, keyed by a deterministic id
+  (`digest:<day>`, `due:<scheduledAt>`), so a restart never re-fires one already in the ledger.
+- **API**: `GET /api/calendar/{events,week,notifications,status,events/:id}`; WS topic
+  `calendar` (`{ type: 'subscribe'|'unsubscribe', topic: 'calendar' }`) pushes `calendarEvent`
+  (`created`/`updated`/`removed`/`actual`) and `notification` frames. `GET /api/health` gains a
+  `calendar` field (`null` when the module is disabled).
+- **Disabling**: `CALENDAR_ENABLED=false` stops the poll loop and the notification scheduler
+  entirely at boot (verified: zero feed requests) and every `/api/calendar/*` route responds
+  `503 calendar disabled` instead of running a query against an empty/disabled cache.
+- **Fixtures**: the real 2026-09-16 feed responses are committed under
+  `test/fixtures/calendar/2026-09-16/` (105 events, the mapper's golden test) and are also what
+  `FixtureFeedClient` serves when `MARKET_DATA_MODE=replay`.
 
 ## Capital.com adapter — untested against live
 
@@ -162,6 +209,20 @@ subscribe/unsubscribe and per-timeframe fan-out; and `MetricIngestionService`'s 
 (storage → backfill → poll, not just each step in isolation) against fixtures. Bucketing
 correctness at every timeframe, including a day boundary, is covered in
 `libs/contracts/test/metric.spec.ts`.
+
+Per SE-CAL-1 (`architecture/economic-calendar.md` §10): `mapFeedSnapshot` against the committed
+golden 2026-09-16 fixture (105 rows → 105 events, 103 series ids, the doubled `ff:832:…`/
+`ff:504:…` ids, the `All`-country row, the Federal Funds Rate UTC instant, the XML/JSON
+positional-then-instant join fallback); `eventDayNY`/`eventWeekWindowNY` across both 2026 DST
+boundaries (`libs/contracts/test/calendar.spec.ts`); `diffSnapshot`'s create/update/remove
+semantics and week-roll isolation (a snapshot from week N+1 never touches week N's stored rows);
+file/S3 `EventStore` upsert idempotency; `CalendarIngestionService`'s boot order, hot-window
+cadence, 304 handling and exponential backoff on a feed error; `ActualsBackfillService`'s
+next-previous rule (incl. never overwriting a `feed`/`provider`-sourced actual); and
+`NotificationSchedulerService`'s fake-clock behaviour — daily-digest-once-per-day with boot
+catch-up, multi-event-one-notification grouping, the catch-up threshold, and ledger dedupe
+across a simulated restart (a second scheduler instance seeded from the same store never
+re-fires an already-ledgered notification).
 
 ## Strategy plug-in: `vwap-band-reversal` (research tier, disabled by default)
 

@@ -21,5 +21,7 @@ services:
       LOG_LEVEL: info
       # architecture/chart-layouts.md §4.4 — open-interest poll cadence, aligned to BarClock.
       METRIC_POLL_INTERVAL_MS: "60000"
+      # architecture/economic-calendar.md §8 — economic calendar module (ForexFactory feed).
+      CALENDAR_ENABLED: "true"
     volumes:
       - ./data:/workspace/apps/signal-server/data

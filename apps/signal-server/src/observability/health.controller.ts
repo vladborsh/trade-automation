@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthResponse, TIMEFRAME_MS } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
+import { CalendarIngestionService } from '../calendar/calendar-ingestion.service';
 import { MarketDataStatusService } from '../market-data/market-data-status.service';
 import { MetricIngestionService } from '../market-data/metrics/metric-ingestion.service';
 
@@ -16,6 +17,7 @@ export class HealthController {
     private readonly config: AppConfigService,
     private readonly status: MarketDataStatusService,
     private readonly metricIngestion: MetricIngestionService,
+    private readonly calendarIngestion: CalendarIngestionService,
   ) {}
 
   @Get()
@@ -48,6 +50,7 @@ export class HealthController {
       uptimeSeconds: (now - START_TIME) / 1000,
       instruments,
       metrics: this.metricIngestion.status(),
+      calendar: this.config.env.get('CALENDAR_ENABLED') ? this.calendarIngestion.healthStatus() : null,
     };
   }
 }
