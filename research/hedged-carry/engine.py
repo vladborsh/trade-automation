@@ -174,7 +174,8 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
     sett = {t: (i, f.f.values[i]) for i, t in enumerate(f.ts.values)}
     on_at = {t: bool(state[i]) for i, (t) in enumerate(f.ts.values)}
 
-    ts = bar.ts.values
+    tsi = pd.DatetimeIndex(bar.ts)          # tz-aware, for date comparisons
+    ts = bar.ts.values                       # datetime64, for fast slicing
     P_open, P_high, P_close = bar.P_open.values, bar.P_high.values, bar.P_close.values
     S_close, ok = bar.S_close.values, bar.ok.values
 
@@ -182,6 +183,10 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
     # the close of the bar opening 2022-11-09 19:00 (§3.3 rule 3, restated).
     bo_a, bo_b = SOL_BLACKOUT
     is_sol = symbol == "SOLUSDT"
+    in_bo = (np.asarray((tsi >= bo_a) & (tsi < bo_b)) if is_sol
+             else np.zeros(len(bar), bool))
+    is_sol_last = (np.asarray(tsi == SOL_LAST_BAR_BEFORE) if is_sol
+                   else np.zeros(len(bar), bool))
 
     realized = 0.0                 # cumulative realised cash for the slot
     eq = np.full(len(bar), np.nan)
@@ -195,7 +200,7 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
         c = ent_cost_maker if (cfg.perp_maker_fee is not None and why in
                                ("gate_on",)) else ent_cost
         realized -= c * N
-        pos = dict(entry_i=i, entry_ts=ts[i], S_e=S_close[i], P_e=P_close[i],
+        pos = dict(entry_i=i, entry_ts=tsi[i], S_e=S_close[i], P_e=P_close[i],
                    q_s=N / S_close[i], q_p=N / P_close[i], F=0.0,
                    fees=c * N, n_settle=0, x_max=0.0, n_rc=0,
                    b_e=P_close[i] / S_close[i] - 1.0, why=why)
@@ -220,7 +225,7 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
                 cost = (cfg.spot_fee + pf + sl) * N
         realized += spot_pnl + perp_pnl - cost
         positions.append(dict(
-            symbol=symbol, entry_ts=p["entry_ts"], exit_ts=ts[i],
+            symbol=symbol, entry_ts=p["entry_ts"], exit_ts=tsi[i],
             why_in=p["why"], why_out=why, N=N,
             S_e=p["S_e"], P_e=p["P_e"], S_x=S_x, P_x=P_x,
             b_e=p["b_e"], b_x=P_x / S_x - 1.0,
@@ -231,15 +236,14 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
             net=spot_pnl + perp_pnl + p["F"] - p["fees"] - cost,
             gross=spot_pnl + perp_pnl + p["F"],
             n_settle=p["n_settle"], x_max=p["x_max"],
-            hold_hours=(ts[i] - p["entry_ts"]) / np.timedelta64(1, "h"),
+            hold_hours=(tsi[i] - p["entry_ts"]).total_seconds() / 3600.0,
             liquidated=bool(liq), n_rc_before=p["n_rc"],
         ))
         pos = None
 
     for i in range(len(bar)):
         t = ts[i]
-        tpd = pd.Timestamp(t)
-        in_blackout = is_sol and (bo_a <= tpd < bo_b)
+        in_blackout = bool(in_bo[i])
 
         # ---- 1. settlement at this bar's open -----------------------------
         s = sett.get(t)
@@ -276,14 +280,14 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
         if pos is not None and do_liq:
             P_x = pos["P_e"] * (1.0 + x_liq_of(cfg.lev, pos["F"] / N, cfg.mmr))
             S_x = S_close[i] if ok[i] else pos["S_e"]
-            events.append(dict(symbol=symbol, ts=t, kind="liquidation",
+            events.append(dict(symbol=symbol, ts=tsi[i], kind="liquidation",
                                entry_ts=pos["entry_ts"], P_e=pos["P_e"],
                                P_liq=P_x, x_liq=P_x / pos["P_e"] - 1.0,
                                x_bar_high=P_high[i] / pos["P_e"] - 1.0))
             close_pos(i, "liquidation", P_x=P_x, S_x=S_x, liq=True)
         elif pos is not None and ok[i] and do_rc:
             n_rc = pos["n_rc"] + 1
-            events.append(dict(symbol=symbol, ts=t, kind="recentre",
+            events.append(dict(symbol=symbol, ts=tsi[i], kind="recentre",
                                entry_ts=pos["entry_ts"],
                                x=P_high[i] / pos["P_e"] - 1.0))
             close_pos(i, "recentre")
@@ -292,7 +296,7 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
                 pos["n_rc"] = n_rc
         elif pos is not None and ok[i] and force_unwind:
             close_pos(i, "absent_bars")
-        elif is_sol and pos is not None and tpd == SOL_LAST_BAR_BEFORE and ok[i]:
+        elif pos is not None and is_sol_last[i] and ok[i]:
             close_pos(i, "sol_blackout")
         elif s is not None and ok[i] and not in_blackout:
             if pos is not None and not last_state:
@@ -327,8 +331,9 @@ def simulate(symbol: str, state: np.ndarray, f: pd.DataFrame, bar: pd.DataFrame,
     # slot-days ON: a bar counts as ON if a position is open at its close
     opens = np.zeros(len(bar))
     for p in positions:
-        a = p["entry_ts"]
-        b = p["exit_ts"] if pd.notna(p["exit_ts"]) else bar.ts.iloc[-1]
-        opens[(bar.ts.values > a) & (bar.ts.values <= b)] = 1.0
+        a = np.datetime64(p["entry_ts"].tz_localize(None))
+        b = (np.datetime64(p["exit_ts"].tz_localize(None))
+             if pd.notna(p["exit_ts"]) else ts[-1])
+        opens[(ts > a) & (ts <= b)] = 1.0
     eqf["open"] = opens
     return pd.DataFrame(positions), eqf, events

@@ -1,0 +1,52 @@
+check,pass_,detail
+BTCUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 7305 (0 pre-listing rows exempt and counted)
+BTCUSDT: perp hours with no spot bar are the known maintenance hours,True,31 perp-only hours
+BTCUSDT: every spot and perp bar open lies on the hour,True,
+BTCUSDT: f9 is prefix-stable (25 probes),True,
+BTCUSDT: no bar with |b| > 5 % is usable,True,58409 usable bars
+ETHUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 7305 (0 pre-listing rows exempt and counted)
+ETHUSDT: perp hours with no spot bar are the known maintenance hours,True,31 perp-only hours
+ETHUSDT: every spot and perp bar open lies on the hour,True,
+ETHUSDT: f9 is prefix-stable (25 probes),True,
+ETHUSDT: no bar with |b| > 5 % is usable,True,58409 usable bars
+SOLUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 6608 (2 pre-listing rows exempt and counted)
+SOLUSDT: perp hours with no spot bar are the known maintenance hours,True,19 perp-only hours
+SOLUSDT: every spot and perp bar open lies on the hour,True,
+SOLUSDT: f9 is prefix-stable (25 probes),True,
+SOLUSDT: zero blackout rows in the settlement stream,True,0 rows; 101 removed
+SOLUSDT: no bar with |b| > 5 % is usable,True,52206 usable bars
+BNBUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 7184 (0 pre-listing rows exempt and counted)
+BNBUSDT: perp hours with no spot bar are the known maintenance hours,True,30 perp-only hours
+BNBUSDT: every spot and perp bar open lies on the hour,True,
+BNBUSDT: f9 is prefix-stable (25 probes),True,
+BNBUSDT: no bar with |b| > 5 % is usable,True,57442 usable bars
+XRPUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 7289 (0 pre-listing rows exempt and counted)
+XRPUSDT: perp hours with no spot bar are the known maintenance hours,True,31 perp-only hours
+XRPUSDT: every spot and perp bar open lies on the hour,True,
+XRPUSDT: f9 is prefix-stable (25 probes),True,
+XRPUSDT: no bar with |b| > 5 % is usable,True,58280 usable bars
+DOGEUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 6730 (1 pre-listing rows exempt and counted)
+DOGEUSDT: perp hours with no spot bar are the known maintenance hours,True,19 perp-only hours
+DOGEUSDT: every spot and perp bar open lies on the hour,True,
+DOGEUSDT: f9 is prefix-stable (25 probes),True,
+DOGEUSDT: no bar with |b| > 5 % is usable,True,53827 usable bars
+ADAUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 7214 (35 pre-listing rows exempt and counted)
+ADAUSDT: perp hours with no spot bar are the known maintenance hours,True,31 perp-only hours
+ADAUSDT: every spot and perp bar open lies on the hour,True,
+ADAUSDT: f9 is prefix-stable (25 probes),True,
+ADAUSDT: no bar with |b| > 5 % is usable,True,57681 usable bars
+LINKUSDT: every settlement at/after the first bar is a bar open,True,0 off-bar of 7256 (0 pre-listing rows exempt and counted)
+LINKUSDT: perp hours with no spot bar are the known maintenance hours,True,31 perp-only hours
+LINKUSDT: every spot and perp bar open lies on the hour,True,
+LINKUSDT: f9 is prefix-stable (25 probes),True,
+LINKUSDT: no bar with |b| > 5 % is usable,True,58017 usable bars
+"majors: settlements counted == settlements in (t_entry, t_exit]",True,0 of 47 positions disagree
+majors: net == hedge_pnl + funding - fees,True,max residual 4.441e-16
+majors: tier series starts on the Reading-A date,True,2020-01-04 vs 2020-01-04
+majors: equity - C_tier == C_tier * sum(r),True,36.1027346337 vs 36.1027346337
+majors: holdout series is exactly 730 days (note says 731; see §11),True,730
+"alts: settlements counted == settlements in (t_entry, t_exit]",True,0 of 166 positions disagree
+alts: net == hedge_pnl + funding - fees,True,max residual 1.110e-16
+alts: tier series starts on the Reading-A date,True,2020-09-17 vs 2020-09-17
+alts: equity - C_tier == C_tier * sum(r),True,26.7182746806 vs 26.7182746806
+alts: holdout series is exactly 730 days (note says 731; see §11),True,730

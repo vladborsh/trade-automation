@@ -1,0 +1,45 @@
+test,pass_,detail
+8.2 hedge_pnl == 0 when b == 0,True,max|hedge_pnl| = 0.000e+00
+8.2 net == funding - fees - slip,True,max|net - (funding - fees)| = 2.220e-16
+8.2 liquidations on the b==0 tape (perp path is the real one),True,"{'BTCUSDT': 0, 'ETHUSDT': 0, 'SOLUSDT': 0, 'BNBUSDT': 0, 'XRPUSDT': 0, 'DOGEUSDT': 1, 'ADAUSDT': 0, 'LINKUSDT': 0}"
+8.4 L=2 high == x_rc (0.2426) -> exactly one re-centre on that bar,True,1 events ['recentre']
+8.4 L=2 high == x_liq (0.4851) -> exactly one liquidation on that bar,True,1 events ['liquidation']
+8.4 L=2 high just below x_rc -> no event,True,0 events
+8.4 L=3 high == x_rc (0.1601) -> exactly one re-centre on that bar,True,1 events ['recentre']
+8.4 L=3 high == x_liq (0.3201) -> exactly one liquidation on that bar,True,1 events ['liquidation']
+8.4 L=3 high just below x_rc -> no event,True,0 events
+8.4 L=5 high == x_rc (0.0941) -> exactly one re-centre on that bar,True,1 events ['recentre']
+8.4 L=5 high == x_liq (0.1881) -> exactly one liquidation on that bar,True,1 events ['liquidation']
+8.4 L=5 high just below x_rc -> no event,True,0 events
+8.3 majors d=-0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected -0.054208034758 got -0.054208034758 diff 1.388e-17
+8.3 majors d=+0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected 0.054208034758 got 0.054208034758 diff 1.804e-16
+8.3 majors d=+0.0005: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected 0.135520086894 got 0.135520086894 diff 4.996e-16
+8.3 majors d=-0.0002: schedule + entries invariant,True,"entries 47 vs 47, re-centres 31 vs 31"
+8.3 majors d=+0.0002: schedule + entries invariant,True,"entries 47 vs 47, re-centres 31 vs 31"
+8.3 majors d=+0.0002: liquidations non-increasing in d,True,0 -> 0
+8.3 majors d=+0.0005: schedule + entries invariant,True,"entries 47 vs 47, re-centres 31 vs 31"
+8.3 majors d=+0.0005: liquidations non-increasing in d,True,0 -> 0
+8.3 alts d=-0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years [1 liquidation(s) in path],True,"expected -0.041392851630 got -0.041049574670 diff 3.433e-04; rel 8.29e-03, attributed to the liquidation price moving with F"
+8.3 alts d=+0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years [1 liquidation(s) in path],True,"expected 0.041392851630 got 0.041049574670 diff -3.433e-04; rel 8.29e-03, attributed to the liquidation price moving with F"
+8.3 alts d=+0.0005: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years [1 liquidation(s) in path],True,"expected 0.103482129076 got 0.102623936674 diff -8.582e-04; rel 8.29e-03, attributed to the liquidation price moving with F"
+8.3 alts d=-0.0002: schedule + entries invariant,True,"entries 166 vs 166, re-centres 116 vs 116"
+8.3 alts d=+0.0002: schedule + entries invariant,True,"entries 166 vs 166, re-centres 116 vs 116"
+8.3 alts d=+0.0002: liquidations non-increasing in d,True,1 -> 1
+8.3 alts d=+0.0005: schedule + entries invariant,True,"entries 166 vs 166, re-centres 116 vs 116"
+8.3 alts d=+0.0005: liquidations non-increasing in d,True,1 -> 1
+8.3 majors (margin off) d=-0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected -0.099234711768 got -0.099234711768 diff -2.776e-17
+8.3 majors (margin off) d=+0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected 0.099234711768 got 0.099234711768 diff 9.714e-17
+8.3 majors (margin off) d=+0.0005: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected 0.248086779419 got 0.248086779419 diff 6.106e-16
+8.3 majors (margin off) d=-0.0002: schedule + entries invariant,True,"entries 16 vs 16, re-centres 0 vs 0"
+8.3 majors (margin off) d=+0.0002: schedule + entries invariant,True,"entries 16 vs 16, re-centres 0 vs 0"
+8.3 majors (margin off) d=+0.0002: liquidations non-increasing in d,True,0 -> 0
+8.3 majors (margin off) d=+0.0005: schedule + entries invariant,True,"entries 16 vs 16, re-centres 0 vs 0"
+8.3 majors (margin off) d=+0.0005: liquidations non-increasing in d,True,0 -> 0
+8.3 alts (margin off) d=-0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected -0.077636720521 got -0.077636720521 diff -1.249e-16
+8.3 alts (margin off) d=+0.0002: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected 0.077636720521 got 0.077636720521 diff 0.000e+00
+8.3 alts (margin off) d=+0.0005: annualised mean moves by exactly d*sum(q_p*P_open)/C_tier/years,True,expected 0.194091801302 got 0.194091801302 diff -4.441e-16
+8.3 alts (margin off) d=-0.0002: schedule + entries invariant,True,"entries 50 vs 50, re-centres 0 vs 0"
+8.3 alts (margin off) d=+0.0002: schedule + entries invariant,True,"entries 50 vs 50, re-centres 0 vs 0"
+8.3 alts (margin off) d=+0.0002: liquidations non-increasing in d,True,0 -> 0
+8.3 alts (margin off) d=+0.0005: schedule + entries invariant,True,"entries 50 vs 50, re-centres 0 vs 0"
+8.3 alts (margin off) d=+0.0005: liquidations non-increasing in d,True,0 -> 0
