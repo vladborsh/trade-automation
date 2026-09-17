@@ -190,8 +190,25 @@ sweep (a dated contract pays **no funding**, so the buffer only meets fees).
   the next quarterly against **spot**: `β = (F/S − 1) · 365/d`, `d` = days to
   expiry. Enter the contract whose `β` is higher, if `β ≥ 10 % p.a.` **and**
   `d ≥ 14` days. One slot per coin.
-- **Hold to expiry settlement** (08:00 UTC on the expiry date). Roll only if
-  the new front also clears the threshold at that hour.
+- **Hold to expiry settlement** (08:00 UTC on the expiry date), unwound at the
+  last clean tradable mark — see the Stage-0 ruling Q1 immediately below. Roll
+  only if the new front also clears the threshold at that hour.
+
+**Stage-0 ruling Q1 — the expiry mark (amendment, 2026-09-17, recorded before
+any arm-B verdict number and disclosed in `REPORT.md` §7).** Binance delivers
+at 08:00 UTC. In the archive, both the bar opening 08:00 *and* the bar opening
+07:00 (which **closes** at 08:00) carry a **stale last-traded price** while
+spot keeps moving: measured dislocations of **1.6–3.8 %** on
+`BTCUSD_211231`, `BTCUSD_210326`, `ETHUSD_210326`, `ETHUSD_240329` and others,
+against ~0.1 % on every earlier hour of the same day. Those prints are not
+tradable and they **inflate** the trade (a negative `b_x` adds to
+`hedge_pnl`). The unwind is therefore priced at the last bar whose **close is
+strictly before delivery** — the bar opening **06:00** — and the position pays
+the **full round trip**, which is conservative against Binance's fee-free
+delivery settlement. This ruling was made on the price series (the staleness
+is visible without any P&L) after a smoke read of arm B's fit return; it moves
+that return **down**, 7.22 % → 6.87 % → 6.16 % p.a., and all three are
+reported in `REPORT.md`.
 - **Payoff.** At expiry `F_T = S_T` (the contract settles to the index), so
   `hedge_pnl = N/(1+β_x·d/365) − N/(1+β_e·d_e/365)` reduces to
   `N·(F_e/S_e − 1)/(F_e/S_e)` — **the basis locked at entry**, earned in full

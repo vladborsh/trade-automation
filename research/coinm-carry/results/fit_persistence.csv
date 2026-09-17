@@ -1,0 +1,3 @@
+symbol,n_on,n_off,mean_on_pct,mean_off_pct,median_on_pct,median_off_pct,ratio_mean,surv_3,surv_9,surv_15,surv_30,surv_60,surv_90,n_episodes,mean_episode
+BTCUSD_PERP,937,3383,0.032256,0.004662,0.014989,0.009861,6.919,1.0,1.0,1.0,1.0,0.5,0.5,6,156.2
+ETHUSD_PERP,1165,3155,0.030765,0.003093,0.01024,0.008951,9.946,1.0,1.0,1.0,0.75,0.625,0.5,8,145.6
