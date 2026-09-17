@@ -1,0 +1,66 @@
+
+== ALL listed symbols (515 with ≥400 daily bars): by year ==
+      sym_days  n_sym  share_on  rate_on_8h  jump30_on  gross_pa_of_notional
+year                                                                        
+2020     14239     80   0.60552     0.00034         39               0.22343
+2021     40691    133   0.60279     0.00055        492               0.36434
+2022     51589    156   0.03293     0.00015          1               0.00537
+2023     72308    251   0.23338     0.00020        118               0.05110
+2024    107323    382   0.41773     0.00025        418               0.11428
+2025    158422    498   0.14313     0.00022        555               0.03518
+2026     97628    427   0.10408     0.00029        306               0.03248
+
+== top-8 by trailing-90d median quote volume: by year ==
+      sym_days  n_sym  share_on  rate_on_8h  jump30_on  gross_pa_of_notional
+year                                                                        
+2020      2647     22   0.61655     0.00033          4               0.22157
+2021      2920     22   0.63767     0.00054         12               0.37864
+2022      2920     24   0.01473     0.00009          0               0.00146
+2023      2920     20   0.16849     0.00022          4               0.04004
+2024      2928     23   0.44467     0.00022          6               0.10619
+2025      2920     15   0.05308     0.00012          0               0.00690
+2026      1944     10   0.00412     0.00010          0               0.00045
+
+== top-30 by trailing-90d median quote volume: by year ==
+      sym_days  n_sym  share_on  rate_on_8h  jump30_on  gross_pa_of_notional
+year                                                                        
+2020      8441     51   0.62185     0.00032         20               0.21761
+2021     10950     65   0.62813     0.00056         98               0.38671
+2022     10950     61   0.01306     0.00009          0               0.00124
+2023     10950     71   0.18548     0.00021         16               0.04306
+2024     10980     82   0.42368     0.00026         27               0.12102
+2025     10950     76   0.07909     0.00007         16               0.00582
+2026      7290     43   0.02730     0.00041         14               0.01240
+
+== top-100 by trailing-90d median quote volume: by year ==
+      sym_days  n_sym  share_on  rate_on_8h  jump30_on  gross_pa_of_notional
+year                                                                        
+2020     11962     77   0.62473     0.00031         29               0.21016
+2021     34868    124   0.60058     0.00057        405               0.37386
+2022     36437    151   0.02061     0.00010          1               0.00226
+2023     36500    193   0.20252     0.00020         45               0.04421
+2024     36600    213   0.42719     0.00026        131               0.12172
+2025     36500    223   0.07978     0.00011         81               0.00938
+2026     24300    158   0.06658     0.00033         68               0.02372
+fit all listed: symbols ON per day mean 48.6 median 20 p10 2 p90 124; listed mean 142; share ON 0.343; rate ON 0.0343%/8h; gross p.a. of notional 12.90%; jump≥30% days while ON 916 over 223 ON symbol-years
+fit top-30: symbols ON per day mean 10.7 median 6 p10 0 p90 29; listed mean 29; share ON 0.368; rate ON 0.0390%/8h; gross p.a. of notional 15.73%; jump≥30% days while ON 147 over 48 ON symbol-years
+fit top-100: symbols ON per day mean 29.1 median 13 p10 0 p90 92; listed mean 86; share ON 0.339; rate ON 0.0393%/8h; gross p.a. of notional 14.59%; jump≥30% days while ON 565 over 131 ON symbol-years
+hold all listed: symbols ON per day mean 63.7 median 43 p10 22 p90 149; listed mean 402; share ON 0.159; rate ON 0.0234%/8h; gross p.a. of notional 4.06%; jump≥30% days while ON 980 over 127 ON symbol-years
+hold top-30: symbols ON per day mean 3.4 median 1 p10 0 p90 8; listed mean 30; share ON 0.112; rate ON 0.0200%/8h; gross p.a. of notional 2.45%; jump≥30% days while ON 44 over 7 ON symbol-years
+hold top-100: symbols ON per day mean 11.9 median 6 p10 3 p90 31; listed mean 100; share ON 0.119; rate ON 0.0205%/8h; gross p.a. of notional 2.68%; jump≥30% days while ON 186 over 24 ON symbol-years
+
+holdout ON symbol-days by qv90 bucket:
+         on_days  rate_on  jump30
+qv90                             
+<1M         1572  0.00037      40
+1-10M      19631  0.00026     489
+10-100M    15023  0.00021     265
+>100M       3987  0.00018      67
+
+fit ON symbol-days by qv90 bucket:
+         on_days  rate_on  jump30
+qv90                             
+<1M           25  0.00010       0
+1-10M      11289  0.00032      98
+10-100M    48324  0.00034     558
+>100M      15017  0.00034     149

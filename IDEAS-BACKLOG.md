@@ -1009,8 +1009,40 @@ cost, window and leverage row lands between +4.1 % and +9.2 %, and even a
 **TIMED CARRY**, hedged as well as directional. A price gate in its place loses
 2.8–5.3 % p.a. on 42–48 round trips per symbol-year.
 
-**What is left for a future ruling** (each needs its own registration; see
-`HANDOFF.md`): the **account-type question** — spot posted as collateral at a
+**Architect ruling on the successors, 2026-09-17
+(`research/hedged-carry/ARCHITECT-NOTE-SUCCESSORS.md`, log Запись 33).**
+The three parked questions were put to the Architect and ruled, ranked:
+**(1) account-type — REGISTER NOW.** The structure is real and reachable, and
+cheaper than the pass assumed: Binance **COIN-M** inverse perps/quarterlies
+(standard on every futures account) collateralised 1:1 with the coin are
+USD-hedged at every price with no re-centre and cannot be liquidated on the
+upside (margin ÷ maintenance = 1/mmr identically); Multi-Assets Mode
+(BTC/ETH/BNB at 95 %, alts not collateral) and Portfolio Margin (open to all
+users since 2024-10-23, uniMMR liquidation at 105 %) also hold the
+un-re-centred USD-M position. The +28.40 % is the *high-variance PM form* of
+the trade carried by one 2020-21 position, not the number the structure pays;
+the honest lever is the denominator (capital 1.0 N, not 1.5 N) and the
+removal of the liquidation gate — fit ≈ +11–15 % on capital, holdout prior
++2–5 %. One registration, two arms, majors only, α = 0.025: A = passive
+inverse carry (funding gate as risk overlay), B = quarterly basis lock ≥ 10 %
+p.a. Prior 15 % build / 65 % clean kill / 20 % inconclusive; a kill closes the
+carry line for good. **(2) quarterly basis — worth one, later, as arm B of
+(1), not standalone**: USD-M quarterlies `BTCUSDT_`/`ETHUSDT_` 2021-03 →
+2026-12 and COIN-M `BTCUSD_`/`ETHUSD_` 2020-09 → 2026-12 verified on the
+archive; front-contract annualised basis mean +9.4 %/+8.7 % (BTC/ETH) on
+2021-01..2024-07 and +6.1 %/+5.5 % on 2024-08..2026-07, share of days ≥ 10 %
+p.a. 30 % → 12–14 %; same venue premium with a date attached. **(3) wider
+universe / duty cycle — CLOSED**: the 515-symbol panel was re-pulled and the
+pass's gate applied to every cut — utilisation 0.34–0.37 on fit for the
+eight, top-30, top-100 and all 515 alike, 0.11–0.16 on the holdout, ON share
+by year 0.62/0.60/0.02/0.20/0.43/0.08/0.07 (2020–2026) on every cut; the
+extra holdout utilisation lives in $1–10M/day symbols at 0.023 %/8 h while ON
+(gross 4 % of notional) with 7.7 ≥ 30 %-jump-days per ON symbol-year against
+2.6 on the eight. The premium regime is a property of time, not of the
+universe. No registration.
+
+**What is left for a future ruling** (as parked by the HANDOFF; now ruled
+above): the **account-type question** — spot posted as collateral at a
 90 % haircut reads +28.4 % p.a. on the majors against +7.89 % on the primary
 account, and the decomposition shows the lift is the perp notional compounding
 with price on an un-re-centred position (one ETH position collected 46.70 USDT
@@ -1070,7 +1102,11 @@ hedged carry became its own family** (`research/hedged-carry/`, next entry),
 taking the spot-data pull and the funding-adjusted basis accounting with it.
 What stays parked here: (a) basis-extreme convergence traded on the perp leg
 alone and (b) spot-lead confirmation — neither dispatched, both explicitly
-outside the hedged-carry registration (its note §10).
+outside the hedged-carry registration (its note §10). **The dated-futures
+(quarterly) basis, which this entry also held, was ruled on 2026-09-17**
+(`research/hedged-carry/ARCHITECT-NOTE-SUCCESSORS.md` §2): worth a
+registration later as arm B of the COIN-M account-structure registration,
+not standalone; data verified, prior recorded there.
 
 **Idea:** Pull Binance **spot** klines (same free bulk archive, same symbols)
 alongside the existing perp data and trade the **relationship between the two
