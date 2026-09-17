@@ -1,0 +1,17 @@
+sensitivity,net_pa,funding_pa,hedge_pa,cost_pa,min_buffer_frac,n_buffer_breach,utilisation
+PRIMARY (arm A),10.9861,11.0484,0.0019,0.0642,0.9612,0,1.0
+(iii) COIN-M maker on entry,10.9958,11.0484,0.0019,0.0546,0.9693,0,1.0
+(iv) buffer b = 0.02 N,11.3092,11.3734,0.002,0.0661,0.8997,0,1.0
+(iv) buffer b = 0.10 N,10.4868,10.5462,0.0018,0.0613,0.9808,0,1.0
+(vi) UNSWEPT funding (directional variant),21.2703,11.0484,0.0019,0.0459,0.9612,0,1.0
+(vii) slippage doubled,10.9765,11.0484,0.0019,0.0739,0.953,0,1.0
+(vii) zero cost (= gross),11.0503,11.0484,0.0019,0.0,1.0,0,1.0
+"(v) overlay, gate ON 0.02 / OFF 0.005 (pass thresholds)",7.1247,7.7449,0.0317,0.652,0.9612,0,0.2433
+"(v) overlay, gate ON 0.015 %",7.393,8.3879,-0.1128,0.8821,0.9307,0,0.297
+"(v) overlay, gate ON 0.030 %",6.7049,7.2541,0.0564,0.6055,0.9612,0,0.2228
+"(v) overlay, gate OFF 0.000 %",7.4144,7.9763,-0.0014,0.5606,0.9612,0,0.2674
+"(v) overlay, gate OFF 0.010 %",5.7717,6.9626,0.1937,1.3846,0.9366,0,0.1776
+"(v) overlay, f9 window 3 settlements",7.0635,8.3483,-0.0362,1.2487,0.9361,0,0.2813
+"(v) overlay, f9 window 15 settlements",7.1526,7.6376,0.0753,0.5602,0.962,0,0.2437
+arm B threshold 7 % p.a.,6.5376,,7.3159,0.9865,,0,0.6626
+arm B threshold 15 % p.a.,5.7942,,6.4988,0.7046,,0,0.3769

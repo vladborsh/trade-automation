@@ -1,0 +1,24 @@
+{
+  "committed_utc": "2026-09-17",
+  "screen": {
+    "fit_net_pa_min": 5.0,
+    "fit_p_boot_max": 0.05,
+    "min_on_slot_days_fit": 300,
+    "min_round_trips_per_slot": 1,
+    "max_buffer_breaches_fit": 0
+  },
+  "arms": {
+    "A": {"name": "passive inverse carry, majors, always-on",
+          "fit_net_pa": 10.9861, "p_boot": 0.0, "ci90": [8.860, 13.457],
+          "boot_se_pa": 1.3998, "on_slot_days": 2880, "positions": 2,
+          "buffer_breaches": 0, "decision": "SCREENED IN"},
+    "B": {"name": "quarterly basis, majors, >=10 % p.a. lock",
+          "fit_net_pa": 6.1641, "p_boot": 0.0, "ci90": [2.990, 9.526],
+          "boot_se_pa": 1.9825, "on_slot_days": 1370, "trades": 16,
+          "buffer_breaches": 0, "decision": "SCREENED IN"}
+  },
+  "projected_holdout_se_pa": {"A": 1.966, "B": 2.751},
+  "power_80_edge_pa": {"A": 11.66, "B": 12.32},
+  "power_to_reject_true_4pct_at_kill_bar": {"A": 0.694, "B": 0.642},
+  "note": "The note's 0.45 % p.a. projected holdout SE (sqrt-10 scaling of the hedged-carry pass's 1.38 %) is NOT supported by measurement; the measured fit block-bootstrap SE is 1.40 % p.a. See DESIGN.md 12.2."
+}

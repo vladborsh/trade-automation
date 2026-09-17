@@ -1,6 +1,6 @@
 label,days,years,net_pa,sharpe,sd_daily_pct,rho1,maxdd_pct,utilisation,on_slot_days,trade_days,n_positions,n_closed,rt_per_symyear,p_boot,ci90_lo,ci90_hi,boot_se_pa,funding_pa,hedge_pa,unswept_pa,fee_pa,sweep_pa,cost_pa,mean_settle,median_hold_days,zero_settle_share,cost_carry_ratio,min_buffer,min_buffer_frac,n_buffer_breach,n_trades,mean_beta_e
 ARM A - passive inverse carry (PRIMARY),1440,3.945,10.9861,7.052,0.08154,0.2505,1.581,1.0,2880,1440,2.0,0.0,0.0,0.0,8.86,13.457,1.3998,11.0484,0.0019,0.0,0.0459,0.0184,0.0642,4319.0,1439.92,0.0,0.0058,2.23973,0.9612,0.0,,
 "funding-gate overlay (fit-only, non-gating)",1440,3.945,7.1247,4.996,0.07465,0.3335,0.829,0.2433,701,402,14.0,14.0,1.774,0.0,4.972,9.651,1.4136,7.7449,0.0317,0.0,0.6421,0.0098,0.652,150.14,35.33,0.0,0.0842,2.23973,0.9612,0.0,,
-price-gated shadow (descriptive),1440,3.945,0.0,,0.0,,0.0,0.0,0,0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,,,,,,,,,,,,,0.0,,
+price-gated shadow (descriptive),1440,3.945,-6.9332,-4.054,0.08952,0.1401,35.355,0.3859,1111,842,328.0,327.0,41.443,1.0,-8.911,-4.739,1.2655,6.9672,1.1304,0.0,15.0212,0.0095,15.0308,10.16,3.0,0.0,2.1574,2.15297,0.9118,0.0,,
 ARM B - quarterly basis (PRIMARY),1406,3.852,6.1641,1.358,0.23756,-0.1015,4.016,0.4872,1370,695,,,,0.0,2.99,9.526,1.9825,,6.7075,,0.7516,,,,90.96,,0.1121,,,,16.0,0.1575
 arm B always-hold benchmark,1406,3.852,6.2051,1.305,0.2489,-0.1142,4.016,0.9997,2811,1406,,,,0.0005,2.876,9.677,2.0697,,7.4062,,1.4093,,,,90.96,,0.1903,,,,30.0,0.0844

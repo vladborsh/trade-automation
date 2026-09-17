@@ -589,12 +589,129 @@ proceeds with the primary and records them as **not run**.
 
 ## 12. Power with measured inputs, and the fit-period screen
 
-**TO BE COMMITTED AFTER THE FIT NUMBERS AND BEFORE ANY HOLDOUT NUMBER
-EXISTS.** `stage2_holdout.py` refuses to execute until `results/screen.json`
-exists, and refuses to run twice.
+**COMMITTED AFTER THE FIT NUMBERS AND BEFORE ANY HOLDOUT NUMBER EXISTS.**
+Sources: `results/fit_arms.csv`, `results/fit_buffer.csv`,
+`results/fit_sensitivities.csv`, `results/fit_nulls.csv`,
+`results/fit_pm_sensitivity.csv`. No holdout window has been run;
+`stage2_holdout.py` refuses to execute until `results/screen.json` exists and
+refuses to run twice.
+
+### 12.1 Measured inputs, replacing the assumptions of §5
+
+| measured on fit | arm A | arm B | §5's assumption |
+|---|---|---|---|
+| tier days | **1,440** (2020-08-22 .. 2024-07-31) | **1,406** (2020-09-25 .. 2024-07-31) | ≈ 1,440 |
+| `sd_daily` of `r_d` | **0.0815 %** | **0.2376 %** | — |
+| `ρ₁` of `r_d` | **0.2505** | **−0.1015** | 0.3 |
+| utilisation | **1.000** (always-on) | **0.487** | 1.0 / 0.12–0.14 |
+| ON slot-days | **2,880** | **1,370** | ≥ 300 |
+| positions / trades | 2 (one per slot) | **16** | — |
+| mean COIN-M funding rate while on | **0.01073 / 0.01064 %/8 h** | n/a | — |
+| mean entry basis `β_e` | n/a | **+15.75 % p.a.** | ≥ 10 % |
+
+### 12.2 Standard errors — MEASURED, and the √10 scaling was WRONG
+
+The note projected a holdout SE of **≈ 0.45 % p.a.** by scaling the pass's
+1.38 % at 143 slot-days by √10, and instructed that this be **measured, not
+assumed**. Measured:
+
+| | arm A | arm B |
+|---|---|---|
+| formula `SE = 365·sd/√n_eff`, `n_eff = n(1−ρ₁)/(1+ρ₁)` | `n_eff` 863 → **1.01 % p.a.** | `n_eff` capped at `n` → **2.09 % p.a.** |
+| **10-day block bootstrap SE on fit (the gating inference)** | **1.400 % p.a.** | **1.983 % p.a.** |
+| **projected holdout SE** (× √(n_fit/730)) | **1.97 % p.a.** | **2.75 % p.a.** |
+| α = 0.025 one-sided threshold on the mean | 3.85 % p.a. | 5.39 % p.a. |
+| **80 %-power edge** (bar + 0.84 SE) | **+11.7 % p.a.** | **+12.3 % p.a.** |
+| power to reject a **true +4 %** at the +5 % kill bar | **69 %** | 64 % |
+
+**The note's power statement was optimistic by a factor of ≈ 4, and the reason
+is instructive rather than arithmetic.** The pass's 1.38 % was measured on a
+holdout in which the perpetual premium had *vanished*: with almost no funding
+to collect, the daily series barely moved. Arm A's fit window contains the
+2020–21 and 2023–24 premium regimes, where the daily funding accrual is an
+order of magnitude more volatile, so `sd_daily` is far larger than the pass's
+holdout `sd_daily` and no √n scaling connects the two. **This is exactly why
+the note said to measure it.**
+
+**What survives, and what does not.** The floors (§9.6) are still met by
+construction — 1,460 ON slot-days and 730 trade-days on the holdout — so
+**arm A's holdout still cannot be UNDERPOWERED: it builds or it kills.** The
+α gate still does not bind for arm A (3.85 % against a 10 % level bar). But
+the claim that "a true +4 % is rejected at the kill bar with power > 95 %" is
+**false at the measured SE**: that power is **69 %**. The honest statement is
+that this is the best-powered carry registration the project has had and it is
+still not a high-powered test of a 1-point difference. Recorded here, before
+the holdout, per `2026-09-power-correction.md` A2 — *information for the
+Architect, not a stop rule.*
+
+Fit-screen power: at a fit SE of 1.40 % (A) and 1.98 % (B), a true +10 % p.a.
+edge sits **3.6 σ** and **2.5 σ** above the +5 % screen bar, so screen power at
+a build-sized edge is 99.98 % and 99.4 %. The screen cannot lose an edge of the
+size these arms are registered to find.
+
+### 12.3 §5.1's honest-gap table with the MEASURED row
+
+| object | on notional | on capital `C = 1.05 N` | vs ladder |
+|---|---|---|---|
+| passive premium, literature average | ≈ 10 % | ≈ 9.5 % | above kill, below build |
+| the pass's own majors arm, USD-M, `C = 1.5 N` | 11.8 % | 7.89 % | above kill, below build |
+| **COIN-M funding measured on fit (§11 G5)** | **11.75 / 11.65 %** | — | — |
+| **ARM A, MEASURED on fit** | **11.6 % gross** | **+10.99 % NET** | **at the build bar** |
+| **ARM B, MEASURED on fit** | 7.0 % of notional | **+6.16 % NET** | above kill, below build |
+
+**The account type delivered exactly what §5.1 said it was worth and not a
+point more: 1/1.05 instead of 1/1.5, i.e. 1.43×.** The pass's +7.89 % × 1.43 =
++11.3 %, against arm A's measured **+10.99 %** — the 0.3-point shortfall is the
+COIN-M funding tape being *cheaper* than the USD-M tape over the same fit dates
+(11.7 % against 14.6/16.4 % p.a. of notional, §11 G5), partly offset by the
+disappearance of re-centre round trips. The Architect's pre-registered fit band
+was **+11 to +15 %**; the measurement lands at **+10.99 %, at the very bottom
+edge of that band and marginally below it.** No parameter was moved.
+
+### 12.4 THE SCREEN DECISION (committed; `results/screen.json`)
 
 Screen: fit net ≥ **+5 % p.a.** on capital, fit `p_boot ≤ 0.05`, the §9.6 fit
-floors met, and **0 buffer breaches on fit**.
+floors (≥ 300 ON slot-days, ≥ 1 round trip per slot), and **0 buffer
+breaches on fit**.
+
+| arm | fit net p.a. | `p_boot` | 90 % CI | ON slot-days | positions | **buffer breaches** | **DECISION** |
+|---|---|---|---|---|---|---|---|
+| **A — passive inverse carry** | **+10.99 %** ✓ | 0.0000 ✓ | [+8.86, +13.46] | 2,880 ✓ | 2 ✓ | **0** ✓ | **SCREENED IN — holdout is read** |
+| **B — quarterly basis** | **+6.16 %** ✓ | 0.0000 ✓ | [+2.99, +9.53] | 1,370 ✓ | 16 ✓ | **0** ✓ | **SCREENED IN — holdout is read** |
+
+Recorded with the screen, not used to re-open anything:
+
+- **The gate costs money, again.** The funding-gate overlay returns **+7.12 %**
+  against arm A's **+10.99 %** on the same window — the pass's §8.4(1) reading
+  reproduced on the correct account model. The overlay is nevertheless **TIMED
+  CARRY**: Null A (1,000 draws) observed +7.12 % against a null mean of
+  +1.70 % and a null p95 of +3.00 %, `p_A = 0.000`; Null B (250 draws) null
+  mean +2.87 %, `p = 0.000`. The gate really does select carry; it just
+  forgoes more than it saves.
+- **A price gate still does not select carry.** −6.93 % p.a., 41.4 round trips
+  per symbol-year, fees 15.0 % of capital a year against 7.0 % of funding
+  collected, cost/carry **2.16**, max drawdown 35 %.
+- **The buffer was never close to exhausted on fit.** Minimum buffer **96.1 %**
+  of its initial 0.05 N over 4,319 settlements per slot; the `b*` ladder shows
+  even **b = 0.005 N** survives the whole fit window (minimum 51.7 % of a
+  buffer a tenth the size), so `b = 0.05 N` is generous, not load-bearing, and
+  the b = 0.02/0.10 N sensitivities move the return by only +0.32 / −0.50 pp.
+- **Every sensitivity lands between +5.8 % and +11.5 %** except the unswept
+  directional variant. Zero cost reaches only **+11.05 %**, i.e. **costs take
+  6 bp of capital a year** — a cost/carry ratio of **0.0058**, forty times
+  smaller than the hedged-carry pass's 0.14, because the always-on trade makes
+  one round trip in four years and there are no re-centres.
+- **The un-re-centred PM / Multi-Assets row (i), fit-only**: at the published
+  **95 %** haircut it returns **+70.6 % p.a.** with funding of +70.2 % — not
+  +28.40 % — because a four-year un-re-centred hold from 2020-08 lets the short
+  notional grow **6.5× (BTC) and 12.7× (ETH)**, and funding is paid on the
+  grown notional (the ETH slot collects **171.6 USD on a 50 USD slot**).
+  Minimum uniMMR 33.7 at a 95 % haircut, **6.3 at 80 %**, and at **60 % the
+  position is LIQUIDATED** (uniMMR goes negative). The honest description is
+  that this row is a carry trade whose **leverage drifts to 6–12× without the
+  operator choosing it**, and whose survival depends on a collateral ratio
+  Binance changes by announcement. It is descriptive, fit-only, and **not
+  admissible in the primary** — §1.2 and note §1.3.
 
 ---
 

@@ -102,7 +102,7 @@ def gate_hysteresis(f: pd.DataFrame, on=ON_LEVEL, off=OFF_LEVEL) -> pd.Series:
 def gate_price(f: pd.DataFrame, b: pd.DataFrame, on=0.03, off=0.0) -> pd.Series:
     """Trailing 3-day spot return, same hysteresis shape (DESIGN §9.2)."""
     s = b.set_index("ts")["close_s"]
-    r3 = (s / s.shift(72) - 1.0).reindex(f.ts.values).values
+    r3 = (s / s.shift(72) - 1.0).reindex(pd.DatetimeIndex(f.ts)).values
     st = np.zeros(len(f), bool)
     cur = False
     for i in range(len(f)):
