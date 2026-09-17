@@ -15,6 +15,7 @@ import {
   FIXTURE_INSTRUMENTS,
   advanceFormingCandle,
   advanceOpenInterestObservation,
+  applyTailGap,
   closeCandle,
   generateSeedHistory,
   resample,
@@ -74,7 +75,7 @@ export class MockMarketState {
   constructor(private readonly barMs = 2000) {
     const now = Date.now();
     for (const instrument of this.instruments) {
-      const history = generateSeedHistory(instrument.id, now);
+      const history = applyTailGap(instrument.id, generateSeedHistory(instrument.id, now));
       this.oneMinuteHistory.set(instrument.id, history);
       // Backfill signals for the seed window too, so a fresh boot already has
       // something for the client to render (§4.4's end-to-end proof) instead

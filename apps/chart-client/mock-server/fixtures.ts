@@ -93,6 +93,24 @@ function seedMinutesFor(instrument: InstrumentId): number {
   return SEED_HISTORY_MINUTES;
 }
 
+// architecture/panel-sync-and-oi-depth-diagnosis.md bug 3's "weekend case": dxy (Capital.com,
+// closed weekends) can never align with btc's last bar today, because `setVisibleRange`'s
+// `timeToIndex(findNearest=true)` snaps any later `to` onto dxy's own last bar. One instrument
+// (opt-in via env vars, same shape as MOCK_DEEP_HISTORY_*, so the default mock instances are
+// unaffected) can have its seeded history truncated at the TAIL — its last bar sits
+// `MOCK_TAIL_GAP_MINUTES` minutes before "now", exactly like a real session close, while every
+// other panel's last bar stays current.
+const TAIL_GAP_INSTRUMENT = process.env['MOCK_TAIL_GAP_INSTRUMENT'] as InstrumentId | undefined;
+const TAIL_GAP_MINUTES = Number(process.env['MOCK_TAIL_GAP_MINUTES'] ?? NaN);
+
+/** Truncates `history`'s tail by `MOCK_TAIL_GAP_MINUTES` (1m bars) when `instrument` is the opt-in gap instrument. */
+export function applyTailGap(instrument: InstrumentId, history: readonly Candle[]): Candle[] {
+  if (TAIL_GAP_INSTRUMENT && instrument === TAIL_GAP_INSTRUMENT && Number.isFinite(TAIL_GAP_MINUTES) && TAIL_GAP_MINUTES > 0) {
+    return history.slice(0, Math.max(0, history.length - TAIL_GAP_MINUTES));
+  }
+  return history.slice();
+}
+
 const STARTING_PRICE: Record<InstrumentId, number> = {
   'binance:BTCUSDT': 62_000,
   'binance:ETHUSDT': 3_200,

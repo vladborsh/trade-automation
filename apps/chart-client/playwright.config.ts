@@ -41,6 +41,22 @@ export default defineConfig({
       reuseExistingServer: !process.env['CI'],
       timeout: 20_000,
     },
+    // architecture/panel-sync-and-oi-depth-diagnosis.md bug 3's "weekend case": a third mock
+    // server instance where `capitalcom:DXY-MOCK`'s seeded history ends 4 hours before the
+    // other instruments' — the same shape as dxy's real Capital.com session gap — so one e2e
+    // scenario can assert the right-edge-pan fix holds when a follower's own last bar is
+    // genuinely earlier than the driver's, not just when every panel's data is current.
+    {
+      command: 'npx tsx mock-server/server.ts',
+      port: 4302,
+      env: {
+        MOCK_SERVER_PORT: '4302',
+        MOCK_TAIL_GAP_INSTRUMENT: 'capitalcom:DXY-MOCK',
+        MOCK_TAIL_GAP_MINUTES: '240',
+      },
+      reuseExistingServer: !process.env['CI'],
+      timeout: 20_000,
+    },
     {
       command: 'npx ng serve --port 4200',
       port: 4200,

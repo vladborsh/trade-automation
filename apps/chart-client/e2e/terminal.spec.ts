@@ -174,3 +174,219 @@ test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a 
     expect(candlesRequests.length).toBeGreaterThan(requestCountBeforeDrag);
   }).toPass({ timeout: 15_000 });
 });
+
+// architecture/panel-sync-and-oi-depth-diagnosis.md bug 3: lightweight-charts' visible TIME
+// range clamps `to` to the last loaded bar, so a pan past the right edge is unrepresentable on
+// the old time-range sync channel — the driver's window collapses to a couple of bars and every
+// follower stretches those same couple of bars across its full width (the live repro,
+// architecture/scratch/repro-right-edge-desync.mjs, caught this: btc went from 103 bars to 2,
+// eth/btc-oi/dxy zoomed in ~50x on the same 2 bars). This is the assertion gap that let it ship:
+// the old test only checked `data-visible-from` CHANGED, which stayed true even for a collapsed
+// window. This test instead asserts the window WIDTH survives the pan.
+test('panning past the right edge moves all four panels into the void together, preserving window width', async ({ page }) => {
+  // Explicit route to the default mock instance (:4300), independent of whatever the shared
+  // dev server's public/config.json currently points at (see REPORT.md's note on this).
+  await page.route('**/config.json', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4300/api', wsUrl: 'ws://localhost:4300/ws' }),
+    }),
+  );
+
+  const warnings: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'warning' && msg.text().includes('[ChartSyncService]')) {
+      warnings.push(msg.text());
+    }
+  });
+
+  await page.goto('/');
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
+
+  const panels = await (await chartPanels(page)).all();
+  for (const panel of panels) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-to', /\d+/, { timeout: 15_000 });
+  }
+
+  const readWidthsAndTos = async () => {
+    const widths: number[] = [];
+    const tos: number[] = [];
+    for (const panel of panels) {
+      const container = panel.locator('.chart-container');
+      const from = Number(await container.getAttribute('data-visible-from'));
+      const to = Number(await container.getAttribute('data-visible-to'));
+      widths.push(to - from);
+      tos.push(to);
+    }
+    return { widths, tos };
+  };
+
+  const before = await readWidthsAndTos();
+  const btcWidth = before.widths[0];
+  const btcToBefore = before.tos[0];
+
+  const btcContainer = panels[0].locator('.chart-container');
+  const box = await btcContainer.boundingBox();
+  if (!box) {
+    throw new Error('chart container has no bounding box');
+  }
+
+  // The exact repro gesture: pan the btc plot body right-to-left three times, mid-height,
+  // 0.8 -> 0.3 of the panel's width, dragging the last bar away from the right edge into the
+  // void.
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5, { steps: 15 });
+    await page.mouse.up();
+  }
+
+  await expect(async () => {
+    const after = await readWidthsAndTos();
+
+    // (a) all four `data-visible-to` are equal within half a bar, AND later than before the
+    // pan — the void is represented, not clamped back onto the last real bar.
+    const epsilon = 5 * 60; // half a 5m bar, generously rounded
+    expect(Math.max(...after.tos) - Math.min(...after.tos)).toBeLessThanOrEqual(epsilon);
+    expect(after.tos[0]).toBeGreaterThan(btcToBefore);
+
+    // (b) all four widths are equal within a bar, AND equal to the pre-pan width — a pan is
+    // not a zoom. Before this fix, btc's width collapsed from ~103 bars to ~2 while the
+    // followers' widths stayed at the pre-pan value (they zoomed onto those 2 bars instead).
+    const barSec = 5 * 60;
+    expect(Math.max(...after.widths) - Math.min(...after.widths)).toBeLessThanOrEqual(barSec);
+    for (const width of after.widths) {
+      expect(Math.abs(width - btcWidth)).toBeLessThanOrEqual(barSec);
+    }
+  }).toPass({ timeout: 15_000 });
+
+  // (c) no circuit-breaker warning: the guards converge on the new (void-inclusive) range,
+  // they don't bounce.
+  expect(warnings).toEqual([]);
+});
+
+// architecture/panel-sync-and-oi-depth-diagnosis.md bug 3's "weekend case": dxy's mock history
+// here ends 4 hours before the other instruments' (see playwright.config.ts's :4302 instance),
+// the same shape as a real Capital.com weekend close. Before the fix, `setVisibleRange`'s
+// `timeToIndex(findNearest=true)` snapped every later `to` onto dxy's own last bar, so dxy could
+// never agree with btc's right-edge pan; the ruling is that dxy shows blank space instead.
+test('a panel whose own history ends earlier still tracks a right-edge pan into the void (weekend case)', async ({ page }) => {
+  await page.route('**/config.json', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4302/api', wsUrl: 'ws://localhost:4302/ws' }),
+    }),
+  );
+
+  await page.goto('/');
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
+
+  const panels = await (await chartPanels(page)).all();
+  for (const panel of panels) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-to', /\d+/, { timeout: 15_000 });
+  }
+
+  const btcContainer = panels[0].locator('.chart-container');
+  const dxyContainer = panelById(page, 'dxy').locator('.chart-container');
+  const box = await btcContainer.boundingBox();
+  if (!box) {
+    throw new Error('chart container has no bounding box');
+  }
+
+  // A single, moderate right-edge pan (not the aggressive 3x repro gesture above): the point of
+  // this test is dxy's own tail gap, not the sync mechanism's absolute reach. `lightweight-
+  // charts` itself caps how far the visible window can sit past the last loaded bar (roughly
+  // one panel-width of bars, `TimeScale._private__maxRightOffset`) — a hard library limit,
+  // independent of this fix, that a big enough excursion hits on EVERY panel including btc.
+  // dxy's tail gap eats into that same budget before the pan even starts, so a pan aggressive
+  // enough to also nearly exhaust btc's own budget would ask dxy to go further than the library
+  // lets any panel go — not a sync bug. A moderate pan stays well inside that shared ceiling and
+  // isolates the actual regression: pre-fix, dxy could never move past its OWN last bar at all.
+  await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5, { steps: 15 });
+  await page.mouse.up();
+
+  await expect(async () => {
+    const btcTo = Number(await btcContainer.getAttribute('data-visible-to'));
+    const dxyTo = Number(await dxyContainer.getAttribute('data-visible-to'));
+    const epsilon = 5 * 60;
+    expect(Math.abs(btcTo - dxyTo)).toBeLessThanOrEqual(epsilon);
+  }).toPass({ timeout: 15_000 });
+});
+
+// architecture/panel-sync-and-oi-depth-diagnosis.md bug 1: a never-built feature (chart-layouts
+// §6.4 explicitly deferred it). The ruling is a TIME-synced crosshair — hovering panel 1 puts a
+// vertical line on every panel at the same instant, each panel's own horizontal line at ITS OWN
+// value there (never panel 1's price/value mirrored onto units it doesn't share).
+test('hovering one panel syncs a time-matched crosshair to all four panels, without disturbing the visible range', async ({
+  page,
+}) => {
+  await page.route('**/config.json', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4300/api', wsUrl: 'ws://localhost:4300/ws' }),
+    }),
+  );
+
+  const warnings: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'warning' && msg.text().includes('[ChartSyncService]')) {
+      warnings.push(msg.text());
+    }
+  });
+
+  await page.goto('/');
+  await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
+
+  const panels = await (await chartPanels(page)).all();
+  for (const panel of panels) {
+    await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-from', /\d+/, { timeout: 15_000 });
+  }
+
+  const rangesBefore: { from: string | null; to: string | null }[] = [];
+  for (const panel of panels) {
+    const container = panel.locator('.chart-container');
+    rangesBefore.push({
+      from: await container.getAttribute('data-visible-from'),
+      to: await container.getAttribute('data-visible-to'),
+    });
+  }
+
+  const firstContainer = panels[0].locator('.chart-container');
+  const box = await firstContainer.boundingBox();
+  if (!box) {
+    throw new Error('chart container has no bounding box');
+  }
+
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5);
+
+  await expect(async () => {
+    const times: number[] = [];
+    for (const panel of panels) {
+      const t = await panel.locator('.chart-container').getAttribute('data-crosshair-time');
+      expect(t).not.toBeNull();
+      times.push(Number(t));
+    }
+    const barSec = 5 * 60;
+    expect(Math.max(...times) - Math.min(...times)).toBeLessThanOrEqual(barSec);
+  }).toPass({ timeout: 15_000 });
+
+  // Moving the pointer off the grid entirely clears the crosshair on every panel.
+  await page.mouse.move(10, 10);
+  await expect(async () => {
+    for (const panel of panels) {
+      const t = await panel.locator('.chart-container').getAttribute('data-crosshair-time');
+      expect(t).toBeNull();
+    }
+  }).toPass({ timeout: 15_000 });
+
+  // The concrete "no echo" check: hovering never disturbed the synced visible range on any
+  // panel, and never tripped the range circuit breaker.
+  for (let i = 0; i < panels.length; i++) {
+    const container = panels[i].locator('.chart-container');
+    expect(await container.getAttribute('data-visible-from')).toBe(rangesBefore[i].from);
+    expect(await container.getAttribute('data-visible-to')).toBe(rangesBefore[i].to);
+  }
+  expect(warnings).toEqual([]);
+});
