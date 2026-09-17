@@ -74,13 +74,27 @@ const TRIP_THRESHOLD = 8;
 const WINDOW_MS = 750;
 const COOLDOWN_MS = 750;
 
+/** A hovered wall-clock instant, and which panel's pointer produced it (architecture/panel-sync-and-oi-depth-diagnosis.md, bug 1). */
+export interface CrosshairState {
+  origin: string;
+  timeSec: number;
+}
+
 @Injectable()
 export class ChartSyncService {
   private readonly _range = signal<TimeRange | null>(null);
   private readonly _origin = signal<string | null>(null);
+  /**
+   * A second, independent channel (bug 1's design point 1): the crosshair never goes through
+   * `propose()` or the circuit breaker above, because it has no feedback loop to police — see
+   * `ChartComponent`'s three loop-prevention layers. Same lifetime as `_range` (reset together
+   * on layout/timeframe rebuild), but writing it never touches `_range`/`_origin`.
+   */
+  private readonly _crosshair = signal<CrosshairState | null>(null);
 
   readonly range = this._range.asReadonly();
   readonly origin = this._origin.asReadonly();
+  readonly crosshair = this._crosshair.asReadonly();
 
   /** Timestamps of recent origin takeovers, within the current trip-detection window. */
   private takeoverTimestamps: number[] = [];
@@ -126,10 +140,20 @@ export class ChartSyncService {
     this._range.set(range);
   }
 
+  /**
+   * Called by the panel under the pointer. `timeSec === null` (mouse left the pane) clears the
+   * crosshair on every panel. Bypasses the drift guard/breaker above by design — see the class
+   * doc on `_crosshair`.
+   */
+  setCrosshair(panelId: string, timeSec: number | null): void {
+    this._crosshair.set(timeSec === null ? null : { origin: panelId, timeSec });
+  }
+
   /** Called on layout/timeframe rebuild — the new panels start with no shared range. */
   reset(): void {
     this._range.set(null);
     this._origin.set(null);
+    this._crosshair.set(null);
     this.takeoverTimestamps = [];
     this.cooldownUntil = null;
   }
