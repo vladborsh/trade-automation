@@ -56,3 +56,5 @@ research/crosssec-instruments-in-play/results/instrument_days.parquet
 
 research/hedged-carry/data
 research/hedged-carry/cache
+
+research/coinm-carry/data

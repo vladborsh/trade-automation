@@ -1,0 +1,31 @@
+{
+ "BTCUSD_PERP": {
+  "cm_fund_archive_n": 4269,
+  "cm_fund_rest_n": 6686,
+  "cm_fund_merged_n": 6686,
+  "cm_fund_first": "2020-08-10 16:00:00+00:00",
+  "cm_fund_last": "2026-09-17 08:00:00+00:00",
+  "cm1h_n": 52985,
+  "cm1h_first": "2020-08-11 07:00:00+00:00",
+  "spot1h_n": 53309,
+  "spot1h_first": "2020-08-01 00:00:00+00:00",
+  "basis_median": -0.0002016926418572096,
+  "basis_p99": 0.0026664501373237365,
+  "basis_anom": 0
+ },
+ "ETHUSD_PERP": {
+  "cm_fund_archive_n": 4269,
+  "cm_fund_rest_n": 6663,
+  "cm_fund_merged_n": 6663,
+  "cm_fund_first": "2020-08-18 08:00:00+00:00",
+  "cm_fund_last": "2026-09-17 08:00:00+00:00",
+  "cm1h_n": 52817,
+  "cm1h_first": "2020-08-18 07:00:00+00:00",
+  "spot1h_n": 53309,
+  "spot1h_first": "2020-08-01 00:00:00+00:00",
+  "basis_median": -0.00023951290603030362,
+  "basis_p99": 0.0028773522089805435,
+  "basis_anom": 0
+ },
+ "fails": []
+}
