@@ -1042,7 +1042,7 @@ extra holdout utilisation lives in $1–10M/day symbols at 0.023 %/8 h while ON
 universe. No registration.
 
 **RESULT, 2026-09-17 — the registration was run and THE CARRY LINE IS CLOSED**
-(`research/coinm-carry/`, log Запись 35). Both arms killed on the holdout,
+(`research/coinm-carry/`, log Запись 34). Both arms killed on the holdout,
 read once. **Arm A** (passive inverse carry, majors, always-on): fit
 **+10.99 %** p.a. on capital — the first fit reading in this project to reach
 the +10 % build bar — holdout **+4.79 %** on **1,460 ON slot-days and 730
