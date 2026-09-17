@@ -65,6 +65,51 @@ describe('ChartSyncService', () => {
   });
 });
 
+// architecture/panel-sync-and-oi-depth-diagnosis.md bug 1: a SEPARATE channel from the range
+// above — it must never interact with `propose()`'s drift guard, origin or circuit breaker,
+// since (per the design doc) the crosshair has no feedback loop to police: lightweight-charts
+// never fires `subscribeCrosshairMove` for a programmatic position, so there is no echo a
+// follower could bounce back through this service in the first place.
+describe('ChartSyncService crosshair channel', () => {
+  it('starts with no crosshair', () => {
+    const sync = new ChartSyncService();
+    expect(sync.crosshair()).toBeNull();
+  });
+
+  it('setCrosshair sets the origin panel and the hovered time', () => {
+    const sync = new ChartSyncService();
+    sync.setCrosshair('btc', 12_345);
+    expect(sync.crosshair()).toEqual({ origin: 'btc', timeSec: 12_345 });
+  });
+
+  it('setCrosshair(panelId, null) clears it', () => {
+    const sync = new ChartSyncService();
+    sync.setCrosshair('btc', 12_345);
+    sync.setCrosshair('btc', null);
+    expect(sync.crosshair()).toBeNull();
+  });
+
+  it('reset() clears the crosshair too', () => {
+    const sync = new ChartSyncService();
+    sync.setCrosshair('btc', 12_345);
+    sync.reset();
+    expect(sync.crosshair()).toBeNull();
+  });
+
+  it('writing the crosshair never changes range()/origin(), and vice versa', () => {
+    const sync = new ChartSyncService();
+    sync.propose('btc', { from: 1000, to: 2000 }, 30);
+    sync.setCrosshair('eth', 1500);
+    expect(sync.range()).toEqual({ from: 1000, to: 2000 });
+    expect(sync.origin()).toBe('btc');
+    expect(sync.crosshair()).toEqual({ origin: 'eth', timeSec: 1500 });
+
+    sync.setCrosshair('eth', null);
+    expect(sync.range()).toEqual({ from: 1000, to: 2000 });
+    expect(sync.origin()).toBe('btc');
+  });
+});
+
 // architecture/scroll-back-freeze-diagnosis.md: a follower whose own data
 // has a real gap gets its requested range snapped by lightweight-charts to
 // something far outside epsilon. Without the read-back fix in
