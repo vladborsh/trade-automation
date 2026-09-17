@@ -1041,6 +1041,41 @@ extra holdout utilisation lives in $1–10M/day symbols at 0.023 %/8 h while ON
 2.6 on the eight. The premium regime is a property of time, not of the
 universe. No registration.
 
+**RESULT, 2026-09-17 — the registration was run and THE CARRY LINE IS CLOSED**
+(`research/coinm-carry/`, log Запись 35). Both arms killed on the holdout,
+read once. **Arm A** (passive inverse carry, majors, always-on): fit
+**+10.99 %** p.a. on capital — the first fit reading in this project to reach
+the +10 % build bar — holdout **+4.79 %** on **1,460 ON slot-days and 730
+trade-days**, 0 buffer breaches; both floors met **by construction**, so the
+arm could not be UNDERPOWERED. `NO EDGE — kill`: 0.21 points under the kill
+bar and **8.9 σ** under the build bar at a measured holdout SE of 0.588 %.
+**Arm B** (quarterly basis ≥ 10 % p.a.): fit +6.16 % on 16 positions, holdout
+**+3.60 %** on 6 positions and 302 trade-days — floors met, `NO EDGE — kill`;
+always-hold benchmark +4.58 %, also under the bar.
+**The premise held exactly:** the `1/mmr` identity was proven and asserted on
+86,400 real position-hours to `1e−15`, through a 1.93× price excursion; the
+hedge held through ETH 3,209 → 1,860 on the holdout with a basis residual of
++0.03 USD on a 50 USD slot. **The account type was worth exactly the
+pre-registered 1.43× and not one point more** (+7.89 % × 1.43 = +11.3 %
+against a measured +10.99 %). **COIN-M funding is a separate, cheaper tape
+than USD-M** — 11.75 % vs 14.55 % p.a. of notional on BTC and 11.65 % vs
+16.39 % on ETH over the fit window, correlation 0.81 → 0.59 — and on the
+holdout both sit near 5 %. **+28.40 % was never the target**: its honest
+un-re-centred PM form returns +70.6 % on fit only because the short notional
+grows 6.5×/12.7× over four years, i.e. a carry trade whose **leverage drifts
+to 6–12× without the operator choosing it**, liquidated outright at a 60 %
+collateral ratio. **"The gate costs money" now fires on two tapes and two
+account models, on fit and on holdout**, while the gate remains a genuine
+carry timer (`p_A = 0.000`). Arm A by year: 2020 +14.6, 2021 +22.0, 2022
++0.2, 2023 +6.8, 2024 +12.0, 2025 +4.5, 2026 +2.5 — **the premium is a
+calendar, not a structure**. Three instruments, three account structures, one
+calendar. **There is no fourth account structure; nothing further on this line
+is to be registered.** Not run, and recorded as not run: the PM collateral
+rates for the six alts (needs the user's read-only API key) and the user's
+confirmation that COIN-M/PM are visible in their account — these gated only
+the alt descriptive and the PM row's rate inputs, and the alt tier stays dead
+where Запись 32 left it.
+
 **What is left for a future ruling** (as parked by the HANDOFF; now ruled
 above): the **account-type question** — spot posted as collateral at a
 90 % haircut reads +28.4 % p.a. on the majors against +7.89 % on the primary
