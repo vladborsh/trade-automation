@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subscription } from 'rxjs';
-import { Instrument, InstrumentId, MetricKind, Venue } from '@trade-automation/contracts';
+import { BackfillStatus, Instrument, InstrumentId, MetricKind, Venue } from '@trade-automation/contracts';
 import { AppConfigService } from '../../config/config.service';
 import { METRIC_STORE, MetricStore } from '../../storage/metric-store.port';
 import { MetricWriteBuffer } from '../../storage/metric-write-buffer.service';
@@ -24,6 +24,7 @@ interface MetricPairStatus {
   instrument: InstrumentId;
   metric: MetricKind;
   lastObservationAge: number | null;
+  backfillStatus: BackfillStatus;
 }
 
 /**
@@ -41,6 +42,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   private adapters = new Map<Venue, MetricAdapter>();
   private readonly lastPolledAt = new Map<string, number>();
   private readonly lastObservationAt = new Map<string, number>();
+  private readonly backfillStatusByPair = new Map<string, BackfillStatus>();
 
   constructor(
     private readonly config: AppConfigService,
@@ -126,6 +128,62 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
     }
   }
 
+  /**
+   * architecture/panel-sync-and-oi-depth-diagnosis.md, Bug 2, defect 2 — fired from `main.ts`
+   * after `app.listen()`, mirroring `IngestionService.deepenHistoryAsync()`'s Phase 2 concept:
+   * `warmUp`'s Phase 1 only ever extends *forward* from `latestStored`, so whatever depth the
+   * very first boot happened to reach (one adapter page, before defect 1 was fixed; or the
+   * venue's true depth after) is otherwise frozen forever. This walks every configured pair
+   * backward to the full `DEFAULT_CACHE_LOOKBACK_MS` window on every boot, so a shallow store
+   * self-heals instead of staying shallow across restarts.
+   */
+  async deepenHistoryAsync(): Promise<void> {
+    for (const { instrument, metric } of this.metricPairs()) {
+      const adapter = this.adapters.get(instrument.venue);
+      if (!adapter || !adapter.supports.includes(metric)) continue;
+      const key = this.pairKey(instrument.id, metric);
+      this.backfillStatusByPair.set(key, 'deepening');
+      try {
+        await this.deepenPair(instrument, metric, adapter);
+      } catch (err) {
+        this.logger.error(`Metric deepen failed for ${key}: ${(err as Error).message}`);
+      } finally {
+        // Same "complete means this pass finished running" semantics as the candle path's
+        // Phase 2 — not necessarily that the full target depth was reached (a short venue
+        // history or a page error still ends the pass, honestly reflected by however far
+        // MetricCache.window() actually reaches).
+        this.backfillStatusByPair.set(key, 'complete');
+      }
+    }
+  }
+
+  /**
+   * Fetches the whole `[now − DEFAULT_CACHE_LOOKBACK_MS, oldest cached observation)` window in
+   * one call — deliberately not chunked like the candle path's `deepenInstrument1m`: that method
+   * chunks to keep a *live* resampler's stateful buckets safe from 45 days of out-of-order 1m
+   * candles, a concern that does not exist here (metrics have no resampler, and `MetricCache`'s
+   * fixed 30-day `depthMs` — matching `DEFAULT_CACHE_LOOKBACK_MS` — never evicts a backward
+   * insert, unlike `CandleCache`'s ring buffer). `fetchObservations` itself still paginates
+   * internally (the adapter's own 500-row pages), so nothing here loses the note's "walk
+   * oldest-page-last" property — the adapter returns the whole window pre-assembled ascending.
+   */
+  private async deepenPair(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
+    const now = Date.now();
+    const target = now - DEFAULT_CACHE_LOOKBACK_MS;
+    const oldestCached = this.cache.window(instrument.id, metric)[0]?.time ?? now;
+    if (oldestCached <= target) return; // already at (or past) full depth
+
+    const deepRows = await adapter.fetchObservations(instrument, metric, target, oldestCached - 1);
+    for (const o of deepRows) {
+      this.cache.upsert(o);
+      void this.writeBuffer.add(o);
+      // Deliberately NOT emitting MetricEvents.MetricObserved for deep rows — same reasoning as
+      // the candle deepen: thousands of historical points pushed to the bus/gateway on every
+      // boot is noise no live WS client needs, they only want the current value going forward.
+    }
+    this.logger.log(`Deepened ${deepRows.length} historical observations for ${instrument.id}/${metric}`);
+  }
+
   private startPolling(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): void {
     const key = this.pairKey(instrument.id, metric);
     const sub = this.barClock.tick$.subscribe(() => void this.maybePoll(instrument, metric, adapter, key));
@@ -164,11 +222,13 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   status(): MetricPairStatus[] {
     const now = Date.now();
     return this.metricPairs().map(({ instrument, metric }) => {
-      const lastTime = this.lastObservationAt.get(this.pairKey(instrument.id, metric)) ?? null;
+      const key = this.pairKey(instrument.id, metric);
+      const lastTime = this.lastObservationAt.get(key) ?? null;
       return {
         instrument: instrument.id,
         metric,
         lastObservationAge: lastTime !== null ? now - lastTime : null,
+        backfillStatus: this.backfillStatusByPair.get(key) ?? 'complete',
       };
     });
   }

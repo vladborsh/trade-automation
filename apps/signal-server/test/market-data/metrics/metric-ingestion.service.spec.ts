@@ -191,7 +191,93 @@ describe('MetricIngestionService boot order', () => {
 
     expect(store.latestTime).not.toHaveBeenCalled();
     expect(service.status()).toEqual([
-      { instrument: instrument.id, metric: 'openInterest', lastObservationAge: null },
+      { instrument: instrument.id, metric: 'openInterest', lastObservationAge: null, backfillStatus: 'complete' },
     ]);
+  });
+
+  /**
+   * architecture/panel-sync-and-oi-depth-diagnosis.md, Bug 2, defect 2 — restart with a store
+   * shallower than the full lookback must not stay shallow forever: Phase 1 (`warmUp`) only
+   * ever extends forward from `latestStored`, so this asserts the new Phase 2
+   * `deepenHistoryAsync()` (fired from `main.ts` after `listen()`, mirroring the candle path)
+   * actually extends the cache backward to the full 30-day window.
+   */
+  it('deepens a shallow store backward to the full lookback after Phase 2 runs, without re-emitting MetricObserved', async () => {
+    const now = 1_800_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    const PERIOD_MS = 5 * 60_000;
+    const SHALLOW_DEPTH_MS = 2 * 24 * 60 * 60_000; // "restart with a shallow store": only 2 days on hand
+    const FULL_DEPTH_MS = 30 * 24 * 60 * 60_000;
+
+    const shallowStart = now - SHALLOW_DEPTH_MS;
+    const shallowObservations: MetricObservation[] = [];
+    for (let t = shallowStart; t <= now; t += PERIOD_MS) {
+      shallowObservations.push({ metric: 'openInterest', instrument: instrument.id, time: t, value: 1 });
+    }
+
+    const store = {
+      latestTime: jest.fn(async () => now),
+      query: jest.fn(async () => shallowObservations),
+      upsert: jest.fn(async () => undefined),
+    };
+
+    // Fake adapter models the venue: fetchObservations(from, to) returns the full ascending,
+    // gapless range asked for (the real adapter's own pagination is covered separately in
+    // binance-metrics.adapter.spec.ts) — this spec is about the ingestion-side deepen wiring.
+    const adapter = {
+      venue: 'binance' as const,
+      supports: ['openInterest'] as const,
+      fetchObservations: jest.fn(async (_instrument: Instrument, _metric: string, from: number, to: number) => {
+        const rows: MetricObservation[] = [];
+        for (let t = from; t <= to; t += PERIOD_MS) {
+          rows.push({ metric: 'openInterest', instrument: instrument.id, time: t, value: 2 });
+        }
+        return rows;
+      }),
+      fetchLatest: jest.fn(async () => ({ metric: 'openInterest', instrument: instrument.id, time: now, value: 1 })),
+    };
+    (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['binance', adapter]]));
+
+    const cache = new MetricCache();
+    const events = new EventEmitter2();
+    const observed: MetricObservation[] = [];
+    events.on('market-data.metric.observed', (e: { observation: MetricObservation }) => observed.push(e.observation));
+    const writeBuffer = { add: jest.fn(async () => undefined) } as never;
+    const barClock = { tick$: { subscribe: jest.fn(() => ({ unsubscribe: () => undefined })) } } as never;
+
+    const service = new MetricIngestionService(
+      fakeConfig(),
+      cache,
+      events,
+      writeBuffer,
+      barClock,
+      fakeAppMetrics(),
+      store as never,
+    );
+
+    await service.onApplicationBootstrap();
+
+    // Phase 1 alone leaves the store's own shallow depth — no adapter backfill call needed
+    // (warm-up's tail is already covered by `now`).
+    expect(cache.window(instrument.id, 'openInterest')[0]?.time).toBe(shallowStart);
+    expect(
+      service.status().find((s) => s.metric === 'openInterest')?.backfillStatus,
+    ).toBe('complete'); // no deepen has run yet — default is 'complete', not 'deepening'
+
+    const deepenPromise = service.deepenHistoryAsync();
+    expect(
+      service.status().find((s) => s.metric === 'openInterest')?.backfillStatus,
+    ).toBe('deepening');
+    await deepenPromise;
+
+    const window = cache.window(instrument.id, 'openInterest');
+    expect(window[0]?.time).toBeLessThanOrEqual(now - FULL_DEPTH_MS + PERIOD_MS);
+    expect(window[window.length - 1]?.time).toBe(now); // the fresher, Phase-1-loaded tail is untouched
+
+    expect(service.status().find((s) => s.metric === 'openInterest')?.backfillStatus).toBe('complete');
+
+    // Deep rows must never hit the live event bus (would be thousands of stale MetricObserved
+    // events to every WS client on every boot) — only the original Phase-1 tail observation.
+    expect(observed).toHaveLength(0);
   });
 });

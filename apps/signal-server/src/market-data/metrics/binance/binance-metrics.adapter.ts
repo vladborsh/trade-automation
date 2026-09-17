@@ -11,7 +11,6 @@ import {
 // architecture/chart-layouts.md §4.3 — `period` for openInterestHist; 5m is the finest grain
 // the endpoint offers, matching the note's "history via openInterestHist at 5m".
 const HIST_PERIOD = '5m';
-const HIST_PERIOD_MS = 5 * 60_000;
 // Binance's documented page size for openInterestHist (`limit` max), verified live below.
 const HIST_PAGE_LIMIT = 500;
 
@@ -26,6 +25,13 @@ const HIST_PAGE_LIMIT = 500;
  * escalation pre-answer (b): if the venue's history is short, backfill what exists — this
  * constant does not need to be exact to the minute, only close enough that the clamp rarely
  * fires (the ingestion boot order already re-derives the real tail from `MetricStore`).
+ *
+ * architecture/panel-sync-and-oi-depth-diagnosis.md, Bug 2, defect 1 — CONFIRMED LIVE on
+ * 2026-09-17 that this endpoint returns the **newest** `limit` rows inside `[startTime,
+ * endTime]`, not the oldest: a request with `startTime = now-29d` came back spanning only the
+ * last ~41h40m of that window. `fetchObservations` therefore paginates *backward* by shrinking
+ * `endTime`, not forward by advancing `startTime` — walking forward silently returns only the
+ * newest page every time, however wide `[from, to]` is.
  */
 const HIST_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
@@ -43,23 +49,28 @@ export class BinanceMetricsAdapter implements MetricAdapter {
     to: number,
   ): Promise<MetricObservation[]> {
     const earliestAllowed = Date.now() - HIST_RETENTION_MS;
-    let cursor = from;
-    if (cursor < earliestAllowed) {
+    let effectiveFrom = from;
+    if (effectiveFrom < earliestAllowed) {
       this.logger.warn(
         `openInterestHist retention window (~30d) is shorter than requested for ${instrument.id}; ` +
           `clamping backfill start from ${new Date(from).toISOString()} to ${new Date(earliestAllowed).toISOString()}`,
       );
-      cursor = earliestAllowed;
+      effectiveFrom = earliestAllowed;
     }
-    if (cursor > to) return [];
+    if (effectiveFrom > to) return [];
 
+    // Paginate BACKWARD by shrinking `endTime` — see HIST_RETENTION_MS's comment above for why:
+    // the venue returns the newest `limit` rows of `[startTime, endTime]`, so each page's own
+    // *first* row is the next `endTime` to ask for, and pages are prepended (oldest-page-last on
+    // the wire, but each individual page is itself ascending) to keep the final result ascending.
     const out: MetricObservation[] = [];
-    while (cursor <= to) {
+    let cursorEnd = to;
+    while (cursorEnd >= effectiveFrom) {
       const url = new URL('/futures/data/openInterestHist', this.restBaseUrl);
       url.searchParams.set('symbol', instrument.symbol);
       url.searchParams.set('period', HIST_PERIOD);
-      url.searchParams.set('startTime', String(cursor));
-      url.searchParams.set('endTime', String(to));
+      url.searchParams.set('startTime', String(effectiveFrom));
+      url.searchParams.set('endTime', String(cursorEnd));
       url.searchParams.set('limit', String(HIST_PAGE_LIMIT));
 
       const res = await fetch(url);
@@ -69,10 +80,10 @@ export class BinanceMetricsAdapter implements MetricAdapter {
       const rows = (await res.json()) as BinanceOpenInterestHistRow[];
       if (rows.length === 0) break;
 
-      out.push(...rows.map((row) => mapOpenInterestHistRow(instrument.id, metric, row)));
-      const lastTimestamp = rows[rows.length - 1].timestamp;
-      if (rows.length < HIST_PAGE_LIMIT || lastTimestamp >= to) break;
-      cursor = lastTimestamp + HIST_PERIOD_MS;
+      out.unshift(...rows.map((row) => mapOpenInterestHistRow(instrument.id, metric, row)));
+      const firstTimestamp = rows[0].timestamp;
+      if (rows.length < HIST_PAGE_LIMIT || firstTimestamp <= effectiveFrom) break;
+      cursorEnd = firstTimestamp - 1;
     }
 
     return out;

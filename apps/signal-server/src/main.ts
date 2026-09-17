@@ -17,6 +17,7 @@ import { Logger } from 'nestjs-pino';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module';
 import { IngestionService } from './market-data/ingestion.service';
+import { MetricIngestionService } from './market-data/metrics/metric-ingestion.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -41,6 +42,11 @@ async function bootstrap() {
   // resampled from it) further back in the background. `/api/health`'s `backfillStatus` reflects
   // progress; a failure here is logged inside the service and never affects server liveness.
   void app.get(IngestionService).deepenHistoryAsync();
+
+  // architecture/panel-sync-and-oi-depth-diagnosis.md, Bug 2, defect 2 — same fire-and-forget
+  // Phase 2 concept as the candle path above, for metric (open-interest) history: `/api/health`'s
+  // per-pair `backfillStatus` reflects progress; a failure is logged inside the service.
+  void app.get(MetricIngestionService).deepenHistoryAsync();
 }
 
 bootstrap();

@@ -131,6 +131,12 @@ export const HealthResponseSchema = z.object({
         instrument: InstrumentIdSchema,
         metric: MetricKindSchema,
         lastObservationAge: z.number().nonnegative().nullable(),
+        /**
+         * architecture/panel-sync-and-oi-depth-diagnosis.md, Bug 2 — same vocabulary as the
+         * candle path's per-timeframe `backfillStatus` above, one entry per (instrument, metric)
+         * pair; additive with a default so an older server response still validates.
+         */
+        backfillStatus: BackfillStatusSchema.default('complete'),
       }),
     )
     .default([]),
