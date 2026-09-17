@@ -58,3 +58,9 @@ research/hedged-carry/data
 research/hedged-carry/cache
 
 research/coinm-carry/data
+
+# Secrets — never commit. cmc-bot-main/.env holds the user's live Capital.com
+# credentials; apps/signal-server/.env is the dev-watch env (see README).
+.env
+.env.*
+!.env.example
