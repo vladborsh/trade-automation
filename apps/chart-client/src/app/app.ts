@@ -4,6 +4,6 @@ import { TerminalShellComponent } from './features/terminal/terminal-shell.compo
 @Component({
   imports: [TerminalShellComponent],
   selector: 'app-root',
-  template: `<app-terminal-shell />`,
+  templateUrl: './app.html',
 })
 export class App {}
