@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.chart-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #30363d;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #30363d;
+  font-size: 12px;
+  color: #c9d1d9;
+}
+.panel-title {
+  font-weight: 600;
+}
+.venue-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #787b86;
+}
+.venue-up {
+  background: #26a69a;
+}
+.venue-degraded {
+  background: #d29922;
+}
+.venue-down,
+.venue-closed {
+  background: #ef5350;
+}
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
