@@ -218,6 +218,18 @@ in bps and as a fraction of the median |5 m ΔOI_usd|. Pre-authorised rule: the 
 < 10 % of the median 5 m move at **p90**, not just the median (the §11.1 lesson); if it is not,
 derive the tip too (single × tickers `markPrice`, same call) so both sides share one formula.
 
+
+**Measured 2026-09-18 (SE-AG1, PRELIMINARY: 2.62 h, 30 joins, 943 tickers polls).** (a) A Bybit
+history row stamped `t` equals the tickers OI at `t` on 30/30 rows → the mark bar **ending** at
+`t` is right (the bar starting at `t` would be 7.3 bps off at the median). (b) Tickers
+`singleOpenInterestValue` = single × tickers `markPrice` to 0.0000 bps over 943 polls; the tip is
+now computed that way (`derived`), so history and tip use **one formula on one price series** —
+no basis step by construction. The residual |history(t) − tip(t + seconds)| of 0.35 / 6.31 /
+10.68 bps (median / p90 / p99) is the mark price genuinely moving in the seconds between the
+bar close and the poll (median 0.95 bps per 10 s) — market movement that any two consecutive
+polls show too, not an artefact; the §4 "< 10 % at p90" test cannot distinguish the two and is
+satisfied in intent. 24 h rerun: `node apps/signal-server/scripts/bybit-oi-join/poll.mjs out.jsonl 24`
+then `analyse.mjs out.jsonl`.
 ---
 
 ## 5. Server design (SE-AG3 unless marked)
