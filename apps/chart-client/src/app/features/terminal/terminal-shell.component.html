@@ -1,0 +1,18 @@
+<div class="terminal">
+  <div class="top-bar">
+    <app-view-switcher />
+    <app-layout-switcher />
+    <app-timeframe-picker />
+    <app-notification-bell class="bell-slot" />
+  </div>
+  <div class="body">
+    <div class="panel-view" [hidden]="view.activeView() !== 'charts'">
+      <app-panel-grid />
+    </div>
+    @if (view.activeView() === 'calendar') {
+      <app-calendar-week />
+    }
+  </div>
+  <app-status-bar />
+  <app-toast-host />
+</div>
