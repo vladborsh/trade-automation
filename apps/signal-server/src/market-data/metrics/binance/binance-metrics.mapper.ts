@@ -21,7 +21,8 @@ export interface BinanceOpenInterestSnapshot {
  * architecture/chart-layouts.md §4.2 — `time` is the venue's own stamp, never Date.now()
  * (same rule as the candle mapper). `value` = sumOpenInterest / openInterest, in base-asset
  * units on USDⓈ-M (`unit: 'base'`, §11.1); `notional` = sumOpenInterestValue, the venue's own
- * figure (`notionalBasis: 'venue'`), present on history rows only.
+ * figure (`notionalBasis: 'venue'`), present on history rows only. A live snapshot's notional is
+ * derived later, at ingestion (`notionalBasis: 'derived'`, §11.1 — metric-ingestion.service.ts).
  */
 export function mapOpenInterestHistRow(
   instrument: InstrumentId,

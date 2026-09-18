@@ -35,6 +35,22 @@ const HIST_PAGE_LIMIT = 500;
  */
 const HIST_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
+/*
+ * architecture/chart-layouts.md §11.1 "The join check" — MEASURED 2026-09-18 (SE-A2), BTCUSDT,
+ * 7925 stored openInterestHist rows 2026-08-18 16:10 → 2026-09-17 16:05 UTC. Implied price
+ * `sumOpenInterestValue / sumOpenInterest` per row, compared with:
+ *   (a) our last-trade 1m close, bar ending at the row stamp:  median |Δ| 0.14 bps, p99 3.67 bps
+ *   (b) Binance 1m mark price close (markPriceKlines, 29 one-off calls), bar ending at the stamp:
+ *       median |Δ| 0.00 bps, p99 0.00 bps (19 of 7925 rows > 0.01 bps, max 1.93 bps) — i.e.
+ *       Binance computes sumOpenInterestValue = sumOpenInterest × mark price at the stamp.
+ * Step at the history/tip join, |notional − value × price|, vs the median |5 m ΔOI_usd| of
+ * 4.89 M USDT: last-trade median 115 k (2.4 %), p90 23 %, p99 3.0 M (62 %); mark 0 %.
+ * Decision rule (pre-authorised): last-trade median 0.14 bps ≤ 2 bps → KEEP the last-trade 1m
+ * close for the derived tip notional (metric-ingestion.service.ts); median step 2.4 % < 10 %.
+ * No premiumIndex call is made. If the p99 step ever matters on screen, the exact-match
+ * alternative is mark price from /fapi/v1/premiumIndex in the same poll (+1 weight/min/instrument).
+ */
+
 export class BinanceMetricsAdapter implements MetricAdapter {
   readonly venue = 'binance' as const;
   readonly supports: readonly MetricKind[] = ['openInterest'];
