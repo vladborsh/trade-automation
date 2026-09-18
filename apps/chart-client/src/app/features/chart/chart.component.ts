@@ -76,28 +76,8 @@ const NEAR_START_BAR_MULTIPLIER = 5;
   // data-marker-count / data-indicator-series-count / data-visible-from
   // / data-visible-to are test hooks (e2e asserts on them) — lightweight-charts
   // draws to canvas, so there is nothing else in the DOM to assert on.
-  template: `<div
-    class="chart-container"
-    #container
-    [attr.data-marker-count]="markerCount()"
-    [attr.data-indicator-series-count]="indicatorSeriesCount()"
-    [attr.data-visible-from]="visibleFrom()"
-    [attr.data-visible-to]="visibleTo()"
-    [attr.data-crosshair-time]="crosshairTime()"
-  ></div>`,
-  styles: [
-    `
-      :host {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-      .chart-container {
-        width: 100%;
-        height: 100%;
-      }
-    `,
-  ],
+  templateUrl: './chart.component.html',
+  styleUrl: './chart.component.scss',
 })
 export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly kind = input.required<'candles' | 'metric'>();
