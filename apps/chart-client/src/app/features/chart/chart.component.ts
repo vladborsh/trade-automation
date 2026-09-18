@@ -26,6 +26,8 @@ import { TIMEFRAME_MS } from '@trade-automation/contracts';
 import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
 import { MetricSeriesRenderer } from './metric-series.renderer';
 import { CHART_OPTIONS, PRICE_CANDLE_OPTIONS } from './chart-theme';
+import { DaySeparatorsPrimitive } from './day-separators.primitive';
+import { nyTickMarkFormatter } from './ny-time';
 import { OverlayLayer } from './overlay/overlay-layer';
 import { MarkerRenderer } from './overlay/marker.renderer';
 import { PriceLineRenderer } from './overlay/price-line.renderer';
@@ -100,6 +102,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private readonly shapesPrimitive = new ShapesPrimitive();
   private readonly indicatorLayer = new IndicatorLayer();
   private readonly metricSeries = new MetricSeriesRenderer();
+  private readonly daySeparators = new DaySeparatorsPrimitive();
+  private axisTf: Timeframe | null = null;
   private lastRenderedCount = 0;
   private lastRenderedTime: number | null = null; // candle openTime or metric point time, seconds-scale source (ms)
   /**
@@ -133,6 +137,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       } else {
         this.renderPoints(this.points());
       }
+      untracked(() => this.renderTimeDecor());
     });
 
     effect(() => {
@@ -224,6 +229,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     const isCandles = this.kind() === 'candles';
     this.stopResizeObserver = observeResize(el, this.resizeSettle); // before createChart — see observeResize
     this.chart = createChart(el, CHART_OPTIONS);
+    this.daySeparators.attachTo(this.chart.panes()[0]);
     this.series = isCandles
       ? this.chart.addSeries(CandlestickSeries, PRICE_CANDLE_OPTIONS)
       : this.metricSeries.attach(this.chart, this.timeframe());
@@ -340,6 +346,17 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     }
     this.indicatorLayer.render(this.indicatorPoints(), this.indicatorSpecs(), this.timeframe());
     this.indicatorSeriesCount.set(this.indicatorLayer.visibleSeriesCount());
+    this.renderTimeDecor();
+  }
+
+  /** §12.2/§12.3 display-only: NY axis labels for the timeframe, day separators for the bars. */
+  private renderTimeDecor(): void {
+    const tf = this.timeframe();
+    this.daySeparators.setData(this.lastTimesSec, tf);
+    if (this.chart && tf !== this.axisTf) {
+      this.axisTf = tf;
+      this.chart.applyOptions({ timeScale: { tickMarkFormatter: nyTickMarkFormatter(tf) } });
+    }
   }
 
   /**
@@ -578,6 +595,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.sync.releaseCrosshair(this.panelId());
     this.overlayLayer.clearAll();
     this.indicatorLayer.clearAll();
+    this.daySeparators.detach();
     this.chart?.remove();
   }
 }
