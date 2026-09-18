@@ -76,3 +76,47 @@
   min-height: 0;
   min-width: 0;
 }
+/* §12.4 RSI chip + period, at the end of the header beside the collapse button */
+.rsi-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.rsi-controls + .collapse-btn {
+  margin-left: 0;
+}
+.rsi-chip {
+  padding: 0 6px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: transparent;
+  color: #8b949e;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.rsi-chip:hover,
+.rsi-chip:focus-visible {
+  color: #c9d1d9;
+}
+.rsi-chip[aria-pressed='true'] {
+  color: #c9d1d9;
+  border-color: #8b949e;
+}
+.rsi-period {
+  width: 3.5em;
+  padding: 0 2px;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  background: #0d1117;
+  color: #c9d1d9;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+}
+.rsi-period:focus-visible {
+  outline: none;
+  border-color: #8b949e;
+}

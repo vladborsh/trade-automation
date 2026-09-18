@@ -9,6 +9,8 @@ import { TimeframeStore } from '../../core/state/timeframe.store';
 import { LayoutFeedService } from '../../core/state/layout-feed.service';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { CollapsedPanelsStore } from '../../core/state/collapsed-panels.store';
+import { RsiPrefsStore } from '../../core/state/rsi-prefs.store';
+import { RSI_MAX_PERIOD, RSI_MIN_PERIOD } from '../../core/state/rsi-prefs';
 import type { PanelFeed } from '../../core/state/panel-feed';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
 import { metricSeriesCaption, metricSeriesStyle } from '../chart/metric-series-style';
@@ -56,6 +58,14 @@ export class ChartPanelComponent {
     return layout ? this.collapsed.canCollapse(layout, this.panel().id) : false;
   });
 
+  /** §12.4 — RSI pane under the candles: per-panel visibility, one global period. Candle panels only. */
+  readonly rsiVisible = computed(() => {
+    const layout = this.layouts.active();
+    return this.panel().kind === 'candles' && (!layout || this.rsiPrefs.isVisible(layout.id, this.panel().id));
+  });
+  readonly rsiMinPeriod = RSI_MIN_PERIOD;
+  readonly rsiMaxPeriod = RSI_MAX_PERIOD;
+
   constructor(
     readonly strategies: StrategiesStore,
     readonly timeframe: TimeframeStore,
@@ -64,7 +74,21 @@ export class ChartPanelComponent {
     private readonly layoutFeed: LayoutFeedService,
     private readonly layouts: LayoutsStore,
     private readonly collapsed: CollapsedPanelsStore,
+    readonly rsiPrefs: RsiPrefsStore,
   ) {}
+
+  toggleRsi(): void {
+    const layout = this.layouts.active();
+    if (layout) {
+      this.rsiPrefs.setVisible(layout.id, this.panel().id, !this.rsiVisible());
+    }
+  }
+
+  /** Commits the typed period (clamped 2–100) and writes the effective value back into the input. */
+  commitRsiPeriod(input: HTMLInputElement): void {
+    this.rsiPrefs.setPeriod(input.value);
+    input.value = String(this.rsiPrefs.period());
+  }
 
   collapse(): void {
     const layout = this.layouts.active();

@@ -13,14 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import {
-  CandlestickSeries,
-  ColorType,
-  type IChartApi,
-  type ISeriesApi,
-  type UTCTimestamp,
-} from 'lightweight-charts';
-import { createChart } from 'lightweight-charts';
+import { CandlestickSeries, ColorType, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
 import type {
   Candle,
   IndicatorPoint,
@@ -40,6 +33,7 @@ import { RayRenderer } from './overlay/ray.renderer';
 import { LineRenderer } from './overlay/line.renderer';
 import { ShapesPrimitive } from './overlay/shapes.primitive';
 import { IndicatorLayer } from './indicator/indicator-layer';
+import { RsiPaneRenderer } from './indicator/rsi-pane.renderer';
 import { ChartSyncService, sameRange, type TimeRange } from './chart-sync.service';
 import { ResizeSettleTracker, observeResize } from './resize-settle';
 import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart-time';
@@ -88,6 +82,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   readonly timeframe = input.required<Timeframe>();
   readonly panelId = input.required<string>();
+  readonly rsiVisible = input(true); // §12.4 — candle panels only; drawn by RsiPaneRenderer
+  readonly rsiPeriod = input(14);
   readonly loadOlderRequested = output<void>();
 
   readonly markerCount = computed(() => this.overlays().filter((o) => o.type === 'marker').length);
@@ -106,6 +102,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private readonly shapesPrimitive = new ShapesPrimitive();
   private readonly indicatorLayer = new IndicatorLayer();
   private readonly metricSeries = new MetricSeriesRenderer();
+  private readonly rsiPane = new RsiPaneRenderer();
   private lastRenderedCount = 0;
   private lastRenderedTime: number | null = null; // candle openTime or metric point time, seconds-scale source (ms)
   /**
@@ -136,10 +133,12 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       if (this.kind() === 'candles') {
         this.renderCandles(this.candles());
+        this.rsiPane.render(this.candles(), untracked(this.rsiPeriod)); // after the price series (see RsiPaneRenderer)
       } else {
         this.renderPoints(this.points());
       }
     });
+    effect(() => this.rsiPane.configure(this.rsiVisible(), this.rsiPeriod(), untracked(this.candles)));
 
     effect(() => {
       if (this.kind() !== 'candles') {
@@ -361,6 +360,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     // re-run pending effects now that chart/series exist
     if (isCandles) {
       this.renderCandles(this.candles());
+      this.rsiPane.attach(this.chart, this.candles(), this.rsiPeriod());
       this.overlayLayer.render(this.overlays());
     } else {
       this.renderPoints(this.points());
