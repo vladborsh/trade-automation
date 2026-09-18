@@ -9,69 +9,8 @@ const IMPACT_OPTIONS: EventImpact[] = ['low', 'medium', 'high'];
   selector: 'app-calendar-filters',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="filters">
-      <label class="field">
-        Impact ≥
-        <select (change)="onImpactChange($event)">
-          @for (impact of impactOptions; track impact) {
-            <option [value]="impact" [selected]="impact === filters.filters().minImpact">{{ impact }}</option>
-          }
-        </select>
-      </label>
-
-      <div class="field countries">
-        Countries
-        <div class="country-list">
-          @for (country of availableCountries(); track country) {
-            <label class="country-item">
-              <input type="checkbox" [checked]="isCountrySelected(country)" (change)="onCountryToggle(country, $event)" />
-              {{ country }}
-            </label>
-          }
-        </div>
-      </div>
-
-      <label class="field">
-        <input type="checkbox" [checked]="filters.filters().hideRemoved" (change)="onHideRemovedChange($event)" />
-        Hide removed
-      </label>
-    </div>
-  `,
-  styles: [
-    `
-      .filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        align-items: flex-start;
-        padding: 6px 12px;
-        border-bottom: 1px solid #30363d;
-        font-size: 12px;
-        color: #8b949e;
-      }
-      .field {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      select {
-        background: #0d1117;
-        color: #c9d1d9;
-        border: 1px solid #30363d;
-      }
-      .country-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .country-item {
-        display: inline-flex;
-        gap: 4px;
-        align-items: center;
-      }
-    `,
-  ],
+  templateUrl: './calendar-filters.component.html',
+  styleUrl: './calendar-filters.component.scss',
 })
 export class CalendarFiltersComponent {
   @Input({ required: true }) countries: string[] = [];

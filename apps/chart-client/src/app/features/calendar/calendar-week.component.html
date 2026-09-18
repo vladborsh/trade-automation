@@ -1,0 +1,48 @@
+<div class="calendar-week" data-testid="calendar-week">
+  <div class="week-header">
+    <button type="button" (click)="previousWeek()" aria-label="Previous week">‹</button>
+    <span class="week-range">{{ weekRangeLabel() }}</span>
+    <button type="button" (click)="nextWeek()" aria-label="Next week">›</button>
+    <span class="tz-note">days are New York days</span>
+  </div>
+
+  <app-calendar-filters [countries]="availableCountries()" />
+
+  <div class="grid" [style.grid-template-columns]="'repeat(' + days().length + ', 1fr)'">
+    @for (day of days(); track day) {
+      <div class="day-col" [class.today]="day === today()" [attr.data-day]="day">
+        <div class="day-header">{{ dayHeaderLabel(day) }}</div>
+        @for (row of rowsFor(day); track rowKey(row)) {
+          @if (row.kind === 'now') {
+            <div class="now-line" data-testid="now-line">now — {{ localTimeLabel(row.at) }}</div>
+          } @else {
+            <div
+              class="event-row"
+              [class]="'status-' + row.event.status"
+              [class.highlighted]="highlightedId() === row.event.id"
+              [attr.data-event-id]="row.event.id"
+              [attr.title]="etTimeLabel(row.event.scheduledAt)"
+              (click)="selectEvent(row.event.id)"
+            >
+              <span class="time">{{ localTimeLabel(row.event.scheduledAt) }}</span>
+              <span class="impact-dot" [class]="'impact-' + row.event.impact"></span>
+              <span class="country">{{ row.event.country }}</span>
+              <span class="title">{{ row.event.title }}</span>
+              <span class="forecast">{{ row.event.forecast ?? '—' }}</span>
+              <span class="previous">{{ row.event.previous ?? '—' }}</span>
+              <span class="actual" [class]="'prov-' + (row.event.actualSource ?? 'none')">
+                {{ row.event.actual ?? '—' }}
+              </span>
+            </div>
+          }
+        } @empty {
+          <div class="empty-day">No events</div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+@if (selectedEventId(); as id) {
+  <app-calendar-event-detail [eventId]="id" (closed)="selectedEventId.set(null)" />
+}

@@ -16,56 +16,8 @@ const EVENT_DUE_AUTO_DISMISS_MS = 15_000;
   selector: 'app-toast-host',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="toast-host">
-      @for (toast of notifications.toastQueue(); track toast.toastId) {
-        <div class="toast" [class]="'kind-' + toast.notification.kind" (click)="onToastClick(toast)">
-          <span class="toast-title">{{ toast.notification.title }}</span>
-          <button type="button" class="dismiss" (click)="onDismiss($event, toast)" aria-label="Dismiss">×</button>
-        </div>
-      }
-    </div>
-  `,
-  styles: [
-    `
-      .toast-host {
-        position: fixed;
-        bottom: 16px;
-        right: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        z-index: 100;
-        max-width: 340px;
-      }
-      .toast {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        background: #161b22;
-        border: 1px solid #30363d;
-        border-left: 3px solid #58a6ff;
-        padding: 10px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        color: #c9d1d9;
-      }
-      .toast.kind-daily-digest {
-        border-left-color: #d29922;
-      }
-      .toast-title {
-        flex: 1;
-      }
-      .dismiss {
-        background: none;
-        border: none;
-        color: #8b949e;
-        cursor: pointer;
-        font-size: 13px;
-        line-height: 1;
-      }
-    `,
-  ],
+  templateUrl: './toast-host.component.html',
+  styleUrl: './toast-host.component.scss',
 })
 export class ToastHostComponent {
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();

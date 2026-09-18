@@ -1,0 +1,20 @@
+<div class="center">
+  <div class="center-header">
+    <span>Notifications</span>
+    <button type="button" class="close" (click)="closed.emit()" aria-label="Close">×</button>
+  </div>
+  <label class="desktop-toggle">
+    <input type="checkbox" [checked]="notifications.desktopNotificationsEnabled()" (change)="onToggleDesktop($event)" />
+    Desktop notifications
+  </label>
+  <div class="list">
+    @for (n of notifications.notifications(); track n.id) {
+      <div class="item" [class]="'kind-' + n.kind">
+        <span class="title">{{ n.title }}</span>
+        <span class="at">{{ n.at | date: 'short' }}</span>
+      </div>
+    } @empty {
+      <div class="empty">No notifications yet.</div>
+    }
+  </div>
+</div>

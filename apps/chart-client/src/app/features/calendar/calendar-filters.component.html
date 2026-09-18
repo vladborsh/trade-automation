@@ -1,0 +1,27 @@
+<div class="filters">
+  <label class="field">
+    Impact ≥
+    <select (change)="onImpactChange($event)">
+      @for (impact of impactOptions; track impact) {
+        <option [value]="impact" [selected]="impact === filters.filters().minImpact">{{ impact }}</option>
+      }
+    </select>
+  </label>
+
+  <div class="field countries">
+    Countries
+    <div class="country-list">
+      @for (country of availableCountries(); track country) {
+        <label class="country-item">
+          <input type="checkbox" [checked]="isCountrySelected(country)" (change)="onCountryToggle(country, $event)" />
+          {{ country }}
+        </label>
+      }
+    </div>
+  </div>
+
+  <label class="field">
+    <input type="checkbox" [checked]="filters.filters().hideRemoved" (change)="onHideRemovedChange($event)" />
+    Hide removed
+  </label>
+</div>

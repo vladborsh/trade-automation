@@ -1,0 +1,104 @@
+.calendar-week {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.week-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #30363d;
+}
+.week-header button {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  cursor: pointer;
+}
+.week-range {
+  font-weight: 600;
+}
+.tz-note {
+  margin-left: auto;
+  color: #8b949e;
+  font-size: 11px;
+}
+.grid {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+}
+.day-col {
+  border-right: 1px solid #21262d;
+  padding: 4px;
+  overflow-y: auto;
+}
+.day-col.today {
+  background: #11161d;
+}
+.day-header {
+  font-size: 11px;
+  color: #8b949e;
+  padding: 4px 2px;
+  border-bottom: 1px solid #21262d;
+  margin-bottom: 4px;
+}
+.event-row {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr auto auto auto;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  padding: 3px 2px;
+  cursor: pointer;
+}
+.event-row:hover {
+  background: #161b22;
+}
+.event-row.highlighted {
+  background: #1f2a3a;
+  outline: 1px solid #58a6ff;
+}
+.event-row.status-released {
+  opacity: 0.55;
+}
+.event-row.status-removed {
+  text-decoration: line-through;
+  opacity: 0.4;
+}
+.impact-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.impact-low {
+  background: #8b949e;
+}
+.impact-medium {
+  background: #d29922;
+}
+.impact-high {
+  background: #ef5350;
+}
+.impact-holiday {
+  background: #58a6ff;
+}
+.impact-unknown {
+  background: #30363d;
+}
+.now-line {
+  color: #58a6ff;
+  font-size: 10px;
+  border-top: 1px dashed #58a6ff;
+  padding: 2px 0;
+}
+.empty-day {
+  color: #8b949e;
+  font-size: 11px;
+  padding: 4px 2px;
+}

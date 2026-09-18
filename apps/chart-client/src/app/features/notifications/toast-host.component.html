@@ -1,0 +1,8 @@
+<div class="toast-host">
+  @for (toast of notifications.toastQueue(); track toast.toastId) {
+    <div class="toast" [class]="'kind-' + toast.notification.kind" (click)="onToastClick(toast)">
+      <span class="toast-title">{{ toast.notification.title }}</span>
+      <button type="button" class="dismiss" (click)="onDismiss($event, toast)" aria-label="Dismiss">×</button>
+    </div>
+  }
+</div>

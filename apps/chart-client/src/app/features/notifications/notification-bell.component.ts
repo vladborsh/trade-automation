@@ -11,46 +11,8 @@ import { NotificationCenterComponent } from './notification-center.component';
   standalone: true,
   imports: [NotificationCenterComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="bell-wrap">
-      <button type="button" class="bell" (click)="toggle()" aria-label="Notifications">
-        🔔
-        @if (notifications.hasUnread()) {
-          <span class="badge">{{ notifications.unreadCount() }}</span>
-        }
-      </button>
-      @if (open()) {
-        <app-notification-center (closed)="open.set(false)" />
-      }
-    </div>
-  `,
-  styles: [
-    `
-      .bell-wrap {
-        position: relative;
-      }
-      .bell {
-        position: relative;
-        background: none;
-        border: none;
-        color: #c9d1d9;
-        font-size: 15px;
-        cursor: pointer;
-        padding: 4px 6px;
-      }
-      .badge {
-        position: absolute;
-        top: 0;
-        right: 0;
-        background: #ef5350;
-        color: white;
-        font-size: 10px;
-        line-height: 1;
-        padding: 2px 4px;
-        border-radius: 8px;
-      }
-    `,
-  ],
+  templateUrl: './notification-bell.component.html',
+  styleUrl: './notification-bell.component.scss',
 })
 export class NotificationBellComponent {
   readonly open = signal(false);
