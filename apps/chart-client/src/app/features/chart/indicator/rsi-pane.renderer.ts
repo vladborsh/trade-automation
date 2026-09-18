@@ -4,8 +4,8 @@ import { rsiLineData } from './rsi';
 
 /** Index of the RSI pane — pane 0 is the price pane. */
 const RSI_PANE_INDEX = 1;
-/** Price pane keeps its default stretch factor 1; 1/3 against it gives the RSI pane ~25 % of the height. */
-const RSI_PANE_STRETCH = 1 / 3;
+/** RSI pane stretch relative to the price pane's (5.2.1 gives the default pane 2, not 1): 1/3 → ~25 % of the height. */
+const RSI_PANE_SHARE_OF_PRICE = 1 / 3;
 const RSI_LINE_COLOR = '#d29922';
 const RSI_GUIDE_COLOR = '#8b949e';
 const RSI_GUIDES = [70, 30];
@@ -20,9 +20,13 @@ const RSI_GUIDES = [70, 30];
  * (`_cleanupIfPaneIsEmpty`, since it was not added with `preserveEmptyPane`), so the price pane
  * takes the whole height back. Shown again = a fresh series (and pane) with a full `setData`.
  *
- * Must be rendered AFTER the price series for the same `candles` (a prepend read of the visible
- * logical range in `ChartComponent.withPreservedRangeOnPrepend` would otherwise see slots this
- * series had already prepended).
+ * Ordering against the price series (`renderAround`): the time scale is the UNION of every
+ * series' times, and `ChartComponent` maps logical<->time against the candles alone. So the RSI
+ * must never hold a time the candles do not: it is rendered AFTER the price series (on a
+ * `loadOlder()` prepend, RSI-first would already have prepended slots when the component reads
+ * the visible range to preserve), and on a non-continuation (timeframe/instrument switch) its old
+ * data is cleared BEFORE the price `setData` (old 5m RSI times days older than the new 1m buffer
+ * would otherwise shift every logical index while the shared range is applied).
  */
 export class RsiPaneRenderer {
   private chart: IChartApi | null = null;
@@ -38,6 +42,16 @@ export class RsiPaneRenderer {
   /** Attaches to the chart and draws the current state (call after the price series got its data). */
   attach(chart: IChartApi, candles: readonly Candle[], period: number): void {
     this.chart = chart;
+    this.render(candles, period);
+  }
+
+  /** Renders the price series via `renderPrice`, keeping the RSI's times a subset of the candles' throughout. */
+  renderAround<C extends readonly Candle[]>(candles: C, period: number, renderPrice: (candles: C) => void): void {
+    if (this.series && this.lastCount > 0 && this.classify(candles) === 'reset') {
+      this.series.setData([]);
+      this.resetRendered();
+    }
+    renderPrice(candles);
     this.render(candles, period);
   }
 
@@ -76,11 +90,9 @@ export class RsiPaneRenderer {
       return;
     }
     const series = this.series ?? this.createSeries();
-    const n = candles.length;
-    const newestTime = n > 0 ? candles[n - 1].openTime : null;
-    const sameShape = this.lastPeriod === period && this.lastCount > 0 && this.lastTime !== null;
-    const isUpdate = sameShape && n === this.lastCount && newestTime === this.lastTime;
-    const isAppend = sameShape && n === this.lastCount + 1 && candles[n - 2].openTime === this.lastTime;
+    const kind = this.lastPeriod === period ? this.classify(candles) : 'reset';
+    const isUpdate = kind === 'update';
+    const isAppend = kind === 'append';
 
     const data = rsiLineData(candles, period);
     if ((isUpdate || isAppend) && data.length > 0) {
@@ -88,7 +100,7 @@ export class RsiPaneRenderer {
       const prev = data[data.length - 2];
       // On an append the previously-newest bar may have closed at a different price than its
       // last forming tick: refresh it (still the series' last point) before appending the new one.
-      if (isAppend && prev && this.lastTime !== null && prev.time === this.lastTime / 1000) {
+      if (isAppend && prev && this.lastTime !== null && prev.time === Math.floor(this.lastTime / 1000)) {
         series.update(prev);
       }
       series.update(last);
@@ -96,9 +108,25 @@ export class RsiPaneRenderer {
       series.setData(data);
       series.applyOptions({ title: `RSI ${period}` });
     }
-    this.lastCount = n;
-    this.lastTime = newestTime;
+    this.lastCount = candles.length;
+    this.lastTime = candles.length > 0 ? candles[candles.length - 1].openTime : null;
     this.lastPeriod = period;
+  }
+
+  /** How `candles` relate to what the series was last given (mirrors `ChartComponent.renderCandles`). */
+  private classify(candles: readonly Candle[]): 'update' | 'append' | 'prepend' | 'reset' {
+    const n = candles.length;
+    if (this.lastCount === 0 || this.lastTime === null || n === 0) {
+      return 'reset';
+    }
+    const newest = candles[n - 1].openTime;
+    if (n === this.lastCount && newest === this.lastTime) {
+      return 'update';
+    }
+    if (n === this.lastCount + 1 && candles[n - 2].openTime === this.lastTime) {
+      return 'append';
+    }
+    return n > this.lastCount && newest === this.lastTime ? 'prepend' : 'reset';
   }
 
   private createSeries(): ISeriesApi<'Line'> {
@@ -115,7 +143,8 @@ export class RsiPaneRenderer {
       },
       RSI_PANE_INDEX,
     );
-    series.getPane().setStretchFactor(RSI_PANE_STRETCH);
+    series.getPane().setStretchFactor(chart.panes()[0].getStretchFactor() * RSI_PANE_SHARE_OF_PRICE);
+    series.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.08 } });
     for (const price of RSI_GUIDES) {
       series.createPriceLine({
         price,

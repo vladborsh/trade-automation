@@ -8,6 +8,7 @@ interface FakeSeries {
   applyOptions: ReturnType<typeof vi.fn>;
   createPriceLine: ReturnType<typeof vi.fn>;
   getPane: () => { setStretchFactor: ReturnType<typeof vi.fn> };
+  priceScale: () => { applyOptions: ReturnType<typeof vi.fn> };
 }
 
 function fakeChart() {
@@ -21,11 +22,13 @@ function fakeChart() {
         applyOptions: vi.fn(),
         createPriceLine: vi.fn(),
         getPane: () => pane,
+        priceScale: () => ({ applyOptions: vi.fn() }),
       };
       created.push({ series, paneIndex });
       return series;
     }),
     removeSeries: vi.fn(),
+    panes: () => [{ getStretchFactor: () => 2 }],
   };
   return { chart, created, api: chart as unknown as IChartApi };
 }
@@ -56,6 +59,7 @@ describe('RsiPaneRenderer', () => {
     expect(chart.addSeries).toHaveBeenCalledTimes(1);
     const { series, paneIndex } = created[0];
     expect(paneIndex).toBe(1);
+    expect(series.getPane().setStretchFactor).toHaveBeenCalledWith(2 / 3); // ~25 % against the price pane's 2
     expect(series.createPriceLine.mock.calls.map((c) => c[0].price)).toEqual([70, 30]);
     expect(series.setData).toHaveBeenCalledTimes(1);
     expect(series.setData.mock.calls[0][0].length).toBe(200 - 140);
@@ -109,5 +113,30 @@ describe('RsiPaneRenderer', () => {
     r.configure(false, 14, candles(200));
     r.attach(api, candles(200), 14);
     expect(chart.addSeries).not.toHaveBeenCalled();
+  });
+});
+
+describe('RsiPaneRenderer.renderAround', () => {
+  it('clears stale RSI before a non-continuation price render, then redraws after it', () => {
+    const { created, api } = fakeChart();
+    const r = new RsiPaneRenderer();
+    r.attach(api, candles(200), 14);
+    const s = created[0].series;
+    const order: string[] = [];
+    s.setData.mockImplementation((d: unknown[]) => order.push(`rsi:${d.length}`));
+    r.renderAround(candles(300, 1000), 14, () => order.push('price')); // e.g. a timeframe switch
+    expect(order).toEqual(['rsi:0', 'price', 'rsi:160']);
+  });
+
+  it('keeps RSI data during a prepend and renders it after the price series', () => {
+    const { created, api } = fakeChart();
+    const r = new RsiPaneRenderer();
+    const current = candles(200, 500);
+    r.attach(api, current, 14);
+    const s = created[0].series;
+    const order: string[] = [];
+    s.setData.mockImplementation((d: unknown[]) => order.push(`rsi:${d.length}`));
+    r.renderAround([...candles(100, 400), ...current], 14, () => order.push('price'));
+    expect(order).toEqual(['price', 'rsi:160']);
   });
 });

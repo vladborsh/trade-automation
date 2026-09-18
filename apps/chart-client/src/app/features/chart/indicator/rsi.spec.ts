@@ -1,4 +1,5 @@
 import type { Candle } from '@trade-automation/contracts';
+import { toCandlestickData } from '../chart-data.adapter';
 import { RSI_STABLE_BARS, rsiDrawable, rsiLineData, rsiWilder } from './rsi';
 
 // The classic Wilder 14-period worked example (StockCharts "RSI" ChartSchool spreadsheet).
@@ -114,5 +115,14 @@ describe('rsiLineData', () => {
     expect(data.length).toBe(20);
     expect(data[0].time).toBe((candles[140].openTime / 1000) as typeof data[0]['time']);
     expect(data[19].value).toBe(rsiWilder(closes, 14)[159] as number);
+  });
+
+  it('uses the candle series\' own time for a non-whole-second openTime (no extra time-scale slots)', () => {
+    const closes = randomWalk(150, 5);
+    const candles = closes.map((close, i) => ({ openTime: 1_700_000_000_807 + i * 60_000, close }) as Candle);
+    const data = rsiLineData(candles, 14);
+    expect(data.map((d) => d.time)).toEqual(
+      candles.slice(140).map((c) => toCandlestickData(c).time),
+    );
   });
 });

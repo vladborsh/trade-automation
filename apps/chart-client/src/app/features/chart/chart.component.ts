@@ -132,8 +132,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       if (this.kind() === 'candles') {
-        this.renderCandles(this.candles());
-        this.rsiPane.render(this.candles(), untracked(this.rsiPeriod)); // after the price series (see RsiPaneRenderer)
+        this.rsiPane.renderAround(this.candles(), untracked(this.rsiPeriod), (c) => this.renderCandles(c));
       } else {
         this.renderPoints(this.points());
       }

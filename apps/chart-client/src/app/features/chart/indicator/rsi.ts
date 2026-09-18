@@ -70,7 +70,9 @@ export function rsiLineData(candles: readonly Candle[], period: number): RsiLine
   const out: RsiLinePoint[] = [];
   values.forEach((value, i) => {
     if (value !== null) {
-      out.push({ time: (candles[i].openTime / 1000) as UTCTimestamp, value });
+      // Exactly the candle series' own time (chart-data.adapter's `Math.floor`): any other rounding
+      // of a non-whole-second openTime would add a time-scale slot per RSI point.
+      out.push({ time: Math.floor(candles[i].openTime / 1000) as UTCTimestamp, value });
     }
   });
   return out;
