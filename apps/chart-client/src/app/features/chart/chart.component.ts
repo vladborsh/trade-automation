@@ -10,6 +10,7 @@ import {
   input,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import {
@@ -40,6 +41,7 @@ import { LineRenderer } from './overlay/line.renderer';
 import { ShapesPrimitive } from './overlay/shapes.primitive';
 import { IndicatorLayer } from './indicator/indicator-layer';
 import { ChartSyncService, sameRange, type TimeRange } from './chart-sync.service';
+import { ResizeSettleTracker, observeResize } from './resize-settle';
 import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart-time';
 
 // Pure logical<->time helpers live in chart-time.ts; re-exported for existing importers.
@@ -139,6 +141,10 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   /** Reentrancy guard 2 (§6.4): suppresses an async echo and a follower's own bar-grid "snap" of the applied range. */
   private lastApplied: TimeRange | null = null;
 
+  /** §11.3 sync rule 3: while the container is resizing, range changes never propose; once settled, re-join the shared range. */
+  private readonly resizeSettle = new ResizeSettleTracker(() => this.reapplySharedRange());
+  private stopResizeObserver: () => void = () => undefined;
+
   constructor() {
     this.overlayLayer.register(new MarkerRenderer());
     this.overlayLayer.register(new PriceLineRenderer());
@@ -179,57 +185,21 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     // `logicalToTimeSec`/`timeSecToLogical` on the way in and out.
     effect(() => {
       const range = this.sync.range();
-      if (!range || this.sync.origin() === this.panelId() || !this.chart || this.lastRenderedCount === 0) {
-        // No data on this panel's series yet: lightweight-charts cannot map a
-        // time range to a logical range with nothing to map it against, and
-        // throws. Once this panel's own history lands, `renderCandles`/
-        // `renderPoints` fires its own range-change event that re-seeds
-        // things, so skipping here loses nothing.
+      if (!range || this.sync.origin() === this.panelId()) {
         return;
       }
-      const timesSec = this.lastTimesSec;
-      if (timesSec.length === 0) {
-        return;
-      }
-      const tf = this.tfSec();
-      this.applying = true;
-      try {
-        this.chart.timeScale().setVisibleLogicalRange({
-          from: timeSecToLogical(range.from, timesSec, tf),
-          to: timeSecToLogical(range.to, timesSec, tf),
-        });
-      } catch {
-        // lightweight-charts can still reject a range outside this panel's
-        // data domain (e.g. a market-hours instrument during a synced
-        // window it has no bars for) — never let one panel's chart crash
-        // the shared sync effect for the rest of the grid.
-        this.applying = false;
-        return;
-      }
-      // Read back what lightweight-charts actually rendered, not what we
-      // asked for — but only on the NEXT animation frame, not synchronously.
-      // A requested range landing inside this panel's own data gap (real
-      // market data, e.g. a session closure) doesn't finish its snap-to-grid
-      // settle inside setVisibleRange() itself; reading getVisibleLogicalRange()
-      // right away can still capture a stale intermediate value, so the
-      // later real async echo would still fail sameRange() against a
-      // wrong lastApplied and re-propose (see
-      // architecture/scroll-back-freeze-diagnosis.md). Deferring both the
-      // read-back and clearing `applying` to the next frame keeps the Drive
-      // handler suppressed until the settle has actually finished. A logical
-      // range is applied exactly (only `minBarSpacing`/fixed-edge clamps are
-      // left, and those are off), so this read-back is now mostly a formality
-      // — but it stays, since that's what it's for.
-      requestAnimationFrame(() => {
-        if (!this.chart) {
-          this.applying = false;
-          return;
+      this.applyRange(range);
+    });
+
+    // §11.3 sync rule 3: after a sibling collapses/restores, EVERY chart (the origin included)
+    // re-applies the current shared range to its new width. A chart still mid-resize skips it:
+    // its own resize-settle re-applies the then-current range anyway.
+    effect(() => {
+      this.sync.reassertEpoch();
+      untracked(() => {
+        if (!this.resizeSettle.resizing) {
+          this.reapplySharedRange();
         }
-        const applied = this.chart.timeScale().getVisibleLogicalRange();
-        this.lastApplied = applied
-          ? { from: logicalToTimeSec(applied.from, this.lastTimesSec, tf), to: logicalToTimeSec(applied.to, this.lastTimesSec, tf) }
-          : range;
-        this.applying = false;
       });
     });
 
@@ -277,6 +247,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     const el = this.container().nativeElement;
     const isCandles = this.kind() === 'candles';
+    this.stopResizeObserver = observeResize(el, this.resizeSettle); // before createChart — see observeResize
     this.chart = createChart(el, {
       layout: {
         background: { type: ColorType.Solid, color: '#0d1117' },
@@ -353,8 +324,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
         this.loadOlderRequested.emit();
       }
 
-      if (this.applying) {
-        return;
+      if (this.applying || this.resizeSettle.resizing) {
+        return; // our own programmatic apply, or a resize-driven change (§11.3 rule 3) — never a proposal
       }
       const eps = this.syncEpsilonSec();
       const proposed: TimeRange = { from: fromSec, to: toSec };
@@ -420,6 +391,88 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     }
     this.indicatorLayer.render(this.indicatorPoints(), this.indicatorSpecs(), this.timeframe());
     this.indicatorSeriesCount.set(this.indicatorLayer.visibleSeriesCount());
+  }
+
+  /**
+   * Applies a shared range to this panel under the `applying` guard (§6.4 Follow, bug 3's
+   * logical-range form). Used by the Follow effect, by reassert/resize-settle (§11.3 rule 3) and
+   * by the first-data join (§11.3 rule 2).
+   */
+  private applyRange(range: TimeRange): void {
+    if (!this.chart || this.lastRenderedCount === 0) {
+      // No data on this panel's series yet: lightweight-charts cannot map a
+      // time range to a logical range with nothing to map it against, and
+      // throws. Once this panel's own history lands, `renderCandles`/
+      // `renderPoints` joins the shared range (§11.3 rule 2), so
+      // skipping here loses nothing.
+      return;
+    }
+    const timesSec = this.lastTimesSec;
+    if (timesSec.length === 0) {
+      return;
+    }
+    const tf = this.tfSec();
+    this.applying = true;
+    try {
+      this.chart.timeScale().setVisibleLogicalRange({
+        from: timeSecToLogical(range.from, timesSec, tf),
+        to: timeSecToLogical(range.to, timesSec, tf),
+      });
+    } catch {
+      // lightweight-charts can still reject a range outside this panel's
+      // data domain (e.g. a market-hours instrument during a synced
+      // window it has no bars for) — never let one panel's chart crash
+      // the shared sync effect for the rest of the grid.
+      this.applying = false;
+      return;
+    }
+    // Read back what lightweight-charts actually rendered, not what we
+    // asked for — but only on the NEXT animation frame, not synchronously.
+    // A requested range landing inside this panel's own data gap (real
+    // market data, e.g. a session closure) doesn't finish its snap-to-grid
+    // settle inside setVisibleRange() itself; reading getVisibleLogicalRange()
+    // right away can still capture a stale intermediate value, so the
+    // later real async echo would still fail sameRange() against a
+    // wrong lastApplied and re-propose (see
+    // architecture/scroll-back-freeze-diagnosis.md). Deferring both the
+    // read-back and clearing `applying` to the next frame keeps the Drive
+    // handler suppressed until the settle has actually finished. A logical
+    // range is applied exactly (only `minBarSpacing`/fixed-edge clamps are
+    // left, and those are off), so this read-back is now mostly a formality
+    // — but it stays, since that's what it's for.
+    requestAnimationFrame(() => {
+      if (!this.chart) {
+        this.applying = false;
+        return;
+      }
+      const applied = this.chart.timeScale().getVisibleLogicalRange();
+      this.lastApplied = applied
+        ? { from: logicalToTimeSec(applied.from, this.lastTimesSec, tf), to: logicalToTimeSec(applied.to, this.lastTimesSec, tf) }
+        : range;
+      this.applying = false;
+    });
+  }
+
+  /** Re-applies the current shared range (if any) regardless of origin — §11.3 rules 2 and 3. */
+  private reapplySharedRange(): void {
+    untracked(() => {
+      const range = this.sync.range();
+      if (range) {
+        this.applyRange(range);
+      }
+    });
+  }
+
+  /**
+   * §11.3 sync rule 2 — a chart that mounts (or gets its first data) while a shared range exists
+   * JOINS it and never proposes its own autofit window. The autofit range-change this `setData`
+   * produced either arrives while `applying` is still set, or matches `lastApplied` — both drop
+   * it. With no shared range yet, nothing happens here and today's boot seeding stands.
+   */
+  private joinSharedRangeOnFirstData(wasEmpty: boolean): void {
+    if (wasEmpty && this.lastRenderedCount > 0) {
+      this.reapplySharedRange();
+    }
   }
 
   /** Half a bar of the current timeframe, in seconds — larger than any bar-grid snap (§6.4). */
@@ -492,6 +545,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       return;
     }
     const series = this.series as ISeriesApi<'Candlestick'>;
+    const wasEmpty = this.lastRenderedCount === 0;
     if (candles.length === 0) {
       series.setData([]);
       this.lastRenderedCount = 0;
@@ -521,6 +575,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.lastRenderedCount = candles.length;
     this.lastRenderedTime = candles[candles.length - 1].openTime;
     this.lastTimesSec = timesSec;
+    this.joinSharedRangeOnFirstData(wasEmpty);
   }
 
   private renderPoints(points: MetricPoint[]): void {
@@ -528,6 +583,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       return;
     }
     const series = this.series as ISeriesApi<'Line'>;
+    const wasEmpty = this.lastRenderedCount === 0;
     if (points.length === 0) {
       series.setData([]);
       this.lastRenderedCount = 0;
@@ -555,9 +611,14 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.lastRenderedCount = points.length;
     this.lastRenderedTime = points[points.length - 1].time;
     this.lastTimesSec = timesSec;
+    this.joinSharedRangeOnFirstData(wasEmpty);
   }
 
   ngOnDestroy(): void {
+    // §11.3 sync rule 1: a collapsed panel's chart is destroyed, not hidden.
+    this.stopResizeObserver();
+    this.resizeSettle.dispose();
+    this.sync.releaseCrosshair(this.panelId());
     this.overlayLayer.clearAll();
     this.indicatorLayer.clearAll();
     this.chart?.remove();

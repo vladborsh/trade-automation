@@ -3,6 +3,16 @@
     <span class="panel-title">{{ title() }}</span>
     <span class="venue-dot" [class]="'venue-' + venueStatus()"></span>
     <app-research-badge />
+    <button
+      type="button"
+      class="collapse-btn"
+      aria-label="Collapse panel"
+      [disabled]="!canCollapse()"
+      [title]="canCollapse() ? 'Collapse panel' : 'At least one panel stays open'"
+      (click)="collapse()"
+    >
+      <span aria-hidden="true">&#x2039;</span>
+    </button>
   </div>
   <div class="panel-body">
     <app-chart

@@ -1,0 +1,11 @@
+<button
+  type="button"
+  class="collapsed-panel-strip"
+  [attr.data-panel-id]="panelId()"
+  aria-label="Expand panel"
+  [title]="'Expand ' + title()"
+  (click)="restore.emit()"
+>
+  <span class="chevron" aria-hidden="true">&#x203A;</span>
+  <span class="strip-title">{{ title() }}</span>
+</button>

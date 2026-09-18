@@ -6,11 +6,19 @@
   min-width: 0;
   flex: 1 1 auto;
 }
+/* §11.3: one row of columns, left to right in panel order; no width animation (it would feed resize-driven range changes into the sync). */
 .panel-grid {
-  display: grid;
+  display: flex;
+  flex-direction: row;
   gap: 4px;
   height: 100%;
   width: 100%;
   min-height: 0;
   min-width: 0;
+}
+.panel-column {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
