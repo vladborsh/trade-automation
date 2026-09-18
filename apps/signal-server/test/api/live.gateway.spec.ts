@@ -1,6 +1,8 @@
 import { LiveGateway } from '../../src/api/ws/live.gateway';
 import { CandleClosedEvent, CandleFormingEvent } from '../../src/market-data/market-data.events';
+import { MetricCache } from '../../src/market-data/metrics/metric-cache.service';
 import { MetricObservedEvent } from '../../src/market-data/metrics/metric.events';
+import { MetricsController } from '../../src/api/rest/metrics.controller';
 import { Candle, MetricObservation } from '@trade-automation/contracts';
 
 class FakeSocket {
@@ -46,6 +48,16 @@ function observation(instrument: MetricObservation['instrument'], time: number, 
   return { metric: 'openInterest', instrument, time, value, unit: 'base' };
 }
 
+function makeGateway(cache = new MetricCache()) {
+  return Object.assign(new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics(), cache), { cache });
+}
+
+/** What MetricIngestionService does: upsert into MetricCache, then emit MetricObserved. */
+function observe(gateway: ReturnType<typeof makeGateway>, o: MetricObservation): void {
+  gateway.cache.upsert(o);
+  gateway.onMetricObserved(new MetricObservedEvent(o));
+}
+
 function candle(instrument: Candle['instrument'], timeframe: Candle['timeframe'], closed: boolean): Candle {
   return {
     instrument,
@@ -63,7 +75,7 @@ function candle(instrument: Candle['instrument'], timeframe: Candle['timeframe']
 
 describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-server.md §3.5)', () => {
   it('only forwards candle frames for a topic the client has subscribed to', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const client = new FakeSocket();
     gateway.handleConnection(client as never, { url: '/' } as never);
 
@@ -81,7 +93,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
   });
 
   it('stops forwarding after unsubscribe', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const client = new FakeSocket();
     gateway.handleConnection(client as never, { url: '/' } as never);
 
@@ -94,7 +106,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
   });
 
   it('responds to ping with pong', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const client = new FakeSocket();
     gateway.handleConnection(client as never, { url: '/' } as never);
 
@@ -103,7 +115,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
   });
 
   it('routes signal frames only to clients subscribed to that instrument', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const subscribed = new FakeSocket();
     const unsubscribed = new FakeSocket();
     gateway.handleConnection(subscribed as never, { url: '/' } as never);
@@ -130,7 +142,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
   });
 
   it('routes indicator frames only to clients subscribed to that instrument, on the same signals topic (architecture/live-signal-server.md §11.5)', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const subscribed = new FakeSocket();
     const unsubscribed = new FakeSocket();
     gateway.handleConnection(subscribed as never, { url: '/' } as never);
@@ -154,11 +166,11 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
   });
 
   it('only forwards metric frames for a topic the client has subscribed to (architecture/chart-layouts.md §4.5)', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const client = new FakeSocket();
     gateway.handleConnection(client as never, { url: '/' } as never);
 
-    gateway.onMetricObserved(new MetricObservedEvent(observation('binance:BTCUSDT', 60_000, 100)));
+    observe(gateway, observation('binance:BTCUSDT', 60_000, 100));
     expect(client.sent).toHaveLength(0);
 
     client.emitMessage({
@@ -168,7 +180,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
       metric: 'openInterest',
       timeframe: '1m',
     });
-    gateway.onMetricObserved(new MetricObservedEvent(observation('binance:BTCUSDT', 60_000, 100)));
+    observe(gateway, observation('binance:BTCUSDT', 60_000, 100));
     const frames = client.sent.filter((m: unknown) => (m as { type: string }).type === 'metric');
     expect(frames).toHaveLength(1);
     expect((frames[0] as { point: { time: number; value: number; timeframe: string } }).point).toEqual(
@@ -177,12 +189,12 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
 
     // a different instrument must not leak through
     client.sent.length = 0;
-    gateway.onMetricObserved(new MetricObservedEvent(observation('binance:ETHUSDT', 60_000, 5)));
+    observe(gateway, observation('binance:ETHUSDT', 60_000, 5));
     expect(client.sent.filter((m: unknown) => (m as { type: string }).type === 'metric')).toHaveLength(0);
   });
 
   it('stops forwarding metric frames after unsubscribe', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const client = new FakeSocket();
     gateway.handleConnection(client as never, { url: '/' } as never);
 
@@ -202,12 +214,12 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
     });
     client.sent.length = 0;
 
-    gateway.onMetricObserved(new MetricObservedEvent(observation('binance:BTCUSDT', 60_000, 100)));
+    observe(gateway, observation('binance:BTCUSDT', 60_000, 100));
     expect(client.sent.filter((m: unknown) => (m as { type: string }).type === 'metric')).toHaveLength(0);
   });
 
   it('bucketing a metric observation to two different subscribed timeframes fans out two frames', () => {
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const oneMinSub = new FakeSocket();
     const fiveMinSub = new FakeSocket();
     gateway.handleConnection(oneMinSub as never, { url: '/' } as never);
@@ -227,7 +239,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
       timeframe: '5m',
     });
 
-    gateway.onMetricObserved(new MetricObservedEvent(observation('binance:BTCUSDT', 62_000, 100)));
+    observe(gateway, observation('binance:BTCUSDT', 62_000, 100));
 
     const oneMinFrame = oneMinSub.sent.find((m: unknown) => (m as { type: string }).type === 'metric') as {
       point: { time: number; timeframe: string };
@@ -241,7 +253,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
 
   it('throttles forming-bar frames to at most ~4/s per topic', () => {
     jest.useFakeTimers();
-    const gateway = new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics());
+    const gateway = makeGateway();
     const client = new FakeSocket();
     gateway.handleConnection(client as never, { url: '/' } as never);
     client.emitMessage({ type: 'subscribe', topic: 'candles', instrument: 'binance:BTCUSDT', timeframe: '1m' });
@@ -252,5 +264,90 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
     const formingFrames = client.sent.filter((m: unknown) => (m as { type: string }).type === 'candle');
     expect(formingFrames.length).toBe(1);
     jest.useRealTimers();
+  });
+});
+
+describe('LiveGateway forming metric point (architecture/chart-layouts.md §11.2)', () => {
+  const M = 60_000;
+  const emptyStore = { query: async () => [], upsert: async () => undefined, latestTime: async () => null };
+
+  function subscribe(client: FakeSocket, timeframe: string): void {
+    client.emitMessage({ type: 'subscribe', topic: 'metrics', instrument: 'binance:BTCUSDT', metric: 'openInterest', timeframe });
+  }
+
+  function lastPoint(client: FakeSocket): Record<string, unknown> {
+    const frames = client.sent.filter((m: unknown) => (m as { type: string }).type === 'metric') as { point: Record<string, unknown> }[];
+    return frames[frames.length - 1].point;
+  }
+
+  function seed(gateway: ReturnType<typeof makeGateway>): void {
+    // history rows every 5 m with a venue notional, then 1 m live snapshots in the forming bucket
+    for (let i = 0; i < 6; i++) {
+      gateway.cache.upsert({ ...observation('binance:BTCUSDT', i * 5 * M, 100 + i), notional: 1000 + i, notionalBasis: 'venue' });
+    }
+  }
+
+  it('builds the forming bucket from MetricCache, not from the single observation', () => {
+    const gateway = makeGateway();
+    const client = new FakeSocket();
+    gateway.handleConnection(client as never, { url: '/' } as never);
+    subscribe(client, '15m');
+    seed(gateway);
+
+    // Rows at 0..25 m are 100..105; the 15m bucket's predecessor (0–15 m) closes at 102.
+    observe(gateway, observation('binance:BTCUSDT', 16 * M + 2000, 90));
+    // 15–20 m sub-bucket: the 15 m row then the 16 m tip → the tip is the sample; open = 102.
+    expect(lastPoint(client)).toEqual(
+      expect.objectContaining({ time: 15 * M, value: 90, ohlc: { open: 102, high: 102, low: 90, close: 90 }, samples: 1 }),
+    );
+
+    observe(gateway, observation('binance:BTCUSDT', 21 * M + 2000, 95));
+    // a second poll must extend the forming candle, not replace it with a flat one
+    expect(lastPoint(client)).toEqual(
+      expect.objectContaining({ time: 15 * M, value: 95, ohlc: { open: 102, high: 102, low: 90, close: 95 }, samples: 2 }),
+    );
+  });
+
+  it('the WS point for a bucket equals the REST point for the same bucket', async () => {
+    const gateway = makeGateway();
+    const client = new FakeSocket();
+    gateway.handleConnection(client as never, { url: '/' } as never);
+    const controller = new MetricsController(gateway.cache, emptyStore as never);
+    seed(gateway);
+
+    for (const tf of ['1m', '5m', '15m', '1h'] as const) {
+      client.sent.length = 0;
+      subscribe(client, tf);
+      observe(gateway, observation('binance:BTCUSDT', 27 * M + 2000, 111));
+      const rest = await controller.get({
+        instrument: 'binance:BTCUSDT',
+        metric: 'openInterest',
+        timeframe: tf,
+        from: 0,
+        to: 27 * M + 2000,
+        limit: 1500,
+      });
+      expect(lastPoint(client)).toEqual(JSON.parse(JSON.stringify(rest[rest.length - 1])));
+      client.emitMessage({ type: 'unsubscribe', topic: 'metrics', instrument: 'binance:BTCUSDT', metric: 'openInterest', timeframe: tf });
+    }
+  });
+});
+
+describe('MetricsController lead bucket (architecture/chart-layouts.md §11.2)', () => {
+  const M = 60_000;
+
+  it('opens the first returned bucket at its predecessor\'s close and drops the predecessor', async () => {
+    const cache = new MetricCache();
+    for (let i = 0; i < 12; i++) cache.upsert(observation('binance:BTCUSDT', i * 5 * M, 100 + i));
+    const store = { query: async () => [], upsert: async () => undefined, latestTime: async () => null };
+    const controller = new MetricsController(cache, store as never);
+    const query = { instrument: 'binance:BTCUSDT', metric: 'openInterest', timeframe: '15m', limit: 1500 } as const;
+
+    const page = await controller.get({ ...query, from: 15 * M, to: 60 * M });
+    expect(page.map((p) => p.time)).toEqual([15 * M, 30 * M, 45 * M]);
+    const full = await controller.get({ ...query, from: 0, to: 60 * M });
+    // the first candle of the page equals the same candle fetched mid-page
+    expect(page[0]).toEqual(full[1]);
+    expect(page[0].ohlc.open).toBe(102);
   });
 });

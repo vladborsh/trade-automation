@@ -13,7 +13,9 @@ import {
   Candle,
   InstrumentId,
   MetricKind,
+  MetricPoint,
   Signal,
+  TIMEFRAME_MS,
   Timeframe,
   WsClientMessage,
   WsClientMessageSchema,
@@ -22,6 +24,7 @@ import {
 } from '@trade-automation/contracts';
 import { CandleClosedEvent, CandleFormingEvent, MarketDataEvents } from '../../market-data/market-data.events';
 import { MarketDataStatusService } from '../../market-data/market-data-status.service';
+import { MetricCache } from '../../market-data/metrics/metric-cache.service';
 import { MetricEvents, MetricObservedEvent } from '../../market-data/metrics/metric.events';
 import {
   IndicatorEmittedEvent,
@@ -75,6 +78,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly status: MarketDataStatusService,
     private readonly config: AppConfigService,
     private readonly metrics: MetricsService,
+    private readonly metricCache: MetricCache,
   ) {}
 
   handleConnection(client: WsSocket, request: IncomingMessage): void {
@@ -222,11 +226,16 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * architecture/chart-layouts.md §4.5 — "ClientState gains metricTopics ... and
    * onMetricObserved fans one bucketed point per subscribed timeframe." At <=1 observation/min
    * no throttle is needed, unlike candle forming frames.
+   *
+   * §11.2: the point is built from MetricCache over [bucketStart − tfMs, observation.time] — the
+   * bucket so far plus its predecessor (for the open) — never from the single observation, which
+   * would replace the forming candle with a flat one on every poll. Same inputs as the REST path,
+   * so the WS point for a bucket equals the REST point for it.
    */
   @OnEvent(MetricEvents.MetricObserved)
   onMetricObserved(event: MetricObservedEvent): void {
     const observation = event.observation;
-    const pointByTimeframe = new Map<Timeframe, ReturnType<typeof bucketObservations>[number]>();
+    const pointByTimeframe = new Map<Timeframe, MetricPoint | null>();
 
     for (const [client, state] of this.clients) {
       for (const topic of state.metricTopics) {
@@ -238,13 +247,21 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (topicInstrument !== observation.instrument || topicMetric !== observation.metric) continue;
 
         let point = pointByTimeframe.get(topicTimeframe);
-        if (!point) {
-          point = bucketObservations([observation], topicTimeframe)[0];
+        if (point === undefined) {
+          point = this.formingMetricPoint(observation, topicTimeframe);
           pointByTimeframe.set(topicTimeframe, point);
         }
-        this.send(client, { type: 'metric', point });
+        if (point) this.send(client, { type: 'metric', point });
       }
     }
+  }
+
+  private formingMetricPoint(observation: MetricObservedEvent['observation'], tf: Timeframe): MetricPoint | null {
+    const tfMs = TIMEFRAME_MS[tf];
+    const bucketStart = Math.floor(observation.time / tfMs) * tfMs;
+    const window = this.metricCache.query(observation.instrument, observation.metric, bucketStart - tfMs, observation.time);
+    const last = bucketObservations(window, tf).at(-1);
+    return last && last.time === bucketStart ? last : null;
   }
 
   private broadcastCandle(topic: string, candle: Candle): void {
