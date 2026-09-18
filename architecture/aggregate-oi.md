@@ -324,6 +324,17 @@ architect-aggregate-oi  (this branch: note + contract; server 223+1 skip, client
   shows 00:00 then 00:15). If they do not match to ≤ 1e-6 relative, **stop and report**, do not
   ingest. Static S3 files, no API weight; pace 1 file/s, Phase 2, resumable.
 
+Dispatched 2026-09-18 in Orca run `run_44720bbc2dc3` (worktrees named after the branches, all
+cut from `architect-aggregate-oi` @ `11ba97d`):
+
+| Task | Branch | Orca task |
+|---|---|---|
+| SE-AG1 | `se-oi-bybit-leg` | `task_4132c4e3434a` |
+| SE-AG2 | `se-oi-hyperliquid-leg` | `task_8367cbcdea31` |
+| SE-AG3 | `se-oi-aggregate-core` | `task_9bd4d2fe7cc3` |
+| SE-AG4 | `se-oi-aggregate-client` | `task_dd69283b098d` |
+| SE-AG5 | `se-oi-binance-deep` | `task_2930fcb0a72d` |
+
 Every task: read `AGENTS.md`; own ports; `libs/contracts` built before the client; server
 `npm test` and client `npx ng test --watch=false` green with counts; `worker_done` with branch.
 
