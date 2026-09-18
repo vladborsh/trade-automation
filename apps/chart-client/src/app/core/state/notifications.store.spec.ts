@@ -1,5 +1,6 @@
-import { NotificationsStore } from './notifications.store';
-import type { CalendarNotification } from '../contracts/calendar';
+import { NotificationsStore, toastContent } from './notifications.store';
+import type { CalendarNotification, EventImpact } from '../contracts/calendar';
+import { testEvent } from './calendar-test-events';
 
 function notification(overrides: Partial<CalendarNotification> = {}): CalendarNotification {
   return {
@@ -93,5 +94,42 @@ describe('NotificationsStore', () => {
 
     const restored = new NotificationsStore();
     expect(restored.desktopNotificationsEnabled()).toBe(true);
+  });
+});
+
+describe('toastContent — toasts respect the filters (§11.3)', () => {
+  const filters = { impacts: ['medium', 'high', 'holiday'] as EventImpact[], countries: ['USD'], hideRemoved: false };
+
+  it('an event-due toast shows only if one of its events passes, titled from the passing ones', () => {
+    const due = notification({ events: [testEvent({ id: 'jpy', country: 'JPY' }), testEvent({ id: 'usd', title: 'Fed Funds Rate' })] });
+    expect(toastContent(due, filters)).toMatchObject({ show: true, title: '🇺🇸 USD · High · Fed Funds Rate', hiddenCount: 1 });
+    expect(toastContent(notification({ events: [testEvent({ country: 'JPY' })] }), filters).show).toBe(false);
+  });
+
+  it('a digest lists only passing events and counts the hidden ones', () => {
+    const digest = notification({
+      id: 'digest:2026-09-22',
+      kind: 'daily-digest',
+      title: 'Today: 3 events · 3 high (USD, JPY)',
+      events: [testEvent({ id: 'b', scheduledAt: 2 }), testEvent({ id: 'jpy', country: 'JPY' }), testEvent({ id: 'a', scheduledAt: 1 })],
+    });
+    const content = toastContent(digest, filters);
+    expect(content.show).toBe(true);
+    expect(content.events.map((e) => e.id)).toEqual(['a', 'b']);
+    expect(content.hiddenCount).toBe(1);
+    expect(content.title).toBe('Today: 2 matching events');
+  });
+
+  it('an empty digest keeps the server title', () => {
+    const empty = notification({ kind: 'daily-digest', title: 'Today: no scheduled events', events: [] });
+    expect(toastContent(empty, filters)).toEqual({ show: true, title: 'Today: no scheduled events', events: [], hiddenCount: 0 });
+  });
+
+  it('receive() with filters skips the toast but still records the notification', () => {
+    const store = new NotificationsStore();
+    store.receive(notification({ events: [testEvent({ country: 'JPY' })] }), filters);
+    expect(store.notifications()).toHaveLength(1);
+    expect(store.unreadCount()).toBe(1);
+    expect(store.toastQueue()).toEqual([]);
   });
 });

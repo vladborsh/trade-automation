@@ -1,0 +1,26 @@
+<div class="toast-host">
+  @for (toast of notifications.toastQueue(); track toast.toastId) {
+    <div
+      class="toast"
+      [class]="'kind-' + toast.notification.kind"
+      [class.alert]="toast.alert"
+      [attr.data-testid]="toast.alert ? 'alert-toast' : 'toast'"
+      (click)="onToastClick(toast)"
+    >
+      <div class="toast-body">
+        <span class="toast-title">{{ toast.title }}</span>
+        @if (toast.events.length > 0) {
+          <ul class="toast-events">
+            @for (event of toast.events; track event.id) {
+              <li>{{ localTimeLabel(event.scheduledAt) }} {{ currencyWithFlag(event.country) }} · {{ event.title }}</li>
+            }
+          </ul>
+        }
+        @if (toast.hiddenCount > 0) {
+          <span class="toast-hidden">{{ toast.hiddenCount }} hidden by filters</span>
+        }
+      </div>
+      <button type="button" class="dismiss" (click)="onDismiss($event, toast)" aria-label="Dismiss">×</button>
+    </div>
+  }
+</div>
