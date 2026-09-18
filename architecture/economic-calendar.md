@@ -2,6 +2,9 @@
 
 **Role:** Architect. **Date:** 2026-09-16. **Status:** design, routed to
 Software Engineer (§10). Nothing here is implemented.
+**Amended 2026-09-18 (§11):** impact filter becomes a set (holiday is not a rung),
+USD/EUR/GBP + medium/high/holiday as editable persisted defaults, currency flags, audible
+pre-event alert. §11 supersedes the filter parts of §7.1.
 
 **Extends:** [`live-signal-server.md`](live-signal-server.md) (base — §3
 contracts, §4 server, §4.3/§6 storage, §3.5 wire) and
@@ -786,3 +789,138 @@ alongside this note. A one-line cross-reference is added to the backlog's
 "Scheduled-macro-event reaction" entry pointing at this note as the future
 source of the event table — that is an annotation on an existing entry, not
 a new one.
+
+---
+
+## 11. Amendment 2026-09-18 — filter defaults, settings, flags, sound
+
+**Role:** Architect. **Status:** design, routed as SE-C (see
+[`four-streams-2026-09-18.md`](four-streams-2026-09-18.md)). Client-only: no contract, server
+or wire change. New/changed components follow `AGENTS.md` (separate `.html`/`.scss`).
+
+### 11.1 What already exists (checked, 2026-09-18)
+
+- `CalendarFiltersStore` (`core/state/calendar-filters.store.ts`): `minImpact`, `countries`
+  (empty = all), `hideRemoved`, persisted under `chart-client:calendar-filters`; defaults
+  `{ minImpact: 'low', countries: [], hideRemoved: false }` inline in the store.
+- `CalendarFiltersComponent`: an `Impact ≥` select (`low|medium|high`), a country checkbox
+  list built from the countries present in the loaded week, a hide-removed box.
+- `passesFilters` ranks impact on the ladder `['low','medium','high','holiday','unknown']` —
+  so **today `minImpact: 'medium'` already lets `holiday` and `unknown` through**, by
+  accident of array order, and there is no way to show medium+high *without* holidays or
+  vice versa. That ladder is the defect.
+- Filters apply to the week view only. Toasts (`NotificationsStore.receive`) are unfiltered
+  client-side; the server filters notifications with its own env (`CALENDAR_NOTIFY_*`,
+  default: everything).
+- Nothing plays sound; there is no pre-event alert of any kind (§5.3 explicitly left it out).
+
+### 11.2 Impact is a set, not a threshold (decision)
+
+The feed's `impact` values are `Low | Medium | High | Holiday` (+ anything unknown, mapped to
+`'unknown'`) — §1.2, and `EventImpactSchema` already has exactly
+`low|medium|high|holiday|unknown`. `Holiday` is a **kind of row** (a bank holiday for a
+currency), not a rung above High. So:
+
+```ts
+// core/state/calendar-settings.defaults.ts — THE one named place for defaults
+export const CALENDAR_DEFAULTS = {
+  impacts: ['medium', 'high', 'holiday'] as EventImpact[],
+  countries: ['USD', 'EUR', 'GBP'],   // currency codes as the feed gives them
+  hideRemoved: false,
+  alert: { enabled: false, leadMinutes: 5 },
+} as const;
+```
+
+- `CalendarFilters` becomes `{ impacts: EventImpact[]; countries: string[]; hideRemoved }`.
+  `passesFilters`: `impacts.includes(event.impact)`; country rule below. `unknown` is a
+  selectable chip, off by default.
+- **`countries` is an explicit list; empty means none, not all** — the old "empty = all"
+  sentinel cannot coexist with a non-empty default and made "Select all" ambiguous. The UI
+  offers All / None / Defaults buttons.
+- **`country: 'All'`** (e.g. "BRICS Summit") passes whenever *any* country is selected — it
+  is by definition about every currency.
+- **Storage key bumps to `chart-client:calendar-filters:v2`** and the old key is removed
+  once read-and-ignored. The old stored value is almost certainly the old default
+  (everything), and the user's request *is* to change what they see; migrating it would
+  silently keep hiding the new defaults. Stated in the PR.
+
+### 11.3 A settings surface, not constants (the user's explicit requirement)
+
+The filter bar above the week becomes the settings surface, always visible on the calendar
+view, and every change persists immediately:
+
+- **Impact:** four toggle chips `Medium · High · Holiday · Low` (+ `Unknown`), each
+  on/off — replaces the `Impact ≥` select.
+- **Currencies:** a checkbox per currency the feed can emit — the fixed list `USD EUR GBP
+  JPY CAD AUD NZD CHF CNY` **plus** any other code seen in the loaded week (the current
+  list only shows codes present this week, so a default like GBP could vanish from the UI in
+  a week with no GBP events and become impossible to untick). Each with its flag (§11.4).
+- **Reset to defaults** button — restores `CALENDAR_DEFAULTS` (filters and alert settings).
+- **Toasts respect the filters too:** an `event-due` toast is shown only if at least one
+  of its events passes; the digest toast lists only passing events (and says "N hidden by
+  filters"). The notification centre keeps the full list. The server's env filters are
+  untouched.
+
+### 11.4 Flags from currency (decision)
+
+Mapping lives in one pure file `features/calendar/currency-flag.ts` (+ spec):
+`currencyFlag(code): { emoji: string | null; label: string }`, built from an ISO
+3166 region per currency, turned into regional-indicator emoji at runtime
+(`'US'` → U+1F1FA U+1F1F8), not hand-typed glyphs.
+
+| Currency | Region | Shown |
+|---|---|---|
+| USD | US | 🇺🇸 |
+| EUR | **EU** — the EU flag has its own regional-indicator pair and renders on macOS; it is the honest symbol for a currency of 20 states | 🇪🇺 |
+| GBP JPY CAD AUD NZD CHF CNY | GB JP CA AU NZ CH CN | national flag |
+| `All` | none | 🌐 |
+| anything else | none | no emoji — the currency code alone |
+
+- The currency code is **always shown next to the flag**; the flag is decoration, never the
+  only identifier. That is also the fallback: platforms without flag-emoji fonts (Windows
+  Chrome/Edge render `🇺🇸` as the letters "US") degrade to letters + code, still correct —
+  no image assets, no CSP change. macOS (the user's platform) renders them natively.
+- Shown on every event row, in the event detail drawer, in toasts, and on the filter chips.
+
+### 11.5 Audible pre-event alert
+
+| Question | Decision |
+|---|---|
+| How far ahead | Setting `leadMinutes` ∈ {1, 2, 5, 10, 15, 30}, default **5**. One alert per event, at `scheduledAt − lead`. |
+| Which events | Those passing the current calendar filters (§11.2), `status === 'scheduled'`. One setting set governs both what you see and what rings — no second filter to keep in sync. |
+| Grouping | Events sharing a `scheduledAt` ring **once** (FOMC's three 14:00 rows = one alert), same rule as `due:` notifications (§5.3). |
+| Once only | Fired keys `alert:<scheduledAt>:<sorted event ids>` kept in `localStorage['chart-client:calendar-alerts-fired']`, pruned to the last 48 h — a reload never re-rings. A time revision (new `scheduledAt`) is a new key, so a moved event rings again at its new time. Two open tabs will both ring — accepted. |
+| Late / missed | Fires if `now ∈ [scheduledAt − lead, scheduledAt + 60 s]`; after that it is dropped silently (an alert after the event is noise). |
+| Sound | **Generated with Web Audio** — two short sine beeps (880 Hz, 150 ms each, 120 ms apart, gentle attack/release, gain 0.2). No asset, no network, no CSP consideration. |
+| Also | A toast `In 5 min: 🇺🇸 USD · High · CPI m/m (+1)`, and, if the existing "Desktop notifications" opt-in is on, an OS notification — so it is seen, not only heard. |
+| Background tab | Timers are throttled in background tabs (≈1/min in Chrome after 5 min hidden), so the check runs every 15 s and an alert can be up to ~1 min late in a long-hidden tab; an already-running `AudioContext` does play from a background tab. Documented in the settings tooltip. |
+
+**Autoplay — the arm affordance (required).** Browsers keep an `AudioContext` suspended
+until a user gesture. So:
+
+- The setting is a **"Sound alerts" toggle** in the calendar filter bar **and** in the
+  notification centre. Turning it on is itself a click: create/resume the `AudioContext`
+  and play the chime once as confirmation.
+- The preference persists, but after a reload the context is suspended again. While the
+  preference is on and the context is not `running`, the top-bar bell shows a **muted
+  badge** ("Sound alerts need one click to arm") and the first `pointerdown`/`keydown`
+  anywhere on the page resumes the context (one-shot document listener). It is never
+  silently broken: armed/unarmed is always visible.
+- A "Test sound" button next to the toggle.
+
+**Where it lives:** `core/state/event-alarm.service.ts` (root; scheduling + fired ledger,
+pure `dueAlerts(events, filters, leadMs, now, fired)` in its own file with a spec) and
+`core/audio/chime.ts` (the only Web Audio code, injectable so specs use a fake). **It must
+not read `CalendarStore`**: that store is replaced wholesale when the user browses to
+another week (`CalendarFeedService.loadWeek`), which would silently disarm every upcoming
+alert. The alarm keeps its own upcoming-events set, seeded by `CalendarFeedService.boot()`
+and `healAfterReconnect()` from the *current* week fetch and merged from
+`calendarEventFrames$` (the live WS frames). No new polling of our server or any venue.
+
+### 11.6 Tests that must exist
+
+`passesFilters` with the set model (holiday alone, medium+high without holiday, `All`,
+unknown), storage v2 read + old-key discard, `CALENDAR_DEFAULTS` applied on empty storage,
+reset-to-defaults, `currencyFlag` for every row of §11.4, `dueAlerts` (lead window, grouping,
+fired dedupe, revision re-arm, late drop), alarm independent of week navigation, toast
+filtering. All existing client tests stay green.

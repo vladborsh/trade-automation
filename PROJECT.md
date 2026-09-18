@@ -177,6 +177,7 @@ note per system. They are role-to-role technical material.
 | [`vwap-band-reversal-plugin.md`](architecture/vwap-band-reversal-plugin.md) | The `cmc-bot` VWAP band-reversal strategy as a **research-tier, unvalidated, visualization-only** plug-in of the signal server; strategy tiers, indicator series, warm-up for session-anchored indicators; routing to Software Engineer |
 | [`chart-layouts.md`](architecture/chart-layouts.md) | Multi-panel layout-setups for the chart terminal (`layouts.yaml`, `GET /api/layouts`), open-interest ingestion as a metric series (`MetricAdapter`, `GET /api/metrics`, WS `metrics` topic), time-range panel sync, per-panel signal visibility; DXY epic (`DXY`, Capital.com) confirmed; routing to Software Engineer |
 | [`economic-calendar.md`](architecture/economic-calendar.md) | Economic calendar / news events: ForexFactory weekly feed ingestion (`ff_calendar_thisweek`, no actuals in the feed — next-occurrence backfill), `EventStore` (File/S3 JSONL, indefinite retention), `GET /api/calendar/*`, WS `calendar` topic, daily digest + at-event-time in-app notifications, calendar view in the chart terminal; infrastructure that unblocks the backlog's "Scheduled-macro-event reaction" idea; routing to Software Engineer |
+| [`four-streams-2026-09-18.md`](architecture/four-streams-2026-09-18.md) | Routing for four streams: OI in USD + OI candles (`chart-layouts.md` §11.1–11.2), horizontal/collapsible panels (§11.3), calendar filter set/flags/sound (`economic-calendar.md` §11), component-file rule (`AGENTS.md`) and its migration |
 
 ## Status
 

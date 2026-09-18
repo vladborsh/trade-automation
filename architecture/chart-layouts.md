@@ -2,6 +2,9 @@
 
 **Role:** Architect. **Date:** 2026-09-12. **Status:** design, routed to
 Software Engineer (§9). Nothing here is implemented.
+**Amended 2026-09-18 (§11):** OI plotted in USD notional and as candles; panels arranged
+as one horizontal row with per-panel collapse. §11 supersedes the conflicting parts of
+§2.1, §4.2, §6.1 and §6.6.
 
 **Extends:** [`live-signal-server.md`](live-signal-server.md) (the base
 system — §3 contracts, §4 server, §5 client). This is a separate note, not
@@ -751,3 +754,248 @@ its Status section (done alongside this note). No `knowledge/` file:
 open interest as a concept is already defined in
 `knowledge/derivatives-positioning.md` §1; this note only adds how it is
 ingested.
+
+---
+
+## 11. Amendment 2026-09-18 — OI in USD, OI as candles; horizontal columns, collapsible panels
+
+**Role:** Architect. **Status:** design, routed (§11.4). Supersedes the parts of §2.1,
+§4.2, §6.1 and §6.6 named below; everything else in this note stands. Input:
+[`coinalyze-oi-assessment.md`](coinalyze-oi-assessment.md) (read it first — it is the
+evidence for §11.1). Component files written for this amendment follow the repo rule in
+`AGENTS.md` (template/styles in `.component.html` / `.component.scss`).
+
+### 11.1 Open interest in USD notional (stream A1)
+
+**What changes and why.** The panel plots `value = sumOpenInterest` — base units (BTC).
+The user compares it against Coinalyze, whose default line is **USD notional**; that alone
+explains why the slopes disagree (24 h on BTCUSDT: +1.171 % in BTC vs +2.652 % in USD,
+price +1.464 % — assessment §3). The panel switches to USD notional.
+
+**Prerequisite — the unit tag (routed first, SE-A1).** Exactly the assessment's §5 step:
+
+```ts
+// libs/contracts/src/metric.ts
+export const MetricUnitSchema = z.enum(['base', 'quote', 'contracts']);
+export const NotionalBasisSchema = z.enum(['venue', 'derived']);
+
+export const MetricObservationSchema = z.object({
+  metric, instrument, time,
+  value: z.number().nonnegative(),
+  unit: MetricUnitSchema,                         // NEW, required: the unit of `value`
+  notional: z.number().nonnegative().optional(),  // always the instrument's quoteCurrency
+  notionalBasis: NotionalBasisSchema.optional(),  // NEW: present iff `notional` is
+});
+```
+
+- `unit` describes `value` and nothing else. `notional` is, by definition, `value`
+  expressed in `instrument.quoteCurrency` (USDT for `binance:BTCUSDT`) — no second unit
+  field for it. `notionalBasis`: `'venue'` = the venue's own published figure
+  (`sumOpenInterestValue`); `'derived'` = `value × price` computed by us (§11.1 tip rule).
+  It exists so a visible step at the history/tip join can be attributed, not guessed at.
+- Every mapper writes `unit` (Binance USDⓈ-M: `'base'`; a future COIN-M mapper: `'contracts'`
+  — that is the latent ~10⁵ bug this closes). `MetricPoint` carries it; the WS payload and
+  REST response carry it; `ReplayMetricAdapter` fixtures carry it.
+- **Legacy stored rows** have neither field. The store read path (file and S3) runs a pure
+  `upgradeLegacyObservation(raw)`: missing `unit` → `'base'` (every row written before this
+  change came from the USDⓈ-M mapper, which only ever wrote base units); `notional` present
+  without `notionalBasis` → `'venue'` (only history rows ever had one). Write path always
+  writes both. No file rewrite, no migration job.
+- The panel header names the unit: `BTCUSDT · Open interest · BTC` after SE-A1 (base asset =
+  `symbol` minus `quoteCurrency` suffix; `'contracts'` → `contracts`), `… · USDT` once SE-A3
+  plots notional.
+
+**History: use the venue's figure, do not recompute (decision).** Every `openInterestHist`
+row already carries `sumOpenInterestValue`, mapped into `notional` and stored — we carry it
+and simply never plotted it. We plot it as is. Reasons: (1) it is the number Binance itself
+publishes and the one any third party (Coinalyze included) starts from, so "our USD OI"
+means the same thing as theirs; (2) recomputing would need a price at every 5 m stamp for
+30 days, i.e. a dependency on our candle store being gap-free across that window, which it
+is not guaranteed to be; (3) the stored record stays "what the venue said". We compute a
+notional **only where the venue gives none** — the live tip.
+
+**The live tip (SE-A2, server).** `/fapi/v1/openInterest` has no notional. At ingestion,
+`MetricIngestionService` derives it:
+
+- **Price = close of the instrument's own most recent *closed* 1 m candle** from
+  `CandleCache`, accepted only if that bar closed within **120 s before** the snapshot's
+  venue `time` (and not after it). Why this price: it is the same contract (candles stream
+  from `fapi`, the USDⓈ-M perp), it is already in memory (zero new requests), and the poll
+  fires on the `BarClock` 1 m tick + ≤2 s jitter, so the just-closed bar's close is the
+  price at ≈ the snapshot instant. It is also the price the user sees on the BTC panel next
+  to it, so OI-in-USD and price move together on screen. Not mark price by default — see
+  the join check.
+- **Stale or missing price → no notional, never an old price.** The observation is stored
+  with `value`/`unit` only; counter `metric_notional_missing_total{instrument,metric}`;
+  one warn log per streak, not per poll. The panel draws a gap for that bucket (a
+  base-unit number is never drawn on a USD series).
+- **The join check — measured, not assumed.** Binance does not publish which price
+  `sumOpenInterestValue` uses. SE-A2 measures it over the stored 30 d: implied price
+  `notional / value` per history row vs (a) our 1 m candle close at the row stamp and
+  (b) Binance 1 m mark price (`/fapi/v1/markPriceKlines`, a one-off, ≤ 30 calls). Report
+  median and p99 |Δ| in bps, and the resulting step at the join as a fraction of the median
+  |5 m ΔOI_usd|. **Decision rule (pre-authorised, no need to come back):** keep last-trade
+  close if its median |Δ| ≤ 2 bps; otherwise, if mark price matches at least twice as
+  closely, switch the tip price to mark price fetched from `/fapi/v1/premiumIndex` in the
+  same poll (+1 request weight per instrument per minute — ≈0.04 % of the 2400/min budget;
+  not a new loop, it rides the existing 60 s poll). Either way the step must be < 10 % of
+  the median 5 m move; record the numbers in the adapter header comment and the PR.
+- **Legacy tip rows.** While the server has been running, the store has accumulated 1 m
+  snapshots with no notional (the backfill only ever runs forward from the latest stored
+  row at boot, so those stretches have no history rows either). A boot-time, idempotent
+  repair derives `notional` for them with the same price rule (candle close from
+  `CandleCache`, falling back to `CandleStore` for the older part of the 30 d window),
+  `notionalBasis: 'derived'`, re-upserted through `MetricWriteBuffer`. Rows with no
+  qualifying candle stay without notional.
+
+**No base↔USD toggle (decision).** The user asked for USD ("как на coinalyze"). A toggle is
+not free — a persisted per-panel preference, a second render path, a second axis label and
+crosshair value — so it is not built. The base value stays on the wire (`value`), so a
+toggle later is a client-only change.
+
+### 11.2 Open interest as candles (stream A2)
+
+**The obstacle.** History is one scalar per 5 m; `bucketObservations` keeps the last one
+per bucket; the live tip is polled every 60 s, so the newest buckets hold 5× more samples
+than history buckets do, and a candle built from them would have wider wicks than any
+history candle — not comparable.
+
+**The rule (decision):**
+
+1. **Sample grain = 5 minutes, always.** Before building OHLC, observations are reduced to
+   one sample per 5 m sub-bucket (last-in-sub-bucket — today's rule, one level down). The
+   live tip's 1 m snapshots therefore contribute exactly as many samples as history rows
+   do; the forming 5 m sub-bucket's latest snapshot is the live close. Every candle on the
+   chart, old or live, is built from the same grain. (At the `1m` timeframe the grain is
+   1 m — no reduction — see rule 4.)
+2. **open = previous bucket's close** when the immediately preceding bucket exists in the
+   input; otherwise the bucket's first sample. `high`/`low` = max/min over `{open} ∪
+   samples`; `close` = last sample. This is the right OHLC for a series of instantaneous
+   readings: the body is the change over the interval, and no change between two samples
+   is lost in the gap between candles (with open = first sample, a 15 m candle would show
+   only 2 of its 3 five-minute changes).
+3. Consequence: **at 5 m, candles are not flat** — each is the change since the previous
+   reading, body only, no wicks (open and close are the only two values). At 15 m it has 4
+   values, at 1 h 13, and wicks appear.
+4. **At 1 m, a line, not candles.** History buckets at 1 m sit 5 minutes apart with no
+   predecessor, so rule 2 would make every history candle a flat dash while the live part
+   has bodies — exactly the "looks broken" chart to avoid. `metricSeriesStyle(tf)` =
+   `tf === '1m' ? 'line' : 'candles'`.
+5. **The user is always told.** The panel header carries a small caption chip, with a
+   tooltip: at 1 m `line · source is one reading per 5 min`; at 5 m `candles: change per
+   5 min, no wicks`; at ≥ 15 m nothing. OI candles use their own colours (up `#58a6ff`,
+   down `#f0883e`) so they never read as price candles.
+
+**Contract** (`libs/contracts/src/metric.ts`):
+
+```ts
+export const MetricOhlcSchema = z.object({ open, high, low, close });  // all nonnegative numbers
+export const MetricPointSchema = z.object({
+  metric, instrument, timeframe, time, unit,
+  value: z.number().nonnegative(),            // = ohlc.close (kept: last-in-bucket, back-compat)
+  ohlc: MetricOhlcSchema,                     // of `value`, always present
+  notional: z.number().nonnegative().optional(),     // = notionalOhlc.close
+  notionalOhlc: MetricOhlcSchema.optional(),         // over samples that carry notional; absent if none
+  notionalBasis: NotionalBasisSchema.optional(),     // of the closing sample
+  samples: z.number().int().positive(),              // 5 m-grain samples in the bucket
+});
+export function bucketObservations(obs: readonly MetricObservation[], tf: Timeframe): MetricPoint[];
+```
+
+`bucketObservations` stays pure and keeps its existing tests (their expected objects gain
+the new fields); new tests: 5 m-grain reduction of 1 m tip data, open = previous close,
+open = first sample after a gap, high/low including open, notional OHLC skipping samples
+without notional, 1 m timeframe (no reduction), a day boundary.
+
+**Server consequences (both in SE-A3):**
+
+- `GET /api/metrics` queries observations from `from − TIMEFRAME_MS[tf]` so the first
+  returned bucket has its predecessor, and drops that extra leading bucket from the
+  response. Otherwise the first candle of every page would differ from the same candle
+  fetched mid-page.
+- **The gateway must stop bucketing a single observation** (`live.gateway.ts`
+  `onMetricObserved` calls `bucketObservations([observation], tf)` today — with OHLC that
+  would replace the forming candle with a flat one on every poll). It builds the point from
+  `MetricCache.query(instrument, metric, bucketStart − tfMs, observation.time)` and sends
+  the last point. Test: the WS point for a bucket equals the REST point for the same bucket.
+- Mock server (`apps/chart-client/mock-server/state.ts`, `server.ts`) does the same, and its
+  synthetic walk emits `unit` and a notional.
+
+**Client (SE-A3):** `ChartComponent` picks `LineSeries` or `CandlestickSeries` for
+`kind: 'metric'` from `metricSeriesStyle(timeframe)` and **swaps the series** if the style
+changes (do not rely on the panel being recreated on timeframe change). It plots the
+notional side (`notionalOhlc` / `notional`); a point without notional is whitespace
+(`{ time }`). Price scale: custom compact formatter (`8.33B`). The crosshair follow reads
+the plotted close, not `value`. Put the new mapping in `chart-data.adapter.ts` and the
+style rule in its own file with a spec — `chart.component.ts` is already 656 lines and
+must not grow (AGENTS.md rule 3).
+
+### 11.3 Horizontal columns, collapsible panels (stream B)
+
+**What is there today.** `PanelGridComponent` is a CSS grid sized from `layout.grid`:
+`crypto` is 2×2 (row-major), `us-indices` is 1 column × 3 rows — a **vertical stack**.
+Nothing is horizontal-by-rule.
+
+**Arrangement (decision).** Every layout renders as **one row of columns, left to right, in
+the order the panels are listed**. The client no longer reads `grid.rows`/`grid.columns`
+for arrangement; it lays out a flex row. `layouts.yaml` is migrated so the file does not
+contradict the screen: `crypto` → `grid: { columns: 4, rows: 1 }`, `us-indices` →
+`grid: { columns: 3, rows: 1 }`. The schema is unchanged (`grid` still bounds panel
+count), so an old file with `rows: 3` keeps parsing and simply renders as one row — no
+boot failure, no server change beyond the yaml.
+
+**Collapse.** Each panel header gets its own collapse button (a chevron, right end of the
+header, `aria-label="Collapse panel"`), not overloaded onto the title or anything else.
+
+- **Collapsed = a thin vertical strip** (28 px wide, full height) showing the rotated
+  panel title and an expand chevron; clicking anywhere on the strip restores it. Never
+  zero-width — a collapsed panel is always visible and recoverable.
+- **Fill.** Expanded columns share the remaining width equally (`flex: 1 1 0`); strips are
+  fixed width. Collapsing/restoring re-flows instantly (no animation — an animated width
+  change would fire a stream of resize-driven range changes into the sync).
+- **All collapsed cannot happen.** The collapse button of the last expanded panel is
+  disabled (tooltip: "At least one panel stays open"). Removes the empty-screen edge case
+  instead of designing for it.
+- **Persistence: yes**, like calendar filters. `localStorage['chart-client:collapsed-panels']
+  = { [layoutId]: panelId[] }`. On load, ids not in the layout are dropped; if the stored
+  set would collapse every panel (layout edited in yaml), it is ignored and all expand.
+  State lives in a small root `CollapsedPanelsStore` with a spec.
+
+**Sync — the part most likely to break.** Three rules, each with a test:
+
+1. **A collapsed panel's chart is destroyed, not hidden.** Its `PanelFeed` keeps running
+   (data stays live and paged-in), but the `ChartComponent` is removed from the DOM. A
+   hidden chart at 0 width would keep receiving resize and range-change callbacks and
+   could propose ranges or be counted as origin takeovers by the circuit breaker. If the
+   destroyed chart was the crosshair origin, it clears the crosshair on destroy.
+2. **A chart that mounts while a shared range exists joins it; it never leads.** Today a
+   chart's first `setData` fires the logical-range callback and *proposes* its own
+   autofit window — on restore that would yank every other panel to the right edge, or
+   (the reverse failure) the restored panel would show whatever stale window it had.
+   New rule in `ChartComponent`: on its first render with data, if `sync.range()` is set,
+   apply it under the `applying` guard and seed `lastApplied`, and do not propose; only if
+   no shared range exists does it seed one (today's boot behaviour). This is the fix for
+   "restore shows a stale window".
+3. **Resizes are not gestures.** When a sibling collapses or restores, every remaining
+   chart changes width, and `autoSize` makes each fire a logical-range change — N panels
+   proposing N slightly different ranges at once, which is precisely the origin-takeover
+   pattern the breaker trips on. `ChartComponent` treats range changes that arrive while
+   its container is resizing (a `ResizeObserver` on the container; suppress until the
+   next animation frame after the last resize) as non-proposing, and `ChartSyncService`
+   gains `reassert()` — bumps an epoch signal that makes **every** chart, the origin
+   included, re-apply the current shared `TimeRange` to its new width. The grid calls it
+   after each collapse/restore. Result: the same wall-clock window on every panel, wider or
+   narrower bars.
+
+**Acceptance (Playwright, against the mock server):** scroll panel 1 back a day → collapse
+panel 2 → no `[ChartSyncService] … circuit breaker` warning in the console, and panels
+1/3/4 `data-visible-from/to` equal each other and the pre-collapse range within epsilon →
+scroll panel 1 further back → restore panel 2 → its `data-visible-from/to` equal the
+*current* shared range (not its autofit latest window, not the range at collapse time) →
+reload → panel 2's collapsed state persisted as left.
+
+### 11.4 Routing
+
+See [`four-streams-2026-09-18.md`](four-streams-2026-09-18.md) for task ids, branches and
+sequencing. Streams: SE-A1 (unit tag) → SE-A2 (USD tip, server) ∥ SE-A3 (OHLC + client
+rendering); SE-B (layout/collapse); SE-C in `economic-calendar.md` §11.
