@@ -6,6 +6,36 @@
     }
     <span class="venue-dot" [class]="'venue-' + venueStatus()"></span>
     <app-research-badge />
+    @if (panel().kind === 'candles') {
+      <span class="rsi-controls">
+        <button
+          type="button"
+          class="rsi-chip"
+          data-testid="rsi-toggle"
+          [attr.aria-pressed]="rsiVisible()"
+          [title]="rsiVisible() ? 'Hide RSI' : 'Show RSI'"
+          (click)="toggleRsi()"
+        >
+          RSI
+        </button>
+        @if (rsiVisible()) {
+          <input
+            #rsiPeriodInput
+            type="number"
+            class="rsi-period"
+            data-testid="rsi-period"
+            aria-label="RSI period"
+            title="RSI period (2–100)"
+            [min]="rsiMinPeriod"
+            [max]="rsiMaxPeriod"
+            step="1"
+            [value]="rsiPrefs.period()"
+            (change)="commitRsiPeriod(rsiPeriodInput)"
+            (keydown.enter)="commitRsiPeriod(rsiPeriodInput)"
+          />
+        }
+      </span>
+    }
     <button
       type="button"
       class="collapse-btn"
@@ -27,6 +57,8 @@
       [indicatorPoints]="feed().indicators.points()"
       [indicatorSpecs]="strategies.indicatorSpecs()"
       [timeframe]="timeframe.selected()"
+      [rsiVisible]="rsiVisible()"
+      [rsiPeriod]="rsiPrefs.period()"
       (loadOlderRequested)="onLoadOlder()"
     />
   </div>

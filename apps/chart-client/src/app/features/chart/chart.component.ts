@@ -36,6 +36,7 @@ import { RayRenderer } from './overlay/ray.renderer';
 import { LineRenderer } from './overlay/line.renderer';
 import { ShapesPrimitive } from './overlay/shapes.primitive';
 import { IndicatorLayer } from './indicator/indicator-layer';
+import { RsiPaneRenderer } from './indicator/rsi-pane.renderer';
 import { ChartSyncService, sameRange, type TimeRange } from './chart-sync.service';
 import { ResizeSettleTracker, observeResize } from './resize-settle';
 import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart-time';
@@ -84,6 +85,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   readonly timeframe = input.required<Timeframe>();
   readonly panelId = input.required<string>();
+  readonly rsiVisible = input(true); // §12.4 — candle panels only; drawn by RsiPaneRenderer
+  readonly rsiPeriod = input(14);
   readonly loadOlderRequested = output<void>();
 
   readonly markerCount = computed(() => this.overlays().filter((o) => o.type === 'marker').length);
@@ -104,6 +107,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private readonly metricSeries = new MetricSeriesRenderer();
   private readonly daySeparators = new DaySeparatorsPrimitive();
   private axisTf: Timeframe | null = null;
+  private readonly rsiPane = new RsiPaneRenderer();
   private lastRenderedCount = 0;
   private lastRenderedTime: number | null = null; // candle openTime or metric point time, seconds-scale source (ms)
   /**
@@ -133,12 +137,13 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       if (this.kind() === 'candles') {
-        this.renderCandles(this.candles());
+        this.rsiPane.renderAround(this.candles(), untracked(this.rsiPeriod), (c) => this.renderCandles(c));
       } else {
         this.renderPoints(this.points());
       }
       untracked(() => this.renderTimeDecor());
     });
+    effect(() => this.rsiPane.configure(this.rsiVisible(), this.rsiPeriod(), untracked(this.candles)));
 
     effect(() => {
       if (this.kind() !== 'candles') {
@@ -340,6 +345,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     // re-run pending effects now that chart/series exist
     if (isCandles) {
       this.renderCandles(this.candles());
+      this.rsiPane.attach(this.chart, this.candles(), this.rsiPeriod());
       this.overlayLayer.render(this.overlays());
     } else {
       this.renderPoints(this.points());
@@ -353,6 +359,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private renderTimeDecor(): void {
     const tf = this.timeframe();
     this.daySeparators.setData(this.lastTimesSec, tf);
+    this.rsiPane.separators.setData(this.lastTimesSec, tf);
     if (this.chart && tf !== this.axisTf) {
       this.axisTf = tf;
       this.chart.applyOptions({ timeScale: { tickMarkFormatter: nyTickMarkFormatter(tf) } });
