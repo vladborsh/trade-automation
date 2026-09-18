@@ -17,7 +17,9 @@ describe('metric contracts round-trip (architecture/chart-layouts.md §4.2)', ()
       instrument: 'binance:BTCUSDT',
       time: 1_726_000_000_000,
       value: 12345.6,
+      unit: 'base',
       notional: 987_654_321,
+      notionalBasis: 'venue',
     };
     const parsed = MetricObservationSchema.parse(observation);
     expect(parsed).toEqual(observation);
@@ -30,8 +32,21 @@ describe('metric contracts round-trip (architecture/chart-layouts.md §4.2)', ()
       instrument: 'binance:BTCUSDT',
       time: 1_726_000_000_000,
       value: 12345.6,
+      unit: 'base',
     };
     expect(MetricObservationSchema.parse(observation)).toEqual(observation);
+  });
+
+  it('requires `unit` (§11.1 — every mapper writes it)', () => {
+    expect(() =>
+      MetricObservationSchema.parse({ metric: 'openInterest', instrument: 'binance:BTCUSDT', time: 1, value: 1 }),
+    ).toThrow();
+  });
+
+  it('rejects an unknown unit or notionalBasis', () => {
+    const base = { metric: 'openInterest', instrument: 'binance:BTCUSDT', time: 1, value: 1 };
+    expect(() => MetricObservationSchema.parse({ ...base, unit: 'usd' })).toThrow();
+    expect(() => MetricObservationSchema.parse({ ...base, unit: 'base', notional: 1, notionalBasis: 'guess' })).toThrow();
   });
 
   it('parses and re-serializes a MetricPoint (extends MetricObservation with timeframe)', () => {
@@ -41,7 +56,9 @@ describe('metric contracts round-trip (architecture/chart-layouts.md §4.2)', ()
       timeframe: '1m',
       time: 1_726_000_000_000,
       value: 12345.6,
+      unit: 'base',
       notional: 987_654_321,
+      notionalBasis: 'venue',
     };
     const parsed = MetricPointSchema.parse(JSON.parse(JSON.stringify(point)));
     expect(parsed).toEqual(point);
@@ -57,6 +74,7 @@ describe('metric contracts round-trip (architecture/chart-layouts.md §4.2)', ()
         instrument: 'binance:BTCUSDT',
         time: 1,
         value: -1,
+        unit: 'base',
       }),
     ).toThrow();
   });
@@ -69,7 +87,7 @@ describe('metric contracts round-trip (architecture/chart-layouts.md §4.2)', ()
 });
 
 describe('bucketObservations (architecture/chart-layouts.md §4.2)', () => {
-  const base = { metric: 'openInterest' as const, instrument: 'binance:BTCUSDT' as const };
+  const base = { metric: 'openInterest' as const, instrument: 'binance:BTCUSDT' as const, unit: 'base' as const };
 
   it('buckets ascending observations to the timeframe grid, keeping the last observation per bucket', () => {
     const obs: MetricObservation[] = [
@@ -127,5 +145,24 @@ describe('bucketObservations (architecture/chart-layouts.md §4.2)', () => {
     ];
     const points = bucketObservations(obs, '1m');
     expect(points).toEqual([{ ...base, timeframe: '1m', time: 0, value: 105, notional: undefined }]);
+  });
+
+  it('carries unit and notionalBasis from the winning observation', () => {
+    const obs: MetricObservation[] = [
+      { ...base, time: 0, value: 100 },
+      { ...base, time: 30_000, value: 105, notional: 1050, notionalBasis: 'venue' },
+      { ...base, time: 60_000, value: 7, unit: 'contracts' },
+    ];
+    const points = bucketObservations(obs, '1m');
+    expect(points[0]).toStrictEqual({
+      ...base,
+      timeframe: '1m',
+      time: 0,
+      value: 105,
+      notional: 1050,
+      notionalBasis: 'venue',
+    });
+    expect(points[1].unit).toBe('contracts');
+    expect(points[1].notionalBasis).toBeUndefined();
   });
 });

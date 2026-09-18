@@ -11,6 +11,7 @@ import { LayoutsStore } from '../../core/state/layouts.store';
 import { CollapsedPanelsStore } from '../../core/state/collapsed-panels.store';
 import type { PanelFeed } from '../../core/state/panel-feed';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
+import { panelTitle } from './panel-title';
 
 /**
  * architecture/chart-layouts.md §6.1 — one panel: header (title, venue
@@ -35,7 +36,11 @@ export class ChartPanelComponent {
   readonly panel = input.required<Panel>();
   readonly feed = input.required<PanelFeed>();
 
-  readonly title = computed(() => this.panel().title ?? this.instruments.selected()?.displayName ?? this.panel().instrument);
+  readonly title = computed(() => {
+    const points = this.feed().points.points();
+    const unit = points.length > 0 ? points[points.length - 1].unit : null;
+    return panelTitle(this.panel(), this.instruments.selected(), unit);
+  });
   readonly venueStatus = computed(() => this.connection.statusFor(this.panel().instrument)?.venueStatus ?? 'down');
   readonly overlays = computed(() =>
     this.panel().kind === 'candles' ? signalsToOverlays(this.feed().signals.signals()) : [],

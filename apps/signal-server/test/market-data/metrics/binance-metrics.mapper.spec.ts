@@ -25,7 +25,9 @@ describe('Binance open-interest payload mapping (architecture/chart-layouts.md Â
       instrument: 'binance:BTCUSDT',
       time: 1_789_247_400_000,
       value: 103212.799,
+      unit: 'base',
       notional: 7967553357.774846,
+      notionalBasis: 'venue',
     });
   });
 
@@ -43,7 +45,9 @@ describe('Binance open-interest payload mapping (architecture/chart-layouts.md Â
       instrument: 'binance:BTCUSDT',
       time: 1_789_248_733_498,
       value: 103361.768,
+      unit: 'base',
     });
     expect(observation.notional).toBeUndefined();
+    expect(observation.notionalBasis).toBeUndefined();
   });
 });

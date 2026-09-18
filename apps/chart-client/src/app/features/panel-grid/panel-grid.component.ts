@@ -120,8 +120,12 @@ export class PanelGridComponent {
     return this.collapsedIds().includes(panelId);
   }
 
+  /** The strip's title — the same text as the expanded header (incl. the §11.1 metric unit, once known). */
   titleFor(panel: Panel): string {
-    return panelTitle(panel, this.instruments.instruments());
+    const instrument = this.instruments.instruments().find((i) => i.id === panel.instrument) ?? null;
+    const points = this.feedFor(panel.id)?.points.points() ?? [];
+    const unit = points.length > 0 ? points[points.length - 1].unit : null;
+    return panelTitle(panel, instrument, unit);
   }
 
   expand(panelId: string): void {
