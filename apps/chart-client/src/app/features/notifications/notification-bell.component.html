@@ -1,6 +1,9 @@
 <div class="bell-wrap">
-  <button type="button" class="bell" (click)="toggle()" aria-label="Notifications">
+  <button type="button" class="bell" (click)="toggle()" aria-label="Notifications" [attr.title]="alarm.needsArming() ? 'Sound alerts need one click to arm' : null">
     🔔
+    @if (alarm.needsArming()) {
+      <span class="muted" data-testid="sound-unarmed" title="Sound alerts need one click to arm">🔇</span>
+    }
     @if (notifications.hasUnread()) {
       <span class="badge">{{ notifications.unreadCount() }}</span>
     }

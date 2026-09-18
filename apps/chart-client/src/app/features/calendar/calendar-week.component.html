@@ -26,7 +26,7 @@
             >
               <span class="time">{{ localTimeLabel(row.event.scheduledAt) }}</span>
               <span class="impact-dot" [class]="'impact-' + row.event.impact"></span>
-              <span class="country">{{ row.event.country }}</span>
+              <span class="country">{{ currencyWithFlag(row.event.country) }}</span>
               <span class="title">{{ row.event.title }}</span>
               <span class="forecast">{{ row.event.forecast ?? '—' }}</span>
               <span class="previous">{{ row.event.previous ?? '—' }}</span>

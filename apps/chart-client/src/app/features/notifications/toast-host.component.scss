@@ -23,8 +23,24 @@
 .toast.kind-daily-digest {
   border-left-color: #d29922;
 }
-.toast-title {
+.toast.alert {
+  border-left-color: #ef5350;
+}
+.toast-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.toast-events {
+  margin: 0;
+  padding-left: 14px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.toast-hidden {
+  color: #8b949e;
+  font-size: 11px;
 }
 .dismiss {
   background: none;

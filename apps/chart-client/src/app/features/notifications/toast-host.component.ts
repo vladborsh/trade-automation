@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, effect } from '@angular/core';
 import { NotificationsStore, type Toast } from '../../core/state/notifications.store';
 import { CalendarStore } from '../../core/state/calendar.store';
 import { ViewStore } from '../../core/state/view.store';
+import { currencyWithFlag } from '../calendar/currency-flag';
+import { localTimeLabel } from '../calendar/et-time';
 
 const EVENT_DUE_AUTO_DISMISS_MS = 15_000;
 
@@ -21,6 +23,8 @@ const EVENT_DUE_AUTO_DISMISS_MS = 15_000;
 })
 export class ToastHostComponent {
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly currencyWithFlag = currencyWithFlag;
+  readonly localTimeLabel = localTimeLabel;
 
   constructor(
     readonly notifications: NotificationsStore,

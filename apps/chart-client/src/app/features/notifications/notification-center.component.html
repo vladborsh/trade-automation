@@ -7,6 +7,16 @@
     <input type="checkbox" [checked]="notifications.desktopNotificationsEnabled()" (change)="onToggleDesktop($event)" />
     Desktop notifications
   </label>
+  <div class="desktop-toggle sound-toggle">
+    <label>
+      <input type="checkbox" [checked]="alarm.enabled()" (change)="onToggleSound($event)" />
+      Sound alerts
+    </label>
+    <button type="button" class="test" (click)="alarm.testSound()">Test sound</button>
+    @if (alarm.needsArming()) {
+      <span class="unarmed">click anywhere to arm</span>
+    }
+  </div>
   <div class="list">
     @for (n of notifications.notifications(); track n.id) {
       <div class="item" [class]="'kind-' + n.kind">

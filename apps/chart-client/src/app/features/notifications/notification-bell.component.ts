@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { NotificationsStore } from '../../core/state/notifications.store';
+import { EventAlarmService } from '../../core/state/event-alarm.service';
 import { NotificationCenterComponent } from './notification-center.component';
 
 /**
@@ -17,7 +18,10 @@ import { NotificationCenterComponent } from './notification-center.component';
 export class NotificationBellComponent {
   readonly open = signal(false);
 
-  constructor(readonly notifications: NotificationsStore) {}
+  constructor(
+    readonly notifications: NotificationsStore,
+    readonly alarm: EventAlarmService,
+  ) {}
 
   toggle(): void {
     this.open.update((v) => !v);

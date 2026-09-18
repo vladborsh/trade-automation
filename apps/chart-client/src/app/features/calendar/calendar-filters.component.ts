@@ -1,10 +1,16 @@
-import { ChangeDetectionStrategy, Component, Input, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { CalendarFiltersStore } from '../../core/state/calendar-filters.store';
+import { EventAlarmService } from '../../core/state/event-alarm.service';
+import { ALERT_LEAD_MINUTES, CALENDAR_DEFAULTS, IMPACT_CHOICES } from '../../core/state/calendar-settings.defaults';
 import type { EventImpact } from '../../core/contracts/calendar';
+import { currencyFlag } from './currency-flag';
+import { currencyOptions } from './currency-options';
 
-const IMPACT_OPTIONS: EventImpact[] = ['low', 'medium', 'high'];
-
-/** §7 — impact ≥ / country multiselect / hide removed, persisted in localStorage (`CalendarFiltersStore`). */
+/**
+ * §11.3 — the calendar settings surface: impact chips, currencies (fixed list
+ * plus any code seen this week), hide-removed, the sound alert and "Reset to
+ * defaults". Every change persists immediately (`CalendarFiltersStore`).
+ */
 @Component({
   selector: 'app-calendar-filters',
   standalone: true,
@@ -13,33 +19,48 @@ const IMPACT_OPTIONS: EventImpact[] = ['low', 'medium', 'high'];
   styleUrl: './calendar-filters.component.scss',
 })
 export class CalendarFiltersComponent {
-  @Input({ required: true }) countries: string[] = [];
+  /** Currency codes present in the loaded week. */
+  readonly countries = input<string[]>([]);
 
-  readonly impactOptions = IMPACT_OPTIONS;
-  readonly availableCountries = computed(() => [...this.countries].sort());
+  readonly impactChoices = IMPACT_CHOICES;
+  readonly leadChoices = ALERT_LEAD_MINUTES;
+  readonly currencyFlag = currencyFlag;
+  readonly currencies = computed(() => currencyOptions(this.countries(), this.store.filters().countries));
 
-  constructor(readonly filters: CalendarFiltersStore) {}
+  constructor(
+    readonly store: CalendarFiltersStore,
+    readonly alarm: EventAlarmService,
+  ) {}
+
+  isImpactOn(impact: EventImpact): boolean {
+    return this.store.filters().impacts.includes(impact);
+  }
 
   isCountrySelected(country: string): boolean {
-    const selected = this.filters.filters().countries;
-    return selected.length === 0 || selected.includes(country);
+    return this.store.filters().countries.includes(country);
   }
 
-  onImpactChange(event: Event): void {
-    this.filters.setMinImpact((event.target as HTMLSelectElement).value as EventImpact);
+  selectAllCountries(): void {
+    this.store.setCountries(this.currencies());
   }
 
-  onCountryToggle(country: string, event: Event): void {
-    const checked = (event.target as HTMLInputElement).checked;
-    const current = this.filters.filters().countries;
-    // empty (= all) is the implicit starting state; the first uncheck seeds
-    // the explicit list from everything currently on offer, minus this one
-    const base = current.length === 0 ? this.countries : current;
-    const next = checked ? [...new Set([...base, country])] : base.filter((c) => c !== country);
-    this.filters.setCountries(next.length === this.countries.length ? [] : next);
+  selectNoCountries(): void {
+    this.store.setCountries([]);
+  }
+
+  selectDefaultCountries(): void {
+    this.store.setCountries([...CALENDAR_DEFAULTS.countries]);
   }
 
   onHideRemovedChange(event: Event): void {
-    this.filters.setHideRemoved((event.target as HTMLInputElement).checked);
+    this.store.setHideRemoved((event.target as HTMLInputElement).checked);
+  }
+
+  onSoundToggle(event: Event): void {
+    this.alarm.setEnabled((event.target as HTMLInputElement).checked);
+  }
+
+  onLeadChange(event: Event): void {
+    this.store.setLeadMinutes(Number((event.target as HTMLSelectElement).value));
   }
 }

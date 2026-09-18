@@ -4,6 +4,7 @@ import { CalendarFeedService } from '../../core/state/calendar-feed.service';
 import { CalendarFiltersStore, passesFilters } from '../../core/state/calendar-filters.store';
 import type { EconomicEvent } from '../../core/contracts/calendar';
 import { dayHeaderLabel, etDayString, etTimeLabel, localTimeLabel } from './et-time';
+import { currencyWithFlag } from './currency-flag';
 import { CalendarFiltersComponent } from './calendar-filters.component';
 import { CalendarEventDetailComponent } from './calendar-event-detail.component';
 
@@ -52,6 +53,7 @@ export class CalendarWeekComponent {
   readonly dayHeaderLabel = dayHeaderLabel;
   readonly etTimeLabel = etTimeLabel;
   readonly localTimeLabel = localTimeLabel;
+  readonly currencyWithFlag = currencyWithFlag;
 
   private weekAt: number | undefined;
 

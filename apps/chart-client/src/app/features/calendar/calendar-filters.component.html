@@ -1,27 +1,65 @@
-<div class="filters">
-  <label class="field">
-    Impact ≥
-    <select (change)="onImpactChange($event)">
-      @for (impact of impactOptions; track impact) {
-        <option [value]="impact" [selected]="impact === filters.filters().minImpact">{{ impact }}</option>
-      }
-    </select>
-  </label>
-
-  <div class="field countries">
-    Countries
-    <div class="country-list">
-      @for (country of availableCountries(); track country) {
-        <label class="country-item">
-          <input type="checkbox" [checked]="isCountrySelected(country)" (change)="onCountryToggle(country, $event)" />
-          {{ country }}
-        </label>
+<div class="filters" data-testid="calendar-filters">
+  <div class="field">
+    Impact
+    <div class="chips">
+      @for (impact of impactChoices; track impact) {
+        <button
+          type="button"
+          class="chip"
+          [class.on]="isImpactOn(impact)"
+          [attr.aria-pressed]="isImpactOn(impact)"
+          [attr.data-impact]="impact"
+          (click)="store.toggleImpact(impact)"
+        >
+          <span class="impact-dot" [class]="'impact-' + impact"></span>{{ impact }}
+        </button>
       }
     </div>
   </div>
 
+  <div class="field countries">
+    Currencies
+    <div class="country-list">
+      @for (country of currencies(); track country) {
+        <label class="country-item" [attr.data-country]="country">
+          <input type="checkbox" [checked]="isCountrySelected(country)" (change)="store.toggleCountry(country)" />
+          @if (currencyFlag(country).emoji; as flag) {
+            <span class="flag">{{ flag }}</span>
+          }
+          {{ country }}
+        </label>
+      }
+    </div>
+    <div class="quick">
+      <button type="button" (click)="selectAllCountries()">All</button>
+      <button type="button" (click)="selectNoCountries()">None</button>
+      <button type="button" (click)="selectDefaultCountries()">Defaults</button>
+    </div>
+  </div>
+
   <label class="field">
-    <input type="checkbox" [checked]="filters.filters().hideRemoved" (change)="onHideRemovedChange($event)" />
+    <input type="checkbox" [checked]="store.filters().hideRemoved" (change)="onHideRemovedChange($event)" />
     Hide removed
   </label>
+
+  <div
+    class="field sound"
+    title="Rings once per event time, for events matching these filters. In a long-hidden background tab the browser throttles timers, so an alert can be up to ~1 min late."
+  >
+    <label class="field">
+      <input type="checkbox" data-testid="sound-alerts" [checked]="alarm.enabled()" (change)="onSoundToggle($event)" />
+      Sound alerts
+    </label>
+    <select [disabled]="!alarm.enabled()" (change)="onLeadChange($event)" aria-label="Minutes before the event">
+      @for (lead of leadChoices; track lead) {
+        <option [value]="lead" [selected]="lead === store.alert().leadMinutes">{{ lead }} min before</option>
+      }
+    </select>
+    <button type="button" (click)="alarm.testSound()">Test sound</button>
+    @if (alarm.needsArming()) {
+      <span class="unarmed">click anywhere to arm</span>
+    }
+  </div>
+
+  <button type="button" class="reset" data-testid="calendar-reset" (click)="store.resetToDefaults()">Reset to defaults</button>
 </div>

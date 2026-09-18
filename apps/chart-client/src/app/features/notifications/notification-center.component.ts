@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, EventEmitter, Output } from '@angular/core';
 import { NotificationsStore } from '../../core/state/notifications.store';
+import { EventAlarmService } from '../../core/state/event-alarm.service';
 
 /** §5.1 — last 50 notifications + the "Desktop notifications" opt-in toggle. */
 @Component({
@@ -14,7 +15,14 @@ import { NotificationsStore } from '../../core/state/notifications.store';
 export class NotificationCenterComponent {
   @Output() readonly closed = new EventEmitter<void>();
 
-  constructor(readonly notifications: NotificationsStore) {}
+  constructor(
+    readonly notifications: NotificationsStore,
+    readonly alarm: EventAlarmService,
+  ) {}
+
+  onToggleSound(event: Event): void {
+    this.alarm.setEnabled((event.target as HTMLInputElement).checked);
+  }
 
   onToggleDesktop(event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;

@@ -5,7 +5,7 @@
         <span class="title">{{ d.event.title }}</span>
         <button type="button" class="close" (click)="closed.emit()" aria-label="Close">×</button>
       </div>
-      <div class="row"><span>Country</span><span>{{ d.event.country }}</span></div>
+      <div class="row"><span>Country</span><span>{{ currencyWithFlag(d.event.country) }}</span></div>
       <div class="row"><span>Impact</span><span>{{ d.event.impact }}</span></div>
       <div class="row"><span>Forecast</span><span>{{ d.event.forecast ?? '—' }}</span></div>
       <div class="row"><span>Previous</span><span>{{ d.event.previous ?? '—' }}</span></div>
