@@ -106,10 +106,14 @@ class DaySeparatorsRenderer implements IPrimitivePaneRenderer {
       context.setLineDash(SEPARATOR_DASH_PX.map((px) => px * horizontalPixelRatio));
       context.beginPath();
       for (const i of boundaries) {
-        const x = timeScale.logicalToCoordinate((i - 0.5) as Logical);
-        if (x === null) {
+        // Logical i − 0.5, as the midpoint of bars i − 1 and i: the library's
+        // logicalToCoordinate returns 0 for a non-integer logical (5.2.1 `indexToCoordinate`).
+        const left = timeScale.logicalToCoordinate((i - 1) as Logical);
+        const right = timeScale.logicalToCoordinate(i as Logical);
+        if (left === null || right === null) {
           continue;
         }
+        const x = (left + right) / 2;
         // Centre a whole-pixel line on the pixel grid so 1 px stays crisp.
         const bx = Math.round(x * horizontalPixelRatio) + (lineWidth % 2) / 2;
         if (bx < 0 || bx > bitmapSize.width) {

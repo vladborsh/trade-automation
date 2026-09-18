@@ -27,7 +27,7 @@ function setup() {
 }
 
 describe('DaySeparatorsPrimitive (§12.3)', () => {
-  it('attaches to the pane and draws one line per NY day boundary at logical i − 0.5', () => {
+  it('attaches to the pane and draws one line per NY day boundary at logical i − 0.5 (midpoint of bars i − 1 and i)', () => {
     const { primitive, pane, requestUpdate, context, draw } = setup();
     expect(pane.attachPrimitive).toHaveBeenCalledWith(primitive);
     primitive.setData(hourly('2026-07-15T00:00:00Z', 20), '1h'); // boundary at index 4 (04:00Z)
