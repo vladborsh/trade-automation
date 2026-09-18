@@ -1,4 +1,4 @@
-import type { Instrument, MetricKind, MetricUnit, Panel } from '@trade-automation/contracts';
+import type { Instrument, MetricKind, MetricPoint, MetricUnit, Panel } from '@trade-automation/contracts';
 
 const METRIC_LABELS: Record<MetricKind, string> = {
   openInterest: 'Open interest',
@@ -22,6 +22,15 @@ export function metricUnitLabel(unit: MetricUnit, instrument: Pick<Instrument, '
     case 'contracts':
       return 'contracts';
   }
+}
+
+/**
+ * §11.1 — the unit the metric panel shows: it plots the notional side, which is by definition in
+ * the instrument's quoteCurrency (`BTCUSDT · Open interest · USDT`), whatever `unit` `value` is in.
+ * Null until the series has data.
+ */
+export function plottedMetricUnit(points: readonly MetricPoint[]): MetricUnit | null {
+  return points.length > 0 ? 'quote' : null;
 }
 
 /**

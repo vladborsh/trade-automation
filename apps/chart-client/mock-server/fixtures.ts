@@ -212,6 +212,8 @@ export function closeCandle(forming: Candle): Candle {
  * WS topic have something real to bucket/stream without a live Binance
  * poller. Not a port of the real `BinanceMetricsAdapter` (§4.3) — same
  * relationship `example-cross` has to a real `SignalStrategy`.
+ * §11.2: each row carries a notional = value × the candle's close (seed rows as the venue's
+ * figure, live rows as our derived one), so the panel's USD series has data.
  */
 export function seedOpenInterestObservations(instrument: InstrumentId, history: readonly Candle[]): MetricObservation[] {
   const startValue = STARTING_OPEN_INTEREST[instrument];
@@ -224,7 +226,15 @@ export function seedOpenInterestObservations(instrument: InstrumentId, history: 
   for (const candle of history) {
     const drift = (rng() - 0.5) * startValue * 0.002;
     value = Math.max(0, value + drift);
-    observations.push({ metric: 'openInterest', instrument, time: candle.openTime, value, unit: 'base' });
+    observations.push({
+      metric: 'openInterest',
+      instrument,
+      time: candle.openTime,
+      value,
+      unit: 'base',
+      notional: value * candle.close,
+      notionalBasis: 'venue',
+    });
   }
   return observations;
 }
@@ -234,11 +244,13 @@ export function advanceOpenInterestObservation(
   instrument: InstrumentId,
   previous: MetricObservation,
   time: number,
+  price: number,
 ): MetricObservation {
   const startValue = STARTING_OPEN_INTEREST[instrument] ?? previous.value;
   const rng = mulberry32(time + seedFor(instrument) + 1);
   const drift = (rng() - 0.5) * startValue * 0.002;
-  return { metric: 'openInterest', instrument, time, value: Math.max(0, previous.value + drift), unit: 'base' };
+  const value = Math.max(0, previous.value + drift);
+  return { metric: 'openInterest', instrument, time, value, unit: 'base', notional: value * price, notionalBasis: 'derived' };
 }
 
 const TIMEFRAME_MINUTES: Record<Timeframe, number> = {

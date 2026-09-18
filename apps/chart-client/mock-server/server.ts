@@ -16,7 +16,6 @@ import type {
   WsClientMessage,
   WsServerMessage,
 } from '@trade-automation/contracts';
-import { bucketObservations } from '@trade-automation/contracts';
 import { MockMarketState } from './state';
 import { MOCK_LAYOUTS } from './layouts';
 import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
@@ -320,14 +319,15 @@ wss.on('connection', (socket: WebSocket) => {
    * architecture/chart-layouts.md §4.5 — one frame per observation, bucketed
    * to EACH subscriber's own requested timeframe (a client on '5m' and one
    * on '1m' both subscribed to the same instrument/metric get their own
-   * correctly-bucketed point from the same raw observation).
+   * correctly-bucketed point from the same raw observation). §11.2: the point
+   * is the whole forming bucket (state.formingMetricPoint), equal to the REST one.
    */
   const unsubscribeMetrics = state.onMetric((observation: MetricObservation) => {
     for (const key of subscriptions.metrics.values()) {
       if (key.instrument !== observation.instrument || key.metric !== observation.metric) {
         continue;
       }
-      const [point] = bucketObservations([observation], key.timeframe);
+      const point = state.formingMetricPoint(observation, key.timeframe);
       if (point) {
         send({ type: 'metric', point });
       }

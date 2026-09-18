@@ -1,10 +1,13 @@
 <div class="chart-panel" [attr.data-panel-id]="panel().id">
   <div class="panel-header">
     <span class="panel-title">{{ title() }}</span>
+    @if (caption(); as c) {
+      <span class="metric-caption" data-testid="metric-caption" [title]="c.tooltip">{{ c.text }}</span>
+    }
     <span class="venue-dot" [class]="'venue-' + venueStatus()"></span>
     <app-research-badge />
   </div>
-  <div class="panel-body">
+  <div class="panel-body" [attr.data-metric-style]="metricStyle()">
     <app-chart
       [panelId]="panel().id"
       [kind]="panel().kind"

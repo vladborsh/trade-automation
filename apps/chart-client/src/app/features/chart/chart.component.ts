@@ -15,7 +15,6 @@ import {
 import {
   CandlestickSeries,
   ColorType,
-  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type UTCTimestamp,
@@ -30,7 +29,8 @@ import type {
   Timeframe,
 } from '@trade-automation/contracts';
 import { TIMEFRAME_MS } from '@trade-automation/contracts';
-import { toCandlestickData, toCandlestickSeries, toLineData, toLineSeries } from './chart-data.adapter';
+import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
+import { MetricSeriesRenderer } from './metric-series.renderer';
 import { OverlayLayer } from './overlay/overlay-layer';
 import { MarkerRenderer } from './overlay/marker.renderer';
 import { PriceLineRenderer } from './overlay/price-line.renderer';
@@ -152,8 +152,8 @@ export function isNearOldestLoaded(
  * pagination requests go out as an output — no store/API knowledge here.
  *
  * `kind` picks the series type: `'candles'` draws a candlestick series and
- * attaches `OverlayLayer` (signal markers etc.); `'metric'` draws a single
- * `LineSeries` and never attaches overlays — a metric panel's `signals`
+ * attaches `OverlayLayer` (signal markers etc.); `'metric'` draws one series via
+ * `MetricSeriesRenderer` (§11.2) and never attaches overlays — a metric panel's `signals`
  * flag is schema-locked to `false` (libs/contracts `layout.ts`), so it
  * would receive nothing anyway, but §6.6 says explicitly: overlays are a
  * `'candles'`-only concept.
@@ -214,6 +214,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private readonly overlayLayer = new OverlayLayer();
   private readonly shapesPrimitive = new ShapesPrimitive();
   private readonly indicatorLayer = new IndicatorLayer();
+  private readonly metricSeries = new MetricSeriesRenderer();
   private lastRenderedCount = 0;
   private lastRenderedTime: number | null = null; // candle openTime or metric point time, seconds-scale source (ms)
   /**
@@ -356,7 +357,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       // bar via lightweight-charts' own timeToIndex(findNearest=true), so a follower with no
       // bar at this exact instant (dxy over a weekend, an OI panel before its first point)
       // draws on its nearest bar, not at the exact wall-clock x.
-      const value = this.kind() === 'candles' ? this.candles()[idx]?.close : this.points()[idx]?.value;
+      const value = this.kind() === 'candles' ? this.candles()[idx]?.close : metricPlottedClose(this.points()[idx]);
       if (value === undefined) {
         return;
       }
@@ -392,12 +393,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350',
         })
-      : this.chart.addSeries(LineSeries, {
-          color: '#58a6ff',
-          lineWidth: 2,
-          lastValueVisible: true,
-          priceFormat: { type: 'volume' },
-        });
+      : this.metricSeries.attach(this.chart, this.timeframe());
 
     if (isCandles) {
       this.overlayLayer.attachAll(this.chart, this.series);
@@ -615,12 +611,16 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   }
 
   private renderPoints(points: MetricPoint[]): void {
+    // Read timeframe() before any early return, so the render effect re-runs on a timeframe change.
+    if (this.metricSeries.setTimeframe(this.timeframe())) {
+      this.series = this.metricSeries.series;
+      this.lastRenderedCount = 0; // §11.2: line <-> candles swapped; the new series needs a full setData
+    }
     if (!this.series || this.kind() !== 'metric') {
       return;
     }
-    const series = this.series as ISeriesApi<'Line'>;
     if (points.length === 0) {
-      series.setData([]);
+      this.metricSeries.setData([]);
       this.lastRenderedCount = 0;
       this.lastRenderedTime = null;
       this.lastTimesSec = [];
@@ -639,9 +639,9 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     const timesSec = points.map((p) => p.time / 1000);
     if (isIncrementalAppendOrUpdate) {
       const last = points[points.length - 1];
-      series.update(toLineData(last));
+      this.metricSeries.update(last);
     } else {
-      this.withPreservedRangeOnPrepend(isPrepend, timesSec, () => series.setData(toLineSeries(points)));
+      this.withPreservedRangeOnPrepend(isPrepend, timesSec, () => this.metricSeries.setData(points));
     }
     this.lastRenderedCount = points.length;
     this.lastRenderedTime = points[points.length - 1].time;

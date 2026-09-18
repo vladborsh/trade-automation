@@ -9,7 +9,8 @@ import { TimeframeStore } from '../../core/state/timeframe.store';
 import { LayoutFeedService } from '../../core/state/layout-feed.service';
 import type { PanelFeed } from '../../core/state/panel-feed';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
-import { panelTitle } from './panel-title';
+import { metricSeriesCaption, metricSeriesStyle } from '../chart/metric-series-style';
+import { panelTitle, plottedMetricUnit } from './panel-title';
 
 /**
  * architecture/chart-layouts.md §6.1 — one panel: header (title, venue
@@ -34,11 +35,15 @@ export class ChartPanelComponent {
   readonly panel = input.required<Panel>();
   readonly feed = input.required<PanelFeed>();
 
-  readonly title = computed(() => {
-    const points = this.feed().points.points();
-    const unit = points.length > 0 ? points[points.length - 1].unit : null;
-    return panelTitle(this.panel(), this.instruments.selected(), unit);
-  });
+  readonly title = computed(() =>
+    panelTitle(this.panel(), this.instruments.selected(), plottedMetricUnit(this.feed().points.points())),
+  );
+  /** §11.2 rule 4 — the style `<app-chart>` draws the metric in; exposed as an e2e hook (canvas has no DOM). */
+  readonly metricStyle = computed(() => (this.panel().kind === 'metric' ? metricSeriesStyle(this.timeframe.selected()) : null));
+  /** §11.2 rule 5 — why the metric panel is a line (1m) or wickless candles (5m); none elsewhere. */
+  readonly caption = computed(() =>
+    this.panel().kind === 'metric' ? metricSeriesCaption(this.timeframe.selected()) : null,
+  );
   readonly venueStatus = computed(() => this.connection.statusFor(this.panel().instrument)?.venueStatus ?? 'down');
   readonly overlays = computed(() =>
     this.panel().kind === 'candles' ? signalsToOverlays(this.feed().signals.signals()) : [],

@@ -25,6 +25,15 @@
 .panel-title {
   font-weight: 600;
 }
+.metric-caption {
+  padding: 0 6px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  cursor: help;
+}
 .venue-dot {
   width: 8px;
   height: 8px;

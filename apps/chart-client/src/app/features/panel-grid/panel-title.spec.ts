@@ -1,5 +1,5 @@
-import type { Instrument, Panel } from '@trade-automation/contracts';
-import { metricUnitLabel, panelTitle } from './panel-title';
+import type { Instrument, MetricPoint, Panel } from '@trade-automation/contracts';
+import { metricUnitLabel, panelTitle, plottedMetricUnit } from './panel-title';
 
 const btc: Pick<Instrument, 'symbol' | 'quoteCurrency' | 'displayName'> = {
   symbol: 'BTCUSDT',
@@ -22,6 +22,18 @@ describe('metricUnitLabel (architecture/chart-layouts.md §11.1)', () => {
   it("'quote' is the quoteCurrency and 'contracts' is literal", () => {
     expect(metricUnitLabel('quote', btc)).toBe('USDT');
     expect(metricUnitLabel('contracts', btc)).toBe('contracts');
+  });
+});
+
+describe('plottedMetricUnit (§11.1 — the panel plots notional)', () => {
+  it('is the quote currency once the series has data, whatever unit `value` is in', () => {
+    const point = { unit: 'base' } as MetricPoint;
+    expect(plottedMetricUnit([point])).toBe('quote');
+    expect(panelTitle(oiPanel, btc, plottedMetricUnit([point]))).toBe('BTCUSDT · Open interest · USDT');
+  });
+
+  it('is null before the series has data', () => {
+    expect(plottedMetricUnit([])).toBeNull();
   });
 });
 
