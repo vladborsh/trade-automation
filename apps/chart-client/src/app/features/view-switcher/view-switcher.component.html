@@ -1,0 +1,18 @@
+<div class="view-switcher" role="group" aria-label="View">
+  <button
+    type="button"
+    class="view-btn"
+    [class.active]="view.activeView() === 'charts'"
+    (click)="view.set('charts')"
+  >
+    Charts
+  </button>
+  <button
+    type="button"
+    class="view-btn"
+    [class.active]="view.activeView() === 'calendar'"
+    (click)="view.set('calendar')"
+  >
+    Calendar
+  </button>
+</div>
