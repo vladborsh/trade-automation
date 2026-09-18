@@ -74,4 +74,41 @@ describe('Resampler (architecture/live-signal-server.md §3.2, §4.1)', () => {
     expect(closed5m!.high).toBe(110);
     expect(closed5m!.low).toBe(90);
   });
+
+  describe('previewForming — derived bars track the forming minute', () => {
+    const base = Date.UTC(2026, 0, 1, 0, 0, 0);
+    const forming = (openTime: number, o: number, h: number, l: number, c: number, v = 1): Candle => ({
+      ...bar(openTime, o, h, l, c, v),
+      closed: false,
+    });
+
+    it('folds the forming 1m into the open 5m bucket without mutating it', () => {
+      const r = new Resampler();
+      r.onClosed1m(bar(base, 100, 105, 95, 101, 2));
+      r.onClosed1m(bar(base + MIN, 101, 103, 99, 102, 3));
+
+      const tick = r.previewForming(forming(base + 2 * MIN, 102, 110, 98, 108, 4));
+      const m5 = tick.find((c) => c.timeframe === '5m')!;
+      expect(m5).toMatchObject({ openTime: base, open: 100, high: 110, low: 95, close: 108, volume: 9, closed: false });
+
+      // a later, lower tick in the same minute must not inherit the earlier tick's high
+      const later = r.previewForming(forming(base + 2 * MIN, 102, 104, 98, 103, 5));
+      expect(later.find((c) => c.timeframe === '5m')).toMatchObject({ high: 105, close: 103, volume: 10 });
+
+      // and the closed path is unaffected by previews
+      const closed = r.onClosed1m(bar(base + 2 * MIN, 102, 104, 98, 103, 5));
+      expect(closed.forming.find((c) => c.timeframe === '5m')).toMatchObject({ high: 105, close: 103, volume: 10 });
+    });
+
+    it('opens a new bar when the forming minute belongs to a bucket not yet started', () => {
+      const r = new Resampler();
+      r.onClosed1m(bar(base + 4 * MIN, 100, 105, 95, 101));
+      const m5 = r.previewForming(forming(base + 5 * MIN, 200, 201, 199, 200)).find((c) => c.timeframe === '5m')!;
+      expect(m5).toMatchObject({ openTime: base + 5 * MIN, open: 200, high: 201, low: 199, close: 200 });
+    });
+
+    it('rejects a closed candle', () => {
+      expect(() => new Resampler().previewForming(bar(base, 1, 1, 1, 1))).toThrow();
+    });
+  });
 });

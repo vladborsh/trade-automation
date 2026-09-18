@@ -77,6 +77,45 @@ export class Resampler {
     return { closed, forming };
   }
 
+  /**
+   * Preview the still-forming derived bars with a *forming* 1m candle folded in, so a 5m/1h
+   * panel moves tick-by-tick instead of only when a minute closes. Read-only: bucket state is
+   * advanced exclusively by `onClosed1m`, so a forming tick can never be double-counted once
+   * its minute closes. A bucket left over from an earlier period (not yet flushed, because
+   * flushing happens on the next *closed* 1m) is ignored — the forming 1m opens a new bar.
+   */
+  previewForming(candle: Candle): Candle[] {
+    if (candle.timeframe !== '1m' || candle.closed) {
+      throw new Error('Resampler.previewForming expects a forming 1m candle');
+    }
+
+    const forming: Candle[] = [];
+    for (const tf of DERIVED_TIMEFRAMES) {
+      const bucketStart = bucketStartFor(candle.openTime, tf);
+      const current = this.buckets.get(this.key(candle.instrument, tf));
+      const merged: Bucket =
+        current && current.bucketStart === bucketStart
+          ? {
+              bucketStart,
+              open: current.open,
+              high: Math.max(current.high, candle.high),
+              low: Math.min(current.low, candle.low),
+              close: candle.close,
+              volume: current.volume + candle.volume,
+            }
+          : {
+              bucketStart,
+              open: candle.open,
+              high: candle.high,
+              low: candle.low,
+              close: candle.close,
+              volume: candle.volume,
+            };
+      forming.push(this.toCandle(candle.instrument, tf, merged, false));
+    }
+    return forming;
+  }
+
   private toCandle(instrument: InstrumentId, tf: Timeframe, b: Bucket, closedFlag: boolean): Candle {
     return {
       instrument,

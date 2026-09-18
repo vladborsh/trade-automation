@@ -33,6 +33,21 @@ export class ResamplerService {
     }
   }
 
+  /**
+   * Forming 1m -> forming derived bars, so coarser panels track price within the minute.
+   * Derived forming candles re-enter this handler through the same event; the `1m` guard
+   * stops that from recursing.
+   */
+  @OnEvent(MarketDataEvents.CandleForming)
+  handleForming1m(event: CandleFormingEvent): void {
+    const candle = event.candle;
+    if (candle.timeframe !== '1m' || candle.source === 'resampled') return;
+
+    for (const c of this.resampler.previewForming(candle)) {
+      this.events.emit(MarketDataEvents.CandleForming, new CandleFormingEvent(c));
+    }
+  }
+
   /** Exposed for tests that want the pure resampling result without the event bus. */
   feed(candle: Candle) {
     return this.resampler.onClosed1m(candle);
