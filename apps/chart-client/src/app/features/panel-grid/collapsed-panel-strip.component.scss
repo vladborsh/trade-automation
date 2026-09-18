@@ -1,0 +1,37 @@
+:host {
+  display: block;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 100%;
+  min-height: 0;
+}
+.collapsed-panel-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 4px 0;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #8b949e;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+}
+.collapsed-panel-strip:hover,
+.collapsed-panel-strip:focus-visible {
+  color: #c9d1d9;
+  border-color: #8b949e;
+}
+.chevron {
+  font-size: 16px;
+  line-height: 1;
+}
+.strip-title {
+  writing-mode: vertical-rl;
+  font-weight: 600;
+  white-space: nowrap;
+}

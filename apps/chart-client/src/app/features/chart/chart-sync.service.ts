@@ -96,6 +96,14 @@ export class ChartSyncService {
   readonly origin = this._origin.asReadonly();
   readonly crosshair = this._crosshair.asReadonly();
 
+  /**
+   * architecture/chart-layouts.md §11.3 sync rule 3: bumped by `reassert()`. Every chart —
+   * the origin included — re-applies the current shared range when it changes. Monotonic; not
+   * touched by `reset()` (a chart only reacts to a change, never to the value itself).
+   */
+  private readonly _reassertEpoch = signal(0);
+  readonly reassertEpoch = this._reassertEpoch.asReadonly();
+
   /** Timestamps of recent origin takeovers, within the current trip-detection window. */
   private takeoverTimestamps: number[] = [];
   /** While `now < cooldownUntil`, every proposal (from any panel) is dropped. */
@@ -147,6 +155,25 @@ export class ChartSyncService {
    */
   setCrosshair(panelId: string, timeSec: number | null): void {
     this._crosshair.set(timeSec === null ? null : { origin: panelId, timeSec });
+  }
+
+  /**
+   * §11.3 sync rule 1: a chart being destroyed (its panel collapsed) clears the crosshair only if
+   * it was the crosshair's origin — nothing else would ever clear a hover from a gone pointer.
+   */
+  releaseCrosshair(panelId: string): void {
+    if (this._crosshair()?.origin === panelId) {
+      this._crosshair.set(null);
+    }
+  }
+
+  /**
+   * §11.3 sync rule 3: after a collapse/restore re-flows every column's width, ask every chart to
+   * re-apply the current shared range to its new width. Never changes the range or its origin,
+   * so it cannot count towards the circuit breaker.
+   */
+  reassert(): void {
+    this._reassertEpoch.update((e) => e + 1);
   }
 
   /** Called on layout/timeframe rebuild — the new panels start with no shared range. */

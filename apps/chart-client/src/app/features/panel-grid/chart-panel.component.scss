@@ -22,6 +22,27 @@
   font-size: 12px;
   color: #c9d1d9;
 }
+.collapse-btn {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #8b949e;
+  font: inherit;
+  font-size: 14px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.collapse-btn:hover:not(:disabled),
+.collapse-btn:focus-visible {
+  color: #c9d1d9;
+  border-color: #30363d;
+}
+.collapse-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .panel-title {
   font-weight: 600;
 }

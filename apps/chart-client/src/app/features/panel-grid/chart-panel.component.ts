@@ -7,6 +7,8 @@ import { InstrumentsStore } from '../../core/state/instruments.store';
 import { StrategiesStore } from '../../core/state/strategies.store';
 import { TimeframeStore } from '../../core/state/timeframe.store';
 import { LayoutFeedService } from '../../core/state/layout-feed.service';
+import { LayoutsStore } from '../../core/state/layouts.store';
+import { CollapsedPanelsStore } from '../../core/state/collapsed-panels.store';
 import type { PanelFeed } from '../../core/state/panel-feed';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
 import { metricSeriesCaption, metricSeriesStyle } from '../chart/metric-series-style';
@@ -48,6 +50,11 @@ export class ChartPanelComponent {
   readonly overlays = computed(() =>
     this.panel().kind === 'candles' ? signalsToOverlays(this.feed().signals.signals()) : [],
   );
+  /** §11.3: the last expanded panel's collapse button is disabled. */
+  readonly canCollapse = computed(() => {
+    const layout = this.layouts.active();
+    return layout ? this.collapsed.canCollapse(layout, this.panel().id) : false;
+  });
 
   constructor(
     readonly strategies: StrategiesStore,
@@ -55,7 +62,16 @@ export class ChartPanelComponent {
     private readonly connection: ConnectionStore,
     private readonly instruments: InstrumentsStore,
     private readonly layoutFeed: LayoutFeedService,
+    private readonly layouts: LayoutsStore,
+    private readonly collapsed: CollapsedPanelsStore,
   ) {}
+
+  collapse(): void {
+    const layout = this.layouts.active();
+    if (layout) {
+      this.collapsed.collapse(layout, this.panel().id);
+    }
+  }
 
   onLoadOlder(): void {
     void this.layoutFeed.loadOlder(this.panel().id);
