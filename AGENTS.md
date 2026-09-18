@@ -29,7 +29,9 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
    without extracting something first.
 4. **Styles are per-component and scoped.** Global rules only in `src/styles.css`. Reuse the
    existing dark-terminal palette (`#0d1117` background, `#30363d` borders, `#c9d1d9` text,
-   `#8b949e` muted, `#26a69a` / `#ef5350` up/down) rather than inventing near-duplicates.
+   `#8b949e` muted, `#ffffff` / `#2962ff` up/down) rather than inventing near-duplicates.
+   Chart colours (candle up/down, OI candles, separators) come from `CHART_PALETTE` in
+   `features/chart/chart-theme.ts` — the single source; never hard-code them in a series.
 5. **New components:** `standalone: true`, `ChangeDetectionStrategy.OnPush`, signal
    `input()` / `output()` for new APIs. Generate with
    `npx ng generate component <feature-folder>/<name> --flat` from `apps/chart-client` —

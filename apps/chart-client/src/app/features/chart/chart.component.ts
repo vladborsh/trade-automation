@@ -13,14 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import {
-  CandlestickSeries,
-  ColorType,
-  type IChartApi,
-  type ISeriesApi,
-  type UTCTimestamp,
-} from 'lightweight-charts';
-import { createChart } from 'lightweight-charts';
+import { CandlestickSeries, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
 import type {
   Candle,
   IndicatorPoint,
@@ -32,6 +25,7 @@ import type {
 import { TIMEFRAME_MS } from '@trade-automation/contracts';
 import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
 import { MetricSeriesRenderer } from './metric-series.renderer';
+import { CHART_OPTIONS, PRICE_CANDLE_OPTIONS } from './chart-theme';
 import { OverlayLayer } from './overlay/overlay-layer';
 import { MarkerRenderer } from './overlay/marker.renderer';
 import { PriceLineRenderer } from './overlay/price-line.renderer';
@@ -229,30 +223,9 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     const el = this.container().nativeElement;
     const isCandles = this.kind() === 'candles';
     this.stopResizeObserver = observeResize(el, this.resizeSettle); // before createChart — see observeResize
-    this.chart = createChart(el, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#c9d1d9',
-        fontFamily: "ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace",
-      },
-      grid: {
-        vertLines: { color: '#161b22' },
-        horzLines: { color: '#161b22' },
-      },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#30363d' },
-      rightPriceScale: { borderColor: '#30363d' },
-      crosshair: { mode: 0 },
-      autoSize: true,
-    });
-
+    this.chart = createChart(el, CHART_OPTIONS);
     this.series = isCandles
-      ? this.chart.addSeries(CandlestickSeries, {
-          upColor: '#26a69a',
-          downColor: '#ef5350',
-          borderVisible: false,
-          wickUpColor: '#26a69a',
-          wickDownColor: '#ef5350',
-        })
+      ? this.chart.addSeries(CandlestickSeries, PRICE_CANDLE_OPTIONS)
       : this.metricSeries.attach(this.chart, this.timeframe());
 
     if (isCandles) {

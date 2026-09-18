@@ -1,3 +1,4 @@
+import { CHART_PALETTE } from './chart-theme';
 import type { Timeframe } from '@trade-automation/contracts';
 
 /**
@@ -38,6 +39,6 @@ export function metricSeriesCaption(tf: Timeframe): MetricSeriesCaption | null {
   }
 }
 
-/** §11.2 rule 5 — OI candles use their own colours so they never read as price candles. */
-export const METRIC_UP_COLOR = '#58a6ff';
-export const METRIC_DOWN_COLOR = '#f0883e';
+/** §12.1 — OI candles take the price palette, so up/down read the same on adjacent panels. */
+export const METRIC_UP_COLOR = CHART_PALETTE.up;
+export const METRIC_DOWN_COLOR = CHART_PALETTE.down;
