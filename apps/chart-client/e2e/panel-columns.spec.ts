@@ -165,3 +165,23 @@ test('the last expanded panel cannot be collapsed', async ({ page }) => {
   await expect(last).toHaveAttribute('title', 'At least one panel stays open');
   await expect(page.locator('.collapsed-panel-strip')).toHaveCount(3);
 });
+
+test('a metric series swap on timeframe change (§11.2) joins the grid: panels converge, no breaker', async ({ page }) => {
+  const warnings = await bootCrypto(page);
+
+  // 5m → 1m: the OI panel swaps candles → line; 1m → 15m: line → candles.
+  for (const [tf, style] of [
+    ['1m', 'line'],
+    ['15m', 'candles'],
+  ] as const) {
+    await scrollBack(page, 'btc', 2);
+    await page.getByRole('button', { name: tf, exact: true }).click();
+    await expect(page.locator('.chart-panel[data-panel-id="btc-oi"] .panel-body')).toHaveAttribute('data-metric-style', style);
+    for (const id of PANEL_IDS) {
+      await expect(chartOf(page, id)).toHaveAttribute('data-visible-to', /\d+/, { timeout: 15_000 });
+    }
+    await page.waitForTimeout(500);
+    await convergedRange(page, PANEL_IDS);
+    expect(warnings).toEqual([]);
+  }
+});
