@@ -1,7 +1,11 @@
 import { z } from 'zod';
 
-/** architecture/live-signal-server.md §3.1 */
-export const VenueSchema = z.enum(['binance', 'capitalcom']);
+/**
+ * architecture/live-signal-server.md §3.1. 'bybit' and 'hyperliquid' (architecture/aggregate-oi.md
+ * §3) are genuine venues but metric-only today: they appear as aggregate members, not in
+ * instruments.yaml, so no candle ingestion or venue status exists for them.
+ */
+export const VenueSchema = z.enum(['binance', 'capitalcom', 'bybit', 'hyperliquid']);
 export type Venue = z.infer<typeof VenueSchema>;
 
 /** `${venue}:${venue-native symbol}`, e.g. 'binance:BTCUSDT', 'capitalcom:US100' */

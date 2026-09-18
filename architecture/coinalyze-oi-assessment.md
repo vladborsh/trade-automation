@@ -175,6 +175,10 @@ one.** Both are small, and the first is worth doing on its own merits.
 
 ## 5. Recommendation + routing
 
+> **Superseded in part, 2026-09-18 — see §8.** The "do not build a multi-venue aggregate yet"
+> below is overruled by the user; all three of its premises turned out false. The
+> Coinalyze-specific advice (do not ingest Coinalyze itself) still stands.
+
 **Do not adopt Coinalyze as a replacement for the Binance feed, and do not adopt it alongside
 yet.** The Binance direct feed is better on every axis we currently use — deeper at 5 m, no
 key, no rate pressure, no third-party dependency — and the one thing Coinalyze uniquely offers
@@ -276,3 +280,29 @@ design in [`chart-layouts.md`](chart-layouts.md) §11.1 (`unit` on `MetricObserv
 `notionalBasis` so a history/tip join step can be attributed). Coinalyze itself is still not
 ingested; the candle rule in §11.2 is built from our own 5 m readings, not their
 `candlestick_oi`.
+
+---
+
+## 8. Amendment (2026-09-18) — the multi-venue aggregate is being built, without Coinalyze
+
+The user asked for aggregated OI across **Binance, Bybit and Hyperliquid**. Design:
+[`aggregate-oi.md`](aggregate-oi.md). §5's "do not build a multi-venue aggregate yet" rested on
+three premises, all now false:
+
+1. *"No consumer in the codebase."* — The user is the consumer; the chart panel is the use.
+2. *"A key to provision"* — true of Coinalyze only. Bybit (`/v5/market/open-interest`,
+   `/v5/market/tickers`) and Hyperliquid (`/info metaAndAssetCtxs`) are public, no key.
+3. *"Intraday retention is a regression"* — Bybit serves **3+ years at 5 min** directly, far
+   beyond both our 30 d and Coinalyze's 5–7 d at 5 m.
+
+What still stands from this note: Coinalyze is not ingested; the unit tag (§5, built in §11.1)
+was the right prerequisite; and "an aggregate is a fan-out behind the port" (§4) — implemented
+as composition on read, see aggregate-oi.md §3.1. The source axis (§4) turned out unnecessary
+for this build: Bybit and Hyperliquid are genuine venues and join `VenueSchema` honestly.
+
+**Correction to §2/§3 as a comparison basis.** This note compared against Coinalyze's USD
+aggregate as if it were one consistent measurement. It likely is not: CoinGlass and CoinGecko
+sum Bybit's **two-sided** `openInterest` with other venues' one-sided figures, and Coinalyze
+probably does the same — *inferred* from those two, **not verified** (Coinalyze renders to
+canvas and its API needs a key). Our aggregate is one-sided throughout and reads ~14 % below
+such sums for BTC; the convention is a named setting (aggregate-oi.md §2).

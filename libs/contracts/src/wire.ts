@@ -8,6 +8,7 @@ import {
 } from './calendar';
 import { InstrumentIdSchema, InstrumentSchema, VenueStatusSchema } from './instrument';
 import { MetricKindSchema, MetricPointSchema } from './metric';
+import { AggregateMetricPointSchema } from './metric-aggregate';
 import { SignalSchema } from './signal';
 import { IndicatorPointSchema, IndicatorSeriesSpecSchema, StrategyTierSchema } from './strategy';
 import { TimeframeSchema } from './timeframe';
@@ -255,6 +256,21 @@ export const WsUnsubscribeMetricsSchema = z.object({
   timeframe: TimeframeSchema,
 });
 
+/** architecture/aggregate-oi.md §5 — `metricAggregates` WS topic; one frame per member observation. */
+export const WsSubscribeMetricAggregatesSchema = z.object({
+  type: z.literal('subscribe'),
+  topic: z.literal('metricAggregates'),
+  aggregate: z.string().min(1),
+  timeframe: TimeframeSchema,
+});
+
+export const WsUnsubscribeMetricAggregatesSchema = z.object({
+  type: z.literal('unsubscribe'),
+  topic: z.literal('metricAggregates'),
+  aggregate: z.string().min(1),
+  timeframe: TimeframeSchema,
+});
+
 /** architecture/economic-calendar.md §6.2 — `calendar` WS topic; no parameters, one stream for the whole calendar. */
 export const WsSubscribeCalendarSchema = z.object({
   type: z.literal('subscribe'),
@@ -272,12 +288,14 @@ const WsSubscribeSchema = z.discriminatedUnion('topic', [
   WsSubscribeCandlesSchema,
   WsSubscribeSignalsSchema,
   WsSubscribeMetricsSchema,
+  WsSubscribeMetricAggregatesSchema,
   WsSubscribeCalendarSchema,
 ]);
 const WsUnsubscribeSchema = z.discriminatedUnion('topic', [
   WsUnsubscribeCandlesSchema,
   WsUnsubscribeSignalsSchema,
   WsUnsubscribeMetricsSchema,
+  WsUnsubscribeMetricAggregatesSchema,
   WsUnsubscribeCalendarSchema,
 ]);
 
@@ -290,6 +308,15 @@ export const WsSignalMessageSchema = z.object({ type: z.literal('signal'), signa
 export const WsIndicatorMessageSchema = z.object({ type: z.literal('indicator'), point: IndicatorPointSchema });
 /** architecture/chart-layouts.md §4.5 — one frame per observation, already bucketed to the subscribed timeframe. */
 export const WsMetricMessageSchema = z.object({ type: z.literal('metric'), point: MetricPointSchema });
+/**
+ * architecture/aggregate-oi.md §5 — the forming aggregate bucket, rebuilt from MetricCache on every
+ * member observation; same-`time` frames replace. May be WITHHELD (no frame) while the forming
+ * slot's coverage is a strict subset of the previous one (§1 rule C3).
+ */
+export const WsMetricAggregateMessageSchema = z.object({
+  type: z.literal('metricAggregate'),
+  point: AggregateMetricPointSchema,
+});
 export const WsStatusMessageSchema = z.object({
   type: z.literal('status'),
   instrument: InstrumentIdSchema,
@@ -315,6 +342,7 @@ export const WsServerMessageSchema = z.discriminatedUnion('type', [
   WsSignalMessageSchema,
   WsIndicatorMessageSchema,
   WsMetricMessageSchema,
+  WsMetricAggregateMessageSchema,
   WsStatusMessageSchema,
   WsPongMessageSchema,
   WsCalendarEventMessageSchema,

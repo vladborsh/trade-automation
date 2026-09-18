@@ -5,5 +5,6 @@ export * from './strategy';
 export * from './signal';
 export * from './layout';
 export * from './metric';
+export * from './metric-aggregate';
 export * from './calendar';
 export * from './wire';

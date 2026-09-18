@@ -135,6 +135,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
           state.metricTopics.add(this.metricKey(parsed.instrument, parsed.metric, parsed.timeframe));
         } else if (parsed.topic === 'calendar') {
           state.calendar = true;
+        } else if (parsed.topic === 'metricAggregates') {
+          // architecture/aggregate-oi.md §5 — accepted by the contract, served by SE-AG3.
         } else {
           state.signalTopics.add(parsed.instrument);
         }
@@ -146,6 +148,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
           state.metricTopics.delete(this.metricKey(parsed.instrument, parsed.metric, parsed.timeframe));
         } else if (parsed.topic === 'calendar') {
           state.calendar = false;
+        } else if (parsed.topic === 'metricAggregates') {
+          // architecture/aggregate-oi.md §5 — accepted by the contract, served by SE-AG3.
         } else {
           state.signalTopics.delete(parsed.instrument);
         }

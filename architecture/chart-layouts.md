@@ -1012,3 +1012,9 @@ reload → panel 2's collapsed state persisted as left.
 See [`four-streams-2026-09-18.md`](four-streams-2026-09-18.md) for task ids, branches and
 sequencing. Streams: SE-A1 (unit tag) → SE-A2 (USD tip, server) ∥ SE-A3 (OHLC + client
 rendering); SE-B (layout/collapse); SE-C in `economic-calendar.md` §11.
+
+### 11.5 Superseded for the `btc-oi` panel: cross-venue aggregate (2026-09-18)
+
+The panel now plots the Binance + Bybit + Hyperliquid aggregate —
+[`aggregate-oi.md`](aggregate-oi.md). §11.1's price basis (venue mark price) and §11.2's OHLC
+rule are kept and applied per leg; the aggregate adds coverage epochs on top (aggregate-oi §1).

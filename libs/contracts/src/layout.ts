@@ -14,10 +14,17 @@ export const PanelSchema = z
     metric: MetricKindSchema.optional(), // §4.2; required iff kind === 'metric'
     signals: z.boolean().default(false),
     title: z.string().min(1).optional(), // default: instrument.displayName (+ " · Open interest")
+    /**
+     * architecture/aggregate-oi.md §3 — id in config/metric-aggregates.yaml; the panel plots the
+     * cross-venue aggregate instead of `instrument` alone. `instrument` stays the anchor (a member
+     * of the aggregate). Only on kind 'metric'.
+     */
+    aggregate: z.string().regex(/^[a-z0-9-]+$/).optional(),
   })
   .superRefine((p, ctx) => {
     if (p.kind === 'metric' && !p.metric) ctx.addIssue({ code: 'custom', message: 'metric panel needs `metric`' });
     if (p.kind === 'candles' && p.metric) ctx.addIssue({ code: 'custom', message: 'candles panel must not set `metric`' });
+    if (p.kind === 'candles' && p.aggregate) ctx.addIssue({ code: 'custom', message: 'candles panel must not set `aggregate`' });
     if (p.kind === 'metric' && p.signals) ctx.addIssue({ code: 'custom', message: 'signals cannot render on a metric panel' });
   });
 export type Panel = z.infer<typeof PanelSchema>;
