@@ -2,6 +2,8 @@ import { Venue } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { MetricAdapter } from './metrics/metric-adapter.port';
 import { BinanceMetricsAdapter } from './metrics/binance/binance-metrics.adapter';
+import { BybitMetricsAdapter } from './metrics/bybit/bybit-metrics.adapter';
+import { MetricsService } from '../observability/metrics.service';
 import { ReplayMetricAdapter } from './metrics/replay/replay-metric.adapter';
 
 /**
@@ -12,7 +14,10 @@ import { ReplayMetricAdapter } from './metrics/replay/replay-metric.adapter';
  * MetricIngestionService, not a boot failure (same "no adapter for venue" precedent as
  * IngestionService).
  */
-export function buildMetricAdapters(config: AppConfigService): Map<Venue, MetricAdapter> {
+export function buildMetricAdapters(
+  config: AppConfigService,
+  appMetrics?: MetricsService,
+): Map<Venue, MetricAdapter> {
   const env = config.env;
   const mode = env.get('MARKET_DATA_MODE');
   const adapters = new Map<Venue, MetricAdapter>();
@@ -23,5 +28,12 @@ export function buildMetricAdapters(config: AppConfigService): Map<Venue, Metric
   }
 
   adapters.set('binance', new BinanceMetricsAdapter(env.get('BINANCE_REST_BASE_URL')));
+  adapters.set(
+    'bybit',
+    new BybitMetricsAdapter(env.get('BYBIT_REST_BASE_URL'), {
+      historyDays: env.get('BYBIT_OI_HISTORY_DAYS'),
+      onSidednessDrift: (source) => appMetrics?.metricSidednessDriftTotal.inc({ source }),
+    }),
+  );
   return adapters;
 }

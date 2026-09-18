@@ -86,12 +86,28 @@ export class FileMetricStore implements MetricStore {
   }
 
   async latestTime(instrument: InstrumentId, metric: MetricKind): Promise<number | null> {
+    const files = this.dayFiles(instrument, metric);
+    if (files.length === 0) return null;
+    const last = this.readFile(files[files.length - 1]);
+    return last.length > 0 ? last[last.length - 1].time : null;
+  }
+
+  async earliestTime(instrument: InstrumentId, metric: MetricKind): Promise<number | null> {
+    const files = this.dayFiles(instrument, metric);
+    if (files.length === 0) return null;
+    const first = this.readFile(files[0]);
+    return first.length > 0 ? first[0].time : null;
+  }
+
+  /** Day files of one series, ascending by date. */
+  private dayFiles(instrument: InstrumentId, metric: MetricKind): string[] {
     const { venue, symbol } = this.parseInstrumentId(instrument);
     const dir = path.join(this.root, 'metrics', `venue=${venue}`, `symbol=${symbol}`, `metric=${metric}`);
-    if (!fs.existsSync(dir)) return null;
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl')).sort();
-    if (files.length === 0) return null;
-    const last = this.readFile(path.join(dir, files[files.length - 1]));
-    return last.length > 0 ? last[last.length - 1].time : null;
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.jsonl'))
+      .sort()
+      .map((f) => path.join(dir, f));
   }
 }

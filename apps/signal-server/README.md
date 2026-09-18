@@ -75,6 +75,7 @@ failure. Key ones:
 | `CAPITAL_COM_BASE_URL`, `CAPITAL_COM_IDENTIFIER`, `CAPITAL_COM_PASSWORD`, `CAPITAL_COM_API_KEY` | Required when `MARKET_DATA_MODE=live` and the universe includes a `capitalcom` instrument. |
 | `WS_SHARED_TOKEN` | Optional shared token gate on the WS endpoint (`?token=`). |
 | `METRIC_POLL_INTERVAL_MS` | Open-interest live poll cadence, aligned to `BarClock`'s 1m tick (default `60000`). See "Open interest ingestion" below. |
+| `BYBIT_REST_BASE_URL`, `BYBIT_OI_HISTORY_DAYS` | Bybit V5 public endpoint (no key) for the Bybit open-interest leg of an aggregate, and how far back its resumable Phase 2 crawl walks (default `1095` days, paced 2 req/s; architecture/aggregate-oi.md §5, §7). |
 | `CALENDAR_ENABLED` | `true` (default) or `false`. `false` cleanly disables the calendar module: no poll, no notifications, and every `/api/calendar/*` route returns `503 calendar disabled`. See "Economic calendar" below. |
 | `CALENDAR_FEED_BASE_URL` | ForexFactory weekly-feed base URL (`.json`/`.xml` appended); default is the live public feed. |
 | `CALENDAR_POLL_INTERVAL_MS`, `CALENDAR_POLL_HOT_INTERVAL_MS` | Default (`600000` = 10 min) and hot (`120000` = 2 min) poll cadence. Hot applies within ±20 min of a high-impact event and through the Sunday ET-midnight week-roll window. |

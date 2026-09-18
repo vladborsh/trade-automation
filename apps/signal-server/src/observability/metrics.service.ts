@@ -118,6 +118,17 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * architecture/aggregate-oi.md §2 — a Bybit row whose legacy `openInterest` is not
+   * 2 × `singleOpenInterest` (± 0.001): the venue changed a field's meaning.
+   */
+  readonly metricSidednessDriftTotal = new client.Counter({
+    name: 'signal_server_metric_sidedness_drift_total',
+    help: 'Venue rows whose two-sided open interest is not exactly 2x the one-sided figure',
+    labelNames: ['source'],
+    registers: [this.registry],
+  });
+
   /** architecture/economic-calendar.md §8. */
   readonly calendarPollsTotal = new client.Counter({
     name: 'signal_server_calendar_polls_total',

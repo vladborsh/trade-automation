@@ -1,6 +1,6 @@
 import * as zlib from 'zlib';
 import { Readable } from 'stream';
-import { GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, ListObjectsV2Command, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { mockClient } from 'aws-sdk-client-mock';
 import { MetricObservation } from '@trade-automation/contracts';
 import { S3MetricStore } from '../../src/storage/s3/s3-metric-store';
@@ -51,6 +51,24 @@ describe('S3MetricStore upsert idempotency (architecture/chart-layouts.md §4.4)
     const rows = written.split('\n').map((l) => JSON.parse(l));
     expect(rows).toHaveLength(1);
     expect(rows[0].value).toBe(999);
+  });
+
+  it('earliestTime / latestTime follow the ListObjectsV2 continuation token (> 1 000 day objects: a 3-year crawl)', async () => {
+    const prefix = 'metrics/venue=binance/symbol=BTCUSDT/metric=openInterest/';
+    const dayKey = (d: number) => `${prefix}date=${new Date(Date.UTC(2023, 0, 1) + d * 86_400_000).toISOString().slice(0, 10)}.jsonl.gz`;
+    s3Mock
+      .on(ListObjectsV2Command, { ContinuationToken: undefined })
+      .resolves({ Contents: Array.from({ length: 1000 }, (_, d) => ({ Key: dayKey(d) })), IsTruncated: true, NextContinuationToken: 'p2' })
+      .on(ListObjectsV2Command, { ContinuationToken: 'p2' })
+      .resolves({ Contents: Array.from({ length: 100 }, (_, d) => ({ Key: dayKey(1000 + d) })), IsTruncated: false });
+    const first = Date.UTC(2023, 0, 1, 0, 5);
+    const last = Date.UTC(2023, 0, 1) + 1099 * 86_400_000 + 300_000;
+    s3Mock.on(GetObjectCommand, { Key: dayKey(0) }).callsFake(() => ({ Body: gzBody([obs(first, 1)]) }));
+    s3Mock.on(GetObjectCommand, { Key: dayKey(1099) }).callsFake(() => ({ Body: gzBody([obs(last, 2)]) }));
+
+    const store = new S3MetricStore(new S3Client({}), 'test-bucket');
+    expect(await store.earliestTime('binance:BTCUSDT', 'openInterest')).toBe(first);
+    expect(await store.latestTime('binance:BTCUSDT', 'openInterest')).toBe(last);
   });
 
   it('query returns [] instead of throwing when the day object does not exist', async () => {

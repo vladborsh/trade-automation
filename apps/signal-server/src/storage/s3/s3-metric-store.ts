@@ -117,12 +117,36 @@ export class S3MetricStore implements MetricStore {
   }
 
   async latestTime(instrument: InstrumentId, metric: MetricKind): Promise<number | null> {
-    const { venue, symbol } = this.parseInstrumentId(instrument);
-    const prefix = `metrics/venue=${venue}/symbol=${symbol}/metric=${metric}/`;
-    const res = await this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix }));
-    const keys = (res.Contents ?? []).map((o) => o.Key!).sort();
+    const keys = await this.dayKeys(instrument, metric);
     if (keys.length === 0) return null;
     const last = await this.getDay(keys[keys.length - 1]);
     return last.length > 0 ? last[last.length - 1].time : null;
+  }
+
+  async earliestTime(instrument: InstrumentId, metric: MetricKind): Promise<number | null> {
+    const keys = await this.dayKeys(instrument, metric);
+    if (keys.length === 0) return null;
+    const first = await this.getDay(keys[0]);
+    return first.length > 0 ? first[0].time : null;
+  }
+
+  /**
+   * Day objects of one series, ascending. Follows the continuation token: ListObjectsV2 returns
+   * at most 1 000 keys per call, and a 3-year Bybit crawl (aggregate-oi.md §5) is ~1 100 days —
+   * without it `latestTime` would read day 1 000, not the newest.
+   */
+  private async dayKeys(instrument: InstrumentId, metric: MetricKind): Promise<string[]> {
+    const { venue, symbol } = this.parseInstrumentId(instrument);
+    const prefix = `metrics/venue=${venue}/symbol=${symbol}/metric=${metric}/`;
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const res = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      keys.push(...(res.Contents ?? []).map((o) => o.Key!));
+      token = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (token);
+    return keys.sort();
   }
 }

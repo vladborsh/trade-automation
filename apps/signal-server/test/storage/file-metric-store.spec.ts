@@ -73,6 +73,20 @@ describe('FileMetricStore upsert idempotency (architecture/chart-layouts.md §4.
     expect(await store.latestTime('binance:BTCUSDT', 'openInterest')).toBe(day2);
   });
 
+  it('earliestTime is the oldest stored observation across day files (aggregate-oi.md §5 crawl resume point)', async () => {
+    const store = new FileMetricStore(root);
+    expect(await store.earliestTime('binance:BTCUSDT', 'openInterest')).toBeNull();
+    const day2 = Date.UTC(2026, 8, 13, 0, 5, 0);
+    const day1 = Date.UTC(2026, 8, 12, 23, 55, 0);
+
+    await store.upsert([obs(day2, 2)]);
+    expect(await store.earliestTime('binance:BTCUSDT', 'openInterest')).toBe(day2);
+
+    await store.upsert([obs(day1 + 60_000, 1), obs(day1, 1)]);
+    expect(await store.earliestTime('binance:BTCUSDT', 'openInterest')).toBe(day1);
+    expect(await store.latestTime('binance:BTCUSDT', 'openInterest')).toBe(day2);
+  });
+
   it('upgrades legacy JSONL rows (no unit / notionalBasis) on read, and writes both back on merge', async () => {
     const store = new FileMetricStore(root);
     const t0 = Date.UTC(2026, 8, 12, 0, 0, 0);

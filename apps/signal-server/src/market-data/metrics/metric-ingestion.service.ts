@@ -27,6 +27,9 @@ const DEFAULT_CACHE_LOOKBACK_MS = 30 * 24 * 60 * 60_000;
 // architecture/chart-layouts.md §4.4 — spreads polls across a boundary tick instead of firing
 // every pair at exactly the same millisecond.
 const MAX_POLL_JITTER_MS = 2000;
+// architecture/aggregate-oi.md §5 — one resumable step of the deep crawl: 7 days of 5 m rows =
+// 2 016 rows ≈ 11 OI pages + 3 mark-kline pages on Bybit, persisted before the next step.
+const DEEP_CRAWL_CHUNK_MS = 7 * 24 * 60 * 60_000;
 
 interface MetricPairStatus {
   instrument: InstrumentId;
@@ -93,7 +96,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    this.adapters = buildMetricAdapters(this.config);
+    this.adapters = buildMetricAdapters(this.config, this.appMetrics);
 
     for (const { instrument, metric } of this.metricPairs()) {
       const adapter = this.adapters.get(instrument.venue);
@@ -170,6 +173,60 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
         this.backfillStatusByPair.set(key, 'complete');
       }
     }
+
+    // aggregate-oi.md §5 — adapters whose history outlives the cache window (Bybit: 3 y) are
+    // crawled only after every pair has its 30 days, so a 16-minute crawl delays nobody.
+    for (const { instrument, metric } of this.metricPairs()) {
+      const adapter = this.adapters.get(instrument.venue);
+      if (!adapter || !adapter.supports.includes(metric)) continue;
+      if ((adapter.historyDepthMs ?? DEFAULT_CACHE_LOOKBACK_MS) <= DEFAULT_CACHE_LOOKBACK_MS) continue;
+      const key = this.pairKey(instrument.id, metric);
+      this.backfillStatusByPair.set(key, 'deepening');
+      try {
+        await this.crawlBeyondCache(instrument, metric, adapter, adapter.historyDepthMs!);
+      } catch (err) {
+        this.logger.error(`Deep history crawl stopped for ${key} (resumes next boot): ${(err as Error).message}`);
+      } finally {
+        this.backfillStatusByPair.set(key, 'complete');
+      }
+    }
+  }
+
+  /**
+   * architecture/aggregate-oi.md §5 "Deep crawl" — Phase 2 only, resumable: walks back from the
+   * OLDEST STORED row (or the cache window's edge, whichever is older) to `now − depthMs` in
+   * DEEP_CRAWL_CHUNK_MS chunks, each awaited straight into MetricStore — so `earliestTime` moves
+   * with every chunk and an interrupted crawl (restart, 403) continues where it stopped on the
+   * next boot. Rows are older than MetricCache's window, so they never enter the cache (served
+   * from the store). Pacing, 403/429 and retCode handling live in the adapter; any error ends
+   * the pass. An empty chunk means the venue has nothing older (listing date): stop.
+   */
+  private async crawlBeyondCache(
+    instrument: Instrument,
+    metric: MetricKind,
+    adapter: MetricAdapter,
+    depthMs: number,
+  ): Promise<void> {
+    const now = Date.now();
+    const target = now - depthMs;
+    const earliestStored = await this.store.earliestTime(instrument.id, metric);
+    let cursor = Math.min(earliestStored ?? Infinity, now - DEFAULT_CACHE_LOOKBACK_MS);
+    let crawled = 0;
+    while (cursor > target) {
+      const chunkFrom = Math.max(target, cursor - DEEP_CRAWL_CHUNK_MS);
+      const rows = await adapter.fetchObservations(instrument, metric, chunkFrom, cursor - 1);
+      if (rows.length === 0) {
+        this.logger.log(`No ${instrument.id}/${metric} history before ${new Date(cursor).toISOString()}; crawl ends`);
+        break;
+      }
+      await this.store.upsert(rows);
+      crawled += rows.length;
+      cursor = chunkFrom;
+    }
+    this.logger.log(
+      `Deep crawl stored ${crawled} observations for ${instrument.id}/${metric}; ` +
+        `store now reaches ${new Date(cursor).toISOString()} (target ${new Date(target).toISOString()})`,
+    );
   }
 
   /**

@@ -19,6 +19,12 @@ export interface MetricAdapter {
   readonly venue: Venue;
   readonly supports: readonly MetricKind[];
 
+  /**
+   * architecture/aggregate-oi.md §5 — how far back the venue's history goes and Phase 2
+   * (`deepenHistoryAsync`) should walk. Omitted = the MetricCache window (30 days).
+   */
+  readonly historyDepthMs?: number;
+
   /** REST history, paginated internally, ascending, at the source's native granularity. */
   fetchObservations(
     instrument: Instrument,

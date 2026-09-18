@@ -7,6 +7,8 @@ export interface MetricStore {
   /** Ascending. */
   query(instrument: InstrumentId, metric: MetricKind, from: number, to: number): Promise<MetricObservation[]>;
   latestTime(instrument: InstrumentId, metric: MetricKind): Promise<number | null>;
+  /** architecture/aggregate-oi.md §5 — where a resumable Phase 2 crawl continues from. */
+  earliestTime(instrument: InstrumentId, metric: MetricKind): Promise<number | null>;
 }
 
 export const METRIC_STORE = Symbol('METRIC_STORE');

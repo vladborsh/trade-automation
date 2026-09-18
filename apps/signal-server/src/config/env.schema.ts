@@ -39,6 +39,12 @@ export const EnvSchema = z.object({
   // an env value rather than hard-coded so it can be widened without a code change.
   METRIC_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
 
+  // architecture/aggregate-oi.md §5 — the Bybit open-interest leg (public V5 endpoints, no key)
+  // and the depth of its resumable Phase 2 history crawl (the venue serves 3+ years; never on
+  // the boot path).
+  BYBIT_REST_BASE_URL: z.string().default('https://api.bybit.com'),
+  BYBIT_OI_HISTORY_DAYS: z.coerce.number().int().positive().default(1095),
+
   CAPITAL_COM_BASE_URL: z.string().default('https://api-capital.backend-capital.com'),
   CAPITAL_COM_IDENTIFIER: z.string().optional(),
   CAPITAL_COM_PASSWORD: z.string().optional(),
