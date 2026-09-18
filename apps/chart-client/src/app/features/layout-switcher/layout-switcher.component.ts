@@ -10,28 +10,8 @@ import { LayoutsStore } from '../../core/state/layouts.store';
   selector: 'app-layout-switcher',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <select class="layout-select" [value]="layouts.active()?.id" (change)="onChange($event)">
-      @for (layout of layouts.layouts(); track layout.id) {
-        <option [value]="layout.id">{{ layout.name }}</option>
-      }
-    </select>
-  `,
-  styles: [
-    `
-      .layout-select {
-        background: #0d1117;
-        color: #c9d1d9;
-        border: 1px solid #30363d;
-        padding: 4px 8px;
-        font-family: inherit;
-        font-size: 13px;
-      }
-      .layout-select:focus {
-        outline: 1px solid #58a6ff;
-      }
-    `,
-  ],
+  templateUrl: './layout-switcher.component.html',
+  styleUrl: './layout-switcher.component.scss',
 })
 export class LayoutSwitcherComponent {
   constructor(readonly layouts: LayoutsStore) {}

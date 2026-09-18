@@ -1,0 +1,5 @@
+<select class="layout-select" [value]="layouts.active()?.id" (change)="onChange($event)">
+  @for (layout of layouts.layouts(); track layout.id) {
+    <option [value]="layout.id">{{ layout.name }}</option>
+  }
+</select>
