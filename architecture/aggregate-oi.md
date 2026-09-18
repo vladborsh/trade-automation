@@ -313,7 +313,9 @@ architect-aggregate-oi  (this branch: note + contract; server 223+1 skip, client
   here). Known overlaps: AG1/AG2/AG3 each touch `metric-adapters.provider.ts` (one line per venue)
   and `metric-adapter.port.ts` narrowing (AG3 owns the narrowing; AG1/AG2 code to
   `MetricSource`); AG3/AG4 both touch the mock-server/wire consumers only via the contract.
-- **Merge order:** AG3 → AG1 → AG2 → AG4 → AG5. AG3 first because it owns the port narrowing and
+- **Merge order:** AG3 → AG1 → AG2 → AG4 → AG5. **AG3 + AG1 + AG2 reach master together** (one
+  integration, never AG3 alone): AG3's boot check fails a live server whose aggregate has a member
+  venue without a metric adapter, and the Bybit/Hyperliquid adapters arrive with AG1/AG2. AG3 first because it owns the port narrowing and
   `metricPairs()`; AG1/AG2 rebase onto it (trivial provider conflict). AG4 last among the core so
   its Playwright runs against the real REST shape as well as the mock.
 - **SE-AG5 is the biggest single fix for §1.** Without it the chart is Bybit-only before
