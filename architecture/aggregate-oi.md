@@ -87,7 +87,9 @@ a break with a label, and incomplete coverage is drawn in a visibly different st
 
 ### What the reader sees (SE-AG4)
 
-1. **Style by completeness.** Complete bars: the OI colours (`#58a6ff` / `#f0883e`). Partial
+1. **Style by completeness.** Complete bars: the OI colours (`METRIC_UP_COLOR` / `METRIC_DOWN_COLOR`,
+   `#58a6ff` / `#f0883e` today; chart-layouts §12 may change the pair — partial styling derives from
+   the constants, so it follows). Partial
    bars: the same hues **hollow and dimmed** (body transparent, border + wick at ~45 % opacity).
    Line mode (1 m): two line series, complete solid / partial dashed + dimmed; each is whitespace
    where the other has data, so the line physically breaks at every seam.
