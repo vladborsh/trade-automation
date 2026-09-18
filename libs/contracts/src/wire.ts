@@ -141,6 +141,20 @@ export const HealthResponseSchema = z.object({
       }),
     )
     .default([]),
+  /**
+   * architecture/aggregate-oi.md §5 — additive, default []. Per configured aggregate: the coverage
+   * of its latest emitted 5 m point (empty when none in the last 15 min) and whether that is every
+   * member. `complete: false` for > 15 min is the alarm condition (§6).
+   */
+  aggregates: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        coverageNow: z.array(InstrumentIdSchema),
+        complete: z.boolean(),
+      }),
+    )
+    .default([]),
   /** architecture/economic-calendar.md §6.1 — additive; null fields when the module is disabled. */
   calendar: z
     .object({
