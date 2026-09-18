@@ -212,7 +212,7 @@ describe('BybitMetricsAdapter (architecture/aggregate-oi.md §4, §5, §7)', () 
     });
   });
 
-  it('live tip: tickers → single OI, singleOpenInterestValue (basis venue), the response time', async () => {
+  it('live tip: tickers → single OI, single × markPrice (basis derived — the history formula), the response time', async () => {
     const venue = fakeBybit({ oiStart: NOW, oiEnd: NOW, venueTime: 1_789_731_656_326 });
     global.fetch = venue.fetchMock as unknown as typeof fetch;
 
@@ -224,8 +224,8 @@ describe('BybitMetricsAdapter (architecture/aggregate-oi.md §4, §5, §7)', () 
       time: 1_789_731_656_326,
       value: 28_357.206,
       unit: 'base',
-      notional: 2_212_795_020.08,
-      notionalBasis: 'venue',
+      notional: 28_357.206 * 78_032.9,
+      notionalBasis: 'derived',
     });
     expect(venue.calls).toHaveLength(1);
     expect(venue.calls[0].searchParams.get('category')).toBe('linear');

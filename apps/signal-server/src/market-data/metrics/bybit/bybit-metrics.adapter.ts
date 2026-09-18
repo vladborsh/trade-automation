@@ -23,7 +23,7 @@ import {
  * returns 403 "access too frequent" plus a >= 10-minute ban of the whole IP — which also kills
  * this live tip. So:
  *   - live: 1 tickers call per METRIC_POLL_INTERVAL_MS (60 s) per symbol = 1 req/min
- *     (0.03 % of the limit); OI, notional and mark come from that one call.
+ *     (0.03 % of the limit); OI and mark (→ notional) come from that one call.
  *   - history: every paginated request is spaced BYBIT_REQUEST_PACING_MS (2 req/s = 10 req / 5 s
  *     = 1.7 % of the limit). The Phase 2 deep crawl for BTCUSDT over 3 y is ~1 577 OI pages +
  *     ~316 mark-kline pages ≈ 1 900 requests ≈ 16 min. A first boot's 30-day warm-up is 44 + 9
@@ -37,8 +37,25 @@ import {
  * `from`, else moves `cursorEnd` to the page's oldest stamp − 1. A forward walker would return
  * one page for any window, however wide.
  *
- * JOIN MEASUREMENT (§4, SE-AG1) — see the block at the end of this header, filled in from the
- * live overlap measurement.
+ * JOIN MEASUREMENT (§4, SE-AG1) — PRELIMINARY: 2.62 h of overlap (2026-09-18 11:41–14:18 UTC,
+ * BTCUSDT), 943 tickers polls every 10 s, 30 history rows fully inside (= 30 joins), not the 24 h
+ * the note asks for; rerun with scripts/bybit-oi-join/{poll,analyse}.mjs.
+ *   (a) A history row stamped t IS the open interest at t: its singleOpenInterest equals the
+ *       tickers value polled at t (±5 s) on 30/30 rows (the matching poll ~4 s BEFORE t),
+ *       and differs at t+1m…t+5m (median 8.9 → 16.2 BTC). So the price is the mark bar ENDING
+ *       at t (close stamped t) — mapMarkPriceKline. The bar STARTING at t would be 7.3 bps
+ *       median / 45 bps p90 off.
+ *   (b) Step |derived(t) − tickers singleOpenInterestValue at t±5 s|: median 0.35 bps, p90
+ *       6.31, p99 10.68 bps = USD 77 k / 1.44 M / 2.36 M against a median |5 m ΔOI_usd| of
+ *       2.13 M → 3.6 % / 67.5 % / 110.7 %. The p90 fails the < 10 % rule.
+ *   Cause: not the formula. OI is identical at the join and tickers singleOpenInterestValue =
+ *   single × markPrice to the cent on 943/943 polls; the gap is the mark price moving in the
+ *   seconds between the bar close and the poll (kline close vs the last poll before it: median
+ *   0.35 bps, p90 3.8 bps; mark |Δ| per 10 s: median 0.95, p90 5.3 bps).
+ *   DECISION (pre-authorised rule, confirmed by the coordinator): the tip is DERIVED too —
+ *   single × tickers markPrice from the same call, basis 'derived' — so both sides share one
+ *   formula. It is numerically identical to the venue figure, so it does NOT shrink the step:
+ *   what remains is a genuine price move between two instants, which no formula removes.
  */
 
 /** §7 — 2 requests per second on every paginated history request (see the header). */
@@ -123,7 +140,7 @@ export class BybitMetricsAdapter implements MetricAdapter {
     });
   }
 
-  /** §4 live tip — one tickers call: single OI, the venue's own notional, the venue's stamp. */
+  /** §4 live tip — one tickers call: single OI, single × markPrice (derived), the venue's stamp. */
   async fetchLatest(source: MetricSource, metric: MetricKind): Promise<MetricObservation> {
     const body = await this.request<BybitTickersResult>(
       '/v5/market/tickers',

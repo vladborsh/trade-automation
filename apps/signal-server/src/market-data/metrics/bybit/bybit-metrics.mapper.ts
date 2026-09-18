@@ -42,6 +42,7 @@ export interface BybitTicker {
   markPrice: string;
   openInterest: string;
   singleOpenInterest: string;
+  /** = single × markPrice to the cent; not read (the tip is derived, §4), kept for reference. */
   singleOpenInterestValue: string;
 }
 
@@ -100,9 +101,11 @@ export function mapMarkPriceKline(row: BybitMarkPriceKline): TipPrice {
 }
 
 /**
- * aggregate-oi.md §4 live tip — `value` = `singleOpenInterest`, `notional` = the venue's own
- * `singleOpenInterestValue` (= single × markPrice to the cent), basis 'venue'. `time` is the
- * response's top-level `time` (venue stamp, never our clock — chart-layouts §4.2).
+ * aggregate-oi.md §4 live tip — `value` = `singleOpenInterest`; `notional` = single × the
+ * ticker's `markPrice`, basis 'derived' — the SAME formula as history rows (single × Bybit's
+ * mark), per the §4 pre-authorised rule after the join measurement (bybit-metrics.adapter.ts
+ * header). Numerically it equals the venue's `singleOpenInterestValue` to the cent (0.0000 bps
+ * over 943 polls). `time` is the response's top-level `time` (venue stamp — chart-layouts §4.2).
  */
 export function mapTicker(
   source: InstrumentId,
@@ -110,13 +113,14 @@ export function mapTicker(
   venueTime: number,
   ticker: BybitTicker,
 ): MetricObservation {
+  const value = Number(ticker.singleOpenInterest);
   return {
     metric,
     instrument: source,
     time: venueTime,
-    value: Number(ticker.singleOpenInterest),
+    value,
     unit: 'base',
-    notional: Number(ticker.singleOpenInterestValue),
-    notionalBasis: 'venue',
+    notional: value * Number(ticker.markPrice),
+    notionalBasis: 'derived',
   };
 }

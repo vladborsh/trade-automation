@@ -28,7 +28,7 @@ describe('Bybit metrics mapper (architecture/aggregate-oi.md §0, §2, §4)', ()
     });
   });
 
-  it('ticker: value single, notional = singleOpenInterestValue (basis venue), time = the response time', () => {
+  it('ticker: value single, notional = single × markPrice (basis derived, = singleOpenInterestValue), time = the response time', () => {
     const o = mapTicker('bybit:BTCUSDT', 'openInterest', 1_789_731_656_326, {
       symbol: 'BTCUSDT',
       markPrice: '78081.42',
@@ -42,8 +42,8 @@ describe('Bybit metrics mapper (architecture/aggregate-oi.md §0, §2, §4)', ()
       time: 1_789_731_656_326,
       value: 28_357.523,
       unit: 'base',
-      notional: 2_214_195_663.52,
-      notionalBasis: 'venue',
+      notional: 28_357.523 * 78_081.42,
+      notionalBasis: 'derived',
     });
   });
 
