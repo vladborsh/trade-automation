@@ -1,0 +1,11 @@
+<div class="panel-grid" [style.grid-template-columns]="gridColumns()" [style.grid-template-rows]="gridRows()">
+  @for (panel of panels(); track panel.id) {
+    @if (feedFor(panel.id); as feed) {
+      @if (injectorFor(feed); as inj) {
+        <ng-container
+          *ngComponentOutlet="chartPanelComponent; inputs: panelInputs(panel, feed); injector: inj"
+        ></ng-container>
+      }
+    }
+  }
+</div>

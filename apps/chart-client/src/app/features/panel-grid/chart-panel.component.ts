@@ -26,80 +26,8 @@ import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
   standalone: true,
   imports: [ChartComponent, ResearchBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="chart-panel" [attr.data-panel-id]="panel().id">
-      <div class="panel-header">
-        <span class="panel-title">{{ title() }}</span>
-        <span class="venue-dot" [class]="'venue-' + venueStatus()"></span>
-        <app-research-badge />
-      </div>
-      <div class="panel-body">
-        <app-chart
-          [panelId]="panel().id"
-          [kind]="panel().kind"
-          [candles]="feed().candles.candles()"
-          [points]="feed().points.points()"
-          [overlays]="overlays()"
-          [indicatorPoints]="feed().indicators.points()"
-          [indicatorSpecs]="strategies.indicatorSpecs()"
-          [timeframe]="timeframe.selected()"
-          (loadOlderRequested)="onLoadOlder()"
-        />
-      </div>
-    </div>
-  `,
-  styles: [
-    `
-      :host {
-        display: block;
-        height: 100%;
-        width: 100%;
-        min-height: 0;
-        min-width: 0;
-      }
-      .chart-panel {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        width: 100%;
-        min-width: 0;
-        border: 1px solid #30363d;
-      }
-      .panel-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 8px;
-        border-bottom: 1px solid #30363d;
-        font-size: 12px;
-        color: #c9d1d9;
-      }
-      .panel-title {
-        font-weight: 600;
-      }
-      .venue-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #787b86;
-      }
-      .venue-up {
-        background: #26a69a;
-      }
-      .venue-degraded {
-        background: #d29922;
-      }
-      .venue-down,
-      .venue-closed {
-        background: #ef5350;
-      }
-      .panel-body {
-        flex: 1;
-        min-height: 0;
-        min-width: 0;
-      }
-    `,
-  ],
+  templateUrl: './chart-panel.component.html',
+  styleUrl: './chart-panel.component.scss',
 })
 export class ChartPanelComponent {
   readonly panel = input.required<Panel>();

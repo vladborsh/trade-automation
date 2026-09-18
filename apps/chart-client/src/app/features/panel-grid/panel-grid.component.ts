@@ -43,39 +43,8 @@ import { ChartPanelComponent } from './chart-panel.component';
   imports: [NgComponentOutlet],
   providers: [ChartSyncService],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="panel-grid" [style.grid-template-columns]="gridColumns()" [style.grid-template-rows]="gridRows()">
-      @for (panel of panels(); track panel.id) {
-        @if (feedFor(panel.id); as feed) {
-          @if (injectorFor(feed); as inj) {
-            <ng-container
-              *ngComponentOutlet="chartPanelComponent; inputs: panelInputs(panel, feed); injector: inj"
-            ></ng-container>
-          }
-        }
-      }
-    </div>
-  `,
-  styles: [
-    `
-      :host {
-        display: block;
-        height: 100%;
-        width: 100%;
-        min-height: 0;
-        min-width: 0;
-        flex: 1 1 auto;
-      }
-      .panel-grid {
-        display: grid;
-        gap: 4px;
-        height: 100%;
-        width: 100%;
-        min-height: 0;
-        min-width: 0;
-      }
-    `,
-  ],
+  templateUrl: './panel-grid.component.html',
+  styleUrl: './panel-grid.component.scss',
 })
 export class PanelGridComponent {
   readonly chartPanelComponent = ChartPanelComponent;
