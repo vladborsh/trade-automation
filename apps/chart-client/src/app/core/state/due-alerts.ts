@@ -9,8 +9,10 @@ import { passesFilters, type CalendarFilters } from './calendar-filters.store';
  * - grouped by `scheduledAt` (FOMC's three 14:00 rows ring once);
  * - due while `now ∈ [scheduledAt − lead, scheduledAt + LATE_GRACE_MS]`,
  *   silently dropped after that (an alert after the event is noise);
- * - keyed `alert:<scheduledAt>:<sorted ids>` so a time revision is a new key
- *   and rings again at its new time, and a fired key never rings twice.
+ * - keyed `alert:<scheduledAt>` only: one instant rings at most once, whichever
+ *   of its events pass the filters (changing filters inside the lead window
+ *   must not re-ring); a time revision changes `scheduledAt`, so a moved
+ *   event is a new key and rings again at its new time.
  */
 export const LATE_GRACE_MS = 60_000;
 export const FIRED_RETENTION_MS = 48 * 60 * 60 * 1000;
@@ -21,8 +23,8 @@ export interface DueAlert {
   events: EconomicEvent[];
 }
 
-export function alertKey(scheduledAt: number, eventIds: readonly string[]): string {
-  return `alert:${scheduledAt}:${[...eventIds].sort().join(',')}`;
+export function alertKey(scheduledAt: number): string {
+  return `alert:${scheduledAt}`;
 }
 
 export function dueAlerts(
@@ -46,7 +48,7 @@ export function dueAlerts(
   }
   const due: DueAlert[] = [];
   for (const [scheduledAt, group] of [...groups].sort(([a], [b]) => a - b)) {
-    const key = alertKey(scheduledAt, group.map((e) => e.id));
+    const key = alertKey(scheduledAt);
     if (!fired.has(key)) {
       due.push({ key, scheduledAt, events: group });
     }

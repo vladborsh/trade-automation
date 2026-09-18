@@ -80,7 +80,7 @@ describe('CalendarFeedService × EventAlarmService', () => {
     expect(alarm.upcoming().map((e) => e.id)).toEqual(['nfp']);
 
     vi.setSystemTime(NOW); // 3 min before NFP
-    expect(alarm.check().map((a) => a.key)).toEqual([`alert:${NOW + 3 * 60_000}:nfp`]);
+    expect(alarm.check().map((a) => a.key)).toEqual([`alert:${NOW + 3 * 60_000}`]);
     expect(chime.plays).toBe(1);
   });
 

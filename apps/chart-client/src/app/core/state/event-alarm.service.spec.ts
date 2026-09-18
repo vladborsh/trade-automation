@@ -57,7 +57,7 @@ describe('EventAlarmService (§11.5)', () => {
     expect(notifications.notifications()).toEqual([]); // alerts are not server notifications
 
     expect(alarm.check(AT - 4 * 60_000)).toEqual([]);
-    expect(Object.keys(JSON.parse(localStorage.getItem(FIRED_KEY)!))).toEqual([`alert:${AT}:cpi`]);
+    expect(Object.keys(JSON.parse(localStorage.getItem(FIRED_KEY)!))).toEqual([`alert:${AT}`]);
   });
 
   it('a reload never re-rings (the ledger is read back)', () => {
@@ -89,7 +89,7 @@ describe('EventAlarmService (§11.5)', () => {
     settings.setAlertEnabled(true);
     alarm.seedWeek(week([]));
     alarm.mergeLive(testEvent({ id: 'late-add', scheduledAt: AT }));
-    expect(alarm.check(AT - 60_000).map((a) => a.key)).toEqual([`alert:${AT}:late-add`]);
+    expect(alarm.check(AT - 60_000).map((a) => a.key)).toEqual([`alert:${AT}`]);
   });
 
   it('seedWeek keeps live events beyond the fetched week', () => {

@@ -20,7 +20,7 @@ describe('dueAlerts (§11.5)', () => {
     expect(dueAlerts(events, FILTERS, LEAD, AT + 60_001, NONE)).toEqual([]);
   });
 
-  it('events sharing a scheduledAt ring once, keyed by sorted ids', () => {
+  it('events sharing a scheduledAt ring once, keyed by the instant', () => {
     const events = [
       testEvent({ id: 'b', scheduledAt: AT }),
       testEvent({ id: 'a', scheduledAt: AT }),
@@ -28,21 +28,33 @@ describe('dueAlerts (§11.5)', () => {
     ];
     const due = dueAlerts(events, FILTERS, LEAD, AT - 60_000, NONE);
     expect(due).toHaveLength(1);
-    expect(due[0].key).toBe(`alert:${AT}:a,b`);
+    expect(due[0].key).toBe(`alert:${AT}`);
     expect(due[0].events.map((e) => e.id)).toEqual(['b', 'a']);
   });
 
   it('a fired key never rings again', () => {
     const events = [testEvent({ id: 'a', scheduledAt: AT })];
-    expect(dueAlerts(events, FILTERS, LEAD, AT - 60_000, new Set([alertKey(AT, ['a'])]))).toEqual([]);
+    expect(dueAlerts(events, FILTERS, LEAD, AT - 60_000, new Set([alertKey(AT)]))).toEqual([]);
   });
 
   it('a time revision is a new key, so the moved event rings again', () => {
-    const fired = new Set([alertKey(AT, ['a'])]);
+    const fired = new Set([alertKey(AT)]);
     const moved = [testEvent({ id: 'a', scheduledAt: AT + 30 * 60_000, revision: 2 })];
     const due = dueAlerts(moved, FILTERS, LEAD, AT + 26 * 60_000, fired);
     expect(due).toHaveLength(1);
-    expect(due[0].key).toBe(alertKey(AT + 30 * 60_000, ['a']));
+    expect(due[0].key).toBe(alertKey(AT + 30 * 60_000));
+  });
+
+  it('a filter change inside the lead window does not re-ring the same instant', () => {
+    const events = [testEvent({ id: 'usd' }), testEvent({ id: 'jpy', country: 'JPY' })];
+    const [first] = dueAlerts(events, FILTERS, LEAD, AT - 4 * 60_000, NONE);
+    expect(first.events.map((e) => e.id)).toEqual(['usd']);
+    const fired = new Set([first.key]);
+
+    const widened: CalendarFilters = { ...FILTERS, countries: [...FILTERS.countries, 'JPY'] };
+    expect(dueAlerts(events, widened, LEAD, AT - 3 * 60_000, fired)).toEqual([]);
+    const narrowed: CalendarFilters = { ...FILTERS, countries: ['USD'] };
+    expect(dueAlerts(events, narrowed, LEAD, AT - 2 * 60_000, fired)).toEqual([]);
   });
 
   it('only scheduled events passing the filters ring', () => {
@@ -58,7 +70,7 @@ describe('dueAlerts (§11.5)', () => {
   it('the group holds only the passing events of that time', () => {
     const events = [testEvent({ id: 'usd' }), testEvent({ id: 'jpy', country: 'JPY' })];
     const [due] = dueAlerts(events, FILTERS, LEAD, AT - 60_000, NONE);
-    expect(due.key).toBe(alertKey(AT, ['usd']));
+    expect(due.key).toBe(alertKey(AT));
   });
 });
 
