@@ -64,3 +64,7 @@ research/coinm-carry/data
 .env
 .env.*
 !.env.example
+
+# OS / editor / Angular build cache
+.DS_Store
+.angular/
