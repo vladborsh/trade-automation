@@ -10,7 +10,7 @@ export const MOCK_LAYOUTS: Layout[] = [
   {
     id: 'crypto',
     name: 'Crypto trading',
-    grid: { columns: 2, rows: 2 },
+    grid: { columns: 4, rows: 1 },
     panels: [
       { id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: true },
       { id: 'eth', kind: 'candles', instrument: 'binance:ETHUSDT', signals: true },
@@ -21,7 +21,7 @@ export const MOCK_LAYOUTS: Layout[] = [
   {
     id: 'us-indices',
     name: 'US indices',
-    grid: { columns: 1, rows: 3 },
+    grid: { columns: 3, rows: 1 },
     panels: [
       { id: 'us100', kind: 'candles', instrument: 'capitalcom:US100', signals: false },
       { id: 'us500', kind: 'candles', instrument: 'capitalcom:US500-MOCK', signals: false },

@@ -107,6 +107,17 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * architecture/chart-layouts.md §11.1 — a live snapshot stored without a derived notional
+   * because no closed 1m candle of the instrument closed within 120 s before it.
+   */
+  readonly metricNotionalMissingTotal = new client.Counter({
+    name: 'signal_server_metric_notional_missing_total',
+    help: 'Live metric snapshots stored without notional (no fresh closed 1m candle price)',
+    labelNames: ['instrument', 'metric'],
+    registers: [this.registry],
+  });
+
   /** architecture/economic-calendar.md §8. */
   readonly calendarPollsTotal = new client.Counter({
     name: 'signal_server_calendar_polls_total',

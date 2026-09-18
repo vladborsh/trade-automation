@@ -6,7 +6,7 @@ import { MetricObservation } from '@trade-automation/contracts';
 import { S3MetricStore } from '../../src/storage/s3/s3-metric-store';
 
 function obs(time: number, value: number): MetricObservation {
-  return { metric: 'openInterest', instrument: 'binance:BTCUSDT', time, value };
+  return { metric: 'openInterest', instrument: 'binance:BTCUSDT', time, value, unit: 'base' };
 }
 
 function gzBody(observations: MetricObservation[]) {
@@ -59,5 +59,20 @@ describe('S3MetricStore upsert idempotency (architecture/chart-layouts.md §4.4)
 
     const rows = await store.query('binance:BTCUSDT', 'openInterest', 0, 1);
     expect(rows).toEqual([]);
+  });
+
+  it('upgrades legacy JSONL rows (no unit / notionalBasis) on read', async () => {
+    const t0 = Date.UTC(2026, 8, 12, 0, 0, 0);
+    const legacy =
+      '{"metric":"openInterest","instrument":"binance:BTCUSDT","time":' + t0 + ',"value":103141.33,"notional":7962510.46}\n' +
+      '{"metric":"openInterest","instrument":"binance:BTCUSDT","time":' + (t0 + 60_000) + ',"value":103150}\n';
+    s3Mock.on(GetObjectCommand).resolves({ Body: Readable.from(zlib.gzipSync(Buffer.from(legacy, 'utf8'))) as never });
+    const store = new S3MetricStore(new S3Client({}), 'test-bucket');
+
+    const rows = await store.query('binance:BTCUSDT', 'openInterest', t0, t0 + 60_000);
+    expect(rows).toEqual([
+      { metric: 'openInterest', instrument: 'binance:BTCUSDT', time: t0, value: 103141.33, unit: 'base', notional: 7962510.46, notionalBasis: 'venue' },
+      { metric: 'openInterest', instrument: 'binance:BTCUSDT', time: t0 + 60_000, value: 103150, unit: 'base' },
+    ]);
   });
 });

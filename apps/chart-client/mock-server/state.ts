@@ -10,7 +10,7 @@ import type {
   Timeframe,
   VenueStatus,
 } from '@trade-automation/contracts';
-import { bucketObservations } from '@trade-automation/contracts';
+import { TIMEFRAME_MS, bucketObservations } from '@trade-automation/contracts';
 import {
   FIXTURE_INSTRUMENTS,
   advanceFormingCandle,
@@ -152,12 +152,30 @@ export class MockMarketState {
     );
   }
 
-  /** `GET /api/metrics` (§4.5): bucketed to `timeframe`, same time-window filtering as `candles()`. */
+  /**
+   * `GET /api/metrics` (§4.5): bucketed to `timeframe`, same time-window filtering as `candles()`.
+   * §11.2 lead bucket, as the real controller: the bucket before `from` stays in the input (its
+   * close is the first returned bucket's open) and is dropped from the response.
+   */
   metrics(id: InstrumentId, metric: MetricKind, timeframe: Timeframe, from?: number, to?: number, limit = 1500): MetricPoint[] {
     const observations = this.metricObservations.get(metricStreamKey(metric, id)) ?? [];
-    const points = bucketObservations(observations, timeframe);
-    const filtered = points.filter((p) => (from === undefined || p.time >= from) && (to === undefined || p.time <= to));
-    return filtered.slice(Math.max(0, filtered.length - limit));
+    const tfMs = TIMEFRAME_MS[timeframe];
+    const firstBucket = from === undefined ? undefined : Math.floor(from / tfMs) * tfMs;
+    const leadFrom = from === undefined ? undefined : from - tfMs;
+    const inWindow = observations.filter((o) => (leadFrom === undefined || o.time >= leadFrom) && (to === undefined || o.time <= to));
+    const points = bucketObservations(inWindow, timeframe).filter((p) => firstBucket === undefined || p.time >= firstBucket);
+    return points.slice(Math.max(0, points.length - limit));
+  }
+
+  /**
+   * §11.2 — the forming point for a live observation, built like the real gateway: from the
+   * stored observations of its bucket and the one before it, never from the single observation.
+   */
+  formingMetricPoint(observation: MetricObservation, timeframe: Timeframe): MetricPoint | null {
+    const tfMs = TIMEFRAME_MS[timeframe];
+    const bucketStart = Math.floor(observation.time / tfMs) * tfMs;
+    const last = this.metrics(observation.instrument, observation.metric, timeframe, bucketStart, observation.time).at(-1);
+    return last && last.time === bucketStart ? last : null;
   }
 
   lastClosedOpenTime(id: InstrumentId): number | null {
@@ -226,7 +244,12 @@ export class MockMarketState {
         const oiKey = metricStreamKey('openInterest', instrument.id);
         const oiHistory = this.metricObservations.get(oiKey);
         if (oiHistory && oiHistory.length > 0) {
-          const nextObservation = advanceOpenInterestObservation(instrument.id, oiHistory[oiHistory.length - 1], closed.openTime);
+          const nextObservation = advanceOpenInterestObservation(
+            instrument.id,
+            oiHistory[oiHistory.length - 1],
+            closed.openTime,
+            closed.close,
+          );
           this.metricObservations.set(oiKey, [...oiHistory, nextObservation]);
           this.emitMetric(nextObservation);
         }

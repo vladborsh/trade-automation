@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { InstrumentId, MetricKind, MetricObservation } from '@trade-automation/contracts';
 import { MetricStore } from '../metric-store.port';
+import { upgradeLegacyObservation } from '../upgrade-legacy-observation';
 
 /**
  * architecture/chart-layouts.md §4.4, base §6.4: identical relative key layout to
@@ -57,7 +58,7 @@ export class FileMetricStore implements MetricStore {
       .readFileSync(file, 'utf8')
       .split('\n')
       .filter((l) => l.trim().length > 0)
-      .map((l) => JSON.parse(l) as MetricObservation);
+      .map((l) => upgradeLegacyObservation(JSON.parse(l)));
   }
 
   private daysBetween(from: number, to: number): string[] {

@@ -131,6 +131,12 @@ test('scrolling one panel back syncs the visible range to all four and triggers 
 test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a follow-up /api/candles request', async ({
   page,
 }) => {
+  // Geometry-calibrated: a single zoom-drag's reach is bounded by lightweight-charts'
+  // zoom-out floor (~panelWidthPx / 0.5 bars). Since chart-layouts.md §11.3 the four panels are
+  // one row of columns (~315 px each at the default 1280 px viewport) instead of a 2x2 grid
+  // (~640 px), which halves that reach below the shallow panels' 2-day depth. A 2560 px viewport
+  // restores the per-panel width this scenario was written against.
+  await page.setViewportSize({ width: 2560, height: 720 });
   await page.route('**/config.json', (route) =>
     route.fulfill({
       contentType: 'application/json',

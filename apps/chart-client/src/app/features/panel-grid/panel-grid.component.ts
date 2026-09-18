@@ -1,5 +1,15 @@
 import { NgComponentOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Injector, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Injector,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import type { Panel } from '@trade-automation/contracts';
 import { ChartSyncService } from '../chart/chart-sync.service';
 import { LayoutsStore } from '../../core/state/layouts.store';
@@ -8,14 +18,20 @@ import { InstrumentsStore } from '../../core/state/instruments.store';
 import { SignalsStore } from '../../core/state/signals.store';
 import { IndicatorsStore } from '../../core/state/indicators.store';
 import type { PanelFeed } from '../../core/state/panel-feed';
+import { CollapsedPanelsStore } from '../../core/state/collapsed-panels.store';
 import { ChartPanelComponent } from './chart-panel.component';
+import { CollapsedPanelStripComponent } from './collapsed-panel-strip.component';
+import { panelTitle } from './panel-title';
 
 /**
- * architecture/chart-layouts.md §6.1/§6.4 — CSS grid sized from
- * `layout.grid`, one `ChartPanelComponent` per panel. Provides
- * `ChartSyncService` for this grid instance (one shared sync per active
- * layout, fresh on every layout switch since the component itself is
- * recreated) so tests can instantiate it in isolation.
+ * architecture/chart-layouts.md §6.1/§6.4, amended by §11.3 — ONE ROW of columns, left to
+ * right in panel order, for every layout (`layout.grid` only bounds the panel count now; it is
+ * not read for arrangement). One `ChartPanelComponent` per expanded panel; a collapsed panel is a
+ * `CollapsedPanelStripComponent` instead, so its chart is destroyed, not hidden (§11.3 sync
+ * rule 1) while its `PanelFeed` (owned by `LayoutFeedService`) keeps running. Provides
+ * `ChartSyncService` for this grid instance (one shared sync, reset on every
+ * feed rebuild — layout or timeframe change) so tests can instantiate it in
+ * isolation.
  *
  * Each panel is rendered through `NgComponentOutlet` with a per-panel child
  * `Injector` that overrides `InstrumentsStore`/`SignalsStore`/`IndicatorsStore`
@@ -40,47 +56,20 @@ import { ChartPanelComponent } from './chart-panel.component';
 @Component({
   selector: 'app-panel-grid',
   standalone: true,
-  imports: [NgComponentOutlet],
+  imports: [NgComponentOutlet, CollapsedPanelStripComponent],
   providers: [ChartSyncService],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="panel-grid" [style.grid-template-columns]="gridColumns()" [style.grid-template-rows]="gridRows()">
-      @for (panel of panels(); track panel.id) {
-        @if (feedFor(panel.id); as feed) {
-          @if (injectorFor(feed); as inj) {
-            <ng-container
-              *ngComponentOutlet="chartPanelComponent; inputs: panelInputs(panel, feed); injector: inj"
-            ></ng-container>
-          }
-        }
-      }
-    </div>
-  `,
-  styles: [
-    `
-      :host {
-        display: block;
-        height: 100%;
-        width: 100%;
-        min-height: 0;
-        min-width: 0;
-        flex: 1 1 auto;
-      }
-      .panel-grid {
-        display: grid;
-        gap: 4px;
-        height: 100%;
-        width: 100%;
-        min-height: 0;
-        min-width: 0;
-      }
-    `,
-  ],
+  templateUrl: './panel-grid.component.html',
+  styleUrl: './panel-grid.component.scss',
 })
 export class PanelGridComponent {
   readonly chartPanelComponent = ChartPanelComponent;
 
   readonly panels = computed(() => this.layouts.active()?.panels ?? []);
+  private readonly collapsedIds = computed(() => {
+    const layout = this.layouts.active();
+    return layout ? this.collapsed.collapsedIds(layout) : [];
+  });
 
   private readonly injector = inject(Injector);
   private readonly injectorCache = new WeakMap<PanelFeed, Injector>();
@@ -90,7 +79,28 @@ export class PanelGridComponent {
     private readonly layouts: LayoutsStore,
     private readonly layoutFeed: LayoutFeedService,
     private readonly instruments: InstrumentsStore,
+    private readonly collapsed: CollapsedPanelsStore,
+    private readonly sync: ChartSyncService,
   ) {
+    // §6.2: a rebuild (layout or timeframe change) starts from no shared range. Needed now that a
+    // mounting chart JOINS an existing shared range (§11.3 rule 2) instead of proposing its own —
+    // without this, the new timeframe's charts would join the previous timeframe's window.
+    effect(() => {
+      this.layoutFeed.feeds();
+      untracked(() => this.sync.reset());
+    });
+
+    // §11.3 sync rule 3: after each collapse/restore has re-flowed the columns, every chart
+    // re-applies the shared range to its new width. Skips the initial run (nothing changed yet).
+    let previousCollapsed: string | null = null;
+    effect(() => {
+      const key = `${this.layouts.active()?.id ?? ''}|${this.collapsedIds().join(',')}`;
+      if (previousCollapsed !== null && previousCollapsed !== key) {
+        afterNextRender(() => this.sync.reassert(), { injector: this.injector });
+      }
+      previousCollapsed = key;
+    });
+
     effect(() => {
       const feeds = this.layoutFeed.feeds();
       let changed = false;
@@ -106,14 +116,23 @@ export class PanelGridComponent {
     });
   }
 
-  gridColumns(): string {
-    const grid = this.layouts.active()?.grid;
-    return grid ? `repeat(${grid.columns}, 1fr)` : '1fr';
+  isCollapsed(panelId: string): boolean {
+    return this.collapsedIds().includes(panelId);
   }
 
-  gridRows(): string {
-    const grid = this.layouts.active()?.grid;
-    return grid ? `repeat(${grid.rows}, 1fr)` : '1fr';
+  /** The strip's title — the same text as the expanded header (incl. the §11.1 metric unit, once known). */
+  titleFor(panel: Panel): string {
+    const instrument = this.instruments.instruments().find((i) => i.id === panel.instrument) ?? null;
+    const points = this.feedFor(panel.id)?.points.points() ?? [];
+    const unit = points.length > 0 ? points[points.length - 1].unit : null;
+    return panelTitle(panel, instrument, unit);
+  }
+
+  expand(panelId: string): void {
+    const layout = this.layouts.active();
+    if (layout) {
+      this.collapsed.expand(layout, panelId);
+    }
   }
 
   feedFor(panelId: string): PanelFeed | undefined {

@@ -4,7 +4,7 @@
 layouts:
   - id: crypto
     name: "Crypto trading"
-    grid: { columns: 2, rows: 2 }          # panels flow row-major into the grid
+    grid: { columns: 4, rows: 1 }          # one row of columns, left to right in panel order (§11.3)
     panels:
       - id: btc
         kind: candles
@@ -26,7 +26,7 @@ layouts:
 
   - id: us-indices
     name: "US indices"
-    grid: { columns: 1, rows: 3 }          # stacked: time axes line up vertically (§6.4)
+    grid: { columns: 3, rows: 1 }          # one row of columns (§11.3); grid only bounds panel count
     panels:
       - id: us100
         kind: candles

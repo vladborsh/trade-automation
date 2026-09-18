@@ -26,7 +26,7 @@ describe('GET /api/layouts (architecture/chart-layouts.md §2.3)', () => {
     expect(layouts.map((l) => l.id)).toEqual(['crypto', 'us-indices']);
 
     const crypto = layouts.find((l) => l.id === 'crypto')!;
-    expect(crypto.grid).toEqual({ columns: 2, rows: 2 });
+    expect(crypto.grid).toEqual({ columns: 4, rows: 1 }); // chart-layouts.md §11.3: one row of columns
     expect(crypto.panels).toHaveLength(4);
     expect(crypto.panels.map((p) => p.id)).toEqual(['btc', 'eth', 'btc-oi', 'dxy']);
     expect(crypto.panels.find((p) => p.id === 'btc-oi')).toMatchObject({
@@ -43,7 +43,7 @@ describe('GET /api/layouts (architecture/chart-layouts.md §2.3)', () => {
     });
 
     const usIndices = layouts.find((l) => l.id === 'us-indices')!;
-    expect(usIndices.grid).toEqual({ columns: 1, rows: 3 });
+    expect(usIndices.grid).toEqual({ columns: 3, rows: 1 });
     expect(usIndices.panels.map((p) => p.instrument)).toEqual([
       'capitalcom:US100',
       'capitalcom:US500',

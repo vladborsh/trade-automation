@@ -137,3 +137,80 @@ describe(
     );
   },
 );
+
+/** architecture/chart-layouts.md §11.1 — the tip price is the venue's mark price. */
+describe('BinanceMetricsAdapter tip price (mark price)', () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  const MIN = 60_000;
+  const T = 1_800_000_000_000 - (1_800_000_000_000 % MIN);
+
+  it('fetchTipPrice reads markPrice and the venue time from /fapi/v1/premiumIndex', async () => {
+    const fetchMock = jest.fn(async (_url: URL) => ({
+      ok: true,
+      json: async () => ({ symbol: 'BTCUSDT', markPrice: '76385.12000000', indexPrice: '76390.1', time: T + 1_234 }),
+    }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const price = await new BinanceMetricsAdapter('https://fapi.example').fetchTipPrice(instrument);
+
+    expect(price).toEqual({ time: T + 1_234, price: 76385.12 });
+    const url = fetchMock.mock.calls[0][0];
+    expect(url.pathname).toBe('/fapi/v1/premiumIndex');
+    expect(url.searchParams.get('symbol')).toBe('BTCUSDT');
+  });
+
+  it('fetchTipPrice throws on a non-OK response (the ingestion service turns that into "no notional")', async () => {
+    global.fetch = jest.fn(async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' })) as never;
+    await expect(new BinanceMetricsAdapter('https://fapi.example').fetchTipPrice(instrument)).rejects.toThrow(
+      'premiumIndex request failed: 503',
+    );
+  });
+
+  /** Fake markPriceKlines over a gapless 1m series: bars with openTime in [startTime, endTime], ≤ limit. */
+  function markKlinesFake() {
+    return jest.fn(async (url: URL) => {
+      const start = Number(url.searchParams.get('startTime'));
+      const end = Number(url.searchParams.get('endTime'));
+      const limit = Number(url.searchParams.get('limit'));
+      const rows: unknown[] = [];
+      for (let t = Math.ceil(start / MIN) * MIN; t <= end && rows.length < limit; t += MIN) {
+        rows.push([t, '1', '1', '1', String(t / MIN), '0', t + MIN - 1]);
+      }
+      return { ok: true, json: async () => rows } as Response;
+    });
+  }
+
+  it('fetchTipPriceHistory stamps each 1m mark bar at its close and covers every row with ≤ 30 pages for 30 days', async () => {
+    const fetchMock = markKlinesFake();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const times: number[] = [];
+    for (let t = T - 30 * 24 * 60 * MIN; t <= T; t += MIN) times.push(t + 1_500);
+
+    const points = await new BinanceMetricsAdapter('https://fapi.example', 0).fetchTipPriceHistory(instrument, times);
+
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(30);
+    expect(fetchMock.mock.calls[0][0].pathname).toBe('/fapi/v1/markPriceKlines');
+    expect(fetchMock.mock.calls[0][0].searchParams.get('limit')).toBe('1500');
+    // Point time = openTime + 1m; its price (the fake's close) is openTime / 1m.
+    expect(points[0].price).toBe(points[0].time / MIN - 1);
+    // Every row has the bar that closed at its minute boundary.
+    const byTime = new Map(points.map((p) => [p.time, p.price]));
+    for (const t of times) expect(byTime.has(t - 1_500)).toBe(true);
+    for (let i = 1; i < points.length; i++) expect(points[i].time).toBeGreaterThan(points[i - 1].time);
+  });
+
+  it('fetchTipPriceHistory fetches only around sparse stretches — gaps between them cost nothing', async () => {
+    const fetchMock = markKlinesFake();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const times = [T - 20 * 24 * 60 * MIN, T - 20 * 24 * 60 * MIN + MIN, T - 2 * 24 * 60 * MIN, T];
+
+    await new BinanceMetricsAdapter('https://fapi.example', 0).fetchTipPriceHistory(instrument, times);
+
+    // Three disjoint stretches → three pages (the last two rows are > 1500 min apart).
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
