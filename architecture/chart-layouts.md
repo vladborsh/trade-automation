@@ -1161,3 +1161,51 @@ Both branch from `master` and run in parallel. **Merge order: CV-T, then CV-R** 
 `architect-chart-visuals` (integration). Expected CV-R conflicts: adjacent lines in
 `chart.component.ts` `ngAfterViewInit`/`ngOnDestroy`, resolved by keeping both sides; then
 the one-line separator attach on the RSI pane.
+
+### 12.8 Integration record (2026-09-18)
+
+`architect-chart-visuals` = design `085cc9a` → CV-T fast-forward (`9f930c9` theme, `0b63d94` NY
+time, `e937d5a`/`7205ecc` separators) → merge of CV-R `f45d280` (`f5bf376`: one import-line and
+one field conflict in `chart.component.ts`, both sides kept; `RsiPaneRenderer.separators` adds
+the §12.3 primitive to the RSI pane, attached on show / detached on hide, spec'd). Client
+**265/265** (master 207), `ng build` clean, signal-server **226 passed / 1 skipped**.
+`chart.component.ts` 608 lines (master 610). Smoke-checked on a mock (:4320/:4321): no grid,
+white/blue on price and OI, separators on 1h on all four panels and none on 4h, NY axis,
+RSI chip toggles the pane and returns the height.
+
+Deviations accepted from the developers: separators are drawn at the midpoint of bars `i−1`
+and `i` (5.2.1 `logicalToCoordinate` rounds fractional logicals — same position as `i − 0.5`
+on a uniform grid); on `1d` the day ticks show the NY date (every 1d bar opens at 20:00/19:00
+NY, so an `HH:mm` label would repeat); RSI point times use `Math.floor(openTime/1000)` like the
+candle adapter; `renderAround()` orders RSI vs price rendering so the RSI never adds time-scale
+slots.
+
+Known, not changed here: an instrument with fewer than `10 × period` loaded bars on a
+timeframe (the mock at 1h/4h; possibly a short-history Capital.com index on 1d) shows an
+empty RSI pane — by design of §12.4's stability rule. Pre-existing and reported by CV-R: the
+BTC-OI panel's append can propose a synced range into the right-hand void, and the first
+proposer after a timeframe switch is racy.
+
+### 12.9 Для пользователя (кратко, простым языком)
+
+- **Сетка на фоне убрана** на всех графиках.
+- **Цвета свечей:** растущая свеча — белая (`#ffffff`), падающая — синяя (**`#2962ff`**). Эти же
+  цвета у свечей открытого интереса (OI), чтобы на соседних панелях синий везде значил «вниз».
+- **Разделители дней — вертикальные линии** (граница дня — это точка во времени, поэтому линия
+  идёт сверху вниз). Стоят ровно в **00:00 по Нью-Йорку**, с учётом летнего/зимнего времени
+  (летом это 04:00 UTC, зимой 05:00 UTC). Видны на таймфреймах 1m, 5m, 15m и 1h, на 4h и 1d
+  скрыты. Если у индекса нет торгов (выходные), линия одна — перед первой свечой нового дня, а не
+  пачка линий.
+- **Всё время на графике — нью-йоркское:** подписи шкалы времени и метка под перекрестием.
+  Экран «Календарь» и время ближайшего события в нижней строке пока показывают ваше местное время
+  (с нью-йоркским во всплывающей подсказке) — если их тоже перевести на Нью-Йорк, скажите.
+- **Границы свечей остаются по UTC.** Меняется только подпись, сами свечи те же, что видит
+  исследовательская часть системы. Поэтому **дневная свеча начинается в 20:00 по Нью-Йорку летом
+  и в 19:00 зимой** (это полночь UTC), а 4-часовые — в 20:00, 00:00, 04:00… (летом).
+- **RSI** — отдельная панель под свечами (только у свечных графиков, не у OI), линии 70 и 30.
+  **Период по умолчанию — 14.** Поменять: поле с числом рядом с кнопкой **RSI** в заголовке
+  панели (от 2 до 100; период один на все панели). Кнопка **RSI** прячет и показывает панель
+  (отдельно для каждой панели), место отдаётся графику цены; выбор запоминается в браузере.
+  Первые примерно 10 × период свечей в самом начале загруженной истории RSI не рисуется
+  (140 свечей при периоде 14): там значение ещё «не устоялось» и сдвигалось бы при подгрузке
+  более старой истории. На обычной глубине истории это только самый левый край графика.
