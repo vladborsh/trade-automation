@@ -1012,3 +1012,152 @@ reload → panel 2's collapsed state persisted as left.
 See [`four-streams-2026-09-18.md`](four-streams-2026-09-18.md) for task ids, branches and
 sequencing. Streams: SE-A1 (unit tag) → SE-A2 (USD tip, server) ∥ SE-A3 (OHLC + client
 rendering); SE-B (layout/collapse); SE-C in `economic-calendar.md` §11.
+
+---
+
+## 12. Amendment 2026-09-18 — chart visuals: no grid, white/blue palette, New York time, day separators, RSI pane
+
+**Role:** Architect. **Status:** routed (§12.7). Display-only: no contract, server or
+candle-boundary change.
+
+User request (verbatim, RU): «убери сетку на фоне · добавь горизонтальные разделители как
+окончание дня, если ТФ больше 1H то не показывай этот индикатор · время показывай по НЙ ·
+00:00 по НЮ это как раз должен быть добавлен разделитель · добавить индикатор RSI внизу
+графика, должна быть возможность его спрятать · палитра графика белый (свеча вверх) и синий
+(свеча вниз)».
+
+### 12.1 Theme: grid off, palette, one place for colours
+
+- New `features/chart/chart-theme.ts` owns `CHART_PALETTE` (`up`, `down`, `bg`, `border`,
+  `text`, `muted`, `separator`), `CHART_OPTIONS` (the `createChart` options, moved out of
+  `chart.component.ts` verbatim, then changed) and `PRICE_CANDLE_OPTIONS`. **Names and shape
+  deliberately match the `chart-theme.ts` the aggregated-OI client branch
+  (`se-oi-aggregate-client`, SE-AG4, unmerged) introduces with the same extraction**, so
+  whichever lands second resolves a trivial add/add conflict by keeping this file's values.
+- Grid: `grid.vertLines.visible = false`, `grid.horzLines.visible = false` — all panels
+  (candle and metric share `CHART_OPTIONS`).
+- **Up = `#ffffff` (white), down = `#2962ff` (blue)**, on body, border and wick
+  (`borderVisible: true`, `borderUp/DownColor` set). `#2962ff` contrast: 3.9:1 against the
+  `#0d1117` background, 4.9:1 against white — distinguishable from both; a lighter blue
+  (e.g. `#58a6ff`) falls to ~1.9:1 against white and reads as "grey-ish" next to it.
+- **OI candles take the same pair.** Today they are `#58a6ff`/`#f0883e` (SE-A3); with a blue
+  *down* on price, a blue *up* on OI would read as the opposite direction on adjacent panels.
+  `METRIC_UP_COLOR`/`METRIC_DOWN_COLOR` in `metric-series-style.ts` become aliases of
+  `CHART_PALETTE.up/down` — a two-line change in a file the OI branches do not touch; the OI
+  data path is untouched.
+- No volume series exists in the client today, so there is nothing to recolour; when one is
+  added it must read `CHART_PALETTE`.
+- AGENTS.md rule 4 is updated to name `CHART_PALETTE` as the source of up/down colours.
+
+### 12.2 New York time — formatters only, never shifted timestamps
+
+Every timestamp handed to lightweight-charts stays **real UTC epoch seconds**.
+`ChartSyncService`, `logicalToTimeSec`/`timeSecToLogical`, `loadOlder()` pagination, metric
+alignment and the crosshair channel keep reasoning in UTC and are not touched. Only what is
+*displayed* changes:
+
+- `features/chart/ny-time.ts` (pure, spec'd): `nyParts(sec)` via a cached
+  `Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', … })`
+  `formatToParts`; `nyDayKey(sec)` (`YYYY-MM-DD` NY calendar day); `nyTickLabel(sec, tickType)`;
+  `nyCrosshairLabel(sec)`. Real tz database → DST-correct with no fixed offset.
+- Wired through `CHART_OPTIONS.localization.timeFormatter` (crosshair label) and
+  `CHART_OPTIONS.timeScale.tickMarkFormatter` (axis labels).
+- **Known library limitation:** lightweight-charts chooses *which* bars get tick marks (and
+  their weight: year/month/day/time) from UTC. The formatter therefore labels by the tick's NY
+  wall-clock, not by the weight it was given: a tick whose NY time is 00:00 shows the NY
+  date, any other intraday tick shows NY `HH:mm`, month/year ticks show the NY month/year.
+  Ticks keep landing on UTC-round instants (e.g. an hourly tick at 00:00 UTC is labelled
+  `20:00`/`19:00`); the NY day boundary is marked by the separator (§12.3), not by a tick.
+- **Candle boundaries stay UTC** (`resampler.ts`, one H1 definition shared with research).
+  So a 1d candle opens at **20:00 NY (summer, EDT)** / **19:00 NY (winter, EST)** of the
+  previous NY day, and a 4h candle opens at 20/00/04/08/12/16 NY (summer) or 19/23/03/…
+  (winter). Intentional; stated in the user section.
+- Scope: the chart (axis, crosshair, anything in `features/chart` / panel header that renders
+  a time). The **economic-calendar view is not changed**: it has its own `et-time.ts` and
+  deliberately shows local time with the ET instant in a tooltip (`economic-calendar.md`
+  §7.1). Same for the status-bar "next event" time. Flagged to the user as a question.
+
+### 12.3 Day separators
+
+- Vertical, subtle (`CHART_PALETTE.separator`, 1 px, dashed, ~35 % alpha) lines at the
+  **00:00 America/New_York** boundary. Timeframes `1m`, `5m`, `15m`, `1h` only; hidden on
+  `4h` and `1d` (`showsDaySeparators(tf)`).
+- Placement is **per data transition, not per calendar midnight**: pure
+  `nyDayBoundaryIndices(timesSec): number[]` returns every index `i > 0` whose `nyDayKey`
+  differs from bar `i-1`'s. The line is drawn at logical `i − 0.5` (the left edge of the first
+  bar of the new NY day; if a bar opens exactly at 00:00 NY that is exactly midnight).
+  Consequences, both intended: a weekend / market-closed gap on a Capital.com index panel
+  yields **one** line at the first bar after the gap (no stacked cluster, no line floating in
+  empty space — the time scale has no empty slots for missing days); a crypto panel gets one
+  line per day.
+- Drawn by a **pane primitive** (`DaySeparatorsPrimitive`, `pane.attachPrimitive`) on the
+  price pane — it survives the metric line↔candles series swap (§11.2) and is drawn on metric
+  panels too. It reads the component's `lastTimesSec` and timeframe; it never touches the
+  time scale, the crosshair or `ChartSyncService`, so sync and the circuit breaker are
+  unaffected by construction. `hitTest` returns null (no crosshair interference).
+- Tests: summer day (00:00 NY = 04:00 UTC), winter day (05:00 UTC), both DST transition
+  days (2026-03-08, 2026-11-01 — a 23 h and a 25 h NY day each yield exactly one boundary),
+  a Fri→Mon gap (one line), and 4h/1d hidden.
+
+### 12.4 RSI pane
+
+- Pure `features/chart/indicator/rsi.ts` + spec: `rsiWilder(closes, period): (number|null)[]`.
+  Wilder smoothing, seeded with the simple average of the first `period` changes. Indices
+  `0 … period−1` are `null` (**nothing drawn**, not a misleading 50 or 0). All-gain → 100,
+  all-loss → 0, flat → 50.
+- **Prepend stability (`loadOlder()`):** RSI is recomputed over the whole loaded buffer, so
+  prepending history re-seeds it. The seed error decays by `(1 − 1/period)` per bar; after
+  `10 × period` bars it is < 0.01 RSI points. So the pane draws **nothing for the first
+  `RSI_STABLE_BARS = 10 × period` bars of the loaded buffer** (140 bars at 14). These are at
+  the far-left edge of history, where `loadOlder()` is already fetching more. Spec asserts:
+  computing over `older ++ current` vs `current` differs by < 0.01 at every drawn index.
+- Forming bar: the chart already gets a new `candles` array on every forming tick; the RSI
+  renderer recomputes (O(n) over ≤ a few thousand bars every ~3 s — negligible) and uses
+  `series.update()` for the last point on an incremental append/update, `setData` otherwise
+  (mirrors `renderCandles`).
+- lightweight-charts 5 **native pane** (`chart.addSeries(LineSeries, opts, 1)`): shares the
+  time scale and crosshair with the price pane for free; ~25 % height; 70/30 guide lines as
+  price lines on the RSI series; fixed 0–100 scale. Hiding removes the series (and the pane),
+  returning the space to the price pane. Owned by `RsiPaneRenderer`
+  (`features/chart/indicator/rsi-pane.renderer.ts`); `ChartComponent` gets two inputs
+  (`rsiVisible`, `rsiPeriod`) and a handful of forwarding lines.
+- **Candle panels only** — never the OI metric panel.
+- Preferences: `core/state/rsi-prefs.store.ts` (+ pure `rsi-prefs.ts` parser with spec),
+  localStorage key `chart-client:rsi` = `{ period: number, hidden: { [layoutId]: panelId[] } }`,
+  same try/catch pattern as `collapsed-panels.store.ts`. Default: visible, **period 14**,
+  clamped 2–100. Period is one global setting; visibility is per panel.
+- UI: in the candle panel header, an `RSI` toggle chip (pressed = shown) and, while shown, a
+  compact number input for the period.
+- Panel sync: the RSI pane does not add time-scale slots (its points are exactly the candle
+  times), so `lastTimesSec`, logical ranges and the sync channel are unchanged. The crosshair
+  follower still positions on the price series.
+- If the separators primitive has landed first, the RSI pane attaches one too (one line).
+
+### 12.5 `chart.component.ts` size (AGENTS.md rule 3)
+
+It is 610 lines today. Stream CV-T first **extracts** the chart/series options to
+`chart-theme.ts` (≈ −25 lines), which pays for CV-T's and CV-R's forwarding lines; both
+keep all logic in their own files (primitive, renderer, pure helpers). Net: the file must not
+grow versus master. A real split of the component (render/bookkeeping vs. sync) is a separate
+follow-up, not in this amendment.
+
+### 12.6 Coordination with the aggregated-OI work
+
+Shared files with `se-oi-aggregate-client` (SE-AG4, unmerged): `chart-theme.ts` (add/add,
+keep §12.1 values), `chart.component.ts` (its hunk replacing the inline options with
+`CHART_OPTIONS` is identical to CV-T's), `chart-panel.component.html/.ts` (CV-R adds the RSI
+chip at the end of the header, beside the collapse button). `metric-series-style.ts` is
+touched only here. No OI data-path file (`metric-points.store`, `panel-feed`,
+`metric-series.renderer`, `aggregate-*`) is touched.
+
+### 12.7 Routing and merge order
+
+| Stream | Branch | Scope |
+|---|---|---|
+| **CV-T** (time + theme) | `se-chart-time` | commit 1: §12.1 (theme extraction, grid off, palette, OI colours, AGENTS.md); commit 2+: §12.2, §12.3 |
+| **CV-R** (RSI) | `se-chart-rsi` | §12.4 |
+
+Both branch from `master` and run in parallel. **Merge order: CV-T, then CV-R** into
+`architect-chart-visuals` (integration). Expected CV-R conflicts: adjacent lines in
+`chart.component.ts` `ngAfterViewInit`/`ngOnDestroy`, resolved by keeping both sides; then
+the one-line separator attach on the RSI pane.
