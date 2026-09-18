@@ -1,11 +1,16 @@
 import { Logger } from '@nestjs/common';
 import { Instrument, MetricKind, MetricObservation } from '@trade-automation/contracts';
-import { MetricAdapter } from '../metric-adapter.port';
+import { MetricAdapter, TipPrice } from '../metric-adapter.port';
+import { TIP_PRICE_MAX_AGE_MS } from '../tip-notional';
 import {
+  BinanceMarkPriceKline,
   BinanceOpenInterestHistRow,
   BinanceOpenInterestSnapshot,
+  BinancePremiumIndex,
+  mapMarkPriceKline,
   mapOpenInterestHistRow,
   mapOpenInterestSnapshot,
+  mapPremiumIndex,
 } from './binance-metrics.mapper';
 
 // architecture/chart-layouts.md §4.3 — `period` for openInterestHist; 5m is the finest grain
@@ -35,12 +40,44 @@ const HIST_PAGE_LIMIT = 500;
  */
 const HIST_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
+/*
+ * architecture/chart-layouts.md §11.1 "The join check" — MEASURED 2026-09-18 (SE-A2), BTCUSDT,
+ * 7925 stored openInterestHist rows 2026-08-18 16:10 → 2026-09-17 16:05 UTC. Implied price
+ * `sumOpenInterestValue / sumOpenInterest` per row, compared with:
+ *   (a) our last-trade 1m close, bar ending at the row stamp:  median |Δ| 0.14 bps, p99 3.67 bps
+ *   (b) Binance 1m mark price close (markPriceKlines, 29 one-off calls), bar ending at the stamp:
+ *       median |Δ| 0.00 bps, p99 0.00 bps (19 of 7925 rows > 0.01 bps, max 1.93 bps) — i.e.
+ *       Binance computes sumOpenInterestValue = sumOpenInterest × mark price at the stamp.
+ * Step at the history/tip join, |notional − value × price|, vs the median |5 m ΔOI_usd| of
+ * 4.89 M USDT: last-trade median 115 k (2.4 %), p90 23 %, p99 3.0 M (62 %); mark 0 %.
+ * DECISION (architect, chart-layouts §11.1, overriding the median-only rule because the tail
+ * step — a visible notch one join in ten — breaks its "< 10 % of the move" intent): the live
+ * tip uses MARK PRICE, `fetchTipPrice` → /fapi/v1/premiumIndex in the same 60 s poll as
+ * /fapi/v1/openInterest (weight 1 → +1 weight/min per instrument, ≈0.04 % of 2400/min; no new
+ * loop). Same basis as the venue's figure → no step at the join by construction. The legacy
+ * repair uses 1m markPriceKlines (`fetchTipPriceHistory`, below).
+ */
+
+/**
+ * markPriceKlines page: 1500 rows is the endpoint's max `limit`, request weight 10 at that
+ * size (Binance: limit > 1000 → 10). The repair runs once per boot over rows still lacking
+ * notional only: a full 30-day window is ⌈43200 / 1500⌉ = 29 calls = 290 weight, paced one call
+ * per MARK_KLINES_PACING_MS so it spreads over ~30 s instead of bursting (< 13 % of one
+ * minute's 2400 budget, once). Sparse legacy stretches cost fewer calls: one page per 25 h run.
+ */
+const MARK_KLINES_PAGE_LIMIT = 1500;
+const MARK_KLINES_PACING_MS = 1000;
+const ONE_MINUTE_MS = 60_000;
+
 export class BinanceMetricsAdapter implements MetricAdapter {
   readonly venue = 'binance' as const;
   readonly supports: readonly MetricKind[] = ['openInterest'];
   private readonly logger = new Logger(BinanceMetricsAdapter.name);
 
-  constructor(private readonly restBaseUrl: string) {}
+  constructor(
+    private readonly restBaseUrl: string,
+    private readonly markKlinesPacingMs: number = MARK_KLINES_PACING_MS,
+  ) {}
 
   async fetchObservations(
     instrument: Instrument,
@@ -99,5 +136,58 @@ export class BinanceMetricsAdapter implements MetricAdapter {
     }
     const snapshot = (await res.json()) as BinanceOpenInterestSnapshot;
     return mapOpenInterestSnapshot(instrument.id, metric, snapshot);
+  }
+
+  /** §11.1 — the current mark price (see the join-check header above). */
+  async fetchTipPrice(instrument: Instrument): Promise<TipPrice> {
+    const url = new URL('/fapi/v1/premiumIndex', this.restBaseUrl);
+    url.searchParams.set('symbol', instrument.symbol);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Binance premiumIndex request failed: ${res.status} ${res.statusText}`);
+    }
+    return mapPremiumIndex((await res.json()) as BinancePremiumIndex);
+  }
+
+  /**
+   * §11.1 legacy-row repair — 1m mark-price bars covering `[t − 120 s, t]` for each `t`: a page
+   * starts at the first uncovered row's `t − 180 s` (the earliest bar that can close in its
+   * window) and spans up to 1500 bars; every row whose bar falls inside that page is covered by
+   * it, so gaps between sparse legacy stretches are skipped rather than fetched. Weight/pacing:
+   * see MARK_KLINES_PAGE_LIMIT.
+   */
+  async fetchTipPriceHistory(instrument: Instrument, times: readonly number[]): Promise<TipPrice[]> {
+    const out: TipPrice[] = [];
+    let i = 0;
+    let calls = 0;
+    while (i < times.length) {
+      const startTime = times[i] - TIP_PRICE_MAX_AGE_MS - ONE_MINUTE_MS;
+      const endTime = startTime + MARK_KLINES_PAGE_LIMIT * ONE_MINUTE_MS - 1;
+      if (calls > 0 && this.markKlinesPacingMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, this.markKlinesPacingMs));
+      }
+
+      const url = new URL('/fapi/v1/markPriceKlines', this.restBaseUrl);
+      url.searchParams.set('symbol', instrument.symbol);
+      url.searchParams.set('interval', '1m');
+      url.searchParams.set('startTime', String(startTime));
+      url.searchParams.set('endTime', String(endTime));
+      url.searchParams.set('limit', String(MARK_KLINES_PAGE_LIMIT));
+      const res = await fetch(url);
+      calls++;
+      if (!res.ok) {
+        throw new Error(`Binance markPriceKlines request failed: ${res.status} ${res.statusText}`);
+      }
+      const rows = (await res.json()) as BinanceMarkPriceKline[];
+      for (const row of rows) {
+        const point = mapMarkPriceKline(row);
+        if (out.length === 0 || point.time > out[out.length - 1].time) out.push(point);
+      }
+      // A row's newest usable bar opens at t − 1m; rows whose bar opens past this page move on.
+      while (i < times.length && times[i] - ONE_MINUTE_MS <= endTime) i++;
+    }
+    this.logger.log(`markPriceKlines: ${calls} call(s) (≤ ${calls * 10} weight) for ${times.length} rows of ${instrument.id}`);
+    return out;
   }
 }

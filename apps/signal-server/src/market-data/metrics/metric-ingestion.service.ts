@@ -1,16 +1,24 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subscription } from 'rxjs';
-import { BackfillStatus, Instrument, InstrumentId, MetricKind, Venue } from '@trade-automation/contracts';
+import {
+  BackfillStatus,
+  Instrument,
+  InstrumentId,
+  MetricKind,
+  MetricObservation,
+  Venue,
+} from '@trade-automation/contracts';
 import { AppConfigService } from '../../config/config.service';
 import { METRIC_STORE, MetricStore } from '../../storage/metric-store.port';
 import { MetricWriteBuffer } from '../../storage/metric-write-buffer.service';
 import { MetricsService } from '../../observability/metrics.service';
 import { BarClock } from '../bar-clock.service';
 import { MetricCache } from './metric-cache.service';
-import { MetricAdapter } from './metric-adapter.port';
+import { MetricAdapter, TipPrice } from './metric-adapter.port';
 import { MetricEvents, MetricObservedEvent } from './metric.events';
 import { buildMetricAdapters } from '../metric-adapters.provider';
+import { TIP_PRICE_MAX_AGE_MS, acceptTipPrice, tipPriceAt, withDerivedNotional } from './tip-notional';
 
 // Matches MetricCache's default depth (metric-cache.service.ts) and the confirmed Binance
 // openInterestHist retention (binance-metrics.adapter.ts) — no point asking the venue for
@@ -43,6 +51,8 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   private readonly lastPolledAt = new Map<string, number>();
   private readonly lastObservationAt = new Map<string, number>();
   private readonly backfillStatusByPair = new Map<string, BackfillStatus>();
+  /** Pairs currently in a missing-notional streak — one warn per streak, not per poll. */
+  private readonly notionalMissingPairs = new Set<string>();
 
   constructor(
     private readonly config: AppConfigService,
@@ -144,6 +154,11 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
       const key = this.pairKey(instrument.id, metric);
       this.backfillStatusByPair.set(key, 'deepening');
       try {
+        await this.repairTipNotional(instrument, metric, adapter);
+      } catch (err) {
+        this.logger.error(`Tip-notional repair failed for ${key}: ${(err as Error).message}`);
+      }
+      try {
         await this.deepenPair(instrument, metric, adapter);
       } catch (err) {
         this.logger.error(`Metric deepen failed for ${key}: ${(err as Error).message}`);
@@ -206,7 +221,12 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
     if (jitterMs > 0) await new Promise((resolve) => setTimeout(resolve, jitterMs));
 
     try {
-      const observation = await adapter.fetchLatest(instrument, metric);
+      // §11.1 — the tip price rides the same poll; its failure must never cost the OI snapshot.
+      const [snapshot, tipPrice] = await Promise.all([
+        adapter.fetchLatest(instrument, metric),
+        this.fetchTipPrice(adapter, instrument),
+      ]);
+      const observation = this.deriveTipNotional(snapshot, tipPrice, key);
       this.cache.upsert(observation);
       this.lastObservationAt.set(key, observation.time);
       void this.writeBuffer.add(observation);
@@ -216,6 +236,91 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
       this.logger.error(`Metric poll failed for ${key}: ${(err as Error).message}`);
       this.appMetrics.metricPollErrorsTotal.inc();
     }
+  }
+
+  /** `null` when the adapter has no tip price or the request fails (logged in the streak warn). */
+  private async fetchTipPrice(
+    adapter: MetricAdapter,
+    instrument: Instrument,
+  ): Promise<TipPrice | { error: string } | null> {
+    if (!adapter.fetchTipPrice) return null;
+    try {
+      return await adapter.fetchTipPrice(instrument);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+  }
+
+  /**
+   * architecture/chart-layouts.md §11.1 "The live tip" — `/fapi/v1/openInterest` has no
+   * notional, so derive it from the venue's mark price (premiumIndex, fetched in the same poll —
+   * the basis of the venue's own `sumOpenInterestValue`, see binance-metrics.adapter.ts), if
+   * that price is stamped within 120 s of the snapshot's venue `time`. Otherwise (stale, or the
+   * price request failed) the snapshot is stored with `value`/`unit` only — never an old price —
+   * counted in `metric_notional_missing_total` and warned about once per streak. An adapter
+   * with no tip price at all (replay) is not a miss: it never had one to give.
+   */
+  private deriveTipNotional(
+    observation: MetricObservation,
+    tipPrice: TipPrice | { error: string } | null,
+    key: string,
+  ): MetricObservation {
+    if (observation.notional !== undefined || tipPrice === null) return observation;
+    const price = 'error' in tipPrice ? null : acceptTipPrice(tipPrice, observation.time);
+    if (price !== null) {
+      if (this.notionalMissingPairs.delete(key)) {
+        this.logger.log(`Derived notional restored for ${key}`);
+      }
+      return withDerivedNotional(observation, price);
+    }
+    this.appMetrics.metricNotionalMissingTotal.inc({
+      instrument: observation.instrument,
+      metric: observation.metric,
+    });
+    if (!this.notionalMissingPairs.has(key)) {
+      this.notionalMissingPairs.add(key);
+      const reason =
+        'error' in tipPrice
+          ? `tip price request failed (${tipPrice.error})`
+          : `tip price at ${new Date(tipPrice.time).toISOString()} is more than ${TIP_PRICE_MAX_AGE_MS / 1000}s ` +
+            `from the snapshot at ${new Date(observation.time).toISOString()}`;
+      this.logger.warn(`No notional for ${key}: ${reason}; storing snapshots without notional until it recovers`);
+    }
+    return observation;
+  }
+
+  /**
+   * architecture/chart-layouts.md §11.1 "Legacy tip rows" — once per boot, idempotent: live
+   * snapshots stored before the tip rule existed (or while no fresh price was available) have
+   * no notional. Derive it with the same basis — 1m mark-price bars (markPriceKlines, fetched
+   * only around the rows still lacking notional; weight and pacing in binance-metrics.adapter.ts)
+   * — taking the bar that closed within 120 s before each row, and re-upsert through
+   * MetricWriteBuffer. Rows with no qualifying bar stay as they are (retried on the next boot).
+   * Runs from `deepenHistoryAsync` (after `listen()`), so it never delays boot. Deliberately
+   * emits no MetricObserved — these are history, not the live tip.
+   */
+  private async repairTipNotional(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
+    if (!adapter.fetchTipPriceHistory) return;
+    const missing = this.cache.window(instrument.id, metric).filter((o) => o.notional === undefined);
+    if (missing.length === 0) return;
+
+    const prices = await adapter.fetchTipPriceHistory(
+      instrument,
+      missing.map((o) => o.time),
+    );
+    let repaired = 0;
+    for (const o of missing) {
+      const price = tipPriceAt(prices, o.time);
+      if (price === null) continue;
+      const fixed = withDerivedNotional(o, price);
+      this.cache.upsert(fixed);
+      void this.writeBuffer.add(fixed);
+      repaired++;
+    }
+    this.logger.log(
+      `Tip-notional repair for ${instrument.id}/${metric}: ${repaired} of ${missing.length} stored ` +
+        `snapshots given a derived notional; ${missing.length - repaired} have no mark price within 120 s`,
+    );
   }
 
   /** architecture/chart-layouts.md §4.4 — backs `GET /api/health`'s `metrics` field. */

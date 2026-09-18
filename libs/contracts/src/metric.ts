@@ -27,8 +27,9 @@ export type NotionalBasis = z.infer<typeof NotionalBasisSchema>;
  * the local clock (same rule as Candle.openTime, base §3.3).
  * `value`: for openInterest, contracts outstanding, in `unit` (Binance USDⓈ-M
  * `sumOpenInterest` / `openInterest` → 'base'). `notional`: `value` in the instrument's
- * quoteCurrency (`sumOpenInterestValue`, basis 'venue') — present on history rows, absent on
- * live snapshots.
+ * quoteCurrency: on history rows the venue's `sumOpenInterestValue` (basis 'venue'); on live
+ * snapshots `value` × the venue's mark price at the snapshot (basis 'derived', §11.1), absent
+ * when no fresh mark price was available.
  */
 export const MetricObservationSchema = z.object({
   metric: MetricKindSchema,
