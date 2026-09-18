@@ -72,7 +72,7 @@ describe('MetricIngestionService boot order', () => {
       upsert: jest.fn(async () => undefined),
     };
 
-    const backfilled: MetricObservation = { metric: 'openInterest', instrument: instrument.id, time: 1000, value: 1 };
+    const backfilled: MetricObservation = { metric: 'openInterest', instrument: instrument.id, time: 1000, value: 1, unit: 'base' };
     const adapter = {
       venue: 'binance' as const,
       supports: ['openInterest'] as const,
@@ -82,7 +82,7 @@ describe('MetricIngestionService boot order', () => {
       }),
       fetchLatest: jest.fn(async () => {
         calls.push('adapter.fetchLatest');
-        return { metric: 'openInterest', instrument: instrument.id, time: 2000, value: 2 } as MetricObservation;
+        return { metric: 'openInterest', instrument: instrument.id, time: 2000, value: 2, unit: 'base' } as MetricObservation;
       }),
     };
     (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['binance', adapter]]));
@@ -133,7 +133,7 @@ describe('MetricIngestionService boot order', () => {
       query: jest.fn(async () => []),
       upsert: jest.fn(async () => undefined),
     };
-    const latest: MetricObservation = { metric: 'openInterest', instrument: instrument.id, time: 60_000, value: 5 };
+    const latest: MetricObservation = { metric: 'openInterest', instrument: instrument.id, time: 60_000, value: 5, unit: 'base' };
     const adapter = {
       venue: 'binance' as const,
       supports: ['openInterest'] as const,
@@ -212,7 +212,7 @@ describe('MetricIngestionService boot order', () => {
     const shallowStart = now - SHALLOW_DEPTH_MS;
     const shallowObservations: MetricObservation[] = [];
     for (let t = shallowStart; t <= now; t += PERIOD_MS) {
-      shallowObservations.push({ metric: 'openInterest', instrument: instrument.id, time: t, value: 1 });
+      shallowObservations.push({ metric: 'openInterest', instrument: instrument.id, time: t, value: 1, unit: 'base' });
     }
 
     const store = {
@@ -230,11 +230,11 @@ describe('MetricIngestionService boot order', () => {
       fetchObservations: jest.fn(async (_instrument: Instrument, _metric: string, from: number, to: number) => {
         const rows: MetricObservation[] = [];
         for (let t = from; t <= to; t += PERIOD_MS) {
-          rows.push({ metric: 'openInterest', instrument: instrument.id, time: t, value: 2 });
+          rows.push({ metric: 'openInterest', instrument: instrument.id, time: t, value: 2, unit: 'base' });
         }
         return rows;
       }),
-      fetchLatest: jest.fn(async () => ({ metric: 'openInterest', instrument: instrument.id, time: now, value: 1 })),
+      fetchLatest: jest.fn(async () => ({ metric: 'openInterest', instrument: instrument.id, time: now, value: 1, unit: 'base' })),
     };
     (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['binance', adapter]]));
 

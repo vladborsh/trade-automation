@@ -19,8 +19,9 @@ export interface BinanceOpenInterestSnapshot {
 
 /**
  * architecture/chart-layouts.md §4.2 — `time` is the venue's own stamp, never Date.now()
- * (same rule as the candle mapper). `value` = sumOpenInterest / openInterest (base-asset
- * units); `notional` = sumOpenInterestValue, present on history rows only.
+ * (same rule as the candle mapper). `value` = sumOpenInterest / openInterest, in base-asset
+ * units on USDⓈ-M (`unit: 'base'`, §11.1); `notional` = sumOpenInterestValue, the venue's own
+ * figure (`notionalBasis: 'venue'`), present on history rows only.
  */
 export function mapOpenInterestHistRow(
   instrument: InstrumentId,
@@ -32,7 +33,9 @@ export function mapOpenInterestHistRow(
     instrument,
     time: row.timestamp,
     value: Number(row.sumOpenInterest),
+    unit: 'base',
     notional: Number(row.sumOpenInterestValue),
+    notionalBasis: 'venue',
   };
 }
 
@@ -46,5 +49,6 @@ export function mapOpenInterestSnapshot(
     instrument,
     time: snapshot.time,
     value: Number(snapshot.openInterest),
+    unit: 'base',
   };
 }

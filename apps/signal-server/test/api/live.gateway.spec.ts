@@ -43,7 +43,7 @@ function fakeMetrics() {
 }
 
 function observation(instrument: MetricObservation['instrument'], time: number, value: number): MetricObservation {
-  return { metric: 'openInterest', instrument, time, value };
+  return { metric: 'openInterest', instrument, time, value, unit: 'base' };
 }
 
 function candle(instrument: Candle['instrument'], timeframe: Candle['timeframe'], closed: boolean): Candle {
@@ -172,7 +172,7 @@ describe('LiveGateway subscribe/unsubscribe contract (architecture/live-signal-s
     const frames = client.sent.filter((m: unknown) => (m as { type: string }).type === 'metric');
     expect(frames).toHaveLength(1);
     expect((frames[0] as { point: { time: number; value: number; timeframe: string } }).point).toEqual(
-      expect.objectContaining({ time: 60_000, value: 100, timeframe: '1m' }),
+      expect.objectContaining({ time: 60_000, value: 100, unit: 'base', timeframe: '1m' }),
     );
 
     // a different instrument must not leak through
