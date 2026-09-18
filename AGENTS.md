@@ -31,9 +31,10 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
    existing dark-terminal palette (`#0d1117` background, `#30363d` borders, `#c9d1d9` text,
    `#8b949e` muted, `#26a69a` / `#ef5350` up/down) rather than inventing near-duplicates.
 5. **New components:** `standalone: true`, `ChangeDetectionStrategy.OnPush`, signal
-   `input()` / `output()` for new APIs. Generate with `npx ng generate component <path>`
-   from `apps/chart-client` — the schematic is configured to emit separate `.html` /
-   `.scss` files.
+   `input()` / `output()` for new APIs. Generate with
+   `npx ng generate component <feature-folder>/<name> --flat` from `apps/chart-client` —
+   the schematic is configured (`angular.json`) to emit `<name>.component.ts/.html/.scss`;
+   without `--flat` it adds a sub-folder, which this repo does not use.
 6. **Mechanical moves stay mechanical.** Moving a template or styles out of a `.ts` file is
    a pure relocation: no markup, selector, class-name or behaviour change in the same
    commit.
