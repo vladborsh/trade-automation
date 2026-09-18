@@ -12,6 +12,7 @@ import { StrategiesController } from './rest/strategies.controller';
 import { IndicatorsController } from './rest/indicators.controller';
 import { LayoutsController } from './rest/layouts.controller';
 import { MetricsController } from './rest/metrics.controller';
+import { MetricAggregatesController } from './rest/metric-aggregates.controller';
 import { CalendarController } from './rest/calendar.controller';
 import { LiveGateway } from './ws/live.gateway';
 
@@ -32,6 +33,7 @@ import { LiveGateway } from './ws/live.gateway';
     IndicatorsController,
     LayoutsController,
     MetricsController,
+    MetricAggregatesController,
     CalendarController,
   ],
   providers: [LiveGateway],

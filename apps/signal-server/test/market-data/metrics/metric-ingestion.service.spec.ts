@@ -474,3 +474,70 @@ describe('MetricIngestionService derived tip notional', () => {
     expect(cache.window(instrument.id, 'openInterest')[3]).toEqual(orphanTip);
   });
 });
+
+describe('MetricIngestionService aggregate members (architecture/aggregate-oi.md §3.2)', () => {
+  const members = [
+    { id: 'binance:BTCUSDT', venue: 'binance', symbol: 'BTCUSDT', quoteCurrency: 'USDT' },
+    { id: 'bybit:BTCUSDT', venue: 'bybit', symbol: 'BTCUSDT', quoteCurrency: 'USDT' },
+    { id: 'hyperliquid:BTC', venue: 'hyperliquid', symbol: 'BTC', quoteCurrency: 'USDC' },
+  ] as const;
+
+  function configWithAggregate() {
+    return Object.assign(fakeConfig(), {
+      metricAggregates: [
+        { id: 'btc-perp-oi', displayName: 'BTC', metric: 'openInterest', countingConvention: 'one-sided', members },
+      ],
+    }) as never;
+  }
+
+  function adapterFor(venue: string, fetched: string[]) {
+    return {
+      venue,
+      supports: ['openInterest'] as const,
+      fetchObservations: jest.fn(async (source: { id: string }) => {
+        fetched.push(source.id);
+        return [];
+      }),
+      fetchLatest: jest.fn(),
+    };
+  }
+
+  function makeService(adapters: Map<string, unknown>) {
+    (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(adapters);
+    const store = { latestTime: jest.fn(async () => null), query: jest.fn(async () => []), upsert: jest.fn() };
+    const barClock = { tick$: { subscribe: jest.fn(() => ({ unsubscribe: () => undefined })) } } as never;
+    return new MetricIngestionService(
+      configWithAggregate(),
+      new MetricCache(),
+      new EventEmitter2(),
+      { add: jest.fn() } as never,
+      barClock,
+      fakeAppMetrics(),
+      store as never,
+    );
+  }
+
+  it('ingests panel instruments ∪ aggregate members, binance:BTCUSDT once, legs as MetricSource', async () => {
+    const fetched: string[] = [];
+    const service = makeService(
+      new Map(['binance', 'bybit', 'hyperliquid'].map((v) => [v, adapterFor(v, fetched)])),
+    );
+    await service.onApplicationBootstrap();
+
+    expect(fetched).toEqual(['binance:BTCUSDT', 'bybit:BTCUSDT', 'hyperliquid:BTC']);
+    expect(service.status().map((s) => s.instrument)).toEqual(['binance:BTCUSDT', 'bybit:BTCUSDT', 'hyperliquid:BTC']);
+  });
+
+  it('refuses to boot when a member venue has no metric adapter', async () => {
+    const fetched: string[] = [];
+    const service = makeService(new Map(['binance', 'bybit'].map((v) => [v, adapterFor(v, fetched)])));
+    await expect(service.onApplicationBootstrap()).rejects.toThrow(/'hyperliquid:BTC'.*no metric adapter/);
+    expect(fetched).toEqual([]); // nothing ingested before the check
+  });
+
+  it('refuses to boot when a member adapter does not support the metric', async () => {
+    const adapters = new Map<string, unknown>(['binance', 'bybit', 'hyperliquid'].map((v) => [v, adapterFor(v, [])]));
+    adapters.set('bybit', { ...adapterFor('bybit', []), supports: [] });
+    await expect(makeService(adapters).onApplicationBootstrap()).rejects.toThrow(/does not support 'openInterest'/);
+  });
+});

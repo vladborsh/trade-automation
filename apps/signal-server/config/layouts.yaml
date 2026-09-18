@@ -18,6 +18,7 @@ layouts:
         kind: metric
         instrument: "binance:BTCUSDT"
         metric: openInterest
+        aggregate: btc-perp-oi              # aggregate-oi.md §3 — Binance + Bybit + Hyperliquid; instrument stays the anchor
         signals: false                      # must be false for kind: metric (schema-enforced)
       - id: dxy
         kind: candles

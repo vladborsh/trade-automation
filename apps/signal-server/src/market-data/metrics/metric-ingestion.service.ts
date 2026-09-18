@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subscription } from 'rxjs';
 import {
   BackfillStatus,
-  Instrument,
+  MetricSource,
   InstrumentId,
   MetricKind,
   MetricObservation,
@@ -18,6 +18,7 @@ import { MetricCache } from './metric-cache.service';
 import { MetricAdapter, TipPrice } from './metric-adapter.port';
 import { MetricEvents, MetricObservedEvent } from './metric.events';
 import { buildMetricAdapters } from '../metric-adapters.provider';
+import { assertAggregateMembersIngestible } from '../../config/metric-aggregates.schema';
 import { TIP_PRICE_MAX_AGE_MS, acceptTipPrice, tipPriceAt, withDerivedNotional } from './tip-notional';
 
 // Matches MetricCache's default depth (metric-cache.service.ts) and the confirmed Binance
@@ -73,27 +74,38 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
    * referenced by metric panels is also what drives metric ingestion at boot; there is no
    * second place to list 'which metrics to ingest'." AppConfigService already boot-fails on a
    * dangling instrument id, so every panel here resolves.
+   *
+   * architecture/aggregate-oi.md §3.2 — plus every member of every configured aggregate, as a
+   * MetricSource (the Bybit / Hyperliquid legs are not chart instruments). Deduplicated by
+   * (id, metric): `binance:BTCUSDT` is both a panel instrument and a member, ingested once.
    */
-  private metricPairs(): { instrument: Instrument; metric: MetricKind }[] {
+  private metricPairs(): { instrument: MetricSource; metric: MetricKind }[] {
     const byId = new Map(this.config.instruments.map((i) => [i.id, i]));
     const seen = new Set<string>();
-    const pairs: { instrument: Instrument; metric: MetricKind }[] = [];
+    const pairs: { instrument: MetricSource; metric: MetricKind }[] = [];
+    const add = (instrument: MetricSource, metric: MetricKind) => {
+      const key = this.pairKey(instrument.id, metric);
+      if (seen.has(key)) return;
+      seen.add(key);
+      pairs.push({ instrument, metric });
+    };
     for (const layout of this.config.layouts) {
       for (const panel of layout.panels) {
         if (panel.kind !== 'metric' || !panel.metric) continue;
-        const key = this.pairKey(panel.instrument, panel.metric);
-        if (seen.has(key)) continue;
-        seen.add(key);
         const instrument = byId.get(panel.instrument);
-        if (!instrument) continue;
-        pairs.push({ instrument, metric: panel.metric });
+        if (instrument) add(instrument, panel.metric);
       }
+    }
+    for (const aggregate of this.config.metricAggregates ?? []) {
+      for (const member of aggregate.members) add(member, aggregate.metric);
     }
     return pairs;
   }
 
   async onApplicationBootstrap(): Promise<void> {
     this.adapters = buildMetricAdapters(this.config);
+    // aggregate-oi.md §3.3 — a member no adapter can ingest is a boot failure, not a 'down' pair.
+    assertAggregateMembersIngestible(this.config.metricAggregates ?? [], this.adapters);
 
     for (const { instrument, metric } of this.metricPairs()) {
       const adapter = this.adapters.get(instrument.venue);
@@ -108,7 +120,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
     }
   }
 
-  private async warmUp(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
+  private async warmUp(instrument: MetricSource, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
     const now = Date.now();
     const latestStored = await this.store.latestTime(instrument.id, metric);
     const fromStorage = await this.store.query(
@@ -182,7 +194,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
    * internally (the adapter's own 500-row pages), so nothing here loses the note's "walk
    * oldest-page-last" property — the adapter returns the whole window pre-assembled ascending.
    */
-  private async deepenPair(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
+  private async deepenPair(instrument: MetricSource, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
     const now = Date.now();
     const target = now - DEFAULT_CACHE_LOOKBACK_MS;
     const oldestCached = this.cache.window(instrument.id, metric)[0]?.time ?? now;
@@ -199,14 +211,14 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
     this.logger.log(`Deepened ${deepRows.length} historical observations for ${instrument.id}/${metric}`);
   }
 
-  private startPolling(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): void {
+  private startPolling(instrument: MetricSource, metric: MetricKind, adapter: MetricAdapter): void {
     const key = this.pairKey(instrument.id, metric);
     const sub = this.barClock.tick$.subscribe(() => void this.maybePoll(instrument, metric, adapter, key));
     this.subscriptions.push(sub);
   }
 
   private async maybePoll(
-    instrument: Instrument,
+    instrument: MetricSource,
     metric: MetricKind,
     adapter: MetricAdapter,
     key: string,
@@ -241,7 +253,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   /** `null` when the adapter has no tip price or the request fails (logged in the streak warn). */
   private async fetchTipPrice(
     adapter: MetricAdapter,
-    instrument: Instrument,
+    instrument: MetricSource,
   ): Promise<TipPrice | { error: string } | null> {
     if (!adapter.fetchTipPrice) return null;
     try {
@@ -299,7 +311,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
    * Runs from `deepenHistoryAsync` (after `listen()`), so it never delays boot. Deliberately
    * emits no MetricObserved — these are history, not the live tip.
    */
-  private async repairTipNotional(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
+  private async repairTipNotional(instrument: MetricSource, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
     if (!adapter.fetchTipPriceHistory) return;
     const missing = this.cache.window(instrument.id, metric).filter((o) => o.notional === undefined);
     if (missing.length === 0) return;

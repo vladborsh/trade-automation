@@ -11,6 +11,7 @@ import { MarketDataStatusService } from './market-data-status.service';
 import { IngestionService } from './ingestion.service';
 import { MetricCache } from './metrics/metric-cache.service';
 import { MetricIngestionService } from './metrics/metric-ingestion.service';
+import { AggregateMetricsService } from './metrics/aggregate-metrics.service';
 import { VENUE_ADAPTERS_MAP, buildVenueAdapters } from './venue-adapters.provider';
 
 @Module({
@@ -24,6 +25,7 @@ import { VENUE_ADAPTERS_MAP, buildVenueAdapters } from './venue-adapters.provide
     IngestionService,
     MetricCache,
     MetricIngestionService,
+    AggregateMetricsService,
     // architecture/live-signal-server.md §12.5 item 4: CandlesController needs the same
     // VenueAdapter instances IngestionService streams/backfills through (one CapitalComSession
     // per venue, not a duplicate that logs in twice) to do on-demand fetch-and-persist on a
@@ -40,6 +42,7 @@ import { VENUE_ADAPTERS_MAP, buildVenueAdapters } from './venue-adapters.provide
     ResamplerService,
     MetricCache,
     MetricIngestionService,
+    AggregateMetricsService,
     VENUE_ADAPTERS_MAP,
     IngestionService,
     // architecture/economic-calendar.md §3.2 — CalendarIngestionService/NotificationSchedulerService

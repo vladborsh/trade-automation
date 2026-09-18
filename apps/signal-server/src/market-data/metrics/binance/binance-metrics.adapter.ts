@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { Instrument, MetricKind, MetricObservation } from '@trade-automation/contracts';
+import { MetricSource, MetricKind, MetricObservation } from '@trade-automation/contracts';
 import { MetricAdapter, TipPrice } from '../metric-adapter.port';
 import { TIP_PRICE_MAX_AGE_MS } from '../tip-notional';
 import {
@@ -80,7 +80,7 @@ export class BinanceMetricsAdapter implements MetricAdapter {
   ) {}
 
   async fetchObservations(
-    instrument: Instrument,
+    instrument: MetricSource,
     metric: MetricKind,
     from: number,
     to: number,
@@ -126,7 +126,7 @@ export class BinanceMetricsAdapter implements MetricAdapter {
     return out;
   }
 
-  async fetchLatest(instrument: Instrument, metric: MetricKind): Promise<MetricObservation> {
+  async fetchLatest(instrument: MetricSource, metric: MetricKind): Promise<MetricObservation> {
     const url = new URL('/fapi/v1/openInterest', this.restBaseUrl);
     url.searchParams.set('symbol', instrument.symbol);
 
@@ -139,7 +139,7 @@ export class BinanceMetricsAdapter implements MetricAdapter {
   }
 
   /** §11.1 — the current mark price (see the join-check header above). */
-  async fetchTipPrice(instrument: Instrument): Promise<TipPrice> {
+  async fetchTipPrice(instrument: MetricSource): Promise<TipPrice> {
     const url = new URL('/fapi/v1/premiumIndex', this.restBaseUrl);
     url.searchParams.set('symbol', instrument.symbol);
 
@@ -157,7 +157,7 @@ export class BinanceMetricsAdapter implements MetricAdapter {
    * it, so gaps between sparse legacy stretches are skipped rather than fetched. Weight/pacing:
    * see MARK_KLINES_PAGE_LIMIT.
    */
-  async fetchTipPriceHistory(instrument: Instrument, times: readonly number[]): Promise<TipPrice[]> {
+  async fetchTipPriceHistory(instrument: MetricSource, times: readonly number[]): Promise<TipPrice[]> {
     const out: TipPrice[] = [];
     let i = 0;
     let calls = 0;

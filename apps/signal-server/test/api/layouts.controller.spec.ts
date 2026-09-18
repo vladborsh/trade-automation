@@ -13,6 +13,7 @@ function fakeNestConfig() {
     INSTRUMENTS_FILE: path.join(root, 'instruments.yaml'),
     STRATEGIES_FILE: path.join(root, 'strategies.yaml'),
     LAYOUTS_FILE: path.join(root, 'layouts.yaml'),
+    METRIC_AGGREGATES_FILE: path.join(root, 'metric-aggregates.yaml'),
   };
   return { get: (key: string) => paths[key] } as never;
 }
@@ -33,8 +34,12 @@ describe('GET /api/layouts (architecture/chart-layouts.md §2.3)', () => {
       kind: 'metric',
       instrument: 'binance:BTCUSDT',
       metric: 'openInterest',
+      aggregate: 'btc-perp-oi', // architecture/aggregate-oi.md §3.3
       signals: false,
     });
+    expect(config.metricAggregates.map((a) => [a.id, a.countingConvention, a.members.map((m) => m.id)])).toEqual([
+      ['btc-perp-oi', 'one-sided', ['binance:BTCUSDT', 'bybit:BTCUSDT', 'hyperliquid:BTC']],
+    ]);
     expect(crypto.panels.filter((p) => p.signals).map((p) => p.id)).toEqual(['btc', 'eth']);
     expect(crypto.panels.find((p) => p.id === 'dxy')).toMatchObject({
       kind: 'candles',

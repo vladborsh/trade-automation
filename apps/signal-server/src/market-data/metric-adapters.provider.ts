@@ -18,7 +18,10 @@ export function buildMetricAdapters(config: AppConfigService): Map<Venue, Metric
   const adapters = new Map<Venue, MetricAdapter>();
 
   if (mode === 'replay') {
-    adapters.set('binance', new ReplayMetricAdapter('binance', env.get('REPLAY_FIXTURES_DIR')));
+    // aggregate-oi.md §5 — every aggregate leg replays from fixtures, so C3/C5 run end-to-end.
+    for (const venue of ['binance', 'bybit', 'hyperliquid'] as const) {
+      adapters.set(venue, new ReplayMetricAdapter(venue, env.get('REPLAY_FIXTURES_DIR')));
+    }
     return adapters;
   }
 

@@ -4,6 +4,7 @@ import { AppConfigService } from '../config/config.service';
 import { CalendarIngestionService } from '../calendar/calendar-ingestion.service';
 import { MarketDataStatusService } from '../market-data/market-data-status.service';
 import { MetricIngestionService } from '../market-data/metrics/metric-ingestion.service';
+import { AggregateMetricsService } from '../market-data/metrics/aggregate-metrics.service';
 
 const START_TIME = Date.now();
 
@@ -18,6 +19,7 @@ export class HealthController {
     private readonly status: MarketDataStatusService,
     private readonly metricIngestion: MetricIngestionService,
     private readonly calendarIngestion: CalendarIngestionService,
+    private readonly aggregateMetrics: AggregateMetricsService,
   ) {}
 
   @Get()
@@ -50,6 +52,7 @@ export class HealthController {
       uptimeSeconds: (now - START_TIME) / 1000,
       instruments,
       metrics: this.metricIngestion.status(),
+      aggregates: this.aggregateMetrics.health(now),
       calendar: this.config.env.get('CALENDAR_ENABLED') ? this.calendarIngestion.healthStatus() : null,
     };
   }

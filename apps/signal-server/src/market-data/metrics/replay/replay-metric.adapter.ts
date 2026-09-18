@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Instrument, MetricKind, MetricObservation, Venue } from '@trade-automation/contracts';
+import { MetricSource, MetricKind, MetricObservation, Venue } from '@trade-automation/contracts';
 import { MetricAdapter } from '../metric-adapter.port';
 
 /**
@@ -20,11 +20,11 @@ export class ReplayMetricAdapter implements MetricAdapter {
     private readonly fixturesDir: string,
   ) {}
 
-  private fixturePath(instrument: Instrument, metric: MetricKind): string {
+  private fixturePath(instrument: MetricSource, metric: MetricKind): string {
     return path.join(this.fixturesDir, instrument.venue, instrument.symbol, `${metric}.jsonl`);
   }
 
-  private loadFixture(instrument: Instrument, metric: MetricKind): MetricObservation[] {
+  private loadFixture(instrument: MetricSource, metric: MetricKind): MetricObservation[] {
     const file = this.fixturePath(instrument, metric);
     if (!fs.existsSync(file)) return [];
     return fs
@@ -36,7 +36,7 @@ export class ReplayMetricAdapter implements MetricAdapter {
   }
 
   async fetchObservations(
-    instrument: Instrument,
+    instrument: MetricSource,
     metric: MetricKind,
     from: number,
     to: number,
@@ -44,7 +44,7 @@ export class ReplayMetricAdapter implements MetricAdapter {
     return this.loadFixture(instrument, metric).filter((o) => o.time >= from && o.time <= to);
   }
 
-  async fetchLatest(instrument: Instrument, metric: MetricKind): Promise<MetricObservation> {
+  async fetchLatest(instrument: MetricSource, metric: MetricKind): Promise<MetricObservation> {
     const fixture = this.loadFixture(instrument, metric);
     const last = fixture[fixture.length - 1];
     if (!last) {

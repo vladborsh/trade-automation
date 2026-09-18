@@ -10,6 +10,7 @@ import {
 import type { IncomingMessage } from 'http';
 import type { Server } from 'ws';
 import {
+  AggregateMetricPoint,
   Candle,
   InstrumentId,
   MetricKind,
@@ -25,6 +26,7 @@ import {
 import { CandleClosedEvent, CandleFormingEvent, MarketDataEvents } from '../../market-data/market-data.events';
 import { MarketDataStatusService } from '../../market-data/market-data-status.service';
 import { MetricCache } from '../../market-data/metrics/metric-cache.service';
+import { AggregateMetricsService } from '../../market-data/metrics/aggregate-metrics.service';
 import { MetricEvents, MetricObservedEvent } from '../../market-data/metrics/metric.events';
 import {
   IndicatorEmittedEvent,
@@ -48,6 +50,8 @@ interface ClientState {
   signalTopics: Set<InstrumentId>;
   /** architecture/chart-layouts.md §4.5 — `${instrument}|${metric}|${timeframe}`. */
   metricTopics: Set<string>;
+  /** architecture/aggregate-oi.md §5 — `${aggregate}|${timeframe}`. */
+  aggregateTopics: Set<string>;
   /** architecture/economic-calendar.md §6.2 — no parameters, one stream for the whole calendar. */
   calendar: boolean;
 }
@@ -79,6 +83,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly config: AppConfigService,
     private readonly metrics: MetricsService,
     private readonly metricCache: MetricCache,
+    private readonly aggregateMetrics: AggregateMetricsService,
   ) {}
 
   handleConnection(client: WsSocket, request: IncomingMessage): void {
@@ -96,6 +101,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       candleTopics: new Set(),
       signalTopics: new Set(),
       metricTopics: new Set(),
+      aggregateTopics: new Set(),
       calendar: false,
     });
     this.metrics.wsClients.set(this.clients.size);
@@ -136,7 +142,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
         } else if (parsed.topic === 'calendar') {
           state.calendar = true;
         } else if (parsed.topic === 'metricAggregates') {
-          // architecture/aggregate-oi.md §5 — accepted by the contract, served by SE-AG3.
+          state.aggregateTopics.add(this.aggregateKey(parsed.aggregate, parsed.timeframe));
         } else {
           state.signalTopics.add(parsed.instrument);
         }
@@ -149,7 +155,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
         } else if (parsed.topic === 'calendar') {
           state.calendar = false;
         } else if (parsed.topic === 'metricAggregates') {
-          // architecture/aggregate-oi.md §5 — accepted by the contract, served by SE-AG3.
+          state.aggregateTopics.delete(this.aggregateKey(parsed.aggregate, parsed.timeframe));
         } else {
           state.signalTopics.delete(parsed.instrument);
         }
@@ -163,6 +169,10 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private metricKey(instrument: InstrumentId, metric: MetricKind, timeframe: Timeframe): string {
     return `${instrument}|${metric}|${timeframe}`;
+  }
+
+  private aggregateKey(aggregate: string, timeframe: Timeframe): string {
+    return `${aggregate}|${timeframe}`;
   }
 
   private send(client: WsSocket, message: WsServerMessage | { type: 'error'; message: string }): void {
@@ -256,6 +266,36 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
           pointByTimeframe.set(topicTimeframe, point);
         }
         if (point) this.send(client, { type: 'metric', point });
+      }
+    }
+    this.fanOutAggregates(observation);
+  }
+
+  /**
+   * architecture/aggregate-oi.md §5 — a member observation rebuilds the forming bucket of every
+   * subscribed aggregate from MetricCache (AggregateMetricsService, the REST path's composition)
+   * and sends it — or nothing when C3 withholds it (the slot is still missing a venue's poll).
+   * Built once per (aggregate, timeframe) per observation, and only if someone subscribed.
+   */
+  private fanOutAggregates(observation: MetricObservedEvent['observation']): void {
+    const memberOf = new Set(
+      this.aggregateMetrics.aggregatesWithMember(observation.instrument, observation.metric).map((a) => a.id),
+    );
+    if (memberOf.size === 0) return;
+    const pointByTopic = new Map<string, AggregateMetricPoint | null>();
+
+    for (const [client, state] of this.clients) {
+      for (const topic of state.aggregateTopics) {
+        const [aggregateId, timeframe] = topic.split('|') as [string, Timeframe];
+        if (!memberOf.has(aggregateId)) continue;
+
+        let point = pointByTopic.get(topic);
+        if (point === undefined) {
+          const aggregate = this.aggregateMetrics.find(aggregateId);
+          point = aggregate ? this.aggregateMetrics.formingPoint(aggregate, timeframe, observation.time) : null;
+          pointByTopic.set(topic, point);
+        }
+        if (point) this.send(client, { type: 'metricAggregate', point });
       }
     }
   }

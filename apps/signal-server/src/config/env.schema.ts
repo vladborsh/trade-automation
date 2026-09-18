@@ -21,6 +21,8 @@ export const EnvSchema = z.object({
   INSTRUMENTS_FILE: z.string().default('config/instruments.yaml'),
   STRATEGIES_FILE: z.string().default('config/strategies.yaml'),
   LAYOUTS_FILE: z.string().default('config/layouts.yaml'),
+  // architecture/aggregate-oi.md §3.3 — cross-venue metric aggregates referenced by layouts.yaml.
+  METRIC_AGGREGATES_FILE: z.string().default('config/metric-aggregates.yaml'),
 
   CANDLE_STORE: z.enum(['file', 's3']).default('file'),
   FILE_STORE_ROOT: z.string().default('data'),

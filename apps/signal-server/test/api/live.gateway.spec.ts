@@ -3,7 +3,9 @@ import { CandleClosedEvent, CandleFormingEvent } from '../../src/market-data/mar
 import { MetricCache } from '../../src/market-data/metrics/metric-cache.service';
 import { MetricObservedEvent } from '../../src/market-data/metrics/metric.events';
 import { MetricsController } from '../../src/api/rest/metrics.controller';
-import { Candle, MetricObservation } from '@trade-automation/contracts';
+import { MetricAggregatesController } from '../../src/api/rest/metric-aggregates.controller';
+import { AggregateMetricsService } from '../../src/market-data/metrics/aggregate-metrics.service';
+import { Candle, MetricAggregate, MetricObservation } from '@trade-automation/contracts';
 
 class FakeSocket {
   readyState = 1;
@@ -48,8 +50,14 @@ function observation(instrument: MetricObservation['instrument'], time: number, 
   return { metric: 'openInterest', instrument, time, value, unit: 'base' };
 }
 
-function makeGateway(cache = new MetricCache()) {
-  return Object.assign(new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics(), cache), { cache });
+const emptyMetricStore = { query: async () => [], upsert: async () => undefined, latestTime: async () => null };
+
+function makeGateway(cache = new MetricCache(), metricAggregates: MetricAggregate[] = []) {
+  const aggregates = new AggregateMetricsService({ metricAggregates } as never, cache, emptyMetricStore as never);
+  return Object.assign(new LiveGateway(fakeStatus(), fakeConfig(), fakeMetrics(), cache, aggregates), {
+    cache,
+    aggregates,
+  });
 }
 
 /** What MetricIngestionService does: upsert into MetricCache, then emit MetricObserved. */
@@ -349,5 +357,93 @@ describe('MetricsController lead bucket (architecture/chart-layouts.md §11.2)',
     // the first candle of the page equals the same candle fetched mid-page
     expect(page[0]).toEqual(full[1]);
     expect(page[0].ohlc.open).toBe(102);
+  });
+});
+
+describe('LiveGateway metricAggregates topic (architecture/aggregate-oi.md §5)', () => {
+  const M5 = 5 * 60_000;
+  const T0 = 1_789_228_800_000; // aligned to 1 h
+  const AGG: MetricAggregate = {
+    id: 'btc-perp-oi',
+    displayName: 'BTC perps · 3 venues',
+    metric: 'openInterest',
+    countingConvention: 'one-sided',
+    members: [
+      { id: 'binance:BTCUSDT', venue: 'binance', symbol: 'BTCUSDT', quoteCurrency: 'USDT' },
+      { id: 'bybit:BTCUSDT', venue: 'bybit', symbol: 'BTCUSDT', quoteCurrency: 'USDT' },
+      { id: 'hyperliquid:BTC', venue: 'hyperliquid', symbol: 'BTC', quoteCurrency: 'USDC' },
+    ],
+  };
+  const leg = (instrument: MetricObservation['instrument'], slot: number, value: number): MetricObservation => ({
+    ...observation(instrument, T0 + slot * M5 + 1_000, value),
+    notional: value * 10,
+    notionalBasis: 'derived',
+  });
+
+  function frames(client: FakeSocket): Record<string, unknown>[] {
+    return (client.sent.filter((m: unknown) => (m as { type: string }).type === 'metricAggregate') as {
+      point: Record<string, unknown>;
+    }[]).map((f) => f.point);
+  }
+
+  /** Binance + Bybit on slots 0–9, Hyperliquid joins at slot 4 with a 2-slot blip at 6–7. */
+  function seeded() {
+    const gateway = makeGateway(new MetricCache(), [AGG]);
+    for (let i = 0; i < 10; i++) {
+      gateway.cache.upsert(leg('binance:BTCUSDT', i, 100 + i));
+      gateway.cache.upsert(leg('bybit:BTCUSDT', i, 200 + i));
+      if (i >= 4 && (i < 6 || i > 7)) gateway.cache.upsert(leg('hyperliquid:BTC', i, 300 + i));
+    }
+    const client = new FakeSocket();
+    gateway.handleConnection(client as never, { url: '/' } as never);
+    return { gateway, client };
+  }
+
+  it('withholds the forming slot until every venue of the previous slot has reported, then sends it', () => {
+    const { gateway, client } = seeded();
+    client.emitMessage({ type: 'subscribe', topic: 'metricAggregates', aggregate: 'btc-perp-oi', timeframe: '5m' });
+
+    observe(gateway, leg('bybit:BTCUSDT', 10, 210));
+    observe(gateway, leg('binance:BTCUSDT', 10, 110));
+    expect(frames(client)).toHaveLength(0); // 2 of 3 venues: never drawn as a dip
+
+    observe(gateway, leg('hyperliquid:BTC', 10, 310));
+    expect(frames(client)).toHaveLength(1);
+    expect(frames(client)[0]).toMatchObject({ time: T0 + 10 * M5, value: 630, complete: true, coverageStart: false });
+  });
+
+  it('the WS point for a bucket equals the REST point for the same bucket', async () => {
+    const { gateway, client } = seeded();
+    const controller = new MetricAggregatesController(gateway.aggregates);
+    for (const tf of ['1m', '5m', '15m', '1h'] as const) {
+      client.sent.length = 0;
+      client.emitMessage({ type: 'subscribe', topic: 'metricAggregates', aggregate: 'btc-perp-oi', timeframe: tf });
+      observe(gateway, leg('hyperliquid:BTC', 9, 309)); // re-observe: rebuild the latest bucket
+      const rest = await controller.points({
+        aggregate: 'btc-perp-oi',
+        timeframe: tf,
+        from: T0 - 24 * 60 * 60_000,
+        to: T0 + 10 * M5,
+        limit: 1500,
+      });
+      const ws = frames(client);
+      expect(ws).toHaveLength(1);
+      expect(ws[0]).toEqual(JSON.parse(JSON.stringify(rest.points[rest.points.length - 1])));
+      client.emitMessage({ type: 'unsubscribe', topic: 'metricAggregates', aggregate: 'btc-perp-oi', timeframe: tf });
+    }
+  });
+
+  it('sends nothing to non-subscribers, for non-members, or after unsubscribe', () => {
+    const { gateway, client } = seeded();
+    observe(gateway, leg('hyperliquid:BTC', 9, 309));
+    expect(frames(client)).toHaveLength(0);
+
+    client.emitMessage({ type: 'subscribe', topic: 'metricAggregates', aggregate: 'btc-perp-oi', timeframe: '5m' });
+    observe(gateway, leg('binance:ETHUSDT' as MetricObservation['instrument'], 9, 1));
+    expect(frames(client)).toHaveLength(0);
+
+    client.emitMessage({ type: 'unsubscribe', topic: 'metricAggregates', aggregate: 'btc-perp-oi', timeframe: '5m' });
+    observe(gateway, leg('hyperliquid:BTC', 9, 309));
+    expect(frames(client)).toHaveLength(0);
   });
 });

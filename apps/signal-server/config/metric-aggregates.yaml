@@ -1,0 +1,10 @@
+# apps/signal-server/config/metric-aggregates.yaml  (architecture/aggregate-oi.md §3)
+aggregates:
+  - id: btc-perp-oi
+    displayName: "BTC perps · 3 venues"
+    metric: openInterest
+    countingConvention: one-sided          # §2 — 'as-published' matches CoinGlass-style sums
+    members:
+      - { id: "binance:BTCUSDT",  venue: binance,     symbol: BTCUSDT, quoteCurrency: USDT }
+      - { id: "bybit:BTCUSDT",    venue: bybit,       symbol: BTCUSDT, quoteCurrency: USDT }
+      - { id: "hyperliquid:BTC",  venue: hyperliquid, symbol: BTC,     quoteCurrency: USDC }
