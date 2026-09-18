@@ -1,6 +1,9 @@
 <div class="chart-panel" [attr.data-panel-id]="panel().id">
   <div class="panel-header">
     <span class="panel-title">{{ title() }}</span>
+    @if (panel().aggregate) {
+      <app-aggregate-header [aggregate]="feed().aggregate()" [point]="chipPoint()" />
+    }
     @if (caption(); as c) {
       <span class="metric-caption" data-testid="metric-caption" [title]="c.tooltip">{{ c.text }}</span>
     }

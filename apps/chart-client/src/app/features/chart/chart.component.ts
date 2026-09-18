@@ -13,25 +13,19 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import {
-  CandlestickSeries,
-  ColorType,
-  type IChartApi,
-  type ISeriesApi,
-  type UTCTimestamp,
-} from 'lightweight-charts';
-import { createChart } from 'lightweight-charts';
+import { CandlestickSeries, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
 import type {
   Candle,
   IndicatorPoint,
   IndicatorSeriesSpec,
-  MetricPoint,
   OverlayPrimitive,
   Timeframe,
 } from '@trade-automation/contracts';
 import { TIMEFRAME_MS } from '@trade-automation/contracts';
 import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
 import { MetricSeriesRenderer } from './metric-series.renderer';
+import { CHART_OPTIONS, PRICE_CANDLE_OPTIONS } from './chart-theme';
+import type { PanelMetricPoint } from '../../core/contracts/panel-metric-point';
 import { OverlayLayer } from './overlay/overlay-layer';
 import { MarkerRenderer } from './overlay/marker.renderer';
 import { PriceLineRenderer } from './overlay/price-line.renderer';
@@ -82,7 +76,7 @@ const NEAR_START_BAR_MULTIPLIER = 5;
 export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly kind = input.required<'candles' | 'metric'>();
   readonly candles = input<Candle[]>([]);
-  readonly points = input<MetricPoint[]>([]);
+  readonly points = input<readonly PanelMetricPoint[]>([]);
   readonly overlays = input<OverlayPrimitive[]>([]);
   readonly indicatorPoints = input<IndicatorPoint[]>([]);
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
@@ -105,7 +99,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private readonly overlayLayer = new OverlayLayer();
   private readonly shapesPrimitive = new ShapesPrimitive();
   private readonly indicatorLayer = new IndicatorLayer();
-  private readonly metricSeries = new MetricSeriesRenderer();
+  protected readonly metricSeries = new MetricSeriesRenderer(); // template reads its e2e hooks
   private lastRenderedCount = 0;
   private lastRenderedTime: number | null = null; // candle openTime or metric point time, seconds-scale source (ms)
   /**
@@ -229,30 +223,10 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     const el = this.container().nativeElement;
     const isCandles = this.kind() === 'candles';
     this.stopResizeObserver = observeResize(el, this.resizeSettle); // before createChart — see observeResize
-    this.chart = createChart(el, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#c9d1d9',
-        fontFamily: "ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace",
-      },
-      grid: {
-        vertLines: { color: '#161b22' },
-        horzLines: { color: '#161b22' },
-      },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#30363d' },
-      rightPriceScale: { borderColor: '#30363d' },
-      crosshair: { mode: 0 },
-      autoSize: true,
-    });
+    this.chart = createChart(el, CHART_OPTIONS);
 
     this.series = isCandles
-      ? this.chart.addSeries(CandlestickSeries, {
-          upColor: '#26a69a',
-          downColor: '#ef5350',
-          borderVisible: false,
-          wickUpColor: '#26a69a',
-          wickDownColor: '#ef5350',
-        })
+      ? this.chart.addSeries(CandlestickSeries, PRICE_CANDLE_OPTIONS)
       : this.metricSeries.attach(this.chart, this.timeframe());
 
     if (isCandles) {
@@ -554,7 +528,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.joinSharedRangeOnFirstData(wasEmpty);
   }
 
-  private renderPoints(points: MetricPoint[]): void {
+  private renderPoints(points: readonly PanelMetricPoint[]): void {
     // Read timeframe() before any early return, so the render effect re-runs on a timeframe change.
     if (this.metricSeries.setTimeframe(this.timeframe())) {
       // §11.2 line <-> candles swap: the new series is empty, so it takes the first-data path —
@@ -587,8 +561,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
     const timesSec = points.map((p) => p.time / 1000);
     if (isIncrementalAppendOrUpdate) {
-      const last = points[points.length - 1];
-      this.metricSeries.update(last);
+      this.metricSeries.update(points);
     } else {
       this.withPreservedRangeOnPrepend(isPrepend, timesSec, () => this.metricSeries.setData(points));
     }

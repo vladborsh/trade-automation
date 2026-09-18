@@ -1,0 +1,30 @@
+:host {
+  display: contents;
+}
+.convention-badge,
+.coverage-chip {
+  padding: 0 6px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: help;
+}
+/* The chip goes on its own header row, after everything else: it is long and must never be cut. */
+.chip-row {
+  display: flex;
+  flex-basis: 100%;
+  order: 1;
+  min-width: 0;
+}
+.convention-badge {
+  color: #8b949e;
+}
+.coverage-chip {
+  color: #c9d1d9;
+}
+/* aggregate-oi.md §1 point 3: a partial bar's chip is in the muted colour. */
+.coverage-chip.partial {
+  color: #8b949e;
+  border-style: dashed;
+}

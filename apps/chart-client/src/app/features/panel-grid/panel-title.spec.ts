@@ -60,3 +60,21 @@ describe('panelTitle', () => {
     expect(panelTitle(candlesPanel, null, null)).toBe('binance:BTCUSDT');
   });
 });
+
+describe('panelTitle — aggregate panel (architecture/aggregate-oi.md §1)', () => {
+  const aggPanel: Panel = { ...oiPanel, aggregate: 'btc-perp-oi' };
+
+  it('is `<displayName> · Open interest · USD` once the series has data', () => {
+    expect(panelTitle(aggPanel, btc, 'quote', { displayName: 'BTC perps · 3 venues' })).toBe(
+      'BTC perps · 3 venues · Open interest · USD',
+    );
+  });
+
+  it('falls back to the aggregate id before the definition arrives, and has no unit before data', () => {
+    expect(panelTitle(aggPanel, btc, null)).toBe('btc-perp-oi · Open interest');
+  });
+
+  it('a layout title still wins', () => {
+    expect(panelTitle({ ...aggPanel, title: 'OI' }, btc, 'quote', { displayName: 'x' })).toBe('OI · USD');
+  });
+});

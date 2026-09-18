@@ -14,7 +14,15 @@ export const MOCK_LAYOUTS: Layout[] = [
     panels: [
       { id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: true },
       { id: 'eth', kind: 'candles', instrument: 'binance:ETHUSDT', signals: true },
-      { id: 'btc-oi', kind: 'metric', instrument: 'binance:BTCUSDT', metric: 'openInterest', signals: false },
+      // architecture/aggregate-oi.md §3.3 — the OI panel plots the 3-venue aggregate (aggregate-oi.ts).
+      {
+        id: 'btc-oi',
+        kind: 'metric',
+        instrument: 'binance:BTCUSDT',
+        metric: 'openInterest',
+        signals: false,
+        aggregate: 'btc-perp-oi',
+      },
       { id: 'dxy', kind: 'candles', instrument: 'capitalcom:DXY-MOCK', signals: false },
     ],
   },

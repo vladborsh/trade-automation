@@ -6,6 +6,7 @@ import type {
   WsCandleFrame,
   WsClientFrame,
   WsIndicatorFrame,
+  WsMetricAggregateFrame,
   WsMetricFrame,
   WsServerFrame,
   WsSignalFrame,
@@ -38,12 +39,19 @@ interface MetricTopicKey {
   timeframe: Timeframe;
 }
 
+/** architecture/aggregate-oi.md §5 — one cross-venue aggregate at one timeframe. */
+interface MetricAggregateTopicKey {
+  topic: 'metricAggregates';
+  aggregate: string;
+  timeframe: Timeframe;
+}
+
 /** §6.2 — one stream for the whole calendar, no parameters. */
 interface CalendarTopicKey {
   topic: 'calendar';
 }
 
-type TopicKey = CandleTopicKey | SignalTopicKey | MetricTopicKey | CalendarTopicKey;
+type TopicKey = CandleTopicKey | SignalTopicKey | MetricTopicKey | MetricAggregateTopicKey | CalendarTopicKey;
 
 function topicKeyId(key: TopicKey): string {
   if (key.topic === 'candles') {
@@ -54,6 +62,9 @@ function topicKeyId(key: TopicKey): string {
   }
   if (key.topic === 'calendar') {
     return 'calendar';
+  }
+  if (key.topic === 'metricAggregates') {
+    return `metricAggregates:${key.aggregate}:${key.timeframe}`;
   }
   return `metrics:${key.instrument}:${key.metric}:${key.timeframe}`;
 }
@@ -98,6 +109,9 @@ export class LiveSocket implements OnDestroy {
   );
   readonly metricFrames$: Observable<WsMetricFrame> = this.frames$.pipe(
     filter((f): f is WsMetricFrame => f.type === 'metric'),
+  );
+  readonly metricAggregateFrames$: Observable<WsMetricAggregateFrame> = this.frames$.pipe(
+    filter((f): f is WsMetricAggregateFrame => f.type === 'metricAggregate'),
   );
   readonly statusFrames$: Observable<WsStatusFrame> = this.frames$.pipe(
     filter((f): f is WsStatusFrame => f.type === 'status'),
@@ -210,6 +224,8 @@ export class LiveSocket implements OnDestroy {
       this.send({ type: 'subscribe', topic: 'signals', instrument: key.instrument });
     } else if (key.topic === 'calendar') {
       this.send({ type: 'subscribe', topic: 'calendar' });
+    } else if (key.topic === 'metricAggregates') {
+      this.send({ type: 'subscribe', topic: 'metricAggregates', aggregate: key.aggregate, timeframe: key.timeframe });
     } else {
       this.send({
         type: 'subscribe',
@@ -257,6 +273,18 @@ export class LiveSocket implements OnDestroy {
     this.send({ type: 'unsubscribe', topic: 'metrics', instrument, metric, timeframe });
   }
 
+  subscribeMetricAggregates(aggregate: string, timeframe: Timeframe): void {
+    const key: TopicKey = { topic: 'metricAggregates', aggregate, timeframe };
+    this.activeTopics.set(topicKeyId(key), key);
+    this.sendSubscribe(key);
+  }
+
+  unsubscribeMetricAggregates(aggregate: string, timeframe: Timeframe): void {
+    const key: TopicKey = { topic: 'metricAggregates', aggregate, timeframe };
+    this.activeTopics.delete(topicKeyId(key));
+    this.send({ type: 'unsubscribe', topic: 'metricAggregates', aggregate, timeframe });
+  }
+
   /**
    * §7 — subscribed once at boot regardless of which view is active
    * (charts/calendar), so notifications reach the user everywhere. Survives
@@ -302,6 +330,12 @@ export class LiveSocket implements OnDestroy {
         (f) =>
           f.point.instrument === instrument && f.point.metric === metric && f.point.timeframe === timeframe,
       ),
+    );
+  }
+
+  metricAggregatesFor(aggregate: string, timeframe: Timeframe): Observable<WsMetricAggregateFrame> {
+    return this.metricAggregateFrames$.pipe(
+      filter((f) => f.point.aggregate === aggregate && f.point.timeframe === timeframe),
     );
   }
 

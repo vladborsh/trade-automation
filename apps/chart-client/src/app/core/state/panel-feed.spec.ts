@@ -129,6 +129,46 @@ describe('PanelFeed', () => {
     });
   });
 
+  it('an aggregate panel pages from /metric-aggregates, keeps the definition, subscribes metricAggregates (aggregate-oi.md §5)', async () => {
+    const definition = { id: 'btc-perp-oi', displayName: 'BTC perps', metric: 'openInterest', countingConvention: 'one-sided', members: [] };
+    const point = (time: number) => ({ time, aggregate: 'btc-perp-oi', timeframe: '5m', coverage: ['bybit:BTCUSDT'] });
+    const getMetricAggregatePoints = vi
+      .fn()
+      .mockResolvedValueOnce({ aggregate: definition, points: [point(600_000), point(900_000)] })
+      .mockResolvedValueOnce({ aggregate: definition, points: [point(300_000)] })
+      .mockResolvedValueOnce({ aggregate: definition, points: [point(900_000), point(1_200_000)] });
+    const rest = fakeRest({ getMetricAggregatePoints });
+    const feed = new PanelFeed({ ...metricPanel(), aggregate: 'btc-perp-oi' }, '5m', { rest, socket: live });
+    await feed.start();
+
+    expect(rest.getMetrics).not.toHaveBeenCalled();
+    expect(getMetricAggregatePoints).toHaveBeenCalledWith('btc-perp-oi', '5m', expect.any(Number), expect.any(Number), 1500);
+    expect(feed.aggregate()).toEqual(definition);
+    const sent = sockets[0].sent.map((s) => JSON.parse(s));
+    expect(sent).toContainEqual({ type: 'subscribe', topic: 'metricAggregates', aggregate: 'btc-perp-oi', timeframe: '5m' });
+    expect(sent.some((f) => f.topic === 'metrics')).toBe(false);
+
+    // same pagination + heal path as the single-venue metric feed
+    await feed.loadOlder();
+    expect(getMetricAggregatePoints.mock.calls[1][3]).toBe(600_000);
+    await feed.healAfterReconnect();
+    expect(getMetricAggregatePoints.mock.calls[2][2]).toBe(900_000);
+    expect(feed.points.points().map((p) => p.time)).toEqual([300_000, 600_000, 900_000, 1_200_000]);
+
+    // a live frame for this aggregate/timeframe merges; another timeframe's does not
+    sockets[0].onmessage?.({ data: JSON.stringify({ type: 'metricAggregate', point: point(1_500_000) }) });
+    sockets[0].onmessage?.({ data: JSON.stringify({ type: 'metricAggregate', point: { ...point(1_800_000), timeframe: '1m' } }) });
+    expect(feed.points.lastTime()).toBe(1_500_000);
+
+    feed.stop();
+    expect(sockets[0].sent.map((s) => JSON.parse(s))).toContainEqual({
+      type: 'unsubscribe',
+      topic: 'metricAggregates',
+      aggregate: 'btc-perp-oi',
+      timeframe: '5m',
+    });
+  });
+
   it('stop() unsubscribes every topic start() subscribed', async () => {
     const rest = fakeRest();
     const feed = new PanelFeed(candlesPanel(true), '1m', { rest, socket: live });

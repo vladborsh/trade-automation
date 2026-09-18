@@ -17,6 +17,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap; /* an aggregate panel's coverage chip takes its own row (aggregate-header) */
+  row-gap: 4px;
   padding: 4px 8px;
   border-bottom: 1px solid #30363d;
   font-size: 12px;
@@ -45,6 +47,7 @@
 }
 .panel-title {
   font-weight: 600;
+  white-space: nowrap;
 }
 .metric-caption {
   padding: 0 6px;

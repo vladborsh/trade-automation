@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { MetricPoint } from '@trade-automation/contracts';
+import type { PanelMetricPoint } from '../contracts/panel-metric-point';
 
 /**
  * Merge a live metric point into an ascending, `time`-sorted series
@@ -9,7 +9,7 @@ import type { MetricPoint } from '@trade-automation/contracts';
  * newer `time` appends. A point older than the last known one is ignored
  * rather than inserted mid-series.
  */
-export function mergePoint(series: readonly MetricPoint[], incoming: MetricPoint): MetricPoint[] {
+export function mergePoint<P extends { time: number }>(series: readonly P[], incoming: P): P[] {
   if (series.length === 0) {
     return [incoming];
   }
@@ -32,7 +32,7 @@ export function mergePoint(series: readonly MetricPoint[], incoming: MetricPoint
  * Prepend an older page of metric-point history for scroll-back pagination.
  * Mirrors `prependHistory` (candles.store.ts).
  */
-export function prependPoints(series: readonly MetricPoint[], older: readonly MetricPoint[]): MetricPoint[] {
+export function prependPoints<P extends { time: number }>(series: readonly P[], older: readonly P[]): P[] {
   if (older.length === 0) {
     return series.slice();
   }
@@ -45,15 +45,16 @@ export function prependPoints(series: readonly MetricPoint[], older: readonly Me
 }
 
 /**
- * MetricPoint[] container for one panel's metric series (architecture/chart-layouts.md
- * §6.2) — not `providedIn: 'root'`; one instance is constructed per `PanelFeed`.
+ * Point container for one panel's metric series (architecture/chart-layouts.md §6.2) — single-venue
+ * `MetricPoint`s or, for an aggregate panel, `AggregateMetricPoint`s (aggregate-oi.md §1) — not
+ * `providedIn: 'root'`; one instance is constructed per `PanelFeed`.
  */
 @Injectable()
 export class MetricPointsStore {
-  private readonly series = signal<MetricPoint[]>([]);
+  private readonly series = signal<PanelMetricPoint[]>([]);
   readonly points = this.series.asReadonly();
 
-  setHistory(points: MetricPoint[]): void {
+  setHistory(points: PanelMetricPoint[]): void {
     this.series.set([...points].sort((a, b) => a.time - b.time));
   }
 
@@ -61,11 +62,11 @@ export class MetricPointsStore {
     this.series.set([]);
   }
 
-  mergeLive(point: MetricPoint): void {
+  mergeLive(point: PanelMetricPoint): void {
     this.series.update((current) => mergePoint(current, point));
   }
 
-  prepend(older: MetricPoint[]): void {
+  prepend(older: PanelMetricPoint[]): void {
     this.series.update((current) => prependPoints(current, older));
   }
 

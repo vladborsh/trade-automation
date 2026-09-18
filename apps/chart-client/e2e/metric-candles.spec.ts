@@ -20,13 +20,14 @@ async function openOnMock(page: Page): Promise<void> {
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 }
 
-test('OI panel: line + caption at 1m, candles at 5m/15m, caption only where §11.2 says, unit USDT', async ({ page }) => {
+test('OI panel: line + caption at 1m, candles at 5m/15m, caption only where §11.2 says, unit USD', async ({ page }) => {
   await openOnMock(page);
   const oi = page.locator('.chart-panel[data-panel-id="btc-oi"]');
   const body = oi.locator('.panel-body');
   const caption = oi.getByTestId('metric-caption');
 
-  await expect(oi.locator('.panel-title')).toHaveText('BTCUSDT · Open interest · USDT', { timeout: 15_000 });
+  // aggregate-oi.md: the mock's OI panel is the 3-venue aggregate (USDT + USDC legs summed as USD).
+  await expect(oi.locator('.panel-title')).toHaveText('BTC perps · 3 venues · Open interest · USD', { timeout: 15_000 });
 
   await page.getByRole('button', { name: '1m', exact: true }).click();
   await expect(body).toHaveAttribute('data-metric-style', 'line');

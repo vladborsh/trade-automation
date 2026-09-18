@@ -19,7 +19,7 @@ export function toCandlestickSeries(candles: readonly Candle[]): CandlestickData
   return candles.map(toCandlestickData);
 }
 
-function metricTime(point: MetricPoint): UTCTimestamp {
+function metricTime(point: Pick<MetricPoint, 'time'>): UTCTimestamp {
   return Math.floor(point.time / 1000) as UTCTimestamp;
 }
 
@@ -29,18 +29,18 @@ function metricTime(point: MetricPoint): UTCTimestamp {
  * line, `notionalOhlc` for candles); a point without a notional is whitespace (`{ time }`) — a
  * gap, never a base-unit number drawn on a USD series.
  */
-export function toMetricLineData(point: MetricPoint): LineData | WhitespaceData {
+export function toMetricLineData(point: Pick<MetricPoint, 'time' | 'notional'>): LineData | WhitespaceData {
   const time = metricTime(point);
   return point.notional === undefined ? { time } : { time, value: point.notional };
 }
 
-export function toMetricCandleData(point: MetricPoint): CandlestickData | WhitespaceData {
+export function toMetricCandleData(point: Pick<MetricPoint, 'time' | 'notionalOhlc'>): CandlestickData | WhitespaceData {
   const time = metricTime(point);
   const ohlc = point.notionalOhlc;
   return ohlc === undefined ? { time } : { time, open: ohlc.open, high: ohlc.high, low: ohlc.low, close: ohlc.close };
 }
 
 /** The value the panel plots as the point's close — what the crosshair follow sits on (§11.2). */
-export function metricPlottedClose(point: MetricPoint | undefined): number | undefined {
+export function metricPlottedClose(point: Pick<MetricPoint, 'notional' | 'notionalOhlc'> | undefined): number | undefined {
   return point?.notionalOhlc?.close ?? point?.notional;
 }

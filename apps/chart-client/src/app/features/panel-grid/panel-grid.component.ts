@@ -123,9 +123,10 @@ export class PanelGridComponent {
   /** The strip's title — the same text as the expanded header (incl. the §11.1 metric unit, once known). */
   titleFor(panel: Panel): string {
     const instrument = this.instruments.instruments().find((i) => i.id === panel.instrument) ?? null;
-    const points = this.feedFor(panel.id)?.points.points() ?? [];
+    const feed = this.feedFor(panel.id);
+    const points = feed?.points.points() ?? [];
     const unit = points.length > 0 ? points[points.length - 1].unit : null;
-    return panelTitle(panel, instrument, unit);
+    return panelTitle(panel, instrument, unit, feed?.aggregate() ?? null);
   }
 
   expand(panelId: string): void {

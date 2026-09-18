@@ -1,6 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import type { Panel } from '@trade-automation/contracts';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { TIMEFRAME_MS, type AggregateMetricPoint, type Panel } from '@trade-automation/contracts';
 import { ChartComponent } from '../chart/chart.component';
+import { ChartSyncService } from '../chart/chart-sync.service';
+import { AggregateHeaderComponent } from '../aggregate/aggregate-header.component';
+import { chipPoint } from '../aggregate/chip-point';
 import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
 import { ConnectionStore } from '../../core/state/connection.store';
 import { InstrumentsStore } from '../../core/state/instruments.store';
@@ -28,7 +31,7 @@ import { panelTitle, plottedMetricUnit } from './panel-title';
 @Component({
   selector: 'app-chart-panel',
   standalone: true,
-  imports: [ChartComponent, ResearchBadgeComponent],
+  imports: [ChartComponent, ResearchBadgeComponent, AggregateHeaderComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chart-panel.component.html',
   styleUrl: './chart-panel.component.scss',
@@ -37,9 +40,28 @@ export class ChartPanelComponent {
   readonly panel = input.required<Panel>();
   readonly feed = input.required<PanelFeed>();
 
+  private readonly sync = inject(ChartSyncService, { optional: true });
+
   readonly title = computed(() =>
-    panelTitle(this.panel(), this.instruments.selected(), plottedMetricUnit(this.feed().points.points())),
+    panelTitle(
+      this.panel(),
+      this.instruments.selected(),
+      plottedMetricUnit(this.feed().points.points()),
+      this.feed().aggregate(),
+    ),
   );
+  /**
+   * architecture/aggregate-oi.md §1 point 3 — the bar the coverage chip describes: under the shared
+   * crosshair (any panel's hover, §6.4 bug 1 channel), else the last bar. Null off aggregate panels.
+   */
+  readonly chipPoint = computed(() => {
+    if (!this.panel().aggregate) {
+      return null;
+    }
+    const points = this.feed().points.points() as AggregateMetricPoint[];
+    const cross = this.sync?.crosshair() ?? null;
+    return chipPoint(points, cross ? cross.timeSec * 1000 : null, TIMEFRAME_MS[this.timeframe.selected()]);
+  });
   /** §11.2 rule 4 — the style `<app-chart>` draws the metric in; exposed as an e2e hook (canvas has no DOM). */
   readonly metricStyle = computed(() => (this.panel().kind === 'metric' ? metricSeriesStyle(this.timeframe.selected()) : null));
   /** §11.2 rule 5 — why the metric panel is a line (1m) or wickless candles (5m); none elsewhere. */

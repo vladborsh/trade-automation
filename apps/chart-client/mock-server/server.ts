@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import type {
+  AggregatePointsResponse,
   Candle,
   HealthResponse,
   IndicatorPoint,
@@ -21,6 +22,7 @@ import { MOCK_LAYOUTS } from './layouts';
 import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
 import { MockCalendarState } from './calendar-state';
 import type { CalendarServerFrame } from './calendar-types';
+import { MOCK_AGGREGATE, MockAggregateOi } from './aggregate-oi';
 
 const PORT = Number(process.env.MOCK_SERVER_PORT ?? 4300);
 const BAR_MS = Number(process.env.MOCK_BAR_MS ?? 2000);
@@ -31,6 +33,9 @@ const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 const state = new MockMarketState(BAR_MS);
 const calendarNotificationIntervalMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_INTERVAL_MS ?? 180_000);
 const calendarNotificationFirstDelayMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_FIRST_DELAY_MS ?? 20_000);
+// architecture/aggregate-oi.md — the scripted 3-venue OI scenario; one live poll round per tick.
+const AGGREGATE_TICK_MS = Number(process.env.MOCK_AGGREGATE_TICK_MS ?? 5000);
+const aggregateOi = new MockAggregateOi(Date.now());
 const calendarState = new MockCalendarState(Date.now(), calendarNotificationIntervalMs, calendarNotificationFirstDelayMs);
 
 function setCors(res: ServerResponse): void {
@@ -216,6 +221,30 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     return;
   }
 
+  if (url.pathname === '/api/metric-aggregates') {
+    sendJson(res, 200, [MOCK_AGGREGATE]);
+    return;
+  }
+
+  if (url.pathname === '/api/metric-aggregates/points') {
+    const aggregate = url.searchParams.get('aggregate');
+    const timeframe = url.searchParams.get('timeframe') as Timeframe | null;
+    const from = parseNumber(url.searchParams.get('from'));
+    const to = parseNumber(url.searchParams.get('to'));
+    if (!timeframe || !TIMEFRAMES.includes(timeframe) || from === undefined || to === undefined) {
+      sendJson(res, 400, { error: 'aggregate, a valid timeframe, from and to are required' });
+      return;
+    }
+    if (aggregate !== MOCK_AGGREGATE.id) {
+      sendJson(res, 404, { error: `unknown aggregate ${aggregate}` });
+      return;
+    }
+    const limit = Math.min(parseNumber(url.searchParams.get('limit')) ?? 1500, 5000);
+    const body: AggregatePointsResponse = { aggregate: MOCK_AGGREGATE, points: aggregateOi.points(timeframe, from, to, limit) };
+    sendJson(res, 200, body);
+    return;
+  }
+
   if (url.pathname === '/api/health') {
     sendJson(res, 200, healthResponse());
     return;
@@ -255,6 +284,12 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
   sendJson(res, 404, { error: 'not found' });
 }
 
+const aggregateListeners = new Set<(now: number) => void>();
+function onAggregateTick(listener: (now: number) => void): () => void {
+  aggregateListeners.add(listener);
+  return () => aggregateListeners.delete(listener);
+}
+
 const httpServer = createServer(handleRequest);
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
@@ -272,11 +307,12 @@ interface ClientSubscriptions {
   candles: Set<string>; // `${instrument}:${timeframe}`
   signals: Set<InstrumentId>;
   metrics: Map<string, MetricTopicKey>; // `${instrument}:${metric}:${timeframe}` -> key
+  metricAggregates: Set<Timeframe>; // timeframes subscribed for the one mock aggregate
   calendar: boolean;
 }
 
 wss.on('connection', (socket: WebSocket) => {
-  const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set(), metrics: new Map(), calendar: false };
+  const subscriptions: ClientSubscriptions = { candles: new Set(), signals: new Set(), metrics: new Map(), metricAggregates: new Set(), calendar: false };
   const lastFormingSentAt = new Map<string, number>();
 
   const send = (frame: WsServerMessage | CalendarServerFrame): void => {
@@ -330,6 +366,16 @@ wss.on('connection', (socket: WebSocket) => {
       const point = state.formingMetricPoint(observation, key.timeframe);
       if (point) {
         send({ type: 'metric', point });
+      }
+    }
+  });
+
+  /** architecture/aggregate-oi.md §5 — the forming aggregate bucket per subscribed timeframe, every poll round. */
+  const unsubscribeAggregates = onAggregateTick((now) => {
+    for (const timeframe of subscriptions.metricAggregates) {
+      const point = aggregateOi.formingPoint(timeframe, now);
+      if (point) {
+        send({ type: 'metricAggregate', point });
       }
     }
   });
@@ -390,6 +436,14 @@ wss.on('connection', (socket: WebSocket) => {
       subscriptions.metrics.delete(metricTopicId({ instrument: frame.instrument, metric: frame.metric, timeframe: frame.timeframe }));
       return;
     }
+    if (frame.type === 'subscribe' && frame.topic === 'metricAggregates') {
+      if (frame.aggregate === MOCK_AGGREGATE.id) subscriptions.metricAggregates.add(frame.timeframe);
+      return;
+    }
+    if (frame.type === 'unsubscribe' && frame.topic === 'metricAggregates') {
+      subscriptions.metricAggregates.delete(frame.timeframe);
+      return;
+    }
     if (frame.type === 'subscribe' && frame.topic === 'calendar') {
       subscriptions.calendar = true;
       return;
@@ -404,6 +458,7 @@ wss.on('connection', (socket: WebSocket) => {
     unsubscribeSignals();
     unsubscribeIndicators();
     unsubscribeMetrics();
+    unsubscribeAggregates();
     unsubscribeCalendarEvents();
     unsubscribeCalendarNotifications();
   });
@@ -411,6 +466,11 @@ wss.on('connection', (socket: WebSocket) => {
 
 state.start();
 calendarState.start();
+setInterval(() => {
+  const now = Date.now();
+  aggregateOi.tick(now);
+  for (const listener of aggregateListeners) listener(now);
+}, AGGREGATE_TICK_MS);
 
 httpServer.listen(PORT, () => {
   console.log(`[mock-server] listening on http://localhost:${PORT} (REST) and ws://localhost:${PORT}/ws (WS)`);

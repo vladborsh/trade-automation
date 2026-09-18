@@ -24,3 +24,5 @@ export type WsIndicatorFrame = Extract<WsServerMessage, { type: 'indicator' }>;
 export type WsMetricFrame = Extract<WsServerMessage, { type: 'metric' }>;
 export type WsStatusFrame = Extract<WsServerMessage, { type: 'status' }>;
 export type WsPongFrame = Extract<WsServerMessage, { type: 'pong' }>;
+/** architecture/aggregate-oi.md §5 — the forming aggregate bucket frame (`metricAggregates` topic). */
+export type WsMetricAggregateFrame = Extract<WsServerMessage, { type: 'metricAggregate' }>;

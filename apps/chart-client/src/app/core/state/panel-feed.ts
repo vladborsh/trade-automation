@@ -1,4 +1,6 @@
-import { TIMEFRAME_MS, type Panel, type Timeframe } from '@trade-automation/contracts';
+import { signal } from '@angular/core';
+import { TIMEFRAME_MS, type MetricAggregate, type Panel, type Timeframe } from '@trade-automation/contracts';
+import type { PanelMetricPoint } from '../contracts/panel-metric-point';
 import { RestClient } from '../api/rest.client';
 import { LiveSocket } from '../api/live.socket';
 import { CandlesStore } from './candles.store';
@@ -54,6 +56,11 @@ export class PanelFeed {
   readonly points = new MetricPointsStore();
   readonly signals = new SignalsStore();
   readonly indicators = new IndicatorsStore();
+  /**
+   * architecture/aggregate-oi.md §1 — for a panel with `aggregate`: the definition in force (members,
+   * counting convention), taken from the points envelope. Null for every other panel.
+   */
+  readonly aggregate = signal<MetricAggregate | null>(null);
 
   private frameSubscriptions: Array<{ unsubscribe: () => void }> = [];
   // `ChartComponent.subscribeVisibleLogicalRangeChange` fires `loadOlderRequested` on every
@@ -89,11 +96,7 @@ export class PanelFeed {
           .then((history) => this.candles.setHistory(history)),
       );
     } else {
-      fetches.push(
-        rest
-          .getMetrics(instrument, this.panel.metric!, this.timeframe, historyFrom, nowMs, HISTORY_LIMIT)
-          .then((history) => this.points.setHistory(history)),
-      );
+      fetches.push(this.fetchMetricPage(historyFrom, nowMs, HISTORY_LIMIT).then((history) => this.points.setHistory(history)));
     }
 
     if (this.panel.signals) {
@@ -113,6 +116,13 @@ export class PanelFeed {
       socket.subscribeCandles(instrument, this.timeframe);
       this.frameSubscriptions.push(
         socket.candlesFor(instrument, this.timeframe).subscribe((frame) => this.candles.mergeLive(frame.candle)),
+      );
+    } else if (this.panel.aggregate) {
+      socket.subscribeMetricAggregates(this.panel.aggregate, this.timeframe);
+      this.frameSubscriptions.push(
+        socket
+          .metricAggregatesFor(this.panel.aggregate, this.timeframe)
+          .subscribe((frame) => this.points.mergeLive(frame.point)),
       );
     } else {
       socket.subscribeMetrics(instrument, this.panel.metric!, this.timeframe);
@@ -140,6 +150,8 @@ export class PanelFeed {
 
     if (this.panel.kind === 'candles') {
       socket.unsubscribeCandles(instrument, this.timeframe);
+    } else if (this.panel.aggregate) {
+      socket.unsubscribeMetricAggregates(this.panel.aggregate, this.timeframe);
     } else {
       socket.unsubscribeMetrics(instrument, this.panel.metric!, this.timeframe);
     }
@@ -195,7 +207,7 @@ export class PanelFeed {
         }
         for (let hop = 0; hop < MAX_EMPTY_GAP_HOPS; hop++) {
           const from = boundedFrom(to, this.timeframe, PAGE_LIMIT);
-          const older = await rest.getMetrics(instrument, this.panel.metric!, this.timeframe, from, to, PAGE_LIMIT);
+          const older = await this.fetchMetricPage(from, to, PAGE_LIMIT);
           if (older.length > 0) {
             this.points.prepend(older);
             return;
@@ -233,17 +245,25 @@ export class PanelFeed {
       }
     } else {
       const lastKnown = this.points.lastTime();
-      const fresh = await rest.getMetrics(
-        instrument,
-        this.panel.metric!,
-        this.timeframe,
-        lastKnown ?? boundedFrom(nowMs, this.timeframe, HISTORY_LIMIT),
-        nowMs,
-        HISTORY_LIMIT,
-      );
+      const fresh = await this.fetchMetricPage(lastKnown ?? boundedFrom(nowMs, this.timeframe, HISTORY_LIMIT), nowMs, HISTORY_LIMIT);
       for (const point of fresh) {
         this.points.mergeLive(point);
       }
     }
+  }
+
+  /**
+   * One page of this metric panel's series — the only place the single-venue and the aggregate
+   * (architecture/aggregate-oi.md §5) panels differ on the REST side, so start/loadOlder/heal share
+   * one pagination and heal path. The aggregate envelope also refreshes the definition in force.
+   */
+  private async fetchMetricPage(from: number, to: number, limit: number): Promise<PanelMetricPoint[]> {
+    const { rest } = this.deps;
+    if (!this.panel.aggregate) {
+      return rest.getMetrics(this.panel.instrument, this.panel.metric!, this.timeframe, from, to, limit);
+    }
+    const page = await rest.getMetricAggregatePoints(this.panel.aggregate, this.timeframe, from, to, limit);
+    this.aggregate.set(page.aggregate);
+    return page.points;
   }
 }

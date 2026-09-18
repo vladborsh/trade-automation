@@ -1,10 +1,12 @@
 import { Injectable } from '@angular/core';
 import { AppConfigService } from '../config/app-config.service';
 import type {
+  AggregatePointsResponse,
   Candle,
   IndicatorPoint,
   InstrumentId,
   Layout,
+  MetricAggregatesResponse,
   MetricKind,
   MetricPoint,
   Signal,
@@ -84,6 +86,22 @@ export class RestClient {
     limit = 1500,
   ): Promise<MetricPoint[]> {
     return this.getJson<MetricPoint[]>('/metrics', { instrument, metric, timeframe, from, to, limit });
+  }
+
+  /** architecture/aggregate-oi.md §5 — `GET /api/metric-aggregates` (definitions). */
+  getMetricAggregates(): Promise<MetricAggregatesResponse> {
+    return this.getJson<MetricAggregatesResponse>('/metric-aggregates');
+  }
+
+  /** architecture/aggregate-oi.md §5 — the envelope carries the definition (members, convention) in force. */
+  getMetricAggregatePoints(
+    aggregate: string,
+    timeframe: Timeframe,
+    from: number,
+    to: number,
+    limit = 1500,
+  ): Promise<AggregatePointsResponse> {
+    return this.getJson<AggregatePointsResponse>('/metric-aggregates/points', { aggregate, timeframe, from, to, limit });
   }
 
   /** §6.1 `GET /api/calendar/week?at?` — the ET Sun–Sat window containing `at` (default now). */

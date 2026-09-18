@@ -1,0 +1,10 @@
+@if (badge(); as b) {
+  <span class="convention-badge" data-testid="convention-badge" [title]="b.tooltip">{{ b.text }}</span>
+}
+<div class="chip-row">
+  @if (chip(); as c) {
+    <span class="coverage-chip" data-testid="coverage-chip" [class.partial]="!c.complete" [title]="c.tooltip">{{ c.text }}</span>
+  } @else {
+    <span class="coverage-chip partial" data-testid="coverage-chip" title="Нет бара в этой точке">—</span>
+  }
+</div>
