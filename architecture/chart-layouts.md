@@ -840,6 +840,19 @@ notional **only where the venue gives none** — the live tip.
   same poll (+1 request weight per instrument per minute — ≈0.04 % of the 2400/min budget;
   not a new loop, it rides the existing 60 s poll). Either way the step must be < 10 % of
   the median 5 m move; record the numbers in the adapter header comment and the PR.
+- **Measured 2026-09-18 (SE-A2, 7 925 BTCUSDT history rows) — and the decision taken on
+  it.** `sumOpenInterestValue` is **exactly OI × 1 m mark price** (median |Δ| 0.00 bps).
+  Against last-trade close: median 0.14 bps, p99 3.67 bps. The rule above would keep
+  last-trade (median ≤ 2 bps), and the *median* join step is only 2.4 % of the median
+  |5 m ΔOI_usd| ($4.89 m) — but the **p90 step is 23 % and p99 62 %**, i.e. a visible
+  notch at the join one time in ten. The rule's intent ("the step must be < 10 % of the
+  move") is not met in the tail, so the architect overrides the median-only test: **the tip
+  uses mark price**, from `/fapi/v1/premiumIndex` (`markPrice`, `time`) fetched in the
+  same 60 s poll (+1 weight per instrument per minute), accepted only if its `time` is
+  within 120 s of the snapshot. Same basis as the venue → no step by construction. The
+  closed-1 m-candle price is dropped. The legacy-row repair uses 1 m mark-price klines
+  (`/fapi/v1/markPriceKlines`, ≤ 1 500 rows per call, one pass per boot over rows still
+  lacking notional, paced — ≈30 calls for a full 30 d window).
 - **Legacy tip rows.** While the server has been running, the store has accumulated 1 m
   snapshots with no notional (the backfill only ever runs forward from the latest stored
   row at boot, so those stretches have no history rows either). A boot-time, idempotent
