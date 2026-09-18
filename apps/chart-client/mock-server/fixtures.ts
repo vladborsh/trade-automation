@@ -224,7 +224,7 @@ export function seedOpenInterestObservations(instrument: InstrumentId, history: 
   for (const candle of history) {
     const drift = (rng() - 0.5) * startValue * 0.002;
     value = Math.max(0, value + drift);
-    observations.push({ metric: 'openInterest', instrument, time: candle.openTime, value });
+    observations.push({ metric: 'openInterest', instrument, time: candle.openTime, value, unit: 'base' });
   }
   return observations;
 }
@@ -238,7 +238,7 @@ export function advanceOpenInterestObservation(
   const startValue = STARTING_OPEN_INTEREST[instrument] ?? previous.value;
   const rng = mulberry32(time + seedFor(instrument) + 1);
   const drift = (rng() - 0.5) * startValue * 0.002;
-  return { metric: 'openInterest', instrument, time, value: Math.max(0, previous.value + drift) };
+  return { metric: 'openInterest', instrument, time, value: Math.max(0, previous.value + drift), unit: 'base' };
 }
 
 const TIMEFRAME_MINUTES: Record<Timeframe, number> = {

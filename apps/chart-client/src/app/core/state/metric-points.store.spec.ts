@@ -2,7 +2,7 @@ import { mergePoint, prependPoints, MetricPointsStore } from './metric-points.st
 import type { MetricPoint } from '@trade-automation/contracts';
 
 function point(time: number, value: number): MetricPoint {
-  return { metric: 'openInterest', instrument: 'binance:BTCUSDT', timeframe: '1m', time, value };
+  return { metric: 'openInterest', instrument: 'binance:BTCUSDT', timeframe: '1m', time, value, unit: 'base' };
 }
 
 describe('mergePoint', () => {
