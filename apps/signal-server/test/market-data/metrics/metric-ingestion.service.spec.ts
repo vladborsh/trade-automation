@@ -1,9 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Candle, Instrument, MetricObservation } from '@trade-automation/contracts';
+import { Instrument, MetricObservation } from '@trade-automation/contracts';
 import { MetricIngestionService } from '../../../src/market-data/metrics/metric-ingestion.service';
 import { MetricCache } from '../../../src/market-data/metrics/metric-cache.service';
-import { CandleCache } from '../../../src/market-data/candle-cache.service';
 import * as metricAdaptersProvider from '../../../src/market-data/metric-adapters.provider';
 
 jest.mock('../../../src/market-data/metric-adapters.provider');
@@ -37,6 +36,9 @@ function fakeConfig(overrides: { pollIntervalMs?: number } = {}) {
     },
   } as never;
 }
+
+/** The bar-clock subscriber fires `maybePoll` without awaiting it; let the poll settle. */
+const flushPoll = () => new Promise((resolve) => setImmediate(resolve));
 
 function fakeAppMetrics() {
   return {
@@ -114,8 +116,6 @@ describe('MetricIngestionService boot order', () => {
       barClock,
       fakeAppMetrics(),
       store as never,
-      new CandleCache(),
-      { query: jest.fn(async () => []) } as never,
     );
 
     await service.onApplicationBootstrap();
@@ -164,13 +164,12 @@ describe('MetricIngestionService boot order', () => {
       barClock,
       fakeAppMetrics(),
       store as never,
-      new CandleCache(),
-      { query: jest.fn(async () => []) } as never,
     );
     await service.onApplicationBootstrap();
     expect(tickCb).toBeDefined();
 
     await tickCb!();
+    await flushPoll();
     expect(adapter.fetchLatest).toHaveBeenCalledTimes(1);
     expect(observed).toEqual([latest]);
 
@@ -192,8 +191,6 @@ describe('MetricIngestionService boot order', () => {
       barClock,
       fakeAppMetrics(),
       store as never,
-      new CandleCache(),
-      { query: jest.fn(async () => []) } as never,
     );
 
     await service.onApplicationBootstrap();
@@ -262,8 +259,6 @@ describe('MetricIngestionService boot order', () => {
       barClock,
       fakeAppMetrics(),
       store as never,
-      new CandleCache(),
-      { query: jest.fn(async () => []) } as never,
     );
 
     await service.onApplicationBootstrap();
@@ -293,25 +288,10 @@ describe('MetricIngestionService boot order', () => {
   });
 });
 
-/** architecture/chart-layouts.md §11.1 "The live tip" + "Legacy tip rows". */
+/** architecture/chart-layouts.md §11.1 "The live tip" + "Legacy tip rows" — mark price. */
 describe('MetricIngestionService derived tip notional', () => {
   const MIN = 60_000;
   const T = 1_800_000_000_000 - (1_800_000_000_000 % MIN);
-
-  function bar(openTime: number, close: number): Candle {
-    return {
-      instrument: instrument.id,
-      timeframe: '1m',
-      openTime,
-      open: close,
-      high: close,
-      low: close,
-      close,
-      volume: 1,
-      closed: true,
-      source: 'venue-stream',
-    };
-  }
 
   function snapshot(time: number, value: number): MetricObservation {
     return { metric: 'openInterest', instrument: instrument.id, time, value, unit: 'base' };
@@ -326,8 +306,8 @@ describe('MetricIngestionService derived tip notional', () => {
   });
 
   async function bootPolling(opts: {
-    candles: CandleCache;
     latest: () => MetricObservation;
+    tipPrice: () => Promise<{ time: number; price: number }>;
     appMetrics?: ReturnType<typeof fakeAppMetrics>;
   }) {
     let now = T;
@@ -337,6 +317,7 @@ describe('MetricIngestionService derived tip notional', () => {
       supports: ['openInterest'] as const,
       fetchObservations: jest.fn(async () => []),
       fetchLatest: jest.fn(async () => opts.latest()),
+      fetchTipPrice: jest.fn(opts.tipPrice),
     };
     (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['binance', adapter]]));
     let tickCb: (() => Promise<void>) | undefined;
@@ -347,54 +328,51 @@ describe('MetricIngestionService derived tip notional', () => {
     const observed: MetricObservation[] = [];
     events.on('market-data.metric.observed', (e: { observation: MetricObservation }) => observed.push(e.observation));
     const written: MetricObservation[] = [];
+    const cache = new MetricCache();
     const service = new MetricIngestionService(
       fakeConfig(),
-      new MetricCache(),
+      cache,
       events,
       { add: jest.fn(async (o: MetricObservation) => void written.push(o)) } as never,
       barClock,
       opts.appMetrics ?? fakeAppMetrics(),
       { latestTime: jest.fn(async () => T), query: jest.fn(async () => []), upsert: jest.fn() } as never,
-      opts.candles,
-      { query: jest.fn(async () => []) } as never,
     );
     await service.onApplicationBootstrap();
     const tick = async () => {
       now += MIN;
       await tickCb!();
+      await flushPoll();
     };
-    return { tick, observed, written };
+    return { tick, observed, written, cache, adapter };
   }
 
-  it('derives notional from the just-closed 1m candle, basis "derived", on the stored and emitted observation', async () => {
-    const candles = new CandleCache();
-    candles.upsert(bar(T - MIN, 50_000));
-    candles.upsert(bar(T, 50_100)); // closes at T + 1 min, before the snapshot below
-    const { tick, observed, written } = await bootPolling({
-      candles,
+  it('mark price accepted: notional = value × markPrice, basis "derived", on the stored and emitted observation', async () => {
+    const { tick, observed, written, adapter } = await bootPolling({
       latest: () => snapshot(T + MIN + 2_000, 100),
+      tipPrice: async () => ({ time: T + MIN + 2_100, price: 50_100 }),
     });
 
     await tick();
 
     const expected = { ...snapshot(T + MIN + 2_000, 100), notional: 5_010_000, notionalBasis: 'derived' };
+    expect(adapter.fetchTipPrice).toHaveBeenCalledTimes(1); // same poll, one request
     expect(observed).toEqual([expected]);
     expect(written).toEqual([expected]);
   });
 
-  it('stores no notional when the latest closed candle is older than 120 s, counts it, and warns once per streak', async () => {
-    const candles = new CandleCache();
-    candles.upsert(bar(T - 3 * MIN, 50_000)); // closes at T − 2 min
+  it('mark price stale (> 120 s from the snapshot): no notional, counted, one warn per streak', async () => {
     const appMetrics = fakeAppMetrics() as unknown as { metricNotionalMissingTotal: { inc: jest.Mock } };
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     let snapTime = T + MIN;
+    let priceTime = T - 2 * MIN; // 3 min before the snapshot
     const { tick, observed } = await bootPolling({
-      candles,
       latest: () => snapshot(snapTime, 100),
+      tipPrice: async () => ({ time: priceTime, price: 50_000 }),
       appMetrics: appMetrics as never,
     });
 
-    await tick(); // snapshot at T + 1 min: bar closed 3 min before → stale
+    await tick();
     snapTime += MIN;
     await tick(); // still stale
     expect(observed.map((o) => o.notional)).toEqual([undefined, undefined]);
@@ -406,33 +384,61 @@ describe('MetricIngestionService derived tip notional', () => {
     });
     expect(warn).toHaveBeenCalledTimes(1);
 
-    // Price returns → notional again; a later outage is a new streak with a new warn.
-    candles.upsert(bar(snapTime, 51_000));
+    // Fresh price → notional again; a later outage is a new streak with a new warn.
     snapTime += MIN;
+    priceTime = snapTime;
     await tick();
-    expect(observed[2].notional).toBe(5_100_000);
-    snapTime += 10 * MIN;
+    expect(observed[2].notional).toBe(5_000_000);
+    snapTime += MIN;
+    priceTime = snapTime - 10 * MIN;
     await tick();
     expect(observed[3].notional).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(2);
   });
 
-  it('repairs stored snapshots without notional from CandleCache, then CandleStore; idempotent; no events', async () => {
+  it('premiumIndex failure: OI snapshot still stored and emitted, without notional, and counted', async () => {
+    const appMetrics = fakeAppMetrics() as unknown as {
+      metricNotionalMissingTotal: { inc: jest.Mock };
+      metricPollErrorsTotal: { inc: jest.Mock };
+    };
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { tick, observed, written, cache } = await bootPolling({
+      latest: () => snapshot(T + MIN + 2_000, 100),
+      tipPrice: async () => {
+        throw new Error('Binance premiumIndex request failed: 503 Service Unavailable');
+      },
+      appMetrics: appMetrics as never,
+    });
+
+    await tick();
+
+    expect(observed).toEqual([snapshot(T + MIN + 2_000, 100)]);
+    expect(written).toEqual([snapshot(T + MIN + 2_000, 100)]);
+    expect(cache.latest(instrument.id, 'openInterest')).toEqual(snapshot(T + MIN + 2_000, 100));
+    expect(appMetrics.metricNotionalMissingTotal.inc).toHaveBeenCalledTimes(1);
+    expect(appMetrics.metricPollErrorsTotal.inc).not.toHaveBeenCalled();
+  });
+
+  it('repairs stored snapshots without notional from mark-price history once per boot; idempotent; no events', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(T + 60 * MIN);
     const history: MetricObservation = { ...snapshot(T - 300 * MIN, 90), notional: 4_500_000, notionalBasis: 'venue' };
-    const oldTip = snapshot(T - 200 * MIN + 1_500, 95); // only CandleStore reaches here
-    const recentTip = snapshot(T + 1_500, 100); // CandleCache has it
-    const orphanTip = snapshot(T + 30 * MIN + 1_500, 101); // no qualifying candle anywhere
+    const oldTip = snapshot(T - 200 * MIN + 1_500, 95);
+    const recentTip = snapshot(T + 1_500, 100);
+    const orphanTip = snapshot(T + 30 * MIN + 1_500, 101); // no mark bar within 120 s
     const stored = [history, oldTip, recentTip, orphanTip];
 
-    const candles = new CandleCache();
-    candles.upsert(bar(T - MIN, 50_000));
-    const candleStore = { query: jest.fn(async () => [bar(T - 201 * MIN, 49_000)]) };
+    const fetchTipPriceHistory = jest.fn(async () => [
+      { time: T - 200 * MIN, price: 49_000 },
+      { time: T, price: 50_000 },
+      { time: T + 20 * MIN, price: 50_500 },
+    ]);
     const adapter = {
       venue: 'binance' as const,
       supports: ['openInterest'] as const,
       fetchObservations: jest.fn(async () => []),
       fetchLatest: jest.fn(),
+      fetchTipPrice: jest.fn(),
+      fetchTipPriceHistory,
     };
     (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['binance', adapter]]));
     const events = new EventEmitter2();
@@ -448,23 +454,22 @@ describe('MetricIngestionService derived tip notional', () => {
       { tick$: { subscribe: jest.fn(() => ({ unsubscribe: () => undefined })) } } as never,
       fakeAppMetrics(),
       { latestTime: jest.fn(async () => T + 60 * MIN), query: jest.fn(async () => stored), upsert: jest.fn() } as never,
-      candles,
-      candleStore as never,
     );
     await service.onApplicationBootstrap();
     await service.deepenHistoryAsync();
 
+    // Only rows lacking notional are asked about — never the venue history row.
+    expect(fetchTipPriceHistory).toHaveBeenCalledWith(instrument, [oldTip.time, recentTip.time, orphanTip.time]);
     const repairedOld = { ...oldTip, notional: 95 * 49_000, notionalBasis: 'derived' };
     const repairedRecent = { ...recentTip, notional: 100 * 50_000, notionalBasis: 'derived' };
-    expect(written).toEqual(expect.arrayContaining([repairedOld, repairedRecent]));
-    expect(written).toHaveLength(2);
-    expect(candleStore.query).toHaveBeenCalledTimes(1);
+    expect(written).toEqual([repairedOld, repairedRecent]);
     expect(cache.window(instrument.id, 'openInterest')).toEqual([history, repairedOld, repairedRecent, orphanTip]);
     expect(emitted).not.toHaveBeenCalled();
 
-    // Second pass over the repaired cache: only the orphan is still a candidate, and stays as is.
+    // A second pass only re-asks about the orphan, and leaves it as is.
     written.length = 0;
     await service.deepenHistoryAsync();
+    expect(fetchTipPriceHistory).toHaveBeenLastCalledWith(instrument, [orphanTip.time]);
     expect(written).toEqual([]);
     expect(cache.window(instrument.id, 'openInterest')[3]).toEqual(orphanTip);
   });
