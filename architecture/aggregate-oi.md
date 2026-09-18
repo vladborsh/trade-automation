@@ -351,6 +351,14 @@ cut from `architect-aggregate-oi` @ `11ba97d`):
 | SE-AG4 | `se-oi-aggregate-client` | `task_dd69283b098d` |
 | SE-AG5 | `se-oi-binance-deep` | `task_2930fcb0a72d` |
 
+**Integration (done 2026-09-18):** `se-oi-aggregate-integration` @ `74ebe75` = this branch + AG3 +
+AG1 + AG2 + AG5 + AG4, plus two follow-ups: Phase 1 warm-up capped at the last 24 h for every
+venue (older → Phase 2, so no crawl on the boot path), and the pre-existing poll-gate bug fixed
+(`maybePoll` skipped a 60 s tick arriving a few ms early → every pair polled every ~2 min; now a 5 s
+tolerance). Contracts 72, server 314 + 1 skipped, client 245, Playwright 7/7. Live boot (scratch data
+dir): health in 5.8 s; Hyperliquid polls 59–60 s apart; forming 5 m bar 3/3 ≈ USD 14.5 B within ~70 s
+of the slot opening. **Merge this one branch to master**; the per-task branches are its inputs.
+
 Every task: read `AGENTS.md`; own ports; `libs/contracts` built before the client; server
 `npm test` and client `npx ng test --watch=false` green with counts; `worker_done` with branch.
 
