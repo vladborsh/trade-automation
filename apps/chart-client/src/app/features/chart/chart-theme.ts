@@ -1,4 +1,5 @@
 import { ColorType, type CandlestickSeriesPartialOptions, type DeepPartial, type ChartOptions } from 'lightweight-charts';
+import { nyTickMarkFormatter, nyTimeFormatter } from './ny-time';
 
 /**
  * The single source of chart colours (architecture/chart-layouts.md §12.1, AGENTS.md rule 4).
@@ -28,7 +29,9 @@ export const CHART_OPTIONS: DeepPartial<ChartOptions> = {
     vertLines: { visible: false },
     horzLines: { visible: false },
   },
-  timeScale: { timeVisible: true, secondsVisible: false, borderColor: CHART_PALETTE.border },
+  // §12.2: axis and crosshair show New York wall-clock; the data stays real UTC.
+  localization: { timeFormatter: nyTimeFormatter },
+  timeScale: { timeVisible: true, secondsVisible: false, borderColor: CHART_PALETTE.border, tickMarkFormatter: nyTickMarkFormatter() },
   rightPriceScale: { borderColor: CHART_PALETTE.border },
   crosshair: { mode: 0 },
   autoSize: true,
