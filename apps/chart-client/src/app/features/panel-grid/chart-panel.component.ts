@@ -7,8 +7,12 @@ import { InstrumentsStore } from '../../core/state/instruments.store';
 import { StrategiesStore } from '../../core/state/strategies.store';
 import { TimeframeStore } from '../../core/state/timeframe.store';
 import { LayoutFeedService } from '../../core/state/layout-feed.service';
+import { LayoutsStore } from '../../core/state/layouts.store';
+import { CollapsedPanelsStore } from '../../core/state/collapsed-panels.store';
 import type { PanelFeed } from '../../core/state/panel-feed';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
+import { metricSeriesCaption, metricSeriesStyle } from '../chart/metric-series-style';
+import { panelTitle, plottedMetricUnit } from './panel-title';
 
 /**
  * architecture/chart-layouts.md §6.1 — one panel: header (title, venue
@@ -26,90 +30,31 @@ import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
   standalone: true,
   imports: [ChartComponent, ResearchBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="chart-panel" [attr.data-panel-id]="panel().id">
-      <div class="panel-header">
-        <span class="panel-title">{{ title() }}</span>
-        <span class="venue-dot" [class]="'venue-' + venueStatus()"></span>
-        <app-research-badge />
-      </div>
-      <div class="panel-body">
-        <app-chart
-          [panelId]="panel().id"
-          [kind]="panel().kind"
-          [candles]="feed().candles.candles()"
-          [points]="feed().points.points()"
-          [overlays]="overlays()"
-          [indicatorPoints]="feed().indicators.points()"
-          [indicatorSpecs]="strategies.indicatorSpecs()"
-          [timeframe]="timeframe.selected()"
-          (loadOlderRequested)="onLoadOlder()"
-        />
-      </div>
-    </div>
-  `,
-  styles: [
-    `
-      :host {
-        display: block;
-        height: 100%;
-        width: 100%;
-        min-height: 0;
-        min-width: 0;
-      }
-      .chart-panel {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        width: 100%;
-        min-width: 0;
-        border: 1px solid #30363d;
-      }
-      .panel-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 8px;
-        border-bottom: 1px solid #30363d;
-        font-size: 12px;
-        color: #c9d1d9;
-      }
-      .panel-title {
-        font-weight: 600;
-      }
-      .venue-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #787b86;
-      }
-      .venue-up {
-        background: #26a69a;
-      }
-      .venue-degraded {
-        background: #d29922;
-      }
-      .venue-down,
-      .venue-closed {
-        background: #ef5350;
-      }
-      .panel-body {
-        flex: 1;
-        min-height: 0;
-        min-width: 0;
-      }
-    `,
-  ],
+  templateUrl: './chart-panel.component.html',
+  styleUrl: './chart-panel.component.scss',
 })
 export class ChartPanelComponent {
   readonly panel = input.required<Panel>();
   readonly feed = input.required<PanelFeed>();
 
-  readonly title = computed(() => this.panel().title ?? this.instruments.selected()?.displayName ?? this.panel().instrument);
+  readonly title = computed(() =>
+    panelTitle(this.panel(), this.instruments.selected(), plottedMetricUnit(this.feed().points.points())),
+  );
+  /** §11.2 rule 4 — the style `<app-chart>` draws the metric in; exposed as an e2e hook (canvas has no DOM). */
+  readonly metricStyle = computed(() => (this.panel().kind === 'metric' ? metricSeriesStyle(this.timeframe.selected()) : null));
+  /** §11.2 rule 5 — why the metric panel is a line (1m) or wickless candles (5m); none elsewhere. */
+  readonly caption = computed(() =>
+    this.panel().kind === 'metric' ? metricSeriesCaption(this.timeframe.selected()) : null,
+  );
   readonly venueStatus = computed(() => this.connection.statusFor(this.panel().instrument)?.venueStatus ?? 'down');
   readonly overlays = computed(() =>
     this.panel().kind === 'candles' ? signalsToOverlays(this.feed().signals.signals()) : [],
   );
+  /** §11.3: the last expanded panel's collapse button is disabled. */
+  readonly canCollapse = computed(() => {
+    const layout = this.layouts.active();
+    return layout ? this.collapsed.canCollapse(layout, this.panel().id) : false;
+  });
 
   constructor(
     readonly strategies: StrategiesStore,
@@ -117,7 +62,16 @@ export class ChartPanelComponent {
     private readonly connection: ConnectionStore,
     private readonly instruments: InstrumentsStore,
     private readonly layoutFeed: LayoutFeedService,
+    private readonly layouts: LayoutsStore,
+    private readonly collapsed: CollapsedPanelsStore,
   ) {}
+
+  collapse(): void {
+    const layout = this.layouts.active();
+    if (layout) {
+      this.collapsed.collapse(layout, this.panel().id);
+    }
+  }
 
   onLoadOlder(): void {
     void this.layoutFeed.loadOlder(this.panel().id);

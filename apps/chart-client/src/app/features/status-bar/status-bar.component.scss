@@ -1,0 +1,42 @@
+.status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 4px 12px;
+  background: #0d1117;
+  border-top: 1px solid #30363d;
+  font-size: 11px;
+  color: #8b949e;
+}
+.instrument-status {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.conn-live {
+  color: #26a69a;
+}
+.conn-connecting,
+.conn-reconnecting {
+  color: #d29922;
+}
+.conn-offline {
+  color: #ef5350;
+}
+.venue-up {
+  color: #26a69a;
+}
+.venue-degraded {
+  color: #d29922;
+}
+.venue-down,
+.venue-closed {
+  color: #ef5350;
+}
+.strategies {
+  color: #8b949e;
+}
+.next-event {
+  margin-left: auto;
+  color: #58a6ff;
+}

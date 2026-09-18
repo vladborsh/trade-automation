@@ -40,64 +40,8 @@ import { CalendarWeekComponent } from '../calendar/calendar-week.component';
     CalendarWeekComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="terminal">
-      <div class="top-bar">
-        <app-view-switcher />
-        <app-layout-switcher />
-        <app-timeframe-picker />
-        <app-notification-bell class="bell-slot" />
-      </div>
-      <div class="body">
-        <div class="panel-view" [hidden]="view.activeView() !== 'charts'">
-          <app-panel-grid />
-        </div>
-        @if (view.activeView() === 'calendar') {
-          <app-calendar-week />
-        }
-      </div>
-      <app-status-bar />
-      <app-toast-host />
-    </div>
-  `,
-  styles: [
-    `
-      :host {
-        display: block;
-        height: 100vh;
-        background: #0d1117;
-        color: #c9d1d9;
-        font-family: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
-      }
-      .terminal {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-      }
-      .top-bar {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 6px 12px;
-        border-bottom: 1px solid #30363d;
-      }
-      .body {
-        display: flex;
-        flex: 1;
-        min-height: 0;
-        position: relative;
-      }
-      .panel-view {
-        display: flex;
-        flex: 1;
-        min-height: 0;
-        min-width: 0;
-      }
-      .bell-slot {
-        margin-left: auto;
-      }
-    `,
-  ],
+  templateUrl: './terminal-shell.component.html',
+  styleUrl: './terminal-shell.component.scss',
 })
 export class TerminalShellComponent {
   constructor(

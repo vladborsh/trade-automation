@@ -259,3 +259,47 @@ describe('ChartSyncService circuit breaker', () => {
     warn.mockRestore();
   });
 });
+
+// architecture/chart-layouts.md §11.3 sync rules 1 and 3 (collapsible panels).
+describe('ChartSyncService reassert / releaseCrosshair', () => {
+  it('reassert bumps the epoch without touching range or origin', () => {
+    const sync = new ChartSyncService();
+    sync.propose('btc', { from: 1000, to: 2000 }, 30);
+    const before = sync.reassertEpoch();
+    sync.reassert();
+    sync.reassert();
+    expect(sync.reassertEpoch()).toBe(before + 2);
+    expect(sync.range()).toEqual({ from: 1000, to: 2000 });
+    expect(sync.origin()).toBe('btc');
+  });
+
+  it('reassert never counts as an origin takeover (cannot trip the breaker)', () => {
+    const sync = new ChartSyncService();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    sync.propose('btc', { from: 1000, to: 2000 }, 30);
+    for (let i = 0; i < 50; i++) {
+      sync.reassert();
+    }
+    // a genuine takeover right after is still accepted
+    sync.propose('eth', { from: 500, to: 1500 }, 30);
+    expect(sync.origin()).toBe('eth');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('reset does not rewind the epoch (charts react to changes only)', () => {
+    const sync = new ChartSyncService();
+    sync.reassert();
+    sync.reset();
+    expect(sync.reassertEpoch()).toBe(1);
+  });
+
+  it('releaseCrosshair clears the crosshair only when the released panel was its origin', () => {
+    const sync = new ChartSyncService();
+    sync.setCrosshair('eth', 1234);
+    sync.releaseCrosshair('btc');
+    expect(sync.crosshair()).toEqual({ origin: 'eth', timeSec: 1234 });
+    sync.releaseCrosshair('eth');
+    expect(sync.crosshair()).toBeNull();
+  });
+});

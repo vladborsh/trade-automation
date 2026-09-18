@@ -5,7 +5,7 @@ import { MetricObservation } from '@trade-automation/contracts';
 import { FileMetricStore } from '../../src/storage/file/file-metric-store';
 
 function obs(time: number, value: number): MetricObservation {
-  return { metric: 'openInterest', instrument: 'binance:BTCUSDT', time, value };
+  return { metric: 'openInterest', instrument: 'binance:BTCUSDT', time, value, unit: 'base' };
 }
 
 describe('FileMetricStore upsert idempotency (architecture/chart-layouts.md §4.4)', () => {
@@ -71,5 +71,38 @@ describe('FileMetricStore upsert idempotency (architecture/chart-layouts.md §4.
 
     await store.upsert([obs(day2, 2)]);
     expect(await store.latestTime('binance:BTCUSDT', 'openInterest')).toBe(day2);
+  });
+
+  it('upgrades legacy JSONL rows (no unit / notionalBasis) on read, and writes both back on merge', async () => {
+    const store = new FileMetricStore(root);
+    const t0 = Date.UTC(2026, 8, 12, 0, 0, 0);
+    const file = path.join(
+      root,
+      'metrics',
+      'venue=binance',
+      'symbol=BTCUSDT',
+      'metric=openInterest',
+      'date=2026-09-12.jsonl',
+    );
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      [
+        '{"metric":"openInterest","instrument":"binance:BTCUSDT","time":' + t0 + ',"value":103141.33,"notional":7962510.46}',
+        '{"metric":"openInterest","instrument":"binance:BTCUSDT","time":' + (t0 + 60_000) + ',"value":103150}',
+      ].join('\n') + '\n',
+    );
+
+    const rows = await store.query('binance:BTCUSDT', 'openInterest', t0, t0 + 60_000);
+    expect(rows).toEqual([
+      { metric: 'openInterest', instrument: 'binance:BTCUSDT', time: t0, value: 103141.33, unit: 'base', notional: 7962510.46, notionalBasis: 'venue' },
+      { metric: 'openInterest', instrument: 'binance:BTCUSDT', time: t0 + 60_000, value: 103150, unit: 'base' },
+    ]);
+    expect(rows[1]).not.toHaveProperty('notionalBasis');
+
+    await store.upsert([obs(t0 + 120_000, 1)]);
+    const written = fs.readFileSync(file, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(written[0]).toMatchObject({ unit: 'base', notionalBasis: 'venue' });
+    expect(written[1]).toMatchObject({ unit: 'base' });
   });
 });

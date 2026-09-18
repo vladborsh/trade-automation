@@ -1,0 +1,12 @@
+<div class="picker">
+  @for (tf of timeframes; track tf) {
+    <button
+      type="button"
+      class="tf-btn"
+      [class.active]="tf === store.selected()"
+      (click)="store.select(tf)"
+    >
+      {{ tf }}
+    </button>
+  }
+</div>

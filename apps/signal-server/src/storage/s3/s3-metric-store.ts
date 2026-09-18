@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { InstrumentId, MetricKind, MetricObservation } from '@trade-automation/contracts';
 import { MetricStore } from '../metric-store.port';
+import { upgradeLegacyObservation } from '../upgrade-legacy-observation';
 
 async function streamToBuffer(body: unknown): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -50,7 +51,7 @@ export class S3MetricStore implements MetricStore {
       return jsonl
         .split('\n')
         .filter((l) => l.trim().length > 0)
-        .map((l) => JSON.parse(l) as MetricObservation);
+        .map((l) => upgradeLegacyObservation(JSON.parse(l)));
     } catch (err) {
       if (err instanceof NoSuchKey || (err as { name?: string }).name === 'NoSuchKey') return [];
       const code = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;

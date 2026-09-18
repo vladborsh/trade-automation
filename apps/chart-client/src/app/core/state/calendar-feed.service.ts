@@ -3,6 +3,8 @@ import { RestClient } from '../api/rest.client';
 import { LiveSocket } from '../api/live.socket';
 import { CalendarStore } from './calendar.store';
 import { NotificationsStore } from './notifications.store';
+import { CalendarFiltersStore } from './calendar-filters.store';
+import { EventAlarmService } from './event-alarm.service';
 
 /**
  * §7 — boots the calendar feature independently of the active view: the
@@ -20,6 +22,8 @@ export class CalendarFeedService {
     private readonly socket: LiveSocket,
     private readonly calendar: CalendarStore,
     private readonly notifications: NotificationsStore,
+    private readonly filters: CalendarFiltersStore,
+    private readonly alarm: EventAlarmService,
   ) {}
 
   async boot(): Promise<void> {
@@ -33,16 +37,25 @@ export class CalendarFeedService {
       this.rest.getCalendarNotifications(),
     ]);
     this.calendar.setWeek(week);
+    this.alarm.seedWeek(week);
     this.notifications.seed(notificationHistory);
 
-    this.socket.calendarEventFrames$.subscribe((frame) => this.calendar.mergeLive(frame.event));
-    this.socket.notificationFrames$.subscribe((frame) => this.notifications.receive(frame.notification));
+    this.socket.calendarEventFrames$.subscribe((frame) => {
+      this.calendar.mergeLive(frame.event);
+      this.alarm.mergeLive(frame.event);
+    });
+    this.socket.notificationFrames$.subscribe((frame) => this.notifications.receive(frame.notification, this.filters.filters()));
     this.socket.reconnected.subscribe(() => void this.healAfterReconnect());
 
     this.socket.subscribeCalendar();
+    this.alarm.start();
   }
 
-  /** Week navigation (prev/next arrows, §7.1) — does not touch notifications. */
+  /**
+   * Week navigation (prev/next arrows, §7.1) — does not touch notifications,
+   * and must not touch the alarm's upcoming set (§11.5): browsing to last
+   * week must not disarm this week's alerts.
+   */
   async loadWeek(at?: number): Promise<void> {
     const week = await this.rest.getCalendarWeek(at);
     this.calendar.setWeek(week);
@@ -60,8 +73,9 @@ export class CalendarFeedService {
       this.rest.getCalendarNotifications(),
     ]);
     this.calendar.setWeek(week);
+    this.alarm.seedWeek(week);
     for (const notification of notificationHistory) {
-      this.notifications.receive(notification);
+      this.notifications.receive(notification, this.filters.filters());
     }
   }
 }

@@ -1,0 +1,17 @@
+<div class="status-bar">
+  <span class="conn" [class]="'conn-' + connection.connectionState()">{{ connection.connectionState() }}</span>
+  @for (row of rows(); track row.instrument) {
+    <span class="instrument-status">
+      <span class="instrument">{{ row.instrument }}</span>
+      @if (row.venueStatus; as vs) {
+        <span class="venue" [class]="'venue-' + vs">{{ vs }}</span>
+      }
+      @if (row.strategies) {
+        <span class="strategies">{{ row.strategies }}</span>
+      }
+    </span>
+  }
+  @if (nextEventChip(); as chip) {
+    <span class="next-event">{{ chip }}</span>
+  }
+</div>

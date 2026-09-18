@@ -266,3 +266,13 @@ Deribit, Hyperliquid, Kraken, Huobi, Bitfinex, WOO X, dYdX), и вечные, и
   `/fapi/v1/premiumIndex` and COIN-M `/dapi/v1/openInterest`, queried live 2026-09-17.
 - Ours: `libs/contracts/src/metric.ts`, `apps/signal-server/src/market-data/metrics/**`,
   `architecture/chart-layouts.md` §4, `architecture/panel-sync-and-oi-depth-diagnosis.md` Bug 2.
+
+---
+
+## 7. Follow-up (2026-09-18)
+
+The unit tag named in §5 is routed as the first task of the "OI in USD, as candles" stream —
+design in [`chart-layouts.md`](chart-layouts.md) §11.1 (`unit` on `MetricObservation`, plus
+`notionalBasis` so a history/tip join step can be attributed). Coinalyze itself is still not
+ingested; the candle rule in §11.2 is built from our own 5 m readings, not their
+`candlestick_oi`.

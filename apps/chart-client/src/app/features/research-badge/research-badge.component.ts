@@ -14,49 +14,8 @@ import { StrategiesStore } from '../../core/state/strategies.store';
   selector: 'app-research-badge',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (visible()) {
-      <div class="research-badge" [class.expanded]="expanded()">
-        <button type="button" class="badge-toggle" (click)="toggle()" [attr.aria-expanded]="expanded()">
-          <strong>RESEARCH — not a trading signal</strong>
-        </button>
-        @if (expanded()) {
-          <p class="badge-detail">
-            "VWAP band reversal" is an unvalidated strategy still being tested. The amber markers and
-            lines show where its rules would have fired. They are not trade recommendations and have
-            no track record.
-          </p>
-        }
-      </div>
-    }
-  `,
-  styles: [
-    `
-      .research-badge {
-        background: #2b2111;
-        border: 1px solid #d29922;
-        color: #d29922;
-        font-size: 11px;
-        padding: 4px 10px;
-      }
-      .badge-toggle {
-        background: none;
-        border: none;
-        color: inherit;
-        font: inherit;
-        font-family: inherit;
-        padding: 0;
-        cursor: pointer;
-        text-align: left;
-      }
-      .badge-detail {
-        margin: 6px 0 0;
-        max-width: 480px;
-        line-height: 1.4;
-        color: #e3b341;
-      }
-    `,
-  ],
+  templateUrl: './research-badge.component.html',
+  styleUrl: './research-badge.component.scss',
 })
 export class ResearchBadgeComponent {
   readonly expanded = signal(false);

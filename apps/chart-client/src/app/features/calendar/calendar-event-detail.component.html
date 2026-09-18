@@ -1,0 +1,29 @@
+<div class="backdrop" (click)="closed.emit()">
+  <div class="drawer" (click)="$event.stopPropagation()">
+    @if (detail(); as d) {
+      <div class="drawer-header">
+        <span class="title">{{ d.event.title }}</span>
+        <button type="button" class="close" (click)="closed.emit()" aria-label="Close">×</button>
+      </div>
+      <div class="row"><span>Country</span><span>{{ currencyWithFlag(d.event.country) }}</span></div>
+      <div class="row"><span>Impact</span><span>{{ d.event.impact }}</span></div>
+      <div class="row"><span>Forecast</span><span>{{ d.event.forecast ?? '—' }}</span></div>
+      <div class="row"><span>Previous</span><span>{{ d.event.previous ?? '—' }}</span></div>
+      <div class="row"><span>Actual</span><span>{{ d.event.actual ?? '—' }} @if (d.event.actualSource) { ({{ d.event.actualSource }}) }</span></div>
+      <div class="row"><span>Status</span><span>{{ d.event.status }}</span></div>
+      <h4>Revisions</h4>
+      <div class="revisions">
+        @for (rev of d.revisions; track rev.revision) {
+          <div class="revision">
+            <span>#{{ rev.revision }} — {{ rev.change }}</span>
+            <span class="at">{{ rev.at | date: 'short' }}</span>
+          </div>
+        } @empty {
+          <div class="empty">No revisions.</div>
+        }
+      </div>
+    } @else {
+      <div class="loading">Loading…</div>
+    }
+  </div>
+</div>
