@@ -24,6 +24,11 @@ import { TIP_PRICE_MAX_AGE_MS, acceptTipPrice, tipPriceAt, withDerivedNotional }
 // openInterestHist retention (binance-metrics.adapter.ts) — no point asking the venue for
 // more history than either can hold or serve.
 const DEFAULT_CACHE_LOOKBACK_MS = 30 * 24 * 60 * 60_000;
+// architecture/aggregate-oi.md §5 "never on the boot path" — Phase 1 (warm-up, before listen())
+// asks a venue for at most this much tail: one or two pages on any adapter (Bybit: 288 rows =
+// 2 OI pages + 1 mark page). Everything older — a fresh store's 30 days, or the part of a long
+// outage beyond 24 h — is Phase 2's job (deepenHistoryAsync, after listen()).
+const WARMUP_TAIL_MS = 24 * 60 * 60_000;
 // architecture/chart-layouts.md §4.4 — spreads polls across a boundary tick instead of firing
 // every pair at exactly the same millisecond.
 const MAX_POLL_JITTER_MS = 2000;
@@ -54,6 +59,8 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   private readonly lastPolledAt = new Map<string, number>();
   private readonly lastObservationAt = new Map<string, number>();
   private readonly backfillStatusByPair = new Map<string, BackfillStatus>();
+  /** Phase 1 tails cut at WARMUP_TAIL_MS: `[from, to]` still to fetch in Phase 2, by pair. */
+  private readonly deferredGaps = new Map<string, { from: number; to: number }>();
   /** Pairs currently in a missing-notional streak — one warn per streak, not per poll. */
   private readonly notionalMissingPairs = new Set<string>();
 
@@ -122,7 +129,14 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
     );
     for (const o of fromStorage) this.cache.upsert(o);
 
-    const backfillFrom = latestStored !== null ? latestStored + 1 : now - DEFAULT_CACHE_LOOKBACK_MS;
+    // Tail since the latest stored row, capped at WARMUP_TAIL_MS; a fresh store gets the last
+    // 24 h only and Phase 2's deepen walks back from there.
+    const tailStart = now - WARMUP_TAIL_MS;
+    const sinceStored = latestStored !== null ? latestStored + 1 : tailStart;
+    if (sinceStored < tailStart) {
+      this.deferredGaps.set(this.pairKey(instrument.id, metric), { from: sinceStored, to: tailStart - 1 });
+    }
+    const backfillFrom = Math.max(sinceStored, tailStart);
     if (backfillFrom > now) return;
 
     try {
@@ -242,6 +256,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
   private async deepenPair(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): Promise<void> {
     const now = Date.now();
     const target = now - DEFAULT_CACHE_LOOKBACK_MS;
+    await this.fillDeferredGap(instrument, metric, adapter, target);
     const oldestCached = this.cache.window(instrument.id, metric)[0]?.time ?? now;
     if (oldestCached <= target) return; // already at (or past) full depth
 
@@ -254,6 +269,33 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
       // boot is noise no live WS client needs, they only want the current value going forward.
     }
     this.logger.log(`Deepened ${deepRows.length} historical observations for ${instrument.id}/${metric}`);
+  }
+
+  /**
+   * aggregate-oi.md §5 — the part of a post-outage tail that Phase 1 left out (older than
+   * WARMUP_TAIL_MS). Rows inside the cache window go to the cache + write buffer; older ones
+   * (a deep-history adapter after a long outage) straight to the store, never into the cache.
+   * No MetricObserved — history, not the live tip.
+   */
+  private async fillDeferredGap(
+    instrument: Instrument,
+    metric: MetricKind,
+    adapter: MetricAdapter,
+    cacheTarget: number,
+  ): Promise<void> {
+    const key = this.pairKey(instrument.id, metric);
+    const gap = this.deferredGaps.get(key);
+    if (!gap) return;
+    const rows = await adapter.fetchObservations(instrument, metric, gap.from, gap.to);
+    const old = rows.filter((o) => o.time < cacheTarget);
+    if (old.length > 0) await this.store.upsert(old);
+    for (const o of rows) {
+      if (o.time < cacheTarget) continue;
+      this.cache.upsert(o);
+      void this.writeBuffer.add(o);
+    }
+    this.deferredGaps.delete(key);
+    this.logger.log(`Filled ${rows.length} observations of the deferred warm-up gap for ${key}`);
   }
 
   private startPolling(instrument: Instrument, metric: MetricKind, adapter: MetricAdapter): void {

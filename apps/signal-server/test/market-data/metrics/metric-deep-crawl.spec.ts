@@ -81,12 +81,17 @@ function series(from: number, to: number): MetricObservation[] {
   return out;
 }
 
-function makeService(adapter: object, store: ReturnType<typeof memoryStore>, cache = new MetricCache()) {
+function makeService(
+  adapter: object,
+  store: ReturnType<typeof memoryStore>,
+  cache = new MetricCache(),
+  events = new EventEmitter2(),
+) {
   (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['bybit', adapter]]));
   const service = new MetricIngestionService(
     fakeConfig(),
     cache,
-    new EventEmitter2(),
+    events,
     { add: jest.fn(async () => undefined) } as never,
     { tick$: { subscribe: jest.fn(() => ({ unsubscribe: () => undefined })) } } as never,
     appMetrics(),
@@ -126,7 +131,61 @@ describe('MetricIngestionService deep crawl (aggregate-oi.md §5)', () => {
 
     expect(adapter.fetchObservations).toHaveBeenCalledTimes(1);
     const [, , from] = adapter.fetchObservations.mock.calls[0];
-    expect(from).toBeGreaterThanOrEqual(NOW - 30 * DAY_MS);
+    expect(from).toBe(NOW - DAY_MS);
+  });
+
+  describe('Phase 1 tail capped at 24 h, the rest in Phase 2 (generic, not Bybit-specific)', () => {
+    function observe(events: EventEmitter2) {
+      const seen: MetricObservation[] = [];
+      events.on('market-data.metric.observed', (e: { observation: MetricObservation }) => seen.push(e.observation));
+      return seen;
+    }
+    const shallowAdapter = () => ({ ...fakeDeepAdapter(0), venue: 'bybit' as const, historyDepthMs: undefined });
+
+    it('fresh store: Phase 1 requests only the last 24 h; Phase 2 fills back to 30 days; deep rows are not emitted', async () => {
+      const adapter = shallowAdapter();
+      const events = new EventEmitter2();
+      const seen = observe(events);
+      const { service, cache } = makeService(adapter, memoryStore(), new MetricCache(), events);
+
+      await service.onApplicationBootstrap();
+      expect(adapter.fetchObservations.mock.calls.map(([, , f, t]) => [f, t])).toEqual([[NOW - DAY_MS, NOW]]);
+      const emittedAtBoot = seen.length;
+      expect(emittedAtBoot).toBe(series(NOW - DAY_MS, NOW).length);
+
+      await service.deepenHistoryAsync();
+      expect(adapter.fetchObservations.mock.calls[1].slice(2)).toEqual([NOW - 30 * DAY_MS, NOW - DAY_MS - 1]);
+      expect(cache.window(instrument.id, 'openInterest')[0].time).toBe(NOW - 30 * DAY_MS);
+      expect(seen).toHaveLength(emittedAtBoot);
+    });
+
+    it('stored rows older than 24 h: Phase 1 tail is still 24 h; Phase 2 fills the gap back to latestStored, not emitted', async () => {
+      const adapter = shallowAdapter();
+      const latest = NOW - 3 * DAY_MS;
+      const store = memoryStore(series(NOW - 30 * DAY_MS, latest));
+      const events = new EventEmitter2();
+      const seen = observe(events);
+      const { service, cache } = makeService(adapter, store, new MetricCache(), events);
+
+      await service.onApplicationBootstrap();
+      expect(adapter.fetchObservations.mock.calls.map(([, , f, t]) => [f, t])).toEqual([[NOW - DAY_MS, NOW]]);
+      const emittedAtBoot = seen.length;
+
+      await service.deepenHistoryAsync();
+      expect(adapter.fetchObservations.mock.calls[1].slice(2)).toEqual([latest + 1, NOW - DAY_MS - 1]);
+      const window = cache.window(instrument.id, 'openInterest');
+      for (let i = 1; i < window.length; i++) expect(window[i].time - window[i - 1].time).toBe(BAR_MS);
+      expect(seen).toHaveLength(emittedAtBoot);
+    });
+
+    it('stored rows within 24 h: Phase 1 keeps the tail since latestStored, Phase 2 has no gap to fill', async () => {
+      const adapter = shallowAdapter();
+      const latest = NOW - 2 * 60 * 60_000;
+      const { service } = makeService(adapter, memoryStore(series(NOW - 30 * DAY_MS, latest)));
+
+      await boot(service);
+      expect(adapter.fetchObservations.mock.calls.map(([, , f, t]) => [f, t])).toEqual([[latest + 1, NOW]]);
+    });
   });
 
   it('Phase 2 resumes from the OLDEST STORED row, walks back to now − historyDepthMs, stores each chunk, keeps it out of the cache', async () => {

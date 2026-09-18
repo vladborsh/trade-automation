@@ -26,8 +26,9 @@ import {
  *     (0.03 % of the limit); OI and mark (→ notional) come from that one call.
  *   - history: every paginated request is spaced BYBIT_REQUEST_PACING_MS (2 req/s = 10 req / 5 s
  *     = 1.7 % of the limit). The Phase 2 deep crawl for BTCUSDT over 3 y is ~1 577 OI pages +
- *     ~316 mark-kline pages ≈ 1 900 requests ≈ 16 min. A first boot's 30-day warm-up is 44 + 9
- *     pages ≈ 27 s; a normal boot's tail is one page of each.
+ *     ~316 mark-kline pages ≈ 1 900 requests ≈ 16 min. Phase 1 (boot path) asks for at most 24 h:
+ *     2 OI pages + 1 mark page ≈ 1 s; a fresh store's other 29 days (44 + 9 pages ≈ 27 s) are
+ *     Phase 2's, after listen().
  *   - HTTP 403/429 throws BybitRateLimitError at once (the pass stops, the crawl resumes next
  *     boot); retCode != 0 on a history page backs off BYBIT_RETCODE_BACKOFF_MS once, then throws.
  *
