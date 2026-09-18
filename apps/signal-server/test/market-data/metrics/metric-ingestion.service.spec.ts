@@ -178,6 +178,43 @@ describe('MetricIngestionService boot order', () => {
     expect(adapter.fetchLatest).toHaveBeenCalledTimes(1);
   });
 
+  it('polls on every BarClock tick even when ticks land a few ms early; a duplicate tick in the same minute does not poll twice', async () => {
+    let now = 1_800_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const adapter = {
+      venue: 'binance' as const,
+      supports: ['openInterest'] as const,
+      fetchObservations: jest.fn(async () => []),
+      fetchLatest: jest.fn(async () => ({ metric: 'openInterest', instrument: instrument.id, time: now, value: 5, unit: 'base' })),
+    };
+    (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map([['binance', adapter]]));
+    let tickCb: (() => void) | undefined;
+    const service = new MetricIngestionService(
+      fakeConfig({ pollIntervalMs: 60_000 }),
+      new MetricCache(),
+      new EventEmitter2(),
+      { add: jest.fn(async () => undefined) } as never,
+      { tick$: { subscribe: (cb: () => void) => ((tickCb = cb), { unsubscribe: () => undefined }) } } as never,
+      fakeAppMetrics(),
+      { latestTime: jest.fn(async () => now), query: jest.fn(async () => []), upsert: jest.fn(async () => undefined) } as never,
+    );
+    await service.onApplicationBootstrap();
+
+    // Ten ticks, each 60 000 ms minus a few ms after the previous one (BarClock jitter).
+    for (let i = 0; i < 10; i++) {
+      now += 60_000 - (i % 4) - 1;
+      await tickCb!();
+      await flushPoll();
+    }
+    expect(adapter.fetchLatest).toHaveBeenCalledTimes(10);
+
+    // A duplicate tick in the same minute (a few hundred ms later) is skipped.
+    now += 300;
+    await tickCb!();
+    await flushPoll();
+    expect(adapter.fetchLatest).toHaveBeenCalledTimes(10);
+  });
+
   it('marks a metric pair down (no fetch attempted) when its venue has no MetricAdapter', async () => {
     (metricAdaptersProvider.buildMetricAdapters as jest.Mock).mockReturnValue(new Map());
     const store = { latestTime: jest.fn(), query: jest.fn(), upsert: jest.fn() };

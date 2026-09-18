@@ -32,6 +32,14 @@ const WARMUP_TAIL_MS = 24 * 60 * 60_000;
 // architecture/chart-layouts.md §4.4 — spreads polls across a boundary tick instead of firing
 // every pair at exactly the same millisecond.
 const MAX_POLL_JITTER_MS = 2000;
+// The poll gate's allowance for BarClock tick jitter. Ticks are nominally METRIC_POLL_INTERVAL_MS
+// apart but can land a few ms early; a strict `now − last < intervalMs` then skips every such tick
+// and a pair polls every ~2 min instead of every minute (measured 2026-09-18: Hyperliquid, whose
+// only history is what we poll — aggregate-oi.md §6 — got 2-min samples, and C3 kept withholding
+// the forming 5 m bar). 5 s is far above tick jitter and far below any sane interval, so a real
+// duplicate tick (same minute) is still skipped. Wall-clock with tolerance, not a bar index, so
+// the gate stays correct for an interval that is not a whole number of ticks.
+const POLL_TICK_TOLERANCE_MS = 5_000;
 // architecture/aggregate-oi.md §5 — one resumable step of the deep crawl: 7 days of 5 m rows =
 // 2 016 rows ≈ 11 OI pages + 3 mark-kline pages on Bybit, persisted before the next step.
 const DEEP_CRAWL_CHUNK_MS = 7 * 24 * 60 * 60_000;
@@ -313,7 +321,7 @@ export class MetricIngestionService implements OnApplicationBootstrap, OnModuleD
     const intervalMs = this.config.env.get('METRIC_POLL_INTERVAL_MS');
     const now = Date.now();
     const last = this.lastPolledAt.get(key) ?? 0;
-    if (now - last < intervalMs) return;
+    if (now - last < intervalMs - POLL_TICK_TOLERANCE_MS) return;
     this.lastPolledAt.set(key, now);
 
     const jitterMs = Math.floor(Math.random() * MAX_POLL_JITTER_MS);
