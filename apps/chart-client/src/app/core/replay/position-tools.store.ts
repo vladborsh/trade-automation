@@ -14,6 +14,8 @@ export interface PositionToolsDeps {
   activated(store: PositionToolsStore): void;
   hint(message: string): void;
   newId(): string;
+  /** ATR(14) of this panel's timeframe for the default stop (T-028); null or absent → 0.5 %. */
+  atr?(): number | null;
 }
 
 /**
@@ -48,6 +50,7 @@ export class PositionToolsStore {
       lastClose,
       precision: this.deps.precision(),
       anchorTime,
+      atr: this.deps.atr?.() ?? null,
     });
     if (hint) this.deps.hint(hint);
     this.list.update((tools) => [...tools.map((t) => ({ ...t, active: false })), tool]);

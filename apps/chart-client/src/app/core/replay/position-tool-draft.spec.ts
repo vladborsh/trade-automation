@@ -27,4 +27,13 @@ describe('createDraft (design §9.1)', () => {
     // 0.5 % of 1 at 0 decimals rounds to 0: the stop is one tick (1) away instead
     expect(createDraft({ ...base, side: 'long', price: 1, lastClose: 1, precision: 0 }).tool).toMatchObject({ entry: 1, sl: 0, tp: 3 });
   });
+
+  it('T-028: the stop is 1 × ATR(14) when known (snapped, at least a tick), else the 0.5 % fallback', () => {
+    expect(createDraft({ ...base, side: 'long', price: 100, atr: 1.234 }).tool).toMatchObject({ entry: 100, sl: 98.77, tp: 102.46 });
+    expect(createDraft({ ...base, side: 'short', price: 100, atr: 1.234 }).tool).toMatchObject({ entry: 100, sl: 101.23, tp: 97.54 });
+    expect(createDraft({ ...base, side: 'long', price: 100, atr: 0.0001 }).tool).toMatchObject({ sl: 99.99 }); // at least one tick
+    for (const atr of [null, undefined, 0, -1, Number.NaN]) {
+      expect(createDraft({ ...base, side: 'long', price: 100, atr }).tool).toMatchObject({ sl: 99.5, tp: 101 });
+    }
+  });
 });

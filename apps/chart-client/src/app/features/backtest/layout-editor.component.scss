@@ -27,7 +27,7 @@ button:disabled {
   z-index: 10;
   top: calc(100% + 4px);
   right: 0;
-  min-width: 300px;
+  min-width: 460px;
   padding: 10px;
   background: #0d1117;
   border: 1px solid #30363d;
@@ -40,6 +40,7 @@ button:disabled {
 }
 .panels li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 4px 0;
@@ -47,6 +48,9 @@ button:disabled {
 }
 .name {
   flex: 1;
+}
+app-indicator-picker {
+  flex-basis: 100%;
 }
 .badge {
   color: #8b949e;

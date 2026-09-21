@@ -91,7 +91,7 @@ describe('LayoutEditorComponent (T-029)', () => {
     select.value = 'binance:SOLUSDT';
     select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    el.querySelector<HTMLButtonElement>('.add button')!.click();
+    el.querySelector<HTMLButtonElement>('.panel > .add button')!.click();
     await settle(fixture);
     const sent = patchSession.mock.calls[0][1].layout as SessionLayout;
     expect(sent.panels.map((p) => p.id)).toEqual(['btc', 'eth', 'binance-solusdt']);

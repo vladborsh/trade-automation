@@ -1,0 +1,149 @@
+import { vi } from 'vitest';
+import { LineSeries, type IChartApi } from 'lightweight-charts';
+import type { IndicatorPoint, IndicatorSeriesSpec } from '@trade-automation/contracts';
+import { IndicatorLayer } from './indicator-layer';
+
+/** A fake lightweight-charts chart: panes are arrays of fake series; empty panes are kept (LWC may or may not drop them). */
+function fakeChart() {
+  const panes: FakeSeries[][] = [[]];
+  const addCalls: unknown[][] = [];
+  class FakeSeries {
+    opts: Record<string, unknown>;
+    data: unknown[] = [];
+    lines: unknown[] = [];
+    constructor(opts: Record<string, unknown>) {
+      this.opts = { visible: true, ...opts };
+    }
+    applyOptions(o: Record<string, unknown>) {
+      Object.assign(this.opts, o);
+    }
+    options() {
+      return this.opts;
+    }
+    setData(d: unknown[]) {
+      this.data = d;
+    }
+    createPriceLine(o: unknown) {
+      this.lines.push(o);
+      return o;
+    }
+    getPane() {
+      const idx = panes.findIndex((p) => p.includes(this));
+      return { paneIndex: () => idx, getSeries: () => panes[idx] };
+    }
+  }
+  const chart = {
+    addSeries: vi.fn((...args: unknown[]) => {
+      addCalls.push(args);
+      const s = new FakeSeries(args[1] as Record<string, unknown>);
+      const idx = (args[2] as number | undefined) ?? 0;
+      while (panes.length <= idx) panes.push([]);
+      panes[idx].push(s);
+      return s;
+    }),
+    removeSeries: vi.fn((s: FakeSeries) => {
+      for (const p of panes) {
+        const i = p.indexOf(s);
+        if (i >= 0) p.splice(i, 1);
+      }
+    }),
+    panes: () => panes.map((p, i) => ({ paneIndex: () => i, getSeries: () => p })),
+    removePane: vi.fn((i: number) => void panes.splice(i, 1)),
+  };
+  return { chart: chart as unknown as IChartApi, raw: chart, panes, addCalls };
+}
+
+const point = (seriesId: string, time: number, values: Record<string, number | null>, timeframe: IndicatorPoint['timeframe'] = '5m'): IndicatorPoint => ({
+  strategyId: 'replay', instrument: 'binance:BTCUSDT', timeframe, tier: 'live', seriesId, time, values,
+});
+
+const VWAP: IndicatorSeriesSpec = { id: 'vwap', label: 'VWAP', scale: 'price', keys: [{ key: 'vwap', label: 'VWAP', color: '#d29922' }, { key: 'top', label: 'Top', style: 'dashed' }] };
+const RSI: IndicatorSeriesSpec = { id: 'rsi-0', label: 'RSI (14)', scale: 'pane', range: { min: 0, max: 100 }, levels: [30, 70], keys: [{ key: 'rsi', label: 'RSI' }] };
+const MACD: IndicatorSeriesSpec = { id: 'macd-1', label: 'MACD', scale: 'pane', levels: [0], keys: [{ key: 'macd', label: 'MACD' }, { key: 'signal', label: 'Signal' }] };
+
+describe('IndicatorLayer', () => {
+  describe("price specs (the live terminal's path) are unchanged", () => {
+    it('are added on the price pane with the original options, and hidden (not removed) when inactive', () => {
+      const { chart, raw, addCalls, panes } = fakeChart();
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      const specs = new Map([['s1:vwap', VWAP]]);
+      layer.render([point('vwap', 1_000_000, { vwap: 10, top: 11 })].map((p) => ({ ...p, strategyId: 's1' })), specs, '5m');
+      expect(addCalls).toEqual([
+        [LineSeries, { color: '#d29922', lineWidth: 1, lineStyle: 0, title: 'VWAP · VWAP', lastValueVisible: false, priceLineVisible: false }],
+        [LineSeries, { color: '#d29922', lineWidth: 1, lineStyle: 2, title: 'VWAP · Top', lastValueVisible: false, priceLineVisible: false }],
+      ]);
+      expect(addCalls.every((c) => c.length === 2)).toBe(true); // no pane index
+      expect(panes).toHaveLength(1);
+      expect(layer.visibleSeriesCount()).toBe(2);
+
+      layer.render([], specs, '5m');
+      expect(raw.removeSeries).not.toHaveBeenCalled();
+      expect(layer.visibleSeriesCount()).toBe(0);
+      // a timeframe mismatch hides them too, as before
+      layer.render([{ ...point('vwap', 1, { vwap: 1, top: 1 }, '1h'), strategyId: 's1' }], specs, '5m');
+      expect(layer.visibleSeriesCount()).toBe(0);
+      expect(raw.removePane).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("'pane' specs (T-028)", () => {
+    it('get their own pane each, with levels and a fixed range', () => {
+      const { chart, addCalls, panes } = fakeChart();
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      const specs = new Map([['replay:rsi-0', RSI], ['replay:macd-1', MACD]]);
+      layer.render(
+        [point('rsi-0', 60_000, { rsi: 55 }), point('rsi-0', 120_000, { rsi: null }), point('macd-1', 60_000, { macd: 1, signal: 0.5 })],
+        specs,
+        '5m',
+      );
+      expect(addCalls.map((c) => c[2])).toEqual([1, 2, 2]); // RSI in pane 1, MACD's two lines in pane 2
+      expect(panes.map((p) => p.length)).toEqual([0, 1, 2]);
+      const rsi = panes[1][0] as unknown as { data: unknown[]; lines: { price: number }[]; opts: { autoscaleInfoProvider: () => unknown } };
+      expect(rsi.data).toEqual([{ time: 60, value: 55 }]); // null values are gaps
+      expect(rsi.lines.map((l) => l.price)).toEqual([30, 70]);
+      expect(rsi.opts.autoscaleInfoProvider()).toEqual({ priceRange: { minValue: 0, maxValue: 100 } });
+      expect(layer.paneCount()).toBe(2);
+      expect(layer.visibleSeriesCount()).toBe(3);
+    });
+
+    it('updates data in place on re-render, and removes an emptied pane when the indicator goes', () => {
+      const { chart, raw, panes } = fakeChart();
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      const specs = new Map([['replay:rsi-0', RSI], ['replay:macd-1', MACD]]);
+      const both = [point('rsi-0', 60_000, { rsi: 55 }), point('macd-1', 60_000, { macd: 1, signal: 0.5 })];
+      layer.render(both, specs, '5m');
+      layer.render([...both, point('rsi-0', 120_000, { rsi: 60 })], specs, '5m');
+      expect(raw.addSeries).toHaveBeenCalledTimes(3); // no new series for new data
+      expect((panes[1][0] as unknown as { data: unknown[] }).data).toHaveLength(2);
+
+      layer.render([point('macd-1', 60_000, { macd: 1, signal: 0.5 })], specs, '5m'); // RSI removed
+      expect(raw.removeSeries).toHaveBeenCalledTimes(1);
+      expect(raw.removePane).toHaveBeenCalledWith(1);
+      expect(panes.map((p) => p.length)).toEqual([0, 2]); // MACD moved up into pane 1
+      expect(layer.paneCount()).toBe(1);
+
+      layer.clearAll();
+      expect(panes.map((p) => p.length)).toEqual([0]);
+      expect(layer.paneCount()).toBe(0);
+    });
+
+    it('does not remove a pane lightweight-charts already dropped by itself', () => {
+      const { chart, raw, panes } = fakeChart();
+      raw.removeSeries.mockImplementation((s: unknown) => {
+        const i = panes.findIndex((p) => p.includes(s as never));
+        panes[i].splice(panes[i].indexOf(s as never), 1);
+        if (i > 0 && panes[i].length === 0) panes.splice(i, 1); // LWC's own empty-pane removal
+      });
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      const specs = new Map([['replay:rsi-0', RSI]]);
+      layer.render([point('rsi-0', 60_000, { rsi: 55 })], specs, '5m');
+      layer.render([], specs, '5m');
+      expect(raw.removePane).not.toHaveBeenCalled();
+      expect(panes).toHaveLength(1);
+    });
+  });
+});

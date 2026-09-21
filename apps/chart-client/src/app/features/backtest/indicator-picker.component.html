@@ -1,0 +1,37 @@
+<div class="picker" [attr.aria-label]="'Indicators of ' + panel().id">
+  @for (row of rows(); track row.index) {
+    <div class="row" data-testid="indicator-row">
+      <span class="label">{{ row.label }}</span>
+      @if (row.entry; as entry) {
+        @for (p of entry.params; track p.key) {
+          <label class="param">
+            <span>{{ p.label }}</span>
+            <input
+              type="number"
+              [attr.aria-label]="row.label + ' ' + p.label"
+              [min]="p.min"
+              [max]="p.max"
+              [step]="p.step"
+              [value]="row.params[p.key]"
+              [disabled]="disabled()"
+              (change)="setParam(row.index, entry, p.key, $any($event.target).value)"
+            />
+          </label>
+        }
+      }
+      <button type="button" class="remove" aria-label="Remove indicator" [disabled]="disabled()" (click)="remove(row.index)">✕</button>
+    </div>
+  }
+  <div class="add">
+    <select aria-label="Indicator to add" [disabled]="disabled()" (change)="choice.set($any($event.target).value)">
+      <option value="" [selected]="choice() === ''">Add an indicator…</option>
+      @for (e of catalog; track e.id) {
+        <option [value]="e.id" [selected]="choice() === e.id">{{ e.name }}</option>
+      }
+    </select>
+    <button type="button" [disabled]="!choice() || disabled()" (click)="add()">Add</button>
+  </div>
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+</div>

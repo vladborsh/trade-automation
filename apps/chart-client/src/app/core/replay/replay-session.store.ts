@@ -6,6 +6,7 @@ import { PortfolioStore } from './portfolio.store';
 import { refusalNotice } from './refusal-notice';
 import type { PanelPositionTools } from '../../features/panel-grid/panel-source';
 import { ReplayEngine, type ReplayApi } from './replay-engine';
+import { panelAtr14 } from './panel-indicators';
 import { ReplayPanelSource } from './replay-panel-source';
 import { PositionToolsStore } from './position-tools.store';
 import { orderTool } from './view-only';
@@ -112,6 +113,7 @@ export class ReplaySessionStore implements OnDestroy {
         activated: (active) => this.toolStores.forEach((other) => other !== active && other.deactivate()),
         hint: (message) => this.showHint(message),
         newId: () => `tool-${++this.toolSeq}`,
+        atr: () => panelAtr14(this.engine()?.seriesFor(panelId)().closed ?? []),
       });
       this.toolStores.set(panelId, store);
     }

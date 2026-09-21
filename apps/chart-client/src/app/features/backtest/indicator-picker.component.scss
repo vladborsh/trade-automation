@@ -1,0 +1,63 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0 4px 12px;
+  font-size: 12px;
+  color: #c9d1d9;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.label {
+  min-width: 110px;
+}
+.param {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #8b949e;
+}
+input,
+select {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font: inherit;
+  color-scheme: dark;
+}
+input {
+  width: 56px;
+}
+.add {
+  display: flex;
+  gap: 6px;
+}
+select {
+  flex: 1;
+}
+button {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.remove {
+  color: #ef5350;
+}
+.error {
+  margin: 0;
+  color: #ef5350;
+}

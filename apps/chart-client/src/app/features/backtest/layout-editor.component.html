@@ -17,6 +17,7 @@
                 <button type="button" aria-label="Move down" [disabled]="last || busy()" (click)="move(p.id, 1)">↓</button>
                 <button type="button" class="remove" aria-label="Remove panel" [disabled]="panels().length === 1 || busy()" (click)="remove(p.id)">✕</button>
               </span>
+              <app-indicator-picker [panel]="p" [disabled]="busy()" (indicatorsChange)="setIndicators(p.id, $event)" />
             </li>
           }
         </ol>

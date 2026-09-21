@@ -9,6 +9,7 @@ import {
   panelsBlockedByOrders,
   panelsWithActiveOrders,
   removePanel,
+  setPanelIndicators,
 } from './layout-edit';
 
 const L: SessionLayout = {
@@ -86,5 +87,15 @@ describe('layout-edit (T-029)', () => {
     expect(layoutEditErrorMessage(new ApiError(409, null, 'x'))).toMatch(/pending or open orders/);
     expect(layoutEditErrorMessage(new ApiError(500, null, 'x'))).toMatch(/Could not change/);
     expect(layoutEditErrorMessage(new TypeError('Failed to fetch'))).toMatch(/Cannot reach/);
+  });
+});
+
+describe('setPanelIndicators (T-028)', () => {
+  it("replaces one panel's indicators and drops the field when emptied", () => {
+    const withEma = setPanelIndicators(L, 'eth', [{ id: 'ema', params: { length: 9 } }]);
+    expect(withEma.panels[1].indicators).toEqual([{ id: 'ema', params: { length: 9 } }]);
+    expect(withEma.panels[0]).toBe(L.panels[0]);
+    expect(setPanelIndicators(withEma, 'eth', []).panels[1]).not.toHaveProperty('indicators');
+    expect(layoutDiff(L, withEma)).toEqual({ added: [], removed: [] }); // no tape change
   });
 });

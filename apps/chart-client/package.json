@@ -15,6 +15,7 @@
   "packageManager": "npm@11.13.0",
   "dependencies": {
     "@trade-automation/contracts": "0.1.0",
+    "@trade-automation/indicators": "0.1.0",
     "@trade-automation/replay-core": "0.1.0",
     "@angular/common": "^22.1.0",
     "@angular/compiler": "^22.1.0",

@@ -1,4 +1,4 @@
-import type { BacktestInstrument, InstrumentId, Order, SessionLayout, SessionPanel } from '@trade-automation/contracts';
+import type { BacktestInstrument, InstrumentId, Order, SessionLayout, SessionPanel, SessionPanelIndicator } from '@trade-automation/contracts';
 import { isApiError } from '../api/api-error';
 
 /**
@@ -55,6 +55,18 @@ export function addPanel(layout: SessionLayout, instrument: InstrumentId): Sessi
   let id = base;
   for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
   return fitGrid({ ...layout, panels: [...layout.panels, { id, kind: 'candles', instrument, signals: false }] });
+}
+
+/** T-028: replaces one panel's indicators (an empty list drops the field, as older layouts have it). */
+export function setPanelIndicators(layout: SessionLayout, panelId: string, indicators: readonly SessionPanelIndicator[]): SessionLayout {
+  return {
+    ...layout,
+    panels: layout.panels.map((p) => {
+      if (p.id !== panelId) return p;
+      const { indicators: _old, ...rest } = p;
+      return indicators.length > 0 ? { ...rest, indicators: [...indicators] } : rest;
+    }),
+  };
 }
 
 /** Keeps the grid while it has room for the panels; otherwise one row. */

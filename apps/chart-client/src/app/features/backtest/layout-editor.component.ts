@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import type { BacktestInstrument, InstrumentId, SessionLayout } from '@trade-automation/contracts';
+import type { BacktestInstrument, InstrumentId, SessionLayout, SessionPanelIndicator } from '@trade-automation/contracts';
 import { BacktestClient } from '../../core/api/backtest.client';
 import {
   MAX_SESSION_PANELS,
@@ -11,8 +11,10 @@ import {
   panelsBlockedByOrders,
   panelsWithActiveOrders,
   removePanel,
+  setPanelIndicators,
 } from '../../core/replay/layout-edit';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
+import { IndicatorPickerComponent } from './indicator-picker.component';
 
 /**
  * T-029 — editing the layout inside a session: add, remove and reorder candle panels. Each action
@@ -24,6 +26,7 @@ import { ReplaySessionStore } from '../../core/replay/replay-session.store';
 @Component({
   selector: 'app-layout-editor',
   standalone: true,
+  imports: [IndicatorPickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './layout-editor.component.html',
   styleUrl: './layout-editor.component.scss',
@@ -67,6 +70,11 @@ export class LayoutEditorComponent {
 
   remove(panelId: string): void {
     this.edit((layout) => removePanel(layout, panelId));
+  }
+
+  /** T-028: one panel's indicators changed in its picker: one PATCH, no tape change. */
+  setIndicators(panelId: string, indicators: SessionPanelIndicator[]): void {
+    this.edit((layout) => setPanelIndicators(layout, panelId, indicators));
   }
 
   add(): void {
