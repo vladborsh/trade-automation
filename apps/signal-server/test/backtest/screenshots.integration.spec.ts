@@ -13,6 +13,7 @@ import { FileScreenshotStore } from '../../src/storage/file/file-screenshot-stor
 import { ScreenshotObject, ScreenshotStore, screenshotKey, sessionScreenshotPrefix } from '../../src/storage/screenshot-store.port';
 import { DAY, T0, fakeStore, makeSessionService } from './fake-backtest';
 import { makePng } from './png-fixture';
+import { expectSameBytes } from '../bytes';
 
 /**
  * T-025 done-when against a real Postgres and a real file store in a tmp dir: write-once under a
@@ -146,7 +147,7 @@ maybeDescribe('screenshots against a real Postgres + file store (T-025 done-when
     expect(await Promise.all([first, second])).toEqual([201, 409]);
     expect(store.puts).toBe(1); // the loser never touched the store
     const key = screenshotKey(alice, session.id, order.id, 'entry');
-    expect(fs.readFileSync(path.join(root, key))).toEqual(a.bytes);
+    expectSameBytes(fs.readFileSync(path.join(root, key)), a.bytes);
     const rows = await db.query<{ width_px: number; height_px: number; bytes: number; store_key: string }>(
       `select width_px, height_px, bytes, store_key from screenshots where order_id = $1`,
       [order.id],

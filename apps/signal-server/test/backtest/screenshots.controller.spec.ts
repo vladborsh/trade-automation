@@ -9,6 +9,7 @@ import { ScreenshotService } from '../../src/backtest/screenshot.service';
 import { FakeAuthRepositories, fastHasher, makeAuthService } from '../auth/fake-auth';
 import { DAY, FakeBacktestRepositories, FakeScreenshotStore, T0, createBody, makeSessionService } from './fake-backtest';
 import { makePng } from './png-fixture';
+import { expectSameBytes } from '../bytes';
 
 /** Real HTTP through AuthGuard: the raw image/png body reaches the handler unparsed. */
 describe('PUT/GET …/orders/:orderId/screenshots/:kind over HTTP (design §7.2)', () => {
@@ -68,7 +69,7 @@ describe('PUT/GET …/orders/:orderId/screenshots/:kind over HTTP (design §7.2)
     expect(back.status).toBe(200);
     expect(back.headers.get('content-type')).toBe('image/png');
     expect(back.headers.get('cache-control')).toBe('private, max-age=31536000');
-    expect(Buffer.from(await back.arrayBuffer())).toEqual(png);
+    expectSameBytes(Buffer.from(await back.arrayBuffer()), png);
 
     const again = await put('alice', 'entry', makePng(320, 180, 8));
     expect(again.status).toBe(409);

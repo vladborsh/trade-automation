@@ -5,6 +5,7 @@ import { MAX_SCREENSHOT_BYTES, ScreenshotService } from '../../src/backtest/scre
 import { screenshotKey, sessionScreenshotPrefix } from '../../src/storage/screenshot-store.port';
 import { DAY, FakeBacktestRepositories, FakeScreenshotStore, T0, createBody, fakeStore, makeSessionService } from './fake-backtest';
 import { makePng } from './png-fixture';
+import { expectSameBytes } from '../bytes';
 
 const ALICE = '00000000-0000-4000-8000-00000000000a';
 const BOB = '00000000-0000-4000-8000-00000000000b';
@@ -72,9 +73,9 @@ describe('ScreenshotService (design §7.2, §9.2)', () => {
     const res = await service.put(ALICE, sessionId, orderId, 'entry', upload(png).upload);
     const key = screenshotKey(ALICE, sessionId, orderId, 'entry');
     expect(res).toEqual({ key, width: 640, height: 360, bytes: png.length });
-    expect(store.objects.get(key)?.bytes).toEqual(png);
+    expectSameBytes(store.objects.get(key)?.bytes, png);
     expect(await repos.screenshots.find(orderId, 'entry')).toMatchObject({ storeKey: key, widthPx: 640, heightPx: 360, bytes: png.length, capturedAtMs: placedAtMs });
-    await expect(service.get(ALICE, sessionId, orderId, 'entry')).resolves.toEqual(png);
+    expectSameBytes(await service.get(ALICE, sessionId, orderId, 'entry'), png);
   });
 
   it('a second upload is 409 SCREENSHOT_EXISTS and its body is never read', async () => {
@@ -85,7 +86,7 @@ describe('ScreenshotService (design §7.2, §9.2)', () => {
       body: { error: { code: 'SCREENSHOT_EXISTS', message: expect.any(String) } },
     });
     expect(second.wasRead()).toBe(false);
-    expect(store.objects.get(screenshotKey(ALICE, sessionId, orderId, 'entry'))?.bytes).toEqual(makePng(10, 10, 1));
+    expectSameBytes(store.objects.get(screenshotKey(ALICE, sessionId, orderId, 'entry'))?.bytes, makePng(10, 10, 1));
     // the other kind is its own slot
     await expect(service.put(ALICE, sessionId, orderId, 'exit', upload(makePng(10, 10, 3)).upload)).resolves.toMatchObject({ width: 10 });
   });

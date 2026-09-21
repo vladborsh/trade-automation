@@ -40,6 +40,26 @@ async function admin<T>(fn: (c: Client) => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * BUG-011: this spec timed out once in a full with-DB run with no error text, and in an
+ * overloaded reproduction every phase just ran into jest's 60 s. Each phase now has a labelled
+ * deadline well inside the test timeout, so a stall names the phase that hung (the database
+ * creation, a runner blocked on the advisory lock or on Postgres, the version read) and how long
+ * the others took.
+ */
+function within<T>(label: string, ms: number, work: Promise<T>): Promise<T> {
+  const started = Date.now();
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}: still pending after ${ms} ms`)), ms);
+  });
+  return Promise.race([work, deadline]).finally(() => {
+    clearTimeout(timer);
+    if (Date.now() - started > ms / 4) process.stderr.write(`migration-race: ${label} took ${Date.now() - started} ms\n`);
+  });
+}
+const PHASE_MS = 20_000;
+
 maybeDescribe('migrations: concurrent boots and tampering (Tester, bt-platform)', () => {
   const made: string[] = [];
   const freshDb = async (): Promise<string> => {
@@ -63,14 +83,16 @@ maybeDescribe('migrations: concurrent boots and tampering (Tester, bt-platform)'
   });
 
   it.each([2, 3, 4])('%i runners at once on a fresh database: exactly one applies all of 001–003, none fails, versions consistent', async (runners) => {
-    const url = await freshDb();
-    const results = await Promise.allSettled(Array.from({ length: runners }, () => runMigrations({ connectionString: url })));
+    const url = await within('create database', PHASE_MS, freshDb());
+    const results = await Promise.allSettled(
+      Array.from({ length: runners }, (_, k) => within(`runner ${k + 1}/${runners}`, PHASE_MS, runMigrations({ connectionString: url }))),
+    );
 
     expect(results.filter((r) => r.status === 'rejected')).toEqual([]);
     const applied = results.map((r) => (r as PromiseFulfilledResult<{ applied: unknown[] }>).value.applied.length);
     expect(applied.filter((n) => n === 3)).toHaveLength(1);
     expect(applied.filter((n) => n === 0)).toHaveLength(runners - 1);
-    expect(await versions(url)).toEqual([0, 1, 2, 3]);
+    expect(await within('read versions', PHASE_MS, versions(url))).toEqual([0, 1, 2, 3]);
   }, 60_000);
 
   it('an applied migration edited afterwards fails the checksum and applies nothing further', async () => {
