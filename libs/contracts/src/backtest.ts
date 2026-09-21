@@ -309,11 +309,15 @@ export type EquityPoint = z.infer<typeof EquityPointSchema>;
 export const StatsBreakdownSchema = z.object({
   trades: z.number().int().nonnegative(),
   pnl: z.number(),
+  pnlR: z.number(),
   winRate: z.number(),
 });
 export type StatsBreakdown = z.infer<typeof StatsBreakdownSchema>;
 
-/** §8 `computeStats(closedTrades) => SessionStats`. */
+/**
+ * §8 `computeStats(closedTrades) => SessionStats`. Every money figure in both currency and R
+ * (§8, decision 21): the unsuffixed / `Ccy` fields are currency, the `R` fields R multiples.
+ */
 export const SessionStatsSchema = z.object({
   trades: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
@@ -321,15 +325,20 @@ export const SessionStatsSchema = z.object({
   breakeven: z.number().int().nonnegative(),
   winRate: z.number(),
   pnl: z.number(),
+  pnlR: z.number(),
   grossProfit: z.number(),
+  grossProfitR: z.number(),
   grossLoss: z.number(),
+  grossLossR: z.number(),
   profitFactor: z.number().nullable(),
   equityCurve: z.array(EquityPointSchema),
   maxDrawdownCcy: z.number().nonnegative(),
   maxDrawdownR: z.number().nonnegative(),
   maxDrawdownPct: z.number().nonnegative(),
   avgWin: z.number().nullable(),
+  avgWinR: z.number().nullable(),
   avgLoss: z.number().nullable(),
+  avgLossR: z.number().nullable(),
   expectancyR: z.number(),
   maeAvg: z.number().nullable(),
   maeWorst: z.number().nullable(),

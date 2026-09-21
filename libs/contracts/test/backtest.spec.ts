@@ -76,22 +76,27 @@ function validStats(): SessionStats {
     breakeven: 0,
     winRate: 0.5,
     pnl: 40,
+    pnlR: 0.4,
     grossProfit: 100,
+    grossProfitR: 1,
     grossLoss: -60,
+    grossLossR: -0.6,
     profitFactor: 1.6667,
     equityCurve: [{ time: 1_726_000_000_000, balance: 10_000, balanceR: 0 }],
     maxDrawdownCcy: 60,
     maxDrawdownR: 0.6,
     maxDrawdownPct: 0.6,
     avgWin: 100,
+    avgWinR: 1,
     avgLoss: -60,
+    avgLossR: -0.6,
     expectancyR: 0.2,
     maeAvg: 0.3,
     maeWorst: 0.9,
     pessimisticTrades: 0,
     endOfSessionCloses: 0,
-    byInstrument: { 'binance:BTCUSDT': { trades: 2, pnl: 40, winRate: 0.5 } },
-    bySide: { long: { trades: 2, pnl: 40, winRate: 0.5 } },
+    byInstrument: { 'binance:BTCUSDT': { trades: 2, pnl: 40, pnlR: 0.4, winRate: 0.5 } },
+    bySide: { long: { trades: 2, pnl: 40, pnlR: 0.4, winRate: 0.5 } },
   };
 }
 
@@ -419,6 +424,21 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
 
   it('rejects SessionStats with a negative trades count', () => {
     expect(() => SessionStatsSchema.parse({ ...validStats(), trades: -1 })).toThrow();
+  });
+
+  it('requires the R counterparts of the money figures (§8: currency and R)', () => {
+    for (const field of ['pnlR', 'grossProfitR', 'grossLossR', 'avgWinR', 'avgLossR'] as const) {
+      const { [field]: _dropped, ...rest } = validStats();
+      expect(() => SessionStatsSchema.parse(rest)).toThrow();
+    }
+    const stats = validStats();
+    const { pnlR: _pnlR, ...breakdown } = stats.bySide.long!;
+    expect(() => SessionStatsSchema.parse({ ...stats, bySide: { long: breakdown } })).toThrow();
+  });
+
+  it('accepts null avgWinR / avgLossR, like avgWin / avgLoss', () => {
+    const stats = { ...validStats(), avgWin: null, avgWinR: null, avgLoss: null, avgLossR: null };
+    expect(SessionStatsSchema.parse(stats)).toEqual(stats);
   });
 
   it('coerces a valid ReplayHistoryQuery from query-string values', () => {
