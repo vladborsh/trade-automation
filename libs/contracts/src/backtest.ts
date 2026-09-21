@@ -43,13 +43,38 @@ export const SessionLayoutSchema = z
 export type SessionLayout = z.infer<typeof SessionLayoutSchema>;
 
 // ---------------------------------------------------------------------------------------------
+// Numeric bounds (BUG-002/BUG-003 — provisional, pending Architect confirmation)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * What the Postgres columns can hold (§3), with product-sane caps where a column allows absurd
+ * values. Request fields are bounded here so an out-of-range body is a 400 from the schema, never
+ * a pg 22003 overflow (500) or a silent round-to-zero. Money and prices are `numeric(20,8)` (max
+ * < 1e12); percentages `numeric(8,4)` (resolution 0.0001); `notional_warn_multiple` is
+ * `numeric(8,2)`. The client's form validation reuses these numbers.
+ */
+export const BACKTEST_BOUNDS = {
+  /** exclusive upper bound of every numeric(20,8) money/price field */
+  moneyMaxExclusive: 1e12,
+  /** riskPct / defaultRiskPct: percent of balance, from the numeric(8,4) resolution up to 100 */
+  riskPctMin: 0.0001,
+  riskPctMax: 100,
+  commissionPctMax: 100,
+  notionalWarnMultipleMax: 999_999.99,
+} as const;
+
+const RiskPctSchema = z.number().min(BACKTEST_BOUNDS.riskPctMin).max(BACKTEST_BOUNDS.riskPctMax);
+/** An order level (limit, stop, target): a positive price that fits numeric(20,8). */
+const PriceLevelSchema = z.number().positive().lt(BACKTEST_BOUNDS.moneyMaxExclusive);
+
+// ---------------------------------------------------------------------------------------------
 // Costs, sessions
 // ---------------------------------------------------------------------------------------------
 
 export const CostsSchema = z.object({
   enabled: z.boolean(),
-  commissionPct: z.number().nonnegative(),
-  spread: z.number().nonnegative(),
+  commissionPct: z.number().nonnegative().max(BACKTEST_BOUNDS.commissionPctMax),
+  spread: z.number().nonnegative().lt(BACKTEST_BOUNDS.moneyMaxExclusive),
 });
 export type Costs = z.infer<typeof CostsSchema>;
 
@@ -63,11 +88,11 @@ export const CreateSessionRequestSchema = z.object({
   timeframe: TimeframeSchema,
   periodFromMs: z.number().int().nonnegative(),
   periodToMs: z.number().int().nonnegative(),
-  initialBalance: z.number().positive(),
-  defaultRiskPct: z.number().positive(),
+  initialBalance: z.number().positive().lt(BACKTEST_BOUNDS.moneyMaxExclusive),
+  defaultRiskPct: RiskPctSchema,
   costs: CostsSchema,
   skipWeekends: z.boolean().optional(),
-  notionalWarnMultiple: z.number().positive().optional(),
+  notionalWarnMultiple: z.number().positive().max(BACKTEST_BOUNDS.notionalWarnMultipleMax).optional(),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 
@@ -231,10 +256,10 @@ export const PlaceOrderRequestSchema = z
     panelId: z.string().min(1),
     side: OrderSideSchema,
     type: OrderTypeSchema,
-    limitPrice: z.number().optional(),
-    sl: z.number(),
-    tp: z.number().optional(),
-    riskPct: z.number().positive(),
+    limitPrice: PriceLevelSchema.optional(),
+    sl: PriceLevelSchema,
+    tp: PriceLevelSchema.optional(),
+    riskPct: RiskPctSchema,
   })
   .superRefine((req, ctx) => {
     if (req.type === 'limit' && req.limitPrice === undefined) {
@@ -273,8 +298,8 @@ export type CloseResponse = z.infer<typeof CloseResponseSchema>;
 export const ModifyOrderRequestSchema = z.object({
   opId: z.string().uuid(),
   cursorMs: z.number().int().nonnegative(),
-  sl: z.number().optional(),
-  tp: z.number().optional(),
+  sl: PriceLevelSchema.optional(),
+  tp: PriceLevelSchema.optional(),
 });
 export type ModifyOrderRequest = z.infer<typeof ModifyOrderRequestSchema>;
 
