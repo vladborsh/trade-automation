@@ -29,13 +29,16 @@ const R_COLUMNS: ReadonlyArray<[string, string]> = [
 
 maybeDescribe('migration 002: widen the R columns (up and down, data preserved)', () => {
   const name = `backtest_mig_${randomUUID().slice(0, 8)}`;
-  const url = new URL(DATABASE_URL as string);
-  url.pathname = `/${name}`;
-  const scratchUrl = url.toString();
+  // Built in beforeAll, not here: describe.skip still runs this body, and without DATABASE_URL a
+  // describe-level `new URL(undefined)` throws and fails the whole suite.
+  let scratchUrl: string;
   let admin: Client;
   let db: PgDatabase;
 
   beforeAll(async () => {
+    const url = new URL(DATABASE_URL as string);
+    url.pathname = `/${name}`;
+    scratchUrl = url.toString();
     admin = new Client({ connectionString: DATABASE_URL });
     await admin.connect();
     await admin.query(`create database ${name}`);
