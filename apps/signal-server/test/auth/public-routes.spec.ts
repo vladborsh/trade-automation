@@ -2,6 +2,7 @@ import { IS_PUBLIC_KEY } from '../../src/auth/public.decorator';
 import { AuthController } from '../../src/api/rest/auth.controller';
 import { BacktestInstrumentsController } from '../../src/api/rest/backtest/instruments.controller';
 import { SessionsController } from '../../src/api/rest/backtest/sessions.controller';
+import { BacktestCandlesController } from '../../src/api/rest/backtest/candles.controller';
 import { CalendarController } from '../../src/api/rest/calendar.controller';
 import { CandlesController } from '../../src/api/rest/candles.controller';
 import { IndicatorsController } from '../../src/api/rest/indicators.controller';
@@ -34,6 +35,7 @@ describe('@Public() allow-list', () => {
       CalendarController,
       BacktestInstrumentsController,
       SessionsController,
+      BacktestCandlesController,
     ]) {
       expect([c.name, isPublic(c)]).toEqual([c.name, false]);
       for (const key of Object.getOwnPropertyNames(c.prototype)) {

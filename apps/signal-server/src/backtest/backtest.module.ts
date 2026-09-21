@@ -5,6 +5,8 @@ import { DbModule } from '../db/db.module';
 import { StorageModule } from '../storage/storage.module';
 import { PgBacktestRepositories } from './pg/pg-backtest-repositories';
 import { BACKTEST_REPOSITORIES } from './session.repository.port';
+import { ReplayAheadService } from './replay-ahead.service';
+import { ReplayHistoryService } from './replay-history.service';
 import { SessionService } from './session.service';
 
 /**
@@ -16,7 +18,9 @@ import { SessionService } from './session.service';
   providers: [
     { provide: BACKTEST_REPOSITORIES, inject: [DB], useFactory: (db: Db | null) => (db ? new PgBacktestRepositories(db) : null) },
     SessionService,
+    ReplayHistoryService,
+    ReplayAheadService,
   ],
-  exports: [SessionService],
+  exports: [SessionService, ReplayHistoryService, ReplayAheadService],
 })
 export class BacktestModule {}
