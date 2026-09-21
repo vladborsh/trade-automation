@@ -1,4 +1,4 @@
-import { computeAtr } from '../../../src/strategy-engine/strategies/vwap-band-reversal/indicators/atr';
+import { computeAtr } from '../src/atr';
 import { bar } from './test-helpers';
 
 const MIN = 60_000;

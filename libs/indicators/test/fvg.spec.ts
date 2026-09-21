@@ -1,4 +1,4 @@
-import { computeFvg } from '../../../src/strategy-engine/strategies/vwap-band-reversal/indicators/fvg';
+import { computeFvg } from '../src/fvg';
 import { bar } from './test-helpers';
 
 const MIN = 60_000;

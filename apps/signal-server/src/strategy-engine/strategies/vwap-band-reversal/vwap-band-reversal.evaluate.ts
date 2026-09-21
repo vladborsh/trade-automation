@@ -1,9 +1,5 @@
 import { Candle } from '@trade-automation/contracts';
-import { computeAtr } from './indicators/atr';
-import { computeFvg } from './indicators/fvg';
-import { computePreviousHourLH } from './indicators/previous-hour';
-import { computeRange } from './indicators/range';
-import { computeVwapBand } from './indicators/vwap';
+import { computeAtr, computeFvg, computePreviousHourLH, computeRange, computeVwapBand } from '@trade-automation/indicators';
 
 const SWEEP_BARS = 6;
 

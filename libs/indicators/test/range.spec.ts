@@ -1,4 +1,4 @@
-import { computeRange } from '../../../src/strategy-engine/strategies/vwap-band-reversal/indicators/range';
+import { computeRange } from '../src/range';
 import { bar } from './test-helpers';
 
 const MIN = 60_000;

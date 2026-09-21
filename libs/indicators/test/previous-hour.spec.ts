@@ -1,4 +1,4 @@
-import { computePreviousHourLH } from '../../../src/strategy-engine/strategies/vwap-band-reversal/indicators/previous-hour';
+import { computePreviousHourLH } from '../src/previous-hour';
 import { bar } from './test-helpers';
 
 const MIN = 60_000;
