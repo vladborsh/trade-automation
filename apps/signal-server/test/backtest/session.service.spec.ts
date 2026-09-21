@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SessionDetailSchema, SessionSchema } from '@trade-automation/contracts';
 import { computeStats } from '@trade-automation/replay-core';
-import { DAY, FakeBacktestRepositories, T0, createBody, makeSessionService } from './fake-backtest';
+import { COVERAGE, DAY, FakeBacktestRepositories, T0, createBody, fakeStore, makeSessionService } from './fake-backtest';
 
 const ALICE = '00000000-0000-4000-8000-00000000000a';
 const BOB = '00000000-0000-4000-8000-00000000000b';
@@ -163,9 +163,93 @@ describe('SessionService (backtest-app-system-design.md §7.2)', () => {
       await expect(service.patch(ALICE, s.id, { name: 'done' })).resolves.toMatchObject({ name: 'done', timeframe: '15m' });
     });
 
-    it('refuses a layout patch (T-029) instead of silently dropping it', async () => {
+  });
+
+  describe('layout edit (T-029)', () => {
+    const layout = (...panels: { id: string; instrument: string; kind?: string; indicators?: unknown }[]) => ({
+      id: 'edited',
+      name: 'Edited',
+      grid: { columns: 4, rows: 1 },
+      panels: panels.map((p) => ({ kind: 'candles', ...p })),
+    });
+    const openOrder = (sessionId: string, panelId: string, instrument: 'binance:BTCUSDT' | 'binance:ETHUSDT', status: 'pending' | 'open') =>
+      repos.orders.insert({
+        sessionId, seq: 1, panelId, instrument, side: 'long', type: status === 'pending' ? 'limit' : 'market', status,
+        placedAtMs: T0 + 5 * DAY, limitPrice: status === 'pending' ? 90 : null, entryPrice: status === 'open' ? 100 : null,
+        entryTimeMs: status === 'open' ? T0 + 5 * DAY : null, qty: 1, riskPct: 1, riskAmountCcy: 10, sl: 80, tp: null,
+        fillResolution: status === 'open' ? '1m' : null,
+      });
+
+    it('adds, removes and reorders panels, carrying indicators, and returns the updated session', async () => {
       const s = await service.create(ALICE, createBody());
-      await expect(service.patch(ALICE, s.id, { layout: s.layout })).rejects.toBeInstanceOf(BadRequestException);
+      const next = layout(
+        { id: 'eth', instrument: 'binance:ETHUSDT' },
+        { id: 'btc', instrument: 'binance:BTCUSDT', indicators: [{ id: 'ema', params: { length: 21 } }] },
+        { id: 'btc-2', instrument: 'binance:BTCUSDT' },
+      );
+      const patched = await service.patch(ALICE, s.id, { layout: next });
+      expect(patched.layout.panels.map((p) => p.id)).toEqual(['eth', 'btc', 'btc-2']);
+      expect(patched.layout.panels[1].indicators).toEqual([{ id: 'ema', params: { length: 21 } }]);
+      expect(patched.cursorMs).toBe(s.cursorMs); // a layout edit never touches the cursor
+      expect((await service.get(ALICE, s.id)).layout).toEqual(patched.layout); // persisted
+    });
+
+    it.each([
+      ['LAYOUT_TOO_MANY_PANELS', layout(...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, instrument: 'binance:BTCUSDT' })))],
+      ['LAYOUT_NOT_CANDLES', layout({ id: 'btc', instrument: 'binance:BTCUSDT' }, { id: 'oi', instrument: 'binance:BTCUSDT', kind: 'metric' })],
+      ['INSTRUMENT_NOT_AVAILABLE', layout({ id: 'ndx', instrument: 'capitalcom:US100' })],
+      ['MIXED_SESSION_CURRENCY', layout({ id: 'btc', instrument: 'binance:BTCUSDT' }, { id: 'eurchf', instrument: 'capitalcom:EURCHF' })],
+      ['MIXED_SESSION_CURRENCY', layout({ id: 'eurchf', instrument: 'capitalcom:EURCHF' })], // consistent, but not the session's USD
+    ])('422 %s, and the layout is unchanged', async (expected, next) => {
+      const s = await service.create(ALICE, createBody());
+      expect(await errorOf(service.patch(ALICE, s.id, { layout: next }))).toEqual({ status: 422, body: code(expected) });
+      expect((await service.get(ALICE, s.id)).layout).toEqual(s.layout);
+    });
+
+    it('422 PERIOD_OUTSIDE_COVERAGE: coverage is checked against the session period', async () => {
+      const shifted = makeSessionService(repos, fakeStore({ ...COVERAGE, 'binance:ETHUSDT': { from: T0 + 20 * DAY, to: T0 + 30 * DAY } }));
+      const s = await shifted.create(ALICE, createBody({ layout: layout({ id: 'btc', instrument: 'binance:BTCUSDT' }) }));
+      expect(await errorOf(shifted.patch(ALICE, s.id, { layout: layout({ id: 'eth', instrument: 'binance:ETHUSDT' }) }))).toEqual({
+        status: 422,
+        body: code('PERIOD_OUTSIDE_COVERAGE'),
+      });
+    });
+
+    it('409 SESSION_COMPLETE for a layout edit on a complete session', async () => {
+      const s = await service.create(ALICE, createBody());
+      repos.rows.get(s.id)!.session.status = 'complete';
+      expect(await errorOf(service.patch(ALICE, s.id, { layout: layout({ id: 'btc', instrument: 'binance:BTCUSDT' }) }))).toEqual({
+        status: 409,
+        body: code('SESSION_COMPLETE'),
+      });
+    });
+
+    it('a panel with a pending or open order cannot be removed or re-pointed (plain 409); closed ones do not block', async () => {
+      const s = await service.create(ALICE, createBody()); // panels btc, eth
+      await openOrder(s.id, 'eth', 'binance:ETHUSDT', 'open');
+      const removeEth = layout({ id: 'btc', instrument: 'binance:BTCUSDT' });
+      const err = await errorOf(service.patch(ALICE, s.id, { layout: removeEth }));
+      expect(err.status).toBe(409);
+      expect(err.body).toMatchObject({ statusCode: 409, message: expect.stringMatching(/Panel 'eth' has pending or open orders/) });
+      const repoint = layout({ id: 'btc', instrument: 'binance:BTCUSDT' }, { id: 'eth', instrument: 'binance:BTCUSDT' });
+      expect((await errorOf(service.patch(ALICE, s.id, { layout: repoint }))).status).toBe(409);
+      // reordering and adding around it is fine
+      await expect(service.patch(ALICE, s.id, { layout: layout({ id: 'eth', instrument: 'binance:ETHUSDT' }, { id: 'btc', instrument: 'binance:BTCUSDT' }) })).resolves.toBeDefined();
+
+      const other = await service.create(ALICE, createBody());
+      await openOrder(other.id, 'btc', 'binance:BTCUSDT', 'pending');
+      expect((await errorOf(service.patch(ALICE, other.id, { layout: layout({ id: 'eth', instrument: 'binance:ETHUSDT' }) }))).status).toBe(409);
+      repos.orderRows.forEach((o) => {
+        if (o.sessionId === other.id) o.status = 'cancelled';
+      });
+      await expect(service.patch(ALICE, other.id, { layout: layout({ id: 'eth', instrument: 'binance:ETHUSDT' }) })).resolves.toBeDefined();
+    });
+
+    it('a malformed layout body is a 400; another user is a 404', async () => {
+      const s = await service.create(ALICE, createBody());
+      await expect(service.patch(ALICE, s.id, { layout: { panels: 'nope' } })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.patch(ALICE, s.id, { layout: layout({ id: 'BTC!', instrument: 'binance:BTCUSDT' }) })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.patch(BOB, s.id, { layout: layout({ id: 'btc', instrument: 'binance:BTCUSDT' }) })).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

@@ -194,6 +194,32 @@ maybeDescribe('backtest sessions against a real Postgres (T-013 done-when)', () 
     expect(detail.session.id).toBe(s.id);
   });
 
+  it('T-029: a layout edit persists in jsonb (indicators included), and a real open order blocks removing its panel', async () => {
+    const s = await repos.sessions.insert(alice, NEW_SESSION);
+    const service = new SessionService(repos, fakeInstrumentConfig(), fakeStore({ 'binance:BTCUSDT': { from: T0, to: T0 + 30 * DAY }, 'binance:ETHUSDT': { from: T0, to: T0 + 30 * DAY } }), new FakeScreenshotStore());
+    const two = {
+      id: 'two',
+      name: 'Two',
+      grid: { columns: 2, rows: 1 },
+      panels: [
+        { id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false, indicators: [{ id: 'rsi', params: { length: 14 } }] },
+        { id: 'eth', kind: 'candles', instrument: 'binance:ETHUSDT', signals: false },
+      ],
+    };
+    await service.patch(alice, s.id, { layout: two });
+    const [row] = await db.query<{ layout: unknown }>(`select layout from backtest_sessions where id = $1`, [s.id]);
+    expect(row.layout).toEqual(two);
+
+    await db.query(
+      `insert into orders (session_id, seq, panel_id, instrument, side, type, status, placed_at_ms, qty, risk_pct, risk_amount_ccy, sl_initial, sl_current, entry_price, entry_time_ms, fill_resolution)
+       values ($1, 1, 'eth', 'binance:ETHUSDT', 'long', 'market', 'open', $2, 1, 1, 10, 90, 90, 100, $2, '1m')`,
+      [s.id, NEW_SESSION.periodFromMs],
+    );
+    const onlyBtc = { ...two, panels: [two.panels[0]] };
+    await expect(service.patch(alice, s.id, { layout: onlyBtc })).rejects.toMatchObject({ status: 409 });
+    expect((await db.query<{ layout: unknown }>(`select layout from backtest_sessions where id = $1`, [s.id]))[0].layout).toEqual(two);
+  });
+
   it('findById with forUpdate works inside a transaction', async () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);
     const name = await repos.transaction(async (tx) => {

@@ -1,7 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UnauthorizedException } from '@nestjs/common';
 import {
-  PatchSessionRequest,
-  PatchSessionRequestSchema,
   Session,
   SessionDetail,
   SessionSummariesResponse,
@@ -9,11 +7,10 @@ import {
 } from '@trade-automation/contracts';
 import { CurrentUser } from '../../../auth/current-user.decorator';
 import { SessionService } from '../../../backtest/session.service';
-import { ZodValidationPipe } from '../../zod-validation.pipe';
 
 /**
  * architecture/backtest-app-system-design.md §7.2 — /api/backtest/sessions. Authenticated by the
- * global AuthGuard; every call is scoped to the cookie user. POST takes the raw body because the
+ * global AuthGuard; every call is scoped to the cookie user. POST and PATCH take the raw body because the
  * layout codes (422 `LAYOUT_TOO_MANY_PANELS` / `LAYOUT_NOT_CANDLES`) are checked before the
  * contract schema — see `SessionService.create`.
  */
@@ -37,11 +34,7 @@ export class SessionsController {
   }
 
   @Patch(':id')
-  patch(
-    @CurrentUser() user: User | undefined,
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(PatchSessionRequestSchema)) body: PatchSessionRequest,
-  ): Promise<Session> {
+  patch(@CurrentUser() user: User | undefined, @Param('id') id: string, @Body() body: unknown): Promise<Session> {
     return this.sessions.patch(this.ownerId(user), id, body);
   }
 

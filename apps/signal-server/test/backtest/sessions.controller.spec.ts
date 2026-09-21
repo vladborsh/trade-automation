@@ -87,6 +87,20 @@ describe('/api/backtest/sessions over HTTP (backtest-app-system-design.md §7.2)
     expect((await call('alice', 'DELETE', `/${session.id}`)).status).toBe(404);
   });
 
+  it('PATCH {layout} (T-029): 200 with the new layout; 422 LAYOUT_TOO_MANY_PANELS over the wire', async () => {
+    const created = (await (await call('alice', 'POST', '', createBody({ name: 'layout edit' }))).json()) as { id: string };
+    const panel = (id: string) => ({ id, kind: 'candles', instrument: 'binance:BTCUSDT' });
+    const ok = await call('alice', 'PATCH', `/${created.id}`, { layout: { id: 'l', name: 'L', grid: { columns: 2, rows: 1 }, panels: [panel('a'), panel('b')] } });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { layout: { panels: { id: string }[] } }).layout.panels.map((p) => p.id)).toEqual(['a', 'b']);
+    const tooMany = await call('alice', 'PATCH', `/${created.id}`, {
+      layout: { id: 'l', name: 'L', grid: { columns: 4, rows: 2 }, panels: ['a', 'b', 'c', 'd', 'e'].map(panel) },
+    });
+    expect(tooMany.status).toBe(422);
+    expect(await tooMany.json()).toEqual({ error: { code: 'LAYOUT_TOO_MANY_PANELS', message: expect.any(String) } });
+    expect((await call('bob', 'PATCH', `/${created.id}`, { layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [panel('a')] } })).status).toBe(404);
+  });
+
   it('422 codes travel in the {error:{code,message}} envelope; shape errors are 400', async () => {
     const res = await call('alice', 'POST', '', createBody({ periodFromMs: 0, periodToMs: 1 }));
     expect(res.status).toBe(422);

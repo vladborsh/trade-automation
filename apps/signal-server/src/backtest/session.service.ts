@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpStatus,
   Inject,
   Injectable,
@@ -12,9 +13,10 @@ import {
   Coverage,
   CreateSessionRequestSchema,
   InstrumentId,
-  PatchSessionRequest,
+  PatchSessionRequestSchema,
   Session,
   SessionDetail,
+  SessionLayout,
   SessionSchema,
   SessionSummary,
 } from '@trade-automation/contracts';
@@ -25,7 +27,7 @@ import { AppConfigService } from '../config/config.service';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { SCREENSHOT_STORE, ScreenshotStore, sessionScreenshotPrefix } from '../storage/screenshot-store.port';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
-import { checkLayoutPanels, isValidationError, periodShapeError, validateCreateSession } from './session-validation';
+import { checkLayoutPanels, isValidationError, panelsLosingActiveOrders, periodShapeError, validateCreateSession, validateLayoutEdit } from './session-validation';
 
 /** §7.2 defaults: `skipWeekends` true (§13, decision 19), `notionalWarnMultiple` 5 (§13, decision 25). */
 export const DEFAULT_SKIP_WEEKENDS = true;
@@ -125,31 +127,62 @@ export class SessionService {
   }
 
   /**
-   * `{name?, timeframe?}` only — a layout edit is T-029 and is refused here rather than silently
-   * dropped. Changing the timeframe of a complete session is 409 `SESSION_COMPLETE` (the client
-   * may still switch tf locally in view-only mode, §7.2); renaming it is allowed. The row is
-   * locked while the status is checked, so a concurrent completion cannot slip between the two.
+   * §7.2 PATCH: `{name?, timeframe?, layout?}`. Takes the raw body, like create, so the two layout
+   * codes are reachable (see `checkLayoutPanels`).
+   *
+   * A layout edit (T-029) passes the create checks against the session's own period, may not
+   * change the session's currency (`validateLayoutEdit`, 422 codes as create), and may not take a
+   * panel away from a pending or open order (plain 409; the orders carry `panel_id`). Changing the
+   * timeframe or the layout of a complete session is 409 `SESSION_COMPLETE`; renaming it is fine.
+   * The row is locked while the status and the orders are checked, so a concurrent completion or
+   * order placement cannot slip in between. A layout edit never touches the cursor.
    */
-  async patch(userId: string, id: string, patch: PatchSessionRequest): Promise<Session> {
+  async patch(userId: string, id: string, body: unknown): Promise<Session> {
     const repos = this.requireEnabled();
-    if (patch.layout !== undefined) {
-      throw new BadRequestException('Editing the layout of a session is not supported yet.');
-    }
+    const layoutError = checkLayoutPanels(body);
+    if (layoutError) throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, layoutError.code, layoutError.message);
+    const parsed = PatchSessionRequestSchema.safeParse(body ?? {});
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    const patch = parsed.data;
     if (!UuidSchema.safeParse(id).success) throw notFound();
+
+    if (patch.layout) {
+      const session = await repos.sessions.findById(userId, id);
+      if (!session) throw notFound();
+      const error = validateLayoutEdit(patch.layout, session, ...(await this.catalogueFor(patch.layout)));
+      if (error) throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, error.code, error.message);
+    }
 
     const updated = await repos.transaction(async (tx) => {
       const current = await tx.sessions.findById(userId, id, { forUpdate: true });
       if (!current) throw notFound();
-      if (patch.timeframe !== undefined && current.status === 'complete') {
-        throw apiError(HttpStatus.CONFLICT, 'SESSION_COMPLETE', 'The timeframe of a complete session cannot be changed.');
+      if ((patch.timeframe !== undefined || patch.layout !== undefined) && current.status === 'complete') {
+        throw apiError(HttpStatus.CONFLICT, 'SESSION_COMPLETE', 'The timeframe or layout of a complete session cannot be changed.');
       }
-      return tx.sessions.update(userId, id, { name: patch.name, timeframe: patch.timeframe });
+      if (patch.layout) {
+        const active = await tx.orders.list(current.id, ['pending', 'open']);
+        const losing = panelsLosingActiveOrders(patch.layout, active);
+        if (losing.length > 0) {
+          throw new ConflictException(`Panel ${losing.map((p) => `'${p}'`).join(', ')} has pending or open orders; cancel or close them first.`);
+        }
+      }
+      return tx.sessions.update(userId, id, { name: patch.name, timeframe: patch.timeframe, layout: patch.layout });
     });
     if (!updated) throw notFound();
     return toSession(updated);
   }
 
-  /** Row delete; orders, modifications, screenshot rows and ops cascade (§3). */
+  /** The configured currencies and each panel instrument's 1m coverage, for the layout checks. */
+  private async catalogueFor(layout: SessionLayout): Promise<[Map<InstrumentId, string>, Map<InstrumentId, Coverage | null>]> {
+    const sessionCurrencyOf = new Map<InstrumentId, string>(this.config.instruments.map((i) => [i.id, i.sessionCurrency]));
+    const instruments = [...new Set(layout.panels.map((p) => p.instrument))].filter((i) => sessionCurrencyOf.has(i));
+    const coverageOf = new Map<InstrumentId, Coverage | null>(
+      await Promise.all(instruments.map(async (i) => [i, await this.store.coverage(i, '1m')] as const)),
+    );
+    return [sessionCurrencyOf, coverageOf];
+  }
+
+
   /**
    * §3, decision 30b, T-025: the session's screenshot prefix is deleted from the store **first**,
    * then the row (orders, modifications, screenshot rows and ops cascade). If the store call

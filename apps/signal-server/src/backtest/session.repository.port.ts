@@ -31,7 +31,7 @@ export interface SessionRepository {
   /** `forUpdate` row-locks it for the rest of the enclosing transaction. */
   findById(userId: string, id: string, opts?: { forUpdate?: boolean }): Promise<SessionSummary | null>;
   /** Bumps `updated_at`; null when no such session for this user. */
-  update(userId: string, id: string, patch: { name?: string; timeframe?: Timeframe }): Promise<SessionSummary | null>;
+  update(userId: string, id: string, patch: { name?: string; timeframe?: Timeframe; layout?: SessionLayout }): Promise<SessionSummary | null>;
   /** True when a row was deleted; cascades to orders, modifications, screenshots, ops (§3). */
   delete(userId: string, id: string): Promise<boolean>;
   /**

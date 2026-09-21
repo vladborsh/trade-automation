@@ -1,8 +1,10 @@
 import { Coverage, CreateSessionRequest, InstrumentId } from '@trade-automation/contracts';
 import {
   checkLayoutPanels,
+  panelsLosingActiveOrders,
   periodShapeError,
   validateCreateSession,
+  validateLayoutEdit,
 } from '../../src/backtest/session-validation';
 
 const DAY = 86_400_000;
@@ -120,5 +122,34 @@ describe('session-validation (backtest-app-system-design.md §7.2)', () => {
         code: 'MIXED_SESSION_CURRENCY',
       });
     });
+  });
+});
+
+describe('T-029 layout edit rules', () => {
+  const session = { sessionCurrency: 'USD', periodFromMs: T0 + 10 * DAY, periodToMs: T0 + 20 * DAY };
+
+  it('validateLayoutEdit: the create checks against the session period', () => {
+    expect(validateLayoutEdit(req(['binance:BTCUSDT', 'binance:ETHUSDT']).layout, session, currencies, coverage)).toBeNull();
+    expect(validateLayoutEdit(req(['capitalcom:US100']).layout, session, currencies, coverage)).toMatchObject({ code: 'INSTRUMENT_NOT_AVAILABLE' });
+    const late = new Map(coverage).set('binance:ETHUSDT', { from: T0 + 25 * DAY, to: T0 + 30 * DAY });
+    expect(validateLayoutEdit(req(['binance:ETHUSDT']).layout, session, currencies, late)).toMatchObject({ code: 'PERIOD_OUTSIDE_COVERAGE' });
+  });
+
+  it('validateLayoutEdit: may not change the session currency, even with a consistent layout', () => {
+    expect(validateLayoutEdit(req(['capitalcom:EURCHF']).layout, session, currencies, coverage)).toMatchObject({
+      code: 'MIXED_SESSION_CURRENCY',
+      message: expect.stringMatching(/trades in USD; its panels cannot move to CHF/),
+    });
+    expect(validateLayoutEdit(req(['binance:BTCUSDT', 'capitalcom:EURCHF']).layout, session, currencies, coverage)).toMatchObject({
+      code: 'MIXED_SESSION_CURRENCY',
+    });
+  });
+
+  it('panelsLosingActiveOrders: removed panels, and panels re-pointed at another instrument', () => {
+    const next = req(['binance:BTCUSDT', 'binance:ETHUSDT']).layout; // p0 = BTC, p1 = ETH
+    expect(panelsLosingActiveOrders(next, [])).toEqual([]);
+    expect(panelsLosingActiveOrders(next, [{ panelId: 'p0', instrument: 'binance:BTCUSDT' }])).toEqual([]);
+    expect(panelsLosingActiveOrders(next, [{ panelId: 'gone', instrument: 'binance:BTCUSDT' }, { panelId: 'gone', instrument: 'binance:BTCUSDT' }])).toEqual(['gone']);
+    expect(panelsLosingActiveOrders(next, [{ panelId: 'p1', instrument: 'binance:BTCUSDT' }])).toEqual(['p1']); // same id, other instrument
   });
 });

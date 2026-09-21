@@ -1,4 +1,4 @@
-import { BacktestErrorCode, Coverage, CreateSessionRequest, InstrumentId, TIMEFRAME_MS } from '@trade-automation/contracts';
+import { BacktestErrorCode, Coverage, CreateSessionRequest, InstrumentId, SessionLayout, TIMEFRAME_MS } from '@trade-automation/contracts';
 
 /**
  * architecture/backtest-app-system-design.md §7.2 — the checks behind POST /backtest/sessions'
@@ -88,4 +88,41 @@ export function validateCreateSession(
 
 export function isValidationError(v: ValidatedSession | SessionValidationError): v is SessionValidationError {
   return 'code' in v;
+}
+
+/**
+ * T-029: a layout edit inside a session. The same checks as creation, against the session's own
+ * (fixed) period, plus one rule: the layout may never change the session's currency group
+ * (decision 36), so every panel's `sessionCurrency` must equal the session's. A layout that is
+ * internally consistent but in another currency is also `MIXED_SESSION_CURRENCY`.
+ */
+export function validateLayoutEdit(
+  layout: SessionLayout,
+  session: { sessionCurrency: string; periodFromMs: number; periodToMs: number },
+  sessionCurrencyOf: ReadonlyMap<InstrumentId, string>,
+  coverageOf: ReadonlyMap<InstrumentId, Coverage | null>,
+): SessionValidationError | null {
+  const verdict = validateCreateSession({ layout, periodFromMs: session.periodFromMs, periodToMs: session.periodToMs }, sessionCurrencyOf, coverageOf);
+  if (isValidationError(verdict)) return verdict;
+  if (verdict.sessionCurrency !== session.sessionCurrency) {
+    return {
+      code: 'MIXED_SESSION_CURRENCY',
+      message: `This session trades in ${session.sessionCurrency}; its panels cannot move to ${verdict.sessionCurrency}.`,
+    };
+  }
+  return null;
+}
+
+/**
+ * T-029: the panels a layout edit would take away from pending or open orders. Orders carry
+ * `panel_id`; a panel holding one may not disappear, and may not keep its id while pointing at a
+ * different instrument (the order would then sit on a chart of something else).
+ */
+export function panelsLosingActiveOrders(
+  next: SessionLayout,
+  activeOrders: readonly { panelId: string; instrument: InstrumentId }[],
+): string[] {
+  const nextInstrument = new Map(next.panels.map((p) => [p.id, p.instrument]));
+  const losing = activeOrders.filter((o) => nextInstrument.get(o.panelId) !== o.instrument).map((o) => o.panelId);
+  return [...new Set(losing)];
 }

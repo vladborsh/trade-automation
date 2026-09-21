@@ -131,13 +131,14 @@ export class PgSessionRepository implements SessionRepository {
     return row ? toSessionSummary(row) : null;
   }
 
-  async update(userId: string, id: string, patch: { name?: string; timeframe?: Timeframe }): Promise<SessionSummary | null> {
+  async update(userId: string, id: string, patch: { name?: string; timeframe?: Timeframe; layout?: SessionLayout }): Promise<SessionSummary | null> {
     const [row] = await this.db.query<SessionRow>(
       `update backtest_sessions
-          set name = coalesce($3, name), timeframe = coalesce($4, timeframe), updated_at = now()
+          set name = coalesce($3, name), timeframe = coalesce($4, timeframe),
+              layout = coalesce($5::jsonb, layout), updated_at = now()
         where id = $1 and user_id = $2
        returning ${COLUMNS}`,
-      [id, userId, patch.name ?? null, patch.timeframe ?? null],
+      [id, userId, patch.name ?? null, patch.timeframe ?? null, patch.layout ? JSON.stringify(patch.layout) : null],
     );
     return row ? toSessionSummary(row) : null;
   }

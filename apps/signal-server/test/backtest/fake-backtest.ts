@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Candle, Coverage, InstrumentId, Order, SessionAggregates, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { Candle, Coverage, InstrumentId, Order, SessionAggregates, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
 import type { OpKind } from '../../src/backtest/op-fingerprint';
 import { OpsRepository } from '../../src/backtest/ops.repository.port';
@@ -129,12 +129,13 @@ export class FakeBacktestRepositories implements BacktestRepositories {
       const row = this.rows.get(id);
       return row && row.userId === userId ? row.session : null;
     },
-    update: async (userId, id, patch: { name?: string; timeframe?: Timeframe }) => {
+    update: async (userId, id, patch: { name?: string; timeframe?: Timeframe; layout?: SessionLayout }) => {
       const row = this.rows.get(id);
       if (!row || row.userId !== userId) return null;
       Object.assign(row.session, {
         ...(patch.name !== undefined && { name: patch.name }),
         ...(patch.timeframe !== undefined && { timeframe: patch.timeframe }),
+        ...(patch.layout !== undefined && { layout: structuredClone(patch.layout) }),
         updatedAt: this.clock++,
       });
       return row.session;
