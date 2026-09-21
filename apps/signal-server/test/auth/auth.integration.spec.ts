@@ -1,4 +1,9 @@
-import { HttpException } from '@nestjs/common';
+import { HttpException, INestApplication, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
+import { AuthController } from '../../src/api/rest/auth.controller';
+import { AuthGuard } from '../../src/auth/auth.guard';
+import { PasswordHasher } from '../../src/auth/password';
 import { randomUUID } from 'crypto';
 import { AdminBootstrap } from '../../src/auth/admin-bootstrap.service';
 import { AdminService } from '../../src/auth/admin.service';
@@ -171,6 +176,45 @@ maybeDescribe('auth against a real Postgres (T-007 done-when)', () => {
       expect((await repos.users.findById(victim.id))!.disabledAtMs).toBeNull();
       await expect(admin.disableUser(adminId, randomUUID())).rejects.toMatchObject({ status: 404 });
     });
+  });
+
+  describe('BUG-005: the Tester\'s reproduction over HTTP, production scrypt', () => {
+    let app: INestApplication;
+    let url: string;
+
+    beforeAll(async () => {
+      await repos.users.insert({ email: email('burst'), passwordHash: await new PasswordHasher().hash('burst-password-ok'), role: 'user' });
+      const real = new AuthService(repos, new PasswordHasher(), new LoginThrottle(), fakeConfig(), () => Date.now());
+      @Module({
+        controllers: [AuthController],
+        providers: [{ provide: AuthService, useValue: real }, { provide: APP_GUARD, useClass: AuthGuard }],
+      })
+      class BurstModule {}
+      app = (await Test.createTestingModule({ imports: [BurstModule] }).compile()).createNestApplication({ logger: false });
+      await app.listen(0);
+      url = `${await app.getUrl()}/api/auth/login`;
+    });
+    afterAll(() => app.close());
+
+    const burst = (who: string, n: number) =>
+      Promise.all(
+        Array.from({ length: n }, () =>
+          fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: who, password: 'bad-bad-bad-1' }) }).then((r) => r.status),
+        ),
+      );
+    const tally = (statuses: number[]) => statuses.reduce<Record<number, number>>((acc, s) => ({ ...acc, [s]: (acc[s] ?? 0) + 1 }), {});
+
+    it('200 parallel wrong logins for a real account: at most 10 are checked (401), the rest 429', async () => {
+      const counts = tally(await burst(email('burst'), 200));
+      expect(counts).toEqual({ 401: 10, 429: 190 });
+      // the right password is now refused too, until the window passes
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email('burst'), password: 'burst-password-ok' }) });
+      expect(res.status).toBe(429);
+    }, 60_000);
+
+    it('the same for an unknown email', async () => {
+      expect(tally(await burst(email('nobody-home'), 200))).toEqual({ 401: 10, 429: 190 });
+    }, 60_000);
   });
 
   it('AdminBootstrap upserts the admin from env: creates, then resets password/role/disabled on re-boot', async () => {

@@ -1,7 +1,8 @@
 import { HttpException, ServiceUnavailableException } from '@nestjs/common';
-import { INVITE_TTL_MS } from '../../src/auth/auth.service';
+import { AuthService, INVITE_TTL_MS } from '../../src/auth/auth.service';
+import { LoginThrottle } from '../../src/auth/login-throttle';
 import { SESSION_TTL_MS, sha256Hex } from '../../src/auth/session-cookie';
-import { FakeAuthRepositories, FakeClock, fastHasher, makeAuthService } from './fake-auth';
+import { FakeAuthRepositories, FakeClock, fakeConfig, fastHasher, makeAuthService } from './fake-auth';
 
 async function errorOf(p: Promise<unknown>): Promise<{ status: number; body: unknown }> {
   try {
@@ -53,6 +54,78 @@ describe('AuthService (backtest-app-system-design.md §7.1)', () => {
       expect(await errorOf(service.login('alice@x.test', 'alice-password', null))).toEqual({ status: 429, body: code('TOO_MANY_ATTEMPTS') });
       clock.advance(15 * 60 * 1000);
       await expect(service.login('alice@x.test', 'alice-password', null)).resolves.toBeDefined();
+    });
+  });
+
+  describe('login under concurrency (BUG-005)', () => {
+    /** A hasher whose verify() waits until the test opens the gate, counting the calls that got there. */
+    function gatedHasher() {
+      const real = fastHasher();
+      const waiting: (() => void)[] = [];
+      let open = false;
+      let calls = 0;
+      return {
+        hasher: {
+          hash: (pw: string) => real.hash(pw),
+          verify: async (pw: string, stored: string) => {
+            calls++;
+            if (!open) await new Promise<void>((resolve) => waiting.push(resolve));
+            return real.verify(pw, stored);
+          },
+        },
+        calls: () => calls,
+        open: () => {
+          open = true;
+          waiting.splice(0).forEach((resolve) => resolve());
+        },
+      };
+    }
+
+    /**
+     * Fires `n` logins for one email and holds every verify() until each request has either been
+     * refused (settled) or is parked in verify(), so all of them are in flight at once.
+     */
+    async function burst(email: string, n: number) {
+      const gate = gatedHasher();
+      const svc = new AuthService(repos, gate.hasher as never, new LoginThrottle(), fakeConfig(), clock.now);
+      let settled = 0;
+      const pending = Array.from({ length: n }, () =>
+        svc.login(email, 'wrong-password', null).then(
+          () => 200,
+          (e: HttpException) => e.getStatus(),
+        ).finally(() => settled++),
+      );
+      const deadline = Date.now() + 3000;
+      while (settled + gate.calls() < n && Date.now() < deadline) await new Promise((resolve) => setImmediate(resolve));
+      const reachedVerifyWhileHeld = gate.calls();
+      gate.open();
+      const statuses = await Promise.all(pending);
+      return { svc, reachedVerifyWhileHeld, totalVerify: gate.calls(), statuses };
+    }
+
+    it('50 parallel logins for one email: exactly 10 reach verify, 40 get 429 without it', async () => {
+      const { svc, reachedVerifyWhileHeld, totalVerify, statuses } = await burst('alice@x.test', 50);
+      expect(reachedVerifyWhileHeld).toBe(10);
+      expect(totalVerify).toBe(10);
+      expect(statuses.filter((s) => s === 401)).toHaveLength(10);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(40);
+      // and the account is now throttled, even for the right password
+      expect(await errorOf(svc.login('alice@x.test', 'alice-password', null))).toEqual({ status: 429, body: code('TOO_MANY_ATTEMPTS') });
+    });
+
+    it('an unknown email goes through exactly the same path', async () => {
+      const { reachedVerifyWhileHeld, totalVerify, statuses } = await burst('nobody@x.test', 50);
+      expect(reachedVerifyWhileHeld).toBe(10);
+      expect(totalVerify).toBe(10);
+      expect(statuses.filter((s) => s === 401)).toHaveLength(10);
+      expect(statuses.filter((s) => s === 429)).toHaveLength(40);
+    });
+
+    it('a disabled account with the right password does not use up an attempt', async () => {
+      (await repos.users.findByEmail('alice@x.test'))!.disabledAtMs = 1;
+      for (let i = 0; i < 12; i++) {
+        expect((await errorOf(service.login('alice@x.test', 'alice-password', null))).status).toBe(403);
+      }
     });
   });
 

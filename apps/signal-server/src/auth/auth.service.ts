@@ -65,24 +65,34 @@ export class AuthService {
   async login(email: string, password: string, userAgent: string | null): Promise<IssuedSession> {
     const repos = this.requireEnabled();
     const now = this.now();
-    if (this.throttle.isBlocked(email, now)) {
+    // BUG-005: reserve the attempt before any await, so a concurrent burst cannot all pass the
+    // check while the first requests are still hashing. Refused attempts never reach scrypt.
+    const reservation = this.throttle.tryReserve(email, now);
+    if (!reservation) {
       throw apiError(HttpStatus.TOO_MANY_REQUESTS, 'TOO_MANY_ATTEMPTS', 'Too many failed login attempts; try again later.');
     }
 
-    const user = await repos.users.findByEmail(email);
-    // An unknown email still pays for one scrypt, so response time does not reveal which emails exist.
-    const ok = await this.hasher.verify(password, user?.passwordHash ?? (await this.dummyPasswordHash()));
-    if (!user || !ok) {
-      this.throttle.recordFailure(email, now);
-      throw apiError(HttpStatus.UNAUTHORIZED, 'INVALID_CREDENTIALS', 'Invalid email or password.');
-    }
-    if (user.disabledAtMs !== null) {
-      throw apiError(HttpStatus.FORBIDDEN, 'USER_DISABLED', 'This account is disabled.');
-    }
+    let outcome: 'failed' | 'succeeded' | 'neutral' = 'neutral';
+    try {
+      const user = await repos.users.findByEmail(email);
+      // An unknown email still pays for one scrypt, so response time does not reveal which emails exist.
+      const ok = await this.hasher.verify(password, user?.passwordHash ?? (await this.dummyPasswordHash()));
+      if (!user || !ok) {
+        outcome = 'failed'; // the reservation stays as the failure
+        throw apiError(HttpStatus.UNAUTHORIZED, 'INVALID_CREDENTIALS', 'Invalid email or password.');
+      }
+      if (user.disabledAtMs !== null) {
+        throw apiError(HttpStatus.FORBIDDEN, 'USER_DISABLED', 'This account is disabled.');
+      }
 
-    this.throttle.reset(email);
-    await repos.sessions.deleteExpiredForUser(user.id, now);
-    return this.issueSession(repos.sessions, user, userAgent, now);
+      outcome = 'succeeded';
+      this.throttle.reset(email);
+      await repos.sessions.deleteExpiredForUser(user.id, now);
+      return await this.issueSession(repos.sessions, user, userAgent, now);
+    } finally {
+      // a disabled account or an unexpected error is not a wrong guess: give the slot back
+      if (outcome === 'neutral') this.throttle.release(reservation);
+    }
   }
 
   async logout(token: string): Promise<void> {
