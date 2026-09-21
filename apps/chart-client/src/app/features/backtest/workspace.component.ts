@@ -4,11 +4,14 @@ import { LayoutsStore } from '../../core/state/layouts.store';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
 import { PanelGridComponent } from '../panel-grid/panel-grid.component';
 import { ReplayToolbarComponent } from './replay-toolbar.component';
+import { JournalComponent } from './journal.component';
+import { StatsSummaryComponent } from './stats-summary.component';
 import { adjacentTimeframe, replayKeyAction } from './replay-keys';
 
 /**
  * backtest-app-system-design.md §2.3, §5.4 — `/sessions/:id`: the replay toolbar over the panel
- * grid, each panel rendered from its `ReplayPanelSource`.
+ * grid, each panel rendered from its `ReplayPanelSource`; the journal and the statistics summary
+ * (T-024, read-only, the server's numbers) below it.
  *
  * Provides its own `LayoutsStore` (empty): the grid and its panels read the *active layout* for
  * collapsing, and the live terminal's layout must not reach into a session — so nothing collapses
@@ -18,7 +21,7 @@ import { adjacentTimeframe, replayKeyAction } from './replay-keys';
 @Component({
   selector: 'app-workspace',
   standalone: true,
-  imports: [ReplayToolbarComponent, PanelGridComponent],
+  imports: [ReplayToolbarComponent, PanelGridComponent, JournalComponent, StatsSummaryComponent],
   providers: [ReplaySessionStore, LayoutsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './workspace.component.html',

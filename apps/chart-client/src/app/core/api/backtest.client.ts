@@ -16,6 +16,7 @@ import type {
   ReplayHistoryResponse,
   Session,
   SessionDetail,
+  SessionStatsResponse,
   SessionSummariesResponse,
   Timeframe,
 } from '@trade-automation/contracts';
@@ -66,6 +67,16 @@ export class BacktestClient {
     return this.rest.send('GET', `/backtest/sessions/${encodeURIComponent(id)}/candles/ahead`, {
       params: { panelId, fromMs, limit },
     });
+  }
+
+  /** §7.2 — the journal: every order of the session by `seq`, optionally one status only. */
+  listOrders(id: string, status?: Order['status']): Promise<Order[]> {
+    return this.rest.send('GET', `${sessionPath(id)}/orders`, { params: { status } });
+  }
+
+  /** §7.2, decision 38 — the full recompute plus the stored aggregates and whether they drifted. */
+  getStats(id: string): Promise<SessionStatsResponse> {
+    return this.rest.send('GET', `${sessionPath(id)}/stats`);
   }
 
   // --- mutations (§5.5, §7.2): each body carries its opId; the AdvanceQueue builds them once --------

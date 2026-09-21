@@ -147,6 +147,22 @@ describe('AdvanceQueue (backtest-app-system-design.md §5.5)', () => {
     expect(sent[0].body).toEqual({ opId: 'op-1', toCursorMs: 6 * M });
   });
 
+  it('reports idle once, when everything queued has been answered', async () => {
+    const { transport, sent } = fakeTransport();
+    const idle: number[] = [];
+    let n = 0;
+    const queue = new AdvanceQueue(transport, { onOutcome: () => undefined, onRefused: () => undefined, onIdle: () => idle.push(sent.length) }, { newOpId: () => `op-${++n}` });
+    queue.push({ kind: 'advance', toCursorMs: 5 * M });
+    queue.push({ kind: 'advance', toCursorMs: 10 * M });
+    await flush();
+    sent[0].answer(result(5 * M));
+    await flush();
+    expect(idle).toEqual([]); // the coalesced advance is still out
+    sent[1].answer(result(10 * M));
+    await flush();
+    expect(idle).toEqual([2]);
+  });
+
   it('stop() drops queued work and ignores the answer in flight', async () => {
     const { queue, sent, outcomes } = setup();
     queue.push({ kind: 'advance', toCursorMs: 5 * M });

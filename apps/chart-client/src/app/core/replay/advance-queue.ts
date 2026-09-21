@@ -34,6 +34,8 @@ export interface AdvanceQueueHooks {
   onRefused(err: unknown, op: MutationInput): void;
   /** Whether a request is currently being retried after a network error or 5xx. */
   onRetrying?(retrying: boolean): void;
+  /** The queue has answered everything it was given (after at least one outcome). */
+  onIdle?(): void;
 }
 
 export interface AdvanceQueueOptions {
@@ -109,6 +111,7 @@ export class AdvanceQueue {
     } finally {
       this.running = false;
     }
+    if (!this.stopped) this.hooks.onIdle?.();
   }
 
   /** The head of the queue, frozen: waiting advances coalesced into one with a fresh opId. */

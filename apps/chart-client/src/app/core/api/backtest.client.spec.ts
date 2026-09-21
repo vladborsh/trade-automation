@@ -51,6 +51,16 @@ describe('BacktestClient (backtest-app-system-design.md §7.2)', () => {
     );
   });
 
+  it('GETs the journal and the stats (T-024)', async () => {
+    const { client, fetchMock } = setup(jsonResponse(200, []));
+    await client.listOrders('s1');
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders`, expect.objectContaining({ method: 'GET' }));
+    await client.listOrders('s1', 'closed');
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders?status=closed`, expect.anything());
+    await client.getStats('s1');
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/stats`, expect.anything());
+  });
+
   it('sends the five mutations to their §7.2 paths with the body as given (T-021)', async () => {
     const { client, fetchMock } = setup(jsonResponse(200, {}));
     const body = { opId: '00000000-0000-4000-8000-000000000001', cursorMs: 60_000 };

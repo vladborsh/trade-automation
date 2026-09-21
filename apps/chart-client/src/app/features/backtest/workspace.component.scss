@@ -16,6 +16,21 @@
   min-height: 0;
   min-width: 0;
 }
+.bottom {
+  display: flex;
+  height: 30%;
+  min-height: 140px;
+  border-top: 1px solid #30363d;
+}
+.bottom .journal {
+  flex: 1;
+  min-width: 0;
+}
+.bottom .stats {
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid #30363d;
+}
 .message {
   margin: 24px 16px;
   color: #8b949e;

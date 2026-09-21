@@ -1,0 +1,16 @@
+<section class="stats" aria-label="Statistics">
+  <h2>Statistics</h2>
+  @if (drift()) {
+    <p class="drift" data-testid="stats-drift" role="status">
+      Stored aggregates differ from a full recompute — showing the recompute.
+    </p>
+  }
+  <dl>
+    @for (item of items(); track item.key) {
+      <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw">
+        <dt>{{ item.label }}</dt>
+        <dd>{{ item.text }}</dd>
+      </div>
+    }
+  </dl>
+</section>

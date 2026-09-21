@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import type { Panel, Session, Timeframe } from '@trade-automation/contracts';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
+import { PortfolioStore } from '../../core/replay/portfolio.store';
 import { PanelGridComponent } from '../panel-grid/panel-grid.component';
 import { WorkspaceComponent } from './workspace.component';
 
@@ -41,6 +42,8 @@ function fakeStore() {
     retrying: signal(false),
     notice: signal<string | null>(null),
     sources: signal(new Map()),
+    portfolio: new PortfolioStore(),
+    pricePrecision: signal(new Map()),
     open: vi.fn(async () => {
       store.session.set(SESSION);
       store.engine.set(engine);
@@ -88,6 +91,12 @@ describe('WorkspaceComponent', () => {
     expect(grid.panels()).toEqual(SESSION.layout.panels);
     expect(grid.sources()).toBe(store.sources());
     expect(grid.timeframe()).toBe('5m');
+  });
+
+  it('shows the journal and the statistics under the grid', async () => {
+    const { el } = await render();
+    expect(el.querySelector('.bottom app-journal')).not.toBeNull();
+    expect(el.querySelector('.bottom app-stats-summary')).not.toBeNull();
   });
 
   it('→ steps and [ / ] switch to the neighbouring timeframe', async () => {

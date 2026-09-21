@@ -1,0 +1,40 @@
+.stats {
+  height: 100%;
+  overflow: auto;
+}
+h2 {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.drift {
+  margin: 0 12px 6px;
+  padding: 4px 8px;
+  border: 1px solid #ef5350;
+  border-radius: 4px;
+  color: #ef5350;
+  font-size: 12px;
+}
+dl {
+  margin: 0;
+  padding: 0 12px 8px;
+  font-size: 12px;
+}
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+  border-bottom: 1px solid #30363d;
+}
+dt {
+  color: #8b949e;
+}
+dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

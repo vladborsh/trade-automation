@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import type { FillEvent, Order, SessionDetail, SessionStats } from '@trade-automation/contracts';
+import type { FillEvent, Order, SessionDetail, SessionStats, SessionStatsResponse } from '@trade-automation/contracts';
 import { previewDiffers } from './reconcile';
 
 /**
@@ -18,6 +18,8 @@ export class PortfolioStore {
   readonly orders = computed(() => [...this.byId().values()].sort((a, b) => a.seq - b.seq));
   readonly events = signal<readonly FillEvent[]>([]);
   readonly stats = signal<SessionStats | null>(null);
+  /** `GET …/stats`: the stored aggregates differ from a full recompute (decision 38). */
+  readonly drift = signal(false);
 
   /** The state `GET …/sessions/:id` returns — the reload and resync source. */
   load(detail: SessionDetail): void {
@@ -25,6 +27,17 @@ export class PortfolioStore {
     this.previews.clear();
     this.events.set([]);
     this.stats.set(detail.stats);
+  }
+
+  /** Every order of the session (`GET …/orders`), replacing what was known: the journal's source. */
+  setOrders(orders: readonly Order[]): void {
+    this.byId.set(new Map(orders.map((o) => [o.id, o])));
+  }
+
+  /** `GET …/stats`: the server's recompute is what the summary shows; `drift` flags the stored row. */
+  applyStatsResponse(res: SessionStatsResponse): void {
+    this.stats.set(res.computed);
+    this.drift.set(res.drift);
   }
 
   /** T-023: the client's own prediction for an order, to be checked against the server's row. */

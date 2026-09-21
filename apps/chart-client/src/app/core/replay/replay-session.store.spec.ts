@@ -23,6 +23,9 @@ function fakeClient(session: Session = SESSION) {
     getReplayHistory: vi.fn(async () => ({ bars: [], forming: null })),
     getReplayAhead: vi.fn(async (_id: string, _p: string, fromMs: number) => ({ candles: tuples.filter((t) => t[0] >= fromMs), endOfTape: true })),
     patchSession: vi.fn(),
+    listOrders: vi.fn(async (): Promise<Order[]> => [{ id: 'o0', seq: 1, status: 'closed' } as Order]),
+    getStats: vi.fn(async () => ({ computed: STATS, stored: {}, drift: false })),
+    getInstruments: vi.fn(async () => [{ id: 'binance:BTCUSDT', pricePrecision: 2 }]),
     advance: vi.fn(async (_id: string, body: { toCursorMs: number }): Promise<AdvanceResult> => ({
       cursorMs: body.toCursorMs,
       status: body.toCursorMs >= session.periodToMs ? 'complete' : 'active',
@@ -53,9 +56,35 @@ describe('ReplaySessionStore (T-021)', () => {
 
     expect(client.advance).toHaveBeenCalledWith('s1', expect.objectContaining({ toCursorMs: T0 + 5 * M }));
     expect(store.session()).toMatchObject({ cursorMs: T0 + 5 * M, balance: 10_250, status: 'active' });
-    expect(store.portfolio.orders().map((o) => o.id)).toEqual(['o1']);
-    expect(store.portfolio.stats()).toEqual({ trades: 1 });
+    expect(store.portfolio.orders().map((o) => o.id)).toEqual(['o0', 'o1']); // o1 added by the advance
+    expect(store.portfolio.stats()).toEqual({ trades: 0 }); // then GET …/stats on idle is the truth
     expect(store.pendingMutations).toBe(0);
+  });
+
+  it('loads the journal (every order), the stats with drift, and the price precision', async () => {
+    const client = fakeClient();
+    client.getStats.mockResolvedValueOnce({ computed: { trades: 7 } as unknown as SessionStats, stored: {}, drift: true });
+    const store = await open(client);
+    expect(store.portfolio.orders().map((o) => o.id)).toEqual(['o0']);
+    expect(store.portfolio.stats()).toEqual({ trades: 7 });
+    expect(store.portfolio.drift()).toBe(true);
+    expect(store.pricePrecision().get('binance:BTCUSDT')).toBe(2);
+  });
+
+  it('refreshes the stats once the queue has drained, not per response', async () => {
+    const client = fakeClient();
+    const answer = client.advance.getMockImplementation()!;
+    client.advance.mockImplementation(async (id, body) => {
+      await new Promise((r) => setTimeout(r, 20)); // a slow server: the second step queues behind the first
+      return answer(id, body);
+    });
+    const store = await open(client);
+    expect(client.getStats).toHaveBeenCalledTimes(1); // on open
+    await store.engine()!.step();
+    await store.engine()!.step();
+    await new Promise((r) => setTimeout(r, 80));
+    expect(client.advance).toHaveBeenCalledTimes(2);
+    expect(client.getStats).toHaveBeenCalledTimes(2); // one refresh for the drained queue
   });
 
   it('locks the workspace when a response says complete', async () => {

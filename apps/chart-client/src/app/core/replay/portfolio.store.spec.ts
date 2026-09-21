@@ -28,6 +28,16 @@ describe('PortfolioStore', () => {
     expect(p.orders()[0].exitPrice).toBe(104);
   });
 
+  it('takes the full journal and the stats response (computed + drift)', () => {
+    const p = new PortfolioStore();
+    p.setOrders([order('b', 2, { status: 'closed' }), order('a', 1, { status: 'cancelled' })]);
+    expect(p.orders().map((o) => [o.id, o.status])).toEqual([['a', 'cancelled'], ['b', 'closed']]);
+    const computed = { trades: 2 } as unknown as SessionStats;
+    p.applyStatsResponse({ computed, stored: {} as never, drift: true });
+    expect(p.stats()).toBe(computed);
+    expect(p.drift()).toBe(true);
+  });
+
   it('accumulates fill events', () => {
     const p = new PortfolioStore();
     const e = { orderId: 'a', kind: 'fill', time: 1, price: 1, resolution: '1m' } as FillEvent;

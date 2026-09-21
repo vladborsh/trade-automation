@@ -19,6 +19,20 @@
       <div class="grid">
         <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
       </div>
+      <div class="bottom">
+        <app-journal
+          class="journal"
+          [orders]="store.portfolio.orders()"
+          [currency]="s.sessionCurrency"
+          [pricePrecision]="store.pricePrecision()"
+        />
+        <app-stats-summary
+          class="stats"
+          [stats]="store.portfolio.stats()"
+          [drift]="store.portfolio.drift()"
+          [currency]="s.sessionCurrency"
+        />
+      </div>
     }
   } @else if (store.loadError(); as message) {
     <p class="message error" role="alert">Could not open the session: {{ message }}</p>

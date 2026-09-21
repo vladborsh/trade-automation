@@ -33,6 +33,8 @@ export class ReplaySessionStore implements OnDestroy {
   readonly retrying = signal(false);
   /** A one-line message: "resynced", "reloaded from the server", … */
   readonly notice = signal<string | null>(null);
+  /** Instrument → price decimals, for the journal (from `GET /backtest/instruments`). */
+  readonly pricePrecision = signal<ReadonlyMap<string, number>>(new Map());
 
   private queue: AdvanceQueue | null = null;
   private sessionId: string | null = null;
@@ -62,6 +64,7 @@ export class ReplaySessionStore implements OnDestroy {
         onOutcome: (outcome) => this.reconcile(outcome),
         onRefused: (err) => this.refused(err),
         onRetrying: (retrying) => this.retrying.set(retrying),
+        onIdle: () => void this.refreshStats(id),
       });
       const engine = new ReplayEngine(this.api(id), {
         panels: session.layout.panels,
@@ -75,11 +78,37 @@ export class ReplaySessionStore implements OnDestroy {
       });
       this.queue = queue;
       this.portfolio.load(detail);
+      await this.loadJournal(id);
       this.session.set(session);
       this.engine.set(engine);
       await engine.start();
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  /**
+   * The journal and summary sources (T-024): every order, the stats with their drift flag, and the
+   * instruments' price precision. Afterwards rows are refreshed from queue outcomes and the stats
+   * once the queue goes idle — never polled.
+   */
+  private async loadJournal(id: string): Promise<void> {
+    const [orders, stats, instruments] = await Promise.all([
+      this.client.listOrders(id),
+      this.client.getStats(id),
+      this.client.getInstruments(),
+    ]);
+    this.portfolio.setOrders(orders);
+    this.portfolio.applyStatsResponse(stats);
+    this.pricePrecision.set(new Map(instruments.map((i) => [i.id, i.pricePrecision])));
+  }
+
+  /** One `GET …/stats` after the queue has drained, so `drift` reflects the rows just written. */
+  private async refreshStats(id: string): Promise<void> {
+    try {
+      this.portfolio.applyStatsResponse(await this.client.getStats(id));
+    } catch (err) {
+      console.warn('[ReplaySessionStore] could not refresh the stats', err);
     }
   }
 

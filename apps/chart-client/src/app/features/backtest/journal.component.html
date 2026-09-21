@@ -1,0 +1,33 @@
+<section class="journal" aria-label="Trade journal">
+  <h2>Journal</h2>
+  @if (rows().length === 0) {
+    <p class="empty">No orders yet.</p>
+  } @else {
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            @for (c of columns; track c) {
+              <th scope="col">{{ c }}</th>
+            }
+            <th scope="col">Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr data-testid="journal-row" [attr.data-order-id]="row.id" [class.win]="row.pnlSign === 1" [class.loss]="row.pnlSign === -1">
+              @for (c of row.cells; track c.field) {
+                <td [attr.data-field]="c.field" [attr.data-value]="c.raw" [attr.title]="c.title ?? null" [class]="'col-' + c.field">{{ c.text }}</td>
+              }
+              <td class="flags">
+                @for (f of row.flags; track f.key) {
+                  <span class="flag" [attr.data-flag]="f.key" [title]="f.title">{{ f.label }}</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

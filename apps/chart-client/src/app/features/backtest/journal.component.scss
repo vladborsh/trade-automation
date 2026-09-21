@@ -1,0 +1,72 @@
+.journal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+h2 {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.empty {
+  margin: 0;
+  padding: 6px 12px;
+  color: #8b949e;
+  font-size: 12px;
+}
+.scroll {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+th,
+td {
+  padding: 3px 10px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid #30363d;
+}
+th {
+  position: sticky;
+  top: 0;
+  background: #0d1117;
+  color: #8b949e;
+  font-weight: 500;
+}
+td.col-instrument,
+td.col-side,
+td.col-type,
+td.col-status,
+td.col-closeReason,
+td.flags {
+  text-align: left;
+}
+tr.win td.col-pnlCcy,
+tr.win td.col-pnlR {
+  color: #26a69a;
+}
+tr.loss td.col-pnlCcy,
+tr.loss td.col-pnlR {
+  color: #ef5350;
+}
+.flag {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  border: 1px solid #8b949e;
+  border-radius: 3px;
+  color: #c9d1d9;
+  font-size: 11px;
+  cursor: help;
+}

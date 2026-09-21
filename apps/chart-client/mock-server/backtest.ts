@@ -13,6 +13,7 @@ import {
 } from '@trade-automation/contracts';
 import { readJsonBody, type SendJson } from './auth';
 import { replayAhead, replayHistory } from './replay-tape';
+import { seededOrders, seededStats } from './journal-seed';
 
 /**
  * architecture/backtest-app-system-design.md §7.2 — an in-memory stand-in for the real server's
@@ -33,7 +34,8 @@ import { replayAhead, replayHistory } from './replay-tape';
  * `POST …/advance` moves the stored cursor like the real one (T-017 + BUG-004): minute-aligned or
  * 400, backwards 409 CURSOR_BACKWARDS, clamped to the period end where the session completes,
  * then 409 SESSION_COMPLETE; the same opId with the same body replays, with another body 409s.
- * No orders exist in the mock, so an advance never fills anything.
+ * No orders are placed in the mock, so an advance never fills anything; `…/orders` and `…/stats`
+ * report the fixed journal from journal-seed.ts (T-024).
  */
 
 const MIN = 60_000;
@@ -98,6 +100,20 @@ export class MockBacktestState {
         return true;
       }
       this.candles(res, send, session, new URL(req.url ?? '/', 'http://mock').searchParams, candles[2] !== undefined);
+      return true;
+    }
+    const journal = /^\/api\/backtest\/sessions\/([^/]+)\/(orders|stats)$/.exec(pathname);
+    if (journal && method === 'GET') {
+      const own = UUID.test(journal[1]) ? this.sessions.get(journal[1]) : undefined;
+      const session = own && own.userId === userId ? own.summary : null;
+      if (!session) {
+        send(res, 404, { statusCode: 404, message: 'Session not found.' });
+      } else if (journal[2] === 'stats') {
+        send(res, 200, seededStats(session));
+      } else {
+        const status = new URL(req.url ?? '/', 'http://mock').searchParams.get('status');
+        send(res, 200, seededOrders(session).filter((o) => !status || o.status === status));
+      }
       return true;
     }
     const advance = /^\/api\/backtest\/sessions\/([^/]+)\/advance$/.exec(pathname);
