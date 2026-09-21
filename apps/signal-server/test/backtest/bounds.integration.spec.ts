@@ -14,7 +14,7 @@ import { SessionService } from '../../src/backtest/session.service';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
-import { fakeInstrumentConfig } from './fake-backtest';
+import { fakeInstrumentConfig, FakeScreenshotStore } from './fake-backtest';
 
 /**
  * BUG-002 / BUG-003 reproductions, exactly as the bug lines state them, over HTTP against a real
@@ -70,7 +70,7 @@ maybeDescribe('BUG-002 / BUG-003 reproductions against a real Postgres', () => {
     @Module({
       controllers: [SessionsController, OrdersController],
       providers: [
-        { provide: SessionService, useValue: new SessionService(repos, fakeInstrumentConfig(), store as never) },
+        { provide: SessionService, useValue: new SessionService(repos, fakeInstrumentConfig(), store as never, new FakeScreenshotStore()) },
         { provide: OrderService, useValue: new OrderService(repos, store) },
         { provide: APP_GUARD, useClass: StubGuard },
       ],

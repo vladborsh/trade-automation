@@ -9,6 +9,7 @@ import { StorageModule } from '../storage/storage.module';
 import { StrategyEngineModule } from '../strategy-engine/strategy-engine.module';
 import { InstrumentsController } from './rest/instruments.controller';
 import { CandlesController } from './rest/candles.controller';
+import { ScreenshotsController } from './rest/backtest/screenshots.controller';
 import { SignalsController } from './rest/signals.controller';
 import { StrategiesController } from './rest/strategies.controller';
 import { IndicatorsController } from './rest/indicators.controller';
@@ -48,6 +49,7 @@ import { LiveGateway } from './ws/live.gateway';
     BacktestInstrumentsController,
     AuthController,
     AdminController,
+    ScreenshotsController,
     SessionsController,
     BacktestCandlesController,
     OrdersController,

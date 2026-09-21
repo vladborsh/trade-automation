@@ -9,6 +9,7 @@ import { AdvanceService } from './advance.service';
 import { OrderService } from './order.service';
 import { ReplayAheadService } from './replay-ahead.service';
 import { ReplayHistoryService } from './replay-history.service';
+import { ScreenshotService } from './screenshot.service';
 import { SessionService } from './session.service';
 import { StatsService } from './stats.service';
 
@@ -26,7 +27,8 @@ import { StatsService } from './stats.service';
     OrderService,
     AdvanceService,
     StatsService,
+    ScreenshotService,
   ],
-  exports: [SessionService, ReplayHistoryService, ReplayAheadService, OrderService, AdvanceService, StatsService],
+  exports: [SessionService, ReplayHistoryService, ReplayAheadService, OrderService, AdvanceService, StatsService, ScreenshotService],
 })
 export class BacktestModule {}

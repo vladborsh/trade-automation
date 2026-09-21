@@ -1,6 +1,7 @@
 import { Costs, SessionAggregates, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import { OpsRepository } from './ops.repository.port';
 import { OrderRepository } from './order.repository.port';
+import { ScreenshotRepository } from './screenshot.repository.port';
 
 /** What POST /backtest/sessions writes (§7.2): the validated request plus the derived fields. */
 export interface NewSession {
@@ -49,6 +50,7 @@ export interface BacktestRepositories {
   sessions: SessionRepository;
   orders: OrderRepository;
   ops: OpsRepository;
+  screenshots: ScreenshotRepository;
   transaction<T>(fn: (repos: Omit<BacktestRepositories, 'transaction'>) => Promise<T>): Promise<T>;
 }
 

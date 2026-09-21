@@ -6,6 +6,7 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { BacktestInstrumentsController } from '../../src/api/rest/backtest/instruments.controller';
 import { SessionsController } from '../../src/api/rest/backtest/sessions.controller';
 import { BacktestCandlesController } from '../../src/api/rest/backtest/candles.controller';
+import { ScreenshotsController } from '../../src/api/rest/backtest/screenshots.controller';
 import { CalendarController } from '../../src/api/rest/calendar.controller';
 import { CandlesController } from '../../src/api/rest/candles.controller';
 import { IndicatorsController } from '../../src/api/rest/indicators.controller';
@@ -40,6 +41,7 @@ describe('@Public() allow-list', () => {
       SessionsController,
       BacktestCandlesController,
       AdminController,
+      ScreenshotsController,
     ]) {
       expect([c.name, isPublic(c)]).toEqual([c.name, false]);
       for (const key of Object.getOwnPropertyNames(c.prototype)) {

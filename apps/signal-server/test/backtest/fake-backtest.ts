@@ -5,7 +5,9 @@ import type { OpKind } from '../../src/backtest/op-fingerprint';
 import { OpsRepository } from '../../src/backtest/ops.repository.port';
 import { NewOrder, OrderClose, OrderFill, OrderRepository } from '../../src/backtest/order.repository.port';
 import { money, percent, rMultiple } from '../../src/backtest/pg/numeric';
+import { NewScreenshot, ScreenshotRecord, ScreenshotRepository } from '../../src/backtest/screenshot.repository.port';
 import { BacktestRepositories, NewSession, SessionRepository } from '../../src/backtest/session.repository.port';
+import { ScreenshotObject, ScreenshotStore, assertScreenshotPrefix } from '../../src/storage/screenshot-store.port';
 import { SessionService } from '../../src/backtest/session.service';
 
 /** In-memory `BacktestRepositories`; `transaction` runs inline (no rollback) — PG behaviour is in the integration spec. */
@@ -157,6 +159,21 @@ export class FakeBacktestRepositories implements BacktestRepositories {
     },
   };
 
+  /** `screenshots`, keyed `orderId|kind` (the unique pair). */
+  readonly screenshotRows = new Map<string, ScreenshotRecord>();
+
+  readonly screenshots: ScreenshotRepository = {
+    insertIfAbsent: async (row: NewScreenshot) => {
+      const k = `${row.orderId}|${row.kind}`;
+      if (this.screenshotRows.has(k)) return null;
+      const record: ScreenshotRecord = { id: randomUUID(), ...row };
+      this.screenshotRows.set(k, record);
+      return record;
+    },
+    find: async (orderId, kind) => this.screenshotRows.get(`${orderId}|${kind}`) ?? null,
+    listByOrder: async (orderId) => [...this.screenshotRows.values()].filter((r) => r.orderId === orderId),
+  };
+
   transaction<T>(fn: (repos: Omit<BacktestRepositories, 'transaction'>) => Promise<T>): Promise<T> {
     return fn(this);
   }
@@ -188,8 +205,41 @@ export function fakeInstrumentConfig() {
   return { instruments: INSTRUMENTS } as never;
 }
 
-export function makeSessionService(repos: FakeBacktestRepositories | null, store = fakeStore()) {
-  return new SessionService(repos, fakeInstrumentConfig(), store);
+/** In-memory ScreenshotStore; `failNext` makes the next call of that method throw. */
+export class FakeScreenshotStore implements ScreenshotStore {
+  readonly objects = new Map<string, ScreenshotObject>();
+  readonly failNext: { put?: Error; deleteByPrefix?: Error } = {};
+  readonly deletedPrefixes: string[] = [];
+
+  async put(key: string, bytes: Buffer, contentType: string): Promise<void> {
+    const err = this.failNext.put;
+    if (err) {
+      delete this.failNext.put;
+      throw err;
+    }
+    this.objects.set(key, { bytes, contentType });
+  }
+
+  async get(key: string): Promise<ScreenshotObject | null> {
+    return this.objects.get(key) ?? null;
+  }
+
+  async deleteByPrefix(prefix: string): Promise<number> {
+    assertScreenshotPrefix(prefix);
+    const err = this.failNext.deleteByPrefix;
+    if (err) {
+      delete this.failNext.deleteByPrefix;
+      throw err;
+    }
+    this.deletedPrefixes.push(prefix);
+    const keys = [...this.objects.keys()].filter((k) => k.startsWith(prefix));
+    keys.forEach((k) => this.objects.delete(k));
+    return keys.length;
+  }
+}
+
+export function makeSessionService(repos: FakeBacktestRepositories | null, store = fakeStore(), screenshots: ScreenshotStore = new FakeScreenshotStore()) {
+  return new SessionService(repos, fakeInstrumentConfig(), store, screenshots);
 }
 
 export function createBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {

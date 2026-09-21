@@ -289,6 +289,22 @@ run needs real candles under `FILE_STORE_ROOT`. Point it at an APFS clone
 (`cp -cR …/tf=1m <scratch>/candles/venue=binance/symbol=BTCUSDT/`), never at another checkout's
 `data/`: boot can write under `FILE_STORE_ROOT`.
 
+## Backtest screenshots
+
+`architecture/backtest-app-system-design.md` §7.2, §9.2 — `PUT` / `GET
+/api/backtest/sessions/:id/orders/:orderId/screenshots/:kind` (`kind` = `entry` | `exit`).
+The PUT body is a raw `image/png` (≤ 2 MB; checked on `Content-Length` and while streaming, so an
+oversized body is never buffered; a real PNG signature; width ≤ `SCREENSHOT_MAX_WIDTH_PX`), and
+each screenshot is **written once** (409 `SCREENSHOT_EXISTS`). The `screenshots` row is claimed
+before the bytes are written, in one transaction. GET proxies the bytes from the private store
+with `Cache-Control: private, max-age=31536000`. `GET …/orders/:orderId` lists them as relative
+API URLs.
+
+Bytes live in a `ScreenshotStore` (`SCREENSHOT_STORE=file|s3`, default = `CANDLE_STORE`) at
+`backtest/screenshots/user=<u>/session=<s>/order=<o>/<kind>.png`, under `FILE_STORE_ROOT` for the
+file store. Deleting a session deletes that session's prefix **first**, then the row. If the store
+call fails, the session is kept and the answer is a 500, so the client can retry.
+
 ## Storage: file vs S3
 
 `CandleStore`/`SignalStore` are ports (§4.3); `FileCandleStore`/`FileSignalStore` and

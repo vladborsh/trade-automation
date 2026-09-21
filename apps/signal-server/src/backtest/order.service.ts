@@ -24,6 +24,7 @@ import { z } from 'zod';
 import { apiError } from '../auth/auth-error';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { lastRevealed1m } from './last-revealed';
+import { screenshotUrl } from './screenshot-url';
 import { orderLevelError, placementOverflows, plannedEntry } from './order-validation';
 import { MutationOp, runSessionMutation, sessionNotFound, TxRepos } from './session-mutation';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
@@ -159,13 +160,16 @@ export class OrderService {
     return repos.orders.list(session.id, parsed.data ? [parsed.data] : undefined);
   }
 
-  /** GET …/orders/:orderId — with its modifications; screenshots stay empty until T-025. */
+  /** GET …/orders/:orderId — with its modifications and the URLs of its stored screenshots (T-025). */
   async get(userId: string, sessionId: string, orderId: string): Promise<OrderDetail> {
     const repos = this.requireEnabled();
     const session = await this.findSession(repos, userId, sessionId);
     const order = UuidSchema.safeParse(orderId).success ? await repos.orders.findById(session.id, orderId) : null;
     if (!order) throw new NotFoundException('Order not found.');
-    return { order, modifications: await repos.orders.listModifications(order.id), screenshots: {} };
+    const [modifications, shots] = await Promise.all([repos.orders.listModifications(order.id), repos.screenshots.listByOrder(order.id)]);
+    const screenshots: OrderDetail['screenshots'] = {};
+    for (const s of shots) screenshots[s.kind] = screenshotUrl(session.id, order.id, s.kind);
+    return { order, modifications, screenshots };
   }
 
   /** 503 when the DB module is disabled. */

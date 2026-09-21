@@ -9,7 +9,7 @@ import { ReplayAheadService } from '../../src/backtest/replay-ahead.service';
 import { ReplayHistoryService } from '../../src/backtest/replay-history.service';
 import { SessionService } from '../../src/backtest/session.service';
 import { FakeAuthRepositories, fastHasher, makeAuthService } from '../auth/fake-auth';
-import { FakeBacktestRepositories, fakeInstrumentConfig } from './fake-backtest';
+import { FakeBacktestRepositories, fakeInstrumentConfig, FakeScreenshotStore } from './fake-backtest';
 import { DAY, H, MIN, oneMinuteRange, tempStore } from './replay-fixtures';
 
 const T0 = Date.UTC(2021, 5, 1);
@@ -32,7 +32,7 @@ describe('/api/backtest/sessions/:id/candles over HTTP (backtest-app-system-desi
     const authRepos = new FakeAuthRepositories();
     for (const name of ['alice', 'bob']) authRepos.addUser(`${name}@x.test`, await fastHasher().hash(`${name}-password`));
     repos = new FakeBacktestRepositories();
-    const sessions = new SessionService(repos, fakeInstrumentConfig(), temp.store);
+    const sessions = new SessionService(repos, fakeInstrumentConfig(), temp.store, new FakeScreenshotStore());
 
     @Module({
       controllers: [AuthController, BacktestCandlesController],

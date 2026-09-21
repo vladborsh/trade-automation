@@ -11,7 +11,7 @@ import { SessionService } from '../../src/backtest/session.service';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
-import { DAY, T0, fakeInstrumentConfig } from './fake-backtest';
+import { DAY, fakeInstrumentConfig, FakeScreenshotStore, T0 } from './fake-backtest';
 
 /**
  * BUG-002/003 ruling, the close paths against a real Postgres (migration 002 applied):
@@ -73,7 +73,7 @@ maybeDescribe('close paths with extreme values (BUG-002/003 ruling)', () => {
     repos = new PgBacktestRepositories(db);
     orders = new OrderService(repos, store);
     advancer = new AdvanceService(repos, store);
-    sessions = new SessionService(repos, fakeInstrumentConfig(), store as never);
+    sessions = new SessionService(repos, fakeInstrumentConfig(), store as never, new FakeScreenshotStore());
     alice = (
       await db.query<{ id: string }>(`insert into users (email, password_hash, role) values ($1, 'x', 'user') returning id`, [
         `alice-${run}@advance-bounds.test`,

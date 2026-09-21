@@ -7,14 +7,17 @@ import { CANDLE_STORE } from './candle-store.port';
 import { SIGNAL_STORE } from './signal-store.port';
 import { METRIC_STORE } from './metric-store.port';
 import { EVENT_STORE } from './event-store.port';
+import { SCREENSHOT_STORE } from './screenshot-store.port';
 import { FileCandleStore } from './file/file-candle-store';
 import { FileSignalStore } from './file/file-signal-store';
 import { FileMetricStore } from './file/file-metric-store';
 import { FileEventStore } from './file/file-event-store';
+import { FileScreenshotStore } from './file/file-screenshot-store';
 import { S3CandleStore } from './s3/s3-candle-store';
 import { S3SignalStore } from './s3/s3-signal-store';
 import { S3MetricStore } from './s3/s3-metric-store';
 import { S3EventStore } from './s3/s3-event-store';
+import { S3ScreenshotStore } from './s3/s3-screenshot-store';
 import { WriteBuffer } from './write-buffer.service';
 import { MetricWriteBuffer } from './metric-write-buffer.service';
 
@@ -81,9 +84,19 @@ function requireBucket(config: AppConfigService): string {
         return new FileEventStore(config.env.get('FILE_STORE_ROOT'));
       },
     },
+    {
+      // backtest-app-system-design.md §2.2, D8: SCREENSHOT_STORE defaults to CANDLE_STORE's mode.
+      provide: SCREENSHOT_STORE,
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => {
+        const mode = config.env.get('SCREENSHOT_STORE') ?? config.env.get('CANDLE_STORE');
+        if (mode === 's3') return new S3ScreenshotStore(buildS3Client(config), requireBucket(config));
+        return new FileScreenshotStore(config.env.get('FILE_STORE_ROOT'));
+      },
+    },
     WriteBuffer,
     MetricWriteBuffer,
   ],
-  exports: [CANDLE_STORE, SIGNAL_STORE, METRIC_STORE, EVENT_STORE, WriteBuffer, MetricWriteBuffer],
+  exports: [CANDLE_STORE, SIGNAL_STORE, METRIC_STORE, EVENT_STORE, SCREENSHOT_STORE, WriteBuffer, MetricWriteBuffer],
 })
 export class StorageModule {}

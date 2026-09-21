@@ -3,6 +3,8 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -21,6 +23,7 @@ import { z } from 'zod';
 import { apiError } from '../auth/auth-error';
 import { AppConfigService } from '../config/config.service';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
+import { SCREENSHOT_STORE, ScreenshotStore, sessionScreenshotPrefix } from '../storage/screenshot-store.port';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
 import { checkLayoutPanels, isValidationError, periodShapeError, validateCreateSession } from './session-validation';
 
@@ -42,10 +45,13 @@ export function toSession(summary: SessionSummary): Session {
  */
 @Injectable()
 export class SessionService {
+  private readonly logger = new Logger(SessionService.name);
+
   constructor(
     @Inject(BACKTEST_REPOSITORIES) private readonly repos: BacktestRepositories | null,
     private readonly config: AppConfigService,
     @Inject(CANDLE_STORE) private readonly store: CandleStore,
+    @Inject(SCREENSHOT_STORE) private readonly screenshots: ScreenshotStore,
   ) {}
 
   /**
@@ -144,10 +150,23 @@ export class SessionService {
   }
 
   /** Row delete; orders, modifications, screenshot rows and ops cascade (§3). */
+  /**
+   * §3, decision 30b, T-025: the session's screenshot prefix is deleted from the store **first**,
+   * then the row (orders, modifications, screenshot rows and ops cascade). If the store call
+   * fails, the session stays and the answer is a 500, so the client can retry. If the row delete
+   * then fails, what is left is rows pointing at nothing, which costs nothing.
+   */
   async delete(userId: string, id: string): Promise<void> {
     const repos = this.requireEnabled();
-    const deleted = UuidSchema.safeParse(id).success && (await repos.sessions.delete(userId, id));
-    if (!deleted) throw notFound();
+    const session = UuidSchema.safeParse(id).success ? await repos.sessions.findById(userId, id) : null;
+    if (!session) throw notFound();
+    try {
+      await this.screenshots.deleteByPrefix(sessionScreenshotPrefix(userId, session.id));
+    } catch (err) {
+      this.logger.error(`session ${session.id}: screenshot prefix delete failed, session kept: ${(err as Error).message}`);
+      throw new InternalServerErrorException("Could not delete the session's screenshots; the session was kept. Try again.");
+    }
+    if (!(await repos.sessions.delete(userId, session.id))) throw notFound();
   }
 
   /** 503 when the DB module is disabled. */

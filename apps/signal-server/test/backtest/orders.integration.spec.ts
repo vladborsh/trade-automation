@@ -126,6 +126,7 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
       sessions: repos.sessions,
       orders: repos.orders,
       ops: repos.ops,
+      screenshots: repos.screenshots,
       transaction: (fn) =>
         repos.transaction((tx) =>
           fn({

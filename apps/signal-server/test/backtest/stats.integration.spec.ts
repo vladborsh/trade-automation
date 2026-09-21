@@ -13,7 +13,7 @@ import { StatsService } from '../../src/backtest/stats.service';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
-import { DAY, T0, fakeInstrumentConfig } from './fake-backtest';
+import { DAY, fakeInstrumentConfig, FakeScreenshotStore, T0 } from './fake-backtest';
 
 /**
  * T-018 done-when against a real Postgres: no drift after real closes (a manual close and an
@@ -71,7 +71,7 @@ maybeDescribe('stats drift against a real Postgres (T-018 done-when)', () => {
     repos = new PgBacktestRepositories(db);
     orders = new OrderService(repos, store);
     advancer = new AdvanceService(repos, store);
-    stats = new StatsService(repos, new SessionService(repos, fakeInstrumentConfig(), store as never));
+    stats = new StatsService(repos, new SessionService(repos, fakeInstrumentConfig(), store as never, new FakeScreenshotStore()));
     alice = (
       await db.query<{ id: string }>(`insert into users (email, password_hash, role) values ($1, 'x', 'user') returning id`, [
         `alice-${run}@stats-it.test`,

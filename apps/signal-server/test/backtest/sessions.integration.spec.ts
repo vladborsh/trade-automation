@@ -5,7 +5,7 @@ import { PgBacktestRepositories } from '../../src/backtest/pg/pg-backtest-reposi
 import { NewSession } from '../../src/backtest/session.repository.port';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
-import { DAY, T0, fakeInstrumentConfig, fakeStore } from './fake-backtest';
+import { DAY, fakeInstrumentConfig, FakeScreenshotStore, fakeStore, T0 } from './fake-backtest';
 
 /**
  * T-013 done-when against a real Postgres: the session repository round-trips every column,
@@ -141,7 +141,7 @@ maybeDescribe('backtest sessions against a real Postgres (T-013 done-when)', () 
 
   it('GET /:id stats = computeStats over the session\'s closed orders read back from Postgres', async () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);
-    const service = new SessionService(repos, fakeInstrumentConfig(), fakeStore());
+    const service = new SessionService(repos, fakeInstrumentConfig(), fakeStore(), new FakeScreenshotStore());
     const closedId = randomUUID();
     const exitTimeMs = NEW_SESSION.periodFromMs + 3 * 3_600_000;
     await db.query(
