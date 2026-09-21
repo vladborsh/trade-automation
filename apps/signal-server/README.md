@@ -73,7 +73,7 @@ failure. Key ones:
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | Required when `CANDLE_STORE=s3`. `S3_ENDPOINT` points at a local S3-compatible stand-in (e.g. MinIO) for dev/testing without a real bucket. |
 | `BINANCE_REST_BASE_URL`, `BINANCE_WS_BASE_URL` | Binance USD-M futures endpoints; no API key needed for market data. |
 | `CAPITAL_COM_BASE_URL`, `CAPITAL_COM_IDENTIFIER`, `CAPITAL_COM_PASSWORD`, `CAPITAL_COM_API_KEY` | Required when `MARKET_DATA_MODE=live` and the universe includes a `capitalcom` instrument. |
-| `WS_SHARED_TOKEN` | Optional shared token gate on the WS endpoint (`?token=`). |
+| `WS_SHARED_TOKEN` | Optional shared token gate on the WS endpoint (`?token=`). Applies only when `DATABASE_URL` is unset — with a database, the WS endpoint checks the `bt_session` cookie instead. |
 | `METRIC_POLL_INTERVAL_MS` | Open-interest live poll cadence, aligned to `BarClock`'s 1m tick (default `60000`). See "Open interest ingestion" below. |
 | `CALENDAR_ENABLED` | `true` (default) or `false`. `false` cleanly disables the calendar module: no poll, no notifications, and every `/api/calendar/*` route returns `503 calendar disabled`. See "Economic calendar" below. |
 | `CALENDAR_FEED_BASE_URL` | ForexFactory weekly-feed base URL (`.json`/`.xml` appended); default is the live public feed. |
@@ -84,7 +84,7 @@ failure. Key ones:
 | `CALENDAR_DUE_CATCHUP_MS` | How late an event-due notification can still fire after a restart (default `900000` = 15 min); older than this, the event is marked released silently. |
 | `DATABASE_URL` | PostgreSQL connection string. **No default** — see "Database" below. Unset means the DB module is disabled. |
 | `DB_MIGRATE_ON_BOOT` | `true` (default) or `false`. Whether migrations run automatically at boot when `DATABASE_URL` is set. |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin user upserted from these at boot (T-007). `ADMIN_PASSWORD` is a secret — never put a real value in a committed file. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin user upserted from these at boot (T-007; password ≥ 10 characters or boot fails). `ADMIN_PASSWORD` is a secret — never put a real value in a committed file. |
 | `APP_BASE_URL` | Base URL used to build invite links (default `http://localhost:3000`). |
 | `SESSION_COOKIE_SECURE` | `true`/`false`; default is `NODE_ENV === 'production'`. Controls the `Secure` flag on the `bt_session` cookie (T-007). |
 | `SCREENSHOT_STORE` | `file` or `s3`; default is whatever `CANDLE_STORE` resolves to (T-013). |
@@ -231,6 +231,44 @@ runs at boot — postgrator, `driver: 'pg'`, `migrationPattern: 'migrations/*'`,
 instance never race each other's migration run. Migrations are versioned SQL files,
 `NNN.do.<name>.sql` / `NNN.undo.<name>.sql` (`migrations/001.do.init.sql` is the full schema
 from §3); applying an already-applied version is a no-op.
+
+## Authentication
+
+`architecture/backtest-app-system-design.md` §7.1, D7 — `src/auth/`. Login sets an httpOnly
+`bt_session` cookie (`SameSite=Lax; Path=/`, `Secure` per `SESSION_COOKIE_SECURE`) holding a
+random token; the `auth_sessions` row is keyed by `sha256(token)`. Sessions last 30 days and
+slide forward (row and cookie) on any request more than an hour after `last_seen_at`. Passwords
+are scrypt (`N=2^15, r=8, p=1`, 16-byte salt) in a self-describing `scrypt$N$r$p$salt$hash`
+string. Login is throttled in memory: 10 failures per email per 15 minutes → `429`.
+
+| Method | Path | Auth |
+|---|---|---|
+| POST | `/api/auth/login` | public |
+| POST | `/api/auth/logout` | cookie |
+| GET | `/api/auth/me` | cookie |
+| GET | `/api/auth/invites/:token` | public |
+| POST | `/api/auth/invites/:token/accept` | public (single-use, 7-day expiry, password ≥ 10 chars) |
+
+`AuthGuard` is the global `APP_GUARD`: **every REST route requires the cookie** except those
+marked `@Public()` — login, the two invite routes, `/api/health` and the Prometheus `/metrics`.
+The WS gateway checks the same cookie on connect. The admin account is upserted from
+`ADMIN_EMAIL`/`ADMIN_PASSWORD` at every boot.
+
+**Without `DATABASE_URL` (dev/mock mode) the guard is a pass-through** — every route behaves as
+before auth existed, and the WS endpoint keeps the `WS_SHARED_TOKEN` check — while the
+`/api/auth/*` routes answer `503`. With `CORS_ORIGIN` set (separate dev client), CORS runs with
+`credentials: true` so the cookie crosses ports.
+
+Manual check against your slot's database:
+
+```bash
+DATABASE_URL=postgres://backtest@localhost:5432/backtest_dev3 ADMIN_EMAIL=admin@local.test \
+  ADMIN_PASSWORD=<10+ chars> PORT=3030 node dist/main.js
+curl -i -c jar -H 'content-type: application/json' \
+  -d '{"email":"admin@local.test","password":"<same>"}' localhost:3030/api/auth/login
+curl -i -b jar localhost:3030/api/auth/me
+curl -i -b jar -X POST localhost:3030/api/auth/logout
+```
 
 ## Storage: file vs S3
 

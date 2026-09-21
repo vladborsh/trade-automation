@@ -8,6 +8,7 @@ import { MarketDataModule } from './market-data/market-data.module';
 import { StorageModule } from './storage/storage.module';
 import { StrategyEngineModule } from './strategy-engine/strategy-engine.module';
 import { DbModule } from './db/db.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { DbModule } from './db/db.module';
     HealthModule,
     StorageModule,
     DbModule,
+    AuthModule,
     MarketDataModule,
     StrategyEngineModule,
     ApiModule,

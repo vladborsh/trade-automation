@@ -27,9 +27,11 @@ async function bootstrap() {
 
   // Dev convenience only: when the client is served separately (e.g. `ng serve` on :4200)
   // instead of by this server's ServeStaticModule, the browser enforces CORS across ports.
-  // Unset in production, where the client is same-origin.
+  // Unset in production, where the client is same-origin. `credentials: true` lets the dev
+  // client's `credentials: 'include'` requests carry the `bt_session` cookie across ports
+  // (architecture/backtest-app-system-design.md §7.1).
   if (process.env.CORS_ORIGIN) {
-    app.enableCors({ origin: process.env.CORS_ORIGIN });
+    app.enableCors({ origin: process.env.CORS_ORIGIN, credentials: true });
   }
 
   const port = Number(process.env.PORT ?? 3000);

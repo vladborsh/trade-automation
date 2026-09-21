@@ -33,6 +33,8 @@ import {
 } from '../../strategy-engine/strategy-engine.events';
 import { AppConfigService } from '../../config/config.service';
 import { MetricsService } from '../../observability/metrics.service';
+import { AuthService } from '../../auth/auth.service';
+import { readSessionToken } from '../../auth/session-cookie';
 import {
   CalendarEventChangedEvent,
   CalendarEvents,
@@ -61,8 +63,9 @@ type WsSocket = {
 
 /**
  * architecture/live-signal-server.md §3.5, §4.5 — plain JSON frames on the native `ws` adapter
- * (no socket.io). Auth: optional shared token via a query param (`?token=`), checked only if
- * `WS_SHARED_TOKEN` is configured — a cheap gate DevOps can enable without a code change.
+ * (no socket.io). Auth: the `bt_session` cookie when the DB module is enabled
+ * (backtest-app-system-design.md §7.1); otherwise the optional shared token via a query param
+ * (`?token=`), checked only if `WS_SHARED_TOKEN` is configured.
  */
 @WebSocketGateway()
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -79,19 +82,79 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly config: AppConfigService,
     private readonly metrics: MetricsService,
     private readonly metricCache: MetricCache,
+    private readonly auth?: AuthService,
   ) {}
 
   handleConnection(client: WsSocket, request: IncomingMessage): void {
-    const sharedToken = this.config.env.get('WS_SHARED_TOKEN');
-    if (sharedToken) {
-      const url = new URL(request.url ?? '', 'http://localhost');
-      if (url.searchParams.get('token') !== sharedToken) {
-        client.send(JSON.stringify({ type: 'error', message: 'unauthorized' }));
-        (client as unknown as { close: () => void }).close?.();
-        return;
-      }
+    const verdict = this.authorize(request);
+    if (verdict instanceof Promise) {
+      this.registerAfter(client, verdict);
+      return;
     }
+    if (!verdict) {
+      this.reject(client);
+      return;
+    }
+    this.addClient(client);
+    client.on('message', (data) => this.onMessage(client, data));
+    client.on('close', () => this.removeClient(client));
+  }
 
+  /**
+   * architecture/backtest-app-system-design.md §7.1, D7 — with the DB module enabled the
+   * connection must carry a valid `bt_session` cookie (async: a DB lookup); without it, the
+   * pre-existing optional `WS_SHARED_TOKEN` query-param check applies unchanged (sync).
+   */
+  private authorize(request: IncomingMessage): boolean | Promise<boolean> {
+    if (this.auth?.enabled) {
+      const token = readSessionToken(request.headers.cookie);
+      if (!token) return false;
+      return this.auth.authenticate(token).then((result) => result !== null);
+    }
+    const sharedToken = this.config.env.get('WS_SHARED_TOKEN');
+    if (!sharedToken) return true;
+    const url = new URL(request.url ?? '', 'http://localhost');
+    return url.searchParams.get('token') === sharedToken;
+  }
+
+  /**
+   * Cookie path: frames that arrive while the session lookup is in flight (a client typically
+   * subscribes the moment the socket opens) are held on the verdict promise and replayed in
+   * order once it resolves, rather than dropped.
+   */
+  private registerAfter(client: WsSocket, verdict: Promise<boolean>): void {
+    let closed = false;
+    const ready = verdict
+      .catch((err) => {
+        this.logger.warn(`WS session check failed: ${(err as Error).message}`);
+        return false;
+      })
+      .then((ok) => {
+        if (closed) return false;
+        if (!ok) {
+          this.reject(client);
+          return false;
+        }
+        this.addClient(client);
+        return true;
+      });
+    client.on('message', (data) => {
+      void ready.then((ok) => {
+        if (ok) this.onMessage(client, data);
+      });
+    });
+    client.on('close', () => {
+      closed = true;
+      this.removeClient(client);
+    });
+  }
+
+  private reject(client: WsSocket): void {
+    client.send(JSON.stringify({ type: 'error', message: 'unauthorized' }));
+    (client as unknown as { close: () => void }).close?.();
+  }
+
+  private addClient(client: WsSocket): void {
     this.clients.set(client, {
       candleTopics: new Set(),
       signalTopics: new Set(),
@@ -99,16 +162,15 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       calendar: false,
     });
     this.metrics.wsClients.set(this.clients.size);
-    client.on('message', (data) => this.onMessage(client, data));
-    client.on('close', () => {
-      this.clients.delete(client);
-      this.metrics.wsClients.set(this.clients.size);
-    });
+  }
+
+  private removeClient(client: WsSocket): void {
+    this.clients.delete(client);
+    this.metrics.wsClients.set(this.clients.size);
   }
 
   handleDisconnect(client: WsSocket): void {
-    this.clients.delete(client);
-    this.metrics.wsClients.set(this.clients.size);
+    this.removeClient(client);
   }
 
   private onMessage(client: WsSocket, raw: unknown): void {

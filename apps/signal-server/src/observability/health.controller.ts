@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthResponse, TIMEFRAME_MS } from '@trade-automation/contracts';
+import { Public } from '../auth/public.decorator';
 import { AppConfigService } from '../config/config.service';
 import { CalendarIngestionService } from '../calendar/calendar-ingestion.service';
 import { MarketDataStatusService } from '../market-data/market-data-status.service';
@@ -11,6 +12,7 @@ const START_TIME = Date.now();
  * architecture/live-signal-server.md §3.5, §4.8 — GET /api/health, for the load balancer and
  * for "a closed 1m candle is late if none arrived within 15s of the boundary."
  */
+@Public() // for the load balancer, not the user (backtest-app-system-design.md §7.1)
 @Controller('api/health')
 export class HealthController {
   constructor(
