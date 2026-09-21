@@ -140,6 +140,41 @@ describe('AdvanceQueue (backtest-app-system-design.md §5.5)', () => {
     expect(sent).toHaveLength(1);
   });
 
+  it('T-023: a 422 on place is a rejection — reported, no stop, the rest of the queue still goes out', async () => {
+    const { transport, sent } = fakeTransport();
+    const outcomes: MutationOutcome[] = [];
+    const refused: unknown[] = [];
+    const rejected: Array<{ err: unknown; kind: string }> = [];
+    let n = 0;
+    const queue = new AdvanceQueue(
+      transport,
+      { onOutcome: (o) => outcomes.push(o), onRefused: (e) => refused.push(e), onRejected: (err, op) => rejected.push({ err, kind: op.kind }) },
+      { newOpId: () => `op-${++n}` },
+    );
+    queue.push({ kind: 'place', cursorMs: 0, panelId: 'p', side: 'long', type: 'market', sl: 1, riskPct: 1 });
+    queue.push({ kind: 'advance', toCursorMs: 5 * M });
+    await flush();
+    const invalid = new ApiError(422, 'SL_ON_WRONG_SIDE', 'A long stop must be below the entry.');
+    sent[0].fail(invalid);
+    await flush();
+    expect(rejected).toEqual([{ err: invalid, kind: 'place' }]);
+    expect(refused).toEqual([]);
+    expect(sent.map((s) => s.kind)).toEqual(['place', 'advance']); // the queue carried on
+    sent[1].answer(result(5 * M));
+    await flush();
+    expect(outcomes.map((o) => o.kind)).toEqual(['advance']);
+  });
+
+  it('without an onRejected hook a 422 on place is still a refusal (the old behaviour)', async () => {
+    const { queue, sent, refused } = setup();
+    queue.push({ kind: 'place', cursorMs: 0, panelId: 'p', side: 'long', type: 'market', sl: 1, riskPct: 1 });
+    await flush();
+    const invalid = new ApiError(422, 'SL_ON_WRONG_SIDE', 'x');
+    sent[0].fail(invalid);
+    await flush();
+    expect(refused).toEqual([invalid]);
+  });
+
   it('rounds a target that is not on a minute up (the server clamps it to the period end)', async () => {
     const { queue, sent } = setup();
     queue.push({ kind: 'advance', toCursorMs: 5 * M + 30_000 });

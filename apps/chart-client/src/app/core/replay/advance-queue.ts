@@ -9,7 +9,7 @@ import type {
   PlaceOrderRequest,
   PlaceOrderResponse,
 } from '@trade-automation/contracts';
-import { advanceTarget, backoffMs, coalesceHead, isRetryable, type MutationInput } from './mutation-rules';
+import { advanceTarget, backoffMs, coalesceHead, isRejection, isRetryable, type MutationInput } from './mutation-rules';
 
 /** The five mutating endpoints (§7.2), each taking the exact request body to send. */
 export interface MutationTransport {
@@ -30,8 +30,13 @@ export type MutationOutcome =
 export interface AdvanceQueueHooks {
   /** Every response, in queue order. */
   onOutcome(outcome: MutationOutcome): void;
-  /** A request the server refused (any 4xx). The queue has stopped and dropped what was left. */
+  /** A request the server refused (a 4xx that is not a rejection). The queue has stopped and dropped what was left. */
   onRefused(err: unknown, op: MutationInput): void;
+  /**
+   * A `place` the server rejected as invalid (422, `isRejection`): nothing changed server-side, so
+   * the queue carries on with the rest. Without this hook a rejection is treated as a refusal.
+   */
+  onRejected?(err: unknown, op: MutationInput): void;
   /** Whether a request is currently being retried after a network error or 5xx. */
   onRetrying?(retrying: boolean): void;
   /** The queue has answered everything it was given (after at least one outcome). */
@@ -60,7 +65,9 @@ interface Frozen {
  * - Order ops get their opId and body when they are pushed; an advance when it is sent. A network
  *   error or 5xx resends the **identical** request (same opId, same body) with capped backoff —
  *   if the first attempt was applied, the server replays its stored response. A 4xx is final: the
- *   queue stops, drops what is left (it was built on a state the server rejected) and reports it.
+ *   queue stops, drops what is left (it was built on a state the server rejected) and reports it —
+ *   except a 422 on `place` (`isRejection`), which is reported through `onRejected` while the queue
+ *   carries on: the server changed nothing.
  *
  * `push` never waits: stepping stays instant and the UI never awaits the queue.
  */
@@ -106,6 +113,7 @@ export class AdvanceQueue {
         const next = this.takeHead();
         const outcome = await this.sendWithRetry(next);
         if (outcome === null) return; // refused: the queue has stopped
+        if (outcome === REJECTED) continue; // the server changed nothing; go on with the rest
         if (!this.stopped) this.hooks.onOutcome(outcome);
       }
     } finally {
@@ -159,8 +167,8 @@ export class AdvanceQueue {
     }
   }
 
-  /** The outcome, or null when the server refused the request (and the queue has stopped). */
-  private async sendWithRetry(frozen: Frozen): Promise<MutationOutcome | null> {
+  /** The outcome; null when the server refused the request (the queue has stopped); `REJECTED` for a rejected place. */
+  private async sendWithRetry(frozen: Frozen): Promise<MutationOutcome | typeof REJECTED | null> {
     for (let attempt = 0; ; attempt++) {
       try {
         const outcome = await frozen.send();
@@ -170,6 +178,10 @@ export class AdvanceQueue {
         if (this.stopped) return null;
         if (!isRetryable(err)) {
           if (attempt > 0) this.hooks.onRetrying?.(false);
+          if (this.hooks.onRejected && isRejection(err, frozen.op)) {
+            this.hooks.onRejected(err, frozen.op);
+            return REJECTED;
+          }
           this.stop();
           this.hooks.onRefused(err, frozen.op);
           return null;
@@ -181,6 +193,8 @@ export class AdvanceQueue {
     }
   }
 }
+
+const REJECTED = Symbol('rejected');
 
 function isRaw(q: MutationInput | Frozen | undefined): q is MutationInput {
   return q !== undefined && 'kind' in q;

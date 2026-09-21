@@ -1,5 +1,5 @@
 import { ApiError } from '../api/api-error';
-import { advanceTarget, backoffMs, coalesceHead, isRetryable, type MutationInput } from './mutation-rules';
+import { advanceTarget, backoffMs, coalesceHead, isRejection, isRetryable, type MutationInput } from './mutation-rules';
 
 const adv = (m: number): MutationInput => ({ kind: 'advance', toCursorMs: m * 60_000 });
 const cancel: MutationInput = { kind: 'cancel', cursorMs: 0, orderId: 'o1' };
@@ -38,5 +38,15 @@ describe('isRetryable', () => {
 describe('backoffMs', () => {
   it('doubles from 250 ms and caps at 8 s', () => {
     expect([0, 1, 2, 3, 4, 5, 9].map(backoffMs)).toEqual([250, 500, 1000, 2000, 4000, 8000, 8000]);
+  });
+});
+
+describe('isRejection (T-023)', () => {
+  const place: MutationInput = { kind: 'place', cursorMs: 0, panelId: 'p', side: 'long', type: 'market', sl: 1, riskPct: 1 };
+  it('only a 422 on place: every other 4xx, and a 422 on anything else, is still a refusal', () => {
+    expect(isRejection(new ApiError(422, 'SL_ON_WRONG_SIDE', 'x'), place)).toBe(true);
+    expect(isRejection(new ApiError(409, 'CURSOR_MISMATCH', 'x'), place)).toBe(false);
+    expect(isRejection(new ApiError(422, 'NO_PRICE_AT_CURSOR', 'x'), { kind: 'close', cursorMs: 0, orderId: 'o' })).toBe(false);
+    expect(isRejection(new TypeError('Failed to fetch'), place)).toBe(false);
   });
 });

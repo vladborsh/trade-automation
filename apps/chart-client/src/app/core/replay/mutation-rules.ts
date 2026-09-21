@@ -45,6 +45,15 @@ export function isRetryable(err: unknown): boolean {
   return isApiError(err) ? err.status >= 500 : true;
 }
 
+/**
+ * T-023: a 422 on `place` is the server validating an order (a level on the wrong side, a stop too
+ * close, …) — an answer about that one request, not a sign the client's state diverged. The queue
+ * reports it and carries on; nothing is reloaded. Every other 4xx still stops the queue (§5.5).
+ */
+export function isRejection(err: unknown, op: MutationInput): boolean {
+  return op.kind === 'place' && isApiError(err, 422);
+}
+
 /** Capped exponential backoff: 250 ms, 500, 1 s, 2 s, 4 s, then 8 s for every further attempt. */
 export function backoffMs(attempt: number): number {
   return Math.min(250 * 2 ** attempt, 8_000);
