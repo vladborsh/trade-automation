@@ -65,4 +65,37 @@ describe('RestClient (backtest-app-system-design.md §7.1)', () => {
       }),
     );
   });
+
+  it('admin fetchers: paths, methods, bodies, and a 401 redirects like any data request', async () => {
+    const list = setup(jsonResponse(200, []));
+    await list.rest.listUsers();
+    expect(list.fetchMock).toHaveBeenCalledWith('http://localhost:4300/api/admin/users', expect.objectContaining({ method: 'GET', credentials: 'include' }));
+
+    const disable = setup(jsonResponse(204, null));
+    await expect(disable.rest.disableUser('u/1')).resolves.toBeUndefined();
+    expect(disable.fetchMock).toHaveBeenCalledWith('http://localhost:4300/api/admin/users/u%2F1/disable', expect.objectContaining({ method: 'POST' }));
+
+    const enable = setup(jsonResponse(204, null));
+    await enable.rest.enableUser('u1');
+    expect(enable.fetchMock).toHaveBeenCalledWith('http://localhost:4300/api/admin/users/u1/enable', expect.objectContaining({ method: 'POST' }));
+
+    const create = setup(jsonResponse(201, { id: 'i', url: 'http://x/invite/t', expiresAt: 1 }));
+    await expect(create.rest.createInvite({ email: 'n@example.com' })).resolves.toMatchObject({ url: 'http://x/invite/t' });
+    expect(create.fetchMock).toHaveBeenCalledWith(
+      'http://localhost:4300/api/admin/invites',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'n@example.com' }) }),
+    );
+
+    const invites = setup(jsonResponse(200, []));
+    await invites.rest.listInvites();
+    expect(invites.fetchMock).toHaveBeenCalledWith('http://localhost:4300/api/admin/invites', expect.objectContaining({ method: 'GET' }));
+
+    const revoke = setup(jsonResponse(409, { error: { code: 'INVITE_USED', message: 'used' } }));
+    await expect(revoke.rest.revokeInvite('i1')).rejects.toMatchObject({ status: 409, code: 'INVITE_USED' });
+    expect(revoke.fetchMock).toHaveBeenCalledWith('http://localhost:4300/api/admin/invites/i1', expect.objectContaining({ method: 'DELETE' }));
+
+    const expired = setup(jsonResponse(401, { statusCode: 401, message: 'Unauthorized' }));
+    await expect(expired.rest.listInvites()).rejects.toBeInstanceOf(ApiError);
+    expect(expired.onUnauthorized).toHaveBeenCalledTimes(1);
+  });
 });

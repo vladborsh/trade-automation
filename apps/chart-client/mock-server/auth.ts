@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { CreateInviteRequestSchema } from '@trade-automation/contracts';
 import type {
   AcceptInviteResponse,
   AdminInvitesResponse,
@@ -25,9 +26,11 @@ import type {
  * (410 INVITE_EXPIRED). Any other unknown token is 404 INVITE_UNKNOWN; create a fresh one with
  * `POST /api/admin/invites` as the admin.
  *
- * Session tokens are `mock.<userId>.<random>`, validated by user id, not by a per-instance
- * table: cookies are not port-scoped, so a login on :4300 must also be honoured by the :4301
- * and :4302 e2e instances. Logout revokes the token on the instance that received it.
+ * Session tokens are `mock.<userId>.<issuedAtMs>.<random>`, validated by user id, not by a
+ * per-instance table: cookies are not port-scoped, so a login on :4300 must also be honoured by
+ * the :4301 and :4302 e2e instances. Logout revokes the token on the instance that received it.
+ * Disabling a user revokes every token issued to them up to then (the real server deletes their
+ * `auth_sessions` rows), so re-enabling does not revive an old cookie.
  */
 
 export const MOCK_ADMIN = { email: 'admin@example.com', password: 'admin-password' } as const;
@@ -43,6 +46,8 @@ interface MockUser extends User {
   password: string;
   createdAt: number;
   disabledAt: number | null;
+  /** Tokens issued at or before this instant are dead (set on disable). */
+  sessionsRevokedAt?: number;
 }
 
 interface MockInvite {
@@ -90,10 +95,12 @@ export class MockAuthState {
   currentUser(req: IncomingMessage): MockUser | null {
     const token = readCookie(req, COOKIE);
     if (!token || this.revoked.has(token)) return null;
-    const [prefix, userId] = token.split('.');
+    const [prefix, userId, issuedAt] = token.split('.');
     if (prefix !== 'mock') return null;
     const user = this.users.get(userId ?? '');
-    return user && user.disabledAt === null ? user : null;
+    if (!user || user.disabledAt !== null) return null;
+    if (user.sessionsRevokedAt !== undefined && !(Number(issuedAt) > user.sessionsRevokedAt)) return null;
+    return user;
   }
 
   /**
@@ -188,9 +195,27 @@ export class MockAuthState {
       return true;
     }
 
+    const userAction = /^\/api\/admin\/users\/([^/]+)\/(disable|enable)$/.exec(pathname);
+    if (method === 'POST' && userAction) {
+      const target = this.users.get(decodeURIComponent(userAction[1]));
+      if (!target) { notFound(send, res, 'User not found.'); return true; }
+      if (userAction[2] === 'enable') {
+        target.disabledAt = null;
+      } else {
+        if (target.id === admin.id) { send(res, 409, { message: 'An admin cannot disable their own account.', error: 'Conflict', statusCode: 409 }); return true; }
+        const now = Date.now();
+        target.disabledAt = now;
+        target.sessionsRevokedAt = now;
+      }
+      send(res, 204, null);
+      return true;
+    }
+
     if (method === 'POST' && pathname === '/api/admin/invites') {
-      const body = (await readJsonBody(req)) ?? {};
-      const email = typeof body['email'] === 'string' ? body['email'] : null;
+      const parsed = CreateInviteRequestSchema.safeParse((await readJsonBody(req)) ?? {});
+      // the real ZodValidationPipe answers 400 with zod's flattened errors
+      if (!parsed.success) { send(res, 400, parsed.error.flatten()); return true; }
+      const email = parsed.data.email ?? null;
       const now = Date.now();
       const invite: MockInvite = { id: randomUUID(), token: randomBytes(24).toString('base64url'), email, createdAt: now, expiresAt: now + INVITE_TTL_MS, usedAt: null, usedBy: null };
       this.invites.set(invite.token, invite);
@@ -200,8 +225,22 @@ export class MockAuthState {
     }
 
     if (method === 'GET' && pathname === '/api/admin/invites') {
-      const response: AdminInvitesResponse = [...this.invites.values()].map(({ token: _token, ...rest }) => rest);
+      // newest first, like the real server's `order by created_at desc`
+      const response: AdminInvitesResponse = [...this.invites.values()]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(({ token: _token, ...rest }) => rest);
       send(res, 200, response);
+      return true;
+    }
+
+    const revokeMatch = /^\/api\/admin\/invites\/([^/]+)$/.exec(pathname);
+    if (method === 'DELETE' && revokeMatch) {
+      const id = decodeURIComponent(revokeMatch[1]);
+      const entry = [...this.invites.entries()].find(([, i]) => i.id === id);
+      if (!entry) { notFound(send, res, 'Invite not found.'); return true; }
+      if (entry[1].usedAt !== null) { fail(send, res, 409, 'INVITE_USED', 'A used invite cannot be revoked.'); return true; }
+      this.invites.delete(entry[0]); // unused, expired or not
+      send(res, 204, null);
       return true;
     }
 
@@ -209,7 +248,7 @@ export class MockAuthState {
   }
 
   private setSession(res: ServerResponse, user: MockUser): void {
-    const token = `mock.${user.id}.${randomBytes(12).toString('base64url')}`;
+    const token = `mock.${user.id}.${Date.now()}.${randomBytes(12).toString('base64url')}`;
     res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${COOKIE_MAX_AGE_S}`);
   }
 
@@ -245,8 +284,14 @@ export function unauthenticated(send: SendJson, res: ServerResponse): void {
   send(res, 401, { statusCode: 401, message: 'Unauthorized' });
 }
 
+/** Used only by the admin routes: the real AdminOnly guard's body. */
 function forbidden(send: SendJson, res: ServerResponse): void {
-  send(res, 403, { statusCode: 403, message: 'Forbidden' });
+  send(res, 403, { message: 'admin only', error: 'Forbidden', statusCode: 403 });
+}
+
+/** Nest's NotFoundException body, in its key order: no contract error code. */
+function notFound(send: SendJson, res: ServerResponse, message: string): void {
+  send(res, 404, { message, error: 'Not Found', statusCode: 404 });
 }
 
 /** Mirrors the server's ZodValidationPipe: a 400 with no contract error code. */

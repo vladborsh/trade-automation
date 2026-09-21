@@ -1,0 +1,52 @@
+<table class="grid" aria-label="Users">
+  <thead>
+    <tr>
+      <th scope="col">Email</th>
+      <th scope="col">Role</th>
+      <th scope="col">Created</th>
+      <th scope="col">Status</th>
+      <th scope="col"><span class="sr-only">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (user of users(); track user.id) {
+      <tr [attr.data-testid]="'user-' + user.email">
+        <td>
+          {{ user.email }}
+          @if (isSelf(user)) {
+            <span class="tag">you</span>
+          }
+        </td>
+        <td>{{ user.role }}</td>
+        <td class="muted">{{ formatUtc(user.createdAt) }}</td>
+        <td>
+          @if (user.disabledAt === null) {
+            <span class="ok">active</span>
+          } @else {
+            <span class="down">disabled {{ formatUtc(user.disabledAt) }}</span>
+          }
+        </td>
+        <td class="actions">
+          @if (user.disabledAt !== null) {
+            <button type="button" class="secondary" [disabled]="busy() !== null" (click)="enable.emit(user.id)">Enable</button>
+          } @else if (isSelf(user)) {
+            <button type="button" class="danger" disabled [attr.aria-describedby]="'self-hint-' + user.id">Disable</button>
+            <span class="hint" [id]="'self-hint-' + user.id">You cannot disable your own account.</span>
+          } @else if (confirming() === user.id) {
+            <span class="hint">Disabling signs {{ user.email }} out everywhere at once.</span>
+            <button type="button" class="danger" [disabled]="busy() !== null" (click)="confirmDisable.emit(user.id)">Confirm disable</button>
+            <button type="button" class="secondary" (click)="cancelDisable.emit()">Cancel</button>
+          } @else {
+            <button type="button" class="danger" [disabled]="busy() !== null || !canDisable(user)" (click)="askDisable.emit(user.id)">
+              Disable
+            </button>
+          }
+        </td>
+      </tr>
+    } @empty {
+      <tr>
+        <td colspan="5" class="muted">No users.</td>
+      </tr>
+    }
+  </tbody>
+</table>

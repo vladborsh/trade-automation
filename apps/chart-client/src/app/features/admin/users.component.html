@@ -1,5 +1,36 @@
 <app-nav />
 <main class="page">
-  <h1>Users</h1>
-  <p class="muted">User and invite management will live here.</p>
+  <h1>Users and invites</h1>
+  <p class="muted">Accounts and invite links only. Each user's sessions and journal are private and never shown here.</p>
+
+  @if (store.error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  <section aria-labelledby="users-heading">
+    <h2 id="users-heading">Users</h2>
+    <app-admin-users-table
+      [users]="store.users()"
+      [currentUserId]="currentUserId()"
+      [busy]="store.busy()"
+      [confirming]="store.confirmingDisable()"
+      (askDisable)="store.askDisable($event)"
+      (confirmDisable)="store.disable($event)"
+      (cancelDisable)="store.cancelDisable()"
+      (enable)="store.enable($event)"
+    />
+  </section>
+
+  <section aria-labelledby="invites-heading">
+    <h2 id="invites-heading">Invites</h2>
+    <app-admin-invites
+      [invites]="store.invites()"
+      [users]="store.users()"
+      [created]="store.created()"
+      [busy]="store.busy()"
+      (create)="store.createInvite($event)"
+      (revoke)="store.revoke($event)"
+      (dismissCreated)="store.dismissCreated()"
+    />
+  </section>
 </main>

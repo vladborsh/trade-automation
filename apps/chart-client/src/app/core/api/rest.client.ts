@@ -3,6 +3,10 @@ import { AppConfigService } from '../config/app-config.service';
 import type {
   AcceptInviteRequest,
   AcceptInviteResponse,
+  AdminInvitesResponse,
+  AdminUsersResponse,
+  CreateInviteRequest,
+  CreateInviteResponse,
   InviteInfo,
   LoginRequest,
   LoginResponse,
@@ -101,6 +105,35 @@ export class RestClient {
       body,
       redirectOn401: false,
     });
+  }
+
+  // --- admin (§7.1, decision 30: users and invites only) ----------------------------------------
+
+  listUsers(): Promise<AdminUsersResponse> {
+    return this.getJson<AdminUsersResponse>('/admin/users');
+  }
+
+  /** 204; the user's sessions are deleted with it. 409 (plain) for the admin's own account. */
+  disableUser(id: string): Promise<void> {
+    return this.request<void>('POST', `/admin/users/${encodeURIComponent(id)}/disable`, { redirectOn401: true });
+  }
+
+  enableUser(id: string): Promise<void> {
+    return this.request<void>('POST', `/admin/users/${encodeURIComponent(id)}/enable`, { redirectOn401: true });
+  }
+
+  /** The response is the only time the invite URL (and its token) is ever returned. */
+  createInvite(body: CreateInviteRequest): Promise<CreateInviteResponse> {
+    return this.request<CreateInviteResponse>('POST', '/admin/invites', { body, redirectOn401: true });
+  }
+
+  listInvites(): Promise<AdminInvitesResponse> {
+    return this.getJson<AdminInvitesResponse>('/admin/invites');
+  }
+
+  /** 204 for an unused invite (expired included); 409 INVITE_USED once it has been used. */
+  revokeInvite(id: string): Promise<void> {
+    return this.request<void>('DELETE', `/admin/invites/${encodeURIComponent(id)}`, { redirectOn401: true });
   }
 
   // --- market data ---------------------------------------------------------------------------

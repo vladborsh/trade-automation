@@ -1,0 +1,71 @@
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #30363d;
+  text-align: left;
+  vertical-align: middle;
+}
+th {
+  color: #8b949e;
+  font-weight: 500;
+}
+.muted,
+.hint {
+  color: #8b949e;
+}
+.hint {
+  font-size: 12px;
+}
+.ok {
+  color: #26a69a;
+}
+.down {
+  color: #ef5350;
+}
+.tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  color: #8b949e;
+  font-size: 11px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+button {
+  border-radius: 4px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.danger {
+  color: #ef5350;
+  border: 1px solid #ef5350;
+}
+.secondary {
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
