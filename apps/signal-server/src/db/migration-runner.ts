@@ -7,6 +7,8 @@ export interface MigrationRunnerOptions {
   connectionString: string;
   /** Defaults to `<repo>/apps/signal-server/migrations/*`, resolved relative to this file. */
   migrationPattern?: string;
+  /** Migrate to this version (e.g. '001', which runs undo files); defaults to the latest. */
+  target?: string;
 }
 
 export interface MigrationResult {
@@ -35,7 +37,7 @@ export async function runMigrations(options: MigrationRunnerOptions): Promise<Mi
         schemaTable: 'schema_migrations',
         execQuery: (query: string) => client.query(query),
       });
-      const applied = await postgrator.migrate();
+      const applied = await postgrator.migrate(options.target);
       return {
         applied: applied.map((m) => ({ version: m.version, action: m.action, name: m.name })),
       };

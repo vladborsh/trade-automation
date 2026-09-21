@@ -5,7 +5,7 @@ type Field = Exclude<keyof SessionAggregates, 'statsComputedAt'>;
 
 /**
  * Each compared column and the rounding of its database scale (§3): money `numeric(20,8)`,
- * R multiples and the profit factor `numeric(12,6)`, counts exact.
+ * R multiples and the profit factor `numeric(20,6)` since migration 002 (scale 6), counts exact.
  */
 const FIELDS: ReadonlyArray<readonly [Field, (v: number) => number]> = [
   ['tradesCount', (v) => v],

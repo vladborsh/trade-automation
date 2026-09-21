@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { apiError } from '../auth/auth-error';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { lastRevealed1m } from './last-revealed';
-import { orderLevelError, plannedEntry } from './order-validation';
+import { orderLevelError, placementOverflows, plannedEntry } from './order-validation';
 import { runSessionMutation, sessionNotFound, TxRepos } from './session-mutation';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
 
@@ -67,6 +67,10 @@ export class OrderService {
       }
       const { qty, riskAmount } = positionSize(session.balance, req.riskPct, plannedEntry(req, last.close), req.sl);
       const market = req.type === 'market';
+      const entryPrice = market ? marketFillPrice(req.side, last.close, session.costs) : null;
+      if (placementOverflows({ qty, riskAmount, entryPrice })) {
+        throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'STOP_DISTANCE_ZERO', 'The stop is too close to the entry to size this order within limits.');
+      }
 
       const order = await tx.orders.insert({
         sessionId: session.id,
@@ -78,7 +82,7 @@ export class OrderService {
         status: market ? 'open' : 'pending',
         placedAtMs: session.cursorMs,
         limitPrice: market ? null : (req.limitPrice as number),
-        entryPrice: market ? marketFillPrice(req.side, last.close, session.costs) : null,
+        entryPrice,
         entryTimeMs: market ? last.openTime : null,
         qty,
         riskPct: req.riskPct,
@@ -212,7 +216,7 @@ function levelMessage(code: string): string {
     case 'LIMIT_ON_WRONG_SIDE':
       return 'A long limit must be below the last close, a short limit above it (stop entries are not supported).';
     case 'STOP_DISTANCE_ZERO':
-      return 'The stop is at the entry; the order cannot be sized.';
+      return 'The stop is too close to the entry to size this order.';
     case 'SL_ON_WRONG_SIDE':
       return 'A long stop must be below the entry, a short stop above it.';
     default:

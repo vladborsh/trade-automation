@@ -125,6 +125,33 @@ describe('OrderService.place (design §7.2, §6)', () => {
   });
 });
 
+describe('OrderService.place — BUG-003 bounds on computed values', () => {
+  it('a stop 1e-12 from the entry is 422 STOP_DISTANCE_ZERO (it used to size qty ≈ 1e14 and overflow)', async () => {
+    const { place, repos } = await setup();
+    await expect(code(place({ sl: 100 - 1e-12 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
+    await expect(code(place({ sl: 99.9999 }))).resolves.toBe('422 STOP_DISTANCE_ZERO'); // inside the 0.001 minimum
+    const atMinimum = await place({ sl: 99.999 }); // exactly the minimum: qty = 100 / 0.001 (float: 99 999.9999995)
+    expect(atMinimum.order.qty).toBeCloseTo(100_000, 3);
+    expect(repos.orderRows.size).toBe(1);
+  });
+
+  it('a size that would not fit numeric(20,8) is refused with the same code (backstop)', async () => {
+    const { place, row } = await setup();
+    row().balance = 999_999_999_999; // 100 % risk → 1R ≈ 1e12, qty = 1e12 / 0.001 ≈ 1e15
+    await expect(code(place({ sl: 99.999, riskPct: 100 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
+  });
+
+  it('a refused request does not burn its opId: the same opId with a valid body then succeeds', async () => {
+    const { orders, session, repos } = await setup();
+    const opId = randomUUID();
+    const base = { opId, cursorMs: session.cursorMs, panelId: 'btc', side: 'long' as const, type: 'market' as const, riskPct: 1 };
+    await expect(code(orders.place('alice', session.id, { ...base, sl: 100 - 1e-12 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
+    expect(repos.opRows.size).toBe(0);
+    await expect(orders.place('alice', session.id, { ...base, sl: 99 })).resolves.toMatchObject({ order: { seq: 1 } });
+    expect(repos.opRows.size).toBe(1);
+  });
+});
+
 describe('OrderService.cancel', () => {
   it('cancels a pending order at the cursor; anything else is 409 ORDER_NOT_PENDING; replay is stable', async () => {
     const { place, orders, session } = await setup();
