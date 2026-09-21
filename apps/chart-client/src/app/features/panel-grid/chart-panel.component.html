@@ -21,11 +21,11 @@
     <app-chart
       [panelId]="panel().id"
       [kind]="panel().kind"
-      [candles]="feed().candles.candles()"
-      [points]="feed().points.points()"
+      [candles]="candles()"
+      [points]="points()"
       [overlays]="overlays()"
-      [indicatorPoints]="feed().indicators.points()"
-      [indicatorSpecs]="strategies.indicatorSpecs()"
+      [indicatorPoints]="indicatorPoints()"
+      [indicatorSpecs]="source().indicatorSpecs()"
       [timeframe]="timeframe.selected()"
       (loadOlderRequested)="onLoadOlder()"
     />

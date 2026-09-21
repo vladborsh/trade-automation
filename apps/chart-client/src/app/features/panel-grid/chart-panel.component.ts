@@ -1,22 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import type { Panel } from '@trade-automation/contracts';
+import type { Candle, IndicatorPoint, MetricPoint, OverlayPrimitive, Panel } from '@trade-automation/contracts';
 import { ChartComponent } from '../chart/chart.component';
 import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
 import { ConnectionStore } from '../../core/state/connection.store';
 import { InstrumentsStore } from '../../core/state/instruments.store';
-import { StrategiesStore } from '../../core/state/strategies.store';
 import { TimeframeStore } from '../../core/state/timeframe.store';
-import { LayoutFeedService } from '../../core/state/layout-feed.service';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { CollapsedPanelsStore } from '../../core/state/collapsed-panels.store';
-import type { PanelFeed } from '../../core/state/panel-feed';
-import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
 import { metricSeriesCaption, metricSeriesStyle } from '../chart/metric-series-style';
 import { panelTitle, plottedMetricUnit } from './panel-title';
+import type { PanelSource } from './panel-source';
 
 /**
  * architecture/chart-layouts.md §6.1 — one panel: header (title, venue
- * status dot) + `<app-chart>`, bound to this panel's own `PanelFeed`.
+ * status dot) + `<app-chart>`, bound to this panel's own `PanelSource`
+ * (backtest-app-system-design.md §2.3, D2) — a live `PanelFeed` or a replay source.
  *
  * `<app-research-badge>` is the VWAP client unit's component (untouched —
  * see instruments.store.ts's doc comment): `PanelGridComponent` renders
@@ -35,10 +33,17 @@ import { panelTitle, plottedMetricUnit } from './panel-title';
 })
 export class ChartPanelComponent {
   readonly panel = input.required<Panel>();
-  readonly feed = input.required<PanelFeed>();
+  readonly source = input.required<PanelSource>();
+
+  // `<app-chart>`'s inputs are typed as mutable arrays and ChartComponent stays untouched (D2);
+  // it never mutates them (its sorts work on copies), so the source's readonly arrays pass as-is.
+  readonly candles = computed(() => this.source().candles() as Candle[]);
+  readonly points = computed(() => this.source().points() as MetricPoint[]);
+  readonly overlays = computed(() => this.source().overlays() as OverlayPrimitive[]);
+  readonly indicatorPoints = computed(() => this.source().indicatorPoints() as IndicatorPoint[]);
 
   readonly title = computed(() =>
-    panelTitle(this.panel(), this.instruments.selected(), plottedMetricUnit(this.feed().points.points())),
+    panelTitle(this.panel(), this.instruments.selected(), plottedMetricUnit(this.points())),
   );
   /** §11.2 rule 4 — the style `<app-chart>` draws the metric in; exposed as an e2e hook (canvas has no DOM). */
   readonly metricStyle = computed(() => (this.panel().kind === 'metric' ? metricSeriesStyle(this.timeframe.selected()) : null));
@@ -47,9 +52,6 @@ export class ChartPanelComponent {
     this.panel().kind === 'metric' ? metricSeriesCaption(this.timeframe.selected()) : null,
   );
   readonly venueStatus = computed(() => this.connection.statusFor(this.panel().instrument)?.venueStatus ?? 'down');
-  readonly overlays = computed(() =>
-    this.panel().kind === 'candles' ? signalsToOverlays(this.feed().signals.signals()) : [],
-  );
   /** §11.3: the last expanded panel's collapse button is disabled. */
   readonly canCollapse = computed(() => {
     const layout = this.layouts.active();
@@ -57,11 +59,9 @@ export class ChartPanelComponent {
   });
 
   constructor(
-    readonly strategies: StrategiesStore,
     readonly timeframe: TimeframeStore,
     private readonly connection: ConnectionStore,
     private readonly instruments: InstrumentsStore,
-    private readonly layoutFeed: LayoutFeedService,
     private readonly layouts: LayoutsStore,
     private readonly collapsed: CollapsedPanelsStore,
   ) {}
@@ -74,6 +74,6 @@ export class ChartPanelComponent {
   }
 
   onLoadOlder(): void {
-    void this.layoutFeed.loadOlder(this.panel().id);
+    void this.source().loadOlder();
   }
 }

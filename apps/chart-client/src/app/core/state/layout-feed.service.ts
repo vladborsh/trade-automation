@@ -6,7 +6,10 @@ import { InstrumentsStore } from './instruments.store';
 import { LayoutsStore } from './layouts.store';
 import { TimeframeStore } from './timeframe.store';
 import { ConnectionStore } from './connection.store';
+import { StrategiesStore } from './strategies.store';
 import { PanelFeed } from './panel-feed';
+import type { PanelSource } from '../../features/panel-grid/panel-source';
+import { panelFeedSource } from '../../features/panel-grid/panel-feed-source';
 import type { Layout, Timeframe } from '@trade-automation/contracts';
 
 /**
@@ -16,11 +19,14 @@ import type { Layout, Timeframe } from '@trade-automation/contracts';
  * `PanelFeed`s → start all. Switching layout/timeframe is subscription
  * churn on the one socket, never a reconnect — `LiveSocket` itself is
  * untouched by a rebuild.
+ *
+ * backtest-app-system-design.md §2.3 (D2): the panels see each feed only as a `PanelSource`
+ * (`feeds()`); the concrete `PanelFeed`s stay private here, for stop/start/heal.
  */
 @Injectable({ providedIn: 'root' })
 export class LayoutFeedService {
   private feedsByPanelId = new Map<string, PanelFeed>();
-  private readonly feedsSignal = signal<ReadonlyMap<string, PanelFeed>>(new Map());
+  private readonly feedsSignal = signal<ReadonlyMap<string, PanelSource>>(new Map());
   private rebuildToken = 0;
   private booting: Promise<void> | null = null;
 
@@ -35,6 +41,7 @@ export class LayoutFeedService {
     private readonly layouts: LayoutsStore,
     private readonly timeframe: TimeframeStore,
     private readonly connection: ConnectionStore,
+    private readonly strategies: StrategiesStore,
   ) {
     effect(() => {
       const layout = this.layouts.active();
@@ -72,14 +79,6 @@ export class LayoutFeedService {
     this.socket.connect(this.config.get().wsUrl);
   }
 
-  feedFor(panelId: string): PanelFeed | undefined {
-    return this.feedsByPanelId.get(panelId);
-  }
-
-  async loadOlder(panelId: string): Promise<void> {
-    await this.feedsByPanelId.get(panelId)?.loadOlder();
-  }
-
   private async rebuild(layout: Layout, tf: Timeframe): Promise<void> {
     const token = ++this.rebuildToken;
 
@@ -92,7 +91,9 @@ export class LayoutFeedService {
       nextFeeds.set(panel.id, new PanelFeed(panel, tf, { rest: this.rest, socket: this.socket }));
     }
     this.feedsByPanelId = nextFeeds;
-    this.feedsSignal.set(new Map(nextFeeds));
+    this.feedsSignal.set(
+      new Map([...nextFeeds].map(([panelId, feed]) => [panelId, panelFeedSource(feed, this.strategies.indicatorSpecs)])),
+    );
 
     await Promise.all([...nextFeeds.values()].map((feed) => feed.start()));
 

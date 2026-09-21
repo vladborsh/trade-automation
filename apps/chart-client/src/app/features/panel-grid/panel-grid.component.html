@@ -2,11 +2,11 @@
   @for (panel of panels(); track panel.id) {
     @if (isCollapsed(panel.id)) {
       <app-collapsed-panel-strip [panelId]="panel.id" [title]="titleFor(panel)" (restore)="expand(panel.id)" />
-    } @else if (feedFor(panel.id); as feed) {
-      @if (injectorFor(feed); as inj) {
+    } @else if (sourceFor(panel.id); as source) {
+      @if (injectorFor(source); as inj) {
         <div class="panel-column">
           <ng-container
-            *ngComponentOutlet="chartPanelComponent; inputs: panelInputs(panel, feed); injector: inj"
+            *ngComponentOutlet="chartPanelComponent; inputs: panelInputs(panel, source); injector: inj"
           ></ng-container>
         </div>
       }
