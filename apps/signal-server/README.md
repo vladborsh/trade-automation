@@ -82,6 +82,13 @@ failure. Key ones:
 | `CALENDAR_DIGEST_TIME`, `CALENDAR_DIGEST_TZ` | Daily-digest fire time (default `00:00` `America/New_York` — the feed's own day). |
 | `CALENDAR_NOTIFY_MIN_IMPACT`, `CALENDAR_NOTIFY_COUNTRIES` | Notification filters: minimum impact (default `low` = everything) and a comma-separated country allowlist (default empty = all). |
 | `CALENDAR_DUE_CATCHUP_MS` | How late an event-due notification can still fire after a restart (default `900000` = 15 min); older than this, the event is marked released silently. |
+| `DATABASE_URL` | PostgreSQL connection string. **No default** — see "Database" below. Unset means the DB module is disabled. |
+| `DB_MIGRATE_ON_BOOT` | `true` (default) or `false`. Whether migrations run automatically at boot when `DATABASE_URL` is set. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin user upserted from these at boot (T-007). `ADMIN_PASSWORD` is a secret — never put a real value in a committed file. |
+| `APP_BASE_URL` | Base URL used to build invite links (default `http://localhost:3000`). |
+| `SESSION_COOKIE_SECURE` | `true`/`false`; default is `NODE_ENV === 'production'`. Controls the `Secure` flag on the `bt_session` cookie (T-007). |
+| `SCREENSHOT_STORE` | `file` or `s3`; default is whatever `CANDLE_STORE` resolves to (T-013). |
+| `SCREENSHOT_MAX_WIDTH_PX` | Max width a captured screenshot is downscaled to before upload (default `1280`). |
 
 The instrument universe (`config/instruments.yaml`), strategy enablement
 (`config/strategies.yaml`) and chart layouts (`config/layouts.yaml`) are separate files, also
@@ -173,6 +180,57 @@ invent numbers, but venue limits do change).
 To exercise Capital.com locally without those credentials, use
 `MARKET_DATA_MODE=replay` with fixtures under `test/fixtures/capitalcom/<symbol>/1m.jsonl`
 (bid/ask retained, matching the real payload shape).
+
+## Database (PostgreSQL) — one instance, one database per worktree slot
+
+`architecture/backtest-app-system-design.md` §3, §4 — the manual backtest app's relational
+data (users, invites, auth sessions, backtest sessions, orders, order modifications,
+screenshots metadata, the idempotency op log) lives in PostgreSQL, behind a `Db` port
+(`src/db/db.port.ts`: `query<T>(sql, params)`, `transaction<T>(fn)`) with a `pg`-backed
+implementation (`src/db/pg/pg-database.ts`). No SQL lives outside `src/db/pg/` and
+`src/**/pg/` directories. Candles stay in the existing file/S3 `CandleStore`, unaffected.
+
+**`DATABASE_URL` has no default.** This is deliberate (§12.8): a slot that forgets to set it
+must boot with the DB module disabled, never fall through to a shared or another slot's
+database. With `DATABASE_URL` unset, `DbModule` provides `null` for the `DB` token and does
+nothing else at boot — every route this server serves today is unaffected. With it set,
+migrations run automatically at boot when `DB_MIGRATE_ON_BOOT=true` (the default); a failed
+migration is a boot failure, like any other invalid env.
+
+**One Postgres instance serves every worktree slot; each slot uses its own database name** —
+this is how the "never touch another slot's state" rule in `AGENTS.md` extends to the
+database, the same way it already applies to ports:
+
+| Slot | `DATABASE_URL` database name |
+|---|---|
+| Coordinator / Tech Lead | `backtest_coord` |
+| dev-1 | `backtest_dev1` |
+| dev-2 | `backtest_dev2` |
+| dev-3 | `backtest_dev3` |
+| Tester | `backtest_tester` |
+
+Start the shared Postgres once (`docker compose up postgres` from this directory, or
+`podman-compose up postgres` — the compose file uses only Docker/Podman-portable keys), then
+create your own database by hand once (the migration runner creates tables only, never
+databases):
+
+```bash
+psql "postgresql://backtest:backtest@localhost:5432/backtest" -c "CREATE DATABASE backtest_dev3;"
+```
+
+Point your own `DATABASE_URL` at it and boot normally, or run migrations standalone:
+
+```bash
+DATABASE_URL=postgresql://backtest:backtest@localhost:5432/backtest_dev3 npm run migrate
+```
+
+`npm run migrate` (`node dist/db/migrate.js`) runs the same `migration-runner.ts` the server
+runs at boot — postgrator, `driver: 'pg'`, `migrationPattern: 'migrations/*'`,
+`schemaTable: 'schema_migrations'` — wrapped in
+`pg_advisory_lock(hashtext('bt-migrate'))` so two slots booting against the same Postgres
+instance never race each other's migration run. Migrations are versioned SQL files,
+`NNN.do.<name>.sql` / `NNN.undo.<name>.sql` (`migrations/001.do.init.sql` is the full schema
+from §3); applying an already-applied version is a no-op.
 
 ## Storage: file vs S3
 

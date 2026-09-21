@@ -59,11 +59,31 @@ export const EnvSchema = z.object({
   CALENDAR_NOTIFY_MIN_IMPACT: z.enum(['low', 'medium', 'high']).default('low'),
   CALENDAR_NOTIFY_COUNTRIES: z.string().default(''), // empty = all; else 'USD,EUR,GBP'
   CALENDAR_DUE_CATCHUP_MS: z.coerce.number().int().positive().default(900_000),
+
+  // architecture/backtest-app-system-design.md §2.2, §4, §12.8 — DATABASE_URL has NO default:
+  // a slot forgetting to set it must boot with the DB module disabled, never fall through to
+  // someone else's database. db.module.ts is the only reader of this being unset/set.
+  DATABASE_URL: z.string().optional(),
+  DB_MIGRATE_ON_BOOT: booleanFlag(true),
+  ADMIN_EMAIL: z.string().optional(),
+  // ADMIN_PASSWORD is a secret (bootstraps the admin user from env at boot, T-004 notes) —
+  // name only, never a default or a committed value. Read once by AdminBootstrap (T-007).
+  ADMIN_PASSWORD: z.string().optional(),
+  APP_BASE_URL: z.string().default('http://localhost:3000'),
+  // Default is NODE_ENV === 'production' (§2.2's env table) — resolved in validateEnv below,
+  // since a per-field zod default cannot see a sibling field's value.
+  SESSION_COOKIE_SECURE: booleanFlag(false),
+  SCREENSHOT_STORE: z.enum(['file', 's3']).optional(), // default = CANDLE_STORE, resolved by the consumer (T-013)
+  SCREENSHOT_MAX_WIDTH_PX: z.coerce.number().int().positive().default(1280),
 });
 export type Env = z.infer<typeof EnvSchema>;
 
 export function validateEnv(config: Record<string, unknown>): Env {
-  const result = EnvSchema.safeParse(config);
+  const withDefaults = { ...config };
+  if (withDefaults.SESSION_COOKIE_SECURE === undefined) {
+    withDefaults.SESSION_COOKIE_SECURE = withDefaults.NODE_ENV === 'production';
+  }
+  const result = EnvSchema.safeParse(withDefaults);
   if (!result.success) {
     throw new Error(`Invalid environment configuration:\n${result.error.toString()}`);
   }

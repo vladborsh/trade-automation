@@ -7,6 +7,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
+    "migrate": "node dist/db/migrate.js",
     "test": "jest",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
@@ -34,7 +35,9 @@
     "rxjs": "^7.8.1",
     "uuid": "^9.0.1",
     "reflect-metadata": "^0.2.2",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "pg": "^8.13.0",
+    "postgrator": "^5.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",
@@ -45,6 +48,7 @@
     "@types/uuid": "^9.0.8",
     "@types/ws": "^8.5.12",
     "@types/js-yaml": "^4.0.9",
+    "@types/pg": "^8.11.10",
     "aws-sdk-client-mock": "^4.0.2",
     "jest": "^29.7.0",
     "pino-pretty": "^11.2.2",

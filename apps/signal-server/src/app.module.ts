@@ -7,6 +7,7 @@ import { ObservabilityModule } from './observability/observability.module';
 import { MarketDataModule } from './market-data/market-data.module';
 import { StorageModule } from './storage/storage.module';
 import { StrategyEngineModule } from './strategy-engine/strategy-engine.module';
+import { DbModule } from './db/db.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { StrategyEngineModule } from './strategy-engine/strategy-engine.module';
     ObservabilityModule,
     HealthModule,
     StorageModule,
+    DbModule,
     MarketDataModule,
     StrategyEngineModule,
     ApiModule,
