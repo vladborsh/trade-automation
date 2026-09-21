@@ -13,11 +13,20 @@ import { InstrumentIdSchema } from './instrument';
 export const StrategyTierSchema = z.enum(['demo', 'research', 'live']);
 export type StrategyTier = z.infer<typeof StrategyTierSchema>;
 
-/** architecture/live-signal-server.md §11.3 — one indicator series a strategy can emit points for. */
+/**
+ * architecture/live-signal-server.md §11.3 — one indicator series a strategy can emit points for.
+ *
+ * T-028 (provisional, pending Architect): `scale` also accepts `'pane'`, a series drawn in its own
+ * pane below the price pane (RSI, MACD, Stochastic), with an optional fixed `range` and reference
+ * `levels`. Additive: every existing spec is `'price'` and parses unchanged; live strategies keep
+ * emitting `'price'`.
+ */
 export const IndicatorSeriesSpecSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  scale: z.literal('price'),
+  scale: z.enum(['price', 'pane']),
+  range: z.object({ min: z.number(), max: z.number() }).optional(),
+  levels: z.array(z.number()).optional(),
   keys: z.array(
     z.object({
       key: z.string().min(1),

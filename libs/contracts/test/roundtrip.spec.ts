@@ -148,6 +148,19 @@ describe('contracts round-trip (architecture/live-signal-server.md §3)', () => 
     expect(IndicatorSeriesSpecSchema.parse(spec)).toEqual(spec);
   });
 
+  it('parses a pane-scaled IndicatorSeriesSpec with range and levels (T-028, provisional)', () => {
+    const spec: IndicatorSeriesSpec = {
+      id: 'rsi-0',
+      label: 'RSI (14)',
+      scale: 'pane',
+      range: { min: 0, max: 100 },
+      levels: [30, 70],
+      keys: [{ key: 'rsi', label: 'RSI' }],
+    };
+    expect(IndicatorSeriesSpecSchema.parse(spec)).toEqual(spec);
+    expect(() => IndicatorSeriesSpecSchema.parse({ ...spec, scale: 'volume' })).toThrow();
+  });
+
   it('StrategyRequirements accepts optional minBars distinct from warmupBars', () => {
     const requirements: StrategyRequirements = {
       instruments: ['capitalcom:US100'],
