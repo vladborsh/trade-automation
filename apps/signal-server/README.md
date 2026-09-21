@@ -270,6 +270,25 @@ curl -i -b jar localhost:3030/api/auth/me
 curl -i -b jar -X POST localhost:3030/api/auth/logout
 ```
 
+## Backtest sessions
+
+`architecture/backtest-app-system-design.md` §7.2 — `src/backtest/`, `/api/backtest/sessions`.
+Authenticated like every other route; every query is scoped to the cookie user, and another
+user's session is a `404`, never a `403`. Without `DATABASE_URL` these routes answer `503`.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/backtest/sessions` | `cursorMs = periodFromMs`, `balance = initialBalance`, `skipWeekends` default `true`, `notionalWarnMultiple` default `5`; the layout is stored as the session's own copy. 422 `LAYOUT_TOO_MANY_PANELS`, `LAYOUT_NOT_CANDLES`, `INSTRUMENT_NOT_AVAILABLE`, `MIXED_SESSION_CURRENCY`, `PERIOD_OUTSIDE_COVERAGE`; a malformed body or `periodFromMs >= periodToMs` is `400`. |
+| GET | `/api/backtest/sessions` | Summaries (config + stored aggregate columns), newest first. |
+| GET | `/api/backtest/sessions/:id` | `{session, openOrders, stats}` — `stats` is `computeStats` over the session's closed orders (decision 38); `openOrders` is `[]` until order persistence (T-015). |
+| PATCH | `/api/backtest/sessions/:id` | `{name?, timeframe?}`; 409 `SESSION_COMPLETE` for a timeframe change on a complete session. Layout edits are not supported yet (400). |
+| DELETE | `/api/backtest/sessions/:id` | `204`; orders, modifications, screenshot rows and op log cascade. |
+
+The period must overlap every panel's stored 1m history (`CandleStore.coverage`), so a manual
+run needs real candles under `FILE_STORE_ROOT`. Point it at an APFS clone
+(`cp -cR …/tf=1m <scratch>/candles/venue=binance/symbol=BTCUSDT/`), never at another checkout's
+`data/`: boot can write under `FILE_STORE_ROOT`.
+
 ## Storage: file vs S3
 
 `CandleStore`/`SignalStore` are ports (§4.3); `FileCandleStore`/`FileSignalStore` and

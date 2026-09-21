@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from '../config/config.module';
 import { AuthModule } from '../auth/auth.module';
+import { BacktestModule } from '../backtest/backtest.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { ObservabilityModule } from '../observability/observability.module';
@@ -16,6 +17,7 @@ import { MetricsController } from './rest/metrics.controller';
 import { CalendarController } from './rest/calendar.controller';
 import { BacktestInstrumentsController } from './rest/backtest/instruments.controller';
 import { AuthController } from './rest/auth.controller';
+import { SessionsController } from './rest/backtest/sessions.controller';
 import { LiveGateway } from './ws/live.gateway';
 
 @Module({
@@ -27,6 +29,7 @@ import { LiveGateway } from './ws/live.gateway';
     ObservabilityModule,
     CalendarModule,
     AuthModule,
+    BacktestModule,
   ],
   controllers: [
     InstrumentsController,
@@ -39,6 +42,7 @@ import { LiveGateway } from './ws/live.gateway';
     CalendarController,
     BacktestInstrumentsController,
     AuthController,
+    SessionsController,
   ],
   providers: [LiveGateway],
 })

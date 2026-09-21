@@ -1,0 +1,44 @@
+import { Costs, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { OrderRepository } from './order.repository.port';
+
+/** What POST /backtest/sessions writes (§7.2): the validated request plus the derived fields. */
+export interface NewSession {
+  name: string;
+  sessionCurrency: string;
+  timeframe: Timeframe;
+  periodFromMs: number;
+  periodToMs: number;
+  initialBalance: number;
+  defaultRiskPct: number;
+  costs: Costs;
+  skipWeekends: boolean;
+  notionalWarnMultiple: number;
+  layout: SessionLayout;
+}
+
+/**
+ * architecture/backtest-app-system-design.md §3, §4 — `backtest_sessions`. Every method takes
+ * the owning `userId` and filters on it (tenancy, §3): a row owned by someone else is
+ * indistinguishable from a missing one, which is how the API answers 404 rather than 403.
+ * Rows come back in the `SessionSummary` wire shape (config + stored aggregates).
+ */
+export interface SessionRepository {
+  insert(userId: string, session: NewSession): Promise<SessionSummary>;
+  /** Newest first (the `(user_id, created_at desc)` index). */
+  listByUser(userId: string): Promise<SessionSummary[]>;
+  /** `forUpdate` row-locks it for the rest of the enclosing transaction. */
+  findById(userId: string, id: string, opts?: { forUpdate?: boolean }): Promise<SessionSummary | null>;
+  /** Bumps `updated_at`; null when no such session for this user. */
+  update(userId: string, id: string, patch: { name?: string; timeframe?: Timeframe }): Promise<SessionSummary | null>;
+  /** True when a row was deleted; cascades to orders, modifications, screenshots, ops (§3). */
+  delete(userId: string, id: string): Promise<boolean>;
+}
+
+export interface BacktestRepositories {
+  sessions: SessionRepository;
+  orders: OrderRepository;
+  transaction<T>(fn: (repos: Omit<BacktestRepositories, 'transaction'>) => Promise<T>): Promise<T>;
+}
+
+/** Resolves to `null` when the DB module is disabled (no `DATABASE_URL`). */
+export const BACKTEST_REPOSITORIES = Symbol('BACKTEST_REPOSITORIES');
