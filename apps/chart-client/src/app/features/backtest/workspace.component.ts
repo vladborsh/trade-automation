@@ -57,7 +57,29 @@ export class WorkspaceComponent {
     const action = engine && !engine.completed() ? replayKeyAction(event) : null;
     if (!engine || !action) return;
     event.preventDefault(); // → would otherwise scroll the page
-    if (action === 'step') this.step();
-    else this.setTimeframe(adjacentTimeframe(engine.timeframe(), action));
+    switch (action) {
+      case 'step':
+        return this.step();
+      case 'finer':
+      case 'coarser':
+        return this.setTimeframe(adjacentTimeframe(engine.timeframe(), action));
+      case 'long':
+      case 'short':
+        return this.store.createDraft(action);
+      case 'cancel':
+        this.store.activeTool()?.store.removeActiveDraft();
+        return;
+      case 'order':
+        return this.order();
+    }
+  }
+
+  /**
+   * `Enter` (decision 29): never a guessed order. With no active draft, a hint and nothing else;
+   * with one, placing it is T-023.
+   */
+  order(): void {
+    const active = this.store.activeTool()?.store.active();
+    if (!active || active.kind !== 'draft') this.store.showHint('No active position tool — press B or S');
   }
 }

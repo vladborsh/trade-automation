@@ -7,6 +7,7 @@ import type {
   OverlayPrimitive,
   Panel,
 } from '@trade-automation/contracts';
+import type { PositionToolChange, PositionToolsView } from '../chart/overlay/position-tool.model';
 import type { IndicatorsStore } from '../../core/state/indicators.store';
 import type { SignalsStore } from '../../core/state/signals.store';
 
@@ -32,7 +33,20 @@ export interface PanelSource {
   readonly indicatorPoints: Signal<readonly IndicatorPoint[]>;
   readonly indicatorSpecs: Signal<ReadonlyMap<string, IndicatorSeriesSpec>>;
   readonly researchScope?: PanelResearchScope;
+  /**
+   * backtest-app-system-design.md §9.1 (T-022): the panel's position tools. Only the replay
+   * workspace supplies it; without it the chart draws none and ignores pointer hits.
+   */
+  readonly positionTools?: PanelPositionTools;
   loadOlder(): Promise<void>;
+}
+
+/** A panel's position tools as the chart kit sees them: what to draw, and where changes go. */
+export interface PanelPositionTools {
+  readonly view: Signal<PositionToolsView>;
+  apply(change: PositionToolChange): void;
+  /** The price under the pointer while it is over this panel's chart, else null. */
+  setPointerPrice(price: number | null): void;
 }
 
 /** The live feed's own per-panel stores, for the research badge only (see `PanelSource`). */

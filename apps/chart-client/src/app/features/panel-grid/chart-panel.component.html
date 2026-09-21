@@ -22,8 +22,11 @@
     [attr.data-metric-style]="metricStyle()"
     [attr.data-last-open]="lastBar()?.openTime"
     [attr.data-last-closed]="lastBar()?.closed"
+    [attr.data-position-tools]="toolsHook()"
+    [attr.data-pointer-price]="pointerPriceHook()"
   >
     <app-chart
+      #chart
       [panelId]="panel().id"
       [kind]="panel().kind"
       [candles]="candles()"
@@ -32,6 +35,9 @@
       [indicatorPoints]="indicatorPoints()"
       [indicatorSpecs]="source().indicatorSpecs()"
       [timeframe]="tf()"
+      [positionTools]="positionTools()"
+      [positionToolsEnabled]="positionTools() !== null"
+      (positionToolChange)="onPositionToolChange($event)"
       (loadOlderRequested)="onLoadOlder()"
     />
   </div>

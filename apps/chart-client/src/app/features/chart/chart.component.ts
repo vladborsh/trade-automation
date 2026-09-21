@@ -38,6 +38,8 @@ import { RectRenderer } from './overlay/rect.renderer';
 import { RayRenderer } from './overlay/ray.renderer';
 import { LineRenderer } from './overlay/line.renderer';
 import { ShapesPrimitive } from './overlay/shapes.primitive';
+import { PositionToolLayer } from './overlay/position-tool.layer';
+import type { PositionToolChange, PositionToolsView } from './overlay/position-tool.model';
 import { IndicatorLayer } from './indicator/indicator-layer';
 import { ChartCrosshair } from './chart-crosshair';
 import { ChartSyncService, sameRange, type TimeRange } from './chart-sync.service';
@@ -88,6 +90,10 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   readonly timeframe = input.required<Timeframe>();
   readonly panelId = input.required<string>();
+  /** §9.1 position tools (replay only): what to draw, whether pointer hits are handled, the changes. */
+  readonly positionTools = input<PositionToolsView | null>(null);
+  readonly positionToolsEnabled = input(false);
+  readonly positionToolChange = output<PositionToolChange>();
   readonly loadOlderRequested = output<void>();
 
   readonly markerCount = computed(() => this.overlays().filter((o) => o.type === 'marker').length);
@@ -120,6 +126,14 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private readonly shapesPrimitive = new ShapesPrimitive();
   private readonly indicatorLayer = new IndicatorLayer();
   private readonly metricSeries = new MetricSeriesRenderer();
+  private readonly positionToolLayer = new PositionToolLayer({
+    chart: () => this.chart,
+    series: () => this.series,
+    view: () => this.positionTools(),
+    enabled: () => this.positionToolsEnabled() && this.kind() === 'candles',
+    lastClose: () => this.candles().at(-1)?.close ?? null,
+    emit: (change) => this.positionToolChange.emit(change),
+  });
   private lastRenderedCount = 0;
   private lastRenderedTime: number | null = null; // candle openTime or metric point time, seconds-scale source (ms)
   /**
@@ -162,6 +176,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       const overlays = this.overlays();
       this.overlayLayer.render(overlays);
     });
+
+    effect(() => this.positionToolLayer.render(this.positionTools(), this.positionToolsEnabled()));
 
     effect(() => {
       const points = this.indicatorPoints();
@@ -224,6 +240,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
     if (isCandles) {
       this.overlayLayer.attachAll(this.chart, this.series);
+      this.positionToolLayer.attach(el, this.series);
     }
     this.indicatorLayer.attach(this.chart);
 
@@ -526,6 +543,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.stopResizeObserver();
     this.resizeSettle.dispose();
     this.sync.releaseCrosshair(this.panelId());
+    this.positionToolLayer.detach();
     this.overlayLayer.clearAll();
     this.indicatorLayer.clearAll();
     this.chart?.remove();

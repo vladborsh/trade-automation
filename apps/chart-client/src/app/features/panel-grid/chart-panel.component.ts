@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, type Signal, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import type { Candle, IndicatorPoint, MetricPoint, OverlayPrimitive, Panel, Timeframe } from '@trade-automation/contracts';
 import { ChartComponent } from '../chart/chart.component';
+import { ChartSyncService } from '../chart/chart-sync.service';
+import type { PositionToolChange } from '../chart/overlay/position-tool.model';
 import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
 import { ConnectionStore } from '../../core/state/connection.store';
 import { InstrumentsStore } from '../../core/state/instruments.store';
@@ -44,6 +46,16 @@ export class ChartPanelComponent {
   readonly points = computed(() => this.source().points() as MetricPoint[]);
   readonly overlays = computed(() => this.source().overlays() as OverlayPrimitive[]);
   readonly indicatorPoints = computed(() => this.source().indicatorPoints() as IndicatorPoint[]);
+  /** §9.1 position tools, when the source has them (the replay workspace). */
+  readonly positionTools = computed(() => this.source().positionTools?.view() ?? null);
+  /** e2e hooks (the tools are drawn on a canvas): each tool, and the price under the pointer. */
+  readonly toolsHook = computed(() =>
+    this.positionTools()?.tools.map((t) => `${t.id}:${t.side}:${t.mode}:${t.entry}:${t.sl}:${t.tp}:${t.active ? 'active' : ''}`).join(' '),
+  );
+  readonly pointerPriceHook = signal<number | null>(null);
+  /** The chart's crosshair (a template ref, so a spec's stub chart satisfies it too). */
+  private readonly chart = viewChild<{ crosshairPrice: Signal<number | null> }>('chart');
+  private readonly sync = inject(ChartSyncService, { optional: true });
   /** The newest bar, as e2e hooks on the panel body (the chart itself is a canvas). */
   readonly lastBar = computed(() => this.candles().at(-1) ?? null);
 
@@ -69,7 +81,24 @@ export class ChartPanelComponent {
     private readonly instruments: InstrumentsStore,
     private readonly layouts: LayoutsStore,
     private readonly collapsed: CollapsedPanelsStore,
-  ) {}
+  ) {
+    // The pointer's price goes to the position tools only while THIS panel drives the shared
+    // crosshair: followers also show a crosshair price (the synced bar's close), which is not
+    // where the user is pointing.
+    // Sources without tools (the live terminal) return before reading anything, so their panels
+    // track nothing here.
+    effect(() => {
+      const tools = this.source().positionTools;
+      if (!tools) return;
+      const price = this.sync?.crosshair()?.origin === this.panel().id ? (this.chart()?.crosshairPrice() ?? null) : null;
+      tools.setPointerPrice(price);
+      this.pointerPriceHook.set(price);
+    });
+  }
+
+  onPositionToolChange(change: PositionToolChange): void {
+    this.source().positionTools?.apply(change);
+  }
 
   collapse(): void {
     const layout = this.layouts.active();

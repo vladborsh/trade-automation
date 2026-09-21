@@ -16,6 +16,9 @@
         (step)="step()"
         (timeframeChange)="setTimeframe($event)"
       />
+      @if (store.hint(); as hint) {
+        <p class="hint" role="status">{{ hint }}</p>
+      }
       <div class="grid">
         <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
       </div>

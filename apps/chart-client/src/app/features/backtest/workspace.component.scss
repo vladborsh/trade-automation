@@ -9,6 +9,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative; // anchors the position-tool hint
 }
 .grid {
   display: flex;
@@ -38,4 +39,20 @@
 }
 .message.error {
   color: #ef5350;
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 10;
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-size: 13px;
+  pointer-events: none;
 }

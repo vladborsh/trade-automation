@@ -12,6 +12,12 @@ describe('replayKeyAction (decision 37b)', () => {
     expect(key('c')).toBeNull();
   });
 
+  it('B / S place a long / short tool (either case), Esc cancels, Enter orders (T-022)', () => {
+    expect([key('b'), key('B'), key('s'), key('S'), key('Escape'), key('Enter')]).toEqual(['long', 'long', 'short', 'short', 'cancel', 'order']);
+    expect(key('s', undefined, { metaKey: true })).toBeNull(); // ⌘S / Ctrl+S stay the browser's
+    expect(key('b', { tagName: 'INPUT' })).toBeNull();
+  });
+
   it('is ignored while typing and with a modifier held', () => {
     for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) expect(key('ArrowRight', { tagName })).toBeNull();
     expect(key('ArrowRight', { tagName: 'DIV', isContentEditable: true })).toBeNull();

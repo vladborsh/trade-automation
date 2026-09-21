@@ -1,14 +1,19 @@
-import { Injectable, type OnDestroy, computed, inject, signal } from '@angular/core';
+import { Injectable, type OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { Session, Timeframe } from '@trade-automation/contracts';
 import { BacktestClient } from '../api/backtest.client';
 import { AdvanceQueue, type MutationOutcome, type MutationTransport } from './advance-queue';
 import { PortfolioStore } from './portfolio.store';
 import { refusalNotice } from './refusal-notice';
+import type { PanelPositionTools } from '../../features/panel-grid/panel-source';
 import { ReplayEngine, type ReplayApi } from './replay-engine';
 import { ReplayPanelSource } from './replay-panel-source';
+import { PositionToolsStore } from './position-tools.store';
 
 /** How long a one-line notice (resynced, reloaded) stays in the toolbar. */
 const NOTICE_MS = 8_000;
+/** How long a position-tool hint (a refused drag, `Enter` with no active tool) stays up. */
+const HINT_MS = 3_000;
+const DEFAULT_PRICE_PRECISION = 2;
 
 /**
  * backtest-app-system-design.md §2.3, §5.4–5.5 — one open backtest session in the workspace: the
@@ -36,9 +41,32 @@ export class ReplaySessionStore implements OnDestroy {
   /** Instrument → price decimals, for the journal (from `GET /backtest/instruments`). */
   readonly pricePrecision = signal<ReadonlyMap<string, number>>(new Map());
 
+  /** A short position-tool message (T-022): a refused drag, `Enter` with no active tool, … */
+  readonly hint = signal<string | null>(null);
+
   private queue: AdvanceQueue | null = null;
   private sessionId: string | null = null;
   private noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  private hintTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Panel id → its position tools; kept across timeframe switches (the sources are rebuilt). */
+  private readonly toolStores = new Map<string, PositionToolsStore>();
+  private toolSeq = 0;
+
+  constructor() {
+    // A `market` draft stays on its panel's last close as the replay steps (§9.1).
+    effect(() => {
+      const engine = this.engine();
+      // reading the sources creates each panel's store, so this effect tracks every panel's series
+      const panelIds = [...this.sources().keys()];
+      if (!engine) return;
+      for (const panelId of panelIds) {
+        const store = this.toolStore(panelId);
+        const s = engine.seriesFor(panelId)();
+        const close = (s.forming ?? s.closed.at(-1))?.close;
+        if (close !== undefined) untracked(() => store.followLastClose(close));
+      }
+    });
+  }
 
   /**
    * Panel id → source, for the panel grid. New sources per timeframe, so the grid re-creates its
@@ -49,8 +77,65 @@ export class ReplaySessionStore implements OnDestroy {
     const session = this.session();
     if (!engine || !session) return new Map<string, ReplayPanelSource>();
     engine.timeframe();
-    return new Map(session.layout.panels.map((p) => [p.id, new ReplayPanelSource(p, engine)]));
+    return new Map(session.layout.panels.map((p) => [p.id, new ReplayPanelSource(p, engine, this.toolsBinding(p.id))]));
   });
+
+  /** The panel's position-tool store (created on first use). */
+  toolStore(panelId: string): PositionToolsStore {
+    let store = this.toolStores.get(panelId);
+    if (!store) {
+      const lastBar = () => {
+        const s = this.engine()?.seriesFor(panelId)();
+        return s ? (s.forming ?? s.closed.at(-1) ?? null) : null;
+      };
+      store = new PositionToolsStore({
+        lastClose: () => lastBar()?.close ?? null,
+        anchorTime: () => lastBar()?.openTime ?? null,
+        precision: () => this.precisionOf(panelId),
+        activated: (active) => this.toolStores.forEach((other) => other !== active && other.deactivate()),
+        hint: (message) => this.showHint(message),
+        newId: () => `tool-${++this.toolSeq}`,
+      });
+      this.toolStores.set(panelId, store);
+    }
+    return store;
+  }
+
+  /** The workspace's single active tool (decision 29), with its panel. */
+  activeTool(): { panelId: string; store: PositionToolsStore } | null {
+    for (const [panelId, store] of this.toolStores) if (store.active()) return { panelId, store };
+    return null;
+  }
+
+  /** `B`/`S`: on the panel under the pointer, else the active tool's panel, else the first panel. */
+  createDraft(side: 'long' | 'short'): void {
+    const panels = this.session()?.layout.panels ?? [];
+    const hovered = panels.find((p) => this.toolStores.get(p.id)?.pointerPrice() != null);
+    const panelId = hovered?.id ?? this.activeTool()?.panelId ?? panels[0]?.id;
+    if (panelId) this.toolStore(panelId).create(side);
+  }
+
+  showHint(message: string): void {
+    this.hint.set(message);
+    clearTimeout(this.hintTimer);
+    this.hintTimer = setTimeout(() => this.hint.set(null), HINT_MS);
+  }
+
+  private precisionOf(panelId: string): number {
+    const instrument = this.session()?.layout.panels.find((p) => p.id === panelId)?.instrument;
+    return (instrument && this.pricePrecision().get(instrument)) ?? DEFAULT_PRICE_PRECISION;
+  }
+
+  private toolsBinding(panelId: string): PanelPositionTools {
+    const store = this.toolStore(panelId);
+    const view = computed(() => ({
+      tools: store.tools(),
+      balance: this.session()?.balance ?? 0,
+      riskPct: this.session()?.defaultRiskPct ?? 1,
+      pricePrecision: this.precisionOf(panelId),
+    }));
+    return { view, apply: (change) => store.apply(change), setPointerPrice: (price) => store.pointerPrice.set(price) };
+  }
 
   /** Loads (or reloads) the session from the server and builds a fresh engine and queue at its cursor. */
   async open(id: string): Promise<void> {
@@ -120,6 +205,7 @@ export class ReplaySessionStore implements OnDestroy {
   ngOnDestroy(): void {
     // The queue is left to drain: steps taken just before leaving the workspace still reach the server.
     clearTimeout(this.noticeTimer);
+    clearTimeout(this.hintTimer);
   }
 
   private reconcile(outcome: MutationOutcome): void {

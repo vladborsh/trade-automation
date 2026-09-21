@@ -2,12 +2,13 @@ import type { Timeframe } from '@trade-automation/contracts';
 
 const ORDER: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
-export type ReplayKeyAction = 'step' | 'finer' | 'coarser';
+export type ReplayKeyAction = 'step' | 'finer' | 'coarser' | 'long' | 'short' | 'cancel' | 'order';
 
 /**
  * Brief decision 37b hotkeys for the workspace: `→` steps, `[` / `]` switch to the next finer /
- * coarser timeframe. Ignored while the user types in a form control, and with a modifier held
- * (so browser and OS shortcuts keep working).
+ * coarser timeframe, `B` / `S` place a long / short position tool, `Esc` removes the active draft,
+ * `Enter` opens an order from the active tool (T-023; with none, a hint only). Ignored while the
+ * user types in a form control, and with a modifier held (so browser and OS shortcuts keep working).
  */
 export function replayKeyAction(event: Pick<KeyboardEvent, 'key' | 'target' | 'altKey' | 'ctrlKey' | 'metaKey'>): ReplayKeyAction | null {
   if (event.altKey || event.ctrlKey || event.metaKey) return null;
@@ -20,6 +21,16 @@ export function replayKeyAction(event: Pick<KeyboardEvent, 'key' | 'target' | 'a
       return 'finer';
     case ']':
       return 'coarser';
+    case 'b':
+    case 'B':
+      return 'long';
+    case 's':
+    case 'S':
+      return 'short';
+    case 'Escape':
+      return 'cancel';
+    case 'Enter':
+      return 'order';
     default:
       return null;
   }

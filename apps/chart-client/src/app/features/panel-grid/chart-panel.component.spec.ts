@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
 import { Component, input, output, signal } from '@angular/core';
+import type { PositionToolChange, PositionToolsView } from '../chart/overlay/position-tool.model';
+import { ChartSyncService } from '../chart/chart-sync.service';
 import { TestBed } from '@angular/core/testing';
 import type {
   Candle,
@@ -30,7 +32,11 @@ class ChartStubComponent {
   readonly indicatorPoints = input<IndicatorPoint[]>([]);
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   readonly timeframe = input.required<Timeframe>();
+  readonly positionTools = input<PositionToolsView | null>(null);
+  readonly positionToolsEnabled = input(false);
+  readonly positionToolChange = output<PositionToolChange>();
   readonly loadOlderRequested = output<void>();
+  readonly crosshairPrice = signal<number | null>(null);
 }
 
 const PANEL: Panel = { id: 'replay-btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false };
@@ -106,6 +112,38 @@ describe('ChartPanelComponent with a stub PanelSource (not a PanelFeed)', () => 
 
     chart.loadOlderRequested.emit();
     expect(source.loadOlder).toHaveBeenCalledTimes(1);
+  });
+
+  it('without position tools the chart draws none and ignores hits (the live terminal)', () => {
+    const { chart } = render(stubSource());
+    expect(chart.positionTools()).toBeNull();
+    expect(chart.positionToolsEnabled()).toBe(false);
+  });
+
+  it('with position tools: the view goes to the chart, its changes to the source (T-022)', () => {
+    const view: PositionToolsView = { tools: [], balance: 10_000, riskPct: 1, pricePrecision: 2 };
+    const tools = { view: signal(view), apply: vi.fn(), setPointerPrice: vi.fn() };
+    const { chart } = render({ ...stubSource(), positionTools: tools });
+    expect(chart.positionTools()).toBe(view);
+    expect(chart.positionToolsEnabled()).toBe(true);
+    chart.positionToolChange.emit({ type: 'activate', id: 't1' });
+    expect(tools.apply).toHaveBeenCalledWith({ type: 'activate', id: 't1' });
+  });
+
+  it('reports the pointer price only while this panel drives the shared crosshair', () => {
+    TestBed.configureTestingModule({ providers: [ChartSyncService] });
+    const tools = { view: signal({ tools: [], balance: 1, riskPct: 1, pricePrecision: 2 }), apply: vi.fn(), setPointerPrice: vi.fn() };
+    const { fixture, chart } = render({ ...stubSource(), positionTools: tools });
+    const sync = TestBed.inject(ChartSyncService);
+
+    chart.crosshairPrice.set(101.5);
+    sync.setCrosshair('replay-btc', 1_000);
+    fixture.detectChanges();
+    expect(tools.setPointerPrice).toHaveBeenLastCalledWith(101.5);
+
+    sync.setCrosshair('another-panel', 1_000); // this panel only follows: not where the user points
+    fixture.detectChanges();
+    expect(tools.setPointerPrice).toHaveBeenLastCalledWith(null);
   });
 
   it('renders without a researchScope (no research strategy in replay)', () => {
