@@ -1,5 +1,5 @@
 import { Candle } from '@trade-automation/contracts';
-import { Resampler } from '../../src/market-data/resampler';
+import { Resampler } from '../../src/resample/resampler';
 
 function bar(openTime: number, o: number, h: number, l: number, c: number, v = 1): Candle {
   return {
