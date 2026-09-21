@@ -79,15 +79,7 @@ export class ReplayEngine {
     this.completed.set(config.completed ?? false);
     this.timeframe.set(config.timeframe);
     this.atEnd.set(config.cursorMs >= config.periodToMs);
-    this.tapes = config.panels.map((panel) => ({
-      panel,
-      cache: new AheadCache(panel.instrument),
-      series: signal<TfSeries>({ closed: [], forming: null }),
-      queue: Promise.resolve(),
-      refilling: false,
-      loadingOlder: false,
-      noMoreOlder: false,
-    }));
+    this.tapes = config.panels.map(newTape);
   }
 
   /** The panel's bars, for its `ReplayPanelSource`. */
@@ -167,6 +159,41 @@ export class ReplayEngine {
       this.api.patchTimeframe(tf).catch((err: unknown) => this.error.set(`Could not save the timeframe: ${describe(err)}`));
     });
     this.refillAll();
+  }
+
+  /**
+   * T-029: a panel added mid-session gets its own tape at the current cursor — history plus the
+   * bar forming there, and an ahead cache — built the way `setTimeframe` rebuilds a series, so it
+   * also works while the client's cursor is ahead of the server's: history up to `anchor` (the bar
+   * boundary at or before the server cursor), the 1m from `anchor` folded with `foldOneMinute`.
+   * The server must already know the panel (its layout was patched first).
+   */
+  async addPanel(panel: Panel): Promise<void> {
+    await this.whenIdle();
+    await this.exclusive(async () => {
+      if (this.tapes.some((t) => t.panel.id === panel.id)) return;
+      this.blocked.set(true);
+      const tf = this.timeframe();
+      const cursor = this.cursor();
+      const anchor = bucketStart(Math.min(cursor, this.serverCursor), tf);
+      const t = newTape(panel);
+      t.cache.reset(anchor);
+      while (!t.cache.endOfTape && !coversReveal([t.cache], cursor)) await this.fetchPage(t);
+      const history = await this.api.history(panel.id, tf, anchor, HISTORY_PAGE);
+      t.series.set(seriesAt(history.bars, t.cache.revealed(anchor, cursor), tf, cursor));
+      t.cache.dropBefore(bucketStart(cursor, tf)); // as after a step: the cache starts at the forming bar
+      this.tapes.push(t);
+    });
+    this.refillAll();
+  }
+
+  /** T-029: a panel removed mid-session drops its tape. */
+  async removePanel(panelId: string): Promise<void> {
+    await this.whenIdle();
+    await this.exclusive(async () => {
+      const i = this.tapes.findIndex((t) => t.panel.id === panelId);
+      if (i >= 0) this.tapes.splice(i, 1);
+    });
   }
 
   /** Older closed bars for one panel (the chart scrolled back to its oldest bar). */
@@ -288,11 +315,28 @@ export class ReplayEngine {
     }
   }
 
+  /** Waits out a step or switch in flight: `exclusive` would otherwise skip the call. */
+  private async whenIdle(): Promise<void> {
+    while (this.busy) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
   private tape(panelId: string): PanelTape {
     const t = this.tapes.find((x) => x.panel.id === panelId);
     if (!t) throw new Error(`Unknown panel '${panelId}'`);
     return t;
   }
+}
+
+function newTape(panel: Panel): PanelTape {
+  return {
+    panel,
+    cache: new AheadCache(panel.instrument),
+    series: signal<TfSeries>({ closed: [], forming: null }),
+    queue: Promise.resolve(),
+    refilling: false,
+    loadingOlder: false,
+    noMoreOlder: false,
+  };
 }
 
 function describe(err: unknown): string {

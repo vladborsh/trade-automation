@@ -3,6 +3,7 @@ import type { Timeframe } from '@trade-automation/contracts';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
 import { PanelGridComponent } from '../panel-grid/panel-grid.component';
+import { LayoutEditorComponent } from './layout-editor.component';
 import { ReplayToolbarComponent } from './replay-toolbar.component';
 import { JournalComponent } from './journal.component';
 import { StatsSummaryComponent } from './stats-summary.component';
@@ -21,7 +22,7 @@ import { adjacentTimeframe, replayKeyAction } from './replay-keys';
 @Component({
   selector: 'app-workspace',
   standalone: true,
-  imports: [ReplayToolbarComponent, PanelGridComponent, JournalComponent, StatsSummaryComponent],
+  imports: [ReplayToolbarComponent, PanelGridComponent, LayoutEditorComponent, JournalComponent, StatsSummaryComponent],
   providers: [ReplaySessionStore, LayoutsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './workspace.component.html',

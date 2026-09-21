@@ -1,0 +1,41 @@
+<div class="layout-editor">
+  <button type="button" class="toggle" [attr.aria-expanded]="open()" (click)="toggle()">Layout</button>
+  @if (open()) {
+    <section class="panel" aria-label="Edit the session layout">
+      @if (locked()) {
+        <p class="muted">The session is complete; its layout can no longer change.</p>
+      } @else {
+        <ol class="panels">
+          @for (p of panels(); track p.id; let first = $first; let last = $last) {
+            <li data-testid="layout-panel">
+              <span class="name">{{ p.title ?? p.instrument }}</span>
+              @if (withOrders().has(p.id)) {
+                <span class="badge" title="Has pending or open orders">orders</span>
+              }
+              <span class="actions">
+                <button type="button" aria-label="Move up" [disabled]="first || busy()" (click)="move(p.id, -1)">↑</button>
+                <button type="button" aria-label="Move down" [disabled]="last || busy()" (click)="move(p.id, 1)">↓</button>
+                <button type="button" class="remove" aria-label="Remove panel" [disabled]="panels().length === 1 || busy()" (click)="remove(p.id)">✕</button>
+              </span>
+            </li>
+          }
+        </ol>
+        <div class="add">
+          <select name="addInstrument" aria-label="Instrument to add" [disabled]="full() || busy() || addable().length === 0" (change)="choice.set($any($event.target).value)">
+            <option value="" [selected]="choice() === ''">{{ full() ? 'At most 4 panels' : addable().length === 0 ? 'Nothing else to add' : 'Add an instrument…' }}</option>
+            @for (i of addable(); track i.id) {
+              <option [value]="i.id" [selected]="choice() === i.id">{{ i.displayName }}</option>
+            }
+          </select>
+          <button type="button" [disabled]="!choice() || full() || busy()" (click)="add()">Add panel</button>
+        </div>
+      }
+      @if (busy()) {
+        <p class="muted" role="status">Saving…</p>
+      }
+      @if (error(); as message) {
+        <p class="error" role="alert" data-testid="layout-error">{{ message }}</p>
+      }
+    </section>
+  }
+</div>

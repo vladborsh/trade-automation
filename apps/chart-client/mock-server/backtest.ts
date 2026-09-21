@@ -7,6 +7,7 @@ import {
   type BacktestInstrument,
   type Session,
   type SessionDetail,
+  type SessionLayout,
   type SessionStats,
   type SessionSummary,
   type Timeframe,
@@ -152,23 +153,17 @@ export class MockBacktestState {
   }
 
   private create(res: ServerResponse, send: SendJson, userId: string, body: Record<string, unknown> | null): void {
-    const panels = (body?.['layout'] as { panels?: unknown } | undefined)?.panels;
-    if (Array.isArray(panels) && panels.length > 4) return fail(send, res, 422, 'LAYOUT_TOO_MANY_PANELS', `A session layout has at most 4 panels (got ${panels.length}).`);
-    if (Array.isArray(panels) && panels.some((p) => (p as { kind?: unknown })?.kind !== 'candles')) return fail(send, res, 422, 'LAYOUT_NOT_CANDLES', 'Session layouts hold candle panels only.');
+    const shapeError = layoutShapeError(body);
+    if (shapeError) return fail(send, res, 422, shapeError.code, shapeError.message);
     const parsed = CreateSessionRequestSchema.safeParse(body);
     if (!parsed.success || parsed.data.periodFromMs >= parsed.data.periodToMs) {
       send(res, 400, { statusCode: 400, message: 'Bad Request' });
       return;
     }
     const req = parsed.data;
-    const ids = [...new Set(req.layout.panels.map((p) => p.instrument))];
-    const catalogue = ids.map((id) => MOCK_BACKTEST_INSTRUMENTS.find((i) => i.id === id));
-    const missing = ids.find((_, n) => !catalogue[n]?.coverage);
-    if (missing) return fail(send, res, 422, 'INSTRUMENT_NOT_AVAILABLE', `Instrument ${missing} has no stored 1m history to replay.`);
-    const currencies = [...new Set(catalogue.map((i) => i!.sessionCurrency))];
-    if (currencies.length > 1) return fail(send, res, 422, 'MIXED_SESSION_CURRENCY', `All panels must share one session currency; got ${currencies.join(', ')}.`);
-    const outside = catalogue.find((i) => !(req.periodFromMs < i!.coverage!.to + MIN && i!.coverage!.from < req.periodToMs));
-    if (outside) return fail(send, res, 422, 'PERIOD_OUTSIDE_COVERAGE', `The period does not overlap the stored 1m history of ${outside.id}.`);
+    const verdict = checkLayout(req.layout, req.periodFromMs, req.periodToMs);
+    if ('code' in verdict) return fail(send, res, 422, verdict.code, verdict.message);
+    const currencies = [verdict.currency];
 
     const now = Date.now();
     const summary: SessionSummary = {
@@ -235,18 +230,55 @@ export class MockBacktestState {
     answer(200, { cursorMs: to, status: session.status, balance: session.balance, events: [], orders: [], stats: emptyStats(session) });
   }
 
+  /**
+   * Like the real server (T-029): a layout edit passes the create checks against the session's
+   * period and keeps the session's currency. The mock holds no orders, so the real server's
+   * "panel with pending or open orders" 409 never fires here.
+   */
   private patch(res: ServerResponse, send: SendJson, session: SessionSummary, body: Record<string, unknown> | null): void {
+    const shapeError = layoutShapeError(body);
+    if (shapeError) return fail(send, res, 422, shapeError.code, shapeError.message);
     const parsed = PatchSessionRequestSchema.safeParse(body ?? {});
-    if (!parsed.success || parsed.data.layout !== undefined) {
+    if (!parsed.success) {
       send(res, 400, { statusCode: 400, message: 'Bad Request' });
       return;
     }
-    if (parsed.data.timeframe !== undefined && session.status === 'complete') {
-      return fail(send, res, 409, 'SESSION_COMPLETE', 'The timeframe of a complete session cannot be changed.');
+    const { layout } = parsed.data;
+    if (layout) {
+      const verdict = checkLayout(layout, session.periodFromMs, session.periodToMs);
+      if ('code' in verdict) return fail(send, res, 422, verdict.code, verdict.message);
+      if (verdict.currency !== session.sessionCurrency) {
+        return fail(send, res, 422, 'MIXED_SESSION_CURRENCY', `This session trades in ${session.sessionCurrency}; its panels cannot move to ${verdict.currency}.`);
+      }
+    }
+    if ((parsed.data.timeframe !== undefined || layout !== undefined) && session.status === 'complete') {
+      return fail(send, res, 409, 'SESSION_COMPLETE', 'The timeframe or layout of a complete session cannot be changed.');
     }
     Object.assign(session, { ...parsed.data, updatedAt: Date.now() });
     send(res, 200, toSession(session));
   }
+}
+
+/** The two layout codes, checked on the raw body before the schema (as the real server does). */
+function layoutShapeError(body: Record<string, unknown> | null): { code: BacktestErrorCode; message: string } | null {
+  const panels = (body?.['layout'] as { panels?: unknown } | undefined)?.panels;
+  if (!Array.isArray(panels)) return null;
+  if (panels.length > 4) return { code: 'LAYOUT_TOO_MANY_PANELS', message: `A session layout has at most 4 panels (got ${panels.length}).` };
+  if (panels.some((p) => (p as { kind?: unknown })?.kind !== 'candles')) return { code: 'LAYOUT_NOT_CANDLES', message: 'Session layouts hold candle panels only.' };
+  return null;
+}
+
+/** Availability, one currency, and a period overlapping each instrument's 1m coverage. */
+function checkLayout(layout: SessionLayout, fromMs: number, toMs: number): { currency: string } | { code: BacktestErrorCode; message: string } {
+  const ids = [...new Set(layout.panels.map((p) => p.instrument))];
+  const catalogue = ids.map((id) => MOCK_BACKTEST_INSTRUMENTS.find((i) => i.id === id));
+  const missing = ids.find((_, n) => !catalogue[n]?.coverage);
+  if (missing) return { code: 'INSTRUMENT_NOT_AVAILABLE', message: `Instrument ${missing} has no stored 1m history to replay.` };
+  const currencies = [...new Set(catalogue.map((i) => i!.sessionCurrency))];
+  if (currencies.length > 1) return { code: 'MIXED_SESSION_CURRENCY', message: `All panels must share one session currency; got ${currencies.join(', ')}.` };
+  const outside = catalogue.find((i) => !(fromMs < i!.coverage!.to + MIN && i!.coverage!.from < toMs));
+  if (outside) return { code: 'PERIOD_OUTSIDE_COVERAGE', message: `The period does not overlap the stored 1m history of ${outside.id}.` };
+  return { currency: currencies[0] };
 }
 
 function fail(send: SendJson, res: ServerResponse, status: number, code: BacktestErrorCode, message: string): void {

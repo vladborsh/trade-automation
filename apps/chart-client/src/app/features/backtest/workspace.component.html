@@ -19,6 +19,7 @@
       @if (store.hint(); as hint) {
         <p class="hint" role="status">{{ hint }}</p>
       }
+      <app-layout-editor />
       <div class="grid">
         <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
       </div>
