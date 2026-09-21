@@ -29,6 +29,7 @@ function fakeStore() {
     cursor: signal(Date.UTC(2026, 8, 18, 23, 45)),
     timeframe: signal<Timeframe>('5m'),
     blocked: signal(false),
+    started: signal(false),
     atEnd: signal(false),
     completed: signal(false),
     viewOnly: false,
@@ -105,6 +106,15 @@ describe('WorkspaceComponent', () => {
     expect(grid.panels()).toEqual(SESSION.layout.panels);
     expect(grid.sources()).toBe(store.sources());
     expect(grid.timeframe()).toBe('5m');
+  });
+
+  it('marks the workspace data-replay-started once the engine has its first history (BUG-010)', async () => {
+    const { fixture, engine, el } = await render();
+    const root = el.querySelector('.workspace')!;
+    expect(root.hasAttribute('data-replay-started')).toBe(false);
+    engine.started.set(true);
+    fixture.detectChanges();
+    expect(root.hasAttribute('data-replay-started')).toBe(true);
   });
 
   it('shows the journal and the statistics under the grid', async () => {

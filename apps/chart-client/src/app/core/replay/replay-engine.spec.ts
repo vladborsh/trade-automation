@@ -119,6 +119,17 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(api.ahead.mock.calls.length).toBeGreaterThan(20);
   });
 
+  it('started turns true only once start() has the first history in (BUG-010 e2e hook)', async () => {
+    const e = engine(fakeServer(), at(18, 23, 50));
+    expect(e.started()).toBe(false);
+    const starting = e.start();
+    expect(e.blocked()).toBe(true);
+    expect(e.started()).toBe(false); // loading: an e2e must not point at the chart yet
+    await starting;
+    expect(e.started()).toBe(true);
+    expect(e.blocked()).toBe(false);
+  });
+
   it('skips the weekend and jumps the empty stretch: the cursor never stops without data', async () => {
     const e = engine(fakeServer(), at(18, 23, 50));
     await e.start();

@@ -69,6 +69,8 @@ export class ReplayEngine {
   readonly timeframe = signal<Timeframe>('5m');
   /** A step (or a timeframe switch) is waiting for data: the toolbar shows "loading". */
   readonly blocked = signal(false);
+  /** `start()` has finished — the first history is in (or failed into `error`). An e2e hook (BUG-010). */
+  readonly started = signal(false);
   /** The cursor has reached the end of the period. */
   readonly atEnd = signal(false);
   readonly error = signal<string | null>(null);
@@ -106,6 +108,7 @@ export class ReplayEngine {
         this.blocked.set(true);
         await Promise.all(this.tapes.map((t) => this.loadHistory(t, this.timeframe())));
       });
+      this.started.set(true);
       return;
     }
     await this.exclusive(async () => {
@@ -119,6 +122,7 @@ export class ReplayEngine {
       );
     });
     this.refillAll();
+    this.started.set(true);
   }
 
   /** An advance response: the server's cursor, which history requests may not pass. */

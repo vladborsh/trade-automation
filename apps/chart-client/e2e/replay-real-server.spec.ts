@@ -77,7 +77,8 @@ async function tape(page: Page, s: Json, fromMs = s.periodFromMs - MIN): Promise
 
 async function openWorkspace(page: Page, id: string): Promise<void> {
   await page.goto(`/sessions/${id}`);
-  await expect(page.getByTestId('replay-loading')).toHaveCount(0, { timeout: 15_000 });
+  // the engine's first history is in (BUG-010): `replay-loading` count 0 also holds before the toolbar exists
+  await expect(page.locator('.workspace[data-replay-started]')).toHaveCount(1, { timeout: 15_000 });
   await expect(page.getByTestId('replay-cursor')).toBeVisible();
   // a key pressed in the first ~200 ms after the loading state disappears is dropped (observed, reported as a
   // note to the Tech Lead); give the workspace a moment so the tests exercise the flow, not that window
@@ -392,7 +393,7 @@ test('robustness: never a guessed order, quick stepping, a dropped network, a st
   // a reload resumes at the persisted cursor
   const persisted = await serverCursor();
   await tab2.reload();
-  await expect(tab2.getByTestId('replay-loading')).toHaveCount(0, { timeout: 15_000 });
+  await expect(tab2.locator('.workspace[data-replay-started]')).toHaveCount(1, { timeout: 15_000 });
   const text = await tab2.getByTestId('replay-cursor').innerText();
   expect(text).toContain(new Date(persisted).toISOString().slice(0, 16).replace('T', ' '));
 });

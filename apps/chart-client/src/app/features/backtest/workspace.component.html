@@ -1,4 +1,5 @@
-<div class="workspace">
+<!-- data-replay-started: the engine's first history is in — what e2e waits on before pointing at a chart -->
+<div class="workspace" [attr.data-replay-started]="engine()?.started() ? '' : null">
   @if (session(); as s) {
     @if (engine(); as e) {
       <app-replay-toolbar

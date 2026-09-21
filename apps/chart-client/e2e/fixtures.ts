@@ -49,4 +49,13 @@ export const test = base.extend({
   },
 });
 
+/**
+ * Waits until the workspace's replay engine has its first history in (`data-replay-started`,
+ * BUG-010). Unlike `replay-loading` having count 0 — also true before the toolbar has rendered
+ * at all — this cannot pass early, so a hover or click after it meets a chart with bars.
+ */
+export async function replayStarted(page: Page): Promise<void> {
+  await expect(page.locator('.workspace[data-replay-started]')).toHaveCount(1, { timeout: 15_000 });
+}
+
 export { expect };

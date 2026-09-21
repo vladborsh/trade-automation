@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { Session } from '@trade-automation/contracts';
-import { apiUrl, expect, test } from './fixtures';
+import { apiUrl, expect, replayStarted, test } from './fixtures';
 
 /**
  * T-022 done-line (backtest-app-system-design.md §9.1) against the mock's replay tape: two drafts
@@ -12,6 +12,8 @@ import { apiUrl, expect, test } from './fixtures';
  */
 const FRIDAY_2140 = Date.UTC(2024, 2, 1, 21, 40);
 const SHOTS = process.env['POSITION_TOOL_SHOTS'];
+/** The controller's hit tolerance (position-tool.controller.ts `HIT_TOLERANCE_PX`). */
+const HIT_TOLERANCE_PX = 6;
 
 type Tool = { id: string; side: string; mode: string; entry: number; sl: number; tp: number; active: boolean };
 
@@ -38,7 +40,7 @@ test('position tool: two drafts, handle drags without panning, click to activate
   });
   const session = (await created.json()) as Session;
   await page.goto(`/sessions/${session.id}`);
-  await expect(page.getByTestId('replay-loading')).toHaveCount(0, { timeout: 15_000 });
+  await replayStarted(page); // not `replay-loading` count 0: that also holds before the toolbar exists
   const body = page.locator('.chart-panel[data-panel-id="btc"] .panel-body');
   const container = body.locator('.chart-container');
   const box = (await container.boundingBox())!;
@@ -68,18 +70,25 @@ test('position tool: two drafts, handle drags without panning, click to activate
 
   const visibleFrom = await container.getAttribute('data-visible-from');
 
-  // drag the short (drawn on top) by its entry line, 40 px up: above the last close it becomes a limit
+  // drag the short (drawn on top) by its entry line up, above the last close, where it becomes a
+  // limit. BUG-010: the target is 20 px above the long's target line, not a fixed distance — a fixed
+  // 40 px once landed the short's entry within 2 px of the long's TP, and the click further down then
+  // (correctly) hit whichever line was nearer.
   const lineX = box.x + box.width - 120;
+  const dragTo = yOf(long0.tp) - 20;
   await page.mouse.move(lineX, yOf(short0.entry));
   await expect(container).toHaveAttribute('data-position-tool-hover', `line:body:${short0.id}`);
   await page.mouse.down();
-  await page.mouse.move(lineX, yOf(short0.entry) - 20, { steps: 4 });
-  await page.mouse.move(lineX, yOf(short0.entry) - 40, { steps: 4 });
+  await page.mouse.move(lineX, (yOf(short0.entry) + dragTo) / 2, { steps: 4 });
+  await page.mouse.move(lineX, dragTo, { steps: 4 });
   await page.mouse.up();
   const short1 = (await tools(page)).find((t) => t.id === short0.id)!;
   expect(short1.mode).toBe('limit');
   expect(short1.entry).toBeGreaterThan(short0.entry);
   expect(short1.sl - short1.entry).toBeCloseTo(short0.sl - short0.entry, 1); // the whole tool moved
+  // the short's entry line is clear of every other line by two hit tolerances, so the click below is unambiguous
+  const others = [long0.entry, long0.sl, long0.tp, short1.sl, short1.tp].map((p) => Math.abs(yOf(p) - yOf(short1.entry)));
+  expect(Math.min(...others)).toBeGreaterThan(2 * HIT_TOLERANCE_PX);
 
   // find the long's stop handle (scan along its level) and drag it 30 px down
   const slY = yOf(long0.sl);
@@ -103,6 +112,7 @@ test('position tool: two drafts, handle drags without panning, click to activate
 
   // click the short's entry line to activate it, then Esc removes it
   await page.mouse.move(lineX, yOf(short1.entry));
+  await expect(container).toHaveAttribute('data-position-tool-hover', `line:body:${short0.id}`); // the pointer is on the short, not a neighbour
   await page.mouse.down();
   await page.mouse.up();
   await expect.poll(async () => (await tools(page)).find((t) => t.active)?.id).toBe(short0.id);
