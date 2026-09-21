@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { replayStarted } from './fixtures';
 
 /**
  * Tester e2e (cluster bt-workspace): the P0 client flow against the REAL signal-server — the mock
@@ -77,12 +78,9 @@ async function tape(page: Page, s: Json, fromMs = s.periodFromMs - MIN): Promise
 
 async function openWorkspace(page: Page, id: string): Promise<void> {
   await page.goto(`/sessions/${id}`);
-  // the engine's first history is in (BUG-010): `replay-loading` count 0 also holds before the toolbar exists
-  await expect(page.locator('.workspace[data-replay-started]')).toHaveCount(1, { timeout: 15_000 });
-  await expect(page.getByTestId('replay-cursor')).toBeVisible();
-  // a key pressed in the first ~200 ms after the loading state disappears is dropped (observed, reported as a
-  // note to the Tech Lead); give the workspace a moment so the tests exercise the flow, not that window
-  await page.waitForTimeout(500);
+  // BUG-009/BUG-010: the one readiness wait — the engine's first history is in. `replay-loading` count 0 also holds
+  // on the blank page before the toolbar exists, and a key pressed during the load is blocked by design.
+  await replayStarted(page);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -387,13 +385,15 @@ test('robustness: never a guessed order, quick stepping, a dropped network, a st
   await expect(tab2.getByTestId('replay-notice')).toContainText('moved on elsewhere', { timeout: 10_000 });
   expect(await serverCursor()).toBe(settled);
   expect(await orderCount()).toBe(0); // the stale tab created nothing
+  // BUG-009: the refusal retires the old engine (not started) until the fresh one is up; a key before that is ignored
+  await replayStarted(tab2);
   await tab2.keyboard.press('ArrowRight');
   await expect.poll(serverCursor, { timeout: 10_000 }).toBe(settled + 5 * MIN); // reloaded tab steps from the persisted cursor
 
   // a reload resumes at the persisted cursor
   const persisted = await serverCursor();
   await tab2.reload();
-  await expect(tab2.locator('.workspace[data-replay-started]')).toHaveCount(1, { timeout: 15_000 });
+  await replayStarted(tab2);
   const text = await tab2.getByTestId('replay-cursor').innerText();
   expect(text).toContain(new Date(persisted).toISOString().slice(0, 16).replace('T', ' '));
 });
