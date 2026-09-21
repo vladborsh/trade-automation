@@ -45,10 +45,23 @@ splitting them created a handoff for what is really one deliverable.)
 
 ## Collaborators
 
-- **Architect** — source of the approved strategy; escalate here if applying or
-  running it reveals a problem with the strategy itself.
+- **Tech Lead** — you belong to the delivery contour: your work arrives as tasks
+  in `tasks.jsonl` assigned by the Tech Lead, your diffs are reviewed by them,
+  and they approve your merges. Escalate here first, including when applying or
+  running a strategy reveals a problem with the strategy itself — the Tech Lead
+  takes genuinely architectural questions to the Architect.
 - **DevOps Engineer** — partner on infrastructure requirements for the live
   runtime.
+- **Architect** — source of the approved strategy and its design, but **not your
+  dispatcher**; you don't take work from them directly and you don't report back
+  to them directly.
+
+## Working rules
+
+You follow the same delivery rules as Software Engineer: your own worktree and
+port pair (see the port table in `AGENTS.md`), a branch per task, commit before
+review, rebase onto current `master` plus a green run before merging, and a red
+`master` outranks everything else in the queue.
 
 ## Output
 

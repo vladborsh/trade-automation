@@ -69,27 +69,79 @@ sub-agents. Because of that, every role is defined as a **self-contained brief**
 under `agents/roles/*.md` — each brief carries everything that role needs to work
 cold, including who it hands its output to next.
 
-There is no single fixed pipeline every idea passes through. The **Architect**
-role is the entry point and orchestrator: it receives a trading idea and decides
-which of the other roles actually need to engage, and in what order, based on what
-kind of idea it is (chart-only, news-based, intraday-signal, analytics/summary,
-etc.).
+The team is split into two contours, and nobody works in both.
 
-Routing is not always coordinator-mediated. A role with orchestration access
-may directly dispatch trivial, fully-specified downstream work itself instead
-of only producing a routing note for the coordinator to act on — this reduces
-round-trips for the unambiguous case. Currently this applies to Architect →
-Software Engineer specifically (see the Direct dispatch authority section of
-`agents/roles/architect.md`); generalizing the pattern to other role pairs is
-a future extension, not a current capability.
+**The research contour — the Architect's.** An idea arrives, gets logged to
+`IDEAS-BACKLOG.md`, and the Architect decides what it needs: a Researcher pass,
+a Backtesting re-validation, or neither. There is no fixed pipeline here — a
+chart-only strategy may never touch news analysis. The contour ends when the
+Architect decomposes an approved design into tasks in `tasks.jsonl`.
+
+**The delivery contour — the Tech Lead's.** Everything downstream of that
+decomposition: Software Engineer (2–3 standing slots), Tester, Integration
+Engineer, DevOps Engineer. The Tech Lead takes tasks off the backlog, assigns
+them, reviews every diff, and approves every merge. The Architect is pulled back
+in for exactly two things: a decision that changes a contract between components
+or adds/removes a component, and the architectural confirmation of a finished
+cluster.
+
+**Dispatch is the Tech Lead's monopoly.** The Architect previously held a
+"direct dispatch authority" to start Software Engineer workers itself for
+trivial work; that is withdrawn. The Tech Lead's merge and acceptance calls are
+only sound if `tasks.jsonl` is the complete truth about who is building what, so
+there is no bypass, however small the task. Urgency is expressed as priority in
+the backlog, not as a side channel.
+
+### How a cluster gets accepted
+
+The Tech Lead tags related tasks with a shared `cluster` **when scheduling
+them**, not retroactively. When the last task of a cluster is merged:
+
+1. **Tester first** — exercises the cluster, files bugs as bug tasks in
+   `tasks.jsonl` (status `new`, unassigned) linked via `source_task`.
+2. Bugs are assigned by the Tech Lead above ordinary work; the cluster goes back
+   through the Tester until green.
+3. **Architect last** — confirms the merged, tested implementation matches the
+   intended architecture.
+
+Tester before Architect is deliberate: an architectural review of broken code is
+thrown-away work, and the Architect (Fable 5) is the most expensive seat in the
+chain — it gets called once, on green.
+
+### Merging
+
+Branches are local to the repository and visible from every worktree, so review
+needs no remote and no pull request: the Tech Lead reads
+`git diff master..<branch>` from the coordinator's checkout. Consequences, binding
+on everyone who writes product code:
+
+- **Commit before requesting review.** Uncommitted work is invisible to the
+  reviewer and is sent back unread.
+- **The author merges, not the reviewer.** The Tech Lead approves; the developer
+  merges.
+- **Rebase onto current `master` and get a green run before merging.** If the
+  rebase changed the code, the approval is void and needs a second look.
+- **A red `master` outranks every task in the backlog**, and is fixed by whoever
+  merged last.
+- **Two rejections are the ceiling** on one task. A third round is forbidden:
+  the Tech Lead either returns the task to the Architect as badly specified or
+  splits it into sub-tasks.
+- After a merge the branch is deleted; the worktree stays — developer slots are
+  standing sessions, not per-task checkouts.
+
+The Tester is the one exception to review: e2e tests are merged by the Tester
+without review, and in exchange the Tester owns suite health and fixes or
+deletes flaky tests the day they appear. The rebase-and-green rule still applies.
 
 ## Roles
 
 | Role | Model | Charter |
 |---|---|---|
 | [Researcher](agents/roles/researcher.md) | Opus 5 | Explores a raw idea: historical data, exploratory/protocol-driven analytics, feasibility, pros/cons, documentation. |
-| [Architect](agents/roles/architect.md) | Claude Fable 5 | Entry point, orchestrator, and quality gate. Designs the approach, routes work, and judges results (ship/rework/kill) — absorbed the former Critique & Refinement role. |
-| [Software Engineer](agents/roles/software-engineer.md) | Sonnet 5 | Builds the strategy/automation logic. |
+| [Architect](agents/roles/architect.md) | Claude Fable 5 | Entry point for ideas and designer of the system. Designs the approach, judges results (ship/rework/kill), decomposes approved designs into `tasks.jsonl`, and confirms finished clusters against the architecture. Owns the research contour. |
+| [Tech Lead](agents/roles/tech-lead.md) | Opus 5 | Owns the delivery contour. Schedules tasks out of `tasks.jsonl`, assigns developers, reviews every diff, approves every merge, and runs the cluster acceptance gate. Does not implement. |
+| [Software Engineer](agents/roles/software-engineer.md) | Sonnet 5 | Builds the strategy/automation logic, one backlog task at a time. 2–3 standing slots. |
+| [Tester](agents/roles/tester.md) | Sonnet 5 | Tests the API and writes e2e tests for critical flows only; files bugs into the backlog. Never touches production code; talks only to the Tech Lead. |
 | [Backtesting](agents/roles/backtesting.md) | Sonnet 5 | Independently re-validates *implemented, shipped* strategy code against historical data — distinct from the Researcher's protocol-driven validation of the idea itself. |
 | [Integration Engineer](agents/roles/integration-engineer.md) | Sonnet 5 | Turns a shipped strategy into deployable rules (position-sizing, execution logic) and builds/runs the real-time pipeline that emits live signals from them — absorbed the former Strategy-Application role. |
 | [DevOps Engineer](agents/roles/devops-engineer.md) | Sonnet 5 | Owns hosting and data storage on AWS. |
@@ -118,10 +170,46 @@ role-to-role, technical detail is the point). For user-facing material:
   descriptive-vs-tested, what a proxy metric isn't) stay exactly as rigorous.
   Only the vocabulary changes.
 
+## Task backlog
+
+`tasks.jsonl` at the repo root is the **delivery queue**: one JSON object per
+line, one line per task. It is deliberately machine-readable rather than prose —
+the Tech Lead answers "what is unblocked", "who is busy", "what depends on this"
+many times a day, and `IDEAS-BACKLOG.md` already shows where a 100 KB prose log
+ends up. Keep it distinct from `IDEAS-BACKLOG.md`, which holds *ideas* upstream
+of any design.
+
+**Two writers, split by field — never by line.** The Architect owns `title`,
+`description`, `depends_on`. The Tech Lead owns `priority`, `assignee`,
+`status`, `branch`, `cluster`. The Tester writes whole new bug lines
+(`status: "new"`, `assignee: null`) and nothing else.
+
+| Field | Owner | Meaning |
+|---|---|---|
+| `id` | creator | `T-017`, or `BUG-004` for a bug task. Never reused. |
+| `title` | Architect | One line, imperative. |
+| `description` | Architect | What to build and what "done" means. For a bug: reproduction steps. |
+| `depends_on` | Architect | Task ids that must be `merged` before this can start. `[]` if none. |
+| `cluster` | Tech Lead | Shared tag for tasks that are only meaningful to verify together. Set when scheduling. |
+| `priority` | Tech Lead | `P0` (red master / blocking bug) · `P1` · `P2`. |
+| `assignee` | Tech Lead | `dev-1` … `dev-3`, `tester`, `integration`, `devops`, or `null`. |
+| `status` | Tech Lead | `new` → `assigned` → `in_review` → `approved` → `merged`; also `blocked`. |
+| `branch` | Tech Lead | Branch the assignee works on. |
+| `rejections` | Tech Lead | Review rejections so far. At `2` the task cannot be sent back a third time. |
+| `source_task` | Tester | Bug tasks only: the task whose merge introduced the bug. |
+| `created_by`, `created_at` | creator | Role name and ISO date. |
+
+Example line:
+
+```json
+{"id":"T-017","title":"Expose VWAP bands over the signal API","description":"Add GET /api/vwap/bands returning the current band set per instrument. Done when the endpoint serves live values and is covered by unit tests.","depends_on":["T-015"],"cluster":"vwap-api","priority":"P1","assignee":"dev-2","status":"in_review","branch":"vwap-bands-api","rejections":0,"created_by":"architect","created_at":"2026-09-21"}
+```
+
 ## Logging conventions
 
 Two append-only logs at the repo root track the team's work; a role skipping
-either one is a process gap, not a shortcut.
+either one is a process gap, not a shortcut. (`tasks.jsonl` is not one of them —
+it is a live queue, not a log, and is described under "Task backlog" above.)
 
 - **`IDEAS-BACKLOG.md`** — every trading idea, logged **before** it is
   dispatched to Researcher, whether raw or already grilled/designed. Each

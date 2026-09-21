@@ -41,9 +41,21 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
 
 ## Working in a worktree
 
-- The coordinator's checkout owns the live server on `:3000` and the client dev server on
-  `:4200`. In your own worktree start your own instances on other ports (mock server:
-  `npm run mock-server` in `apps/chart-client`, default `:4300`).
+- **Ports are assigned per slot, not chosen per session.** Starting a server on a port
+  that is not yours will collide with another agent's running instance and give you (or
+  them) someone else's state.
+
+  | Slot | Signal server | Client dev server |
+  |---|---|---|
+  | Coordinator / Tech Lead checkout | `:3000` | `:4200` |
+  | dev-1 | `:3010` | `:4210` |
+  | dev-2 | `:3020` | `:4220` |
+  | dev-3 | `:3030` | `:4230` |
+  | Tester | `:3040` | `:4240` |
+
+  The mock server (`npm run mock-server` in `apps/chart-client`) stays on its default
+  `:4300`. If you are not one of the slots above, take the next free `:30x0`/`:42x0`
+  pair and say which one you took.
 - `apps/chart-client/public/config.json` may carry an uncommitted local change in the
   coordinator's checkout — never commit or revert a change to it you did not make.
 - Client tests: `npx ng test --watch=false` from `apps/chart-client` (no `--browsers`

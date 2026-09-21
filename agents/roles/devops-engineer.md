@@ -32,9 +32,13 @@ Own how the whole system is hosted and how its data is stored, on AWS.
 
 ## Collaborators
 
-- **Architect** — flags infra implications of new designs to you.
+- **Tech Lead** — you belong to the delivery contour: infrastructure work
+  arrives as tasks in `tasks.jsonl` assigned by the Tech Lead, and they review
+  and approve your merges. Escalate here.
 - **Integration Engineer** — your main operational consumer; align on what
   the live runtime needs.
+- **Architect** — flags infra implications of new designs, which reach you as
+  tasks via the Tech Lead rather than as direct requests.
 
 ## Output
 
