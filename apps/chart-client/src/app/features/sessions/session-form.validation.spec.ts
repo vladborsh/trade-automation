@@ -71,6 +71,21 @@ describe('validateSessionForm (mirrors the server session-validation.ts)', () =>
     expect(validateSessionForm(fields({ costsEnabled: false, commissionPct: null, spread: null }), CATALOGUE)).toEqual({});
   });
 
+  it('BUG-002: the contract bounds — each edge accepted, just past it refused, with a clear message', () => {
+    const ok = (over: Partial<SessionFormFields>) => validateSessionForm(fields(over), CATALOGUE);
+    expect(ok({ defaultRiskPct: 0.0001 })).toEqual({});
+    expect(ok({ defaultRiskPct: 100 })).toEqual({});
+    expect(ok({ defaultRiskPct: 0.00009 }).defaultRiskPct).toBe('Enter a risk % between 0.0001 and 100.');
+    expect(ok({ defaultRiskPct: 10_000 }).defaultRiskPct).toBe('Enter a risk % between 0.0001 and 100.');
+    expect(ok({ initialBalance: 999_999_999_999.99 })).toEqual({});
+    expect(ok({ initialBalance: 1e13 }).initialBalance).toBe('Enter a starting balance below 1 000 000 000 000.');
+    expect(ok({ commissionPct: 100 })).toEqual({});
+    expect(ok({ commissionPct: 100_000 }).commissionPct).toBe('Commission must be at most 100 %.');
+    expect(ok({ spread: 1e13 }).spread).toBe('Spread must be below 1 000 000 000 000.');
+    expect(ok({ notionalWarnMultiple: 999_999.99 })).toEqual({});
+    expect(ok({ notionalWarnMultiple: 1_000_000 }).notionalWarnMultiple).toBe('Enter a multiple of at most 999 999.99.');
+  });
+
   it('a blank name is refused', () => {
     expect(validateSessionForm(fields({ name: '   ' }), CATALOGUE).name).toMatch(/name/);
   });

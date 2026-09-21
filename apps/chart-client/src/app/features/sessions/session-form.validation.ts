@@ -1,4 +1,4 @@
-import type { BacktestInstrument, Coverage, CreateSessionRequest, InstrumentId, SessionLayout, Timeframe } from '@trade-automation/contracts';
+import { BACKTEST_BOUNDS, type BacktestInstrument, type Coverage, type CreateSessionRequest, type InstrumentId, type SessionLayout, type Timeframe } from '@trade-automation/contracts';
 import { MAX_SESSION_PANELS } from './session-layout';
 
 /**
@@ -81,13 +81,23 @@ export function validateSessionForm(f: SessionFormFields, catalogue: ReadonlyMap
   const periodError = validatePeriod(f, catalogue, instrumentError === null);
   if (periodError) errors.periodFromMs = periodError;
 
-  if (!(positive(f.initialBalance))) errors.initialBalance = 'Enter a starting balance above 0.';
-  if (!(positive(f.defaultRiskPct))) errors.defaultRiskPct = 'Enter a risk % above 0.';
+  // BUG-002: the same bounds as the contract (BACKTEST_BOUNDS), so an out-of-range value is caught
+  // here rather than refused by the server with a 400.
+  const B = BACKTEST_BOUNDS;
+  if (!positive(f.initialBalance)) errors.initialBalance = 'Enter a starting balance above 0.';
+  else if (f.initialBalance! >= B.moneyMaxExclusive) errors.initialBalance = 'Enter a starting balance below 1 000 000 000 000.';
+  if (!positive(f.defaultRiskPct)) errors.defaultRiskPct = 'Enter a risk % above 0.';
+  else if (f.defaultRiskPct! < B.riskPctMin || f.defaultRiskPct! > B.riskPctMax) {
+    errors.defaultRiskPct = `Enter a risk % between ${B.riskPctMin} and ${B.riskPctMax}.`;
+  }
   if (f.costsEnabled) {
     if (!nonNegative(f.commissionPct)) errors.commissionPct = 'Commission must be 0 or more.';
+    else if (f.commissionPct! > B.commissionPctMax) errors.commissionPct = `Commission must be at most ${B.commissionPctMax} %.`;
     if (!nonNegative(f.spread)) errors.spread = 'Spread must be 0 or more.';
+    else if (f.spread! >= B.moneyMaxExclusive) errors.spread = 'Spread must be below 1 000 000 000 000.';
   }
   if (!positive(f.notionalWarnMultiple)) errors.notionalWarnMultiple = 'Enter a multiple above 0.';
+  else if (f.notionalWarnMultiple! > B.notionalWarnMultipleMax) errors.notionalWarnMultiple = 'Enter a multiple of at most 999 999.99.';
   return errors;
 }
 
