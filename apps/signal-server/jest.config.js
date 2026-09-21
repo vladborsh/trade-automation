@@ -6,4 +6,5 @@ module.exports = {
   testMatch: ['<rootDir>/test/**/*.spec.ts'],
   moduleFileExtensions: ['js', 'json', 'ts'],
   setupFiles: ['<rootDir>/test/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/setup-after-env.ts'],
 };
