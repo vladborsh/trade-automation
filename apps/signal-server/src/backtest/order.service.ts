@@ -25,9 +25,8 @@ import { apiError } from '../auth/auth-error';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { lastRevealed1m } from './last-revealed';
 import { orderLevelError, plannedEntry } from './order-validation';
+import { runSessionMutation, sessionNotFound, TxRepos } from './session-mutation';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
-
-type TxRepos = Omit<BacktestRepositories, 'transaction'>;
 
 const UuidSchema = z.string().uuid();
 
@@ -36,9 +35,8 @@ const UuidSchema = z.string().uuid();
  *
  * - Every call is scoped to `userId` (the cookie user): the session is resolved through
  *   `SessionRepository.findById(userId, …)` first, and another user's session is a 404.
- * - Every mutation (D9) runs in one transaction that locks the session row, replays the stored
- *   response when the `opId` was seen before, and otherwise stores its response with the
- *   mutation — so a retried or duplicated request never mutates twice.
+ * - Every mutation goes through `runSessionMutation` (D9): one transaction that locks the session
+ *   row, replays a seen `opId`, and otherwise stores its response with the mutation.
  * - All fill and money maths is replay-core's (`positionSize`, `marketFillPrice`,
  *   `marketExitEvent`, `computeTradeResult`, `computeMae`, `computeStats`,
  *   `toSessionAggregates`): the client runs the same functions (decision 5).
@@ -132,6 +130,7 @@ export class OrderService {
         exitTimeMs: exit.time,
         closeReason: 'manual',
         fillResolution: order.fillResolution ?? '1m',
+        slTpSameBar: false,
         ...result,
         ...mae,
       })) as Order;
@@ -170,19 +169,8 @@ export class OrderService {
     this.requireEnabled();
   }
 
-  /** D9: lock the session, replay a seen `opId`, otherwise mutate and store the response. */
   private mutate<T>(userId: string, sessionId: string, opId: string, fn: (tx: TxRepos, session: SessionSummary) => Promise<T>): Promise<T> {
-    const repos = this.requireEnabled();
-    if (!UuidSchema.safeParse(sessionId).success) return Promise.reject(sessionNotFound());
-    return repos.transaction(async (tx) => {
-      const session = await tx.sessions.findById(userId, sessionId, { forUpdate: true });
-      if (!session) throw sessionNotFound();
-      const stored = await tx.ops.find(session.id, opId);
-      if (stored !== null) return stored as T;
-      const response = await fn(tx, session);
-      await tx.ops.save(session.id, opId, response);
-      return response;
-    });
+    return runSessionMutation(this.requireEnabled(), userId, sessionId, opId, fn);
   }
 
   private async findSession(repos: BacktestRepositories, userId: string, sessionId: string): Promise<SessionSummary> {
@@ -230,8 +218,4 @@ function levelMessage(code: string): string {
     default:
       return 'A long target must be above the entry, a short target below it.';
   }
-}
-
-function sessionNotFound(): NotFoundException {
-  return new NotFoundException('Session not found.');
 }

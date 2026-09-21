@@ -10,7 +10,7 @@ import type {
 } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
 import { DbHandle } from '../../db/db.port';
-import { NewOrder, OrderClose, OrderRepository } from '../order.repository.port';
+import { NewOrder, OrderClose, OrderFill, OrderRepository } from '../order.repository.port';
 import { money, percent, rMultiple } from './numeric';
 
 /** numeric/bigint columns arrive as `number` (PgDatabase type parsers); timestamptz as `Date`. */
@@ -202,6 +202,16 @@ export class PgOrderRepository implements OrderRepository {
     }));
   }
 
+  async fill(sessionId: string, orderId: string, f: OrderFill): Promise<Order | null> {
+    const [row] = await this.db.query<OrderRow>(
+      `update orders set status = 'open', entry_price = $3, entry_time_ms = $4, fill_resolution = $5, updated_at = now()
+        where id = $1 and session_id = $2 and status = 'pending'
+       returning ${COLUMNS}`,
+      [orderId, sessionId, money(f.entryPrice), f.entryTimeMs, f.fillResolution],
+    );
+    return row ? toOrder(row) : null;
+  }
+
   async cancel(sessionId: string, orderId: string, cancelledAtMs: number): Promise<Order | null> {
     const [row] = await this.db.query<OrderRow>(
       `update orders set status = 'cancelled', cancelled_at_ms = $3, updated_at = now()
@@ -217,7 +227,7 @@ export class PgOrderRepository implements OrderRepository {
       `update orders
           set status = 'closed', exit_price = $3, exit_time_ms = $4, close_reason = $5, fill_resolution = $6,
               commission_ccy = $7, spread_cost_ccy = $8, pnl_ccy = $9, pnl_r = $10, mae_price = $11, mae_r = $12,
-              updated_at = now()
+              sl_tp_same_bar = $13, updated_at = now()
         where id = $1 and session_id = $2 and status = 'open'
        returning ${COLUMNS}`,
       [
@@ -233,6 +243,7 @@ export class PgOrderRepository implements OrderRepository {
         rMultiple(c.pnlR),
         money(c.maePrice),
         rMultiple(c.maeR),
+        c.slTpSameBar,
       ],
     );
     return row ? toOrder(row) : null;

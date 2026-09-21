@@ -38,6 +38,11 @@ export interface SessionRepository {
    * columns (`toSessionAggregates(computeStats(…))`). Call inside the closing transaction.
    */
   applyTradeClose(userId: string, id: string, balance: number, aggregates: SessionAggregates): Promise<SessionSummary | null>;
+  /**
+   * §5.5 steps 1 and 5: move the cursor; with `complete`, also set `status='complete'` and
+   * `completed_at` (decision 28). Call inside the advancing transaction.
+   */
+  advanceCursor(userId: string, id: string, cursorMs: number, complete: boolean): Promise<SessionSummary | null>;
 }
 
 export interface BacktestRepositories {

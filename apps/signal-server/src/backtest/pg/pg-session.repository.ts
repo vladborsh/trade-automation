@@ -185,4 +185,18 @@ export class PgSessionRepository implements SessionRepository {
     );
     return row ? toSessionSummary(row) : null;
   }
+
+  async advanceCursor(userId: string, id: string, cursorMs: number, complete: boolean): Promise<SessionSummary | null> {
+    const [row] = await this.db.query<SessionRow>(
+      `update backtest_sessions
+          set cursor_ms = $3,
+              status = case when $4 then 'complete' else status end,
+              completed_at = case when $4 then now() else completed_at end,
+              updated_at = now()
+        where id = $1 and user_id = $2
+       returning ${COLUMNS}`,
+      [id, userId, cursorMs, complete],
+    );
+    return row ? toSessionSummary(row) : null;
+  }
 }

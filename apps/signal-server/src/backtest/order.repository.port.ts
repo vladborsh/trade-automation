@@ -37,12 +37,21 @@ export interface OrderClose {
   exitTimeMs: number;
   closeReason: CloseReason;
   fillResolution: FillResolution;
+  /** §6: the exit candle touched both stop and target and the stop was taken. */
+  slTpSameBar: boolean;
   commissionCcy: number;
   spreadCostCcy: number;
   pnlCcy: number;
   pnlR: number;
   maePrice: number;
   maeR: number;
+}
+
+/** What a limit fill writes (§5.5 step 3). */
+export interface OrderFill {
+  entryPrice: number;
+  entryTimeMs: number;
+  fillResolution: FillResolution;
 }
 
 /**
@@ -65,6 +74,8 @@ export interface OrderRepository {
   list(sessionId: string, statuses?: readonly OrderStatus[]): Promise<Order[]>;
   /** Oldest first. */
   listModifications(orderId: string): Promise<OrderModification[]>;
+  /** pending → open; null when no pending order with that id. */
+  fill(sessionId: string, orderId: string, fill: OrderFill): Promise<Order | null>;
   /** pending → cancelled; null when no pending order with that id. */
   cancel(sessionId: string, orderId: string, cancelledAtMs: number): Promise<Order | null>;
   /** open → closed; null when no open order with that id. */

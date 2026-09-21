@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Candle, Coverage, InstrumentId, Order, SessionAggregates, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
 import { OpsRepository } from '../../src/backtest/ops.repository.port';
-import { NewOrder, OrderClose, OrderRepository } from '../../src/backtest/order.repository.port';
+import { NewOrder, OrderClose, OrderFill, OrderRepository } from '../../src/backtest/order.repository.port';
 import { money, percent, rMultiple } from '../../src/backtest/pg/numeric';
 import { BacktestRepositories, NewSession, SessionRepository } from '../../src/backtest/session.repository.port';
 import { SessionService } from '../../src/backtest/session.service';
@@ -57,12 +57,16 @@ export class FakeBacktestRepositories implements BacktestRepositories {
     list: async (sessionId, statuses) =>
       this.ordersOf(sessionId).filter((o) => !statuses || statuses.includes(o.status)).map((o) => ({ ...o })),
     listModifications: async () => [],
+    fill: async (sessionId, orderId, f: OrderFill) =>
+      this.patchOrder(sessionId, orderId, 'pending', {
+        status: 'open', entryPrice: money(f.entryPrice), entryTimeMs: f.entryTimeMs, fillResolution: f.fillResolution,
+      }),
     cancel: async (sessionId, orderId, cancelledAtMs) =>
       this.patchOrder(sessionId, orderId, 'pending', { status: 'cancelled', cancelledAtMs }),
     close: async (sessionId, orderId, c: OrderClose) =>
       this.patchOrder(sessionId, orderId, 'open', {
         status: 'closed', exitPrice: money(c.exitPrice), exitTimeMs: c.exitTimeMs, closeReason: c.closeReason,
-        fillResolution: c.fillResolution, commissionCcy: money(c.commissionCcy), spreadCostCcy: money(c.spreadCostCcy),
+        fillResolution: c.fillResolution, slTpSameBar: c.slTpSameBar, commissionCcy: money(c.commissionCcy), spreadCostCcy: money(c.spreadCostCcy),
         pnlCcy: money(c.pnlCcy), pnlR: rMultiple(c.pnlR), maePrice: money(c.maePrice), maeR: rMultiple(c.maeR),
       }),
   };
@@ -136,6 +140,13 @@ export class FakeBacktestRepositories implements BacktestRepositories {
       const row = this.rows.get(id);
       if (!row || row.userId !== userId) return false;
       return this.rows.delete(id);
+    },
+    advanceCursor: async (userId, id, cursorMs: number, complete: boolean) => {
+      const row = this.rows.get(id);
+      if (!row || row.userId !== userId) return null;
+      const now = this.clock++;
+      Object.assign(row.session, { cursorMs, updatedAt: now, ...(complete && { status: 'complete', completedAt: now }) });
+      return row.session;
     },
     applyTradeClose: async (userId, id, balance: number, a: SessionAggregates) => {
       const row = this.rows.get(id);
