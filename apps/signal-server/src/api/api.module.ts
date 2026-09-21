@@ -22,6 +22,7 @@ import { SessionsController } from './rest/backtest/sessions.controller';
 import { BacktestCandlesController } from './rest/backtest/candles.controller';
 import { OrdersController } from './rest/backtest/orders.controller';
 import { AdvanceController } from './rest/backtest/advance.controller';
+import { StatsController } from './rest/backtest/stats.controller';
 import { LiveGateway } from './ws/live.gateway';
 
 @Module({
@@ -51,6 +52,7 @@ import { LiveGateway } from './ws/live.gateway';
     BacktestCandlesController,
     OrdersController,
     AdvanceController,
+    StatsController,
   ],
   providers: [LiveGateway],
 })

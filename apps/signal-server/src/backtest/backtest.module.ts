@@ -10,6 +10,7 @@ import { OrderService } from './order.service';
 import { ReplayAheadService } from './replay-ahead.service';
 import { ReplayHistoryService } from './replay-history.service';
 import { SessionService } from './session.service';
+import { StatsService } from './stats.service';
 
 /**
  * architecture/backtest-app-system-design.md §2.2 `backtest/`. `BACKTEST_REPOSITORIES` is null
@@ -24,7 +25,8 @@ import { SessionService } from './session.service';
     ReplayAheadService,
     OrderService,
     AdvanceService,
+    StatsService,
   ],
-  exports: [SessionService, ReplayHistoryService, ReplayAheadService, OrderService, AdvanceService],
+  exports: [SessionService, ReplayHistoryService, ReplayAheadService, OrderService, AdvanceService, StatsService],
 })
 export class BacktestModule {}
