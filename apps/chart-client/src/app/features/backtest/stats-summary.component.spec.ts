@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import type { SessionStats } from '@trade-automation/contracts';
 import { StatsSummaryComponent } from './stats-summary.component';
 
@@ -8,7 +9,7 @@ const STATS = {
 } as unknown as SessionStats;
 
 function render(stats: SessionStats | null, drift = false) {
-  TestBed.configureTestingModule({ imports: [StatsSummaryComponent] });
+  TestBed.configureTestingModule({ imports: [StatsSummaryComponent], providers: [provideRouter([])] });
   const fixture = TestBed.createComponent(StatsSummaryComponent);
   fixture.componentRef.setInput('stats', stats);
   fixture.componentRef.setInput('currency', 'USD');
@@ -30,6 +31,16 @@ describe('StatsSummaryComponent', () => {
   it('shows the drift notice when the stored aggregates differ', () => {
     const el = render(STATS, true);
     expect(el.querySelector('[data-testid="stats-drift"]')?.textContent).toMatch(/Stored aggregates differ/);
+  });
+
+  it('links to the full statistics screen when it knows the session', () => {
+    TestBed.configureTestingModule({ imports: [StatsSummaryComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(StatsSummaryComponent);
+    fixture.componentRef.setInput('stats', STATS);
+    fixture.componentRef.setInput('currency', 'USD');
+    fixture.componentRef.setInput('sessionId', 's1');
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="stats-full-link"]')?.getAttribute('href')).toBe('/sessions/s1/stats');
   });
 
   it('renders nothing before the stats arrive', () => {

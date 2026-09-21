@@ -72,6 +72,14 @@ async function setup(client: Partial<Record<keyof BacktestClient, ReturnType<typ
 const text = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
 describe('SessionListComponent', () => {
+  it('offers the full statistics for a complete session only (T-032)', async () => {
+    const { el } = await setup({
+      listSessions: vi.fn().mockResolvedValue([summary({ id: '00000000-0000-4000-8000-0000000000c1', status: 'complete' }), summary({ id: '00000000-0000-4000-8000-0000000000a1' })]),
+    });
+    const links = [...el.querySelectorAll('[data-testid="session-stats-link"]')];
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/sessions/00000000-0000-4000-8000-0000000000c1/stats']);
+  });
+
   it('lists each session: name, instruments, period, tf, status, balance, PnL in currency and R, trades', async () => {
     const { el } = await setup({ listSessions: vi.fn().mockResolvedValue([summary()]) });
     const cells = [...el.querySelectorAll('[data-testid="session-row"] td')].map(text);

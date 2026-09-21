@@ -1,0 +1,109 @@
+<main class="page">
+  <nav class="crumbs">
+    <a routerLink="/sessions">&#x2039; Сессии</a>
+    @if (session(); as s) {
+      <a [routerLink]="['/sessions', s.id]">Вернуться к сессии</a>
+    }
+  </nav>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">Не удалось загрузить статистику: {{ message }}</p>
+  } @else if (stats(); as s) {
+    <h1>Статистика · {{ session()?.name }}</h1>
+    @if (response()?.drift) {
+      <p class="drift" data-testid="stats-drift" role="status">
+        Итоги, сохранённые в сессии, расходятся с полным пересчётом — здесь показан пересчёт.
+      </p>
+    }
+    @if (s.trades === 0) {
+      <p class="muted" data-testid="stats-empty">Закрытых сделок пока нет — цифры появятся после первой закрытой сделки.</p>
+    }
+
+    <section class="headline" aria-label="Итоги">
+      @for (item of headline(); track item.key) {
+        <div class="figure" [attr.data-stat]="item.key" [attr.data-value]="item.raw" [title]="item.hint">
+          <span class="label">{{ item.label }}</span>
+          <span class="value">{{ item.text }}</span>
+        </div>
+      }
+    </section>
+
+    <section aria-labelledby="equity-h">
+      <header class="section-head">
+        <h2 id="equity-h">Кривая капитала</h2>
+        <div class="toggle" role="group" aria-label="Единицы">
+          <button type="button" [class.active]="unit() === 'ccy'" (click)="unit.set('ccy')">{{ session()?.sessionCurrency }}</button>
+          <button type="button" [class.active]="unit() === 'r'" (click)="unit.set('r')">R</button>
+        </div>
+      </header>
+      <p class="caption">
+        Счёт после каждой закрытой сделки — ступенька на каждое закрытие, начиная с баланса в начале периода. Красная область
+        внизу — насколько счёт в этот момент ниже своего прежнего максимума (просадка).
+      </p>
+      <app-equity-chart [points]="s.equityCurve" [unit]="unit()" />
+    </section>
+
+    <div class="two">
+      <section aria-labelledby="dist-h">
+        <h2 id="dist-h">Результаты сделок в R</h2>
+        <p class="caption">Сколько сделок закрылось с каким результатом. 1R — сумма, которой вы рисковали в сделке.</p>
+        <ul class="histogram" data-testid="r-histogram">
+          @for (bin of histogram(); track bin.label) {
+            <li [attr.data-bin]="bin.label" [attr.data-count]="bin.count">
+              <span class="bin-label">{{ bin.label }}</span>
+              <span class="bar" [class]="'bar ' + bin.side" [style.width.%]="(bin.count / histogramMax()) * 100"></span>
+              <span class="count">{{ bin.count }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+
+      <section aria-labelledby="mae-h">
+        <h2 id="mae-h">Откат против позиции</h2>
+        <p class="caption">Насколько далеко цена уходила против вас, пока сделка была открыта, в R.</p>
+        @for (item of mae(); track item.key) {
+          <div class="row" [attr.data-stat]="item.key" [attr.data-value]="item.raw" [title]="item.hint" [class.callout]="item.key === 'pessimisticTrades' && s.pessimisticTrades > 0">
+            <span class="label">{{ item.label }}</span>
+            <span class="value">{{ item.text }}</span>
+          </div>
+        }
+        @if (s.pessimisticTrades > 0) {
+          <p class="callout-text" data-testid="pessimistic-callout">
+            {{ s.pessimisticTrades }} из {{ s.trades }} сделок посчитаны по барам, без минутных данных: если в одной свече цена задела и стоп,
+            и цель, засчитан стоп. Их результат может быть хуже реального.
+          </p>
+        }
+      </section>
+    </div>
+
+    <div class="two">
+      @for (table of [{ title: 'По инструментам', rows: byInstrument() }, { title: 'По направлению', rows: bySide() }]; track table.title) {
+        <section>
+          <h2>{{ table.title }}</h2>
+          @if (table.rows.length === 0) {
+            <p class="muted">Нет закрытых сделок.</p>
+          } @else {
+            <table>
+              <thead>
+                <tr><th scope="col"></th><th scope="col">Сделок</th><th scope="col">Прибыльных</th><th scope="col">Результат</th><th scope="col">В R</th></tr>
+              </thead>
+              <tbody>
+                @for (row of table.rows; track row.key) {
+                  <tr [attr.data-breakdown]="row.key">
+                    <th scope="row">{{ row.label }}</th>
+                    <td [attr.data-stat]="row.key + '.trades'" [attr.data-value]="row.raw.trades">{{ row.trades }}</td>
+                    <td [attr.data-stat]="row.key + '.winRate'" [attr.data-value]="row.raw.winRate">{{ row.winRate }}</td>
+                    <td [attr.data-stat]="row.key + '.pnl'" [attr.data-value]="row.raw.pnl">{{ row.pnl }}</td>
+                    <td [attr.data-stat]="row.key + '.pnlR'" [attr.data-value]="row.raw.pnlR">{{ row.pnlR }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      }
+    </div>
+  } @else {
+    <p class="muted" role="status">Загружаем статистику…</p>
+  }
+</main>

@@ -1,0 +1,17 @@
+:host {
+  display: block;
+  position: relative;
+}
+.chart {
+  height: 320px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

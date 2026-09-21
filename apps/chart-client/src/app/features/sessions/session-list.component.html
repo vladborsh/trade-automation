@@ -42,6 +42,9 @@
             <td class="num">{{ s.tradesCount }}</td>
             <td class="actions">
               <a [routerLink]="['/sessions', s.id]">Open</a>
+              @if (s.status === 'complete') {
+                <a [routerLink]="['/sessions', s.id, 'stats']" data-testid="session-stats-link">Статистика</a>
+              }
               <button type="button" class="link danger" (click)="askDelete(s.id)" [disabled]="deleting() === s.id">Delete</button>
             </td>
           </tr>

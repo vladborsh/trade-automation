@@ -1,0 +1,8 @@
+<div class="chart" #container data-testid="equity-chart" [attr.data-point-count]="points().length"></div>
+<ol class="visually-hidden" data-testid="equity-points" aria-label="Точки кривой капитала">
+  @for (p of points(); track $index) {
+    <li [attr.data-time]="p.time" [attr.data-balance]="p.balance" [attr.data-balance-r]="p.balanceR">
+      {{ p.time }}: {{ p.balance }} ({{ p.balanceR }} R)
+    </li>
+  }
+</ol>
