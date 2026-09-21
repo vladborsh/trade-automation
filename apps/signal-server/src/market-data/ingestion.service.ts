@@ -7,7 +7,7 @@ import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { WriteBuffer } from '../storage/write-buffer.service';
 import { MetricsService } from '../observability/metrics.service';
 import { CandleCache } from './candle-cache.service';
-import { Resampler } from './resampler';
+import { Resampler } from '@trade-automation/replay-core';
 import { ResamplerService } from './resampler.service';
 import { GapRepairService } from './gap-repair.service';
 import { MarketDataStatusService } from './market-data-status.service';

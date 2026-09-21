@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Candle } from '@trade-automation/contracts';
-import { Resampler } from './resampler';
+import { Resampler } from '@trade-automation/replay-core';
 import { CandleCache } from './candle-cache.service';
 import { CandleClosedEvent, CandleFormingEvent, MarketDataEvents } from './market-data.events';
 
