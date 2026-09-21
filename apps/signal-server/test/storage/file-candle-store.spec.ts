@@ -80,3 +80,63 @@ describe('FileCandleStore upsert idempotency (architecture/live-signal-server.md
     expect(await store.latestOpenTime('binance:BTCUSDT', '1m')).toBe(day2);
   });
 });
+
+describe('FileCandleStore.coverage (backtest-app-system-design.md §2.2)', () => {
+  let root: string;
+  const day = (d: number, h = 0, m = 0) => Date.UTC(2026, 8, d, h, m);
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'signal-server-file-store-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('returns null when nothing is stored for (instrument, tf)', async () => {
+    const store = new FileCandleStore(root);
+    expect(await store.coverage('binance:BTCUSDT', '1m')).toBeNull();
+
+    // A tf directory that exists but holds no day files is also empty.
+    fs.mkdirSync(path.join(root, 'candles/venue=binance/symbol=BTCUSDT/tf=1m'), { recursive: true });
+    expect(await store.coverage('binance:BTCUSDT', '1m')).toBeNull();
+  });
+
+  it('single day: from/to are the earliest and latest openTime in that day', async () => {
+    const store = new FileCandleStore(root);
+    await store.upsert([bar(day(12, 9, 30), 1), bar(day(12, 0, 5), 2), bar(day(12, 23, 59), 3)]);
+
+    expect(await store.coverage('binance:BTCUSDT', '1m')).toEqual({ from: day(12, 0, 5), to: day(12, 23, 59) });
+  });
+
+  it('multi-day: first bar of the first day to last bar of the last day, reading only those two day files', async () => {
+    const store = new FileCandleStore(root);
+    await store.upsert([
+      bar(day(10, 4, 0), 1),
+      bar(day(10, 5, 0), 1),
+      bar(day(11, 12, 0), 1),
+      bar(day(14, 7, 0), 1), // gap on the 12th/13th — coverage says nothing about gaps
+      bar(day(15, 1, 0), 1),
+      bar(day(15, 2, 0), 1),
+    ]);
+    // Other timeframes and instruments must not leak in.
+    await store.upsert([{ ...bar(day(1), 1), timeframe: '1h' }, { ...bar(day(20), 1), instrument: 'binance:ETHUSDT' }]);
+    // Corrupt the middle days: coverage must never parse them (it reads first and last only).
+    const dir = path.join(root, 'candles/venue=binance/symbol=BTCUSDT/tf=1m');
+    fs.writeFileSync(path.join(dir, 'date=2026-09-11.jsonl'), 'not json\n');
+    fs.writeFileSync(path.join(dir, 'date=2026-09-14.jsonl'), 'not json\n');
+
+    expect(await store.coverage('binance:BTCUSDT', '1m')).toEqual({ from: day(10, 4, 0), to: day(15, 2, 0) });
+  });
+
+  it('skips empty day files at either end and ignores non-day files', async () => {
+    const store = new FileCandleStore(root);
+    await store.upsert([bar(day(11, 3, 0), 1), bar(day(13, 4, 0), 1)]);
+    const dir = path.join(root, 'candles/venue=binance/symbol=BTCUSDT/tf=1m');
+    fs.writeFileSync(path.join(dir, 'date=2026-09-10.jsonl'), '');
+    fs.writeFileSync(path.join(dir, 'date=2026-09-14.jsonl'), '\n');
+    fs.writeFileSync(path.join(dir, '.DS_Store'), 'junk');
+
+    expect(await store.coverage('binance:BTCUSDT', '1m')).toEqual({ from: day(11, 3, 0), to: day(13, 4, 0) });
+  });
+});

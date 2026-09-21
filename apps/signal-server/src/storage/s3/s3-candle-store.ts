@@ -6,7 +6,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { Candle, InstrumentId, Timeframe } from '@trade-automation/contracts';
+import { Candle, Coverage, InstrumentId, Timeframe } from '@trade-automation/contracts';
 import { CandleStore } from '../candle-store.port';
 
 async function streamToBuffer(body: unknown): Promise<Buffer> {
@@ -120,6 +120,40 @@ export class S3CandleStore implements CandleStore {
     if (keys.length === 0) return null;
     const last = await this.getDay(keys[keys.length - 1]);
     return last.length > 0 ? last[last.length - 1].openTime : null;
+  }
+
+  /** All day-object keys under the (instrument, tf) prefix, ascending; follows pagination (1000 keys/page). */
+  private async listDayKeys(instrument: InstrumentId, tf: Timeframe): Promise<string[]> {
+    const { venue, symbol } = this.parseInstrumentId(instrument);
+    const prefix = `candles/venue=${venue}/symbol=${symbol}/tf=${tf}/`;
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const res = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      for (const o of res.Contents ?? []) {
+        if (o.Key && o.Key.startsWith(`${prefix}date=`) && o.Key.endsWith('.jsonl.gz')) keys.push(o.Key);
+      }
+      token = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (token);
+    return keys.sort();
+  }
+
+  async coverage(instrument: InstrumentId, tf: Timeframe): Promise<Coverage | null> {
+    const keys = await this.listDayKeys(instrument, tf);
+    // Walk inward past empty day objects; in practice this GETs exactly the first and last day.
+    let first: Candle[] = [];
+    let i = 0;
+    for (; i < keys.length && first.length === 0; i++) first = await this.getDay(keys[i]);
+    if (first.length === 0) return null;
+    let last: Candle[] = [];
+    for (let j = keys.length - 1; j >= i && last.length === 0; j--) last = await this.getDay(keys[j]);
+    if (last.length === 0) last = first;
+    return {
+      from: Math.min(...first.map((c) => c.openTime)),
+      to: Math.max(...last.map((c) => c.openTime)),
+    };
   }
 
   async *stream(instrument: InstrumentId, tf: Timeframe, from: number, to?: number): AsyncIterable<Candle> {

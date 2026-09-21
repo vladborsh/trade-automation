@@ -13,6 +13,7 @@ import { IndicatorsController } from './rest/indicators.controller';
 import { LayoutsController } from './rest/layouts.controller';
 import { MetricsController } from './rest/metrics.controller';
 import { CalendarController } from './rest/calendar.controller';
+import { BacktestInstrumentsController } from './rest/backtest/instruments.controller';
 import { LiveGateway } from './ws/live.gateway';
 
 @Module({
@@ -33,6 +34,7 @@ import { LiveGateway } from './ws/live.gateway';
     LayoutsController,
     MetricsController,
     CalendarController,
+    BacktestInstrumentsController,
   ],
   providers: [LiveGateway],
 })

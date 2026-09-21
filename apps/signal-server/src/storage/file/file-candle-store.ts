@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Candle, InstrumentId, Timeframe } from '@trade-automation/contracts';
+import { Candle, Coverage, InstrumentId, Timeframe } from '@trade-automation/contracts';
 import { CandleStore } from '../candle-store.port';
 
 /**
@@ -93,6 +93,29 @@ export class FileCandleStore implements CandleStore {
     if (files.length === 0) return null;
     const last = this.readFile(path.join(dir, files[files.length - 1]));
     return last.length > 0 ? last[last.length - 1].openTime : null;
+  }
+
+  async coverage(instrument: InstrumentId, tf: Timeframe): Promise<Coverage | null> {
+    const { venue, symbol } = this.parseInstrumentId(instrument);
+    const dir = path.join(this.root, 'candles', `venue=${venue}`, `symbol=${symbol}`, `tf=${tf}`);
+    if (!fs.existsSync(dir)) return null;
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('date=') && f.endsWith('.jsonl'))
+      .sort()
+      .map((f) => path.join(dir, f));
+    // Walk inward past empty day files; in practice this reads exactly the first and last day.
+    let first: Candle[] = [];
+    let i = 0;
+    for (; i < files.length && first.length === 0; i++) first = this.readFile(files[i]);
+    if (first.length === 0) return null;
+    let last: Candle[] = [];
+    for (let j = files.length - 1; j >= i && last.length === 0; j--) last = this.readFile(files[j]);
+    if (last.length === 0) last = first;
+    return {
+      from: Math.min(...first.map((c) => c.openTime)),
+      to: Math.max(...last.map((c) => c.openTime)),
+    };
   }
 
   async *stream(instrument: InstrumentId, tf: Timeframe, from: number, to?: number): AsyncIterable<Candle> {
