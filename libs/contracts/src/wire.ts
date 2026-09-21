@@ -15,7 +15,10 @@ import { TimeframeSchema } from './timeframe';
 /** architecture/live-signal-server.md §3.5 — REST wire contract. */
 
 export const InstrumentsResponseSchema = z.array(
-  InstrumentSchema.extend({ venueStatus: VenueStatusSchema }),
+  // InstrumentSchema is a ZodEffects (the sessionCurrency default transform, D11), which has no
+  // `.extend` — `.and` (intersection) is the ZodEffects-safe equivalent used everywhere else in
+  // this file that layers fields onto a transformed schema.
+  InstrumentSchema.and(z.object({ venueStatus: VenueStatusSchema })),
 );
 export type InstrumentsResponse = z.infer<typeof InstrumentsResponseSchema>;
 

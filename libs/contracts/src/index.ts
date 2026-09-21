@@ -7,3 +7,5 @@ export * from './layout';
 export * from './metric';
 export * from './calendar';
 export * from './wire';
+export * from './auth';
+export * from './backtest';

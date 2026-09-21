@@ -24,12 +24,27 @@ describe('contracts round-trip (architecture/live-signal-server.md §3)', () => 
       displayName: 'BTC/USDT Perp',
       pricePrecision: 2,
       quoteCurrency: 'USDT',
+      sessionCurrency: 'USDT',
       sessionTimezone: 'UTC',
     };
     const parsed = InstrumentSchema.parse(instrument);
     expect(parsed).toEqual(instrument);
     const reparsed = InstrumentSchema.parse(JSON.parse(JSON.stringify(parsed)));
     expect(reparsed).toEqual(instrument);
+  });
+
+  it('defaults sessionCurrency to quoteCurrency when absent (D11)', () => {
+    const parsed = InstrumentSchema.parse({
+      id: 'binance:BTCUSDT',
+      venue: 'binance',
+      symbol: 'BTCUSDT',
+      assetClass: 'crypto-perp',
+      displayName: 'BTC/USDT Perp',
+      pricePrecision: 2,
+      quoteCurrency: 'USDT',
+      sessionTimezone: 'UTC',
+    });
+    expect(parsed.sessionCurrency).toBe('USDT');
   });
 
   it('rejects an InstrumentId with an unknown venue', () => {

@@ -1,6 +1,9 @@
 # architecture/live-signal-server.md §3.1, §4.7 — the configured universe.
 # Adding an instrument = adding an entry here, provided its venue adapter exists.
 instruments:
+  # backtest-app-system-design.md §1 D11 — sessionCurrency: USD makes the USDT-quoted
+  # perps join the USD account-currency group explicitly (decision 36); every other
+  # instrument below still defaults sessionCurrency to quoteCurrency at parse time.
   - id: "binance:BTCUSDT"
     venue: binance
     symbol: BTCUSDT
@@ -8,6 +11,7 @@ instruments:
     displayName: "BTC/USDT Perp"
     pricePrecision: 2
     quoteCurrency: USDT
+    sessionCurrency: USD
     sessionTimezone: UTC
 
   - id: "binance:ETHUSDT"
@@ -17,6 +21,7 @@ instruments:
     displayName: "ETH/USDT Perp"
     pricePrecision: 2
     quoteCurrency: USDT
+    sessionCurrency: USD
     sessionTimezone: UTC
 
   - id: "capitalcom:US100"
