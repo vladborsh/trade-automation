@@ -13,8 +13,9 @@ import { Range, closedBarsEnd, formingRange, holesToFold, mergeBars } from './re
  * against 1m: where 1m exists the bars are folded on demand with replay-core's `foldOneMinute`,
  * logged at `warn` so the derive job can be run; where it does not, the hole is a real gap in the
  * tape. A fully derived store has no holes on a 24/7 venue, so this costs nothing there; on a
- * store the job has not processed, the history is still complete. The forming bar is always `foldOneMinute` over the 1m in its bucket, the same fold
- * the client runs (§5.4), so both sides build it bit for bit.
+ * store the job has not processed, the history is still complete. The forming bar is always
+ * `foldOneMinute` over the 1m in its bucket, the same fold the client runs (§5.4), so both sides
+ * build it bit for bit.
  *
  * The cursor guard (`before <= cursor_ms`) is the caller's; this service serves any `before`.
  */
@@ -68,12 +69,8 @@ export class ReplayHistoryService {
           if (range.to <= coverage1m.from || range.from > coverage1m.to) continue; // no 1m there at all
           const bars1m = await this.store.query(instrument, '1m', range.from, range.to - 1);
           if (bars1m.length === 0) continue;
-          // Fold up to the close of the last bucket that has 1m, not up to range.to: past a gap,
-          // foldOneMinute drops that bucket instead of closing it (reported to the Tech Lead).
-          // Every 1m in the range is revealed, so this upToMs gives the same closed bars.
-          const upTo = Math.min(range.to, Math.floor(bars1m[bars1m.length - 1].openTime / tfMs) * tfMs + tfMs);
           fromOneMinute.push(
-            ...foldOneMinute(bars1m, tf, upTo).closed.filter((c) => c.openTime >= range.from && c.openTime + tfMs <= range.to),
+            ...foldOneMinute(bars1m, tf, range.to).closed.filter((c) => c.openTime >= range.from && c.openTime + tfMs <= range.to),
           );
           folded.push(range);
         }
