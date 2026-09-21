@@ -54,7 +54,10 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   | Tester | `:3040` | `:4240` |
 
   The mock server (`npm run mock-server` in `apps/chart-client`) stays on its default
-  `:4300`. If you are not one of the slots above, take the next free `:30x0`/`:42x0`
+  `:4300`. Once the backtest app's database exists, each slot also gets **its own
+  database inside the one local Postgres** (`backtest_dev1`, `backtest_dev2`,
+  `backtest_dev3`, `backtest_tester`) — one server, separate databases, so migrations
+  run in one worktree never break another. If you are not one of the slots above, take the next free `:30x0`/`:42x0`
   pair and say which one you took.
 - `apps/chart-client/public/config.json` may carry an uncommitted local change in the
   coordinator's checkout — never commit or revert a change to it you did not make.

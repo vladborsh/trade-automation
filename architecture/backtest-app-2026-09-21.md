@@ -99,7 +99,7 @@ only shared lib and is consumed as a built package, not via path aliases. Node
 
 | # | Decision |
 |---|---|
-| 2 | Binance for crypto; Capital.com for indices and FX pairs. Deepest history the vendor allows. Everything fetched is persisted locally to avoid re-paying for API calls. |
+| 2 | Binance for crypto; Capital.com for indices (US100, US500, DXY) and FX pairs (**EURUSD, GBPUSD, EURCHF, GBPCHF**). Deepest history the vendor allows. Everything fetched is persisted locally to avoid re-paying for API calls. |
 | 15 | The Capital.com intraday floor of 2024-01-02 is **accepted** — ~2.6 years of intraday for indices/FX is enough for manual practice (this is training, not a statistical power exercise). The instrument list must be configuration, never code. |
 | 9 | 1m backfill for the remaining instruments is a **separate task running in parallel with development**, not a blocker — provided the instrument list is not hardcoded. |
 | 16 | **Bulk backfill ahead of time**, by a background process. A session can only be created on instruments already stored locally, so the instrument picker in the create-session form reflects reality. Per `AGENTS.md`, the backfill design must state its Binance weight per minute. |
@@ -198,10 +198,15 @@ app fully usable.
 
 ## 11. Open items
 
-- **Which FX pairs exactly.** The user named EURUSD and EURGBP; the store
-  currently holds EURCHF and GBPCHF. To be confirmed before the backfill task is
-  specified — and note that the pair choice interacts with decision 36, since
-  EUR/GBP-vs-USD pairs are USD-quoted while the CHF crosses are not.
+- ~~Which FX pairs exactly.~~ **Settled 2026-09-21: EURUSD, GBPUSD, EURCHF,
+  GBPCHF.** Per decision 36 this splits into two session currency groups that
+  may never be mixed in one session:
+  - **USD-quoted:** EURUSD, GBPUSD, the indices (US100, US500, DXY) and the
+    USDT-quoted crypto pairs.
+  - **CHF-quoted:** EURCHF, GBPCHF.
+
+  All four pairs need 1m backfill from Capital.com, bounded by the 2024-01-02
+  intraday vendor floor (decision 15).
 - **AWS credentials** — to be supplied by the user when production work starts
   (deferred per decision 33).
 - **Warning multiple** for notional versus deposit (decision 25) — a number, not
