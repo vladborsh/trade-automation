@@ -305,6 +305,37 @@ Bytes live in a `ScreenshotStore` (`SCREENSHOT_STORE=file|s3`, default = `CANDLE
 file store. Deleting a session deletes that session's prefix **first**, then the row. If the store
 call fails, the session is kept and the answer is a 500, so the client can retry.
 
+## Jobs: derive-timeframes and 1m backfill
+
+Both run as standalone CLIs (no Nest boot) against the same `CANDLE_STORE` / `FILE_STORE_ROOT` /
+`S3_*` env as the server (architecture/backtest-app-system-design.md §10).
+
+- `npm run derive-timeframes -- [--instrument <id>] [--from <iso>] [--force]` persists closed
+  5m/15m/1h/4h/1d bars from stored 1m. It makes no venue calls.
+- `npm run backfill -- --instrument <id> [--from <iso>]` fetches one instrument's 1m history from
+  its venue, then runs derive-timeframes for it. The id must be in `instruments.yaml`.
+  - **Default (backward, resumable).** It walks down from just below the earliest stored 1m bar
+    (or from the last closed minute when nothing is stored) to the vendor floor. It upserts a UTC
+    day once that day is fully fetched, so an interrupted run resumes by simply running it again.
+  - **`--from <iso>` (forward).** It refetches from that time to now. This fills gaps inside
+    existing coverage, for example after an outage. It is idempotent; resume by rerunning from
+    the last logged day.
+
+**Venue budget.** One request per second per job, one venue page per request:
+
+| Venue | Page | Weight | Rate | Floor |
+|---|---|---|---|---|
+| Binance | `fapi/v1/klines?limit=1500` | 10 per request | **600 weight/min, 25 % of the 2400/min budget** (the live path uses ~1 %) | the first empty page (before the listing): a seven-year tape is ~2,450 requests ≈ 41 min per symbol |
+| Capital.com | `/prices?max=720` | — | plus one session login, renewed every 9 min | hard stop at the **2024-01-02** intraday floor (a 404 also means the floor): ~2,000 requests ≈ 34 min per instrument |
+
+Run one backfill per venue at a time; two concurrent Binance backfills would take 50 % of the
+budget.
+
+The job does not read a `.env` file itself. Export the Capital.com credentials, or run
+`node --env-file=<file> dist/jobs/backfill.js --instrument capitalcom:EURUSD`. Specs never reach a
+venue: `test/jobs/backfill.job.spec.ts` uses a stub adapter and a fake clock, and
+`test/jobs/backfill.adapters.spec.ts` drives the real adapters against loopback stubs.
+
 ## Storage: file vs S3
 
 `CandleStore`/`SignalStore` are ports (§4.3); `FileCandleStore`/`FileSignalStore` and

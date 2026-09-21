@@ -64,6 +64,28 @@ instruments:
     quoteCurrency: CHF
     sessionTimezone: UTC
 
+  # backtest-app-system-design.md §10 (T-031) — the USD-quoted FX pairs for the backfill.
+  # sessionCurrency USD puts them in the USD account-currency group (EURCHF/GBPCHF stay CHF).
+  - id: "capitalcom:EURUSD"
+    venue: capitalcom
+    symbol: EURUSD
+    assetClass: forex-cfd
+    displayName: "EUR/USD"
+    pricePrecision: 5
+    quoteCurrency: USD
+    sessionCurrency: USD
+    sessionTimezone: UTC
+
+  - id: "capitalcom:GBPUSD"
+    venue: capitalcom
+    symbol: GBPUSD
+    assetClass: forex-cfd
+    displayName: "GBP/USD"
+    pricePrecision: 5
+    quoteCurrency: USD
+    sessionCurrency: USD
+    sessionTimezone: UTC
+
   # architecture/chart-layouts.md §5 — epic confirmed against the live Capital.com API:
   # instrumentType INDICES, streamingPricesAvailable true. Trading hours are near-continuous
   # (Mon-Fri 00:00-21:00 UTC + Sun 22:00-00:00 UTC), NOT the US cash-session shape US100/US500

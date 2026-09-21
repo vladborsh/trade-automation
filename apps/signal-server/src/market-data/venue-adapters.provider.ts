@@ -1,4 +1,5 @@
 import { Venue } from '@trade-automation/contracts';
+import { Env } from '../config/env.schema';
 import { AppConfigService } from '../config/config.service';
 import { VenueAdapter } from './venue-adapter.port';
 import { ReplayAdapter } from './replay/replay.adapter';
@@ -23,24 +24,48 @@ export function buildVenueAdapters(config: AppConfigService): Map<Venue, VenueAd
       continue;
     }
 
-    if (venue === 'binance') {
-      adapters.set(venue, new BinanceAdapter(env.get('BINANCE_REST_BASE_URL'), env.get('BINANCE_WS_BASE_URL')));
-    } else if (venue === 'capitalcom') {
-      const identifier = env.get('CAPITAL_COM_IDENTIFIER');
-      const password = env.get('CAPITAL_COM_PASSWORD');
-      const apiKey = env.get('CAPITAL_COM_API_KEY');
-      if (!identifier || !password || !apiKey) {
-        throw new Error(
-          'MARKET_DATA_MODE=live requires CAPITAL_COM_IDENTIFIER/PASSWORD/API_KEY for capitalcom instruments',
-        );
-      }
-      const baseUrl = env.get('CAPITAL_COM_BASE_URL');
-      const session = new CapitalComSession(baseUrl, identifier, password, apiKey);
-      adapters.set(venue, new CapitalComAdapter(baseUrl, session));
-    }
+    const adapter = buildLiveVenueAdapter(venue, {
+      BINANCE_REST_BASE_URL: env.get('BINANCE_REST_BASE_URL'),
+      BINANCE_WS_BASE_URL: env.get('BINANCE_WS_BASE_URL'),
+      CAPITAL_COM_BASE_URL: env.get('CAPITAL_COM_BASE_URL'),
+      CAPITAL_COM_IDENTIFIER: env.get('CAPITAL_COM_IDENTIFIER'),
+      CAPITAL_COM_PASSWORD: env.get('CAPITAL_COM_PASSWORD'),
+      CAPITAL_COM_API_KEY: env.get('CAPITAL_COM_API_KEY'),
+    });
+    if (adapter) adapters.set(venue, adapter);
   }
 
   return adapters;
+}
+
+export type LiveVenueEnv = Pick<
+  Env,
+  | 'BINANCE_REST_BASE_URL'
+  | 'BINANCE_WS_BASE_URL'
+  | 'CAPITAL_COM_BASE_URL'
+  | 'CAPITAL_COM_IDENTIFIER'
+  | 'CAPITAL_COM_PASSWORD'
+  | 'CAPITAL_COM_API_KEY'
+>;
+
+/**
+ * The live adapter for one venue, from plain env values, so the standalone backfill job
+ * (T-031) builds exactly what the server builds without booting Nest. Undefined for a venue with
+ * no live adapter.
+ */
+export function buildLiveVenueAdapter(venue: Venue, env: LiveVenueEnv): VenueAdapter | undefined {
+  if (venue === 'binance') return new BinanceAdapter(env.BINANCE_REST_BASE_URL, env.BINANCE_WS_BASE_URL);
+  if (venue === 'capitalcom') {
+    const { CAPITAL_COM_IDENTIFIER: identifier, CAPITAL_COM_PASSWORD: password, CAPITAL_COM_API_KEY: apiKey } = env;
+    if (!identifier || !password || !apiKey) {
+      throw new Error(
+        'MARKET_DATA_MODE=live requires CAPITAL_COM_IDENTIFIER/PASSWORD/API_KEY for capitalcom instruments',
+      );
+    }
+    const session = new CapitalComSession(env.CAPITAL_COM_BASE_URL, identifier, password, apiKey);
+    return new CapitalComAdapter(env.CAPITAL_COM_BASE_URL, session);
+  }
+  return undefined;
 }
 
 export const VENUE_ADAPTERS_MAP = Symbol('VENUE_ADAPTERS_MAP');

@@ -9,6 +9,7 @@
     "start:dev": "nest start --watch",
     "migrate": "node dist/db/migrate.js",
     "derive-timeframes": "node dist/jobs/derive-timeframes.js",
+    "backfill": "node dist/jobs/backfill.js",
     "test": "jest",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
