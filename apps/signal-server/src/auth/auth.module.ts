@@ -4,6 +4,8 @@ import { AppConfigModule } from '../config/config.module';
 import { DB, Db } from '../db/db.port';
 import { DbModule } from '../db/db.module';
 import { AdminBootstrap } from './admin-bootstrap.service';
+import { AdminGuard } from './admin-only.decorator';
+import { AdminService } from './admin.service';
 import { AUTH_REPOSITORIES } from './auth-repositories.port';
 import { AuthGuard } from './auth.guard';
 import { AUTH_CLOCK, AuthService } from './auth.service';
@@ -23,9 +25,11 @@ import { PgAuthRepositories } from './pg/pg-auth-repositories';
     { provide: LoginThrottle, useFactory: () => new LoginThrottle() },
     { provide: AUTH_CLOCK, useValue: () => Date.now() },
     AuthService,
+    AdminService,
+    AdminGuard,
     AdminBootstrap,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  exports: [AuthService],
+  exports: [AuthService, AdminService, AdminGuard],
 })
 export class AuthModule {}

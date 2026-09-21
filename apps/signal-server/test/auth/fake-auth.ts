@@ -29,6 +29,13 @@ export class FakeAuthRepositories implements AuthRepositories {
       Object.assign(existing, { passwordHash, role: 'admin', disabledAtMs: null });
       return existing;
     },
+    listAll: async () => [...this.userRows.values()].sort((a, b) => a.createdAtMs - b.createdAtMs),
+    setDisabledAt: async (id, disabledAtMs) => {
+      const user = this.userRows.get(id);
+      if (!user) return null;
+      user.disabledAtMs = disabledAtMs;
+      return user;
+    },
   };
 
   readonly invites: InviteRepository = {
@@ -41,6 +48,21 @@ export class FakeAuthRepositories implements AuthRepositories {
     },
     setUsedBy: async (id, userId) => {
       this.inviteRows.get(id)!.usedBy = userId;
+    },
+    create: async ({ tokenHash, email, createdBy, nowMs, expiresAtMs }) => {
+      const invite = { id: randomUUID(), tokenHash, email, createdBy, createdAtMs: nowMs, expiresAtMs, usedAtMs: null, usedBy: null };
+      this.inviteRows.set(invite.id, invite);
+      const { tokenHash: _hash, ...record } = invite;
+      return record;
+    },
+    listAll: async () =>
+      [...this.inviteRows.values()].sort((a, b) => b.createdAtMs - a.createdAtMs).map(({ tokenHash: _hash, ...record }) => record),
+    deleteUnused: async (id) => {
+      const invite = this.inviteRows.get(id);
+      if (!invite) return 'missing';
+      if (invite.usedAtMs !== null) return 'used';
+      this.inviteRows.delete(id);
+      return 'deleted';
     },
   };
 
@@ -58,6 +80,9 @@ export class FakeAuthRepositories implements AuthRepositories {
     delete: async (id) => {
       this.sessionRows.delete(id);
     },
+    deleteAllForUser: async (userId) => {
+      for (const [id, row] of this.sessionRows) if (row.userId === userId) this.sessionRows.delete(id);
+    },
     deleteExpiredForUser: async (userId, nowMs) => {
       for (const [id, row] of this.sessionRows) if (row.userId === userId && row.expiresAtMs <= nowMs) this.sessionRows.delete(id);
     },
@@ -67,8 +92,10 @@ export class FakeAuthRepositories implements AuthRepositories {
     return fn(this);
   }
 
+  private userSeq = 0;
+
   addUser(email: string, passwordHash: string, role: UserRole = 'user'): UserRecord {
-    const user: UserRecord = { id: randomUUID(), email, passwordHash, role, disabledAtMs: null, createdAtMs: 0 };
+    const user: UserRecord = { id: randomUUID(), email, passwordHash, role, disabledAtMs: null, createdAtMs: this.userSeq++ };
     this.userRows.set(user.id, user);
     return user;
   }

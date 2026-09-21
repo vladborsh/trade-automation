@@ -63,6 +63,10 @@ export class PgAuthSessionRepository implements AuthSessionRepository {
     await this.db.query(`delete from auth_sessions where id = $1`, [id]);
   }
 
+  async deleteAllForUser(userId: string): Promise<void> {
+    await this.db.query(`delete from auth_sessions where user_id = $1`, [userId]);
+  }
+
   async deleteExpiredForUser(userId: string, nowMs: number): Promise<void> {
     await this.db.query(`delete from auth_sessions where user_id = $1 and expires_at <= ${TS('$2')}`, [
       userId,

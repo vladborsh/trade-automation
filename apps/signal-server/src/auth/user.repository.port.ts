@@ -28,4 +28,8 @@ export interface UserRepository {
    * truth for the admin account.
    */
   upsertAdmin(email: string, passwordHash: string): Promise<UserRecord>;
+  /** GET /admin/users (T-008): every user, oldest first. */
+  listAll(): Promise<UserRecord[]>;
+  /** Sets or clears `disabled_at`; null when no such user. */
+  setDisabledAt(id: string, disabledAtMs: number | null): Promise<UserRecord | null>;
 }

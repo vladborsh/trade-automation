@@ -17,4 +17,6 @@ export interface AuthSessionRepository {
   delete(id: string): Promise<void>;
   /** Housekeeping on login: drop this user's expired rows so the table does not grow forever. */
   deleteExpiredForUser(userId: string, nowMs: number): Promise<void>;
+  /** Admin disable (T-008): signs the user out everywhere. */
+  deleteAllForUser(userId: string): Promise<void>;
 }

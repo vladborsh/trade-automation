@@ -19,4 +19,13 @@ export interface InviteRepository {
   claim(tokenHash: string, nowMs: number): Promise<string | null>;
   /** Records who accepted a claimed invite (same transaction as `claim`). */
   setUsedBy(inviteId: string, userId: string): Promise<void>;
+  /** POST /admin/invites (T-008): stores only the token's hash; the token itself is never stored. */
+  create(invite: { tokenHash: string; email: string | null; createdBy: string; nowMs: number; expiresAtMs: number }): Promise<InviteRecord>;
+  /** GET /admin/invites (T-008): every invite, newest first. Never the token or its hash. */
+  listAll(): Promise<InviteRecord[]>;
+  /**
+   * DELETE /admin/invites/:id (T-008): deletes the invite only if it is unused (expired or not).
+   * 'deleted' when it was, 'used' when it exists but was accepted, 'missing' when there is none.
+   */
+  deleteUnused(id: string): Promise<'deleted' | 'used' | 'missing'>;
 }

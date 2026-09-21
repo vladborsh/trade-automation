@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { AdminBootstrap } from '../../src/auth/admin-bootstrap.service';
+import { AdminService } from '../../src/auth/admin.service';
 import { AuthService, INVITE_TTL_MS } from '../../src/auth/auth.service';
 import { LoginThrottle } from '../../src/auth/login-throttle';
 import { PgAuthRepositories } from '../../src/auth/pg/pg-auth-repositories';
@@ -111,6 +112,65 @@ maybeDescribe('auth against a real Postgres (T-007 done-when)', () => {
     clock.advance(SESSION_TTL_MS);
     await expect(service.authenticate(token)).resolves.toBeNull();
     expect(await db.query(`select id from auth_sessions where id = $1`, [id])).toHaveLength(0);
+  });
+
+  describe('admin (T-008) against Postgres', () => {
+    let admin: AdminService;
+    beforeEach(() => {
+      admin = new AdminService(repos, fakeConfig({ APP_BASE_URL: 'http://localhost:3030' }), clock.now);
+    });
+
+    it('invite create stores only sha256(token); list never returns it; revoke deletes unused, 409s used', async () => {
+      const created = await admin.createInvite(adminId, email('invitee'));
+      const token = created.url.split('/invite/')[1];
+      const [row] = await db.query<{ token_hash: string; email: string; created_by: string; expires_at: Date }>(
+        `select token_hash, email, created_by, expires_at from invites where id = $1`,
+        [created.id],
+      );
+      expect(row).toEqual({ token_hash: sha256Hex(token), email: email('invitee'), created_by: adminId, expires_at: new Date(created.expiresAt) });
+      expect(created.expiresAt).toBe(clock.ms + INVITE_TTL_MS);
+      const stored = await db.query<{ n: number }>(`select count(*)::int as n from invites where token_hash = $1 or email = $1`, [token]);
+      expect(stored[0].n).toBe(0); // the raw token is nowhere in the table
+
+      const listed = (await admin.listInvites()).find((i) => i.id === created.id)!;
+      expect(listed).toEqual({ id: created.id, email: email('invitee'), createdAt: clock.ms, expiresAt: created.expiresAt, usedAt: null, usedBy: null });
+
+      // accept it, then revoke is 409 INVITE_USED and the row stays
+      const accepted = await service.acceptInvite(token, email('invitee'), 'invitee-password', null);
+      await expect(admin.revokeInvite(created.id)).rejects.toMatchObject({ status: 409, response: { error: { code: 'INVITE_USED' } } });
+      expect((await admin.listInvites()).find((i) => i.id === created.id)).toMatchObject({ usedBy: accepted.user.id });
+
+      // an unused one, even expired, is deleted
+      const expired = await createInvite(clock.ms - 1000);
+      const expiredId = (await repos.invites.findByTokenHash(sha256Hex(expired)))!.id;
+      await admin.revokeInvite(expiredId);
+      expect(await repos.invites.findByTokenHash(sha256Hex(expired))).toBeNull();
+      await expect(admin.revokeInvite(expiredId)).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('disable sets disabled_at and deletes every auth_sessions row of the user; enable clears it', async () => {
+      await repos.users.insert({ email: email('victim'), passwordHash: await fastHasher().hash('victim-password'), role: 'user' });
+      const victim = (await repos.users.findByEmail(email('victim')))!;
+      await service.login(email('victim'), 'victim-password', 'one');
+      await service.login(email('victim'), 'victim-password', 'two');
+      const count = async () => (await db.query<{ n: number }>(`select count(*)::int as n from auth_sessions where user_id = $1`, [victim.id]))[0].n;
+      expect(await count()).toBe(2);
+
+      await admin.disableUser(adminId, victim.id);
+      expect(await count()).toBe(0);
+      expect((await repos.users.findById(victim.id))!.disabledAtMs).toBe(clock.ms);
+      expect((await admin.listUsers()).find((u) => u.id === victim.id)).toEqual({
+        id: victim.id,
+        email: email('victim'),
+        role: 'user',
+        createdAt: victim.createdAtMs,
+        disabledAt: clock.ms,
+      });
+
+      await admin.enableUser(victim.id);
+      expect((await repos.users.findById(victim.id))!.disabledAtMs).toBeNull();
+      await expect(admin.disableUser(adminId, randomUUID())).rejects.toMatchObject({ status: 404 });
+    });
   });
 
   it('AdminBootstrap upserts the admin from env: creates, then resets password/role/disabled on re-boot', async () => {

@@ -1,5 +1,8 @@
 import { IS_PUBLIC_KEY } from '../../src/auth/public.decorator';
 import { AuthController } from '../../src/api/rest/auth.controller';
+import { AdminController } from '../../src/api/rest/admin.controller';
+import { AdminGuard } from '../../src/auth/admin-only.decorator';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { BacktestInstrumentsController } from '../../src/api/rest/backtest/instruments.controller';
 import { SessionsController } from '../../src/api/rest/backtest/sessions.controller';
 import { BacktestCandlesController } from '../../src/api/rest/backtest/candles.controller';
@@ -36,6 +39,7 @@ describe('@Public() allow-list', () => {
       BacktestInstrumentsController,
       SessionsController,
       BacktestCandlesController,
+      AdminController,
     ]) {
       expect([c.name, isPublic(c)]).toEqual([c.name, false]);
       for (const key of Object.getOwnPropertyNames(c.prototype)) {
@@ -49,5 +53,9 @@ describe('@Public() allow-list', () => {
     expect(isPublic(AuthController)).toBe(false);
     expect([p.login, p.invite, p.acceptInvite].map(isPublic)).toEqual([true, true, true]);
     expect([p.me, p.logout].map(isPublic)).toEqual([false, false]);
+  });
+
+  it('admin: the whole controller is behind AdminGuard (on top of the global AuthGuard)', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, AdminController)).toEqual([AdminGuard]);
   });
 });

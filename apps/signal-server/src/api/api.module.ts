@@ -17,6 +17,7 @@ import { MetricsController } from './rest/metrics.controller';
 import { CalendarController } from './rest/calendar.controller';
 import { BacktestInstrumentsController } from './rest/backtest/instruments.controller';
 import { AuthController } from './rest/auth.controller';
+import { AdminController } from './rest/admin.controller';
 import { SessionsController } from './rest/backtest/sessions.controller';
 import { BacktestCandlesController } from './rest/backtest/candles.controller';
 import { OrdersController } from './rest/backtest/orders.controller';
@@ -44,6 +45,7 @@ import { LiveGateway } from './ws/live.gateway';
     CalendarController,
     BacktestInstrumentsController,
     AuthController,
+    AdminController,
     SessionsController,
     BacktestCandlesController,
     OrdersController,

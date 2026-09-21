@@ -52,6 +52,21 @@ export class PgUserRepository implements UserRepository {
     }
   }
 
+  async listAll(): Promise<UserRecord[]> {
+    const rows = await this.db.query<UserRow>(`select ${COLUMNS} from users order by created_at, id`);
+    return rows.map(toUserRecord);
+  }
+
+  async setDisabledAt(id: string, disabledAtMs: number | null): Promise<UserRecord | null> {
+    const [row] = await this.db.query<UserRow>(
+      `update users set disabled_at = case when $2::double precision is null then null
+                                           else to_timestamp($2::double precision / 1000) end
+        where id = $1 returning ${COLUMNS}`,
+      [id, disabledAtMs],
+    );
+    return row ? toUserRecord(row) : null;
+  }
+
   async upsertAdmin(email: string, passwordHash: string): Promise<UserRecord> {
     const [row] = await this.db.query<UserRow>(
       `insert into users (email, password_hash, role) values ($1, $2, 'admin')
