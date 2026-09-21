@@ -234,6 +234,29 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(e.completed()).toBe(true);
   });
 
+  it('view-only (§9.3): history at the cursor, no ahead cache, steps inert, a switch re-fetches and is not persisted', async () => {
+    const api = fakeServer({ serverCursor: at(21, 2, 0) });
+    const stepped: number[] = [];
+    const e = new ReplayEngine(api, {
+      panels: PANELS, cursorMs: at(18, 22, 7), serverCursorMs: at(21, 2, 0), timeframe: '5m', periodToMs: PERIOD_TO,
+      skipWeekends: true, viewOnly: true, completed: true, onStep: (c) => stepped.push(c),
+    });
+    await e.start();
+    expect(seriesBars(e.seriesFor('btc')())).toEqual(await serverBars(api, 'btc', '5m', at(18, 22, 7)));
+    expect(api.ahead).not.toHaveBeenCalled();
+
+    await e.step();
+    expect(e.cursor()).toBe(at(18, 22, 7));
+    expect(stepped).toEqual([]);
+
+    await e.setTimeframe('1h'); // allowed in view-only, even on a complete session
+    expect(e.timeframe()).toBe('1h');
+    expect(e.cursor()).toBe(at(18, 22, 7));
+    expect(seriesBars(e.seriesFor('btc')())).toEqual(await serverBars(api, 'btc', '1h', at(18, 22, 7)));
+    expect(api.patchTimeframe).not.toHaveBeenCalled();
+    expect(api.ahead).not.toHaveBeenCalled();
+  });
+
   it('reports a failed request instead of throwing, and leaves the cursor where it was', async () => {
     const api = fakeServer();
     const e = engine(api, at(18, 21, 40));

@@ -25,6 +25,11 @@ export interface ReplayEngineConfig {
   completed?: boolean;
   /** Called after every step with the new cursor — the workspace queues it for the server (T-021). */
   onStep?: (cursorMs: number) => void;
+  /**
+   * §9.3 view-only rewind (decision 32): history at the cursor only — no ahead cache, no steps, a
+   * timeframe switch re-fetches history and is never persisted. Nothing here can move the session.
+   */
+  viewOnly?: boolean;
   timeframe: Timeframe;
   periodToMs: number;
   skipWeekends: boolean;
@@ -65,6 +70,8 @@ export class ReplayEngine {
   readonly error = signal<string | null>(null);
   /** The server has completed the session: stepping and switching are inert (decision 28). */
   readonly completed = signal(false);
+  /** §9.3: viewing the past; nothing can be stepped or persisted. */
+  readonly viewOnly: boolean;
 
   private readonly tapes: PanelTape[];
   private busy = false;
@@ -77,6 +84,7 @@ export class ReplayEngine {
     this.cursor.set(config.cursorMs);
     this.serverCursor = config.serverCursorMs;
     this.completed.set(config.completed ?? false);
+    this.viewOnly = config.viewOnly ?? false;
     this.timeframe.set(config.timeframe);
     this.atEnd.set(config.cursorMs >= config.periodToMs);
     this.tapes = config.panels.map(newTape);
@@ -89,6 +97,13 @@ export class ReplayEngine {
 
   /** History behind the cursor, and each cache filled from the open of the bar forming there. */
   async start(): Promise<void> {
+    if (this.viewOnly) {
+      await this.exclusive(async () => {
+        this.blocked.set(true);
+        await Promise.all(this.tapes.map((t) => this.loadHistory(t, this.timeframe())));
+      });
+      return;
+    }
     await this.exclusive(async () => {
       const tf = this.timeframe();
       this.blocked.set(true);
@@ -114,7 +129,7 @@ export class ReplayEngine {
 
   /** `→`: ignored while a step or a switch is in flight — the key is blocked, never queued. */
   async step(): Promise<void> {
-    if (this.atEnd() || this.completed()) return;
+    if (this.atEnd() || this.completed() || this.viewOnly) return;
     await this.exclusive(async () => {
       for (;;) {
         try {
@@ -138,7 +153,8 @@ export class ReplayEngine {
    * boundary at or before the server cursor, and the 1m from there folded with `foldOneMinute`.
    */
   async setTimeframe(tf: Timeframe): Promise<void> {
-    if (tf === this.timeframe() || this.completed()) return;
+    if (tf === this.timeframe() || (this.completed() && !this.viewOnly)) return;
+    if (this.viewOnly) return this.viewTimeframe(tf);
     await this.exclusive(async () => {
       this.blocked.set(true);
       const cursor = this.cursor();
@@ -193,6 +209,19 @@ export class ReplayEngine {
     await this.exclusive(async () => {
       const i = this.tapes.findIndex((t) => t.panel.id === panelId);
       if (i >= 0) this.tapes.splice(i, 1);
+    });
+  }
+
+  /** §9.3: in view-only mode `cursor <= server cursor`, so history with the forming bar is servable as is. */
+  private async viewTimeframe(tf: Timeframe): Promise<void> {
+    await this.exclusive(async () => {
+      this.blocked.set(true);
+      const histories = await Promise.all(this.tapes.map((t) => this.api.history(t.panel.id, tf, this.cursor(), HISTORY_PAGE)));
+      this.timeframe.set(tf); // not persisted: no PATCH in view-only mode
+      this.tapes.forEach((t, i) => {
+        t.series.set({ closed: histories[i].bars, forming: histories[i].forming });
+        t.noMoreOlder = false;
+      });
     });
   }
 
@@ -284,6 +313,7 @@ export class ReplayEngine {
 
   /** §5.3 background refill: below `refill1m` ahead, fetch pages until `target1m` ahead. */
   private refillAll(): void {
+    if (this.viewOnly) return;
     const { target1m, refill1m } = cacheSizing(this.timeframe());
     for (const t of this.tapes) {
       if (t.refilling || t.cache.endOfTape || t.cache.countAtOrAfter(this.cursor()) >= refill1m) continue;

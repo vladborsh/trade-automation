@@ -1,0 +1,56 @@
+<main class="detail">
+  <nav class="crumbs">
+    <a [routerLink]="['/sessions', id()]">&#x2039; Back to the session</a>
+  </nav>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">Could not load the trade: {{ message }}</p>
+  } @else if (detail(); as d) {
+    <header>
+      <h1>Trade #{{ d.order.seq }} · {{ d.order.instrument }} · {{ d.order.side }}</h1>
+      @if (showOnChart(); as q) {
+        <a class="show" data-testid="show-on-chart" [routerLink]="['/sessions', id()]" [queryParams]="q">Show on chart</a>
+      }
+    </header>
+
+    <div class="columns">
+      <dl class="fields">
+        @for (f of fields(); track f.field) {
+          <div class="field" [attr.data-field]="f.field" [attr.data-value]="f.raw">
+            <dt>{{ f.label }}</dt>
+            <dd>{{ f.text }}</dd>
+          </div>
+        }
+      </dl>
+
+      <section class="side">
+        <h2>Modifications</h2>
+        @if (modifications().length === 0) {
+          <p class="muted" data-testid="no-modifications">No stop or target was moved.</p>
+        } @else {
+          <ul class="mods">
+            @for (m of modifications(); track $index) {
+              <li>{{ m }}</li>
+            }
+          </ul>
+        }
+
+        <h2>Screenshots</h2>
+        <div class="shots">
+          @for (kind of ['entry', 'exit']; track kind) {
+            <figure [attr.data-shot]="kind">
+              @if (kind === 'entry' ? shots().entry : shots().exit; as url) {
+                <img [src]="url" [alt]="kind + ' screenshot'" />
+              } @else {
+                <div class="placeholder" data-testid="shot-placeholder">No {{ kind }} screenshot</div>
+              }
+              <figcaption>{{ kind === 'entry' ? 'At placement' : 'At close' }}</figcaption>
+            </figure>
+          }
+        </div>
+      </section>
+    </div>
+  } @else {
+    <p class="muted" role="status">Loading the trade…</p>
+  }
+</main>

@@ -3,6 +3,8 @@
     @if (engine(); as e) {
       <app-replay-toolbar
         [sessionName]="s.name"
+        [sessionId]="s.id"
+        [viewingAt]="e.viewOnly ? e.cursor() : null"
         [cursorMs]="e.cursor()"
         [timeframe]="e.timeframe()"
         [balance]="s.balance"
@@ -26,6 +28,7 @@
       <div class="bottom">
         <app-journal
           class="journal"
+          [sessionId]="s.id"
           [orders]="store.portfolio.orders()"
           [currency]="s.sessionCurrency"
           [pricePrecision]="store.pricePrecision()"

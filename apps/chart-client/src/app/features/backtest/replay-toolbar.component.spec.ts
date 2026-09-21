@@ -6,7 +6,7 @@ import { ReplayToolbarComponent } from './replay-toolbar.component';
 function render(extra: Record<string, unknown> = {}) {
   TestBed.configureTestingModule({ imports: [ReplayToolbarComponent], providers: [provideRouter([])] });
   const fixture = TestBed.createComponent(ReplayToolbarComponent);
-  const inputs = { sessionName: 'BTC practice', cursorMs: Date.UTC(2026, 8, 18, 23, 45), timeframe: '5m', balance: 10000, currency: 'USD', ...extra };
+  const inputs = { sessionName: 'BTC practice', sessionId: 's1', cursorMs: Date.UTC(2026, 8, 18, 23, 45), timeframe: '5m', balance: 10000, currency: 'USD', ...extra };
   for (const [k, v] of Object.entries(inputs)) fixture.componentRef.setInput(k, v);
   fixture.detectChanges();
   return { fixture, el: fixture.nativeElement as HTMLElement, cmp: fixture.componentInstance };
@@ -50,6 +50,15 @@ describe('ReplayToolbarComponent', () => {
     expect(el.querySelector('[data-testid="replay-completed"]')?.textContent).toBe('completed');
     expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-step"]')!.disabled).toBe(true);
     expect([...el.querySelectorAll<HTMLButtonElement>('.tf-btn')].every((b) => b.disabled)).toBe(true);
+  });
+
+  it('view-only: "viewing … — read only", no stepping, the timeframe still switchable, a way back', () => {
+    const { el } = render({ viewingAt: Date.UTC(2026, 8, 16, 10, 5), cursorMs: Date.UTC(2026, 8, 16, 10, 5), completed: true });
+    expect(el.querySelector('[data-testid="replay-viewing"]')?.textContent).toBe('viewing 2026-09-16 10:05 UTC — read only');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-step"]')!.disabled).toBe(true);
+    expect([...el.querySelectorAll<HTMLButtonElement>('.tf-btn')].some((b) => b.disabled)).toBe(false);
+    expect(el.querySelector('[data-testid="replay-back"]')?.getAttribute('href')).toBe('/sessions/s1');
+    expect(el.querySelector('[data-testid="replay-completed"]')).toBeNull();
   });
 
   it('shows retrying and a one-line notice', () => {

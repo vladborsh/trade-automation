@@ -10,7 +10,7 @@
         type="button"
         class="tf-btn"
         [class.active]="tf === timeframe()"
-        [disabled]="completed()"
+        [disabled]="timeframeLocked()"
         (click)="timeframeChange.emit(tf)"
       >
         {{ tf }}
@@ -22,14 +22,17 @@
     type="button"
     class="step"
     data-testid="replay-step"
-    [disabled]="loading() || atEnd() || completed()"
+    [disabled]="loading() || atEnd() || completed() || viewingAt() !== null"
     title="Step forward one bar (→)"
     (click)="step.emit()"
   >
     Step &#x2192;
   </button>
 
-  @if (completed()) {
+  @if (viewingAt() !== null) {
+    <span class="status viewing" data-testid="replay-viewing" role="status">viewing {{ cursorText() }} — read only</span>
+    <a class="back-to-session" data-testid="replay-back" [routerLink]="['/sessions', sessionId()]">Back to the session</a>
+  } @else if (completed()) {
     <span class="status completed" data-testid="replay-completed">completed</span>
   } @else if (loading()) {
     <span class="status loading" data-testid="replay-loading" role="status">loading…</span>

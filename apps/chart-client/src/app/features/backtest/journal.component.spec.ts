@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import type { Order } from '@trade-automation/contracts';
 import { JournalComponent } from './journal.component';
 
@@ -10,10 +11,11 @@ const order = (id: string, seq: number, extra: Partial<Order> = {}) =>
   }) as Order;
 
 function render(orders: Order[]) {
-  TestBed.configureTestingModule({ imports: [JournalComponent] });
+  TestBed.configureTestingModule({ imports: [JournalComponent], providers: [provideRouter([])] });
   const fixture = TestBed.createComponent(JournalComponent);
   fixture.componentRef.setInput('orders', orders);
   fixture.componentRef.setInput('currency', 'USD');
+  fixture.componentRef.setInput('sessionId', 's1');
   fixture.componentRef.setInput('pricePrecision', new Map([['binance:BTCUSDT', 1]]));
   fixture.detectChanges();
   return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -25,7 +27,8 @@ describe('JournalComponent', () => {
     const rows = el.querySelectorAll('[data-testid="journal-row"]');
     expect([...rows].map((r) => r.getAttribute('data-order-id'))).toEqual(['a', 'b']);
     const entry = rows[0].querySelector('[data-field="entryPrice"]')!;
-    expect(entry.textContent).toBe('100.0');
+    expect(entry.textContent?.trim()).toBe('100.0');
+    expect(rows[1].querySelector('[data-field="seq"] a')?.getAttribute('href')).toBe('/sessions/s1/trades/b');
     expect(entry.getAttribute('data-value')).toBe('100');
     expect(rows[0].classList.contains('win')).toBe(true);
     expect(rows[1].classList.contains('loss')).toBe(true);

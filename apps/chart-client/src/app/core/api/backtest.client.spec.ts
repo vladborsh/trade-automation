@@ -51,6 +51,15 @@ describe('BacktestClient (backtest-app-system-design.md §7.2)', () => {
     );
   });
 
+  it('GETs one order and fetches a screenshot from the API origin with the cookie (T-030)', async () => {
+    const { client, fetchMock } = setup(jsonResponse(200, {}));
+    await client.getOrder('s1', 'o1');
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders/o1`, expect.objectContaining({ method: 'GET' }));
+    const blob = await client.fetchScreenshot('/api/backtest/sessions/s1/orders/o1/screenshots/entry');
+    expect(fetchMock).toHaveBeenLastCalledWith('http://localhost:4330/api/backtest/sessions/s1/orders/o1/screenshots/entry', { credentials: 'include' });
+    expect(blob).not.toBeNull();
+  });
+
   it('GETs the journal and the stats (T-024)', async () => {
     const { client, fetchMock } = setup(jsonResponse(200, []));
     await client.listOrders('s1');

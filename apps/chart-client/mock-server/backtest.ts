@@ -14,7 +14,7 @@ import {
 } from '@trade-automation/contracts';
 import { readJsonBody, type SendJson } from './auth';
 import { replayAhead, replayHistory } from './replay-tape';
-import { seededOrders, seededStats } from './journal-seed';
+import { screenshotPng, seededOrderDetail, seededOrders, seededStats } from './journal-seed';
 
 /**
  * architecture/backtest-app-system-design.md §7.2 — an in-memory stand-in for the real server's
@@ -101,6 +101,27 @@ export class MockBacktestState {
         return true;
       }
       this.candles(res, send, session, new URL(req.url ?? '/', 'http://mock').searchParams, candles[2] !== undefined);
+      return true;
+    }
+    const one = /^\/api\/backtest\/sessions\/([^/]+)\/orders\/([^/]+)(\/screenshots\/entry)?$/.exec(pathname);
+    if (one && method === 'GET') {
+      const own = UUID.test(one[1]) ? this.sessions.get(one[1]) : undefined;
+      const detail = own && own.userId === userId ? seededOrderDetail(own.summary, one[2]) : null;
+      if (!detail || (one[3] && !detail.screenshots.entry)) {
+        send(res, 404, { statusCode: 404, message: 'Not found.' });
+      } else if (one[3]) {
+        // Not JSON, so not through `send`: set the credentialed-CORS headers it would have.
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'private, max-age=31536000',
+          'Access-Control-Allow-Origin': req.headers.origin ?? '*',
+          'Access-Control-Allow-Credentials': 'true',
+          Vary: 'Origin',
+        });
+        res.end(screenshotPng);
+      } else {
+        send(res, 200, detail);
+      }
       return true;
     }
     const journal = /^\/api\/backtest\/sessions\/([^/]+)\/(orders|stats)$/.exec(pathname);

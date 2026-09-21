@@ -135,4 +135,50 @@ describe('ReplaySessionStore (T-021)', () => {
     expect(store.retrying()).toBe(false);
     expect(store.session()?.cursorMs).toBe(T0 + 5 * M);
   });
+
+  it('GUARD (§9.3): view-only never sends a mutating request, and a normal open resumes at the persisted cursor', async () => {
+    const persisted = { ...SESSION, cursorMs: T0 + 25 * M };
+    const client = fakeClient(persisted);
+    const calls: string[] = [];
+    const recorded = new Proxy(client, {
+      get: (target, prop: string) => {
+        const value = (target as Record<string, unknown>)[prop];
+        return typeof value === 'function' ? (...args: unknown[]) => (calls.push(prop), (value as (...a: unknown[]) => unknown)(...args)) : value;
+      },
+    });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [ReplaySessionStore, { provide: BacktestClient, useValue: recorded }] });
+    const store = TestBed.inject(ReplaySessionStore);
+
+    await store.open('s1', { viewAt: T0 + 5 * M, orderId: 'o0' });
+    const view = store.engine()!;
+    expect(view.viewOnly).toBe(true);
+    expect(view.cursor()).toBe(T0 + 5 * M);
+    await view.step(); // → is inert
+    await view.setTimeframe('1h'); // allowed, not persisted
+    expect(view.timeframe()).toBe('1h');
+    store.ngOnDestroy(); // leaving the view
+    await settle();
+
+    const mutating = ['advance', 'placeOrder', 'cancelOrder', 'closeOrder', 'modifyOrder', 'patchSession', 'deleteSession', 'createSession'];
+    expect(calls.filter((c) => mutating.includes(c))).toEqual([]);
+    expect(calls).not.toContain('getReplayAhead'); // and no ahead cache
+    expect(store.pendingMutations).toBe(0);
+
+    await store.open('s1'); // back to the workspace
+    expect(store.engine()!.viewOnly).toBe(false);
+    expect(store.engine()!.cursor()).toBe(T0 + 25 * M); // the persisted cursor, not viewAt
+  });
+
+  it('view-only shows the order\'s drawing on its panel only', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValueOnce([
+      { id: 'o0', seq: 1, status: 'closed', panelId: 'btc', side: 'long', entryTimeMs: T0, placedAtMs: T0, entryPrice: 1.5, limitPrice: null, slCurrent: 1, tpCurrent: 2, exitPrice: 2 } as Order,
+    ]);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [ReplaySessionStore, { provide: BacktestClient, useValue: client }] });
+    const store = TestBed.inject(ReplaySessionStore);
+    await store.open('s1', { viewAt: T0 + M, orderId: 'o0' });
+    expect(store.sources().get('btc')!.overlays().map((o) => (o.type === 'ray' ? o.label : ''))).toEqual(['entry (long)', 'stop', 'target', 'exit']);
+  });
 });

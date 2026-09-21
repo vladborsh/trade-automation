@@ -10,6 +10,7 @@ import type {
   CreateSessionRequest,
   ModifyOrderRequest,
   Order,
+  OrderDetail,
   PatchSessionRequest,
   PlaceOrderRequest,
   PlaceOrderResponse,
@@ -20,7 +21,9 @@ import type {
   SessionSummariesResponse,
   Timeframe,
 } from '@trade-automation/contracts';
+import { AppConfigService } from '../config/app-config.service';
 import { RestClient } from './rest.client';
+import { serverUrl } from './server-url';
 
 /**
  * backtest-app-system-design.md §7.2 — typed fetchers for the backtest API. Every call goes
@@ -30,6 +33,7 @@ import { RestClient } from './rest.client';
 @Injectable({ providedIn: 'root' })
 export class BacktestClient {
   private readonly rest = inject(RestClient);
+  private readonly config = inject(AppConfigService);
 
   /** Every configured instrument with its 1m coverage (null when nothing is stored). */
   getInstruments(): Promise<BacktestInstrumentsResponse> {
@@ -72,6 +76,24 @@ export class BacktestClient {
   /** §7.2 — the journal: every order of the session by `seq`, optionally one status only. */
   listOrders(id: string, status?: Order['status']): Promise<Order[]> {
     return this.rest.send('GET', `${sessionPath(id)}/orders`, { params: { status } });
+  }
+
+  /** §7.2, §9.3 — one order with its modification history and the URLs of its screenshots (T-025). */
+  getOrder(id: string, orderId: string): Promise<OrderDetail> {
+    return this.rest.send('GET', orderPath(id, orderId));
+  }
+
+  /**
+   * A screenshot by the URL `getOrder` returned (a server path, proxied — the bucket stays private),
+   * fetched with the session cookie. Null when it cannot be had; the page shows a placeholder.
+   */
+  async fetchScreenshot(path: string): Promise<Blob | null> {
+    try {
+      const res = await fetch(serverUrl(this.config.get().apiBaseUrl, path, window.location.origin), { credentials: 'include' });
+      return res.ok ? await res.blob() : null;
+    } catch {
+      return null;
+    }
   }
 
   /** §7.2, decision 38 — the full recompute plus the stored aggregates and whether they drifted. */

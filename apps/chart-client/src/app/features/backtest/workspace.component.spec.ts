@@ -31,6 +31,7 @@ function fakeStore() {
     blocked: signal(false),
     atEnd: signal(false),
     completed: signal(false),
+    viewOnly: false,
     error: signal<string | null>(null),
     step: vi.fn().mockResolvedValue(undefined),
     setTimeframe: vi.fn().mockResolvedValue(undefined),
@@ -85,7 +86,7 @@ function press(key: string, target: EventTarget = document.body) {
 describe('WorkspaceComponent', () => {
   it('opens the session from the route id and shows its toolbar', async () => {
     const { store, el } = await render();
-    expect(store.open).toHaveBeenCalledWith(SESSION.id);
+    expect(store.open).toHaveBeenCalledWith(SESSION.id, null);
     expect(el.querySelector('app-replay-toolbar .name')?.textContent).toBe('BTC practice');
     expect(el.querySelector('[data-testid="replay-cursor"]')?.textContent).toBe('2026-09-18 23:45 UTC');
   });
@@ -112,6 +113,28 @@ describe('WorkspaceComponent', () => {
     press('[');
     expect(engine.step).toHaveBeenCalledTimes(1);
     expect(engine.setTimeframe.mock.calls).toEqual([['15m'], ['1m']]);
+  });
+
+  it('?viewAt&order opens the view-only rewind: → is inert, [ ] still switch timeframe (§9.3)', async () => {
+    const { store, engine } = fakeStore();
+    (engine as { viewOnly: boolean }).viewOnly = true;
+    TestBed.configureTestingModule({ imports: [WorkspaceComponent], providers: [provideRouter([])] });
+    TestBed.overrideComponent(WorkspaceComponent, { set: { providers: [{ provide: ReplaySessionStore, useValue: store }] } });
+    TestBed.overrideComponent(WorkspaceComponent, { remove: { imports: [PanelGridComponent] }, add: { imports: [PanelGridStubComponent] } });
+    const fixture = TestBed.createComponent(WorkspaceComponent);
+    fixture.componentRef.setInput('id', SESSION.id);
+    fixture.componentRef.setInput('viewAt', '1789552200000');
+    fixture.componentRef.setInput('order', 'o1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(store.open).toHaveBeenCalledWith(SESSION.id, { viewAt: 1789552200000, orderId: 'o1' });
+    press('ArrowRight');
+    press(']');
+    expect(engine.step).not.toHaveBeenCalled();
+    expect(engine.setTimeframe).toHaveBeenCalledWith('15m');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="replay-viewing"]')).not.toBeNull();
   });
 
   it('keys are inert once the session is complete', async () => {

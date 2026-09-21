@@ -18,6 +18,9 @@ import { REPLAY_TIMEFRAMES } from './replay-keys';
 })
 export class ReplayToolbarComponent {
   readonly sessionName = input.required<string>();
+  readonly sessionId = input.required<string>();
+  /** §9.3: the cursor being viewed, read-only; null in the normal workspace. */
+  readonly viewingAt = input<number | null>(null);
   readonly cursorMs = input.required<number>();
   readonly timeframe = input.required<Timeframe>();
   readonly balance = input.required<number>();
@@ -38,5 +41,7 @@ export class ReplayToolbarComponent {
 
   readonly timeframes = REPLAY_TIMEFRAMES;
   readonly cursorText = computed(() => formatCursorUtc(this.cursorMs()));
+  /** In view-only mode the timeframe can still change (not persisted); only a live, complete session locks it. */
+  readonly timeframeLocked = computed(() => this.completed() && this.viewingAt() === null);
   readonly balanceText = computed(() => formatBalance(this.balance(), this.currency()));
 }

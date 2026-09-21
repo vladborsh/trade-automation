@@ -1,4 +1,4 @@
-import type { Order, SessionStatsResponse, SessionSummary } from '@trade-automation/contracts';
+import type { Order, OrderDetail, SessionStatsResponse, SessionSummary } from '@trade-automation/contracts';
 import { computeStats, toSessionAggregates } from '@trade-automation/replay-core';
 
 /**
@@ -44,3 +44,25 @@ export function seededStats(s: SessionSummary): SessionStatsResponse {
   const computed = computeStats(seededOrders(s), s.initialBalance, s.periodFromMs);
   return { computed, stored: toSessionAggregates(computed, Date.now()), drift: s.name.includes('drift') };
 }
+
+/**
+ * T-030 — `GET …/orders/:orderId`: a seeded order with one stop move on the pessimistic-bar trade
+ * and an entry screenshot on the first one (served by `screenshotPng`), so the detail page shows
+ * both kinds of content and both placeholders.
+ */
+export function seededOrderDetail(s: SessionSummary, orderId: string): OrderDetail | null {
+  const order = seededOrders(s).find((o) => o.id === orderId);
+  if (!order) return null;
+  const modifications =
+    order.seq === 2
+      ? [{ id: 1, orderId, cursorMs: (order.entryTimeMs as number) + 2 * M, field: 'sl' as const, oldValue: 40_750, newValue: 40_700, createdAt: order.createdAt }]
+      : [];
+  const screenshots = order.seq === 1 ? { entry: `/api/backtest/sessions/${s.id}/orders/${orderId}/screenshots/entry` } : {};
+  return { order, modifications, screenshots };
+}
+
+/** A 1x1 PNG, the mock's only screenshot. */
+export const screenshotPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);

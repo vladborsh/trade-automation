@@ -31,6 +31,9 @@ import { adjacentTimeframe, replayKeyAction } from './replay-keys';
 export class WorkspaceComponent {
   /** The `:id` route parameter. */
   readonly id = input.required<string>();
+  /** `?viewAt=<ms>&order=<id>` — §9.3 view-only rewind ("Show on chart" from a trade's detail). */
+  readonly viewAt = input<string | undefined>();
+  readonly order = input<string | undefined>();
 
   readonly store = inject(ReplaySessionStore);
   readonly session = this.store.session;
@@ -40,7 +43,9 @@ export class WorkspaceComponent {
   constructor() {
     effect(() => {
       const id = this.id();
-      untracked(() => void this.store.open(id));
+      const viewAt = Number(this.viewAt());
+      const view = Number.isFinite(viewAt) && viewAt > 0 ? { viewAt, orderId: this.order() ?? null } : null;
+      untracked(() => void this.store.open(id, view));
     });
   }
 
@@ -55,8 +60,10 @@ export class WorkspaceComponent {
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
     const engine = this.engine();
-    const action = engine && !engine.completed() ? replayKeyAction(event) : null;
+    const action = engine ? replayKeyAction(event) : null;
     if (!engine || !action) return;
+    // Completed: everything is inert. View-only: only the timeframe keys work (§9.3).
+    if (action === 'step' ? engine.completed() || engine.viewOnly : engine.completed() && !engine.viewOnly) return;
     event.preventDefault(); // → would otherwise scroll the page
     switch (action) {
       case 'step':

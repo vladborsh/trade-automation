@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { Order } from '@trade-automation/contracts';
 import { JOURNAL_COLUMNS, journalRow } from './journal-row';
 
@@ -10,12 +11,15 @@ import { JOURNAL_COLUMNS, journalRow } from './journal-row';
 @Component({
   selector: 'app-journal',
   standalone: true,
+  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './journal.component.html',
   styleUrl: './journal.component.scss',
 })
 export class JournalComponent {
   readonly orders = input.required<readonly Order[]>();
+  /** For the row links to each trade's detail page (§9.3). */
+  readonly sessionId = input.required<string>();
   readonly currency = input.required<string>();
   /** Instrument → price decimals. */
   readonly pricePrecision = input<ReadonlyMap<string, number>>(new Map());

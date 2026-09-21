@@ -8,6 +8,13 @@ import type { PanelPositionTools } from '../../features/panel-grid/panel-source'
 import { ReplayEngine, type ReplayApi } from './replay-engine';
 import { ReplayPanelSource } from './replay-panel-source';
 import { PositionToolsStore } from './position-tools.store';
+import { orderTool } from './view-only';
+
+/** §9.3 view-only rewind: the cursor to view at, and the order whose drawing to show. */
+export interface ViewAt {
+  viewAt: number;
+  orderId: string | null;
+}
 
 /** How long a one-line notice (resynced, reloaded) stays in the toolbar. */
 const NOTICE_MS = 8_000;
@@ -46,6 +53,8 @@ export class ReplaySessionStore implements OnDestroy {
 
   private queue: AdvanceQueue | null = null;
   private sessionId: string | null = null;
+  /** Set while viewing the past (§9.3); `null` for the normal, live-stepping workspace. */
+  readonly view = signal<ViewAt | null>(null);
   private noticeTimer: ReturnType<typeof setTimeout> | undefined;
   private hintTimer: ReturnType<typeof setTimeout> | undefined;
   /** Panel id → its position tools; kept across timeframe switches (the sources are rebuilt). */
@@ -77,7 +86,15 @@ export class ReplaySessionStore implements OnDestroy {
     const session = this.session();
     if (!engine || !session) return new Map<string, ReplayPanelSource>();
     engine.timeframe();
-    return new Map(session.layout.panels.map((p) => [p.id, new ReplayPanelSource(p, engine, this.toolsBinding(p.id))]));
+    const view = this.view();
+    const viewed = view?.orderId ? this.portfolio.orders().find((o) => o.id === view.orderId) : undefined;
+    return new Map(
+      session.layout.panels.map((p) => [
+        p.id,
+        // §9.3: view-only shows the viewed order as a read-only position tool; nothing is editable.
+        new ReplayPanelSource(p, engine, view ? this.viewedBinding(p.id, viewed) : this.toolsBinding(p.id)),
+      ]),
+    );
   });
 
   /** The panel's position-tool store (created on first use). */
@@ -137,14 +154,40 @@ export class ReplaySessionStore implements OnDestroy {
     return { view, apply: (change) => store.apply(change), setPointerPrice: (price) => store.pointerPrice.set(price) };
   }
 
-  /** Loads (or reloads) the session from the server and builds a fresh engine and queue at its cursor. */
-  async open(id: string): Promise<void> {
+  /**
+   * §9.3: a panel's tools while viewing the past — the viewed order's drawing (on its own panel),
+   * never editable: changes and the pointer are ignored, so a drag snaps back.
+   */
+  private viewedBinding(panelId: string, order: Parameters<typeof orderTool>[0] | undefined): PanelPositionTools {
+    const tool = order && order.panelId === panelId ? orderTool(order) : null;
+    const view = computed(() => ({
+      tools: tool ? [tool] : [],
+      balance: this.session()?.balance ?? 0,
+      riskPct: this.session()?.defaultRiskPct ?? 1,
+      pricePrecision: this.precisionOf(panelId),
+    }));
+    return { view, apply: () => undefined, setPointerPrice: () => undefined };
+  }
+
+  /**
+   * Loads (or reloads) the session from the server and builds a fresh engine and queue at its
+   * cursor. With `view`, the §9.3 view-only rewind instead: an engine at `viewAt` with no ahead
+   * cache and **no AdvanceQueue** — nothing can reach a mutating endpoint, so `cursor_ms` is
+   * untouched and a later normal open resumes at the persisted cursor (decisions 32, 37).
+   */
+  async open(id: string, view: ViewAt | null = null): Promise<void> {
     this.sessionId = id;
     this.queue?.stop();
+    this.queue = null;
+    this.view.set(view);
     this.loadError.set(null);
     try {
       const detail = await this.client.getSession(id);
       const { session } = detail;
+      if (view) {
+        await this.openViewOnly(id, detail, view);
+        return;
+      }
       const queue = new AdvanceQueue(this.transport(id), {
         onOutcome: (outcome) => this.reconcile(outcome),
         onRefused: (err) => this.refused(err),
@@ -170,6 +213,25 @@ export class ReplaySessionStore implements OnDestroy {
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  private async openViewOnly(id: string, detail: Awaited<ReturnType<BacktestClient['getSession']>>, view: ViewAt): Promise<void> {
+    const { session } = detail;
+    const engine = new ReplayEngine(this.api(id), {
+      panels: session.layout.panels,
+      cursorMs: Math.min(view.viewAt, session.cursorMs), // never ask for history past the server cursor
+      serverCursorMs: session.cursorMs,
+      completed: session.status === 'complete',
+      timeframe: session.timeframe,
+      periodToMs: session.periodToMs,
+      skipWeekends: session.skipWeekends,
+      viewOnly: true,
+    });
+    this.portfolio.load(detail);
+    await this.loadJournal(id);
+    this.session.set(session);
+    this.engine.set(engine);
+    await engine.start();
   }
 
   /**

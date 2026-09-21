@@ -32,6 +32,11 @@ export const routes: Routes = [
         title: 'New session',
       },
       {
+        path: 'sessions/:id/trades/:orderId',
+        loadComponent: () => import('./features/backtest/trade-detail.component').then((m) => m.TradeDetailComponent),
+        title: 'Trade',
+      },
+      {
         path: 'sessions/:id',
         loadComponent: () => import('./features/backtest/workspace.component').then((m) => m.WorkspaceComponent),
         title: 'Backtest',
