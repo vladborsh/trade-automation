@@ -333,4 +333,43 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
       }
     }
   }, 120_000);
+  it('regressions BUG-002/003/004: out-of-range numbers are 400 and do not burn the opId; an opId reused for another request is 409 and moves nothing', async () => {
+    const J = (i: number) => journeyT0 + i * MIN;
+    const sid = await createSession('alice', { from: J(0), to: J(20), costs: FIXTURE_COSTS_ON });
+    const bad = await call('alice', 'POST', '/backtest/sessions', {
+      name: 'x', layout, timeframe: '1m', periodFromMs: J(0), periodToMs: J(20), initialBalance: 1e13, defaultRiskPct: 10_000, costs: FIXTURE_COSTS_ON,
+    });
+    expect(bad.status).toBe(400); // was a 500 "numeric field overflow"
+
+    const op = randomUUID();
+    const body = { opId: op, cursorMs: J(0), panelId: 'p1', side: 'long', type: 'market', sl: 990, riskPct: 1 };
+    expect((await call('alice', 'POST', `/backtest/sessions/${sid}/orders`, { ...body, riskPct: 10_000 })).status).toBe(400);
+    const ok = await call('alice', 'POST', `/backtest/sessions/${sid}/orders`, body); // same opId, valid body: not burnt
+    expect(ok.status).toBe(201);
+    const retry = await call('alice', 'POST', `/backtest/sessions/${sid}/orders`, body);
+    expect(retry.status).toBe(201);
+    expect(retry.body.order.id).toBe(ok.body.order.id); // identical retry replays
+
+    expect((await call('alice', 'POST', `/backtest/sessions/${sid}/orders`, { ...body, sl: 980 })).status).toBe(409); // same opId, other body
+    const stolen = await call('alice', 'POST', `/backtest/sessions/${sid}/advance`, { opId: op, toCursorMs: J(3) }); // same opId, other operation
+    expect(stolen.status).toBe(409);
+    const detail = await call('alice', 'GET', `/backtest/sessions/${sid}`);
+    expect(detail.body.session.cursorMs).toBe(J(0)); // the rejected advance moved nothing
+    expect((await call('alice', 'GET', `/backtest/sessions/${sid}/orders`)).body).toHaveLength(1);
+  });
+
+  it('regression BUG-005: a burst of parallel wrong logins is throttled after 10, not evaluated in full', async () => {
+    const email = `burst-${RUN}@bt-e2e.test`;
+    const attempts = await Promise.all(
+      Array.from({ length: 60 }, () =>
+        fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: 'wrong-password-1' }) }).then((r) => r.status),
+      ),
+    );
+    expect(attempts.filter((s) => s === 401).length).toBeLessThanOrEqual(10);
+    expect(attempts.filter((s) => s === 429).length).toBeGreaterThanOrEqual(50);
+    expect(attempts.every((s) => s === 401 || s === 429)).toBe(true);
+    // the bootstrapped admin is a different key and unaffected
+    const res = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: adminEmail, password: PASSWORD }) });
+    expect(res.status).toBe(200);
+  });
 });
