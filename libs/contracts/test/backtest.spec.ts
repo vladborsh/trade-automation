@@ -536,6 +536,12 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
     expect(ErrorResponseSchema.parse(err)).toEqual(err);
   });
 
+  it('accepts the T-015 order codes (provisional, design §7.2)', () => {
+    for (const code of ['BALANCE_NOT_POSITIVE', 'NO_PRICE_AT_CURSOR', 'ORDER_NOT_OPEN'] as const) {
+      expect(ErrorResponseSchema.parse({ error: { code, message: 'x' } }).error.code).toBe(code);
+    }
+  });
+
   it('rejects an error envelope with an unknown code', () => {
     expect(() => ErrorResponseSchema.parse({ error: { code: 'NOT_A_REAL_CODE', message: 'x' } })).toThrow();
   });

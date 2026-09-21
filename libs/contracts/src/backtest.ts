@@ -476,6 +476,10 @@ export const BacktestErrorCodeSchema = z.enum([
   'STOP_DISTANCE_ZERO',
   'ORDER_NOT_PENDING',
   'SCREENSHOT_EXISTS',
+  // T-015 (§7.2 orders), provisional pending Architect confirmation:
+  'BALANCE_NOT_POSITIVE', // 422 — the session balance is <= 0, so an order cannot be sized
+  'NO_PRICE_AT_CURSOR', // 422 — no revealed 1m candle within the lookback, so no lastClose
+  'ORDER_NOT_OPEN', // 409 — close on an order that is not open (mirror of ORDER_NOT_PENDING)
 ]);
 export type BacktestErrorCode = z.infer<typeof BacktestErrorCodeSchema>;
 
