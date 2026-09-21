@@ -1,0 +1,11 @@
+<nav class="app-nav">
+  <span class="brand">Backtest</span>
+  @for (link of links(); track link.path) {
+    <a [routerLink]="link.path" routerLinkActive="active">{{ link.label }}</a>
+  }
+  <span class="spacer"></span>
+  @if (user(); as u) {
+    <span class="who" data-testid="current-user">{{ u.email }}</span>
+  }
+  <button type="button" (click)="logout()">Sign out</button>
+</nav>

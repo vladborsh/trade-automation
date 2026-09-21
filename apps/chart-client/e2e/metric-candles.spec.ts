@@ -1,22 +1,19 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { apiUrl, expect, routeConfigTo, test, wsUrl } from './fixtures';
 
 /**
  * architecture/chart-layouts.md §11.2 — the OI panel draws a line at 1m (with its caption),
  * wickless-candle caption at 5m, candles with no caption at 15m, in USD (header unit USDT);
  * and a live WS metric point equals the REST point for the same bucket.
  *
- * MOCK_API_PORT lets a worktree point this spec at its own mock server (default :4300, the
- * port public/config.json uses) without touching the shared config file.
+ * Ports (E2E_MOCK_PORT, formerly MOCK_API_PORT) come from ./fixtures.
  */
-const MOCK_PORT = process.env['MOCK_API_PORT'] ?? '4300';
-const API = `http://localhost:${MOCK_PORT}/api`;
-const WS = `ws://localhost:${MOCK_PORT}/ws`;
+const API = apiUrl();
+const WS = wsUrl();
 
 async function openOnMock(page: Page): Promise<void> {
-  await page.route('**/config.json', (route) =>
-    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ apiBaseUrl: API, wsUrl: WS }) }),
-  );
-  await page.goto('/');
+  await routeConfigTo(page);
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 }
 

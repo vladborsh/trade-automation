@@ -22,6 +22,7 @@ export class LayoutFeedService {
   private feedsByPanelId = new Map<string, PanelFeed>();
   private readonly feedsSignal = signal<ReadonlyMap<string, PanelFeed>>(new Map());
   private rebuildToken = 0;
+  private booting: Promise<void> | null = null;
 
   /** Reactive so `PanelGridComponent`'s template re-renders as feeds are (re)built. */
   readonly feeds = this.feedsSignal.asReadonly();
@@ -44,7 +45,20 @@ export class LayoutFeedService {
     });
   }
 
-  async boot(): Promise<void> {
+  /**
+   * Once per app load. `/terminal` is a route (backtest-app-system-design.md §2.3), so the
+   * shell — which calls this from its constructor — is re-created each time the user comes
+   * back to it; the feeds and the socket are root singletons and must not be booted twice.
+   */
+  boot(): Promise<void> {
+    this.booting ??= this.bootOnce().catch((err: unknown) => {
+      this.booting = null; // a failed boot may be retried on the next visit
+      throw err;
+    });
+    return this.booting;
+  }
+
+  private async bootOnce(): Promise<void> {
     await this.config.load();
     const [instruments, layouts] = await Promise.all([this.rest.getInstruments(), this.rest.getLayouts()]);
     this.instruments.setInstruments(instruments);

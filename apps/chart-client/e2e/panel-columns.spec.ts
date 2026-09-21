@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, routeConfigTo, test } from './fixtures';
 
 /**
  * architecture/chart-layouts.md §11.3 — horizontal columns and collapsible panels, against the
@@ -7,9 +8,7 @@ import { test, expect, type Page } from '@playwright/test';
  * its own autofit window) is the one most likely to break.
  */
 
-// Default mock instance, like terminal.spec.ts's routed tests. `E2E_MOCK_PORT` lets a worktree
-// that cannot use :4300 point this spec at its own mock server.
-const MOCK_PORT = process.env['E2E_MOCK_PORT'] ?? '4300';
+// Default mock instance, like terminal.spec.ts's routed tests; ports come from ./fixtures.
 const EPSILON_SEC = 5 * 60; // half a 5m bar, generously rounded — same as terminal.spec.ts
 const PANEL_IDS = ['btc', 'eth', 'btc-oi', 'dxy'];
 
@@ -19,12 +18,7 @@ interface Range {
 }
 
 async function routeConfigToMock(page: Page): Promise<void> {
-  await page.route('**/config.json', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ apiBaseUrl: `http://localhost:${MOCK_PORT}/api`, wsUrl: `ws://localhost:${MOCK_PORT}/ws` }),
-    }),
-  );
+  await routeConfigTo(page);
 }
 
 function chartOf(page: Page, panelId: string) {
@@ -80,7 +74,7 @@ async function bootCrypto(page: Page): Promise<string[]> {
     }
   });
   await routeConfigToMock(page);
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
   for (const id of PANEL_IDS) {
     await expect(chartOf(page, id)).toHaveAttribute('data-visible-to', /\d+/, { timeout: 15_000 });

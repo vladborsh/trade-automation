@@ -1,6 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { AppConfigService } from '../config/app-config.service';
 import type {
+  AcceptInviteRequest,
+  AcceptInviteResponse,
+  InviteInfo,
+  LoginRequest,
+  LoginResponse,
+  MeResponse,
   Candle,
   IndicatorPoint,
   InstrumentId,
@@ -12,13 +18,22 @@ import type {
 } from '@trade-automation/contracts';
 import type { Health, InstrumentWithStatus, StrategyInfo } from '../contracts/derived';
 import type { CalendarNotification, CalendarWeekResponse, EconomicEvent, EventDetailResponse } from '../contracts/calendar';
+import { buildUrl, toApiError } from './api-error';
+import { UNAUTHORIZED_HANDLER } from './unauthorized-handler';
 
 /**
  * Typed fetchers for the REST surface in §3.5. Plain `fetch`, no RxJS here —
  * RxJS is reserved for the WS boundary (live.socket.ts).
+ *
+ * backtest-app-system-design.md §7.1: every request carries the `bt_session` cookie
+ * (`credentials: 'include'`), and a 401 on a data request means "go to /login". Auth calls
+ * (`/auth/*`) report their own 401s (wrong password, no session yet) to the caller instead.
+ * Failures throw `ApiError` (status + contract error code).
  */
 @Injectable({ providedIn: 'root' })
 export class RestClient {
+  private readonly onUnauthorized = inject(UNAUTHORIZED_HANDLER);
+
   constructor(private readonly config: AppConfigService) {}
 
   private get baseUrl(): string {
@@ -26,20 +41,59 @@ export class RestClient {
   }
 
   private async getJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
-    const url = new URL(this.baseUrl.replace(/\/$/, '') + path, window.location.origin);
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined) {
-          url.searchParams.set(key, String(value));
-        }
-      }
-    }
-    const response = await fetch(url.toString());
+    return this.request<T>('GET', path, { params, redirectOn401: true });
+  }
+
+  private async request<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    opts: { params?: Record<string, string | number | undefined>; body?: unknown; redirectOn401: boolean },
+  ): Promise<T> {
+    const response = await fetch(buildUrl(this.baseUrl, path, window.location.origin, opts.params), {
+      method,
+      credentials: 'include',
+      headers: opts.body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    });
     if (!response.ok) {
-      throw new Error(`GET ${path} failed: HTTP ${response.status}`);
+      if (response.status === 401 && opts.redirectOn401) {
+        this.onUnauthorized();
+      }
+      const body: unknown = await response.json().catch(() => null);
+      throw toApiError(method, path, response.status, body);
+    }
+    if (response.status === 204) {
+      return undefined as T;
     }
     return (await response.json()) as T;
   }
+
+  // --- auth (§7.1) ---------------------------------------------------------------------------
+
+  getMe(): Promise<MeResponse> {
+    return this.request<MeResponse>('GET', '/auth/me', { redirectOn401: false });
+  }
+
+  login(body: LoginRequest): Promise<LoginResponse> {
+    return this.request<LoginResponse>('POST', '/auth/login', { body, redirectOn401: false });
+  }
+
+  logout(): Promise<void> {
+    return this.request<void>('POST', '/auth/logout', { redirectOn401: false });
+  }
+
+  getInvite(token: string): Promise<InviteInfo> {
+    return this.request<InviteInfo>('GET', `/auth/invites/${encodeURIComponent(token)}`, { redirectOn401: false });
+  }
+
+  acceptInvite(token: string, body: AcceptInviteRequest): Promise<AcceptInviteResponse> {
+    return this.request<AcceptInviteResponse>('POST', `/auth/invites/${encodeURIComponent(token)}/accept`, {
+      body,
+      redirectOn401: false,
+    });
+  }
+
+  // --- market data ---------------------------------------------------------------------------
 
   getInstruments(): Promise<InstrumentWithStatus[]> {
     return this.getJson<InstrumentWithStatus[]>('/instruments');

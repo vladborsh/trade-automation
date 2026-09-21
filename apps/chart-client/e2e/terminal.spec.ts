@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { DEEP_HISTORY_MOCK_PORT, TAIL_GAP_MOCK_PORT, expect, routeConfigTo, test } from './fixtures';
 
 /**
  * architecture/chart-layouts.md §9 SE-5's e2e proof: boots on the `crypto`
@@ -21,7 +22,7 @@ async function chartPanels(page: Page) {
 }
 
 test('boots on the crypto layout with 4 panels, markers only on signals:true panels', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/terminal');
 
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
@@ -51,7 +52,7 @@ test('boots on the crypto layout with 4 panels, markers only on signals:true pan
 });
 
 test('changing timeframe re-fetches all four panels', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
   for (const panel of await (await chartPanels(page)).all()) {
@@ -71,7 +72,7 @@ test('changing timeframe re-fetches all four panels', async ({ page }) => {
 test('scrolling one panel back syncs the visible range to all four and triggers an independent older-history fetch on another', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
   const panels = await (await chartPanels(page)).all();
@@ -137,12 +138,7 @@ test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a 
   // (~640 px), which halves that reach below the shallow panels' 2-day depth. A 2560 px viewport
   // restores the per-panel width this scenario was written against.
   await page.setViewportSize({ width: 2560, height: 720 });
-  await page.route('**/config.json', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4301/api', wsUrl: 'ws://localhost:4301/ws' }),
-    }),
-  );
+  await routeConfigTo(page, DEEP_HISTORY_MOCK_PORT);
 
   const candlesRequests: string[] = [];
   page.on('request', (request) => {
@@ -151,7 +147,7 @@ test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a 
     }
   });
 
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
   const panels = await (await chartPanels(page)).all();
@@ -192,12 +188,7 @@ test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a 
 test('panning past the right edge moves all four panels into the void together, preserving window width', async ({ page }) => {
   // Explicit route to the default mock instance (:4300), independent of whatever the shared
   // dev server's public/config.json currently points at (see REPORT.md's note on this).
-  await page.route('**/config.json', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4300/api', wsUrl: 'ws://localhost:4300/ws' }),
-    }),
-  );
+  await routeConfigTo(page);
 
   const warnings: string[] = [];
   page.on('console', (msg) => {
@@ -206,7 +197,7 @@ test('panning past the right edge moves all four panels into the void together, 
     }
   });
 
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
   const panels = await (await chartPanels(page)).all();
@@ -277,14 +268,9 @@ test('panning past the right edge moves all four panels into the void together, 
 // `timeToIndex(findNearest=true)` snapped every later `to` onto dxy's own last bar, so dxy could
 // never agree with btc's right-edge pan; the ruling is that dxy shows blank space instead.
 test('a panel whose own history ends earlier still tracks a right-edge pan into the void (weekend case)', async ({ page }) => {
-  await page.route('**/config.json', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4302/api', wsUrl: 'ws://localhost:4302/ws' }),
-    }),
-  );
+  await routeConfigTo(page, TAIL_GAP_MOCK_PORT);
 
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
   const panels = await (await chartPanels(page)).all();
@@ -328,12 +314,7 @@ test('a panel whose own history ends earlier still tracks a right-edge pan into 
 test('hovering one panel syncs a time-matched crosshair to all four panels, without disturbing the visible range', async ({
   page,
 }) => {
-  await page.route('**/config.json', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ apiBaseUrl: 'http://localhost:4300/api', wsUrl: 'ws://localhost:4300/ws' }),
-    }),
-  );
+  await routeConfigTo(page);
 
   const warnings: string[] = [];
   page.on('console', (msg) => {
@@ -342,7 +323,7 @@ test('hovering one panel syncs a time-matched crosshair to all four panels, with
     }
   });
 
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-chart-panel')).toHaveCount(4, { timeout: 15_000 });
 
   const panels = await (await chartPanels(page)).all();

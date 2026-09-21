@@ -1,0 +1,89 @@
+<main class="auth-page">
+  <section class="auth-card" [attr.data-invite-state]="state()">
+    @switch (state()) {
+      @case ('loading') {
+        <p class="muted">Checking your invite…</p>
+      }
+      @case ('unknown') {
+        <h1>Invite not found</h1>
+        <p class="muted">This invite link is not valid. Check that you copied the whole link, or ask the administrator for a new one.</p>
+        <a routerLink="/login">Go to sign in</a>
+      }
+      @case ('used') {
+        <h1>Invite already used</h1>
+        <p class="muted">This invite has already been used to create an account. If it was yours, sign in.</p>
+        <a routerLink="/login">Go to sign in</a>
+      }
+      @case ('expired') {
+        <h1>Invite expired</h1>
+        <p class="muted">Invites are valid for 7 days. Ask the administrator for a new one.</p>
+        <a routerLink="/login">Go to sign in</a>
+      }
+      @case ('error') {
+        <h1>Could not check the invite</h1>
+        <p class="muted">The server did not answer. Try again in a moment.</p>
+        <button type="button" (click)="load()">Try again</button>
+      }
+      @case ('valid') {
+        <form (submit)="submit($event)" novalidate>
+          <h1>Create your account</h1>
+          @if (invite(); as info) {
+            <p class="muted">Set a password to accept the invite. It expires {{ info.expiresAt | date: 'yyyy-MM-dd HH:mm' }}.</p>
+          }
+
+          <label class="field">
+            <span>Email</span>
+            <input
+              type="email"
+              name="email"
+              autocomplete="username"
+              [value]="email()"
+              [readOnly]="emailLocked()"
+              (input)="email.set($any($event.target).value)"
+              [attr.aria-invalid]="fieldErrors().email ? true : null"
+            />
+            @if (fieldErrors().email; as message) {
+              <small class="field-error">{{ message }}</small>
+            }
+          </label>
+
+          <label class="field">
+            <span>Password (at least 10 characters)</span>
+            <input
+              type="password"
+              name="password"
+              autocomplete="new-password"
+              [value]="password()"
+              (input)="password.set($any($event.target).value)"
+              [attr.aria-invalid]="fieldErrors().password ? true : null"
+            />
+            @if (fieldErrors().password; as message) {
+              <small class="field-error">{{ message }}</small>
+            }
+          </label>
+
+          <label class="field">
+            <span>Repeat password</span>
+            <input
+              type="password"
+              name="confirm"
+              autocomplete="new-password"
+              [value]="confirm()"
+              (input)="confirm.set($any($event.target).value)"
+              [attr.aria-invalid]="fieldErrors().confirm ? true : null"
+            />
+            @if (fieldErrors().confirm; as message) {
+              <small class="field-error">{{ message }}</small>
+            }
+          </label>
+
+          @if (error(); as message) {
+            <p class="form-error" role="alert">{{ message }}</p>
+          }
+
+          <button type="submit" [disabled]="busy()">{{ busy() ? 'Creating account…' : 'Create account' }}</button>
+        </form>
+      }
+    }
+  </section>
+</main>

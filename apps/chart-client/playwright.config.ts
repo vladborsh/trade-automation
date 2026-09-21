@@ -1,4 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { CLIENT_PORT, DEEP_HISTORY_MOCK_PORT, MOCK_PORT, TAIL_GAP_MOCK_PORT } from './e2e/ports';
+
+// Ports are overridable per worktree (E2E_CLIENT_PORT, E2E_MOCK_PORT) — see e2e/ports.ts.
 
 export default defineConfig({
   testDir: './e2e',
@@ -6,17 +9,19 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: `http://localhost:${CLIENT_PORT}`,
   },
   webServer: [
     {
       command: 'npx tsx mock-server/server.ts',
-      port: 4300,
+      port: MOCK_PORT,
       // architecture/economic-calendar.md §7.2's synthetic notification defaults to a
       // dev-friendly "every few minutes" cadence; e2e needs the first one to land well
       // inside a single test's timeout, so it's sped up here only, the same way the
       // :4301 instance below overrides history depth for its own scenario.
       env: {
+        MOCK_SERVER_PORT: String(MOCK_PORT),
+        MOCK_APP_BASE_URL: `http://localhost:${CLIENT_PORT}`, // invite links point at this client
         MOCK_CALENDAR_NOTIFICATION_FIRST_DELAY_MS: '1000',
         MOCK_CALENDAR_NOTIFICATION_INTERVAL_MS: '10000',
       },
@@ -32,9 +37,9 @@ export default defineConfig({
     // page.route, never the shared public/config.json file.
     {
       command: 'npx tsx mock-server/server.ts',
-      port: 4301,
+      port: DEEP_HISTORY_MOCK_PORT,
       env: {
-        MOCK_SERVER_PORT: '4301',
+        MOCK_SERVER_PORT: String(DEEP_HISTORY_MOCK_PORT),
         MOCK_DEEP_HISTORY_INSTRUMENT: 'binance:BTCUSDT',
         MOCK_DEEP_HISTORY_MINUTES: '8000', // 1600 5m bars, sliced to HISTORY_LIMIT=1500
       },
@@ -48,9 +53,9 @@ export default defineConfig({
     // genuinely earlier than the driver's, not just when every panel's data is current.
     {
       command: 'npx tsx mock-server/server.ts',
-      port: 4302,
+      port: TAIL_GAP_MOCK_PORT,
       env: {
-        MOCK_SERVER_PORT: '4302',
+        MOCK_SERVER_PORT: String(TAIL_GAP_MOCK_PORT),
         MOCK_TAIL_GAP_INSTRUMENT: 'capitalcom:DXY-MOCK',
         MOCK_TAIL_GAP_MINUTES: '240',
       },
@@ -58,8 +63,8 @@ export default defineConfig({
       timeout: 20_000,
     },
     {
-      command: 'npx ng serve --port 4200',
-      port: 4200,
+      command: `npx ng serve --port ${CLIENT_PORT}`,
+      port: CLIENT_PORT,
       reuseExistingServer: !process.env['CI'],
       timeout: 60_000,
     },

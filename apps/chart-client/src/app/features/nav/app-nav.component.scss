@@ -1,0 +1,38 @@
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #30363d;
+  font-size: 13px;
+}
+.brand {
+  font-weight: 600;
+  color: #c9d1d9;
+}
+a {
+  color: #8b949e;
+  text-decoration: none;
+}
+a:hover,
+a.active {
+  color: #c9d1d9;
+}
+.spacer {
+  flex: 1;
+}
+.who {
+  color: #8b949e;
+}
+button {
+  background: transparent;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover {
+  border-color: #8b949e;
+}

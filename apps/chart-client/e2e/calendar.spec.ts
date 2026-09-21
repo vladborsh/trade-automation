@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * architecture/economic-calendar.md §10 SE-CAL-2's e2e proof: boots on the
@@ -32,7 +32,7 @@ test('boots on the charts view, shows a toast from the mock notification frame, 
   page,
 }) => {
   await showEverything(page);
-  await page.goto('/');
+  await page.goto('/terminal');
 
   // Default view: the panel grid, not the calendar table.
   await expect(page.locator('app-panel-grid')).toBeVisible();
@@ -53,7 +53,7 @@ test('boots on the charts view, shows a toast from the mock notification frame, 
 });
 
 test('the "c" key toggles between the charts and calendar views', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/terminal');
   await expect(page.locator('app-panel-grid')).toBeVisible();
 
   await page.keyboard.press('c');
@@ -65,7 +65,9 @@ test('the "c" key toggles between the charts and calendar views', async ({ page 
 });
 
 test('calendar filters persist across a page reload', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/terminal');
+  // The shell's `c` listener exists only once the guarded, lazy /terminal route has rendered.
+  await expect(page.locator('app-panel-grid')).toBeVisible();
   await page.keyboard.press('c');
   await expect(page.locator('[data-testid="calendar-week"]')).toBeVisible();
 
@@ -89,7 +91,9 @@ test('calendar filters persist across a page reload', async ({ page }) => {
 });
 
 test('sound alerts: the toggle arms audio; after a reload the bell shows unarmed until the first click', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/terminal');
+  // The shell's `c` listener exists only once the guarded, lazy /terminal route has rendered.
+  await expect(page.locator('app-panel-grid')).toBeVisible();
   await page.keyboard.press('c');
   const toggle = page.locator('[data-testid="sound-alerts"]');
   await toggle.check();

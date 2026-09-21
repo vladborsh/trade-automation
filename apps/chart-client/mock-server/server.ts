@@ -21,6 +21,7 @@ import { MOCK_LAYOUTS } from './layouts';
 import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
 import { MockCalendarState } from './calendar-state';
 import type { CalendarServerFrame } from './calendar-types';
+import { MockAuthState, isPublicPath, unauthenticated } from './auth';
 
 const PORT = Number(process.env.MOCK_SERVER_PORT ?? 4300);
 const BAR_MS = Number(process.env.MOCK_BAR_MS ?? 2000);
@@ -32,15 +33,28 @@ const state = new MockMarketState(BAR_MS);
 const calendarNotificationIntervalMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_INTERVAL_MS ?? 180_000);
 const calendarNotificationFirstDelayMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_FIRST_DELAY_MS ?? 20_000);
 const calendarState = new MockCalendarState(Date.now(), calendarNotificationIntervalMs, calendarNotificationFirstDelayMs);
+const authState = new MockAuthState(process.env.MOCK_APP_BASE_URL ?? 'http://localhost:4200');
 
-function setCors(res: ServerResponse): void {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+/**
+ * The client sends `credentials: 'include'` (backtest-app-system-design.md §7.1), and a
+ * credentialed request is refused by the browser unless the response names the exact origin
+ * (never `*`) and allows credentials.
+ */
+function setCors(req: IncomingMessage, res: ServerResponse): void {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  setCors(res);
+  setCors(res.req, res);
+  if (status === 204) {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
 }
@@ -122,15 +136,24 @@ function healthResponse(): HealthResponse {
   };
 }
 
-function handleRequest(req: IncomingMessage, res: ServerResponse): void {
+async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method === 'OPTIONS') {
-    setCors(res);
+    setCors(req, res);
     res.writeHead(204);
     res.end();
     return;
   }
 
   const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
+
+  if (await authState.handle(req, res, url.pathname, sendJson)) {
+    return;
+  }
+  // §7.1: every existing data route becomes "auth" — the whole app sits behind login.
+  if (!isPublicPath(req.method ?? 'GET', url.pathname) && !authState.currentUser(req)) {
+    unauthenticated(sendJson, res);
+    return;
+  }
 
   if (req.method !== 'GET') {
     sendJson(res, 405, { error: 'method not allowed' });
@@ -255,7 +278,12 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
   sendJson(res, 404, { error: 'not found' });
 }
 
-const httpServer = createServer(handleRequest);
+const httpServer = createServer((req, res) => {
+  handleRequest(req, res).catch((err: unknown) => {
+    console.error('[mock-server] request failed', err);
+    if (!res.headersSent) sendJson(res, 500, { error: 'internal error' });
+  });
+});
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
 interface MetricTopicKey {
