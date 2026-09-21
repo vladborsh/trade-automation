@@ -44,4 +44,17 @@ describe('ReplayToolbarComponent', () => {
     expect(el.querySelector('[data-testid="replay-end"]')).not.toBeNull();
     expect(el.querySelector('[role="alert"]')?.textContent).toBe('HTTP 503');
   });
+
+  it('a completed session says so and cannot be stepped or switched', () => {
+    const { el } = render({ completed: true });
+    expect(el.querySelector('[data-testid="replay-completed"]')?.textContent).toBe('completed');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-step"]')!.disabled).toBe(true);
+    expect([...el.querySelectorAll<HTMLButtonElement>('.tf-btn')].every((b) => b.disabled)).toBe(true);
+  });
+
+  it('shows retrying and a one-line notice', () => {
+    const { el } = render({ retrying: true, notice: 'Resynced with the server.' });
+    expect(el.querySelector('[data-testid="replay-retrying"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="replay-notice"]')?.textContent).toBe('Resynced with the server.');
+  });
 });

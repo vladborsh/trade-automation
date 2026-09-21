@@ -1,9 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import type {
+  AdvanceRequest,
+  AdvanceResult,
   AheadResponse,
   BacktestInstrumentsResponse,
+  CancelRequest,
+  CloseRequest,
+  CloseResponse,
   CreateSessionRequest,
+  ModifyOrderRequest,
+  Order,
   PatchSessionRequest,
+  PlaceOrderRequest,
+  PlaceOrderResponse,
   ReplayHistoryResponse,
   Session,
   SessionDetail,
@@ -59,8 +68,38 @@ export class BacktestClient {
     });
   }
 
+  // --- mutations (§5.5, §7.2): each body carries its opId; the AdvanceQueue builds them once --------
+
+  advance(id: string, body: AdvanceRequest): Promise<AdvanceResult> {
+    return this.rest.send('POST', `${sessionPath(id)}/advance`, { body });
+  }
+
+  placeOrder(id: string, body: PlaceOrderRequest): Promise<PlaceOrderResponse> {
+    return this.rest.send('POST', `${sessionPath(id)}/orders`, { body });
+  }
+
+  cancelOrder(id: string, orderId: string, body: CancelRequest): Promise<Order> {
+    return this.rest.send('POST', `${orderPath(id, orderId)}/cancel`, { body });
+  }
+
+  closeOrder(id: string, orderId: string, body: CloseRequest): Promise<CloseResponse> {
+    return this.rest.send('POST', `${orderPath(id, orderId)}/close`, { body });
+  }
+
+  modifyOrder(id: string, orderId: string, body: ModifyOrderRequest): Promise<Order> {
+    return this.rest.send('PATCH', orderPath(id, orderId), { body });
+  }
+
   /** Irreversible: the session, its orders and its screenshots (§3, decision 30b). */
   deleteSession(id: string): Promise<void> {
     return this.rest.send('DELETE', `/backtest/sessions/${encodeURIComponent(id)}`);
   }
+}
+
+function sessionPath(id: string): string {
+  return `/backtest/sessions/${encodeURIComponent(id)}`;
+}
+
+function orderPath(id: string, orderId: string): string {
+  return `${sessionPath(id)}/orders/${encodeURIComponent(orderId)}`;
 }

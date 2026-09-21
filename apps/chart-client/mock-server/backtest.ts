@@ -30,6 +30,10 @@ import { replayAhead, replayHistory } from './replay-tape';
  *   capitalcom:US100  USD  no stored 1m (coverage null)
  * Sessions are per user id; the mock holds no orders, so every session is empty.
  * Replay candles (`…/candles`, `…/candles/ahead`) come from the deterministic tape in replay-tape.ts.
+ * `POST …/advance` moves the stored cursor like the real one (T-017 + BUG-004): minute-aligned or
+ * 400, backwards 409 CURSOR_BACKWARDS, clamped to the period end where the session completes,
+ * then 409 SESSION_COMPLETE; the same opId with the same body replays, with another body 409s.
+ * No orders exist in the mock, so an advance never fills anything.
  */
 
 const MIN = 60_000;
@@ -63,6 +67,8 @@ function toSession(s: SessionSummary): Session {
 
 export class MockBacktestState {
   private readonly sessions = new Map<string, { userId: string; summary: SessionSummary }>();
+  /** `${sessionId}:${opId}` → the request body as sent and the stored response (D9, BUG-004). */
+  private readonly ops = new Map<string, { body: string; status: number; response: unknown }>();
 
   /** Handles `/api/backtest/*` for a signed-in user; false when the path is not one of these. */
   async handle(req: IncomingMessage, res: ServerResponse, pathname: string, send: SendJson, userId: string): Promise<boolean> {
@@ -92,6 +98,17 @@ export class MockBacktestState {
         return true;
       }
       this.candles(res, send, session, new URL(req.url ?? '/', 'http://mock').searchParams, candles[2] !== undefined);
+      return true;
+    }
+    const advance = /^\/api\/backtest\/sessions\/([^/]+)\/advance$/.exec(pathname);
+    if (advance && method === 'POST') {
+      const own = UUID.test(advance[1]) ? this.sessions.get(advance[1]) : undefined;
+      const session = own && own.userId === userId ? own.summary : null;
+      if (!session) {
+        send(res, 404, { statusCode: 404, message: 'Session not found.' });
+        return true;
+      }
+      this.advance(res, send, session, await readJsonBody(req));
       return true;
     }
     const match = /^\/api\/backtest\/sessions\/([^/]+)$/.exec(pathname);
@@ -169,6 +186,37 @@ export class MockBacktestState {
     const before = Number(q.get('before'));
     if (before > session.cursorMs) return fail(send, res, 422, 'FUTURE_REQUESTED', 'History is served only up to the session cursor.');
     send(res, 200, replayHistory(panel.instrument, coverage, tf, before, Math.min(Number(q.get('limit') ?? 1500), 1500)));
+  }
+
+  private advance(res: ServerResponse, send: SendJson, session: SessionSummary, body: Record<string, unknown> | null): void {
+    const opId = typeof body?.['opId'] === 'string' ? body['opId'] : '';
+    const target = body?.['toCursorMs'];
+    if (!UUID.test(opId) || typeof target !== 'number' || !Number.isInteger(target) || target < 0) {
+      send(res, 400, { statusCode: 400, message: 'Bad Request' });
+      return;
+    }
+    const key = `${session.id}:${opId}`;
+    const fingerprint = JSON.stringify({ opId, toCursorMs: target });
+    const seen = this.ops.get(key);
+    if (seen) {
+      if (seen.body === fingerprint) send(res, seen.status, seen.response);
+      else send(res, 409, { statusCode: 409, message: 'opId already used for a different request' });
+      return;
+    }
+    const answer = (status: number, response: unknown) => {
+      this.ops.set(key, { body: fingerprint, status, response });
+      send(res, status, response);
+    };
+    if (session.status === 'complete') return answer(409, { error: { code: 'SESSION_COMPLETE', message: 'The session is complete.' } });
+    if (target % MIN !== 0) return answer(400, { statusCode: 400, message: 'toCursorMs must be on a minute boundary.' });
+    if (target < session.cursorMs) {
+      return answer(409, { error: { code: 'CURSOR_BACKWARDS', message: `toCursorMs ${target} is before the cursor ${session.cursorMs}.` } });
+    }
+    const to = Math.min(target, session.periodToMs);
+    const now = Date.now();
+    Object.assign(session, { cursorMs: to, updatedAt: now });
+    if (to === session.periodToMs) Object.assign(session, { status: 'complete', completedAt: now });
+    answer(200, { cursorMs: to, status: session.status, balance: session.balance, events: [], orders: [], stats: emptyStats(session) });
   }
 
   private patch(res: ServerResponse, send: SendJson, session: SessionSummary, body: Record<string, unknown> | null): void {

@@ -6,7 +6,15 @@
 
   <div class="tf-picker" role="group" aria-label="Timeframe">
     @for (tf of timeframes; track tf) {
-      <button type="button" class="tf-btn" [class.active]="tf === timeframe()" (click)="timeframeChange.emit(tf)">{{ tf }}</button>
+      <button
+        type="button"
+        class="tf-btn"
+        [class.active]="tf === timeframe()"
+        [disabled]="completed()"
+        (click)="timeframeChange.emit(tf)"
+      >
+        {{ tf }}
+      </button>
     }
   </div>
 
@@ -14,20 +22,28 @@
     type="button"
     class="step"
     data-testid="replay-step"
-    [disabled]="loading() || atEnd()"
+    [disabled]="loading() || atEnd() || completed()"
     title="Step forward one bar (→)"
     (click)="step.emit()"
   >
     Step &#x2192;
   </button>
 
-  @if (loading()) {
+  @if (completed()) {
+    <span class="status completed" data-testid="replay-completed">completed</span>
+  } @else if (loading()) {
     <span class="status loading" data-testid="replay-loading" role="status">loading…</span>
   } @else if (atEnd()) {
     <span class="status" data-testid="replay-end">end of period</span>
   }
+  @if (retrying()) {
+    <span class="status retrying" data-testid="replay-retrying" role="status">saving… retrying</span>
+  }
 
   <span class="spacer"></span>
+  @if (notice(); as message) {
+    <span class="notice" data-testid="replay-notice" role="status">{{ message }}</span>
+  }
   @if (error(); as message) {
     <span class="error" role="alert">{{ message }}</span>
   }

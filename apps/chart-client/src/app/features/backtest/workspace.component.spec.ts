@@ -29,6 +29,7 @@ function fakeStore() {
     timeframe: signal<Timeframe>('5m'),
     blocked: signal(false),
     atEnd: signal(false),
+    completed: signal(false),
     error: signal<string | null>(null),
     step: vi.fn().mockResolvedValue(undefined),
     setTimeframe: vi.fn().mockResolvedValue(undefined),
@@ -37,6 +38,8 @@ function fakeStore() {
     session: signal<Session | null>(null),
     engine: signal<typeof engine | null>(null),
     loadError: signal<string | null>(null),
+    retrying: signal(false),
+    notice: signal<string | null>(null),
     sources: signal(new Map()),
     open: vi.fn(async () => {
       store.session.set(SESSION);
@@ -94,6 +97,17 @@ describe('WorkspaceComponent', () => {
     press('[');
     expect(engine.step).toHaveBeenCalledTimes(1);
     expect(engine.setTimeframe.mock.calls).toEqual([['15m'], ['1m']]);
+  });
+
+  it('keys are inert once the session is complete', async () => {
+    const { engine, fixture, el } = await render();
+    engine.completed.set(true);
+    fixture.detectChanges();
+    press('ArrowRight');
+    press(']');
+    expect(engine.step).not.toHaveBeenCalled();
+    expect(engine.setTimeframe).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="replay-completed"]')).not.toBeNull();
   });
 
   it('ignores the hotkeys while typing', async () => {

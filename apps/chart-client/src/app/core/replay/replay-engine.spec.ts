@@ -201,6 +201,39 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(e.seriesFor('btc')().closed[0].openTime).toBe(oldest);
   });
 
+  it('reports every step, uses the confirmed server cursor for history, and locks once complete', async () => {
+    const api = fakeServer({ serverCursor: at(18, 22, 0) });
+    const stepped: number[] = [];
+    const e = new ReplayEngine(api, {
+      panels: PANELS, cursorMs: at(18, 21, 40), serverCursorMs: at(18, 21, 40), timeframe: '5m',
+      periodToMs: PERIOD_TO, skipWeekends: true, onStep: (c) => stepped.push(c),
+    });
+    await e.start();
+    await stepN(e, 4);
+    expect(stepped).toEqual([45, 50, 55, 60].map((m) => at(18, 21, 0) + m * M));
+
+    e.confirmServerCursor(at(18, 22, 0)); // the advances came back
+    await e.setTimeframe('15m');
+    expect(api.history.mock.calls.at(-1)?.[2]).toBe(at(18, 22, 0)); // anchor = 22:00, not 21:30
+    e.confirmServerCursor(at(18, 21, 0)); // never moves backwards
+    await e.setTimeframe('1h');
+    expect(e.error()).toBeNull();
+
+    e.complete();
+    await e.step();
+    await e.setTimeframe('5m');
+    expect(e.cursor()).toBe(at(18, 22, 0));
+    expect(e.timeframe()).toBe('1h');
+    expect(stepped).toHaveLength(4);
+  });
+
+  it('a session loaded as complete is locked from the start', async () => {
+    const e = new ReplayEngine(fakeServer(), {
+      panels: PANELS, cursorMs: PERIOD_TO, serverCursorMs: PERIOD_TO, timeframe: '5m', periodToMs: PERIOD_TO, skipWeekends: true, completed: true,
+    });
+    expect(e.completed()).toBe(true);
+  });
+
   it('reports a failed request instead of throwing, and leaves the cursor where it was', async () => {
     const api = fakeServer();
     const e = engine(api, at(18, 21, 40));

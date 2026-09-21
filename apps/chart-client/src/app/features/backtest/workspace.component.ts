@@ -51,7 +51,7 @@ export class WorkspaceComponent {
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
     const engine = this.engine();
-    const action = engine ? replayKeyAction(event) : null;
+    const action = engine && !engine.completed() ? replayKeyAction(event) : null;
     if (!engine || !action) return;
     event.preventDefault(); // → would otherwise scroll the page
     if (action === 'step') this.step();

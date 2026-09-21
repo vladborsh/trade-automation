@@ -25,6 +25,12 @@ export class ReplayToolbarComponent {
   /** A step or a switch is waiting for candles. */
   readonly loading = input(false);
   readonly atEnd = input(false);
+  /** The server has completed the session: nothing can be stepped or switched (decision 28). */
+  readonly completed = input(false);
+  /** A request to the server is being retried after a network failure. */
+  readonly retrying = input(false);
+  /** A one-line message: resynced, reloaded from the server, … */
+  readonly notice = input<string | null>(null);
   readonly error = input<string | null>(null);
 
   readonly step = output<void>();

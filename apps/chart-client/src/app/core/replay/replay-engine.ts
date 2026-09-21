@@ -18,9 +18,13 @@ export interface ReplayEngineConfig {
   cursorMs: number;
   /**
    * The cursor the server has stored for the session — history is served only up to it (422
-   * FUTURE_REQUESTED). The session's cursor at load; TODO(T-021): updated from each advance.
+   * FUTURE_REQUESTED). The session's cursor at load, then `confirmServerCursor()` per advance.
    */
   serverCursorMs: number;
+  /** The session is already complete: nothing can be stepped or switched. */
+  completed?: boolean;
+  /** Called after every step with the new cursor — the workspace queues it for the server (T-021). */
+  onStep?: (cursorMs: number) => void;
   timeframe: Timeframe;
   periodToMs: number;
   skipWeekends: boolean;
@@ -59,6 +63,8 @@ export class ReplayEngine {
   /** The cursor has reached the end of the period. */
   readonly atEnd = signal(false);
   readonly error = signal<string | null>(null);
+  /** The server has completed the session: stepping and switching are inert (decision 28). */
+  readonly completed = signal(false);
 
   private readonly tapes: PanelTape[];
   private busy = false;
@@ -70,6 +76,7 @@ export class ReplayEngine {
   ) {
     this.cursor.set(config.cursorMs);
     this.serverCursor = config.serverCursorMs;
+    this.completed.set(config.completed ?? false);
     this.timeframe.set(config.timeframe);
     this.atEnd.set(config.cursorMs >= config.periodToMs);
     this.tapes = config.panels.map((panel) => ({
@@ -103,9 +110,19 @@ export class ReplayEngine {
     this.refillAll();
   }
 
+  /** An advance response: the server's cursor, which history requests may not pass. */
+  confirmServerCursor(ms: number): void {
+    this.serverCursor = Math.max(this.serverCursor, ms);
+  }
+
+  /** The server says the session is complete. */
+  complete(): void {
+    this.completed.set(true);
+  }
+
   /** `→`: ignored while a step or a switch is in flight — the key is blocked, never queued. */
   async step(): Promise<void> {
-    if (this.atEnd()) return;
+    if (this.atEnd() || this.completed()) return;
     await this.exclusive(async () => {
       for (;;) {
         try {
@@ -129,7 +146,7 @@ export class ReplayEngine {
    * boundary at or before the server cursor, and the 1m from there folded with `foldOneMinute`.
    */
   async setTimeframe(tf: Timeframe): Promise<void> {
-    if (tf === this.timeframe()) return;
+    if (tf === this.timeframe() || this.completed()) return;
     await this.exclusive(async () => {
       this.blocked.set(true);
       const cursor = this.cursor();
@@ -194,6 +211,7 @@ export class ReplayEngine {
     }
     this.cursor.set(next);
     this.atEnd.set(next >= this.config.periodToMs);
+    this.config.onStep?.(next);
   }
 
   private async loadHistory(t: PanelTape, tf: Timeframe): Promise<void> {

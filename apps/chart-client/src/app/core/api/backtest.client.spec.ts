@@ -51,6 +51,24 @@ describe('BacktestClient (backtest-app-system-design.md §7.2)', () => {
     );
   });
 
+  it('sends the five mutations to their §7.2 paths with the body as given (T-021)', async () => {
+    const { client, fetchMock } = setup(jsonResponse(200, {}));
+    const body = { opId: '00000000-0000-4000-8000-000000000001', cursorMs: 60_000 };
+    await client.advance('s1', { opId: body.opId, toCursorMs: 120_000 });
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/advance`, expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ opId: body.opId, toCursorMs: 120_000 }),
+    }));
+    await client.placeOrder('s1', { ...body, panelId: 'btc', side: 'long', type: 'market', sl: 90, riskPct: 1 });
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders`, expect.objectContaining({ method: 'POST' }));
+    await client.cancelOrder('s1', 'o1', body);
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders/o1/cancel`, expect.objectContaining({ method: 'POST' }));
+    await client.closeOrder('s1', 'o1', body);
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders/o1/close`, expect.objectContaining({ method: 'POST' }));
+    await client.modifyOrder('s1', 'o1', { ...body, sl: 95 });
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s1/orders/o1`, expect.objectContaining({ method: 'PATCH' }));
+  });
+
   it('POSTs a create body as JSON', async () => {
     const { client, fetchMock } = setup(jsonResponse(201, { id: 's1' }));
     await client.createSession({ name: 'x' } as never);

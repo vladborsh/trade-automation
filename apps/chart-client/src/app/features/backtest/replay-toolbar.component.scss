@@ -52,6 +52,20 @@
 .status {
   color: #8b949e;
 }
+.status.completed {
+  color: #26a69a;
+  font-weight: 600;
+}
+.status.retrying {
+  color: #ef5350;
+}
+.tf-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.notice {
+  color: #c9d1d9;
+}
 .spacer {
   flex: 1;
 }
