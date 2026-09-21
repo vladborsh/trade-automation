@@ -1,6 +1,26 @@
 # Local dev: file-backed storage, ReplayAdapter fixtures (no venue credentials needed).
 # architecture/live-signal-server.md §9.1.
+# architecture/backtest-app-system-design.md §4 — one Postgres instance serves every worktree
+# slot; each slot points DATABASE_URL at its own database name (backtest_coord, backtest_dev1,
+# backtest_dev2, backtest_dev3, backtest_tester) on this one server. podman-compose compatible
+# (plain `image`/`ports`/`volumes`/`environment` keys only, no Docker-only extensions).
 services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: backtest
+      POSTGRES_PASSWORD: backtest
+      POSTGRES_DB: backtest
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U backtest"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   signal-server:
     build:
       context: ../..
@@ -23,5 +43,10 @@ services:
       METRIC_POLL_INTERVAL_MS: "60000"
       # architecture/economic-calendar.md §8 — economic calendar module (ForexFactory feed).
       CALENDAR_ENABLED: "true"
+      # No default (§12.8): left unset here on purpose. Set explicitly per slot, e.g.
+      # postgresql://backtest:backtest@postgres:5432/backtest_coord — never share a database
+      # name across slots.
+      # DATABASE_URL: postgresql://backtest:backtest@postgres:5432/<slot-database>
+      DB_MIGRATE_ON_BOOT: "true"
     volumes:
       - ./data:/workspace/apps/signal-server/data
