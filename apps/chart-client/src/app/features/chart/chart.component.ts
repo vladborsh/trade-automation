@@ -18,7 +18,6 @@ import {
   ColorType,
   type IChartApi,
   type ISeriesApi,
-  type UTCTimestamp,
 } from 'lightweight-charts';
 import { createChart } from 'lightweight-charts';
 import type {
@@ -40,6 +39,7 @@ import { RayRenderer } from './overlay/ray.renderer';
 import { LineRenderer } from './overlay/line.renderer';
 import { ShapesPrimitive } from './overlay/shapes.primitive';
 import { IndicatorLayer } from './indicator/indicator-layer';
+import { ChartCrosshair } from './chart-crosshair';
 import { ChartSyncService, sameRange, type TimeRange } from './chart-sync.service';
 import { ResizeSettleTracker, observeResize } from './resize-settle';
 import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart-time';
@@ -94,9 +94,21 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly indicatorSeriesCount = signal(0);
   readonly visibleFrom = signal<number | null>(null);
   readonly visibleTo = signal<number | null>(null);
-  readonly crosshairTime = signal<number | null>(null);
 
   private readonly sync = inject(ChartSyncService);
+  private readonly crosshair = new ChartCrosshair(
+    {
+      chart: () => this.chart,
+      series: () => this.series,
+      panelId: () => this.panelId(),
+      timesSec: () => this.lastTimesSec,
+      tfSec: () => this.tfSec(),
+      valueAt: (idx) =>
+        this.kind() === 'candles' ? this.candles()[idx]?.close : metricPlottedClose(this.points()[idx]),
+    },
+    this.sync,
+  );
+  readonly crosshairTime = this.crosshair.time;
 
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
@@ -194,34 +206,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       // signals, both still null on this effect's first run in the constructor, before
       // ngAfterViewInit) must never gate the read of `sync.crosshair()` itself.
       const cross = this.sync.crosshair();
-      if (!this.chart || !this.series) {
-        return;
-      }
-      if (!cross) {
-        this.chart.clearCrosshairPosition();
-        this.crosshairTime.set(null);
-        return;
-      }
-      if (cross.origin === this.panelId()) {
-        // The driver keeps its own native crosshair (and already cleared its own
-        // `crosshairTime` directly from its Drive handler on leave); only followers write here.
-        return;
-      }
-      const timesSec = this.lastTimesSec;
-      if (timesSec.length === 0) {
-        return;
-      }
-      const idx = nearestBarIndexByTime(cross.timeSec, timesSec);
-      // Known limitation, accepted for v1 (see design doc point 6): this snaps to the nearest
-      // bar via lightweight-charts' own timeToIndex(findNearest=true), so a follower with no
-      // bar at this exact instant (dxy over a weekend, an OI panel before its first point)
-      // draws on its nearest bar, not at the exact wall-clock x.
-      const value = this.kind() === 'candles' ? this.candles()[idx]?.close : metricPlottedClose(this.points()[idx]);
-      if (value === undefined) {
-        return;
-      }
-      this.chart.setCrosshairPosition(value, timesSec[idx] as UTCTimestamp, this.series);
-      this.crosshairTime.set(timesSec[idx]);
+      this.crosshair.follow(cross);
     });
   }
 
@@ -311,52 +296,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       this.sync.propose(this.panelId(), proposed, eps);
     });
 
-    // Drive, crosshair (bug 1, design point 2 + loop-prevention layer 2): hovering this panel
-    // publishes the hovered wall-clock instant on the shared crosshair channel. Three
-    // loop-prevention layers, per the design doc:
-    //   1. By construction: lightweight-charts does not fire subscribeCrosshairMove for a
-    //      programmatic setCrosshairPosition (setAndSaveSyntheticPosition passes
-    //      skipEvent=true internally, verified in the 5.2.1 source) — a follower applying a
-    //      position produces no event at all, so there is no echo to guard against.
-    //   2. Explicit, here: only propose when `param.sourceEvent` is defined — undefined for
-    //      anything programmatic — so a future library version that starts firing on synthetic
-    //      positions still can't turn this into a two-way channel.
-    //   3. Origin skip, in the Follow effect above: a follower never writes back regardless.
-    this.chart.subscribeCrosshairMove((param) => {
-      if (param.point === undefined) {
-        // Mouse left the pane. Checked BEFORE the `sourceEvent` guard below: a genuine
-        // mouse-leave calls the library's internal clear path with no event data at all
-        // (verified in the 5.2.1 source — `_private__clearCrosshairPosition()` fires
-        // `_crosshairMoved` with `(null, null, null)`, so `sourceEvent` is undefined here even
-        // for a REAL leave), unlike a real move within the pane. That's harmless to gate on
-        // `param.point` alone instead: per loop-prevention layer 1, the library never invokes
-        // this callback AT ALL for a synthetic position (`setCrosshairPosition`/
-        // `clearCrosshairPosition` both pass `skipEvent: true` internally) — so every call that
-        // reaches here, leave included, is already a real user event, `sourceEvent` field or not.
-        this.crosshairTime.set(null);
-        this.sync.setCrosshair(this.panelId(), null);
-        return;
-      }
-      if (param.sourceEvent === undefined) {
-        // Defense-in-depth (loop-prevention layer 2): a hover WITH a point is only ever real
-        // today (layer 1), but if a future library version starts firing this for a synthetic
-        // position that carries a point, this keeps the channel one-directional.
-        return;
-      }
-      if (param.logical === undefined) {
-        return;
-      }
-      const timesSec = this.lastTimesSec;
-      if (timesSec.length === 0) {
-        return;
-      }
-      // `param.logical` (not `param.time`) so hovering the void (past the last/before the
-      // first bar) still syncs at the right wall-clock instant — `param.time` is undefined
-      // there, but `param.logical` is defined everywhere on the pane.
-      const timeSec = logicalToTimeSec(param.logical, timesSec, this.tfSec());
-      this.crosshairTime.set(timeSec);
-      this.sync.setCrosshair(this.panelId(), timeSec);
-    });
+    // Drive, crosshair: see ChartCrosshair.drive for the loop-prevention layers.
+    this.chart.subscribeCrosshairMove((param) => this.crosshair.drive(param));
 
     // re-run pending effects now that chart/series exist
     if (isCandles) {
