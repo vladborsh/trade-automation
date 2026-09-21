@@ -1,4 +1,4 @@
-import { Candle, CompactCandleTuple, Coverage, TIMEFRAME_MS, Timeframe } from '@trade-automation/contracts';
+import { Candle, CompactCandleTuple, TIMEFRAME_MS, Timeframe } from '@trade-automation/contracts';
 
 /**
  * architecture/backtest-app-system-design.md §5.1, §5.3, §7.2 — the pure arithmetic behind the
@@ -34,20 +34,24 @@ export interface Range {
 }
 
 /**
- * The parts of `window` the persisted `tf` does not cover, which must be folded from 1m. "Not
- * covered" means before the first or after the last persisted bar. A hole *inside* the persisted
- * span is a real gap in the tape (the derive job fills every hole it has 1m for, T-012), so it is
- * not folded. The persisted span is `[coverage.from, coverage.to + tfMs)`. With no persisted
- * coverage at all, the whole window is folded. Returned ranges are `tf`-aligned when the window is.
+ * The holes in `window` the persisted `tf` bars leave: before the first bar, between two bars
+ * more than `tfMs` apart, and after the last bar; the whole window when it holds none. Each hole
+ * is a candidate for folding from 1m. Whether it is a real gap in the tape (a weekend, a market
+ * close) or bars the derive job has not written yet is decided by whether 1m exists there,
+ * which is the caller's I/O. `persistedOpenTimes` must be ascending and inside the window.
+ * Holes are `tf`-aligned when the window is.
  */
-export function rangesToFold(window: Range, persisted: Coverage | null, tf: Timeframe): Range[] {
+export function holesToFold(window: Range, persistedOpenTimes: readonly number[], tf: Timeframe): Range[] {
   if (window.from >= window.to) return [];
-  if (!persisted) return [window];
-  const persistedTo = persisted.to + TIMEFRAME_MS[tf];
-  const out: Range[] = [];
-  if (window.from < persisted.from) out.push({ from: window.from, to: Math.min(window.to, persisted.from) });
-  if (window.to > persistedTo) out.push({ from: Math.max(window.from, persistedTo), to: window.to });
-  return out;
+  const tfMs = TIMEFRAME_MS[tf];
+  const holes: Range[] = [];
+  let expected = window.from; // open of the next bar we would expect to see
+  for (const openTime of persistedOpenTimes) {
+    if (openTime > expected) holes.push({ from: expected, to: openTime });
+    expected = Math.max(expected, openTime + tfMs);
+  }
+  if (expected < window.to) holes.push({ from: expected, to: window.to });
+  return holes;
 }
 
 /**

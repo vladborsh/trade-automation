@@ -86,7 +86,7 @@ describe('ReplayHistoryService (backtest-app-system-design.md §5.1, §7.2)', ()
       expect(bars).toEqual(foldOneMinute(tape, '1h', T0 + 4 * H).closed);
       expect(bars).toHaveLength(4);
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toMatch(/binance:BTCUSDT 1h: no persisted bars .* derive-timeframes/);
+      expect(warn.mock.calls[0][0]).toMatch(/binance:BTCUSDT 1h: 1 range\(s\) within .* had no persisted bars .* derive-timeframes/);
     });
 
     it('folds only the tail the derive job has not reached; the rest comes from the store', async () => {
@@ -102,6 +102,65 @@ describe('ReplayHistoryService (backtest-app-system-design.md §5.1, §7.2)', ()
         [T0 + 5 * H, 'fold'],
       ]);
       expect(bars.slice(3)).toEqual(foldOneMinute(oneMinuteRange(T0 + 3 * H, T0 + 6 * H), '1h', T0 + 6 * H).closed);
+    });
+
+    describe('holes inside the persisted span (T-014 review r1)', () => {
+      // persisted 1h on days 0-1 and 5-6; days 2-4 are a 3-day hole in the persisted tf
+      const persistedDays = [0, 1, 5, 6];
+      const writePersisted = () =>
+        store.upsert(persistedDays.flatMap((d) => Array.from({ length: 24 }, (_, h) => persistedBar('1h', T0 + d * DAY + h * H, 'resampled'))));
+
+      it('a hole where 1m exists is folded from 1m and warn-logged', async () => {
+        await writePersisted();
+        const hole1m = oneMinuteRange(T0 + 2 * DAY, T0 + 5 * DAY);
+        await store.upsert(hole1m);
+        const { bars } = await service.history(INSTRUMENT, '1h', T0 + 7 * DAY, 24 * 7);
+        expect(bars).toHaveLength(24 * 7);
+        expect(bars.map((b) => b.openTime)).toEqual(Array.from({ length: 24 * 7 }, (_, i) => T0 + i * H)); // contiguous
+        const inHole = bars.filter((b) => b.openTime >= T0 + 2 * DAY && b.openTime < T0 + 5 * DAY);
+        expect(inHole).toEqual(foldOneMinute(hole1m, '1h', T0 + 5 * DAY).closed);
+        expect(bars.filter((b) => b.volume === 7)).toHaveLength(24 * 4); // the persisted days, untouched
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toMatch(/1 range\(s\) within \[2021-06-03T00:00:00.000Z, 2021-06-06T00:00:00.000Z\)/);
+      });
+
+      it('the same hole with no 1m stays a gap, with no fold', async () => {
+        await writePersisted();
+        // 1m exists outside the hole only, so the 1m coverage spans it
+        await store.upsert([...oneMinuteRange(T0, T0 + 2 * DAY), ...oneMinuteRange(T0 + 5 * DAY, T0 + 7 * DAY)]);
+        const { bars } = await service.history(INSTRUMENT, '1h', T0 + 7 * DAY, 24 * 7);
+        expect(bars).toHaveLength(24 * 4);
+        expect(bars.every((b) => b.volume === 7)).toBe(true);
+        expect(bars.some((b) => b.openTime >= T0 + 2 * DAY && b.openTime < T0 + 5 * DAY)).toBe(false);
+        expect(warn).not.toHaveBeenCalled();
+      });
+
+      it('a weekend on a Capital.com-like tape costs no fold', async () => {
+        // weekdays only: Fri 2021-06-04 and Mon 2021-06-07, 1m and derived 1h both; nothing Sat/Sun
+        const fri = Date.UTC(2021, 5, 4);
+        const mon = Date.UTC(2021, 5, 7);
+        const ndx = 'capitalcom:US100' as const;
+        const weekday1m = [...oneMinuteRange(fri, fri + DAY, ndx), ...oneMinuteRange(mon, mon + DAY, ndx)];
+        await store.upsert(weekday1m);
+        const derived = [...foldOneMinute(oneMinuteRange(fri, fri + DAY, ndx), '1h', fri + DAY).closed, ...foldOneMinute(oneMinuteRange(mon, mon + DAY, ndx), '1h', mon + DAY).closed];
+        await store.upsert(derived);
+        const query1m = jest.spyOn(store, 'query');
+
+        const { bars } = await service.history(ndx, '1h', mon + DAY, 48);
+        expect(bars).toEqual(derived);
+        expect(warn).not.toHaveBeenCalled();
+        // the only 1m reads are the weekend hole's existence checks (split across the two
+        // backward windows), each finding nothing
+        const oneMinuteReads = query1m.mock.calls.filter((c) => c[1] === '1m');
+        expect(oneMinuteReads.length).toBeGreaterThan(0);
+        for (const [, , from, to] of oneMinuteReads) {
+          expect(from).toBeGreaterThanOrEqual(fri + DAY);
+          expect(to).toBeLessThan(mon);
+        }
+        for (const r of query1m.mock.results.filter((_, i) => query1m.mock.calls[i][1] === '1m')) {
+          await expect(r.value).resolves.toEqual([]);
+        }
+      });
     });
 
     it('walks back across a gap in the tape to fill `limit`', async () => {

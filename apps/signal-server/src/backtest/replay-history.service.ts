@@ -2,16 +2,18 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Candle, InstrumentId, ReplayHistoryResponse, TIMEFRAME_MS, Timeframe } from '@trade-automation/contracts';
 import { foldOneMinute } from '@trade-automation/replay-core';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
-import { Range, closedBarsEnd, formingRange, mergeBars, rangesToFold } from './replay-window';
+import { Range, closedBarsEnd, formingRange, holesToFold, mergeBars } from './replay-window';
 
 /**
  * architecture/backtest-app-system-design.md §5.1, §7.2 — GET …/candles: the last `limit`
  * closed `tf` bars with `openTime + tfMs <= before`, plus the bar forming at `before`.
  *
  * Closed bars come from the store's persisted `tf` (venue and T-012 `resampled` bars alike).
- * Where the persisted `tf` does not reach (before its first or after its last bar) they are
- * folded on demand from 1m with replay-core's `foldOneMinute`, logged at `warn` so the derive job
- * can be run. The forming bar is always `foldOneMinute` over the 1m in its bucket, the same fold
+ * Every hole the persisted bars leave in a window (at its edges or between two bars) is checked
+ * against 1m: where 1m exists the bars are folded on demand with replay-core's `foldOneMinute`,
+ * logged at `warn` so the derive job can be run; where it does not, the hole is a real gap in the
+ * tape. A fully derived store has no holes on a 24/7 venue, so this costs nothing there; on a
+ * store the job has not processed, the history is still complete. The forming bar is always `foldOneMinute` over the 1m in its bucket, the same fold
  * the client runs (§5.4), so both sides build it bit for bit.
  *
  * The cursor guard (`before <= cursor_ms`) is the caller's; this service serves any `before`.
@@ -61,8 +63,9 @@ export class ReplayHistoryService {
       const stored = persisted ? await this.store.query(instrument, tf, windowStart, windowEnd - 1) : [];
       const fromOneMinute: Candle[] = [];
       if (tf !== '1m' && coverage1m) {
-        for (const range of rangesToFold({ from: windowStart, to: windowEnd }, persisted, tf)) {
-          if (range.to <= coverage1m.from || range.from > coverage1m.to) continue;
+        const holes = holesToFold({ from: windowStart, to: windowEnd }, stored.map((c) => c.openTime), tf);
+        for (const range of holes) {
+          if (range.to <= coverage1m.from || range.from > coverage1m.to) continue; // no 1m there at all
           const bars1m = await this.store.query(instrument, '1m', range.from, range.to - 1);
           if (bars1m.length === 0) continue;
           // Fold up to the close of the last bucket that has 1m, not up to range.to: past a gap,
@@ -84,7 +87,7 @@ export class ReplayHistoryService {
       const from = new Date(Math.min(...folded.map((r) => r.from))).toISOString();
       const to = new Date(Math.max(...folded.map((r) => r.to))).toISOString();
       this.logger.warn(
-        `${instrument} ${tf}: no persisted bars for [${from}, ${to}) — folded from 1m on demand; run the derive-timeframes job.`,
+        `${instrument} ${tf}: ${folded.length} range(s) within [${from}, ${to}) had no persisted bars — folded from 1m on demand; run the derive-timeframes job.`,
       );
     }
     return collected.slice(-limit);

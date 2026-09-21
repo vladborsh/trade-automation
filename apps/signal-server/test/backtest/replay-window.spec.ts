@@ -1,5 +1,5 @@
 import { Candle } from '@trade-automation/contracts';
-import { aheadEnd, closedBarsEnd, formingRange, mergeBars, rangesToFold, toCompactTuple } from '../../src/backtest/replay-window';
+import { aheadEnd, closedBarsEnd, formingRange, holesToFold, mergeBars, toCompactTuple } from '../../src/backtest/replay-window';
 
 const H = 3_600_000;
 const T0 = Date.UTC(2021, 5, 1);
@@ -31,30 +31,40 @@ describe('replay-window (backtest-app-system-design.md §5.1, §5.3)', () => {
     expect(formingRange(T0 + 90 * 60_000 + 1, '1m')).toBeNull();
   });
 
-  describe('rangesToFold', () => {
+  describe('holesToFold', () => {
     const window = { from: T0, to: T0 + 10 * H };
+    const at = (...hours: number[]) => hours.map((h) => T0 + h * H);
 
-    it('folds everything when the tf has nothing persisted', () => {
-      expect(rangesToFold(window, null, '1h')).toEqual([window]);
+    it('the whole window when it holds no persisted bar', () => {
+      expect(holesToFold(window, [], '1h')).toEqual([window]);
     });
 
-    it('folds nothing inside the persisted span, holes included', () => {
-      expect(rangesToFold(window, { from: T0 - H, to: T0 + 20 * H }, '1h')).toEqual([]);
+    it('none when the persisted bars are contiguous across the window', () => {
+      expect(holesToFold(window, at(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), '1h')).toEqual([]);
     });
 
-    it('folds the tail past the last persisted bar (its close is persisted.to + tfMs)', () => {
-      expect(rangesToFold(window, { from: T0, to: T0 + 6 * H }, '1h')).toEqual([{ from: T0 + 7 * H, to: T0 + 10 * H }]);
+    it('an inner hole between two bars more than tfMs apart', () => {
+      expect(holesToFold(window, at(0, 1, 2, 6, 7, 8, 9), '1h')).toEqual([{ from: T0 + 3 * H, to: T0 + 6 * H }]);
     });
 
-    it('folds the head before the first persisted bar, and both ends when persisted sits inside', () => {
-      expect(rangesToFold(window, { from: T0 + 3 * H, to: T0 + 5 * H }, '1h')).toEqual([
+    it('the head before the first bar and the tail after the last', () => {
+      expect(holesToFold(window, at(3, 4, 5), '1h')).toEqual([
         { from: T0, to: T0 + 3 * H },
         { from: T0 + 6 * H, to: T0 + 10 * H },
       ]);
     });
 
-    it('an empty window folds nothing', () => {
-      expect(rangesToFold({ from: T0, to: T0 }, null, '1h')).toEqual([]);
+    it('several holes, in order', () => {
+      expect(holesToFold(window, at(1, 4, 8), '1h')).toEqual([
+        { from: T0, to: T0 + H },
+        { from: T0 + 2 * H, to: T0 + 4 * H },
+        { from: T0 + 5 * H, to: T0 + 8 * H },
+        { from: T0 + 9 * H, to: T0 + 10 * H },
+      ]);
+    });
+
+    it('an empty window has no holes', () => {
+      expect(holesToFold({ from: T0, to: T0 }, [], '1h')).toEqual([]);
     });
   });
 
