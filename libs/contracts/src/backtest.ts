@@ -15,6 +15,13 @@ import { TimeframeSchema } from './timeframe';
 // Session layout (§14: candle panels only, 1..4, `signals` accepted but ignored in replay — D10)
 // ---------------------------------------------------------------------------------------------
 
+/** One indicator on a session panel (T-029): an id and its parameters, opaque to the server. */
+export const SessionPanelIndicatorSchema = z.object({
+  id: z.string().min(1),
+  params: z.record(z.unknown()),
+});
+export type SessionPanelIndicator = z.infer<typeof SessionPanelIndicatorSchema>;
+
 export const SessionPanelSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   kind: z.literal('candles'),
@@ -22,6 +29,11 @@ export const SessionPanelSchema = z.object({
   /** Accepted for compatibility with `layouts.yaml` presets; has no meaning in replay (D10). */
   signals: z.boolean().default(false),
   title: z.string().min(1).optional(),
+  /**
+   * T-029: the panel's indicators, `{id, params}` per entry. Optional (older layouts have none)
+   * and carried opaquely by the server: shape only, no validation of ids or params.
+   */
+  indicators: z.array(SessionPanelIndicatorSchema).optional(),
 });
 export type SessionPanel = z.infer<typeof SessionPanelSchema>;
 

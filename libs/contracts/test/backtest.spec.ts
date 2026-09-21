@@ -163,6 +163,38 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
     expect(SessionLayoutSchema.parse(layout)).toEqual(layout);
   });
 
+  it('carries optional per-panel indicators {id, params} opaquely (T-029)', () => {
+    const layout = {
+      id: 'l',
+      name: 'L',
+      grid: { columns: 1, rows: 1 },
+      panels: [
+        {
+          id: 'btc',
+          kind: 'candles',
+          instrument: 'binance:BTCUSDT',
+          signals: false,
+          indicators: [
+            { id: 'ema', params: { length: 21, source: 'close' } },
+            { id: 'future-thing', params: { anything: [1, { nested: true }] } },
+          ],
+        },
+      ],
+    };
+    expect(SessionLayoutSchema.parse(layout)).toEqual(layout);
+    // older layouts have none, and that is still valid
+    const { indicators: _none, ...plain } = layout.panels[0];
+    expect(SessionLayoutSchema.parse({ ...layout, panels: [plain] }).panels[0]).not.toHaveProperty('indicators');
+  });
+
+  it('rejects a malformed indicator entry (shape only)', () => {
+    const base = { id: 'l', name: 'L', grid: { columns: 1, rows: 1 } };
+    const panel = (indicators: unknown) => ({ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', indicators });
+    expect(() => SessionLayoutSchema.parse({ ...base, panels: [panel([{ id: '', params: {} }])] })).toThrow();
+    expect(() => SessionLayoutSchema.parse({ ...base, panels: [panel([{ id: 'ema' }])] })).toThrow();
+    expect(() => SessionLayoutSchema.parse({ ...base, panels: [panel([{ id: 'ema', params: 5 }])] })).toThrow();
+  });
+
   it('rejects a SessionLayout with more than 4 panels', () => {
     const panel = (id: string) => ({ id, kind: 'candles' as const, instrument: 'binance:BTCUSDT' as const, signals: false });
     expect(() =>
