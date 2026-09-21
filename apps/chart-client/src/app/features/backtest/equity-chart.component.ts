@@ -10,7 +10,7 @@ import {
   input,
   viewChild,
 } from '@angular/core';
-import { AreaSeries, type IChartApi, type ISeriesApi, LineSeries, LineType, type UTCTimestamp, createChart } from 'lightweight-charts';
+import { BaselineSeries, type IChartApi, type ISeriesApi, LineSeries, LineType, type UTCTimestamp, createChart } from 'lightweight-charts';
 import type { EquityPoint } from '@trade-automation/contracts';
 import { CHART_OPTIONS } from '../chart/chart-options';
 import { type EquityUnit, drawdownChartData, equityChartData } from './stats-full';
@@ -24,7 +24,7 @@ export const EQUITY_CHART_FACTORY = new InjectionToken<typeof createChart>('EQUI
 /**
  * backtest-app-system-design.md §8, decision 26 — the session's equity curve as a step line (a step
  * per close, seeded at the period start), in currency or in R, with the drawdown from the running
- * peak as a red area at the bottom. Its own small lightweight-charts instance, not the replay chart.
+ * peak as a red area at the bottom, filled from 0 down to the drawdown. Its own small lightweight-charts instance, not the replay chart.
  * Every raw point is also listed (visually hidden): the data behind the picture, and the diff hook.
  */
 @Component({
@@ -42,7 +42,7 @@ export class EquityChartComponent implements OnDestroy {
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
   private chart: IChartApi | null = null;
   private equity: ISeriesApi<'Line'> | null = null;
-  private drawdown: ISeriesApi<'Area'> | null = null;
+  private drawdown: ISeriesApi<'Baseline'> | null = null;
 
   readonly equityData = computed(() => equityChartData(this.points(), this.unit()));
   readonly drawdownData = computed(() => drawdownChartData(this.points(), this.unit()));
@@ -67,11 +67,16 @@ export class EquityChartComponent implements OnDestroy {
   private create(el: HTMLDivElement): void {
     this.chart = this.factory(el, { ...CHART_OPTIONS, crosshair: { mode: 1 } });
     this.equity = this.chart.addSeries(LineSeries, { color: '#26a69a', lineWidth: 2, lineType: LineType.WithSteps, priceLineVisible: false });
-    this.drawdown = this.chart.addSeries(AreaSeries, {
+    // Filled between 0 and the line, so the red grows as the account sinks below its peak.
+    this.drawdown = this.chart.addSeries(BaselineSeries, {
       priceScaleId: 'drawdown',
-      lineColor: '#ef5350',
-      topColor: 'rgba(239, 83, 80, 0.05)',
-      bottomColor: 'rgba(239, 83, 80, 0.35)',
+      baseValue: { type: 'price', price: 0 },
+      topLineColor: 'rgba(0, 0, 0, 0)',
+      topFillColor1: 'rgba(0, 0, 0, 0)',
+      topFillColor2: 'rgba(0, 0, 0, 0)',
+      bottomLineColor: '#ef5350',
+      bottomFillColor1: 'rgba(239, 83, 80, 0.15)',
+      bottomFillColor2: 'rgba(239, 83, 80, 0.45)',
       lineWidth: 1,
       lineType: LineType.WithSteps,
       priceLineVisible: false,
