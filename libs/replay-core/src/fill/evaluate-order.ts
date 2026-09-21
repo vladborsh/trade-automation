@@ -13,8 +13,10 @@ import { EngineFillEvent, EvaluableOrder, PathBar } from './types';
  *   gap through anything (see `stopExitPrice(open = null)`).
  * - `open`: exits on the first candle that touches the stop (long `low <= sl`, short `high >= sl`)
  *   or the target (long `high >= tp`, short `low <= tp`), with gap-through at the candle's open;
- *   both in one candle → stop, flagged `slTpSameBar`. Candles opening before `entryTimeMs` are
- *   skipped, so a caller may pass a path that starts earlier.
+ *   both in one candle → stop, flagged `slTpSameBar`. Only candles opening strictly **after**
+ *   `entryTimeMs` are evaluated: a market order's entry candle closed before it was placed, and a
+ *   limit order's fill candle was already resolved (at the levels) by the walk that filled it —
+ *   so a caller may pass a path that starts at or before the entry candle.
  * - `closed` / `cancelled`: nothing.
  *
  * Every event carries `time = openTime` of the candle that produced it and `resolution: '1m'`.
@@ -89,7 +91,7 @@ function walk(
 
   if (order.entryPrice === null) throw new Error(`order ${order.id}: open order without entryPrice`);
   const from = order.entryTimeMs;
-  const exit = firstExit(from === null ? bars : bars.filter((b) => b.openTime >= from), exitAt);
+  const exit = firstExit(from === null ? bars : bars.filter((b) => b.openTime > from), exitAt);
   return exit ? [exit] : [];
 }
 

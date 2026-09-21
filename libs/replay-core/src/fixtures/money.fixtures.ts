@@ -186,34 +186,59 @@ export const TRADE_RESULT_FIXTURES: readonly TradeResultFixture[] = [
 
 export interface MaeFixture {
   name: string;
-  order: Pick<Order, 'id' | 'side' | 'entryPrice' | 'entryTimeMs' | 'exitTimeMs' | 'qty' | 'riskAmountCcy'>;
+  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'entryTimeMs' | 'exitTimeMs' | 'qty' | 'riskAmountCcy'>;
   path: PathBar[];
   expected: { maePrice: number; maeR: number };
 }
 
 export const MAE_FIXTURES: readonly MaeFixture[] = [
   {
-    // window = candles 1..3; the 900 low before entry and the 950 low after exit are outside it.
-    // worst low inside = 985 → mae 1000 - 985 = 15; maeR = 15 * 10 / 100 = 1.5
-    name: 'long · worst low inside the entry→exit window',
-    order: { id: FIXTURE_LONG_ID, side: 'long', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(3), qty: 10, riskAmountCcy: 100 },
+    // limit filled on candle 1: window = candles 1..3 (fill candle included); the 900 low before
+    // entry and the 950 low after exit are outside it. Worst low inside = 985 on candle 2
+    // → mae 1000 - 985 = 15; maeR = 15 * 10 / 100 = 1.5
+    name: 'long limit · worst low inside the fill→exit window',
+    order: { id: FIXTURE_LONG_ID, side: 'long', type: 'limit', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(3), qty: 10, riskAmountCcy: 100 },
     path: [bar(0, 1000, 1001, 900, 1000), bar(1, 1000, 1002, 995, 998), bar(2, 998, 999, 985, 990),
       bar(3, 990, 1021, 990, 1020), bar(4, 1020, 1022, 950, 960)],
     expected: { maePrice: 15, maeR: 1.5 },
   },
   {
-    // worst high inside = 1008 → mae 1008 - 1000 = 8; maeR = 8 * 20 / 100 = 1.6
-    name: 'short · worst high inside the entry→exit window',
-    order: { id: FIXTURE_SHORT_ID, side: 'short', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(3), qty: 20, riskAmountCcy: 100 },
+    // limit filled on candle 1, whose low 980 is the worst: the fill candle counts
+    // → mae 1000 - 980 = 20; maeR = 20 * 10 / 100 = 2
+    name: 'long limit · the fill candle is inside the window',
+    order: { id: FIXTURE_LONG_ID, side: 'long', type: 'limit', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(2), qty: 10, riskAmountCcy: 100 },
+    path: [bar(1, 1003, 1004, 980, 1001), bar(2, 1001, 1021, 995, 1020)],
+    expected: { maePrice: 20, maeR: 2 },
+  },
+  {
+    // market entry at candle 1's close: its low 970 printed before the trade existed and is
+    // excluded. Worst low after it = 985 → mae 15; maeR 1.5
+    name: 'long market · the entry candle is outside the window',
+    order: { id: FIXTURE_LONG_ID, side: 'long', type: 'market', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(3), qty: 10, riskAmountCcy: 100 },
+    path: [bar(1, 1001, 1002, 970, 999), bar(2, 999, 1001, 985, 990), bar(3, 990, 1021, 988, 1020)],
+    expected: { maePrice: 15, maeR: 1.5 },
+  },
+  {
+    // limit filled on candle 1; worst high inside = 1008 → mae 1008 - 1000 = 8; maeR = 8 * 20 / 100 = 1.6
+    name: 'short limit · worst high inside the fill→exit window',
+    order: { id: FIXTURE_SHORT_ID, side: 'short', type: 'limit', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(3), qty: 20, riskAmountCcy: 100 },
     path: [bar(0, 1000, 1100, 999, 1000), bar(1, 1000, 1003, 995, 1001), bar(2, 1001, 1008, 996, 1000),
       bar(3, 1000, 1001, 979, 980), bar(4, 980, 1050, 978, 1040)],
     expected: { maePrice: 8, maeR: 1.6 },
   },
   {
-    // every low stays above the (spread-paying) entry 1001 → no adverse excursion, floored at 0
-    name: 'long · never traded below entry → 0',
-    order: { id: FIXTURE_LONG_ID, side: 'long', entryPrice: 1001, entryTimeMs: t(0), exitTimeMs: t(1), qty: 10, riskAmountCcy: 100 },
-    path: [bar(0, 1002, 1010, 1002, 1008), bar(1, 1008, 1021, 1005, 1020)],
+    // market entry at candle 1's close: its high 1030 is excluded. Worst high after = 1006
+    // → mae 6; maeR = 6 * 10 / 100 = 0.6
+    name: 'short market · the entry candle is outside the window',
+    order: { id: FIXTURE_SHORT_ID, side: 'short', type: 'market', entryPrice: 1000, entryTimeMs: t(1), exitTimeMs: t(3), qty: 10, riskAmountCcy: 100 },
+    path: [bar(1, 999, 1030, 998, 1001), bar(2, 1001, 1006, 995, 997), bar(3, 997, 999, 979, 980)],
+    expected: { maePrice: 6, maeR: 0.6 },
+  },
+  {
+    // every low after entry stays above the (spread-paying) entry 1001 → no adverse excursion, floored at 0
+    name: 'long market · never traded below entry → 0',
+    order: { id: FIXTURE_LONG_ID, side: 'long', type: 'market', entryPrice: 1001, entryTimeMs: t(0), exitTimeMs: t(2), qty: 10, riskAmountCcy: 100 },
+    path: [bar(0, 1000, 1001, 998, 1000), bar(1, 1002, 1010, 1002, 1008), bar(2, 1008, 1021, 1005, 1020)],
     expected: { maePrice: 0, maeR: 0 },
   },
 ];

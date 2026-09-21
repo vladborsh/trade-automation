@@ -17,7 +17,8 @@ import {
  *
  * Levels. Long: limit 995, stop 990, target 1020, entry 1000 once open.
  *         Short: limit 1005, stop 1010, target 980, entry 1000 once open.
- * Candles are `bar(i, open, high, low, close)`, `i` minutes after `FIXTURE_T0`.
+ * Candles are `bar(i, open, high, low, close)`, `i` minutes after `FIXTURE_T0`. Open positions
+ * entered on candle -1 (`entryTimeMs = t(-1)`), just before each path starts.
  */
 
 export type FillTableRow =
@@ -43,7 +44,7 @@ export interface FillTableFixture {
 
 const LONG_OPEN: EvaluableOrder = {
   id: FIXTURE_LONG_ID, side: 'long', type: 'market', status: 'open',
-  limitPrice: null, entryPrice: 1000, entryTimeMs: t(0), slCurrent: 990, tpCurrent: 1020,
+  limitPrice: null, entryPrice: 1000, entryTimeMs: t(-1), slCurrent: 990, tpCurrent: 1020,
 };
 const LONG_PENDING: EvaluableOrder = {
   id: FIXTURE_LONG_ID, side: 'long', type: 'limit', status: 'pending',
@@ -51,7 +52,7 @@ const LONG_PENDING: EvaluableOrder = {
 };
 const SHORT_OPEN: EvaluableOrder = {
   id: FIXTURE_SHORT_ID, side: 'short', type: 'market', status: 'open',
-  limitPrice: null, entryPrice: 1000, entryTimeMs: t(0), slCurrent: 1010, tpCurrent: 980,
+  limitPrice: null, entryPrice: 1000, entryTimeMs: t(-1), slCurrent: 1010, tpCurrent: 980,
 };
 const SHORT_PENDING: EvaluableOrder = {
   id: FIXTURE_SHORT_ID, side: 'short', type: 'limit', status: 'pending',
@@ -135,6 +136,16 @@ const LONG: FillTableFixture[] = [
     [bar(0, 1000, 1100, 995, 1050)], {}, {}),
   ...row('No event', 'candles before entryTimeMs are not evaluated', { ...LONG_OPEN, entryTimeMs: t(1) },
     [bar(0, 1000, 1000, 980, 990), bar(1, 1000, 1004, 996, 1001)], {}, {}),
+  // The entry candle itself: its low 980 printed before a market order placed at its close.
+  ...row('Stop exit', 'the entry candle is not evaluated, only candles after it', { ...LONG_OPEN, entryTimeMs: t(0) },
+    [bar(0, 1000, 1000, 980, 999), bar(1, 999, 1004, 996, 1001), bar(2, 1001, 1002, 989, 992)],
+    { exit: { i: 2, price: 989, reason: 'stop' } },
+    { exit: { i: 2, price: 990, reason: 'stop' } }),
+  // A later walk over a filled limit's fill candle (open 985 below the stop) must not re-resolve
+  // it with gap-through: it was settled, at the levels, by the walk that filled it.
+  ...row('No event', 'a filled limit re-walked from its fill candle', { ...LONG_OPEN, type: 'limit',
+    limitPrice: 995, entryPrice: 995, entryTimeMs: t(0) },
+    [bar(0, 985, 996, 980, 994), bar(1, 994, 1000, 993, 998)], {}, {}),
 
   // Both inside one candle: stop first, flagged.
   ...row('SL and TP both inside one 1m candle', 'stop first', LONG_OPEN,
@@ -221,6 +232,14 @@ const SHORT: FillTableFixture[] = [
     [bar(0, 1000, 1005, 900, 950)], {}, {}),
   ...row('No event', 'candles before entryTimeMs are not evaluated', { ...SHORT_OPEN, entryTimeMs: t(1) },
     [bar(0, 1000, 1020, 1000, 1010), bar(1, 1000, 1004, 996, 999)], {}, {}),
+  // The entry candle itself: its high 1020 printed before a market order placed at its close.
+  ...row('Stop exit', 'the entry candle is not evaluated, only candles after it', { ...SHORT_OPEN, entryTimeMs: t(0) },
+    [bar(0, 1000, 1020, 1000, 1001), bar(1, 1001, 1004, 996, 999), bar(2, 999, 1011, 998, 1008)],
+    { exit: { i: 2, price: 1011, reason: 'stop' } },
+    { exit: { i: 2, price: 1010, reason: 'stop' } }),
+  ...row('No event', 'a filled limit re-walked from its fill candle', { ...SHORT_OPEN, type: 'limit',
+    limitPrice: 1005, entryPrice: 1005, entryTimeMs: t(0) },
+    [bar(0, 1015, 1020, 1004, 1006), bar(1, 1006, 1007, 1000, 1002)], {}, {}),
 
   // Both inside one candle: stop first, flagged.
   ...row('SL and TP both inside one 1m candle', 'stop first', SHORT_OPEN,
