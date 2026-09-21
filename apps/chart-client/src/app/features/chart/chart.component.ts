@@ -292,6 +292,11 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       this.rangeSync.drive(fromSec, toSec);
     });
 
+    // BUG-007: only a real gesture lets this panel's range changes propose before the grid is user-driven.
+    for (const type of ['pointerdown', 'wheel'] as const) {
+      el.addEventListener(type, () => this.rangeSync.noteGesture(), { capture: true, passive: true });
+    }
+
     // Drive, crosshair: see ChartCrosshair.drive for the loop-prevention layers.
     this.chart.subscribeCrosshairMove((param) => this.crosshair.drive(param));
 

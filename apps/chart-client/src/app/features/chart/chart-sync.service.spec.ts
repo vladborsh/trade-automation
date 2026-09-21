@@ -303,3 +303,59 @@ describe('ChartSyncService reassert / releaseCrosshair', () => {
     expect(sync.crosshair()).toBeNull();
   });
 });
+
+describe('ChartSyncService boot seeding (BUG-007)', () => {
+  const A = { from: 100, to: 1000 };
+  const B = { from: 200, to: 2000 };
+
+  it('the seed with the latest `to` wins whatever order the seeds arrive in', () => {
+    for (const order of [
+      [['a', A], ['b', B]],
+      [['b', B], ['a', A]],
+    ] as const) {
+      const s = new ChartSyncService();
+      for (const [id, r] of order) {
+        s.seed(id, r);
+      }
+      expect(s.range()).toEqual(B);
+      expect(s.origin()).toBe('b');
+    }
+  });
+
+  it('an equal-or-older seed leaves the standing one untouched', () => {
+    const s = new ChartSyncService();
+    s.seed('b', B);
+    s.seed('a', { from: 0, to: 2000 });
+    expect(s.range()).toEqual(B);
+    expect(s.origin()).toBe('b');
+  });
+
+  it('the standing seed\'s own panel may refine it', () => {
+    const s = new ChartSyncService();
+    s.seed('b', B);
+    s.seed('b', { from: 500, to: 2000 });
+    expect(s.range()).toEqual({ from: 500, to: 2000 });
+    expect(s.origin()).toBe('b');
+  });
+
+  it('once a proposal is accepted, seeds are ignored; reset() re-opens seeding', () => {
+    const s = new ChartSyncService();
+    expect(s.isUserDriven()).toBe(false);
+    s.propose('a', A, 1);
+    expect(s.isUserDriven()).toBe(true);
+    s.seed('b', B);
+    expect(s.range()).toEqual(A);
+    expect(s.origin()).toBe('a');
+    s.reset();
+    expect(s.isUserDriven()).toBe(false);
+    s.seed('b', B);
+    expect(s.range()).toEqual(B);
+  });
+
+  it('a seed does not make the grid user-driven', () => {
+    const s = new ChartSyncService();
+    s.seed('a', A);
+    s.seed('b', B);
+    expect(s.isUserDriven()).toBe(false);
+  });
+});

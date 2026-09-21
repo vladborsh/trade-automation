@@ -104,6 +104,13 @@ export class ChartSyncService {
   private readonly _reassertEpoch = signal(0);
   readonly reassertEpoch = this._reassertEpoch.asReadonly();
 
+  /**
+   * True once a `propose()` has been accepted since the last `reset()` — i.e. something other
+   * than first-data seeding has moved the grid. Until then `seed()` decides the shared range.
+   * A plain field, not a signal: it is read from inside render effects and must not track.
+   */
+  private userDriven = false;
+
   /** Timestamps of recent origin takeovers, within the current trip-detection window. */
   private takeoverTimestamps: number[] = [];
   /** While `now < cooldownUntil`, every proposal (from any panel) is dropped. */
@@ -146,6 +153,33 @@ export class ChartSyncService {
 
     this._origin.set(panelId);
     this._range.set(range);
+    this.userDriven = true;
+  }
+
+  /**
+   * BUG-007: a chart's first-data autofit window, or a library-driven settle of it. Before any
+   * `propose()` has been accepted, the seed with the latest `to` wins, whatever order the panels'
+   * histories arrive in — so the grid opens at the freshest data deterministically, instead of at
+   * whichever panel happened to load last. The standing seed's own panel may always refine it
+   * (its autofit settling as the price axis takes its width). A seed that does not win changes
+   * nothing (its chart then joins the shared range); once the grid is user-driven, seeds are
+   * ignored (§11.3 rule 2: late data joins).
+   */
+  seed(panelId: string, range: TimeRange): void {
+    if (this.userDriven) {
+      return;
+    }
+    const cur = this._range();
+    if (cur && this._origin() !== panelId && cur.to >= range.to) {
+      return;
+    }
+    this._origin.set(panelId);
+    this._range.set(range);
+  }
+
+  /** Whether a `propose()` has moved the grid since the last `reset()` (see `seed()`). */
+  isUserDriven(): boolean {
+    return this.userDriven;
   }
 
   /**
@@ -181,6 +215,7 @@ export class ChartSyncService {
     this._range.set(null);
     this._origin.set(null);
     this._crosshair.set(null);
+    this.userDriven = false;
     this.takeoverTimestamps = [];
     this.cooldownUntil = null;
   }

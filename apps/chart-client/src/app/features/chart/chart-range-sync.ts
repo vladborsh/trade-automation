@@ -28,6 +28,8 @@ export class ChartRangeSync {
   private applying = false;
   /** Reentrancy guard 2 (§6.4): suppresses an async echo and a follower's own bar-grid "snap" of the applied range. */
   private lastApplied: TimeRange | null = null;
+  /** BUG-007: a pointer or wheel gesture has reached this panel's chart (see `drive`). */
+  private gestured = false;
 
   constructor(
     private readonly host: RangeSyncHost,
@@ -55,7 +57,25 @@ export class ChartRangeSync {
     if (sameRange(proposed, this.lastApplied, eps)) {
       return;
     }
+    if (!this.gestured && !this.sync.isUserDriven()) {
+      // BUG-007, boot: nobody has touched the grid, so this is the library settling a window
+      // (the autofit re-fitting once the price axis has its width, a new bar shifting it). The
+      // seed's own panel refines the seed; any other panel goes back to the shared range. A
+      // propose here would make the last panel to settle the origin — the boot race.
+      if (this.sync.origin() === this.host.panelId()) {
+        this.lastApplied = proposed;
+        this.sync.seed(this.host.panelId(), proposed);
+      } else {
+        this.reapplyShared();
+      }
+      return;
+    }
     this.sync.propose(this.host.panelId(), proposed, eps);
+  }
+
+  /** A pointer or wheel gesture on this panel's chart: from now on its range changes propose. */
+  noteGesture(): void {
+    this.gestured = true;
   }
 
   /**
@@ -131,15 +151,36 @@ export class ChartRangeSync {
   }
 
   /**
-   * §11.3 sync rule 2 — a chart that mounts (or gets its first data) while a shared range exists
-   * JOINS it and never proposes its own autofit window. The autofit range-change this `setData`
-   * produced either arrives while `applying` is still set, or matches `lastApplied` — both drop
-   * it. With no shared range yet, nothing happens here and today's boot seeding stands.
+   * First data on this panel (§11.3 rule 2, BUG-007). Once the grid is user-driven, the chart
+   * JOINS the shared range and never proposes its own autofit window. Before that, the autofit
+   * window is offered as a `seed()` — the freshest seed wins regardless of arrival order — and
+   * the chart joins whatever seed stands. Either way `lastApplied` / `applying` absorb the
+   * autofit's own range-change echo, so first data never reaches `propose()`.
    */
   joinOnFirstData(wasEmpty: boolean): void {
-    if (wasEmpty && this.host.renderedCount() > 0) {
-      this.reapplyShared();
+    if (!wasEmpty || this.host.renderedCount() === 0) {
+      return;
     }
+    untracked(() => {
+      if (!this.sync.isUserDriven()) {
+        this.seedOwnWindow();
+      }
+      if (this.sync.origin() !== this.host.panelId()) {
+        this.reapplyShared();
+      }
+    });
+  }
+
+  private seedOwnWindow(): void {
+    const r = this.host.chart()?.timeScale().getVisibleLogicalRange();
+    const timesSec = this.host.timesSec();
+    if (!r || timesSec.length === 0) {
+      return;
+    }
+    const tf = this.host.tfSec();
+    const own: TimeRange = { from: logicalToTimeSec(r.from, timesSec, tf), to: logicalToTimeSec(r.to, timesSec, tf) };
+    this.lastApplied = own;
+    this.sync.seed(this.host.panelId(), own);
   }
 
   /** Half a bar of the current timeframe, in seconds — larger than any bar-grid snap (§6.4). */
