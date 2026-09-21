@@ -19,14 +19,17 @@ describe('orderTool (the viewed order as a read-only position tool)', () => {
     slCurrent: 95, tpCurrent: 110, entryTimeMs: T, placedAtMs: T + 60_000,
   } as Order;
 
-  it('a filled order is a position at its fill, never active', () => {
-    expect(orderTool(order)).toEqual({
+  it('a filled order is a position at its fill bar, never active', () => {
+    expect(orderTool(order, '1m')).toEqual({
       id: 'view-o1', orderId: 'o1', side: 'long', mode: 'market', entry: 100, sl: 95, tp: 110, kind: 'position', active: false, anchorTime: T,
     });
+    // 10:04 has no x on a 5m or 1h chart: the anchor is that bar's open
+    expect(orderTool(order, '5m')?.anchorTime).toBe(Date.UTC(2026, 8, 16, 10, 0));
+    expect(orderTool(order, '1h')?.anchorTime).toBe(Date.UTC(2026, 8, 16, 10, 0));
   });
 
   it('an unfilled limit is a pending tool at its limit, anchored where it was placed', () => {
-    const tool = orderTool({ ...order, type: 'limit', status: 'cancelled', entryPrice: null, limitPrice: 98, entryTimeMs: null, tpCurrent: null });
+    const tool = orderTool({ ...order, type: 'limit', status: 'cancelled', entryPrice: null, limitPrice: 98, entryTimeMs: null, tpCurrent: null }, '1m');
     expect(tool).toMatchObject({ kind: 'pending', mode: 'limit', entry: 98, tp: null, anchorTime: T + 60_000 });
   });
 });

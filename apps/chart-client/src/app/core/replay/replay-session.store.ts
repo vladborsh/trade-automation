@@ -159,7 +159,7 @@ export class ReplaySessionStore implements OnDestroy {
    * never editable: changes and the pointer are ignored, so a drag snaps back.
    */
   private viewedBinding(panelId: string, order: Parameters<typeof orderTool>[0] | undefined): PanelPositionTools {
-    const tool = order && order.panelId === panelId ? orderTool(order) : null;
+    const tool = order && order.panelId === panelId ? orderTool(order, this.engine()?.timeframe() ?? '5m') : null;
     const view = computed(() => ({
       tools: tool ? [tool] : [],
       balance: this.session()?.balance ?? 0,

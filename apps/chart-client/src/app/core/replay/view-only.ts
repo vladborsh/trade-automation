@@ -1,4 +1,5 @@
-import type { Order } from '@trade-automation/contracts';
+import type { Order, Timeframe } from '@trade-automation/contracts';
+import { bucketStart } from './fold-on-step';
 import type { PositionToolState } from '../../features/chart/overlay/position-tool.model';
 
 const ONE_MINUTE_MS = 60_000;
@@ -16,10 +17,13 @@ export function viewAtFor(order: Pick<Order, 'entryTimeMs' | 'placedAtMs'>): num
 
 /**
  * §9.3 — the viewed order as a position tool (T-022's primitive): a `position` once it has filled,
- * a `pending` limit otherwise, anchored where it filled (or was placed). Read-only: never active.
+ * a `pending` limit otherwise, anchored at the bar of `tf` that contains its fill (or placement) —
+ * the chart places the tool only at a bar's open time (an entry at 09:59 has no x on a 5m chart;
+ * the primitive would fall back to the left edge). Read-only: never active.
  */
 export function orderTool(
   order: Pick<Order, 'id' | 'panelId' | 'side' | 'type' | 'status' | 'entryPrice' | 'limitPrice' | 'slCurrent' | 'tpCurrent' | 'entryTimeMs' | 'placedAtMs'>,
+  tf: Timeframe,
 ): PositionToolState | null {
   const entry = order.entryPrice ?? order.limitPrice;
   if (entry === null) return null;
@@ -33,6 +37,6 @@ export function orderTool(
     tp: order.tpCurrent,
     kind: order.entryPrice === null ? 'pending' : 'position',
     active: false,
-    anchorTime: order.entryTimeMs ?? order.placedAtMs,
+    anchorTime: bucketStart(order.entryTimeMs ?? order.placedAtMs, tf),
   };
 }
