@@ -69,4 +69,16 @@ describe('ReplaySessionStore — position tools (T-022)', () => {
       vi.useRealTimers();
     }
   });
+
+  it("every tool's anchor is a bar open of the current timeframe, re-snapped on a switch (dev-1's T-030 finding)", () => {
+    const { store } = setup();
+    const tf = signal<'5m' | '1h'>('5m');
+    const at1037 = { ...bar(100), openTime: Date.UTC(2026, 8, 18, 10, 37) }; // e.g. a 1m fill time
+    store.engine.set({ timeframe: tf, seriesFor: () => signal({ closed: [], forming: at1037 }) } as unknown as ReplayEngine);
+    store.toolStore('a').create('long');
+    const anchor = () => store.sources().get('a')!.positionTools!.view().tools[0].anchorTime;
+    expect(anchor()).toBe(Date.UTC(2026, 8, 18, 10, 35));
+    tf.set('1h');
+    expect(anchor()).toBe(Date.UTC(2026, 8, 18, 10, 0));
+  });
 });

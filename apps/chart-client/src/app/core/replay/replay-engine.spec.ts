@@ -227,6 +227,22 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(stepped).toHaveLength(4);
   });
 
+  it("hands onStep each panel's newly revealed 1m: from <= openTime <= cursor − 60 000 (T-023 preview)", async () => {
+    const api = fakeServer();
+    const revealed: Array<{ cursor: number; btc: number[]; eth: number[] }> = [];
+    const e = new ReplayEngine(api, {
+      panels: PANELS, cursorMs: at(18, 21, 40), serverCursorMs: at(18, 21, 40), timeframe: '5m',
+      periodToMs: PERIOD_TO, skipWeekends: true,
+      onStep: (c, r) => revealed.push({ cursor: c, btc: r.get('btc')!.map((b) => b.openTime), eth: r.get('eth')!.map((b) => b.openTime) }),
+    });
+    await e.start();
+    await stepN(e, 2);
+    const span = (from: number, to: number) => TAPES['btc'].map((b) => b.openTime).filter((t) => t >= from && t + M <= to);
+    expect(revealed[0]).toEqual({ cursor: at(18, 21, 45), btc: span(at(18, 21, 40), at(18, 21, 45)), eth: span(at(18, 21, 40), at(18, 21, 45)) });
+    expect(revealed[1].btc).toEqual(span(at(18, 21, 45), at(18, 21, 50)));
+    expect(revealed[1].btc).toHaveLength(5);
+  });
+
   it('a session loaded as complete is locked from the start', async () => {
     const e = new ReplayEngine(fakeServer(), {
       panels: PANELS, cursorMs: PERIOD_TO, serverCursorMs: PERIOD_TO, timeframe: '5m', periodToMs: PERIOD_TO, skipWeekends: true, completed: true,

@@ -34,6 +34,7 @@ type LabelContext = Pick<PositionToolsView, 'balance' | 'riskPct' | 'pricePrecis
 export function labelFor(tool: PositionToolState, level: 'entry' | 'sl' | 'tp', ctx: LabelContext): string {
   const fmt = (p: number) => p.toFixed(ctx.pricePrecision);
   const signed = (d: number) => `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(ctx.pricePrecision)}`;
+  if (tool.order) return liveLabel(tool, tool.order, level, fmt, signed);
   if (level === 'entry') {
     const head = `${tool.side === 'long' ? 'Long' : 'Short'} ${tool.mode} ${fmt(tool.entry)}`;
     if (tool.entry === tool.sl || isStopTooClose(tool.entry, tool.sl)) return `${head} · stop too close`;
@@ -48,9 +49,34 @@ export function labelFor(tool: PositionToolState, level: 'entry' | 'sl' | 'tp', 
   return tool.tp === null ? '' : `TP ${fmt(tool.tp)} · ${signed(tool.tp - tool.entry)} · ${r === null ? '—' : r.toFixed(2)}R`;
 }
 
-/** Which parts of a tool can be dragged: a draft all of them; a live order only its stop and target. */
+/**
+ * A live order's labels (T-023): its own qty, and each level's R from its own 1R (`riskAmountCcy`)
+ * — `dir × (level − entry) × qty / 1R` — so a fill that paid the spread shows the R it really has.
+ */
+function liveLabel(
+  tool: PositionToolState,
+  order: { qty: number; riskAmount: number },
+  level: 'entry' | 'sl' | 'tp',
+  fmt: (p: number) => string,
+  signed: (d: number) => string,
+): string {
+  const dir = tool.side === 'long' ? 1 : -1;
+  const r = (price: number) => {
+    const v = order.riskAmount > 0 ? (dir * (price - tool.entry) * order.qty) / order.riskAmount : 0;
+    return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}R`;
+  };
+  if (level === 'entry') return `${tool.side === 'long' ? 'Long' : 'Short'} ${tool.kind === 'pending' ? 'limit' : 'position'} ${fmt(tool.entry)} · qty ${formatQty(order.qty)}`;
+  if (level === 'sl') return `SL ${fmt(tool.sl)} · ${signed(tool.sl - tool.entry)} · ${r(tool.sl)}`;
+  return tool.tp === null ? '' : `TP ${fmt(tool.tp)} · ${signed(tool.tp - tool.entry)} · ${r(tool.tp)}`;
+}
+
+/**
+ * Which parts of a tool can be dragged: a draft all of them. A live order none yet — moving its
+ * stop or target is a server `modify` (P2, decision 23), and a drag that moved only the drawing
+ * would lie about the order.
+ */
 export function draggableParts(tool: PositionToolState): readonly PositionToolPart[] {
-  return tool.kind === 'draft' ? ['entry', 'sl', 'tp', 'body'] : ['sl', 'tp'];
+  return tool.kind === 'draft' ? ['entry', 'sl', 'tp', 'body'] : [];
 }
 
 export interface ToolHandle {
@@ -75,7 +101,7 @@ export const HANDLE_OFFSET_PX = 12;
 /**
  * Screen geometry of `tool`, or null when its levels are off the price scale. `xStart` is the
  * tool's left edge (its anchor time, clamped to the pane by the caller). Drafts get three handles;
- * a pending order or a position gets handles on SL/TP only (§9.1).
+ * a live order none until its stop/target can be moved (§9.1 P2).
  */
 export function toolGeometry(tool: PositionToolState, xStart: number, priceToY: (price: number) => number | null): ToolGeometry | null {
   const yEntry = priceToY(tool.entry);
@@ -84,9 +110,10 @@ export function toolGeometry(tool: PositionToolState, xStart: number, priceToY: 
   const yTp = tool.tp === null ? null : priceToY(tool.tp);
   const x = xStart + HANDLE_OFFSET_PX;
   const handles: ToolHandle[] = [];
-  if (tool.kind === 'draft') handles.push({ part: 'entry', x, y: yEntry });
-  handles.push({ part: 'sl', x, y: ySl });
-  if (yTp !== null) handles.push({ part: 'tp', x, y: yTp });
+  if (tool.kind === 'draft') {
+    handles.push({ part: 'entry', x, y: yEntry }, { part: 'sl', x, y: ySl });
+    if (yTp !== null) handles.push({ part: 'tp', x, y: yTp });
+  }
   return { toolId: tool.id, x: xStart, yEntry, ySl, yTp, handles };
 }
 

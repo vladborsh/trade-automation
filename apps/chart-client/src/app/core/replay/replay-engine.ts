@@ -1,5 +1,5 @@
 import { type WritableSignal, signal } from '@angular/core';
-import type { AheadResponse, CompactCandleTuple, Panel, ReplayHistoryResponse, Timeframe } from '@trade-automation/contracts';
+import type { AheadResponse, Candle, CompactCandleTuple, Panel, ReplayHistoryResponse, Timeframe } from '@trade-automation/contracts';
 import { nextCursor } from '@trade-automation/replay-core';
 import { AheadCache } from './ahead-cache';
 import { AHEAD_PAGE_SIZE, cacheSizing } from './cache-sizing';
@@ -23,8 +23,12 @@ export interface ReplayEngineConfig {
   serverCursorMs: number;
   /** The session is already complete: nothing can be stepped or switched. */
   completed?: boolean;
-  /** Called after every step with the new cursor — the workspace queues it for the server (T-021). */
-  onStep?: (cursorMs: number) => void;
+  /**
+   * Called after every step with the new cursor — the workspace queues it for the server (T-021) —
+   * and, per panel, the 1m candles this step revealed: `from <= openTime` and `openTime + 60 000 <=
+   * cursorMs`, the span the server walks for the same advance (§5.5), for the fill preview (T-023).
+   */
+  onStep?: (cursorMs: number, revealed: ReadonlyMap<string, readonly Candle[]>) => void;
   /**
    * §9.3 view-only rewind (decision 32): history at the cursor only — no ahead cache, no steps, a
    * timeframe switch re-fetches history and is never persisted. Nothing here can move the session.
@@ -261,13 +265,16 @@ export class ReplayEngine {
       return;
     }
     const carryFrom = bucketStart(from, tf);
+    const revealed = new Map<string, readonly Candle[]>();
     for (const t of this.tapes) {
-      t.series.set(foldStep(t.series(), t.cache.revealed(carryFrom, next), tf, next));
+      const bars = t.cache.revealed(carryFrom, next);
+      revealed.set(t.panel.id, bars.filter((b) => b.openTime >= from));
+      t.series.set(foldStep(t.series(), bars, tf, next));
       t.cache.dropBefore(bucketStart(next, tf));
     }
     this.cursor.set(next);
     this.atEnd.set(next >= this.config.periodToMs);
-    this.config.onStep?.(next);
+    this.config.onStep?.(next, revealed);
   }
 
   private async loadHistory(t: PanelTape, tf: Timeframe): Promise<void> {

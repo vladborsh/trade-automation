@@ -1,0 +1,45 @@
+<section class="panel" aria-labelledby="positions-title">
+  <h2 id="positions-title">Positions</h2>
+  @if (rows().length === 0) {
+    <p class="empty">No pending or open orders.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Side</th>
+          <th scope="col">Entry</th>
+          <th scope="col">SL</th>
+          <th scope="col">TP</th>
+          <th scope="col">PnL</th>
+          <th scope="col">Risk</th>
+          <th scope="col"><span class="sr-only">Action</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.order.id) {
+          <tr [attr.data-testid]="'position-' + row.order.seq" [attr.data-status]="row.order.status">
+            <td>{{ row.order.seq }}</td>
+            <td [class.up]="row.order.side === 'long'" [class.down]="row.order.side === 'short'">
+              {{ row.order.side }} {{ row.order.status === 'pending' ? 'limit' : '' }}
+            </td>
+            <td>{{ price(row, row.entry) }}</td>
+            <td>{{ price(row, row.order.slCurrent) }}</td>
+            <td>{{ price(row, row.order.tpCurrent) }}</td>
+            <td [class.up]="(row.floating ?? 0) > 0" [class.down]="(row.floating ?? 0) < 0" data-testid="position-pnl">
+              {{ row.floating === null ? '—' : signed(row.floating) }}
+            </td>
+            <td>{{ money(row.risk) }}</td>
+            <td>
+              @if (row.order.status === 'pending') {
+                <button type="button" (click)="cancel.emit(row.order.id)">Cancel</button>
+              } @else {
+                <button type="button" (click)="close.emit(row.order.id)">Close</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

@@ -46,12 +46,22 @@ describe('position-tool geometry (design §9.1)', () => {
     expect(labelFor(draft(), 'entry', { ...CTX, balance: 0 })).toBe('Long limit 100.00 · qty —');
   });
 
-  it('draggable parts: a draft all of them, a live order only stop and target', () => {
-    expect(draggableParts(draft())).toEqual(['entry', 'sl', 'tp', 'body']);
-    expect(draggableParts(draft({ kind: 'position' }))).toEqual(['sl', 'tp']);
+  it("a live order's labels show ITS qty and R from its own 1R, not a size from the current balance (T-023)", () => {
+    // a long filled at 100.25 (spread paid), qty 0.66666667, 1R = 100: stop 99 → (99 − 100.25) × q / 100 = −0.83R
+    const live = draft({ kind: 'position', mode: 'market', entry: 100.25, sl: 99, tp: 103, order: { qty: 0.66666667, riskAmount: 100 } });
+    expect(labelFor(live, 'entry', CTX)).toBe('Long position 100.25 · qty 0.6667');
+    expect(labelFor(live, 'sl', CTX)).toBe('SL 99.00 · −1.25 · −0.01R');
+    expect(labelFor({ ...live, order: { qty: 80, riskAmount: 100 } }, 'sl', CTX)).toBe('SL 99.00 · −1.25 · −1.00R');
+    expect(labelFor({ ...live, order: { qty: 80, riskAmount: 100 } }, 'tp', CTX)).toBe('TP 103.00 · +2.75 · +2.20R');
+    expect(labelFor(draft({ kind: 'pending', order: { qty: 200, riskAmount: 100 } }), 'entry', CTX)).toBe('Long limit 100.00 · qty 200');
   });
 
-  it('toolGeometry: three handles on a draft, SL/TP only on a position, null off-scale', () => {
+  it('draggable parts: a draft all of them, a live order none until stop-moving (P2)', () => {
+    expect(draggableParts(draft())).toEqual(['entry', 'sl', 'tp', 'body']);
+    expect(draggableParts(draft({ kind: 'position' }))).toEqual([]);
+  });
+
+  it('toolGeometry: three handles on a draft, none on a live order, null off-scale', () => {
     const g = toolGeometry(draft(), 40, priceToY)!;
     expect(g).toMatchObject({ x: 40, yEntry: 500, ySl: 505, yTp: 490 });
     expect(g.handles.map((h) => [h.part, h.x, h.y])).toEqual([
@@ -59,7 +69,7 @@ describe('position-tool geometry (design §9.1)', () => {
       ['sl', 40 + HANDLE_OFFSET_PX, 505],
       ['tp', 40 + HANDLE_OFFSET_PX, 490],
     ]);
-    expect(toolGeometry(draft({ kind: 'position' }), 40, priceToY)!.handles.map((h) => h.part)).toEqual(['sl', 'tp']);
+    expect(toolGeometry(draft({ kind: 'position' }), 40, priceToY)!.handles).toEqual([]);
     expect(toolGeometry(draft(), 40, () => null)).toBeNull();
   });
 

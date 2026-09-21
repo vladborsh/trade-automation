@@ -173,7 +173,7 @@ describe('ReplaySessionStore (T-021)', () => {
   it('view-only shows the order as a read-only position tool on its panel; a drag changes nothing', async () => {
     const client = fakeClient();
     client.listOrders.mockResolvedValueOnce([
-      { id: 'o0', seq: 1, status: 'closed', panelId: 'btc', side: 'long', type: 'market', entryTimeMs: T0, placedAtMs: T0 + M, entryPrice: 1.5, limitPrice: null, slCurrent: 1, tpCurrent: 2, exitPrice: 2 } as Order,
+      { id: 'o0', seq: 1, status: 'closed', panelId: 'btc', side: 'long', type: 'market', entryTimeMs: T0, placedAtMs: T0 + M, entryPrice: 1.5, limitPrice: null, slCurrent: 1, tpCurrent: 2, exitPrice: 2, qty: 20, riskAmountCcy: 10 } as Order,
     ]);
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [ReplaySessionStore, { provide: BacktestClient, useValue: client }] });
@@ -182,7 +182,7 @@ describe('ReplaySessionStore (T-021)', () => {
 
     const tools = store.sources().get('btc')!.positionTools!;
     expect(tools.view().tools).toEqual([
-      { id: 'view-o0', orderId: 'o0', side: 'long', mode: 'market', entry: 1.5, sl: 1, tp: 2, kind: 'position', active: false, anchorTime: T0 },
+      { id: 'view-o0', orderId: 'o0', side: 'long', mode: 'market', entry: 1.5, sl: 1, tp: 2, kind: 'position', active: false, anchorTime: T0, order: { qty: 20, riskAmount: 10 } },
     ]);
     const tool = tools.view().tools[0];
     tools.apply({ type: 'update', tool: { ...tool, sl: 0.5 }, final: true });

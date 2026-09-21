@@ -35,6 +35,8 @@ export class ReplayToolbarComponent {
   /** A one-line message: resynced, reloaded from the server, … */
   readonly notice = input<string | null>(null);
   readonly error = input<string | null>(null);
+  /** T-023: what every open position's current stop would lose (replay-core `openRisk`). */
+  readonly openRisk = input(0);
 
   readonly step = output<void>();
   readonly timeframeChange = output<Timeframe>();
@@ -44,4 +46,5 @@ export class ReplayToolbarComponent {
   /** In view-only mode the timeframe can still change (not persisted); only a live, complete session locks it. */
   readonly timeframeLocked = computed(() => this.completed() && this.viewingAt() === null);
   readonly balanceText = computed(() => formatBalance(this.balance(), this.currency()));
+  readonly openRiskText = computed(() => formatBalance(this.openRisk(), this.currency()));
 }

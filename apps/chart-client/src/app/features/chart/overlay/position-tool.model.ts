@@ -20,8 +20,13 @@ export interface PositionToolState {
   kind: PositionToolKind;
   orderId?: string;
   active: boolean;
-  /** Where the drawing starts on the time axis (ms): the cursor when the tool was created. */
+  /** Where the drawing starts on the time axis (ms): a bar open of the panel's timeframe. */
   anchorTime: number;
+  /**
+   * A live order's own size and 1R (T-023): its labels show these, never a size re-derived from
+   * the current balance and risk % (that is only right for a draft).
+   */
+  order?: { qty: number; riskAmount: number };
 }
 
 /** What the chart needs to draw and label the tools of one panel. */

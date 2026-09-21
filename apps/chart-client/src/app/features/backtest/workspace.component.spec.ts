@@ -51,6 +51,13 @@ function fakeStore() {
     createDraft: vi.fn(),
     activeTool: vi.fn((): unknown => (store.activeDraft ? { panelId: 'btc', store: { active: () => store.activeDraft, removeActiveDraft: store.removeActiveDraft } } : null)),
     showHint: vi.fn((message: string) => store.hint.set(message)),
+    placeActiveDraft: vi.fn(),
+    riskPct: signal(1),
+    riskPctOverride: signal<number | null>(null),
+    positions: signal({ rows: [], openRisk: 0 }),
+    lastCloseOf: vi.fn(() => 100),
+    cancelOrder: vi.fn(),
+    closeOrder: vi.fn(),
     open: vi.fn(async () => {
       store.session.set(SESSION);
       store.engine.set(engine);
@@ -176,16 +183,21 @@ describe('WorkspaceComponent', () => {
     expect(store.removeActiveDraft).toHaveBeenCalledTimes(1);
   });
 
-  it('Enter with no active draft shows the hint and does nothing else; with one it does nothing yet (T-023)', async () => {
+  it('Enter places the active draft through the store (which alone decides: T-023)', async () => {
     const { fixture, store, el } = await render();
     press('Enter');
+    expect(store.placeActiveDraft).toHaveBeenCalledTimes(1);
+    store.showHint('No active position tool — press B or S');
     fixture.detectChanges();
-    expect(store.showHint).toHaveBeenCalledWith('No active position tool — press B or S');
     expect(el.querySelector('.hint[role="status"]')?.textContent).toBe('No active position tool — press B or S');
-    store.activeDraft = { kind: 'draft', id: 't1' };
-    press('Enter');
-    expect(store.showHint).toHaveBeenCalledTimes(1);
     expect(store.createDraft).not.toHaveBeenCalled();
+  });
+
+  it('shows the order and positions panels and the open risk (T-023)', async () => {
+    const { el } = await render();
+    expect(el.querySelector('app-order-panel')).not.toBeNull();
+    expect(el.querySelector('app-positions-panel')).not.toBeNull();
+    expect(el.querySelector('[data-testid="replay-open-risk"]')?.textContent).toContain('0.00');
   });
 
   it('B / S / Esc / Enter are ignored while typing', async () => {
@@ -194,7 +206,7 @@ describe('WorkspaceComponent', () => {
     el.appendChild(input);
     for (const key of ['b', 's', 'Escape', 'Enter']) press(key, input);
     expect(store.createDraft).not.toHaveBeenCalled();
-    expect(store.showHint).not.toHaveBeenCalled();
+    expect(store.placeActiveDraft).not.toHaveBeenCalled();
   });
 
   it('removes its key listener with the route', async () => {

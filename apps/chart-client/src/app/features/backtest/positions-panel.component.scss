@@ -1,0 +1,59 @@
+.panel {
+  padding: 8px 12px;
+  font-size: 12px;
+  overflow: auto;
+}
+h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.empty {
+  margin: 0;
+  color: #8b949e;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 3px 4px;
+  border-bottom: 1px solid #30363d;
+  text-align: right;
+  white-space: nowrap;
+}
+th {
+  color: #8b949e;
+  font-weight: 500;
+}
+th:first-child,
+td:first-child,
+td:nth-child(2) {
+  text-align: left;
+}
+.up {
+  color: #26a69a;
+}
+.down {
+  color: #ef5350;
+}
+button {
+  padding: 2px 6px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: transparent;
+  color: #c9d1d9;
+  font: inherit;
+  cursor: pointer;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

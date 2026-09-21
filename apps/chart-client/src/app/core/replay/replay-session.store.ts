@@ -1,7 +1,13 @@
 import { Injectable, type OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { Session, Timeframe } from '@trade-automation/contracts';
 import { BacktestClient } from '../api/backtest.client';
+import type { Order } from '@trade-automation/contracts';
+import { isApiError } from '../api/api-error';
+import type { PositionToolState } from '../../features/chart/overlay/position-tool.model';
+import { positionRows } from '../../features/backtest/positions.view';
 import { AdvanceQueue, type MutationOutcome, type MutationTransport } from './advance-queue';
+import { buildPlaceRequest } from './place-check';
+import { bucketStart } from './fold-on-step';
 import { PortfolioStore } from './portfolio.store';
 import { refusalNotice } from './refusal-notice';
 import type { PanelPositionTools } from '../../features/panel-grid/panel-source';
@@ -22,6 +28,7 @@ const NOTICE_MS = 8_000;
 /** How long a position-tool hint (a refused drag, `Enter` with no active tool) stays up. */
 const HINT_MS = 3_000;
 const DEFAULT_PRICE_PRECISION = 2;
+export const NO_ACTIVE_TOOL_HINT = 'No active position tool — press B or S';
 
 /**
  * backtest-app-system-design.md §2.3, §5.4–5.5 — one open backtest session in the workspace: the
@@ -51,6 +58,20 @@ export class ReplaySessionStore implements OnDestroy {
 
   /** A short position-tool message (T-022): a refused drag, `Enter` with no active tool, … */
   readonly hint = signal<string | null>(null);
+  /** The order panel's risk %, when the user changed it; otherwise the session's default (T-023). */
+  readonly riskPctOverride = signal<number | null>(null);
+  readonly riskPct = computed(() => this.riskPctOverride() ?? this.session()?.defaultRiskPct ?? 1);
+  /**
+   * The positions panel (T-023): pending and open orders with floating PnL and risk, and the total
+   * open risk — recomputed on every step, since the last closes are the engine's series.
+   */
+  readonly positions = computed(() => {
+    const session = this.session();
+    const costs = session?.costs ?? { enabled: false, commissionPct: 0, spread: 0 };
+    return positionRows(this.portfolio.orders(), (panelId) => this.lastCloseOf(panelId), costs);
+  });
+  /** Places sent and not yet answered, oldest first: which draft each 201 consumes. */
+  private readonly placing: Array<{ draftId: string; panelId: string }> = [];
 
   private queue: AdvanceQueue | null = null;
   private sessionId: string | null = null;
@@ -140,6 +161,27 @@ export class ReplaySessionStore implements OnDestroy {
     this.hintTimer = setTimeout(() => this.hint.set(null), HINT_MS);
   }
 
+  /** The panel's pending and open orders as drawings (T-023): a placed draft lives on as these. */
+  private orderTools(panelId: string, activeOrderId: string | null): PositionToolState[] {
+    return this.portfolio
+      .orders()
+      .filter((o) => o.panelId === panelId && (o.status === 'pending' || o.status === 'open'))
+      .map((o: Order) => ({
+        id: o.id,
+        side: o.side,
+        mode: o.type,
+        entry: (o.entryPrice ?? o.limitPrice) as number,
+        sl: o.slCurrent,
+        tp: o.tpCurrent,
+        kind: o.status === 'open' ? 'position' : 'pending',
+        orderId: o.id,
+        active: o.id === activeOrderId,
+        // a position from the bar of its fill; a pending order from the last bar at its placement
+        anchorTime: o.status === 'open' && o.entryTimeMs !== null ? o.entryTimeMs : o.placedAtMs - 1,
+        order: { qty: o.qty, riskAmount: o.riskAmountCcy },
+      }));
+  }
+
   private precisionOf(panelId: string): number {
     const instrument = this.session()?.layout.panels.find((p) => p.id === panelId)?.instrument;
     return (instrument && this.pricePrecision().get(instrument)) ?? DEFAULT_PRICE_PRECISION;
@@ -148,9 +190,14 @@ export class ReplaySessionStore implements OnDestroy {
   private toolsBinding(panelId: string): PanelPositionTools {
     const store = this.toolStore(panelId);
     const view = computed(() => ({
-      tools: store.tools(),
+      // every anchor on a bar open of the current timeframe (re-snapped on a switch), so a drawing
+      // never starts from a time the chart has no bar at
+      tools: [...store.tools(), ...this.orderTools(panelId, store.activeOrderId())].map((t) => ({
+        ...t,
+        anchorTime: bucketStart(t.anchorTime, this.engine()?.timeframe() ?? '1m'),
+      })),
       balance: this.session()?.balance ?? 0,
-      riskPct: this.session()?.defaultRiskPct ?? 1,
+      riskPct: this.riskPct(),
       pricePrecision: this.precisionOf(panelId),
     }));
     return { view, apply: (change) => store.apply(change), setPointerPrice: (price) => store.pointerPrice.set(price) };
@@ -193,6 +240,7 @@ export class ReplaySessionStore implements OnDestroy {
       const queue = new AdvanceQueue(this.transport(id), {
         onOutcome: (outcome) => this.reconcile(outcome),
         onRefused: (err) => this.refused(err),
+        onRejected: (err) => this.rejected(err),
         onRetrying: (retrying) => this.retrying.set(retrying),
         onIdle: () => void this.refreshStats(id),
       });
@@ -204,9 +252,15 @@ export class ReplaySessionStore implements OnDestroy {
         timeframe: session.timeframe,
         periodToMs: session.periodToMs,
         skipWeekends: session.skipWeekends,
-        onStep: (cursorMs) => queue.push({ kind: 'advance', toCursorMs: cursorMs }),
+        onStep: (cursorMs, revealed) => {
+          // the preview first (the drawings flip now), then the advance that makes it true;
+          // the step onto the period end is the server's alone (the end-of-session force close)
+          if (cursorMs < session.periodToMs) this.portfolio.previewStep(cursorMs, revealed, session.costs);
+          queue.push({ kind: 'advance', toCursorMs: cursorMs });
+        },
       });
       this.queue = queue;
+      this.placing.length = 0;
       this.portfolio.load(detail);
       await this.loadJournal(id);
       this.session.set(session);
@@ -279,34 +333,101 @@ export class ReplaySessionStore implements OnDestroy {
         const { cursorMs, status, balance, events, orders, stats } = outcome.result;
         engine?.confirmServerCursor(cursorMs);
         this.session.update((s) => (s ? { ...s, cursorMs, status, balance } : s));
-        this.applyOrders(orders);
+        this.reportMismatches(this.portfolio.applyAdvance(cursorMs, orders));
         this.portfolio.applyEvents(events);
         this.portfolio.stats.set(stats);
         if (status === 'complete') engine?.complete();
         return;
       }
-      case 'place':
+      case 'place': {
+        // the draft is consumed: the server's order draws it from now on, and stays active
+        const placed = this.placing.shift();
+        if (placed) {
+          const store = this.toolStore(placed.panelId);
+          store.removeDraft(placed.draftId);
+          store.activate(outcome.result.order.id);
+        }
         this.applyOrders([outcome.result.order]);
         this.portfolio.applyEvents(outcome.result.events);
         return;
+      }
       case 'close':
+        this.portfolio.clearPending(outcome.result.order.id);
         this.applyOrders([outcome.result.order]);
         this.portfolio.stats.set(outcome.result.stats);
         this.session.update((s) => (s ? { ...s, balance: outcome.result.balance } : s));
         return;
       case 'cancel':
       case 'modify':
+        this.portfolio.clearPending(outcome.result.id);
         this.applyOrders([outcome.result]);
         return;
     }
   }
 
   private applyOrders(orders: Parameters<PortfolioStore['applyOrders']>[0]): void {
-    const mismatches = this.portfolio.applyOrders(orders);
+    this.reportMismatches(this.portfolio.applyOrders(orders));
+  }
+
+  private reportMismatches(mismatches: ReturnType<PortfolioStore['applyOrders']>): void {
     if (mismatches.length > 0) {
       console.warn('[ReplaySessionStore] preview/server mismatch — the server rows win', mismatches);
       this.showNotice('Resynced with the server.');
     }
+  }
+
+  /** A 422 on place (T-023): the server validated the order and changed nothing — a hint, the draft stays. */
+  private rejected(err: unknown): void {
+    this.placing.shift();
+    this.showHint(isApiError(err) ? `Order refused: ${err.message}` : 'Order refused by the server.');
+  }
+
+  /**
+   * `Enter` (decision 29): the active draft becomes a `place` op — never a guessed order. With no
+   * active draft, a hint and nothing else. The client checks the server's rules first
+   * (`buildPlaceRequest`), and a draft already on its way is not sent twice.
+   */
+  placeActiveDraft(): void {
+    const active = this.activeTool();
+    const draft = active?.store.active();
+    const engine = this.engine();
+    const session = this.session();
+    if (!active || !draft || draft.kind !== 'draft' || !engine || !session) return this.showHint(NO_ACTIVE_TOOL_HINT);
+    if (this.placing.some((p) => p.draftId === draft.id)) return this.showHint('This order is already on its way.');
+    const lastClose = this.lastCloseOf(active.panelId);
+    if (lastClose === null) return this.showHint('No price on this panel yet.');
+    const built = buildPlaceRequest(draft, {
+      panelId: active.panelId,
+      cursorMs: engine.cursor(),
+      lastClose,
+      riskPct: this.riskPct(),
+      balance: session.balance,
+    });
+    if ('hint' in built) return this.showHint(built.hint);
+    this.placing.push({ draftId: draft.id, panelId: active.panelId });
+    this.queue?.push(built.input);
+  }
+
+  /** The positions panel's cancel (pending) and close-at-market (open), through the queue. */
+  cancelOrder(orderId: string): void {
+    this.orderOp('cancel', orderId);
+  }
+
+  closeOrder(orderId: string): void {
+    this.orderOp('close', orderId);
+  }
+
+  private orderOp(kind: 'cancel' | 'close', orderId: string): void {
+    const engine = this.engine();
+    if (!engine || !this.queue) return;
+    this.portfolio.markPending(orderId);
+    this.queue.push({ kind, cursorMs: engine.cursor(), orderId });
+  }
+
+  /** The last revealed 1m close on a panel (its forming bar's close), or null before data. */
+  lastCloseOf(panelId: string): number | null {
+    const s = this.engine()?.seriesFor(panelId)();
+    return (s ? (s.forming ?? s.closed.at(-1))?.close : undefined) ?? null;
   }
 
   private refused(err: unknown): void {

@@ -14,6 +14,7 @@
         [completed]="e.completed()"
         [retrying]="store.retrying()"
         [notice]="store.notice()"
+        [openRisk]="store.positions().openRisk"
         [error]="e.error()"
         (step)="step()"
         (timeframeChange)="setTimeframe($event)"
@@ -25,8 +26,34 @@
         <!-- §9.3: editing the layout PATCHes the session — never while viewing the past -->
         <app-layout-editor />
       }
-      <div class="grid">
-        <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
+      <div class="main">
+        <div class="grid">
+          <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
+        </div>
+        @if (!e.viewOnly) {
+          <!-- placing, cancelling and closing are mutations too: none while viewing the past -->
+          <aside class="side">
+            <app-order-panel
+              [draft]="activeDraft()?.draft ?? null"
+              [lastClose]="activeDraft()?.lastClose ?? null"
+              [pricePrecision]="activeDraft()?.precision ?? 2"
+              [balance]="s.balance"
+              [riskPct]="store.riskPct()"
+              [notionalWarnMultiple]="s.notionalWarnMultiple"
+              [currency]="s.sessionCurrency"
+              (riskPctChange)="store.riskPctOverride.set($event)"
+              (place)="order()"
+            />
+            <app-positions-panel
+              class="positions"
+              [rows]="store.positions().rows"
+              [currency]="s.sessionCurrency"
+              [pricePrecision]="store.pricePrecision()"
+              (cancel)="store.cancelOrder($event)"
+              (close)="store.closeOrder($event)"
+            />
+          </aside>
+        }
       </div>
       <div class="bottom">
         <app-journal

@@ -22,7 +22,7 @@ export function viewAtFor(order: Pick<Order, 'entryTimeMs' | 'placedAtMs'>): num
  * the primitive would fall back to the left edge). Read-only: never active.
  */
 export function orderTool(
-  order: Pick<Order, 'id' | 'panelId' | 'side' | 'type' | 'status' | 'entryPrice' | 'limitPrice' | 'slCurrent' | 'tpCurrent' | 'entryTimeMs' | 'placedAtMs'>,
+  order: Pick<Order, 'id' | 'panelId' | 'side' | 'type' | 'status' | 'entryPrice' | 'limitPrice' | 'slCurrent' | 'tpCurrent' | 'entryTimeMs' | 'placedAtMs' | 'qty' | 'riskAmountCcy'>,
   tf: Timeframe,
 ): PositionToolState | null {
   const entry = order.entryPrice ?? order.limitPrice;
@@ -38,5 +38,6 @@ export function orderTool(
     kind: order.entryPrice === null ? 'pending' : 'position',
     active: false,
     anchorTime: bucketStart(order.entryTimeMs ?? order.placedAtMs, tf),
+    order: { qty: order.qty, riskAmount: order.riskAmountCcy }, // labelled with its own qty and R (T-023)
   };
 }

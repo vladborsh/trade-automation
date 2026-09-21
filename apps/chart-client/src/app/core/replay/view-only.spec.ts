@@ -16,12 +16,13 @@ describe('viewAtFor (§9.3)', () => {
 describe('orderTool (the viewed order as a read-only position tool)', () => {
   const order = {
     id: 'o1', panelId: 'btc', side: 'long', type: 'market', status: 'closed', entryPrice: 100, limitPrice: null,
-    slCurrent: 95, tpCurrent: 110, entryTimeMs: T, placedAtMs: T + 60_000,
+    slCurrent: 95, tpCurrent: 110, entryTimeMs: T, placedAtMs: T + 60_000, qty: 2, riskAmountCcy: 10,
   } as Order;
 
   it('a filled order is a position at its fill bar, never active', () => {
     expect(orderTool(order, '1m')).toEqual({
       id: 'view-o1', orderId: 'o1', side: 'long', mode: 'market', entry: 100, sl: 95, tp: 110, kind: 'position', active: false, anchorTime: T,
+      order: { qty: 2, riskAmount: 10 },
     });
     // 10:04 has no x on a 5m or 1h chart: the anchor is that bar's open
     expect(orderTool(order, '5m')?.anchorTime).toBe(Date.UTC(2026, 8, 16, 10, 0));

@@ -6,6 +6,7 @@ import type {
   ISeriesApi,
   ISeriesPrimitive,
   SeriesAttachedParameter,
+  Logical,
   SeriesType,
   Time,
   UTCTimestamp,
@@ -29,8 +30,14 @@ export const TOOL_MIN_WIDTH_PX = 200;
  */
 export function anchorX(chart: IChartApi, anchorTimeMs: number): number {
   const timeScale = chart.timeScale();
-  const x = timeScale.timeToCoordinate(Math.floor(anchorTimeMs / 1000) as UTCTimestamp) ?? 0;
-  return Math.max(0, Math.min(x, timeScale.width() - TOOL_MIN_WIDTH_PX));
+  const time = Math.floor(anchorTimeMs / 1000) as UTCTimestamp;
+  // not a bar's open (a live order is anchored at its placement cursor): the nearest bar
+  let x = timeScale.timeToCoordinate(time);
+  if (x === null) {
+    const index = timeScale.timeToIndex(time, true);
+    x = index === null ? null : timeScale.logicalToCoordinate(index as unknown as Logical);
+  }
+  return Math.max(0, Math.min(x ?? 0, timeScale.width() - TOOL_MIN_WIDTH_PX));
 }
 
 /**

@@ -31,7 +31,10 @@ export class PositionToolsStore {
   /** The price under the pointer while it is over this panel's chart; null otherwise. */
   readonly pointerPrice = signal<number | null>(null);
   readonly tools: Signal<readonly PositionToolState[]> = this.list.asReadonly();
+  /** The active draft, if the active tool is a draft. */
   readonly active = computed(() => this.list().find((t) => t.active) ?? null);
+  /** The active live order's drawing (T-023), if the active tool is one of those. */
+  readonly activeOrderId = signal<string | null>(null);
 
   constructor(private readonly deps: PositionToolsDeps) {}
 
@@ -58,15 +61,23 @@ export class PositionToolsStore {
     return tool;
   }
 
+  /** A draft of this store, or else a live order's drawing (whose id is the order id, T-023). */
   activate(id: string): void {
-    if (!this.list().some((t) => t.id === id)) return;
-    this.list.update((tools) => tools.map((t) => ({ ...t, active: t.id === id })));
+    const isDraft = this.list().some((t) => t.id === id);
+    this.list.update((tools) => tools.map((t) => (t.active === (t.id === id) ? t : { ...t, active: t.id === id })));
+    this.activeOrderId.set(isDraft ? null : id);
     this.deps.activated(this);
   }
 
   /** Another panel's tool became active. */
   deactivate(): void {
     if (this.active()) this.list.update((tools) => tools.map((t) => (t.active ? { ...t, active: false } : t)));
+    this.activeOrderId.set(null);
+  }
+
+  /** A draft was placed: the server's order now draws it (T-023). */
+  removeDraft(id: string): void {
+    this.list.update((tools) => tools.filter((t) => t.id !== id));
   }
 
   /** `Esc`: removes the active tool if it is a draft. True when one was removed. */
