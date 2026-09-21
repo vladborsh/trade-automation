@@ -28,9 +28,10 @@ export function effectiveParams(entry: IndicatorCatalogEntry, params: Readonly<R
   return out;
 }
 
-/** `EMA (21)`, `MACD (12, 26, 9)`. */
+/** `EMA (21)`, `MACD (12, 26, 9)`; an entry without params is just its id, `VWAP`. */
 export function indicatorLabel(entry: IndicatorCatalogEntry, params: Readonly<Record<string, number>>): string {
-  return `${entry.id.toUpperCase()} (${entry.params.map((p) => params[p.key]).join(', ')})`;
+  const id = entry.id.toUpperCase();
+  return entry.params.length === 0 ? id : `${id} (${entry.params.map((p) => params[p.key]).join(', ')})`;
 }
 
 /**

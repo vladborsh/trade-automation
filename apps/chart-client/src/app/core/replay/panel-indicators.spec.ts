@@ -47,6 +47,9 @@ describe('panel-indicators (T-028)', () => {
   it('labels, param acceptance and ATR(14)', () => {
     const macd = indicatorById('macd')!;
     expect(indicatorLabel(macd, effectiveParams(macd, {}))).toBe('MACD (12, 26, 9)');
+    for (const [id, label] of [['vwap', 'VWAP'], ['prev-hour', 'PREV-HOUR'], ['fvg', 'FVG'], ['atr', 'ATR (20)']]) {
+      expect(indicatorLabel(indicatorById(id)!, effectiveParams(indicatorById(id)!, {}))).toBe(label); // T-034: no empty "()"
+    }
     expect(acceptParam(macd, 'fast', '8')).toBe(8);
     expect(acceptParam(macd, 'fast', '8.5')).toBeNull(); // integer
     expect(acceptParam(macd, 'fast', '0')).toBeNull(); // below min
