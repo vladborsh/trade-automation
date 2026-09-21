@@ -189,7 +189,8 @@ maybeDescribe('backtest sessions against a real Postgres (T-013 done-when)', () 
       { time: NEW_SESSION.periodFromMs, balance: 10_000.5, balanceR: 0 },
       { time: exitTimeMs, balance: 10_150.75, balanceR: 1.502462 },
     ]);
-    expect(detail.openOrders).toEqual([]);
+    // T-015: openOrders are the pending + open orders — here just the seq-2 pending limit
+    expect(detail.openOrders.map((o) => [o.seq, o.status])).toEqual([[2, 'pending']]);
     expect(detail.session.id).toBe(s.id);
   });
 

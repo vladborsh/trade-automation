@@ -1,4 +1,5 @@
-import { Costs, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { Costs, SessionAggregates, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { OpsRepository } from './ops.repository.port';
 import { OrderRepository } from './order.repository.port';
 
 /** What POST /backtest/sessions writes (§7.2): the validated request plus the derived fields. */
@@ -32,11 +33,17 @@ export interface SessionRepository {
   update(userId: string, id: string, patch: { name?: string; timeframe?: Timeframe }): Promise<SessionSummary | null>;
   /** True when a row was deleted; cascades to orders, modifications, screenshots, ops (§3). */
   delete(userId: string, id: string): Promise<boolean>;
+  /**
+   * A trade close (§5.5 step 4, decision 38): writes the new realized balance and the aggregate
+   * columns (`toSessionAggregates(computeStats(…))`). Call inside the closing transaction.
+   */
+  applyTradeClose(userId: string, id: string, balance: number, aggregates: SessionAggregates): Promise<SessionSummary | null>;
 }
 
 export interface BacktestRepositories {
   sessions: SessionRepository;
   orders: OrderRepository;
+  ops: OpsRepository;
   transaction<T>(fn: (repos: Omit<BacktestRepositories, 'transaction'>) => Promise<T>): Promise<T>;
 }
 

@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto';
-import { Coverage, InstrumentId, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { Candle, Coverage, InstrumentId, Order, SessionAggregates, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
-import { OrderRepository } from '../../src/backtest/order.repository.port';
+import { OpsRepository } from '../../src/backtest/ops.repository.port';
+import { NewOrder, OrderClose, OrderRepository } from '../../src/backtest/order.repository.port';
+import { money, percent, rMultiple } from '../../src/backtest/pg/numeric';
 import { BacktestRepositories, NewSession, SessionRepository } from '../../src/backtest/session.repository.port';
 import { SessionService } from '../../src/backtest/session.service';
 
@@ -9,11 +11,70 @@ import { SessionService } from '../../src/backtest/session.service';
 export class FakeBacktestRepositories implements BacktestRepositories {
   readonly rows = new Map<string, { userId: string; session: SessionSummary }>();
   private clock = 1_000;
-  /** Closed orders per session id, as `listClosedForStats` returns them. */
+  /** Closed orders per session id seeded directly, as `listClosedForStats` returns them. */
   readonly closedOrders = new Map<string, StatsOrder[]>();
+  /** Every order row, by id (T-015). */
+  readonly orderRows = new Map<string, Order>();
+  /** `backtest_ops`, keyed `sessionId|opId`; stored as JSON text like the jsonb column. */
+  readonly opRows = new Map<string, string>();
+
+  private ordersOf(sessionId: string): Order[] {
+    return [...this.orderRows.values()].filter((o) => o.sessionId === sessionId).sort((a, b) => a.seq - b.seq);
+  }
+
+  private patchOrder(sessionId: string, orderId: string, from: Order['status'], patch: Partial<Order>): Order | null {
+    const row = this.orderRows.get(orderId);
+    if (!row || row.sessionId !== sessionId || row.status !== from) return null;
+    Object.assign(row, patch, { updatedAt: this.clock++ });
+    return { ...row };
+  }
 
   readonly orders: OrderRepository = {
-    listClosedForStats: jest.fn(async (sessionId: string) => this.closedOrders.get(sessionId) ?? []),
+    listClosedForStats: jest.fn(async (sessionId: string) => [
+      ...(this.closedOrders.get(sessionId) ?? []),
+      ...this.ordersOf(sessionId).filter((o) => o.status === 'closed'),
+    ]),
+    nextSeq: async (sessionId) => Math.max(0, ...this.ordersOf(sessionId).map((o) => o.seq)) + 1,
+    insert: async (o: NewOrder) => {
+      const now = this.clock++;
+      const row: Order = {
+        id: randomUUID(), sessionId: o.sessionId, seq: o.seq, panelId: o.panelId, instrument: o.instrument,
+        side: o.side, type: o.type, status: o.status, placedAtMs: o.placedAtMs,
+        limitPrice: money(o.limitPrice), entryPrice: money(o.entryPrice), entryTimeMs: o.entryTimeMs,
+        qty: money(o.qty), riskPct: percent(o.riskPct), riskAmountCcy: money(o.riskAmountCcy),
+        slInitial: money(o.sl), slCurrent: money(o.sl), tpInitial: money(o.tp), tpCurrent: money(o.tp),
+        exitPrice: null, exitTimeMs: null, closeReason: null, fillResolution: o.fillResolution, slTpSameBar: false,
+        commissionCcy: 0, spreadCostCcy: 0, pnlCcy: null, pnlR: null, maePrice: null, maeR: null,
+        cancelledAtMs: null, createdAt: now, updatedAt: now,
+      };
+      this.orderRows.set(row.id, row);
+      return { ...row };
+    },
+    findById: async (sessionId, orderId) => {
+      const row = this.orderRows.get(orderId);
+      return row && row.sessionId === sessionId ? { ...row } : null;
+    },
+    list: async (sessionId, statuses) =>
+      this.ordersOf(sessionId).filter((o) => !statuses || statuses.includes(o.status)).map((o) => ({ ...o })),
+    listModifications: async () => [],
+    cancel: async (sessionId, orderId, cancelledAtMs) =>
+      this.patchOrder(sessionId, orderId, 'pending', { status: 'cancelled', cancelledAtMs }),
+    close: async (sessionId, orderId, c: OrderClose) =>
+      this.patchOrder(sessionId, orderId, 'open', {
+        status: 'closed', exitPrice: money(c.exitPrice), exitTimeMs: c.exitTimeMs, closeReason: c.closeReason,
+        fillResolution: c.fillResolution, commissionCcy: money(c.commissionCcy), spreadCostCcy: money(c.spreadCostCcy),
+        pnlCcy: money(c.pnlCcy), pnlR: rMultiple(c.pnlR), maePrice: money(c.maePrice), maeR: rMultiple(c.maeR),
+      }),
+  };
+
+  readonly ops: OpsRepository = {
+    find: async (sessionId, opId) => {
+      const stored = this.opRows.get(`${sessionId}|${opId}`);
+      return stored === undefined ? null : JSON.parse(stored);
+    },
+    save: async (sessionId, opId, response) => {
+      this.opRows.set(`${sessionId}|${opId}`, JSON.stringify(response));
+    },
   };
 
   readonly sessions: SessionRepository = {
@@ -76,6 +137,12 @@ export class FakeBacktestRepositories implements BacktestRepositories {
       if (!row || row.userId !== userId) return false;
       return this.rows.delete(id);
     },
+    applyTradeClose: async (userId, id, balance: number, a: SessionAggregates) => {
+      const row = this.rows.get(id);
+      if (!row || row.userId !== userId) return null;
+      Object.assign(row.session, { ...a, balance: money(balance), updatedAt: this.clock++ });
+      return row.session;
+    },
   };
 
   transaction<T>(fn: (repos: Omit<BacktestRepositories, 'transaction'>) => Promise<T>): Promise<T> {
@@ -133,4 +200,23 @@ export function createBody(overrides: Record<string, unknown> = {}): Record<stri
     costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
     ...overrides,
   };
+}
+
+/** A 1m candle of `instrument` (T-015 order specs). */
+export function m1(instrument: InstrumentId, openTime: number, o: number, h: number, l: number, c: number): Candle {
+  return { instrument, timeframe: '1m', openTime, open: o, high: h, low: l, close: c, volume: 1, closed: true, source: 'venue-rest' };
+}
+
+/** In-memory `CandleStore` over a fixed set of 1m candles: `coverage` and `query` only. */
+export function candleStore(bars: Candle[]) {
+  const of = (id: InstrumentId) => bars.filter((b) => b.instrument === id).sort((a, b) => a.openTime - b.openTime);
+  return {
+    coverage: jest.fn(async (id: InstrumentId) => {
+      const own = of(id);
+      return own.length ? { from: own[0].openTime, to: own[own.length - 1].openTime } : null;
+    }),
+    query: jest.fn(async (id: InstrumentId, tf: Timeframe, from: number, to: number) =>
+      tf === '1m' ? of(id).filter((b) => b.openTime >= from && b.openTime <= to) : [],
+    ),
+  } as never;
 }

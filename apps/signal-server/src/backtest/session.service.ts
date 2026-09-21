@@ -104,15 +104,16 @@ export class SessionService {
   /**
    * §7.2 GET /backtest/sessions/:id. `stats` is recomputed from the session's closed orders with
    * replay-core's `computeStats` (decision 38: the list reads the stored aggregates, the detail
-   * recomputes). The orders are read only after the session has resolved for this user.
-   * `openOrders` is empty until order persistence lands (T-015).
+   * recomputes). `openOrders` are the pending and open orders, by `seq`. The orders are read only
+   * after the session has resolved for this user.
    */
   async detail(userId: string, id: string): Promise<SessionDetail> {
     const session = await this.get(userId, id);
-    const closed = await this.requireEnabled().orders.listClosedForStats(session.id);
+    const { orders } = this.requireEnabled();
+    const closed = await orders.listClosedForStats(session.id);
     return {
       session: toSession(session),
-      openOrders: [],
+      openOrders: await orders.list(session.id, ['pending', 'open']),
       stats: computeStats(closed, session.initialBalance, session.periodFromMs),
     };
   }

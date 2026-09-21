@@ -1,6 +1,7 @@
-import { SessionLayout, SessionStatus, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { SessionAggregates, SessionLayout, SessionStatus, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import { DbHandle } from '../../db/db.port';
 import { NewSession, SessionRepository } from '../session.repository.port';
+import { money, rMultiple } from './numeric';
 
 /** numeric/bigint columns arrive as `number` (PgDatabase type parsers); timestamptz as `Date`. */
 interface SessionRow {
@@ -147,5 +148,41 @@ export class PgSessionRepository implements SessionRepository {
       [id, userId],
     );
     return rows.length > 0;
+  }
+
+  async applyTradeClose(
+    userId: string,
+    id: string,
+    balance: number,
+    a: SessionAggregates,
+  ): Promise<SessionSummary | null> {
+    const [row] = await this.db.query<SessionRow>(
+      `update backtest_sessions
+          set balance = $3, trades_count = $4, wins_count = $5, losses_count = $6, pnl_ccy = $7, pnl_r = $8,
+              profit_factor = $9, max_drawdown_ccy = $10, max_drawdown_r = $11, avg_win_ccy = $12,
+              avg_win_r = $13, avg_loss_ccy = $14, avg_loss_r = $15, stats_computed_at = to_timestamp($16 / 1000.0),
+              updated_at = now()
+        where id = $1 and user_id = $2
+       returning ${COLUMNS}`,
+      [
+        id,
+        userId,
+        money(balance),
+        a.tradesCount,
+        a.winsCount,
+        a.lossesCount,
+        money(a.pnlCcy),
+        rMultiple(a.pnlR),
+        rMultiple(a.profitFactor),
+        money(a.maxDrawdownCcy),
+        rMultiple(a.maxDrawdownR),
+        money(a.avgWinCcy),
+        rMultiple(a.avgWinR),
+        money(a.avgLossCcy),
+        rMultiple(a.avgLossR),
+        a.statsComputedAt,
+      ],
+    );
+    return row ? toSessionSummary(row) : null;
   }
 }

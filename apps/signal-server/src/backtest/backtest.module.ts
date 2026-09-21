@@ -5,6 +5,7 @@ import { DbModule } from '../db/db.module';
 import { StorageModule } from '../storage/storage.module';
 import { PgBacktestRepositories } from './pg/pg-backtest-repositories';
 import { BACKTEST_REPOSITORIES } from './session.repository.port';
+import { OrderService } from './order.service';
 import { ReplayAheadService } from './replay-ahead.service';
 import { ReplayHistoryService } from './replay-history.service';
 import { SessionService } from './session.service';
@@ -20,7 +21,8 @@ import { SessionService } from './session.service';
     SessionService,
     ReplayHistoryService,
     ReplayAheadService,
+    OrderService,
   ],
-  exports: [SessionService, ReplayHistoryService, ReplayAheadService],
+  exports: [SessionService, ReplayHistoryService, ReplayAheadService, OrderService],
 })
 export class BacktestModule {}

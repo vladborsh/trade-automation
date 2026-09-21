@@ -1,0 +1,237 @@
+import { BadRequestException, HttpStatus, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  CancelRequest,
+  CloseRequest,
+  CloseResponse,
+  FillEvent,
+  Order,
+  OrderDetail,
+  OrderStatusSchema,
+  PlaceOrderRequest,
+  PlaceOrderResponse,
+  SessionSummary,
+} from '@trade-automation/contracts';
+import {
+  computeMae,
+  computeStats,
+  computeTradeResult,
+  marketExitEvent,
+  marketFillPrice,
+  positionSize,
+  toSessionAggregates,
+} from '@trade-automation/replay-core';
+import { z } from 'zod';
+import { apiError } from '../auth/auth-error';
+import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
+import { lastRevealed1m } from './last-revealed';
+import { orderLevelError, plannedEntry } from './order-validation';
+import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
+
+type TxRepos = Omit<BacktestRepositories, 'transaction'>;
+
+const UuidSchema = z.string().uuid();
+
+/**
+ * architecture/backtest-app-system-design.md §7.2 — orders: place, cancel, manual close, list, get.
+ *
+ * - Every call is scoped to `userId` (the cookie user): the session is resolved through
+ *   `SessionRepository.findById(userId, …)` first, and another user's session is a 404.
+ * - Every mutation (D9) runs in one transaction that locks the session row, replays the stored
+ *   response when the `opId` was seen before, and otherwise stores its response with the
+ *   mutation — so a retried or duplicated request never mutates twice.
+ * - All fill and money maths is replay-core's (`positionSize`, `marketFillPrice`,
+ *   `marketExitEvent`, `computeTradeResult`, `computeMae`, `computeStats`,
+ *   `toSessionAggregates`): the client runs the same functions (decision 5).
+ */
+@Injectable()
+export class OrderService {
+  constructor(
+    @Inject(BACKTEST_REPOSITORIES) private readonly repos: BacktestRepositories | null,
+    @Inject(CANDLE_STORE) private readonly store: CandleStore,
+  ) {}
+
+  /**
+   * POST …/orders. A market order fills now at `lastClose ± half` (`marketFillPrice`) with
+   * `entry_time_ms` = the last revealed 1m candle's `openTime`; a limit order is `pending`.
+   * `qty` / `riskAmount` come from `positionSize` over the current balance and are fixed here.
+   */
+  place(userId: string, sessionId: string, req: PlaceOrderRequest): Promise<PlaceOrderResponse> {
+    return this.mutate(userId, sessionId, req.opId, async (tx, session) => {
+      assertTradable(session, req.cursorMs);
+      const panel = session.layout.panels.find((p) => p.id === req.panelId);
+      if (!panel) throw new BadRequestException(`Unknown panelId '${req.panelId}' for this session.`);
+
+      const last = await this.lastBar(panel.instrument, session.cursorMs);
+      const levelError = orderLevelError(req, last.close);
+      if (levelError) throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, levelError, levelMessage(levelError));
+      if (!(session.balance > 0)) {
+        throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'BALANCE_NOT_POSITIVE', 'The session balance is not positive; the order cannot be sized.');
+      }
+      const { qty, riskAmount } = positionSize(session.balance, req.riskPct, plannedEntry(req, last.close), req.sl);
+      const market = req.type === 'market';
+
+      const order = await tx.orders.insert({
+        sessionId: session.id,
+        seq: await tx.orders.nextSeq(session.id),
+        panelId: panel.id,
+        instrument: panel.instrument,
+        side: req.side,
+        type: req.type,
+        status: market ? 'open' : 'pending',
+        placedAtMs: session.cursorMs,
+        limitPrice: market ? null : (req.limitPrice as number),
+        entryPrice: market ? marketFillPrice(req.side, last.close, session.costs) : null,
+        entryTimeMs: market ? last.openTime : null,
+        qty,
+        riskPct: req.riskPct,
+        riskAmountCcy: riskAmount,
+        sl: req.sl,
+        tp: req.tp ?? null,
+        fillResolution: market ? '1m' : null,
+      });
+      const events: FillEvent[] = market
+        ? [{ orderId: order.id, kind: 'fill', time: order.entryTimeMs as number, price: order.entryPrice as number, resolution: '1m' }]
+        : [];
+      return { order, events };
+    });
+  }
+
+  /** POST …/orders/:orderId/cancel — pending only (409 `ORDER_NOT_PENDING`). */
+  cancel(userId: string, sessionId: string, orderId: string, req: CancelRequest): Promise<Order> {
+    return this.mutate(userId, sessionId, req.opId, async (tx, session) => {
+      assertTradable(session, req.cursorMs);
+      const order = await this.lockOrder(tx, session.id, orderId);
+      if (order.status !== 'pending') {
+        throw apiError(HttpStatus.CONFLICT, 'ORDER_NOT_PENDING', `Only a pending order can be cancelled (this one is ${order.status}).`);
+      }
+      return (await tx.orders.cancel(session.id, order.id, session.cursorMs)) as Order;
+    });
+  }
+
+  /**
+   * POST …/orders/:orderId/close — open only (409 `ORDER_NOT_OPEN`). A market exit at the last
+   * revealed 1m close (`marketExitEvent`, `close_reason='manual'`); costs, PnL, R and MAE from
+   * replay-core; then the balance and the aggregate columns, all in the one transaction.
+   */
+  close(userId: string, sessionId: string, orderId: string, req: CloseRequest): Promise<CloseResponse> {
+    return this.mutate(userId, sessionId, req.opId, async (tx, session) => {
+      assertTradable(session, req.cursorMs);
+      const order = await this.lockOrder(tx, session.id, orderId);
+      if (order.status !== 'open') {
+        throw apiError(HttpStatus.CONFLICT, 'ORDER_NOT_OPEN', `Only an open order can be closed (this one is ${order.status}).`);
+      }
+      const entryTimeMs = order.entryTimeMs as number;
+      const last = await this.lastBar(order.instrument, session.cursorMs);
+      const exit = marketExitEvent(order, last, 'manual', session.costs);
+      const result = computeTradeResult(order, exit, session.costs);
+      const path = await this.store.query(order.instrument, '1m', entryTimeMs, exit.time);
+      const mae = computeMae({ ...order, exitTimeMs: exit.time }, path);
+
+      const closed = (await tx.orders.close(session.id, order.id, {
+        exitPrice: exit.price,
+        exitTimeMs: exit.time,
+        closeReason: 'manual',
+        fillResolution: order.fillResolution ?? '1m',
+        ...result,
+        ...mae,
+      })) as Order;
+
+      const stats = computeStats(await tx.orders.listClosedForStats(session.id), session.initialBalance, session.periodFromMs);
+      const updated = await tx.sessions.applyTradeClose(
+        userId,
+        session.id,
+        session.balance + (closed.pnlCcy as number),
+        toSessionAggregates(stats, Date.now()),
+      );
+      return { order: closed, stats, balance: (updated as SessionSummary).balance };
+    });
+  }
+
+  /** GET …/orders?status= — the journal, by `seq`. */
+  async list(userId: string, sessionId: string, status?: string): Promise<Order[]> {
+    const parsed = OrderStatusSchema.optional().safeParse(status);
+    if (!parsed.success) throw new BadRequestException(`Unknown status '${status}'.`);
+    const repos = this.requireEnabled();
+    const session = await this.findSession(repos, userId, sessionId);
+    return repos.orders.list(session.id, parsed.data ? [parsed.data] : undefined);
+  }
+
+  /** GET …/orders/:orderId — with its modifications; screenshots stay empty until T-025. */
+  async get(userId: string, sessionId: string, orderId: string): Promise<OrderDetail> {
+    const repos = this.requireEnabled();
+    const session = await this.findSession(repos, userId, sessionId);
+    const order = UuidSchema.safeParse(orderId).success ? await repos.orders.findById(session.id, orderId) : null;
+    if (!order) throw new NotFoundException('Order not found.');
+    return { order, modifications: await repos.orders.listModifications(order.id), screenshots: {} };
+  }
+
+  /** 503 when the DB module is disabled. */
+  assertEnabled(): void {
+    this.requireEnabled();
+  }
+
+  /** D9: lock the session, replay a seen `opId`, otherwise mutate and store the response. */
+  private mutate<T>(userId: string, sessionId: string, opId: string, fn: (tx: TxRepos, session: SessionSummary) => Promise<T>): Promise<T> {
+    const repos = this.requireEnabled();
+    if (!UuidSchema.safeParse(sessionId).success) return Promise.reject(sessionNotFound());
+    return repos.transaction(async (tx) => {
+      const session = await tx.sessions.findById(userId, sessionId, { forUpdate: true });
+      if (!session) throw sessionNotFound();
+      const stored = await tx.ops.find(session.id, opId);
+      if (stored !== null) return stored as T;
+      const response = await fn(tx, session);
+      await tx.ops.save(session.id, opId, response);
+      return response;
+    });
+  }
+
+  private async findSession(repos: BacktestRepositories, userId: string, sessionId: string): Promise<SessionSummary> {
+    const session = UuidSchema.safeParse(sessionId).success ? await repos.sessions.findById(userId, sessionId) : null;
+    if (!session) throw sessionNotFound();
+    return session;
+  }
+
+  private async lockOrder(tx: TxRepos, sessionId: string, orderId: string): Promise<Order> {
+    const order = UuidSchema.safeParse(orderId).success ? await tx.orders.findById(sessionId, orderId, { forUpdate: true }) : null;
+    if (!order) throw new NotFoundException('Order not found.');
+    return order;
+  }
+
+  private async lastBar(instrument: Order['instrument'], cursorMs: number) {
+    const last = await lastRevealed1m(this.store, instrument, cursorMs);
+    if (!last) {
+      throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'NO_PRICE_AT_CURSOR', `No 1m candle of ${instrument} is revealed at the cursor.`);
+    }
+    return last;
+  }
+
+  private requireEnabled(): BacktestRepositories {
+    if (!this.repos) throw new ServiceUnavailableException('backtest disabled: DATABASE_URL not set');
+    return this.repos;
+  }
+}
+
+/** 409 `SESSION_COMPLETE`, then 409 `CURSOR_MISMATCH` (§5.5: an order op carries the cursor it was made at). */
+function assertTradable(session: SessionSummary, cursorMs: number): void {
+  if (session.status === 'complete') throw apiError(HttpStatus.CONFLICT, 'SESSION_COMPLETE', 'The session is complete.');
+  if (cursorMs !== session.cursorMs) {
+    throw apiError(HttpStatus.CONFLICT, 'CURSOR_MISMATCH', `cursorMs ${cursorMs} does not match the session cursor ${session.cursorMs}.`);
+  }
+}
+
+function levelMessage(code: string): string {
+  switch (code) {
+    case 'LIMIT_ON_WRONG_SIDE':
+      return 'A long limit must be below the last close, a short limit above it (stop entries are not supported).';
+    case 'STOP_DISTANCE_ZERO':
+      return 'The stop is at the entry; the order cannot be sized.';
+    case 'SL_ON_WRONG_SIDE':
+      return 'A long stop must be below the entry, a short stop above it.';
+    default:
+      return 'A long target must be above the entry, a short target below it.';
+  }
+}
+
+function sessionNotFound(): NotFoundException {
+  return new NotFoundException('Session not found.');
+}
