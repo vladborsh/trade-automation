@@ -12,6 +12,7 @@ const instrument: Instrument = {
   displayName: 'BTC/USDT Perp',
   pricePrecision: 2,
   quoteCurrency: 'USDT',
+  sessionCurrency: 'USDT',
   sessionTimezone: 'UTC',
 };
 

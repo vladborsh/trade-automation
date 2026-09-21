@@ -16,6 +16,7 @@ const instrumentA: Instrument = {
   displayName: 'BTC',
   pricePrecision: 2,
   quoteCurrency: 'USDT',
+  sessionCurrency: 'USDT',
   sessionTimezone: 'UTC',
 };
 

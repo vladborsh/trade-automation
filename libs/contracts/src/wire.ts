@@ -16,8 +16,7 @@ import { TimeframeSchema } from './timeframe';
 
 export const InstrumentsResponseSchema = z.array(
   // InstrumentSchema is a ZodEffects (the sessionCurrency default transform, D11), which has no
-  // `.extend` — `.and` (intersection) is the ZodEffects-safe equivalent used everywhere else in
-  // this file that layers fields onto a transformed schema.
+  // `.extend` — `.and` (intersection) layers the extra field on without needing one.
   InstrumentSchema.and(z.object({ venueStatus: VenueStatusSchema })),
 );
 export type InstrumentsResponse = z.infer<typeof InstrumentsResponseSchema>;

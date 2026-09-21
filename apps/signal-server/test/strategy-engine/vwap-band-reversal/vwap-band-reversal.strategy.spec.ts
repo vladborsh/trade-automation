@@ -17,6 +17,7 @@ const instrument: Instrument = {
   displayName: 'US Tech 100',
   pricePrecision: 1,
   quoteCurrency: 'USD',
+  sessionCurrency: 'USD',
   sessionTimezone: 'America/New_York',
 };
 

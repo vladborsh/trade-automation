@@ -18,6 +18,7 @@ const instrument: Instrument = {
   displayName: 'US100',
   pricePrecision: 1,
   quoteCurrency: 'USD',
+  sessionCurrency: 'USD',
   sessionTimezone: 'UTC',
 };
 

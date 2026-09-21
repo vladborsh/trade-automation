@@ -12,6 +12,7 @@ const binanceInstrument: Instrument = {
   displayName: 'BTC',
   pricePrecision: 2,
   quoteCurrency: 'USDT',
+  sessionCurrency: 'USDT',
   sessionTimezone: 'UTC',
 };
 
@@ -23,6 +24,7 @@ const capComInstrument: Instrument = {
   displayName: 'US100',
   pricePrecision: 1,
   quoteCurrency: 'USD',
+  sessionCurrency: 'USD',
   sessionTimezone: 'UTC',
 };
 

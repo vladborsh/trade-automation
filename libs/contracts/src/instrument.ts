@@ -35,20 +35,18 @@ const InstrumentObjectSchema = z.object({
   sessionTimezone: z.string().min(1),
 });
 
-/**
- * `sessionCurrency` stays optional on the inferred `Instrument` type (from the pre-transform
- * object schema) even though `.parse()` always fills it in below — so every existing literal
- * `const x: Instrument = {...}` that predates D11 keeps compiling unchanged, while every actual
- * parse (config load, wire response) gets the resolved value.
- */
-export type Instrument = z.infer<typeof InstrumentObjectSchema>;
+export const InstrumentSchema = InstrumentObjectSchema.transform((instrument) => ({
+  ...instrument,
+  sessionCurrency: instrument.sessionCurrency ?? instrument.quoteCurrency,
+}));
 
-export const InstrumentSchema = InstrumentObjectSchema.transform(
-  (instrument): Instrument => ({
-    ...instrument,
-    sessionCurrency: instrument.sessionCurrency ?? instrument.quoteCurrency,
-  }),
-);
+/**
+ * The *parsed* shape: `sessionCurrency` is required here, because `.parse()` always fills it
+ * in above (D11, decision 36 — the grouping is enforced from configuration, not an optional
+ * field a reader has to coalesce). `InstrumentObjectSchema`'s own `sessionCurrency` stays
+ * optional — that's the pre-parse input shape, where the YAML/wire may omit it.
+ */
+export type Instrument = z.output<typeof InstrumentSchema>;
 
 export const VenueStatusSchema = z.enum(['up', 'degraded', 'down', 'closed']);
 export type VenueStatus = z.infer<typeof VenueStatusSchema>;
