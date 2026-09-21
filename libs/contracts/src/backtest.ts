@@ -349,10 +349,14 @@ export const SessionStatsSchema = z.object({
 });
 export type SessionStats = z.infer<typeof SessionStatsSchema>;
 
-/** §7.2 GET /backtest/sessions/:id/stats — the recompute-vs-stored drift check (decision 38). */
+/**
+ * §7.2 GET /backtest/sessions/:id/stats — the recompute-vs-stored drift check (decision 38).
+ * `stored` is the aggregate subset the session row actually holds (T-018 ruling, provisional
+ * pending Architect confirmation): a full `SessionStats` cannot be rebuilt from those columns.
+ */
 export const SessionStatsResponseSchema = z.object({
   computed: SessionStatsSchema,
-  stored: SessionStatsSchema,
+  stored: SessionAggregatesSchema,
   drift: z.boolean(),
 });
 export type SessionStatsResponse = z.infer<typeof SessionStatsResponseSchema>;

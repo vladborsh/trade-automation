@@ -24,6 +24,7 @@ import {
   SessionLayoutSchema,
   SessionSchema,
   SessionStats,
+  SessionStatsResponseSchema,
   SessionStatsSchema,
   SessionSummary,
   SessionSummarySchema,
@@ -420,6 +421,17 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
   it('parses a valid SessionStats', () => {
     const stats = validStats();
     expect(SessionStatsSchema.parse(stats)).toEqual(stats);
+  });
+
+  it('SessionStatsResponse carries the full computed stats and the stored aggregate subset (T-018)', () => {
+    const stored = {
+      tradesCount: 2, winsCount: 1, lossesCount: 1, pnlCcy: 40, pnlR: 0.4, profitFactor: 1.6667,
+      maxDrawdownCcy: 60, maxDrawdownR: 0.6, avgWinCcy: 100, avgWinR: 1, avgLossCcy: -60, avgLossR: -0.6,
+      statsComputedAt: 1_726_000_000_000,
+    };
+    const res = { computed: validStats(), stored, drift: false };
+    expect(SessionStatsResponseSchema.parse(res)).toEqual(res);
+    expect(() => SessionStatsResponseSchema.parse({ ...res, stored: validStats() })).toThrow();
   });
 
   it('rejects SessionStats with a negative trades count', () => {
