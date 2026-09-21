@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { S3Client } from '@aws-sdk/client-s3';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
@@ -19,6 +19,7 @@ import { S3MetricStore } from './s3/s3-metric-store';
 import { S3EventStore } from './s3/s3-event-store';
 import { S3ScreenshotStore } from './s3/s3-screenshot-store';
 import { WriteBuffer } from './write-buffer.service';
+import { NoPersistCandleStore, NoPersistEventStore, NoPersistMetricStore, NoPersistSignalStore, isReplayMode } from './replay-no-persist';
 import { MetricWriteBuffer } from './metric-write-buffer.service';
 
 /**
@@ -53,8 +54,10 @@ function requireBucket(config: AppConfigService): string {
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => {
         const mode = config.env.get('CANDLE_STORE');
-        if (mode === 's3') return new S3CandleStore(buildS3Client(config), requireBucket(config));
-        return new FileCandleStore(config.env.get('FILE_STORE_ROOT'));
+        const store = mode === 's3' ? new S3CandleStore(buildS3Client(config), requireBucket(config)) : new FileCandleStore(config.env.get('FILE_STORE_ROOT'));
+        // BUG-006: in replay mode the candle, metric, signal and event stores drop writes and read
+        // through (replay-no-persist.ts lists the accepted consequences). ScreenshotStore is not wrapped.
+        return isReplayMode(config.env.get('MARKET_DATA_MODE')) ? new NoPersistCandleStore(store) : store;
       },
     },
     {
@@ -62,8 +65,8 @@ function requireBucket(config: AppConfigService): string {
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => {
         const mode = config.env.get('CANDLE_STORE');
-        if (mode === 's3') return new S3SignalStore(buildS3Client(config), requireBucket(config));
-        return new FileSignalStore(config.env.get('FILE_STORE_ROOT'));
+        const store = mode === 's3' ? new S3SignalStore(buildS3Client(config), requireBucket(config)) : new FileSignalStore(config.env.get('FILE_STORE_ROOT'));
+        return isReplayMode(config.env.get('MARKET_DATA_MODE')) ? new NoPersistSignalStore(store) : store;
       },
     },
     {
@@ -71,8 +74,8 @@ function requireBucket(config: AppConfigService): string {
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => {
         const mode = config.env.get('CANDLE_STORE');
-        if (mode === 's3') return new S3MetricStore(buildS3Client(config), requireBucket(config));
-        return new FileMetricStore(config.env.get('FILE_STORE_ROOT'));
+        const store = mode === 's3' ? new S3MetricStore(buildS3Client(config), requireBucket(config)) : new FileMetricStore(config.env.get('FILE_STORE_ROOT'));
+        return isReplayMode(config.env.get('MARKET_DATA_MODE')) ? new NoPersistMetricStore(store) : store;
       },
     },
     {
@@ -80,8 +83,8 @@ function requireBucket(config: AppConfigService): string {
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => {
         const mode = config.env.get('CANDLE_STORE');
-        if (mode === 's3') return new S3EventStore(buildS3Client(config), requireBucket(config));
-        return new FileEventStore(config.env.get('FILE_STORE_ROOT'));
+        const store = mode === 's3' ? new S3EventStore(buildS3Client(config), requireBucket(config)) : new FileEventStore(config.env.get('FILE_STORE_ROOT'));
+        return isReplayMode(config.env.get('MARKET_DATA_MODE')) ? new NoPersistEventStore(store) : store;
       },
     },
     {
@@ -99,4 +102,14 @@ function requireBucket(config: AppConfigService): string {
   ],
   exports: [CANDLE_STORE, SIGNAL_STORE, METRIC_STORE, EVENT_STORE, SCREENSHOT_STORE, WriteBuffer, MetricWriteBuffer],
 })
-export class StorageModule {}
+export class StorageModule implements OnModuleInit {
+  private readonly logger = new Logger(StorageModule.name);
+
+  constructor(private readonly config: AppConfigService) {}
+
+  onModuleInit(): void {
+    if (isReplayMode(this.config.env.get('MARKET_DATA_MODE'))) {
+      this.logger.log('replay mode: stores are read-only (candles, metrics, signals, calendar events are never persisted; BUG-006)');
+    }
+  }
+}
