@@ -21,7 +21,10 @@
       @if (store.hint(); as hint) {
         <p class="hint" role="status">{{ hint }}</p>
       }
-      <app-layout-editor />
+      @if (!e.viewOnly) {
+        <!-- §9.3: editing the layout PATCHes the session — never while viewing the past -->
+        <app-layout-editor />
+      }
       <div class="grid">
         <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
       </div>

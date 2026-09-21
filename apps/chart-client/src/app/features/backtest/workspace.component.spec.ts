@@ -102,6 +102,7 @@ describe('WorkspaceComponent', () => {
 
   it('shows the journal and the statistics under the grid', async () => {
     const { el } = await render();
+    expect(el.querySelector('app-layout-editor')).not.toBeNull(); // the live workspace offers it
     expect(el.querySelector('.bottom app-journal')).not.toBeNull();
     expect(el.querySelector('.bottom app-stats-summary')).not.toBeNull();
   });
@@ -140,6 +141,8 @@ describe('WorkspaceComponent', () => {
     expect(store.activeTool).not.toHaveBeenCalled(); // …and no order from one
     expect(engine.setTimeframe).toHaveBeenCalledWith('15m');
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="replay-viewing"]')).not.toBeNull();
+    // Editing the layout PATCHes the session: not offered while viewing the past.
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-layout-editor')).toBeNull();
   });
 
   it('keys are inert once the session is complete', async () => {
