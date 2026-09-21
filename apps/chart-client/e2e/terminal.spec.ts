@@ -1,5 +1,6 @@
-import type { Page } from '@playwright/test';
-import { DEEP_HISTORY_MOCK_PORT, TAIL_GAP_MOCK_PORT, expect, routeConfigTo, test } from './fixtures';
+import type { Locator, Page } from '@playwright/test';
+import type { Candle } from '@trade-automation/contracts';
+import { DEEP_HISTORY_MOCK_PORT, FROZEN_MOCK_PORT, TAIL_GAP_MOCK_PORT, apiUrl, expect, routeConfigTo, test } from './fixtures';
 
 /**
  * architecture/chart-layouts.md §9 SE-5's e2e proof: boots on the `crypto`
@@ -19,6 +20,43 @@ function panelById(page: Page, id: string) {
 
 async function chartPanels(page: Page) {
   return page.locator('app-chart-panel');
+}
+
+/**
+ * BUG-007: the plot area of a panel's chart — its pane canvas, the largest one — WITHOUT the
+ * price axis. A drag must start inside it to pan: the container also holds the ~80 px price
+ * axis, and a drag starting there rescales prices instead (the right-edge pan below used to
+ * start at 0.8 of the container, on the axis, and passed only because a live bar moved `to`).
+ */
+async function plotBox(container: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  const boxes = await container.locator('canvas').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }),
+  );
+  return boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+}
+
+/**
+ * BUG-007: waits until every panel has its history and shows the one shared window (all visible
+ * ranges within half a 5m bar) — the grid's boot seeding has finished. Every panel seeds on its
+ * own first data, so once all agree nothing but a gesture moves them. A baseline read before
+ * this can catch a panel still on its own autofit window.
+ */
+async function waitForSyncedGrid(panels: Locator[]): Promise<void> {
+  await expect(async () => {
+    const froms: number[] = [];
+    const tos: number[] = [];
+    for (const panel of panels) {
+      const container = panel.locator('.chart-container');
+      froms.push(Number(await container.getAttribute('data-visible-from')));
+      tos.push(Number(await container.getAttribute('data-visible-to')));
+    }
+    const halfBar = 150;
+    expect(Math.max(...froms) - Math.min(...froms)).toBeLessThanOrEqual(halfBar);
+    expect(Math.max(...tos) - Math.min(...tos)).toBeLessThanOrEqual(halfBar);
+  }).toPass({ timeout: 15_000 });
 }
 
 test('boots on the crypto layout with 4 panels, markers only on signals:true panels', async ({ page }) => {
@@ -186,9 +224,9 @@ test('a single zoom-drag against a real-HISTORY_LIMIT-deep buffer still fires a 
 // the old test only checked `data-visible-from` CHANGED, which stayed true even for a collapsed
 // window. This test instead asserts the window WIDTH survives the pan.
 test('panning past the right edge moves all four panels into the void together, preserving window width', async ({ page }) => {
-  // Explicit route to the default mock instance (:4300), independent of whatever the shared
-  // dev server's public/config.json currently points at (see REPORT.md's note on this).
-  await routeConfigTo(page);
+  // Explicit route to the frozen-feed mock instance (:4303, the default data with no live bars —
+  // BUG-007), independent of whatever the shared dev server's public/config.json points at.
+  await routeConfigTo(page, FROZEN_MOCK_PORT);
 
   const warnings: string[] = [];
   page.on('console', (msg) => {
@@ -204,6 +242,7 @@ test('panning past the right edge moves all four panels into the void together, 
   for (const panel of panels) {
     await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-to', /\d+/, { timeout: 15_000 });
   }
+  await waitForSyncedGrid(panels);
 
   const readWidthsAndTos = async () => {
     const widths: number[] = [];
@@ -222,14 +261,10 @@ test('panning past the right edge moves all four panels into the void together, 
   const btcWidth = before.widths[0];
   const btcToBefore = before.tos[0];
 
-  const btcContainer = panels[0].locator('.chart-container');
-  const box = await btcContainer.boundingBox();
-  if (!box) {
-    throw new Error('chart container has no bounding box');
-  }
+  const box = await plotBox(panels[0].locator('.chart-container'));
 
   // The exact repro gesture: pan the btc plot body right-to-left three times, mid-height,
-  // 0.8 -> 0.3 of the panel's width, dragging the last bar away from the right edge into the
+  // 0.8 -> 0.3 of the plot's width, dragging the last bar away from the right edge into the
   // void.
   for (let i = 0; i < 3; i++) {
     await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.5);
@@ -263,7 +298,7 @@ test('panning past the right edge moves all four panels into the void together, 
 });
 
 // architecture/panel-sync-and-oi-depth-diagnosis.md bug 3's "weekend case": dxy's mock history
-// here ends 4 hours before the other instruments' (see playwright.config.ts's :4302 instance),
+// here ends 1 hour before the other instruments' (see playwright.config.ts's :4302 instance),
 // the same shape as a real Capital.com weekend close. Before the fix, `setVisibleRange`'s
 // `timeToIndex(findNearest=true)` snapped every later `to` onto dxy's own last bar, so dxy could
 // never agree with btc's right-edge pan; the ruling is that dxy shows blank space instead.
@@ -277,13 +312,20 @@ test('a panel whose own history ends earlier still tracks a right-edge pan into 
   for (const panel of panels) {
     await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-to', /\d+/, { timeout: 15_000 });
   }
+  await waitForSyncedGrid(panels);
 
   const btcContainer = panels[0].locator('.chart-container');
   const dxyContainer = panelById(page, 'dxy').locator('.chart-container');
-  const box = await btcContainer.boundingBox();
-  if (!box) {
-    throw new Error('chart container has no bounding box');
-  }
+
+  // BUG-007: the grid opens at the freshest data — btc's newest bar in view — whichever panel's
+  // history arrived last. Before the fix the last arrival won, and dxy winning put every panel
+  // at dxy's own last bar, in the past.
+  const btcCandles: Candle[] = await (
+    await page.context().request.get(`${apiUrl(TAIL_GAP_MOCK_PORT)}/candles?instrument=binance:BTCUSDT&timeframe=5m`)
+  ).json();
+  expect(Number(await btcContainer.getAttribute('data-visible-to'))).toBeGreaterThanOrEqual(btcCandles.at(-1)!.openTime / 1000);
+
+  const box = await plotBox(btcContainer);
 
   // A single, moderate right-edge pan (not the aggressive 3x repro gesture above): the point of
   // this test is dxy's own tail gap, not the sync mechanism's absolute reach. `lightweight-
@@ -314,7 +356,9 @@ test('a panel whose own history ends earlier still tracks a right-edge pan into 
 test('hovering one panel syncs a time-matched crosshair to all four panels, without disturbing the visible range', async ({
   page,
 }) => {
-  await routeConfigTo(page);
+  // The frozen-feed instance (BUG-007): the "no echo" check below compares visible ranges, and a
+  // live 5m close in between shifts every panel's window by a bar — correctly, but not an echo.
+  await routeConfigTo(page, FROZEN_MOCK_PORT);
 
   const warnings: string[] = [];
   page.on('console', (msg) => {
@@ -330,6 +374,7 @@ test('hovering one panel syncs a time-matched crosshair to all four panels, with
   for (const panel of panels) {
     await expect(panel.locator('.chart-container')).toHaveAttribute('data-visible-from', /\d+/, { timeout: 15_000 });
   }
+  await waitForSyncedGrid(panels);
 
   const rangesBefore: { from: string | null; to: string | null }[] = [];
   for (const panel of panels) {

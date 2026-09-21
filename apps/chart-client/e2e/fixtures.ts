@@ -2,7 +2,7 @@ import { test as base, expect, type APIRequestContext, type Page } from '@playwr
 import { MOCK_ADMIN } from '../mock-server/auth';
 import { MOCK_PORT } from './ports';
 
-export { DEEP_HISTORY_MOCK_PORT, MOCK_PORT, TAIL_GAP_MOCK_PORT } from './ports';
+export { DEEP_HISTORY_MOCK_PORT, FROZEN_MOCK_PORT, MOCK_PORT, TAIL_GAP_MOCK_PORT } from './ports';
 
 // Shared e2e fixtures: ports (./ports), the mock's runtime config, and a signed-in page.
 

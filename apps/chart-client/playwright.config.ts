@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-import { CLIENT_PORT, DEEP_HISTORY_MOCK_PORT, MOCK_PORT, TAIL_GAP_MOCK_PORT } from './e2e/ports';
+import { CLIENT_PORT, DEEP_HISTORY_MOCK_PORT, FROZEN_MOCK_PORT, MOCK_PORT, TAIL_GAP_MOCK_PORT } from './e2e/ports';
 
 // Ports are overridable per worktree (E2E_CLIENT_PORT, E2E_MOCK_PORT) — see e2e/ports.ts.
 
@@ -47,17 +47,34 @@ export default defineConfig({
       timeout: 20_000,
     },
     // architecture/panel-sync-and-oi-depth-diagnosis.md bug 3's "weekend case": a third mock
-    // server instance where `capitalcom:DXY-MOCK`'s seeded history ends 4 hours before the
-    // other instruments' — the same shape as dxy's real Capital.com session gap — so one e2e
-    // scenario can assert the right-edge-pan fix holds when a follower's own last bar is
-    // genuinely earlier than the driver's, not just when every panel's data is current.
+    // server instance where `capitalcom:DXY-MOCK`'s seeded history ends 1 hour (12 5m bars)
+    // before the other instruments' — the shape of dxy's real Capital.com session gap — so one
+    // e2e scenario can assert the right-edge-pan fix holds when a follower's own last bar is
+    // genuinely earlier than the driver's, not just when every panel's data is current. The gap
+    // must stay well inside lightweight-charts' right-offset cap (about one window of bars, ~39
+    // here): the grid opens at the freshest data (BUG-007), which already puts dxy that far into
+    // its own void. The live feed is off (BUG-007): the one test here compares ranges.
     {
       command: 'npx tsx mock-server/server.ts',
       port: TAIL_GAP_MOCK_PORT,
       env: {
         MOCK_SERVER_PORT: String(TAIL_GAP_MOCK_PORT),
         MOCK_TAIL_GAP_INSTRUMENT: 'capitalcom:DXY-MOCK',
-        MOCK_TAIL_GAP_MINUTES: '240',
+        MOCK_TAIL_GAP_MINUTES: '60',
+        MOCK_LIVE_FEED: 'off',
+      },
+      reuseExistingServer: !process.env['CI'],
+      timeout: 20_000,
+    },
+    // BUG-007: the default data with the live feed off, for the range-sync scenarios that compare
+    // visible ranges before and after a gesture — a 5m bar closing mid-test shifts the window
+    // (correctly) and made them flaky. Everything that needs live bars stays on :4300.
+    {
+      command: 'npx tsx mock-server/server.ts',
+      port: FROZEN_MOCK_PORT,
+      env: {
+        MOCK_SERVER_PORT: String(FROZEN_MOCK_PORT),
+        MOCK_LIVE_FEED: 'off',
       },
       reuseExistingServer: !process.env['CI'],
       timeout: 20_000,

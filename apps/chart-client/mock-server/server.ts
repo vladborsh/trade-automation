@@ -444,7 +444,12 @@ wss.on('connection', (socket: WebSocket) => {
   });
 });
 
-state.start();
+// MOCK_LIVE_FEED=off: no bar ever closes or forms — the history stays exactly as seeded. For e2e
+// scenarios that compare visible ranges before and after a gesture (BUG-007): a live 5m close
+// mid-test legitimately shifts the window and made them flaky.
+if (process.env.MOCK_LIVE_FEED !== 'off') {
+  state.start();
+}
 calendarState.start();
 
 httpServer.listen(PORT, () => {
