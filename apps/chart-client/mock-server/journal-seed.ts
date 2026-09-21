@@ -27,10 +27,10 @@ export function seededOrders(s: SessionSummary): Order[] {
     slInitial: sl, slCurrent: sl, commissionCcy: 1.25, spreadCostCcy: 0.5, pnlCcy: pnl, pnlR: r, maePrice: null, maeR: mae, ...extra,
   });
   return [
-    closed(1, 'long', 40_000, 40_400, 39_800, 0.5, 198.25, 1.98, -0.3, 'take-profit', '1m'),
-    closed(2, 'short', 40_500, 40_700, 40_700, 0.5, -101.75, -1.02, -1, 'stop', 'pessimistic-bar'),
-    closed(3, 'long', 40_200, 40_000, 40_000, 0.5, -101.75, -1.02, -1, 'stop', '1m', { slTpSameBar: true, tpInitial: 40_600, tpCurrent: 40_600 }),
-    closed(4, 'long', 40_100, 40_180, 39_900, 0.5, 38.25, 0.38, -0.1, 'end-of-session', '1m'),
+    closed(1, 'long', 40_000, 40_400, 39_800, 0.5, 198.25, 1.98, 0.3, 'take-profit', '1m'),
+    closed(2, 'short', 40_500, 40_700, 40_700, 0.5, -101.75, -1.02, 1, 'stop', 'pessimistic-bar'),
+    closed(3, 'long', 40_200, 40_000, 40_000, 0.5, -101.75, -1.02, 1, 'stop', '1m', { slTpSameBar: true, tpInitial: 40_600, tpCurrent: 40_600 }),
+    closed(4, 'long', 40_100, 40_180, 39_900, 0.5, 38.25, 0.38, 0.1, 'end-of-session', '1m'),
     {
       ...base, id: '00000000-0000-4000-8000-00000000c005', seq: 5, side: 'short', type: 'limit', status: 'cancelled', placedAtMs: t(50),
       limitPrice: 41_000, entryPrice: null, entryTimeMs: null, exitPrice: null, exitTimeMs: null, closeReason: null, fillResolution: null,

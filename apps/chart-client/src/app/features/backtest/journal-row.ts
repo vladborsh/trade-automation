@@ -4,6 +4,7 @@ import {
   formatMoney,
   formatPrice,
   formatR,
+  formatRAmount,
   formatSignedMoney,
   formatUtc,
   orderFlags,
@@ -56,7 +57,8 @@ export function journalRow(o: Order, pricePrecision: number | undefined, currenc
       cell('spreadCostCcy', formatMoney(o.spreadCostCcy, currency), o.spreadCostCcy),
       cell('pnlCcy', formatSignedMoney(o.pnlCcy, currency), o.pnlCcy),
       cell('pnlR', formatR(o.pnlR), o.pnlR),
-      cell('maeR', formatR(o.maeR), o.maeR),
+      // MAE is a magnitude (replay-core `computeMae`: the worst adverse excursion, never below 0).
+      cell('maeR', formatRAmount(o.maeR), o.maeR, 'Maximum adverse excursion'),
     ],
   };
 }

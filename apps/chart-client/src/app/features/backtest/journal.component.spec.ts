@@ -6,7 +6,7 @@ const order = (id: string, seq: number, extra: Partial<Order> = {}) =>
   ({
     id, seq, instrument: 'binance:BTCUSDT', side: 'long', type: 'market', status: 'closed', placedAtMs: 0, entryPrice: 100,
     entryTimeMs: 0, exitPrice: 110, exitTimeMs: 60_000, closeReason: 'take-profit', qty: 1, commissionCcy: 0.1, spreadCostCcy: 0.05,
-    pnlCcy: 9.85, pnlR: 1.97, maeR: -0.2, fillResolution: '1m', slTpSameBar: false, ...extra,
+    pnlCcy: 9.85, pnlR: 1.97, maeR: 0.2, fillResolution: '1m', slTpSameBar: false, ...extra,
   }) as Order;
 
 function render(orders: Order[]) {
