@@ -1,0 +1,25 @@
+<div class="workspace">
+  @if (session(); as s) {
+    @if (engine(); as e) {
+      <app-replay-toolbar
+        [sessionName]="s.name"
+        [cursorMs]="e.cursor()"
+        [timeframe]="e.timeframe()"
+        [balance]="s.balance"
+        [currency]="s.sessionCurrency"
+        [loading]="e.blocked()"
+        [atEnd]="e.atEnd()"
+        [error]="e.error()"
+        (step)="step()"
+        (timeframeChange)="setTimeframe($event)"
+      />
+      <div class="grid">
+        <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
+      </div>
+    }
+  } @else if (store.loadError(); as message) {
+    <p class="message error" role="alert">Could not open the session: {{ message }}</p>
+  } @else {
+    <p class="message" role="status">Opening the session…</p>
+  }
+</div>

@@ -7,10 +7,11 @@ import {
   computed,
   effect,
   inject,
+  input,
   signal,
   untracked,
 } from '@angular/core';
-import type { Panel } from '@trade-automation/contracts';
+import type { Panel, Timeframe } from '@trade-automation/contracts';
 import { ChartSyncService } from '../chart/chart-sync.service';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { LayoutFeedService } from '../../core/state/layout-feed.service';
@@ -66,7 +67,16 @@ import type { PanelSource } from './panel-source';
 export class PanelGridComponent {
   readonly chartPanelComponent = ChartPanelComponent;
 
-  readonly panels = computed(() => this.layouts.active()?.panels ?? []);
+  /**
+   * A replay session (T-020) supplies its own panels, sources and timeframe; the live terminal
+   * passes none and the grid reads `LayoutsStore` / `LayoutFeedService` as it always has.
+   */
+  readonly panelsIn = input<readonly Panel[] | null>(null, { alias: 'panels' });
+  readonly sourcesIn = input<ReadonlyMap<string, PanelSource> | null>(null, { alias: 'sources' });
+  readonly timeframe = input<Timeframe | null>(null);
+
+  readonly panels = computed(() => this.panelsIn() ?? this.layouts.active()?.panels ?? []);
+  private readonly sources = computed(() => this.sourcesIn() ?? this.layoutFeed.feeds());
   private readonly collapsedIds = computed(() => {
     const layout = this.layouts.active();
     return layout ? this.collapsed.collapsedIds(layout) : [];
@@ -87,7 +97,7 @@ export class PanelGridComponent {
     // mounting chart JOINS an existing shared range (§11.3 rule 2) instead of proposing its own —
     // without this, the new timeframe's charts would join the previous timeframe's window.
     effect(() => {
-      this.layoutFeed.feeds();
+      this.sources();
       untracked(() => this.sync.reset());
     });
 
@@ -103,7 +113,7 @@ export class PanelGridComponent {
     });
 
     effect(() => {
-      const feeds = this.layoutFeed.feeds();
+      const feeds = this.sources();
       let changed = false;
       for (const source of feeds.values()) {
         if (!this.injectorCache.has(source)) {
@@ -137,7 +147,7 @@ export class PanelGridComponent {
   }
 
   sourceFor(panelId: string): PanelSource | undefined {
-    return this.layoutFeed.feeds().get(panelId);
+    return this.sources().get(panelId);
   }
 
   /** Pure read (plus a signal read for reactivity) — never builds anything itself. */
@@ -147,7 +157,7 @@ export class PanelGridComponent {
   }
 
   panelInputs(panel: Panel, source: PanelSource): Record<string, unknown> {
-    return { panel, source };
+    return { panel, source, timeframe: this.timeframe() };
   }
 
   private buildInjector(source: PanelSource): Injector {

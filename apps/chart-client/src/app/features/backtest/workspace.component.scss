@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  height: 100vh;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+}
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.grid {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.message {
+  margin: 24px 16px;
+  color: #8b949e;
+  font-size: 13px;
+}
+.message.error {
+  color: #ef5350;
+}

@@ -1,0 +1,278 @@
+import { type WritableSignal, signal } from '@angular/core';
+import type { AheadResponse, CompactCandleTuple, Panel, ReplayHistoryResponse, Timeframe } from '@trade-automation/contracts';
+import { nextCursor } from '@trade-automation/replay-core';
+import { AheadCache } from './ahead-cache';
+import { AHEAD_PAGE_SIZE, cacheSizing } from './cache-sizing';
+import { bucketStart, foldStep, seriesAt, type TfSeries } from './fold-on-step';
+import { coversReveal, nextDataAcross } from './next-data';
+
+/** The engine's I/O: the three session endpoints it uses (backtest-app-system-design.md §7.2). */
+export interface ReplayApi {
+  history(panelId: string, tf: Timeframe, before: number, limit: number): Promise<ReplayHistoryResponse>;
+  ahead(panelId: string, fromMs: number, limit: number): Promise<AheadResponse>;
+  patchTimeframe(tf: Timeframe): Promise<void>;
+}
+
+export interface ReplayEngineConfig {
+  panels: readonly Panel[];
+  cursorMs: number;
+  /**
+   * The cursor the server has stored for the session — history is served only up to it (422
+   * FUTURE_REQUESTED). The session's cursor at load; TODO(T-021): updated from each advance.
+   */
+  serverCursorMs: number;
+  timeframe: Timeframe;
+  periodToMs: number;
+  skipWeekends: boolean;
+}
+
+/** Bars per history page, initial load and each `loadOlder()`. */
+export const HISTORY_PAGE = 500;
+
+interface PanelTape {
+  readonly panel: Panel;
+  readonly cache: AheadCache;
+  readonly series: WritableSignal<TfSeries>;
+  /** Serialises this panel's ahead fetches (§5.3). */
+  queue: Promise<void>;
+  refilling: boolean;
+  loadingOlder: boolean;
+  noMoreOlder: boolean;
+}
+
+class NeedMoreData extends Error {}
+
+/**
+ * backtest-app-system-design.md §5.1–5.4 on the client: the cursor, one 1m ahead cache and one
+ * timeframe series per panel. `step()` moves the cursor with replay-core's `nextCursor` over all
+ * panels' caches, folds the newly revealed 1m of every panel with `foldOneMinute` (fold-on-step.ts)
+ * and refills the caches in the background. A step never renders a bar it does not have: when a
+ * cache cannot answer, the step waits for the page (`blocked`) and then completes.
+ *
+ * Framework-free apart from its signals. The server is not told about advances yet (T-021).
+ */
+export class ReplayEngine {
+  readonly cursor = signal(0);
+  readonly timeframe = signal<Timeframe>('5m');
+  /** A step (or a timeframe switch) is waiting for data: the toolbar shows "loading". */
+  readonly blocked = signal(false);
+  /** The cursor has reached the end of the period. */
+  readonly atEnd = signal(false);
+  readonly error = signal<string | null>(null);
+
+  private readonly tapes: PanelTape[];
+  private busy = false;
+  private serverCursor: number;
+
+  constructor(
+    private readonly api: ReplayApi,
+    private readonly config: ReplayEngineConfig,
+  ) {
+    this.cursor.set(config.cursorMs);
+    this.serverCursor = config.serverCursorMs;
+    this.timeframe.set(config.timeframe);
+    this.atEnd.set(config.cursorMs >= config.periodToMs);
+    this.tapes = config.panels.map((panel) => ({
+      panel,
+      cache: new AheadCache(panel.instrument),
+      series: signal<TfSeries>({ closed: [], forming: null }),
+      queue: Promise.resolve(),
+      refilling: false,
+      loadingOlder: false,
+      noMoreOlder: false,
+    }));
+  }
+
+  /** The panel's bars, for its `ReplayPanelSource`. */
+  seriesFor(panelId: string) {
+    return this.tape(panelId).series.asReadonly();
+  }
+
+  /** History behind the cursor, and each cache filled from the open of the bar forming there. */
+  async start(): Promise<void> {
+    await this.exclusive(async () => {
+      const tf = this.timeframe();
+      this.blocked.set(true);
+      await Promise.all(
+        this.tapes.map(async (t) => {
+          t.cache.reset(bucketStart(this.cursor(), tf));
+          await Promise.all([this.loadHistory(t, tf), this.fetchPage(t)]);
+        }),
+      );
+    });
+    this.refillAll();
+  }
+
+  /** `→`: ignored while a step or a switch is in flight — the key is blocked, never queued. */
+  async step(): Promise<void> {
+    if (this.atEnd()) return;
+    await this.exclusive(async () => {
+      for (;;) {
+        try {
+          this.advance();
+          return;
+        } catch (err) {
+          if (!(err instanceof NeedMoreData)) throw err;
+          this.blocked.set(true);
+          await this.fetchLaggards();
+        }
+      }
+    });
+    this.refillAll();
+  }
+
+  /**
+   * §5.4 timeframe switch: the cursor does not move, each cache is re-sized (nothing is
+   * discarded) and the session is patched. The new series is what `GET …/candles?before=cursor`
+   * would return — closed bars plus the partially formed one — built so it also works while the
+   * client's cursor is ahead of the server's: history up to `anchor`, the new timeframe's bar
+   * boundary at or before the server cursor, and the 1m from there folded with `foldOneMinute`.
+   */
+  async setTimeframe(tf: Timeframe): Promise<void> {
+    if (tf === this.timeframe()) return;
+    await this.exclusive(async () => {
+      this.blocked.set(true);
+      const cursor = this.cursor();
+      const anchor = bucketStart(Math.min(cursor, this.serverCursor), tf);
+      const series = await Promise.all(
+        this.tapes.map(async (t) => {
+          await this.extendBack(t, anchor);
+          const history = await this.api.history(t.panel.id, tf, anchor, HISTORY_PAGE);
+          return seriesAt(history.bars, t.cache.revealed(anchor, cursor), tf, cursor);
+        }),
+      );
+      // The new timeframe and its bars land together, only once every panel has them.
+      this.timeframe.set(tf);
+      this.tapes.forEach((t, i) => {
+        t.series.set(series[i]);
+        t.noMoreOlder = false;
+      });
+      this.api.patchTimeframe(tf).catch((err: unknown) => this.error.set(`Could not save the timeframe: ${describe(err)}`));
+    });
+    this.refillAll();
+  }
+
+  /** Older closed bars for one panel (the chart scrolled back to its oldest bar). */
+  async loadOlder(panelId: string): Promise<void> {
+    const t = this.tape(panelId);
+    const { closed, forming } = t.series();
+    if (t.loadingOlder || t.noMoreOlder) return;
+    const tf = this.timeframe();
+    const newest = closed[0]?.openTime ?? forming?.openTime ?? bucketStart(this.cursor(), tf);
+    const before = Math.min(newest, this.serverCursor); // the server serves history only up to its cursor
+    t.loadingOlder = true;
+    try {
+      const res = await this.api.history(t.panel.id, tf, before, HISTORY_PAGE);
+      if (tf !== this.timeframe()) return; // a switch replaced this series meanwhile
+      const older = res.bars.filter((b) => b.openTime < before);
+      if (older.length === 0) t.noMoreOlder = true;
+      else t.series.update((s) => ({ closed: [...older, ...s.closed], forming: s.forming }));
+    } finally {
+      t.loadingOlder = false;
+    }
+  }
+
+  /** One step, synchronously, or `NeedMoreData` when a cache cannot answer yet. */
+  private advance(): void {
+    const tf = this.timeframe();
+    const from = this.cursor();
+    const caches = this.tapes.map((t) => t.cache);
+    const next = nextCursor(from, tf, this.config.skipWeekends, (ms) => {
+      const r = nextDataAcross(caches, ms);
+      if (r.kind === 'unknown') throw new NeedMoreData();
+      return r.kind === 'at' ? r.ms : null;
+    }, this.config.periodToMs);
+    if (!coversReveal(caches, next)) throw new NeedMoreData();
+    if (next <= from) {
+      this.atEnd.set(true);
+      return;
+    }
+    const carryFrom = bucketStart(from, tf);
+    for (const t of this.tapes) {
+      t.series.set(foldStep(t.series(), t.cache.revealed(carryFrom, next), tf, next));
+      t.cache.dropBefore(bucketStart(next, tf));
+    }
+    this.cursor.set(next);
+    this.atEnd.set(next >= this.config.periodToMs);
+  }
+
+  private async loadHistory(t: PanelTape, tf: Timeframe): Promise<void> {
+    const res = await this.api.history(t.panel.id, tf, this.cursor(), HISTORY_PAGE);
+    t.series.set({ closed: res.bars, forming: res.forming });
+  }
+
+  /** Makes the cache know every 1m from `fromMs` (a coarser bar opens before the cache does). */
+  private async extendBack(t: PanelTape, fromMs: number): Promise<void> {
+    const knownFrom = t.cache.knownFrom;
+    if (fromMs >= knownFrom) return;
+    const older: CompactCandleTuple[] = [];
+    for (let from = fromMs; from < knownFrom; ) {
+      const page = await this.api.ahead(t.panel.id, from, AHEAD_PAGE_SIZE);
+      const inRange = page.candles.filter((c) => c[0] < knownFrom);
+      older.push(...inRange);
+      if (page.endOfTape || inRange.length < page.candles.length || page.candles.length === 0) break;
+      from = page.candles[page.candles.length - 1][0] + 1;
+    }
+    t.cache.prependRange(fromMs, older);
+  }
+
+  /** One page for every panel whose cache knows the least — the one holding the step back. */
+  private async fetchLaggards(): Promise<void> {
+    const open = this.tapes.filter((t) => !t.cache.endOfTape);
+    if (open.length === 0) throw new Error('Replay tape exhausted but the cursor could not advance');
+    const least = Math.min(...open.map((t) => t.cache.knownUntil));
+    await Promise.all(open.filter((t) => t.cache.knownUntil === least).map((t) => this.fetchPage(t)));
+  }
+
+  private fetchPage(t: PanelTape): Promise<void> {
+    t.queue = t.queue.then(async () => {
+      if (t.cache.endOfTape) return;
+      const page = await this.api.ahead(t.panel.id, t.cache.knownUntil, AHEAD_PAGE_SIZE);
+      t.cache.appendPage(page.candles, page.endOfTape);
+    });
+    return t.queue;
+  }
+
+  /** §5.3 background refill: below `refill1m` ahead, fetch pages until `target1m` ahead. */
+  private refillAll(): void {
+    const { target1m, refill1m } = cacheSizing(this.timeframe());
+    for (const t of this.tapes) {
+      if (t.refilling || t.cache.endOfTape || t.cache.countAtOrAfter(this.cursor()) >= refill1m) continue;
+      t.refilling = true;
+      void (async () => {
+        try {
+          while (!t.cache.endOfTape && t.cache.countAtOrAfter(this.cursor()) < target1m) await this.fetchPage(t);
+        } catch (err) {
+          this.error.set(`Could not load candles ahead: ${describe(err)}`);
+        } finally {
+          t.refilling = false;
+        }
+      })();
+    }
+  }
+
+  /** Runs `fn` unless a step or switch is already in flight; errors land in `error`. */
+  private async exclusive(fn: () => Promise<void>): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    this.error.set(null);
+    try {
+      await fn();
+    } catch (err) {
+      this.error.set(describe(err));
+    } finally {
+      this.busy = false;
+      this.blocked.set(false);
+    }
+  }
+
+  private tape(panelId: string): PanelTape {
+    const t = this.tapes.find((x) => x.panel.id === panelId);
+    if (!t) throw new Error(`Unknown panel '${panelId}'`);
+    return t;
+  }
+}
+
+function describe(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

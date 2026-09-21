@@ -17,7 +17,12 @@
       <span aria-hidden="true">&#x2039;</span>
     </button>
   </div>
-  <div class="panel-body" [attr.data-metric-style]="metricStyle()">
+  <div
+    class="panel-body"
+    [attr.data-metric-style]="metricStyle()"
+    [attr.data-last-open]="lastBar()?.openTime"
+    [attr.data-last-closed]="lastBar()?.closed"
+  >
     <app-chart
       [panelId]="panel().id"
       [kind]="panel().kind"
@@ -26,7 +31,7 @@
       [overlays]="overlays()"
       [indicatorPoints]="indicatorPoints()"
       [indicatorSpecs]="source().indicatorSpecs()"
-      [timeframe]="timeframe.selected()"
+      [timeframe]="tf()"
       (loadOlderRequested)="onLoadOlder()"
     />
   </div>

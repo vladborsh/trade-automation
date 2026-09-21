@@ -1,0 +1,35 @@
+<header class="toolbar">
+  <a class="back" routerLink="/sessions" title="All sessions">&#x2039; Sessions</a>
+  <span class="name">{{ sessionName() }}</span>
+
+  <span class="cursor" data-testid="replay-cursor" title="Replay cursor (UTC)">{{ cursorText() }}</span>
+
+  <div class="tf-picker" role="group" aria-label="Timeframe">
+    @for (tf of timeframes; track tf) {
+      <button type="button" class="tf-btn" [class.active]="tf === timeframe()" (click)="timeframeChange.emit(tf)">{{ tf }}</button>
+    }
+  </div>
+
+  <button
+    type="button"
+    class="step"
+    data-testid="replay-step"
+    [disabled]="loading() || atEnd()"
+    title="Step forward one bar (→)"
+    (click)="step.emit()"
+  >
+    Step &#x2192;
+  </button>
+
+  @if (loading()) {
+    <span class="status loading" data-testid="replay-loading" role="status">loading…</span>
+  } @else if (atEnd()) {
+    <span class="status" data-testid="replay-end">end of period</span>
+  }
+
+  <span class="spacer"></span>
+  @if (error(); as message) {
+    <span class="error" role="alert">{{ message }}</span>
+  }
+  <span class="balance" data-testid="replay-balance" title="Balance">{{ balanceText() }}</span>
+</header>

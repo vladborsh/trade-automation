@@ -37,6 +37,20 @@ describe('BacktestClient (backtest-app-system-design.md §7.2)', () => {
     expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions`, expect.objectContaining({ method: 'GET' }));
   });
 
+  it('GETs replay history and the 1m ahead page with their query parameters (T-020)', async () => {
+    const { client, fetchMock } = setup(jsonResponse(200, { bars: [], forming: null }));
+    await client.getReplayHistory('s 1', 'btc', '5m', 1_000, 500);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `${API}/backtest/sessions/s%201/candles?panelId=btc&timeframe=5m&before=1000&limit=500`,
+      expect.objectContaining({ method: 'GET', credentials: 'include' }),
+    );
+    await client.getReplayAhead('s 1', 'btc', 2_000, 5_000);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `${API}/backtest/sessions/s%201/candles/ahead?panelId=btc&fromMs=2000&limit=5000`,
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   it('POSTs a create body as JSON', async () => {
     const { client, fetchMock } = setup(jsonResponse(201, { id: 's1' }));
     await client.createSession({ name: 'x' } as never);

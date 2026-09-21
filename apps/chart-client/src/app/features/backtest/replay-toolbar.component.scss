@@ -1,0 +1,63 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #30363d;
+  font-size: 13px;
+  color: #c9d1d9;
+}
+.back {
+  color: #8b949e;
+  text-decoration: none;
+}
+.back:hover {
+  color: #c9d1d9;
+}
+.name {
+  font-weight: 600;
+}
+.cursor {
+  font-variant-numeric: tabular-nums;
+  color: #c9d1d9;
+}
+.tf-picker {
+  display: flex;
+  gap: 2px;
+}
+.tf-btn,
+.step {
+  background: #0d1117;
+  color: #8b949e;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.tf-btn.active {
+  color: #c9d1d9;
+  border-color: #8b949e;
+}
+.step {
+  color: #0d1117;
+  background: #26a69a;
+  border-color: #26a69a;
+  font-weight: 600;
+}
+.step:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.status {
+  color: #8b949e;
+}
+.spacer {
+  flex: 1;
+}
+.error {
+  color: #ef5350;
+}
+.balance {
+  font-variant-numeric: tabular-nums;
+}

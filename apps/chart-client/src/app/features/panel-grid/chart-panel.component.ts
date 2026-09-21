@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import type { Candle, IndicatorPoint, MetricPoint, OverlayPrimitive, Panel } from '@trade-automation/contracts';
+import type { Candle, IndicatorPoint, MetricPoint, OverlayPrimitive, Panel, Timeframe } from '@trade-automation/contracts';
 import { ChartComponent } from '../chart/chart.component';
 import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
 import { ConnectionStore } from '../../core/state/connection.store';
@@ -34,6 +34,9 @@ import type { PanelSource } from './panel-source';
 export class ChartPanelComponent {
   readonly panel = input.required<Panel>();
   readonly source = input.required<PanelSource>();
+  /** The panel's timeframe when it is not the live terminal's shared one (a replay session's). */
+  readonly timeframe = input<Timeframe | null>(null);
+  readonly tf = computed(() => this.timeframe() ?? this.timeframes.selected());
 
   // `<app-chart>`'s inputs are typed as mutable arrays and ChartComponent stays untouched (D2);
   // it never mutates them (its sorts work on copies), so the source's readonly arrays pass as-is.
@@ -41,15 +44,17 @@ export class ChartPanelComponent {
   readonly points = computed(() => this.source().points() as MetricPoint[]);
   readonly overlays = computed(() => this.source().overlays() as OverlayPrimitive[]);
   readonly indicatorPoints = computed(() => this.source().indicatorPoints() as IndicatorPoint[]);
+  /** The newest bar, as e2e hooks on the panel body (the chart itself is a canvas). */
+  readonly lastBar = computed(() => this.candles().at(-1) ?? null);
 
   readonly title = computed(() =>
     panelTitle(this.panel(), this.instruments.selected(), plottedMetricUnit(this.points())),
   );
   /** §11.2 rule 4 — the style `<app-chart>` draws the metric in; exposed as an e2e hook (canvas has no DOM). */
-  readonly metricStyle = computed(() => (this.panel().kind === 'metric' ? metricSeriesStyle(this.timeframe.selected()) : null));
+  readonly metricStyle = computed(() => (this.panel().kind === 'metric' ? metricSeriesStyle(this.tf()) : null));
   /** §11.2 rule 5 — why the metric panel is a line (1m) or wickless candles (5m); none elsewhere. */
   readonly caption = computed(() =>
-    this.panel().kind === 'metric' ? metricSeriesCaption(this.timeframe.selected()) : null,
+    this.panel().kind === 'metric' ? metricSeriesCaption(this.tf()) : null,
   );
   readonly venueStatus = computed(() => this.connection.statusFor(this.panel().instrument)?.venueStatus ?? 'down');
   /** §11.3: the last expanded panel's collapse button is disabled. */
@@ -59,7 +64,7 @@ export class ChartPanelComponent {
   });
 
   constructor(
-    readonly timeframe: TimeframeStore,
+    private readonly timeframes: TimeframeStore,
     private readonly connection: ConnectionStore,
     private readonly instruments: InstrumentsStore,
     private readonly layouts: LayoutsStore,

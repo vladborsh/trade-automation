@@ -9,8 +9,10 @@ import {
   type SessionDetail,
   type SessionStats,
   type SessionSummary,
+  type Timeframe,
 } from '@trade-automation/contracts';
 import { readJsonBody, type SendJson } from './auth';
+import { replayAhead, replayHistory } from './replay-tape';
 
 /**
  * architecture/backtest-app-system-design.md §7.2 — an in-memory stand-in for the real server's
@@ -27,6 +29,7 @@ import { readJsonBody, type SendJson } from './auth';
  *   capitalcom:EURCHF CHF  2024-01-01 .. 2026-06-30   (a second currency, to demo mixing)
  *   capitalcom:US100  USD  no stored 1m (coverage null)
  * Sessions are per user id; the mock holds no orders, so every session is empty.
+ * Replay candles (`…/candles`, `…/candles/ahead`) come from the deterministic tape in replay-tape.ts.
  */
 
 const MIN = 60_000;
@@ -79,6 +82,17 @@ export class MockBacktestState {
         this.create(res, send, userId, await readJsonBody(req));
         return true;
       }
+    }
+    const candles = /^\/api\/backtest\/sessions\/([^/]+)\/candles(\/ahead)?$/.exec(pathname);
+    if (candles && method === 'GET') {
+      const own = UUID.test(candles[1]) ? this.sessions.get(candles[1]) : undefined;
+      const session = own && own.userId === userId ? own.summary : null;
+      if (!session) {
+        send(res, 404, { statusCode: 404, message: 'Session not found.' });
+        return true;
+      }
+      this.candles(res, send, session, new URL(req.url ?? '/', 'http://mock').searchParams, candles[2] !== undefined);
+      return true;
     }
     const match = /^\/api\/backtest\/sessions\/([^/]+)$/.exec(pathname);
     if (match) {
@@ -135,6 +149,26 @@ export class MockBacktestState {
     };
     this.sessions.set(summary.id, { userId, summary });
     send(res, 201, toSession(summary));
+  }
+
+  /** §7.2 replay candles: an unknown panel is a 400, `before > cursor` a 422 FUTURE_REQUESTED. */
+  private candles(res: ServerResponse, send: SendJson, session: SessionSummary, q: URLSearchParams, ahead: boolean): void {
+    const panel = session.layout.panels.find((p) => p.id === q.get('panelId'));
+    const coverage = MOCK_BACKTEST_INSTRUMENTS.find((i) => i.id === panel?.instrument)?.coverage;
+    if (!panel || !coverage) {
+      send(res, 400, { statusCode: 400, message: 'Bad Request' });
+      return;
+    }
+    if (ahead) {
+      const fromMs = Number(q.get('fromMs'));
+      const limit = Math.min(Number(q.get('limit') ?? 5000), 5000);
+      send(res, 200, replayAhead(panel.instrument, coverage, fromMs, limit, session.periodToMs));
+      return;
+    }
+    const tf = q.get('timeframe') as Timeframe;
+    const before = Number(q.get('before'));
+    if (before > session.cursorMs) return fail(send, res, 422, 'FUTURE_REQUESTED', 'History is served only up to the session cursor.');
+    send(res, 200, replayHistory(panel.instrument, coverage, tf, before, Math.min(Number(q.get('limit') ?? 1500), 1500)));
   }
 
   private patch(res: ServerResponse, send: SendJson, session: SessionSummary, body: Record<string, unknown> | null): void {

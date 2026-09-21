@@ -32,6 +32,11 @@ export const routes: Routes = [
         title: 'New session',
       },
       {
+        path: 'sessions/:id',
+        loadComponent: () => import('./features/backtest/workspace.component').then((m) => m.WorkspaceComponent),
+        title: 'Backtest',
+      },
+      {
         path: 'admin/users',
         loadComponent: () => import('./features/admin/users.component').then((m) => m.UsersComponent),
         canActivate: [adminGuard],
