@@ -10,7 +10,8 @@ const CLOSES = [10, 11, 12, 13];
 
 function setup(overrides: Partial<CrosshairHost> = {}) {
   const chart = { clearCrosshairPosition: vi.fn(), setCrosshairPosition: vi.fn() };
-  const series = {} as ISeriesApi<'Candlestick'>;
+  // Price at pixel y: 1000 - y, so y=250 reads 750.
+  const series = { coordinateToPrice: vi.fn((y: number) => 1000 - y) } as unknown as ISeriesApi<'Candlestick'>;
   const sync = { setCrosshair: vi.fn() };
   const host: CrosshairHost = {
     chart: () => chart as unknown as IChartApi,
@@ -94,5 +95,45 @@ describe('ChartCrosshair.drive (the subscribeCrosshairMove handler, moved out of
     crosshair.drive(move({ point: { x: 1, y: 1 } as never, sourceEvent: {} as never, logical: undefined }));
     expect(sync.setCrosshair).not.toHaveBeenCalled();
     expect(crosshair.time()).toBeNull();
+  });
+});
+
+describe('ChartCrosshair.price (crosshairPrice, for the position tool)', () => {
+  it('on the panel under the pointer: the price at the pointer’s y', () => {
+    const { crosshair } = setup();
+    crosshair.drive(move({ point: { x: 1, y: 250 } as never, sourceEvent: {} as never, logical: 1 as never }));
+    expect(crosshair.price()).toBe(750);
+  });
+
+  it('is null when the series cannot map the y (e.g. no data in the pane yet)', () => {
+    const { crosshair } = setup({ series: () => ({ coordinateToPrice: () => null }) as unknown as ISeriesApi<'Candlestick'> });
+    crosshair.drive(move({ point: { x: 1, y: 250 } as never, sourceEvent: {} as never, logical: 1 as never }));
+    expect(crosshair.price()).toBeNull();
+  });
+
+  it('on a following panel: the value its crosshair snaps to', () => {
+    const { crosshair } = setup();
+    crosshair.follow({ origin: 'eth', timeSec: 910 }); // nearest bar 900, close 13
+    expect(crosshair.price()).toBe(13);
+  });
+
+  it('goes back to null with the time, on leave and on clear', () => {
+    const { crosshair } = setup();
+    crosshair.drive(move({ point: { x: 1, y: 250 } as never, sourceEvent: {} as never, logical: 1 as never }));
+    crosshair.drive(move({ point: undefined }));
+    expect(crosshair.price()).toBeNull();
+
+    crosshair.follow({ origin: 'eth', timeSec: 300 });
+    expect(crosshair.price()).toBe(11);
+    crosshair.follow(null);
+    expect(crosshair.price()).toBeNull();
+  });
+
+  it('is left as-is by moves the crosshair ignores', () => {
+    const { crosshair } = setup();
+    crosshair.drive(move({ point: { x: 1, y: 250 } as never, sourceEvent: {} as never, logical: 1 as never }));
+    crosshair.drive(move({ point: { x: 1, y: 400 } as never, sourceEvent: undefined, logical: 1 as never }));
+    crosshair.follow({ origin: 'btc', timeSec: 300 }); // own origin
+    expect(crosshair.price()).toBe(750);
   });
 });

@@ -109,6 +109,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.sync,
   );
   readonly crosshairTime = this.crosshair.time;
+  /** The price at the crosshair's horizontal line (see ChartCrosshair.price); for the position tool. */
+  readonly crosshairPrice = this.crosshair.price;
 
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 

@@ -20,9 +20,14 @@ export interface CrosshairHost {
  * architecture/panel-sync-and-oi-depth-diagnosis.md), moved out of `ChartComponent`
  * unchanged: `follow()` is the body of its Follow effect, `drive()` its
  * `subscribeCrosshairMove` handler. `time` is the hovered/followed instant, seconds.
+ *
+ * `price` is the price at the crosshair's horizontal line, null whenever `time` is: on the
+ * panel under the pointer, the price at the pointer's y (what the position tool places a level
+ * at); on a following panel, the value its crosshair snaps to (that bar's plotted close).
  */
 export class ChartCrosshair {
   readonly time = signal<number | null>(null);
+  readonly price = signal<number | null>(null);
 
   constructor(
     private readonly host: CrosshairHost,
@@ -39,6 +44,7 @@ export class ChartCrosshair {
     if (!cross) {
       chart.clearCrosshairPosition();
       this.time.set(null);
+      this.price.set(null);
       return;
     }
     if (cross.origin === this.host.panelId()) {
@@ -61,6 +67,7 @@ export class ChartCrosshair {
     }
     chart.setCrosshairPosition(value, timesSec[idx] as UTCTimestamp, series);
     this.time.set(timesSec[idx]);
+    this.price.set(value);
   }
 
   // Drive, crosshair (bug 1, design point 2 + loop-prevention layer 2): hovering this panel
@@ -86,6 +93,7 @@ export class ChartCrosshair {
       // `clearCrosshairPosition` both pass `skipEvent: true` internally) — so every call that
       // reaches here, leave included, is already a real user event, `sourceEvent` field or not.
       this.time.set(null);
+      this.price.set(null);
       this.sync.setCrosshair(this.host.panelId(), null);
       return;
     }
@@ -107,6 +115,7 @@ export class ChartCrosshair {
     // there, but `param.logical` is defined everywhere on the pane.
     const timeSec = logicalToTimeSec(param.logical, timesSec, this.host.tfSec());
     this.time.set(timeSec);
+    this.price.set(this.host.series()?.coordinateToPrice(param.point.y) ?? null);
     this.sync.setCrosshair(this.host.panelId(), timeSec);
   }
 }
