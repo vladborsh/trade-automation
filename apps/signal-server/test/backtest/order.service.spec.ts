@@ -152,6 +152,30 @@ describe('OrderService.place — BUG-003 bounds on computed values', () => {
   });
 });
 
+describe('OrderService — BUG-004 opId reuse', () => {
+  it('the same opId with a different body is 409 and writes nothing; the identical retry still replays', async () => {
+    const { orders, session, repos } = await setup();
+    const req: PlaceOrderRequest = { opId: randomUUID(), cursorMs: session.cursorMs, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 };
+    const first = await orders.place('alice', session.id, req);
+    await expect(code(orders.place('alice', session.id, { ...req, riskPct: 2 }))).resolves.toBe('409');
+    await expect(orders.place('alice', session.id, { ...req })).resolves.toEqual(first);
+    expect(repos.orderRows.size).toBe(1);
+  });
+
+  it('a cancel opId reused for another order, or for a close, is 409', async () => {
+    const { place, orders, session } = await setup();
+    const a = (await place({ type: 'limit', limitPrice: 99.5 })).order;
+    const b = (await place({ type: 'limit', limitPrice: 99.4 })).order;
+    const long = (await place()).order;
+    const req = { opId: randomUUID(), cursorMs: session.cursorMs };
+    await orders.cancel('alice', session.id, a.id, req);
+    await expect(code(orders.cancel('alice', session.id, b.id, req))).resolves.toBe('409');
+    await expect(code(orders.close('alice', session.id, long.id, req))).resolves.toBe('409');
+    expect((await orders.get('alice', session.id, b.id)).order.status).toBe('pending');
+    expect((await orders.get('alice', session.id, long.id)).order.status).toBe('open');
+  });
+});
+
 describe('OrderService.cancel', () => {
   it('cancels a pending order at the cursor; anything else is 409 ORDER_NOT_PENDING; replay is stable', async () => {
     const { place, orders, session } = await setup();

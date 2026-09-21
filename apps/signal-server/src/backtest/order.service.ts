@@ -25,7 +25,7 @@ import { apiError } from '../auth/auth-error';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { lastRevealed1m } from './last-revealed';
 import { orderLevelError, placementOverflows, plannedEntry } from './order-validation';
-import { runSessionMutation, sessionNotFound, TxRepos } from './session-mutation';
+import { MutationOp, runSessionMutation, sessionNotFound, TxRepos } from './session-mutation';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
 
 const UuidSchema = z.string().uuid();
@@ -54,7 +54,7 @@ export class OrderService {
    * `qty` / `riskAmount` come from `positionSize` over the current balance and are fixed here.
    */
   place(userId: string, sessionId: string, req: PlaceOrderRequest): Promise<PlaceOrderResponse> {
-    return this.mutate(userId, sessionId, req.opId, async (tx, session) => {
+    return this.mutate(userId, sessionId, { opId: req.opId, kind: 'place', request: req }, async (tx, session) => {
       assertTradable(session, req.cursorMs);
       const panel = session.layout.panels.find((p) => p.id === req.panelId);
       if (!panel) throw new BadRequestException(`Unknown panelId '${req.panelId}' for this session.`);
@@ -100,7 +100,7 @@ export class OrderService {
 
   /** POST …/orders/:orderId/cancel — pending only (409 `ORDER_NOT_PENDING`). */
   cancel(userId: string, sessionId: string, orderId: string, req: CancelRequest): Promise<Order> {
-    return this.mutate(userId, sessionId, req.opId, async (tx, session) => {
+    return this.mutate(userId, sessionId, { opId: req.opId, kind: 'cancel', request: req, orderId }, async (tx, session) => {
       assertTradable(session, req.cursorMs);
       const order = await this.lockOrder(tx, session.id, orderId);
       if (order.status !== 'pending') {
@@ -116,7 +116,7 @@ export class OrderService {
    * replay-core; then the balance and the aggregate columns, all in the one transaction.
    */
   close(userId: string, sessionId: string, orderId: string, req: CloseRequest): Promise<CloseResponse> {
-    return this.mutate(userId, sessionId, req.opId, async (tx, session) => {
+    return this.mutate(userId, sessionId, { opId: req.opId, kind: 'close', request: req, orderId }, async (tx, session) => {
       assertTradable(session, req.cursorMs);
       const order = await this.lockOrder(tx, session.id, orderId);
       if (order.status !== 'open') {
@@ -173,8 +173,8 @@ export class OrderService {
     this.requireEnabled();
   }
 
-  private mutate<T>(userId: string, sessionId: string, opId: string, fn: (tx: TxRepos, session: SessionSummary) => Promise<T>): Promise<T> {
-    return runSessionMutation(this.requireEnabled(), userId, sessionId, opId, fn);
+  private mutate<T>(userId: string, sessionId: string, op: MutationOp, fn: (tx: TxRepos, session: SessionSummary) => Promise<T>): Promise<T> {
+    return runSessionMutation(this.requireEnabled(), userId, sessionId, op, fn);
   }
 
   private async findSession(repos: BacktestRepositories, userId: string, sessionId: string): Promise<SessionSummary> {

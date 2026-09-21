@@ -1,9 +1,18 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { SessionSummary } from '@trade-automation/contracts';
 import { z } from 'zod';
+import { OpKind, opFingerprint } from './op-fingerprint';
 import { BacktestRepositories } from './session.repository.port';
 
 export type TxRepos = Omit<BacktestRepositories, 'transaction'>;
+
+/** One mutating request: its `opId`, the operation, the (parsed) body and the target order if any. */
+export interface MutationOp {
+  opId: string;
+  kind: OpKind;
+  request: object;
+  orderId?: string;
+}
 
 const UuidSchema = z.string().uuid();
 
@@ -12,8 +21,11 @@ const UuidSchema = z.string().uuid();
  * request (place, cancel, close, advance). In one transaction:
  *
  * 1. lock the session row (`FOR UPDATE`) for the cookie user — 404 when absent or someone else's;
- * 2. when this `opId` was seen before, return its stored response (no second mutation);
- * 3. otherwise run `fn` and store its response with the mutation.
+ * 2. when this `opId` was seen before: the **same request** (same kind and fingerprint, BUG-004)
+ *    gets its stored response back, with no second mutation; a **different** request under that
+ *    `opId` is a 409 (plain body) and nothing happens; a row from before migration 003 (no
+ *    fingerprint) replays as it always did;
+ * 3. otherwise run `fn` and store its response, kind and fingerprint with the mutation.
  *
  * Because every mutation takes the same row lock, order ops and advances on one session
  * serialise: neither ever sees the other half-applied (the second-tab guard, §5.5). A refusal
@@ -23,17 +35,23 @@ export function runSessionMutation<T>(
   repos: BacktestRepositories,
   userId: string,
   sessionId: string,
-  opId: string,
+  op: MutationOp,
   fn: (tx: TxRepos, session: SessionSummary) => Promise<T>,
 ): Promise<T> {
   if (!UuidSchema.safeParse(sessionId).success) return Promise.reject(sessionNotFound());
+  const fingerprint = opFingerprint(op.kind, op.request, op.orderId);
   return repos.transaction(async (tx) => {
     const session = await tx.sessions.findById(userId, sessionId, { forUpdate: true });
     if (!session) throw sessionNotFound();
-    const stored = await tx.ops.find(session.id, opId);
-    if (stored !== null) return stored as T;
+    const stored = await tx.ops.find(session.id, op.opId);
+    if (stored !== null) {
+      if (stored.fingerprint !== null && (stored.kind !== op.kind || stored.fingerprint !== fingerprint)) {
+        throw new ConflictException('opId already used for a different request');
+      }
+      return stored.response as T;
+    }
     const response = await fn(tx, session);
-    await tx.ops.save(session.id, opId, response);
+    await tx.ops.save(session.id, op.opId, { kind: op.kind, fingerprint }, response);
     return response;
   });
 }

@@ -43,7 +43,8 @@ interface Exit {
 
 /**
  * architecture/backtest-app-system-design.md §5.5 — POST …/advance `{opId, toCursorMs}`, D4.
- * One `runSessionMutation` (session row locked, `opId` replayed, response stored), then:
+ * One `runSessionMutation` (session row locked, the same request under a seen `opId` replayed, a
+ * different one refused with 409, the response stored), then:
  *
  * 1. 409 `SESSION_COMPLETE`; 400 for a `toCursorMs` not on a minute (every cursor a client
  *    produces is a bar close); 409 `CURSOR_BACKWARDS` when it is before the cursor. A target past
@@ -74,7 +75,7 @@ export class AdvanceService {
   ) {}
 
   advance(userId: string, sessionId: string, req: AdvanceRequest): Promise<AdvanceResult> {
-    return runSessionMutation(this.requireEnabled(), userId, sessionId, req.opId, (tx, session) =>
+    return runSessionMutation(this.requireEnabled(), userId, sessionId, { opId: req.opId, kind: 'advance', request: req }, (tx, session) =>
       this.apply(tx, userId, session, req.toCursorMs),
     );
   }

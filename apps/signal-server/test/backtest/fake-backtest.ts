@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Candle, Coverage, InstrumentId, Order, SessionAggregates, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
+import type { OpKind } from '../../src/backtest/op-fingerprint';
 import { OpsRepository } from '../../src/backtest/ops.repository.port';
 import { NewOrder, OrderClose, OrderFill, OrderRepository } from '../../src/backtest/order.repository.port';
 import { money, percent, rMultiple } from '../../src/backtest/pg/numeric';
@@ -15,8 +16,8 @@ export class FakeBacktestRepositories implements BacktestRepositories {
   readonly closedOrders = new Map<string, StatsOrder[]>();
   /** Every order row, by id (T-015). */
   readonly orderRows = new Map<string, Order>();
-  /** `backtest_ops`, keyed `sessionId|opId`; stored as JSON text like the jsonb column. */
-  readonly opRows = new Map<string, string>();
+  /** `backtest_ops`, keyed `sessionId|opId`; the response stored as JSON text like the jsonb column. */
+  readonly opRows = new Map<string, { response: string; kind: OpKind | null; fingerprint: string | null }>();
 
   private ordersOf(sessionId: string): Order[] {
     return [...this.orderRows.values()].filter((o) => o.sessionId === sessionId).sort((a, b) => a.seq - b.seq);
@@ -74,10 +75,10 @@ export class FakeBacktestRepositories implements BacktestRepositories {
   readonly ops: OpsRepository = {
     find: async (sessionId, opId) => {
       const stored = this.opRows.get(`${sessionId}|${opId}`);
-      return stored === undefined ? null : JSON.parse(stored);
+      return stored === undefined ? null : { response: JSON.parse(stored.response), kind: stored.kind, fingerprint: stored.fingerprint };
     },
-    save: async (sessionId, opId, response) => {
-      this.opRows.set(`${sessionId}|${opId}`, JSON.stringify(response));
+    save: async (sessionId, opId, op, response) => {
+      this.opRows.set(`${sessionId}|${opId}`, { response: JSON.stringify(response), kind: op.kind, fingerprint: op.fingerprint });
     },
   };
 

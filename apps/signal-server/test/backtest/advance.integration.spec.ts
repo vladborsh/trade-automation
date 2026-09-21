@@ -103,11 +103,36 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);
     const opId = randomUUID();
     const first = await advancer.advance(alice, s.id, { opId, toCursorMs: C + 15 * MIN });
-    const replay = await advancer.advance(alice, s.id, { opId, toCursorMs: C + 30 * MIN });
+    const replay = await advancer.advance(alice, s.id, { opId, toCursorMs: C + 15 * MIN });
 
     expect(replay).toEqual(first);
     expect((await repos.sessions.findById(alice, s.id))!.cursorMs).toBe(C + 15 * MIN);
     expect((await db.query(`select op_id from backtest_ops where session_id = $1`, [s.id])).length).toBe(1);
+  });
+
+  it('BUG-004: an opId used by a place and then sent with an advance is 409; the cursor does not move', async () => {
+    const s = await repos.sessions.insert(alice, NEW_SESSION);
+    const opId = randomUUID();
+    await orders.place(alice, s.id, { opId, cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 });
+
+    await expect(advancer.advance(alice, s.id, { opId, toCursorMs: C + 60 * MIN })).rejects.toMatchObject({
+      status: 409,
+      response: expect.objectContaining({ message: 'opId already used for a different request' }),
+    });
+    expect((await repos.sessions.findById(alice, s.id))!.cursorMs).toBe(C);
+    const [row] = await db.query<{ kind: string; fingerprint: string }>(`select kind, fingerprint from backtest_ops where session_id = $1`, [s.id]);
+    expect(row.kind).toBe('place');
+    expect(row.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('BUG-004: a row from before migration 003 (NULL kind and fingerprint) still replays', async () => {
+    const s = await repos.sessions.insert(alice, NEW_SESSION);
+    const opId = randomUUID();
+    const legacy = { cursorMs: C + 15 * MIN, status: 'active', balance: 10_000, events: [], orders: [], stats: { legacy: true } };
+    await db.query(`insert into backtest_ops (session_id, op_id, response) values ($1, $2, $3)`, [s.id, opId, JSON.stringify(legacy)]);
+
+    expect(await advancer.advance(alice, s.id, { opId, toCursorMs: C + 60 * MIN })).toEqual(legacy);
+    expect((await repos.sessions.findById(alice, s.id))!.cursorMs).toBe(C);
   });
 
   it('an advance and a place-order racing on one session serialise — never a half state', async () => {

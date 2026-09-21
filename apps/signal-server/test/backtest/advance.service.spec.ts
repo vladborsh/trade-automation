@@ -194,11 +194,31 @@ describe('AdvanceService (design §5.5) against a fixture 1m tape in the file st
 
     const first = await advance(C + 15 * MIN, opId);
     const fill = jest.spyOn(repos.orders, 'fill');
-    const replay = await advance(C + 30 * MIN, opId); // a different target under the same opId: still the stored body
+    const replay = await advance(C + 15 * MIN, opId); // the same request again (a retry)
 
     expect(replay).toEqual(first);
     expect(fill).not.toHaveBeenCalled();
     expect(repos.rows.get(session.id)!.session.cursorMs).toBe(C + 15 * MIN);
+  });
+
+  it('BUG-004: the same opId for a different target, or for a place, is 409 and moves nothing', async () => {
+    await tape(store, BTC, C - 10 * MIN, 40);
+    await tape(store, ETH, C - 10 * MIN, 40);
+    await start();
+    const opId = randomUUID();
+    await advance(C + 15 * MIN, opId);
+
+    await expect(code(advance(C + 30 * MIN, opId))).resolves.toBe('409'); // same kind, different body
+    expect(repos.rows.get(session.id)!.session.cursorMs).toBe(C + 15 * MIN);
+
+    // an opId first used by a place, then sent with an advance
+    const placeOp = randomUUID();
+    await orders.place('alice', session.id, { opId: placeOp, cursorMs: C + 15 * MIN, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 });
+    const err = await advance(C + 30 * MIN, placeOp).catch((e: { getStatus(): number; getResponse(): unknown }) => e);
+    expect((err as { getStatus(): number }).getStatus()).toBe(409);
+    expect((err as { getResponse(): { message: string } }).getResponse().message).toBe('opId already used for a different request');
+    expect(repos.rows.get(session.id)!.session.cursorMs).toBe(C + 15 * MIN);
+    expect(repos.opRows.size).toBe(2);
   });
 
   it('with no orders an advance only moves the cursor', async () => {
