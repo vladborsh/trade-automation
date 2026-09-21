@@ -1,11 +1,14 @@
 import { Candle } from '@trade-automation/contracts';
 import { INDICATOR_CATALOG, defaultParams, indicatorById } from '../src';
-import { bar } from './test-helpers';
+import real from './fixtures/btcusdt-1m-2days.json';
 
-describe('INDICATOR_CATALOG (T-027) — what the client picker renders', () => {
-  const bars: Candle[] = Array.from({ length: 120 }, (_, i) => bar(i * 60_000, { open: 100, high: 101 + (i % 5), low: 99 - (i % 3), close: 100 + Math.sin(i) }));
+describe('INDICATOR_CATALOG (T-027, T-034) — what the client picker renders', () => {
+  // Real bars (T-034): Range(200) needs 201 bars and the iFVG line needs real gaps.
+  const bars: Candle[] = (real.bars as number[][]).map(([openTime, open, high, low, close, volume]) => ({
+    instrument: 'binance:BTCUSDT', timeframe: '1m', openTime, open, high, low, close, volume, closed: true, source: 'venue-rest',
+  }));
 
-  it('lists the six indicators once each, with the right panes', () => {
+  it('lists the eleven indicators once each, with the right panes', () => {
     expect(INDICATOR_CATALOG.map((e) => [e.id, e.pane])).toEqual([
       ['sma', 'overlay'],
       ['ema', 'overlay'],
@@ -13,10 +16,15 @@ describe('INDICATOR_CATALOG (T-027) — what the client picker renders', () => {
       ['rsi', 'separate'],
       ['macd', 'separate'],
       ['stochastic', 'separate'],
+      ['vwap', 'overlay'],
+      ['atr', 'separate'],
+      ['range', 'overlay'],
+      ['prev-hour', 'overlay'],
+      ['fvg', 'overlay'],
     ]);
   });
 
-  it('defaults are the classic settings', () => {
+  it('defaults are the classic settings, and the plug-in\'s for the lifted five', () => {
     expect(Object.fromEntries(INDICATOR_CATALOG.map((e) => [e.id, defaultParams(e)]))).toEqual({
       sma: { length: 20 },
       ema: { length: 20 },
@@ -24,6 +32,12 @@ describe('INDICATOR_CATALOG (T-027) — what the client picker renders', () => {
       rsi: { length: 14 },
       macd: { fast: 12, slow: 26, signal: 9 },
       stochastic: { kLength: 14, dLength: 3, smoothing: 3 },
+      // T-034: the vwap-band-reversal plug-in's (strategies.yaml atrBars, rangeBars)
+      vwap: {},
+      atr: { length: 20 },
+      range: { length: 200 },
+      'prev-hour': {},
+      fvg: {},
     });
   });
 

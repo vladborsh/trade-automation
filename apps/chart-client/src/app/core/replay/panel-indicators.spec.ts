@@ -39,7 +39,7 @@ describe('panel-indicators (T-028)', () => {
   });
 
   it('skips unknown ids and params the function refuses; nothing for an empty panel', () => {
-    expect(panelIndicators(B, [{ id: 'vwap', params: {} }, { id: 'ema', params: { length: 0 } }], 'binance:BTCUSDT', '5m')).toEqual({ points: [], specs: new Map() });
+    expect(panelIndicators(B, [{ id: 'no-such-indicator', params: {} }, { id: 'ema', params: { length: 0 } }], 'binance:BTCUSDT', '5m')).toEqual({ points: [], specs: new Map() });
     expect(panelIndicators([], [{ id: 'ema', params: {} }], 'binance:BTCUSDT', '5m').specs.size).toBe(0);
     expect(panelIndicators(B, undefined, 'binance:BTCUSDT', '5m').points).toEqual([]);
   });

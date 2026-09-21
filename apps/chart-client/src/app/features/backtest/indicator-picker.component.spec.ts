@@ -50,8 +50,8 @@ describe('IndicatorPickerComponent (T-028)', () => {
   });
 
   it('an id the catalogue no longer has is shown as unknown and can be removed', () => {
-    const { el, emitted } = setup({ ...PANEL, indicators: [{ id: 'vwap', params: {} }] });
-    expect(el.querySelector('[data-testid="indicator-row"] .label')?.textContent?.trim()).toBe('vwap (unknown)');
+    const { el, emitted } = setup({ ...PANEL, indicators: [{ id: 'no-such-indicator', params: {} }] });
+    expect(el.querySelector('[data-testid="indicator-row"] .label')?.textContent?.trim()).toBe('no-such-indicator (unknown)');
     el.querySelector<HTMLButtonElement>('button.remove')!.click();
     expect(emitted.at(-1)).toEqual([]);
   });

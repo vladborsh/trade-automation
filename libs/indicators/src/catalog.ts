@@ -1,10 +1,15 @@
 import { Candle } from '@trade-automation/contracts';
+import { atrSeries } from './atr-series';
 import { bollinger } from './bollinger';
+import { ifvgSeries } from './fvg-series';
 import { macd } from './macd';
 import { ema, sma } from './moving-averages';
+import { previousHourSeries } from './previous-hour-series';
+import { rangeSeries } from './range-series';
 import { rsi } from './rsi';
 import { IndicatorSeries } from './series';
 import { stochastic } from './stochastic';
+import { vwapBandSeries } from './vwap-series';
 
 /** One numeric parameter the picker renders: label, default and allowed range. */
 export interface IndicatorParamSpec {
@@ -40,7 +45,7 @@ export interface IndicatorCatalogEntry {
   compute(bars: readonly Candle[], params: Readonly<Record<string, number>>): IndicatorSeries;
 }
 
-export type IndicatorId = 'sma' | 'ema' | 'rsi' | 'macd' | 'bollinger' | 'stochastic';
+export type IndicatorId = 'sma' | 'ema' | 'rsi' | 'macd' | 'bollinger' | 'stochastic' | 'vwap' | 'atr' | 'range' | 'prev-hour' | 'fvg';
 
 const lengthParam = (key: string, label: string, def: number): IndicatorParamSpec => ({
   key,
@@ -119,6 +124,62 @@ export const INDICATOR_CATALOG: readonly IndicatorCatalogEntry[] = [
     levels: [20, 80],
     compute: (bars, params) =>
       stochastic(bars, { kLength: p(params, 'kLength'), dLength: p(params, 'dLength'), smoothing: p(params, 'smoothing') }),
+  },
+  // T-034 — the five lifted from the vwap-band-reversal plug-in, as series. Defaults are the
+  // plug-in's (strategies.yaml: atrBars 20, rangeBars 200); VWAP, previous hour and iFVG have none.
+  {
+    id: 'vwap',
+    name: 'VWAP band (UTC day from 00:01, ±1σ)',
+    pane: 'overlay',
+    params: [],
+    outputs: [
+      { key: 'vwap', label: 'VWAP' },
+      { key: 'upper', label: '+1σ' },
+      { key: 'lower', label: '−1σ' },
+    ],
+    compute: (bars) => vwapBandSeries(bars),
+  },
+  {
+    id: 'atr',
+    name: 'Average true range',
+    pane: 'separate',
+    params: [lengthParam('length', 'Length', 20)],
+    outputs: [{ key: 'atr', label: 'ATR' }],
+    compute: (bars, params) => atrSeries(bars, { length: p(params, 'length') }),
+  },
+  {
+    id: 'range',
+    name: 'Range high / low (bars before the current one)',
+    pane: 'overlay',
+    params: [lengthParam('length', 'Length', 200)],
+    outputs: [
+      { key: 'top', label: 'Top' },
+      { key: 'middle', label: 'Middle' },
+      { key: 'bottom', label: 'Bottom' },
+    ],
+    compute: (bars, params) => rangeSeries(bars, { length: p(params, 'length') }),
+  },
+  {
+    id: 'prev-hour',
+    name: 'Previous UTC hour high / low',
+    pane: 'overlay',
+    params: [],
+    outputs: [
+      { key: 'high', label: 'High' },
+      { key: 'low', label: 'Low' },
+    ],
+    compute: (bars) => previousHourSeries(bars),
+  },
+  {
+    id: 'fvg',
+    name: 'Inverse FVG (latest)',
+    pane: 'overlay',
+    params: [],
+    outputs: [
+      { key: 'high', label: 'iFVG top' },
+      { key: 'low', label: 'iFVG bottom' },
+    ],
+    compute: (bars) => ifvgSeries(bars),
   },
 ];
 

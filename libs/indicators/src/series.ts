@@ -11,8 +11,10 @@ export interface IndicatorValue {
  * name (`macd`/`signal`/`hist`, `upper`/`middle`/`lower`, `k`/`d`, or the indicator's own id for
  * single-output ones), each aligned to bar `openTime`. A series holds **only defined values**: it
  * starts at the first bar where the output is defined (no zeros, no NaN during the warm-up) and
- * then has one point per bar. Defined here rather than in contracts: indicators are computed on
- * the client only (decision 11) and never cross the wire.
+ * then has one point per bar — except the session-anchored and event series of T-034 (`vwap`,
+ * `prev-hour`, `fvg`), which have no point on the bars where their lifted function reports nothing
+ * (the 00:00 bar, an hour without bars, no iFVG). Defined here rather than in contracts: indicators
+ * are computed on the client only (decision 11) and never cross the wire.
  */
 export type IndicatorSeries<K extends string = string> = Record<K, IndicatorValue[]>;
 

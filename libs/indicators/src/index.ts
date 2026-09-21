@@ -18,6 +18,14 @@ export { macd } from './macd';
 export { ema, sma } from './moving-averages';
 export { rsi } from './rsi';
 export { stochastic } from './stochastic';
+
+// T-034 — series forms of the five lifted functions (a value per bar; the lifted bodies above stay
+// byte-identical), registered in the catalog.
+export { atrSeries } from './atr-series';
+export { ifvgSeries } from './fvg-series';
+export { previousHourSeries } from './previous-hour-series';
+export { rangeSeries } from './range-series';
+export { vwapBandSeries } from './vwap-series';
 export type { IndicatorSeries, IndicatorValue } from './series';
 export {
   INDICATOR_CATALOG,
