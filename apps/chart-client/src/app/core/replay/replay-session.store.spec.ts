@@ -118,6 +118,33 @@ describe('ReplaySessionStore (T-021)', () => {
     expect(store.engine()!.cursor()).toBe(T0 + 20 * M); // …at the server's cursor
   });
 
+  it('BUG-009: while the reload is loading, the old engine shows loading and a step is ignored, not lost', async () => {
+    const client = fakeClient();
+    client.advance.mockRejectedValueOnce(new ApiError(409, 'CURSOR_BACKWARDS', 'toCursorMs is before the cursor'));
+    const store = await open(client);
+    const first = store.engine()!;
+    let release!: () => void;
+    const detail: SessionDetail = { session: { ...SESSION, cursorMs: T0 + 20 * M }, openOrders: [], stats: STATS };
+    client.getSession.mockImplementationOnce(() => new Promise((r) => (release = () => r(detail))));
+
+    await first.step(); // refused → reload starts, getSession held
+    await settle();
+    expect(store.engine()).toBe(first); // still on screen…
+    expect(first.blocked()).toBe(true); // …but showing "loading"
+    expect(first.started()).toBe(false); // …and not "started" (the e2e readiness hook)
+    const cursor = first.cursor();
+    await first.step(); // the key pressed during the reload
+    expect(first.cursor()).toBe(cursor); // not moved on screen only to vanish
+
+    release();
+    await settle();
+    await settle();
+    expect(store.engine()).not.toBe(first);
+    expect(store.engine()!.blocked()).toBe(false);
+    expect(store.engine()!.started()).toBe(true);
+    expect(client.advance).toHaveBeenCalledTimes(1); // only the refused one
+  });
+
   it('shows "retrying" while a network failure is being retried', async () => {
     const client = fakeClient();
     let fail = true;

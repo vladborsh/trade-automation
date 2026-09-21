@@ -108,6 +108,21 @@ describe('ReplaySessionStore — the trading loop (T-023)', () => {
     expect(client.getSession).toHaveBeenCalledTimes(1);
   });
 
+  it('BUG-009: Enter while the session is reloading is a hint, not a silently dropped order', async () => {
+    const { store, client } = await open();
+    store.toolStore('btc').create('long');
+    let release!: () => void;
+    client.getSession.mockImplementationOnce(() => new Promise((r) => (release = () => r({ session: SESSION, openOrders: [], stats: STATS }))));
+    const reload = store.open('s1'); // a refusal's reload, getSession held
+    store.placeActiveDraft();
+    expect(store.hint()).toBe('The session is reloading — press Enter again in a moment.');
+    release();
+    await reload;
+    store.placeActiveDraft(); // the same draft, once the new queue is up
+    await settle();
+    expect(client.placeOrder).toHaveBeenCalledTimes(1);
+  });
+
   it('a client-side check refuses before sending (the limit is no longer below the last close)', async () => {
     const { store, client } = await open();
     const tools = store.toolStore('btc');

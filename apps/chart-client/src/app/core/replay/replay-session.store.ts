@@ -226,6 +226,7 @@ export class ReplaySessionStore implements OnDestroy {
    */
   async open(id: string, view: ViewAt | null = null): Promise<void> {
     this.sessionId = id;
+    this.engine()?.retire(); // BUG-009: the old engine shows "loading" until the new one replaces it
     this.queue?.stop();
     this.queue = null;
     this.view.set(view);
@@ -404,6 +405,7 @@ export class ReplaySessionStore implements OnDestroy {
       balance: session.balance,
     });
     if ('hint' in built) return this.showHint(built.hint);
+    if (!this.queue) return this.showHint('The session is reloading — press Enter again in a moment.');
     this.placing.push({ draftId: draft.id, panelId: active.panelId });
     this.queue?.push(built.input);
   }

@@ -200,6 +200,23 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(e.cursor()).toBe(at(18, 22, 5));
   });
 
+  it('a retired engine (BUG-009: the session is reloading) shows loading for good and ignores steps and switches', async () => {
+    const api = fakeServer({ pageCap: 3 });
+    const e = engine(api, at(18, 22, 0));
+    await e.start();
+    const inFlight = e.step(); // a step that blocks on a page…
+    e.retire(); // …when the reload starts
+    await inFlight;
+    expect(e.blocked()).toBe(true); // the in-flight step's end does not clear it
+    expect(e.started()).toBe(false); // the readiness hook drops until the fresh engine has started
+    const cursor = e.cursor();
+    await e.step();
+    await e.setTimeframe('1m');
+    expect(e.cursor()).toBe(cursor);
+    expect(e.timeframe()).toBe('5m');
+    expect(api.patchTimeframe).not.toHaveBeenCalled();
+  });
+
   it('loads older history page by page and stops when there is none', async () => {
     const api = fakeServer();
     const e = engine(api, at(21, 2, 0));

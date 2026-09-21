@@ -81,6 +81,8 @@ export class ReplayEngine {
 
   private readonly tapes: PanelTape[];
   private busy = false;
+  /** BUG-009: the store is replacing this engine (a reload) — blocked for good. */
+  private retired = false;
   private serverCursor: number;
 
   constructor(
@@ -123,6 +125,18 @@ export class ReplayEngine {
     });
     this.refillAll();
     this.started.set(true);
+  }
+
+  /**
+   * BUG-009: the store is reloading the session and will replace this engine. From now on it shows
+   * "loading" and ignores every step and switch — its queue is already stopped, so a step taken
+   * here would move the cursor on screen and then vanish with the reload. It is no longer
+   * `started` either, so the readiness hook drops until the fresh engine's `start()` completes.
+   */
+  retire(): void {
+    this.retired = true;
+    this.blocked.set(true);
+    this.started.set(false);
   }
 
   /** An advance response: the server's cursor, which history requests may not pass. */
@@ -343,7 +357,7 @@ export class ReplayEngine {
 
   /** Runs `fn` unless a step or switch is already in flight; errors land in `error`. */
   private async exclusive(fn: () => Promise<void>): Promise<void> {
-    if (this.busy) return;
+    if (this.busy || this.retired) return;
     this.busy = true;
     this.error.set(null);
     try {
@@ -352,7 +366,7 @@ export class ReplayEngine {
       this.error.set(describe(err));
     } finally {
       this.busy = false;
-      this.blocked.set(false);
+      this.blocked.set(this.retired);
     }
   }
 
