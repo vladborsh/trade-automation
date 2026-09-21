@@ -7,7 +7,7 @@ import { LayoutEditorComponent } from './layout-editor.component';
 import { ReplayToolbarComponent } from './replay-toolbar.component';
 import { JournalComponent } from './journal.component';
 import { StatsSummaryComponent } from './stats-summary.component';
-import { adjacentTimeframe, replayKeyAction } from './replay-keys';
+import { adjacentTimeframe, keyAllowed, replayKeyAction } from './replay-keys';
 
 /**
  * backtest-app-system-design.md §2.3, §5.4 — `/sessions/:id`: the replay toolbar over the panel
@@ -33,7 +33,8 @@ export class WorkspaceComponent {
   readonly id = input.required<string>();
   /** `?viewAt=<ms>&order=<id>` — §9.3 view-only rewind ("Show on chart" from a trade's detail). */
   readonly viewAt = input<string | undefined>();
-  readonly order = input<string | undefined>();
+  /** Public name `order` (the query parameter); `order()` is the Enter action. */
+  readonly viewOrder = input<string | undefined>(undefined, { alias: 'order' });
 
   readonly store = inject(ReplaySessionStore);
   readonly session = this.store.session;
@@ -44,7 +45,7 @@ export class WorkspaceComponent {
     effect(() => {
       const id = this.id();
       const viewAt = Number(this.viewAt());
-      const view = Number.isFinite(viewAt) && viewAt > 0 ? { viewAt, orderId: this.order() ?? null } : null;
+      const view = Number.isFinite(viewAt) && viewAt > 0 ? { viewAt, orderId: this.viewOrder() ?? null } : null;
       untracked(() => void this.store.open(id, view));
     });
   }
@@ -62,8 +63,7 @@ export class WorkspaceComponent {
     const engine = this.engine();
     const action = engine ? replayKeyAction(event) : null;
     if (!engine || !action) return;
-    // Completed: everything is inert. View-only: only the timeframe keys work (§9.3).
-    if (action === 'step' ? engine.completed() || engine.viewOnly : engine.completed() && !engine.viewOnly) return;
+    if (!keyAllowed(action, { completed: engine.completed(), viewOnly: engine.viewOnly })) return;
     event.preventDefault(); // → would otherwise scroll the page
     switch (action) {
       case 'step':

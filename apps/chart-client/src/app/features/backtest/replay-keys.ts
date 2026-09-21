@@ -36,6 +36,16 @@ export function replayKeyAction(event: Pick<KeyboardEvent, 'key' | 'target' | 'a
   }
 }
 
+/**
+ * Whether a hotkey may act in the workspace's current mode. A complete session is inert
+ * (decision 28). Viewing the past (§9.3) allows only the timeframe keys — never a step, a tool
+ * or an order (decision 32) — and there the timeframe works even on a complete session.
+ */
+export function keyAllowed(action: ReplayKeyAction, mode: { completed: boolean; viewOnly: boolean }): boolean {
+  if (action === 'finer' || action === 'coarser') return mode.viewOnly || !mode.completed;
+  return !mode.viewOnly && !mode.completed;
+}
+
 /** The neighbouring timeframe, clamped at 1m and 1d. */
 export function adjacentTimeframe(tf: Timeframe, direction: 'finer' | 'coarser'): Timeframe {
   const i = ORDER.indexOf(tf);

@@ -1,4 +1,4 @@
-import { adjacentTimeframe, replayKeyAction } from './replay-keys';
+import { adjacentTimeframe, keyAllowed, replayKeyAction, type ReplayKeyAction } from './replay-keys';
 
 const key = (k: string, target: unknown = { tagName: 'BODY' }, mods: Partial<Record<'altKey' | 'ctrlKey' | 'metaKey', boolean>> = {}) =>
   replayKeyAction({ key: k, target: target as EventTarget, altKey: false, ctrlKey: false, metaKey: false, ...mods });
@@ -32,5 +32,23 @@ describe('adjacentTimeframe', () => {
     expect(adjacentTimeframe('5m', 'finer')).toBe('1m');
     expect(adjacentTimeframe('1m', 'finer')).toBe('1m');
     expect(adjacentTimeframe('1d', 'coarser')).toBe('1d');
+  });
+});
+
+describe('keyAllowed', () => {
+  const all: ReplayKeyAction[] = ['step', 'finer', 'coarser', 'long', 'short', 'cancel', 'order'];
+  const allowed = (mode: { completed: boolean; viewOnly: boolean }) => all.filter((a) => keyAllowed(a, mode));
+
+  it('a live session: every key', () => {
+    expect(allowed({ completed: false, viewOnly: false })).toEqual(all);
+  });
+
+  it('a complete session: nothing', () => {
+    expect(allowed({ completed: true, viewOnly: false })).toEqual([]);
+  });
+
+  it('viewing the past (§9.3): only the timeframe, even on a complete session — never a step, a tool or an order', () => {
+    expect(allowed({ completed: false, viewOnly: true })).toEqual(['finer', 'coarser']);
+    expect(allowed({ completed: true, viewOnly: true })).toEqual(['finer', 'coarser']);
   });
 });

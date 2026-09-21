@@ -131,8 +131,13 @@ describe('WorkspaceComponent', () => {
 
     expect(store.open).toHaveBeenCalledWith(SESSION.id, { viewAt: 1789552200000, orderId: 'o1' });
     press('ArrowRight');
+    press('b');
+    press('S');
+    press('Enter');
     press(']');
     expect(engine.step).not.toHaveBeenCalled();
+    expect(store.createDraft).not.toHaveBeenCalled(); // no tool…
+    expect(store.activeTool).not.toHaveBeenCalled(); // …and no order from one
     expect(engine.setTimeframe).toHaveBeenCalledWith('15m');
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="replay-viewing"]')).not.toBeNull();
   });

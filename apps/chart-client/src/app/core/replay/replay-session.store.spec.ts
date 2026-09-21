@@ -170,15 +170,26 @@ describe('ReplaySessionStore (T-021)', () => {
     expect(store.engine()!.cursor()).toBe(T0 + 25 * M); // the persisted cursor, not viewAt
   });
 
-  it('view-only shows the order\'s drawing on its panel only', async () => {
+  it('view-only shows the order as a read-only position tool on its panel; a drag changes nothing', async () => {
     const client = fakeClient();
     client.listOrders.mockResolvedValueOnce([
-      { id: 'o0', seq: 1, status: 'closed', panelId: 'btc', side: 'long', entryTimeMs: T0, placedAtMs: T0, entryPrice: 1.5, limitPrice: null, slCurrent: 1, tpCurrent: 2, exitPrice: 2 } as Order,
+      { id: 'o0', seq: 1, status: 'closed', panelId: 'btc', side: 'long', type: 'market', entryTimeMs: T0, placedAtMs: T0 + M, entryPrice: 1.5, limitPrice: null, slCurrent: 1, tpCurrent: 2, exitPrice: 2 } as Order,
     ]);
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [ReplaySessionStore, { provide: BacktestClient, useValue: client }] });
     const store = TestBed.inject(ReplaySessionStore);
     await store.open('s1', { viewAt: T0 + M, orderId: 'o0' });
-    expect(store.sources().get('btc')!.overlays().map((o) => (o.type === 'ray' ? o.label : ''))).toEqual(['entry (long)', 'stop', 'target', 'exit']);
+
+    const tools = store.sources().get('btc')!.positionTools!;
+    expect(tools.view().tools).toEqual([
+      { id: 'view-o0', orderId: 'o0', side: 'long', mode: 'market', entry: 1.5, sl: 1, tp: 2, kind: 'position', active: false, anchorTime: T0 },
+    ]);
+    const tool = tools.view().tools[0];
+    tools.apply({ type: 'update', tool: { ...tool, sl: 0.5 }, final: true });
+    tools.apply({ type: 'activate', id: tool.id });
+    expect(tools.view().tools[0]).toEqual(tool);
+
+    await store.open('s1'); // the normal workspace gets T-022's editable tools back
+    expect(store.sources().get('btc')!.positionTools!.view().tools).toEqual([]);
   });
 });
