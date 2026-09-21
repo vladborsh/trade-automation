@@ -22,6 +22,7 @@ import { VWAP_BAND_STRATEGY_ID } from './vwap-band-mock';
 import { MockCalendarState } from './calendar-state';
 import type { CalendarServerFrame } from './calendar-types';
 import { MockAuthState, isPublicPath, unauthenticated } from './auth';
+import { MockBacktestState } from './backtest';
 
 const PORT = Number(process.env.MOCK_SERVER_PORT ?? 4300);
 const BAR_MS = Number(process.env.MOCK_BAR_MS ?? 2000);
@@ -34,6 +35,7 @@ const calendarNotificationIntervalMs = Number(process.env.MOCK_CALENDAR_NOTIFICA
 const calendarNotificationFirstDelayMs = Number(process.env.MOCK_CALENDAR_NOTIFICATION_FIRST_DELAY_MS ?? 20_000);
 const calendarState = new MockCalendarState(Date.now(), calendarNotificationIntervalMs, calendarNotificationFirstDelayMs);
 const authState = new MockAuthState(process.env.MOCK_APP_BASE_URL ?? 'http://localhost:4200');
+const backtestState = new MockBacktestState();
 
 /**
  * The client sends `credentials: 'include'` (backtest-app-system-design.md §7.1), and a
@@ -43,7 +45,7 @@ const authState = new MockAuthState(process.env.MOCK_APP_BASE_URL ?? 'http://loc
 function setCors(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? '*');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Vary', 'Origin');
 }
@@ -150,8 +152,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return;
   }
   // §7.1: every existing data route becomes "auth" — the whole app sits behind login.
-  if (!isPublicPath(req.method ?? 'GET', url.pathname) && !authState.currentUser(req)) {
+  const user = authState.currentUser(req);
+  if (!isPublicPath(req.method ?? 'GET', url.pathname) && !user) {
     unauthenticated(sendJson, res);
+    return;
+  }
+  // §7.2 — backtest instruments and sessions (mock-server/backtest.ts), scoped to the user.
+  if (user && (await backtestState.handle(req, res, url.pathname, sendJson, user.id))) {
     return;
   }
 

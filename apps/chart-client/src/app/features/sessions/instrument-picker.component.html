@@ -1,0 +1,24 @@
+<div class="picker" role="group" aria-label="Instruments">
+  @for (group of groups(); track group.currency) {
+    <fieldset class="group">
+      <legend>{{ group.currency }}</legend>
+      @for (instrument of group.instruments; track instrument.id) {
+        <label class="option" [class.checked]="isSelected(instrument.id)">
+          <input
+            type="checkbox"
+            [checked]="isSelected(instrument.id)"
+            [disabled]="full() && !isSelected(instrument.id)"
+            (change)="toggle(instrument.id, $any($event.target).checked)"
+          />
+          <span class="name">{{ instrument.displayName }}</span>
+          @if (instrument.coverage; as coverage) {
+            <span class="coverage">{{ day(coverage.from) }} → {{ day(coverage.to) }}</span>
+          }
+        </label>
+      }
+    </fieldset>
+  } @empty {
+    <p class="muted">No instrument has stored 1m history yet.</p>
+  }
+  <p class="hint">Up to {{ max }} instruments, all from one currency group.</p>
+</div>

@@ -27,6 +27,11 @@ export const routes: Routes = [
         title: 'Sessions',
       },
       {
+        path: 'sessions/new',
+        loadComponent: () => import('./features/sessions/session-create.component').then((m) => m.SessionCreateComponent),
+        title: 'New session',
+      },
+      {
         path: 'admin/users',
         loadComponent: () => import('./features/admin/users.component').then((m) => m.UsersComponent),
         canActivate: [adminGuard],

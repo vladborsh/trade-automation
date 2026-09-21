@@ -1,0 +1,48 @@
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.group {
+  margin: 0;
+  padding: 8px 12px 10px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  min-width: 220px;
+}
+legend {
+  padding: 0 4px;
+  color: #8b949e;
+  font-size: 12px;
+  font-weight: 600;
+}
+.option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+.option.checked .name {
+  color: #26a69a;
+}
+.coverage,
+.hint,
+.muted {
+  color: #8b949e;
+  font-size: 12px;
+}
+.coverage {
+  margin-left: auto;
+}
+.hint,
+.muted {
+  flex-basis: 100%;
+  margin: 0;
+}
+input[type='checkbox'] {
+  accent-color: #26a69a;
+}

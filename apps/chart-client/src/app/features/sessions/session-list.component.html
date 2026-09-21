@@ -1,6 +1,69 @@
 <app-nav />
 <main class="page">
-  <h1>Backtest sessions</h1>
-  <p class="muted">Your sessions will be listed here. Meanwhile, the live chart terminal is available.</p>
-  <a routerLink="/terminal">Open the terminal</a>
+  <header class="head">
+    <h1>Backtest sessions</h1>
+    <a class="primary" routerLink="/sessions/new">New session</a>
+  </header>
+
+  @if (loading()) {
+    <p class="muted">Loading sessions…</p>
+  } @else if (loadError(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  } @else if (sessions().length === 0) {
+    <p class="muted">No sessions yet. Create one to start practising on historical data.</p>
+    <a routerLink="/terminal">Or open the live terminal</a>
+  } @else {
+    <table class="sessions">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Instruments</th>
+          <th>Period</th>
+          <th>TF</th>
+          <th>Status</th>
+          <th class="num">Balance</th>
+          <th class="num">PnL</th>
+          <th class="num">R</th>
+          <th class="num">Trades</th>
+          <th><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of sessions(); track s.id) {
+          <tr data-testid="session-row">
+            <td class="name">{{ s.name }}</td>
+            <td>{{ instruments(s) }}</td>
+            <td class="period">{{ period(s) }}</td>
+            <td>{{ s.timeframe }}</td>
+            <td><span class="status" [class.complete]="s.status === 'complete'">{{ s.status }}</span></td>
+            <td class="num">{{ balance(s) }}</td>
+            <td class="num" [class.up]="s.pnlCcy > 0" [class.down]="s.pnlCcy < 0">{{ pnl(s) }}</td>
+            <td class="num" [class.up]="s.pnlR > 0" [class.down]="s.pnlR < 0">{{ pnlR(s) }}</td>
+            <td class="num">{{ s.tradesCount }}</td>
+            <td class="actions">
+              <a [routerLink]="['/sessions', s.id]">Open</a>
+              <button type="button" class="link danger" (click)="askDelete(s.id)" [disabled]="deleting() === s.id">Delete</button>
+            </td>
+          </tr>
+          @if (confirming() === s.id) {
+            <tr class="confirm" data-testid="delete-confirm">
+              <td colspan="10">
+                <p role="alertdialog" aria-label="Confirm delete">
+                  Delete “{{ s.name }}”? This removes the session together with all its orders and screenshots.
+                  This cannot be undone.
+                </p>
+                <button type="button" class="danger-fill" (click)="confirmDelete(s.id)" [disabled]="deleting() === s.id">
+                  {{ deleting() === s.id ? 'Deleting…' : 'Delete session' }}
+                </button>
+                <button type="button" class="link" (click)="cancelDelete()">Cancel</button>
+                @if (deleteError()?.id === s.id) {
+                  <span class="form-error" role="alert">{{ deleteError()?.message }}</span>
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  }
 </main>

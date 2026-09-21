@@ -1,0 +1,136 @@
+<app-nav />
+<main class="page">
+  <h1>New backtest session</h1>
+
+  @if (loading()) {
+    <p class="muted">Loading instruments…</p>
+  } @else if (loadError(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  } @else {
+    <form class="form" (submit)="submit($event)" novalidate>
+      <label class="field">
+        <span>Name</span>
+        <input name="name" [value]="form().name" (input)="set('name', $any($event.target).value)" [attr.aria-invalid]="shown().name ? true : null" />
+        @if (shown().name; as message) {
+          <small class="field-error">{{ message }}</small>
+        }
+      </label>
+
+      <section class="section">
+        <h2>Instruments</h2>
+        @if (presets().length > 0) {
+          <label class="field inline">
+            <span>Start from a layout</span>
+            <select name="preset" (change)="choosePreset($any($event.target).value)">
+              <option value="" [selected]="presetId() === null">Custom</option>
+              @for (p of presets(); track p.id) {
+                <option [value]="p.id" [disabled]="!!p.disabledReason" [selected]="presetId() === p.id">
+                  {{ p.name }}{{ p.disabledReason ? ' — ' + p.disabledReason : '' }}
+                </option>
+              }
+            </select>
+          </label>
+          @if (preset(); as p) {
+            @if (p.unavailable.length > 0) {
+              <p class="muted" data-testid="preset-unavailable">Left out, no stored 1m history: {{ p.unavailable.join(', ') }}.</p>
+            }
+          }
+        }
+        <app-instrument-picker [groups]="groups()" [selected]="form().instruments" (selectedChange)="selectInstruments($event)" />
+        @if (shown().instruments; as message) {
+          <p class="field-error" role="alert" data-testid="instruments-error">{{ message }}</p>
+        }
+      </section>
+
+      <section class="section">
+        <h2>Period and timeframe</h2>
+        <div class="row">
+          <label class="field">
+            <span>From (UTC)</span>
+            <input type="datetime-local" name="periodFrom" [value]="toInput(form().periodFromMs)" [min]="toInput(common()?.from ?? null)" [max]="toInput(common()?.to ?? null)" (change)="setPeriod('periodFromMs', $any($event.target).value)" />
+          </label>
+          <label class="field">
+            <span>To (UTC)</span>
+            <input type="datetime-local" name="periodTo" [value]="toInput(form().periodToMs)" [min]="toInput(common()?.from ?? null)" [max]="toInput(common()?.to ?? null)" (change)="setPeriod('periodToMs', $any($event.target).value)" />
+          </label>
+          <label class="field">
+            <span>Timeframe</span>
+            <select name="timeframe" (change)="setTimeframe($any($event.target).value)">
+              @for (tf of timeframes; track tf) {
+                <option [value]="tf" [selected]="form().timeframe === tf">{{ tf }}</option>
+              }
+            </select>
+          </label>
+        </div>
+        @if (shown().periodFromMs; as message) {
+          <small class="field-error">{{ message }}</small>
+        }
+      </section>
+
+      <section class="section">
+        <h2>Account</h2>
+        <div class="row">
+          <label class="field">
+            <span>Starting balance ({{ currency() }})</span>
+            <input type="number" name="initialBalance" min="0" step="any" [value]="form().initialBalance" (input)="setNumber('initialBalance', $any($event.target).value)" />
+            @if (shown().initialBalance; as message) {
+              <small class="field-error">{{ message }}</small>
+            }
+          </label>
+          <label class="field">
+            <span>Default risk %</span>
+            <input type="number" name="defaultRiskPct" min="0" step="any" [value]="form().defaultRiskPct" (input)="setNumber('defaultRiskPct', $any($event.target).value)" />
+            @if (shown().defaultRiskPct; as message) {
+              <small class="field-error">{{ message }}</small>
+            }
+          </label>
+          <label class="field">
+            <span>Notional warning (× balance)</span>
+            <input type="number" name="notionalWarnMultiple" min="0" step="any" [value]="form().notionalWarnMultiple" (input)="setNumber('notionalWarnMultiple', $any($event.target).value)" />
+            @if (shown().notionalWarnMultiple; as message) {
+              <small class="field-error">{{ message }}</small>
+            }
+          </label>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Costs and calendar</h2>
+        <label class="check">
+          <input type="checkbox" name="costsEnabled" [checked]="form().costsEnabled" (change)="set('costsEnabled', $any($event.target).checked)" />
+          <span>Apply costs</span>
+        </label>
+        @if (form().costsEnabled) {
+          <div class="row">
+            <label class="field">
+              <span>Commission % per side</span>
+              <input type="number" name="commissionPct" min="0" step="any" [value]="form().commissionPct" (input)="setNumber('commissionPct', $any($event.target).value)" />
+              @if (shown().commissionPct; as message) {
+                <small class="field-error">{{ message }}</small>
+              }
+            </label>
+            <label class="field">
+              <span>Spread (price units)</span>
+              <input type="number" name="spread" min="0" step="any" [value]="form().spread" (input)="setNumber('spread', $any($event.target).value)" />
+              @if (shown().spread; as message) {
+                <small class="field-error">{{ message }}</small>
+              }
+            </label>
+          </div>
+        }
+        <label class="check">
+          <input type="checkbox" name="skipWeekends" [checked]="form().skipWeekends" (change)="set('skipWeekends', $any($event.target).checked)" />
+          <span>Skip weekends (Sat 00:00 – Mon 00:00 UTC)</span>
+        </label>
+      </section>
+
+      @if (submitError(); as message) {
+        <p class="form-error" role="alert">{{ message }}</p>
+      }
+      <div class="actions">
+        <button type="submit" [disabled]="blocked()">{{ busy() ? 'Creating…' : 'Create session' }}</button>
+        <a routerLink="/sessions">Cancel</a>
+      </div>
+    </form>
+  }
+</main>

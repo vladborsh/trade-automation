@@ -21,6 +21,8 @@ import type { CalendarNotification, CalendarWeekResponse, EconomicEvent, EventDe
 import { buildUrl, toApiError } from './api-error';
 import { UNAUTHORIZED_HANDLER } from './unauthorized-handler';
 
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+
 /**
  * Typed fetchers for the REST surface in §3.5. Plain `fetch`, no RxJS here —
  * RxJS is reserved for the WS boundary (live.socket.ts).
@@ -44,8 +46,16 @@ export class RestClient {
     return this.request<T>('GET', path, { params, redirectOn401: true });
   }
 
+  /**
+   * The one request path for feature clients (e.g. `BacktestClient`): same credentials,
+   * `ApiError` and 401 → /login handling as every data fetcher here.
+   */
+  send<T>(method: HttpMethod, path: string, opts: { params?: Record<string, string | number | undefined>; body?: unknown } = {}): Promise<T> {
+    return this.request<T>(method, path, { ...opts, redirectOn401: true });
+  }
+
   private async request<T>(
-    method: 'GET' | 'POST',
+    method: HttpMethod,
     path: string,
     opts: { params?: Record<string, string | number | undefined>; body?: unknown; redirectOn401: boolean },
   ): Promise<T> {

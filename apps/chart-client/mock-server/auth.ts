@@ -262,7 +262,7 @@ function readCookie(req: IncomingMessage, name: string): string | null {
   return null;
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+export async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   if (chunks.length === 0) return null;
