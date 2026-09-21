@@ -137,8 +137,10 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     await e.start();
     await stepN(e, 3); // 21:45, 21:50, 21:55
     const cursor = e.cursor();
+    const aheadCallsBefore = api.ahead.mock.calls.length;
 
     await e.setTimeframe('1h');
+    const switchCalls = api.ahead.mock.calls.slice(aheadCallsBefore);
     expect(e.cursor()).toBe(cursor);
     expect(e.timeframe()).toBe('1h');
     const bars = seriesBars(e.seriesFor('btc')());
@@ -151,6 +153,12 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(e.error()).toBeNull();
     expect(seriesBars(e.seriesFor('btc')())).toEqual(await serverBars(fakeServer(), 'btc', '1h', e.cursor()));
     expect(api.history.mock.calls.every(([, , before]) => before <= at(18, 21, 40))).toBe(true);
+    // Extending the cache back to 21:00 asked only for the 55 missing minutes, not a full page.
+    const back = switchCalls.filter(([, from]) => from < cursor);
+    expect(back.map(([panel, from, limit]) => [panel, from, limit])).toEqual([
+      ['btc', at(18, 21, 0), 55],
+      ['eth', at(18, 21, 0), 55],
+    ]);
   });
 
   it('a switch to a finer timeframe mid-bar is also exact, far ahead of the server cursor', async () => {

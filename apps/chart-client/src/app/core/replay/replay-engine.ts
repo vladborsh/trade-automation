@@ -207,11 +207,15 @@ export class ReplayEngine {
     if (fromMs >= knownFrom) return;
     const older: CompactCandleTuple[] = [];
     for (let from = fromMs; from < knownFrom; ) {
-      const page = await this.api.ahead(t.panel.id, from, AHEAD_PAGE_SIZE);
+      // At most one 1m candle per minute of the missing range — no need for a full page.
+      const need = Math.min(AHEAD_PAGE_SIZE, Math.ceil((knownFrom - from) / 60_000));
+      const page = await this.api.ahead(t.panel.id, from, need);
       const inRange = page.candles.filter((c) => c[0] < knownFrom);
       older.push(...inRange);
       if (page.endOfTape || inRange.length < page.candles.length || page.candles.length === 0) break;
-      from = page.candles[page.candles.length - 1][0] + 1;
+      const last = page.candles[page.candles.length - 1][0];
+      if (last + 60_000 >= knownFrom) break; // no minute left before the cache's start
+      from = last + 1;
     }
     t.cache.prependRange(fromMs, older);
   }
