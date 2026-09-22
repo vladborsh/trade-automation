@@ -224,3 +224,49 @@ test('T-052: play 3 s at 0.5 s/candle steps about six times; pause stops it', as
   expect(await steps()).toBe(taken); // paused: nothing more
   await serverCursorReaches(request, session.id, FRIDAY_2140 + taken * 300_000);
 });
+
+// T-062: the toolbar at the three widths people use. Every item readable, the session name shown for
+// at least ~20 characters (a 24-character name in full), nothing off-screen or overlapping; below a
+// width the groups take a second row instead of squeezing the name.
+test('T-062: at 1280, 1400 and 1920 px every toolbar item is readable and a 24-character name is shown in full', async ({ page }) => {
+  const request = page.context().request;
+  const session = await createSession(request, FRIDAY_2140 + 86_400_000);
+  const NAME = 'London breakout practice'; // 24 characters
+  expect(NAME).toHaveLength(24);
+  expect((await request.patch(`${apiUrl()}/backtest/sessions/${session.id}`, { data: { name: NAME } })).status()).toBe(200);
+
+  for (const width of [1280, 1400, 1920]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(`/sessions/${session.id}`);
+    await replayStarted(page);
+    await page.getByTestId('replay-play').click(); // the widest state: "❚❚ Pause"
+    await expect(page.getByTestId('replay-play')).toHaveAttribute('aria-pressed', 'true');
+
+    const name = page.locator('.toolbar .name');
+    await expect(name).toHaveText(NAME);
+    const n = await name.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(n.scroll, `${width}px: the name is cut (${n.scroll} > ${n.client})`).toBeLessThanOrEqual(n.client);
+
+    const boxes = await page.locator('.toolbar .group').evaluateAll((groups) =>
+      groups.filter((g) => g.getBoundingClientRect().width > 0).map((g) => {
+        const r = g.getBoundingClientRect();
+        return { cls: g.className, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      }),
+    );
+    for (const b of boxes) expect(b.right, `${width}px: ${b.cls} runs off-screen`).toBeLessThanOrEqual(width);
+    for (const [i, a] of boxes.entries()) {
+      for (const b of boxes.slice(i + 1)) {
+        const overlap = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+        expect(overlap, `${width}px: ${a.cls} overlaps ${b.cls}`).toBe(false);
+      }
+    }
+    for (const id of ['replay-cursor', 'replay-step', 'replay-play', 'replay-speed', 'trade-buy', 'trade-sell', 'trade-place', 'positions-toggle', 'replay-open-risk', 'replay-balance']) {
+      await expect(page.getByTestId(id), `${width}px: ${id}`).toBeInViewport();
+    }
+    if (process.env['T062_SHOTS']) {
+      const h = await page.locator('.toolbar').evaluate((el) => el.getBoundingClientRect().bottom);
+      await page.screenshot({ path: `${process.env['T062_SHOTS']}/toolbar-${width}.png`, clip: { x: 0, y: 0, width, height: Math.ceil(h) + 40 } });
+    }
+    await page.getByTestId('replay-play').click(); // pause before leaving
+  }
+});

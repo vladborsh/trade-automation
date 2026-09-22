@@ -1,92 +1,109 @@
+<!--
+  T-062: four groups — session info | stepping | trade actions | account figures — each kept on one
+  line. When the window is too narrow for one row, whole groups wrap onto a second row; the session
+  name keeps at least ~20 characters instead of shrinking to nothing.
+-->
 <header class="toolbar">
-  <a class="back" routerLink="/sessions" title="All sessions">&#x2039; Sessions</a>
-  <span class="name" [title]="sessionName()">{{ sessionName() }}</span>
+  <div class="group info">
+    <a class="back" routerLink="/sessions" title="All sessions">&#x2039; Sessions</a>
+    <span class="name" [title]="sessionName()">{{ sessionName() }}</span>
+    <span class="cursor" data-testid="replay-cursor" title="Replay cursor (UTC)">{{ cursorText() }}</span>
+  </div>
 
-  <span class="cursor" data-testid="replay-cursor" title="Replay cursor (UTC)">{{ cursorText() }}</span>
+  <div class="group stepping">
+    <div class="tf-picker" role="group" aria-label="Timeframe">
+      @for (tf of timeframes; track tf) {
+        <button
+          type="button"
+          class="tf-btn"
+          [class.active]="tf === timeframe()"
+          [disabled]="timeframeLocked()"
+          (click)="timeframeChange.emit(tf)"
+        >
+          {{ tf }}
+        </button>
+      }
+    </div>
 
-  <div class="tf-picker" role="group" aria-label="Timeframe">
-    @for (tf of timeframes; track tf) {
+    <button
+      type="button"
+      class="step"
+      data-testid="replay-step"
+      [disabled]="!stepReady() || atEnd() || completed() || halted() !== null || viewingAt() !== null"
+      title="Step forward one bar (→)"
+      (click)="step.emit()"
+    >
+      Step &#x2192;
+    </button>
+
+    @if (viewingAt() === null) {
+      <!-- T-052: auto-advance -->
       <button
         type="button"
-        class="tf-btn"
-        [class.active]="tf === timeframe()"
-        [disabled]="timeframeLocked()"
-        (click)="timeframeChange.emit(tf)"
+        class="play"
+        data-testid="replay-play"
+        [class.playing]="playing()"
+        [disabled]="!playing() && !canPlay()"
+        [attr.aria-pressed]="playing()"
+        [title]="playing() ? 'Pause auto-advance' : 'Play: step automatically'"
+        (click)="playToggle.emit()"
       >
-        {{ tf }}
+        {{ playing() ? '❚❚ Pause' : '▶ Play' }}
       </button>
+      <select
+        class="speed"
+        data-testid="replay-speed"
+        aria-label="Seconds per candle"
+        title="Seconds per candle"
+        (change)="onSpeed($any($event.target).value)"
+      >
+        @for (ms of speeds; track ms) {
+          <option [value]="ms" [selected]="ms === speedMs()">{{ ms / 1000 }} s</option>
+        }
+      </select>
     }
   </div>
 
-  <button
-    type="button"
-    class="step"
-    data-testid="replay-step"
-    [disabled]="!stepReady() || atEnd() || completed() || halted() !== null || viewingAt() !== null"
-    title="Step forward one bar (→)"
-    (click)="step.emit()"
-  >
-    Step &#x2192;
-  </button>
+  <div class="group status-group">
+    @if (viewingAt() !== null) {
+      <span class="status viewing" data-testid="replay-viewing" role="status">viewing {{ cursorText() }} — read only</span>
+      <a class="back-to-session" data-testid="replay-back" [routerLink]="['/sessions', sessionId()]">Back to the session</a>
+    } @else if (halted(); as message) {
+      <span class="status halted" data-testid="replay-halted" role="alert">{{ message }}</span>
+    } @else if (completed()) {
+      <span class="status completed" data-testid="replay-completed">completed</span>
+    } @else if (loading()) {
+      <span class="status loading" data-testid="replay-loading" role="status">loading…</span>
+    } @else if (atEnd()) {
+      <span class="status" data-testid="replay-end">end of period</span>
+    }
+    @if (stepQueued()) {
+      <span class="status queued" data-testid="replay-step-queued" role="status" title="Runs as soon as the step in progress finishes">+1 step queued</span>
+    }
+    @if (retrying()) {
+      <span class="status retrying" data-testid="replay-retrying" role="status">saving… retrying</span>
+    }
+    @if (notice(); as message) {
+      <span class="notice" data-testid="replay-notice" role="status">{{ message }}</span>
+    }
+    @if (error(); as message) {
+      <span class="error" role="alert">{{ message }}</span>
+    }
+  </div>
 
-  @if (viewingAt() === null) {
-    <!-- T-052: auto-advance -->
-    <button
-      type="button"
-      class="play"
-      data-testid="replay-play"
-      [class.playing]="playing()"
-      [disabled]="!playing() && !canPlay()"
-      [attr.aria-pressed]="playing()"
-      [title]="playing() ? 'Pause auto-advance' : 'Play: step automatically'"
-      (click)="playToggle.emit()"
-    >
-      {{ playing() ? '❚❚ Pause' : '▶ Play' }}
-    </button>
-    <select
-      class="speed"
-      data-testid="replay-speed"
-      aria-label="Seconds per candle"
-      title="Seconds per candle"
-      (change)="onSpeed($any($event.target).value)"
-    >
-      @for (ms of speeds; track ms) {
-        <option [value]="ms" [selected]="ms === speedMs()">{{ ms / 1000 }} s</option>
+  <!-- T-062: trade actions and account figures move as one block, at the right end of their row -->
+  <div class="end">
+    <!-- the workspace's own controls (T-048 trade controls, T-046 positions dropdown); pushed right -->
+    <div class="group trade">
+      <ng-content select="[toolbarEnd]" />
+    </div>
+
+    <div class="group account">
+      <span class="open-risk" data-testid="replay-open-risk" title="Open risk: what the open positions' current stops would lose">risk {{ openRiskText() }}</span>
+      @if (marginText(); as margin) {
+        <span class="margin" data-testid="replay-margin" [class.amber]="marginAmber()" title="Margin in use: open and pending orders' initial margin as a share of equity">{{ margin }}</span>
       }
-    </select>
-  }
-
-  @if (viewingAt() !== null) {
-    <span class="status viewing" data-testid="replay-viewing" role="status">viewing {{ cursorText() }} — read only</span>
-    <a class="back-to-session" data-testid="replay-back" [routerLink]="['/sessions', sessionId()]">Back to the session</a>
-  } @else if (halted(); as message) {
-    <span class="status halted" data-testid="replay-halted" role="alert">{{ message }}</span>
-  } @else if (completed()) {
-    <span class="status completed" data-testid="replay-completed">completed</span>
-  } @else if (loading()) {
-    <span class="status loading" data-testid="replay-loading" role="status">loading…</span>
-  } @else if (atEnd()) {
-    <span class="status" data-testid="replay-end">end of period</span>
-  }
-  @if (stepQueued()) {
-    <span class="status queued" data-testid="replay-step-queued" role="status" title="Runs as soon as the step in progress finishes">+1 step queued</span>
-  }
-  @if (retrying()) {
-    <span class="status retrying" data-testid="replay-retrying" role="status">saving… retrying</span>
-  }
-
-  <span class="spacer"></span>
-  @if (notice(); as message) {
-    <span class="notice" data-testid="replay-notice" role="status">{{ message }}</span>
-  }
-  @if (error(); as message) {
-    <span class="error" role="alert">{{ message }}</span>
-  }
-  <!-- the workspace's own controls on the right (T-048 trade controls, T-046 positions dropdown) -->
-  <ng-content select="[toolbarEnd]" />
-  <span class="open-risk" data-testid="replay-open-risk" title="Open risk: what the open positions' current stops would lose">risk {{ openRiskText() }}</span>
-  @if (marginText(); as margin) {
-    <span class="margin" data-testid="replay-margin" [class.amber]="marginAmber()" title="Margin in use: open and pending orders' initial margin as a share of equity">{{ margin }}</span>
-  }
-  <span class="balance" data-testid="replay-balance" title="Balance">{{ balanceText() }}</span>
+      <span class="balance" data-testid="replay-balance" title="Balance">{{ balanceText() }}</span>
+    </div>
+  </div>
 </header>

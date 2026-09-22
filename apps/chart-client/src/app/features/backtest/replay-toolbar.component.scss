@@ -1,23 +1,42 @@
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  column-gap: 20px;
+  row-gap: 6px;
   padding: 6px 12px;
   border-bottom: 1px solid #30363d;
   font-size: 13px;
   color: #c9d1d9;
 }
-/* T-048: with the trade controls the bar is full at 1280 px — keep every item on one line; only the
-   session name gives way (ellipsis) */
-.toolbar > * {
-  flex-shrink: 0;
+/* T-062: a group never breaks inside; when the row is full the next group wraps onto a second row */
+.group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
 }
-.toolbar > .name {
-  flex-shrink: 1;
-  min-width: 4ch;
+.group > * {
+  flex-shrink: 0;
+}
+.status-group:empty {
+  display: none;
+}
+/* trade actions and account figures: one block at the right end of whichever row it lands on */
+.end {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-left: auto;
+}
+.name {
+  min-width: 20ch;
+  max-width: 36ch;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.group > .name {
+  flex-shrink: 1;
 }
 .back {
   color: #8b949e;
@@ -111,9 +130,6 @@
 .notice {
   color: #c9d1d9;
 }
-.spacer {
-  flex: 1;
-}
 .error {
   color: #ef5350;
 }
@@ -123,7 +139,6 @@
 
 .open-risk {
   color: #8b949e;
-  margin-right: 12px;
   font-size: 12px;
 }
 
