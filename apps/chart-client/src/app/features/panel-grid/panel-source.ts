@@ -43,6 +43,12 @@ export interface PanelSource {
    * picture, for the trade screenshots. Only the replay workspace supplies it.
    */
   readonly capture?: PanelCapture;
+  /**
+   * T-047: whether indicator series titles are drawn on the chart. Absent means yes (the live
+   * terminal, whose research titles carry the "unvalidated" wording); the replay workspace draws
+   * lines only.
+   */
+  readonly indicatorLabels?: boolean;
   loadOlder(): Promise<void>;
 }
 

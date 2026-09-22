@@ -146,4 +146,34 @@ describe('IndicatorLayer', () => {
       expect(panes).toHaveLength(1);
     });
   });
+
+  describe('T-047: labels', () => {
+    const render = (layer: IndicatorLayer) =>
+      layer.render(
+        [point('vwap', 60_000, { vwap: 100, top: 101 }), point('rsi-0', 60_000, { rsi: 55 }), point('macd-1', 60_000, { macd: 1, signal: 0.5 })],
+        new Map([['replay:vwap', VWAP], ['replay:rsi-0', RSI], ['replay:macd-1', MACD]]),
+        '5m',
+      );
+    const options = (addCalls: unknown[][]) => addCalls.map((c) => c[1] as { title: string; lastValueVisible: boolean; priceLineVisible: boolean });
+
+    it('off (replay panels): lines only — no title on any series, price-pane or own-pane; no value labels, no price lines', () => {
+      const { chart, addCalls, panes } = fakeChart();
+      const layer = new IndicatorLayer(() => false);
+      layer.attach(chart);
+      render(layer);
+      expect(options(addCalls).map((o) => o.title)).toEqual(['', '', '', '', '']);
+      expect(options(addCalls).every((o) => o.lastValueVisible === false && o.priceLineVisible === false)).toBe(true);
+      const levels = (panes[1][0] as unknown as { lines: { axisLabelVisible: boolean; title: string }[] }).lines;
+      expect(levels.every((l) => l.axisLabelVisible === false && l.title === '')).toBe(true); // the RSI 30/70 guides are unlabelled too
+      expect(layer.visibleSeriesCount()).toBe(5); // every line is still drawn
+    });
+
+    it('on by default (the live terminal): each series keeps "<indicator> · <line>"', () => {
+      const { chart, addCalls } = fakeChart();
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      render(layer);
+      expect(options(addCalls).map((o) => o.title)).toEqual(['VWAP · VWAP', 'VWAP · Top', 'RSI (14) · RSI', 'MACD · MACD', 'MACD · Signal']);
+    });
+  });
 });

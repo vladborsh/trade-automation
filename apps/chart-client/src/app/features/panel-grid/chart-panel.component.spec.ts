@@ -31,6 +31,7 @@ class ChartStubComponent {
   readonly overlays = input<OverlayPrimitive[]>([]);
   readonly indicatorPoints = input<IndicatorPoint[]>([]);
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
+  readonly indicatorLabels = input(true);
   readonly timeframe = input.required<Timeframe>();
   readonly positionTools = input<PositionToolsView | null>(null);
   readonly positionToolsEnabled = input(false);
@@ -95,6 +96,12 @@ describe('ChartPanelComponent with a stub PanelSource (not a PanelFeed)', () => 
     expect(chart.candles()).toBe(source.candles());
     expect(chart.overlays()).toBe(source.overlays());
     expect(chart.indicatorSpecs()).toBe(source.indicatorSpecs());
+    expect(chart.indicatorLabels()).toBe(true); // T-047: no preference on the source → labels, as the live terminal
+  });
+
+  it('T-047: a source that turns indicator labels off (replay) passes that to the chart', () => {
+    const { chart } = render({ ...stubSource(), indicatorLabels: false });
+    expect(chart.indicatorLabels()).toBe(false);
   });
 
   it('follows the source as it changes, as a replay step would', () => {

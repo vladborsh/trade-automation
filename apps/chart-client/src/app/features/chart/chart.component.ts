@@ -78,6 +78,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly overlays = input<OverlayPrimitive[]>([]);
   readonly indicatorPoints = input<IndicatorPoint[]>([]);
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
+  /** T-047: indicator series titles on the chart (off on replay panels). */
+  readonly indicatorLabels = input(true);
   readonly timeframe = input.required<Timeframe>();
   readonly panelId = input.required<string>();
   /** §9.1 position tools (replay only): what to draw, whether pointer hits are handled, the changes. */
@@ -114,7 +116,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private series: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | null = null;
   private readonly overlayLayer = new OverlayLayer();
   private readonly shapesPrimitive = new ShapesPrimitive();
-  private readonly indicatorLayer = new IndicatorLayer();
+  private readonly indicatorLayer = new IndicatorLayer(() => this.indicatorLabels());
   private readonly metricSeries = new MetricSeriesRenderer();
   private readonly positionToolLayer = new PositionToolLayer({
     chart: () => this.chart,

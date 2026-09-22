@@ -24,6 +24,8 @@ export class ReplayPanelSource implements PanelSource {
   readonly indicatorSpecs: Signal<ReadonlyMap<string, IndicatorSeriesSpec>>;
   /** The chart panel's picture, for the entry and exit screenshots (T-026). */
   readonly capture = new CaptureSlot();
+  /** T-047: indicators are lines only on replay panels. */
+  readonly indicatorLabels = false;
 
   constructor(
     readonly panel: Panel & Pick<SessionPanel, 'indicators'>,

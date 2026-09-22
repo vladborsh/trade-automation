@@ -30,8 +30,14 @@ function groupKey(strategyId: string, seriesId: string): string {
  * indicator instance, with its `levels` as dashed price lines and `range` as a fixed scale. A pane
  * group that is no longer rendered is removed together with its (then empty) pane. Price-scale
  * specs — everything the live terminal's strategies emit — take the unchanged path above.
+ *
+ * T-047: `labels` off (the replay workspace) draws lines only — no series title text on the chart.
+ * The live terminal keeps them: its research strategies' titles carry the "research, unvalidated"
+ * wording (§6), and they come through this same layer.
  */
 export class IndicatorLayer {
+  constructor(private readonly labels: () => boolean = () => true) {}
+
   private chart: IChartApi | null = null;
   private readonly series = new Map<string, ISeriesApi<'Line'>>();
   /** 'pane' groups by `${strategyId}:${seriesId}`: their series (by key) and level lines. */
@@ -54,7 +60,7 @@ export class IndicatorLayer {
       color: key.color ?? '#d29922',
       lineWidth: 1,
       lineStyle: key.style === 'dashed' ? 2 : 0,
-      title: `${seriesLabel} · ${key.label}`,
+      title: this.title(seriesLabel, key.label),
       lastValueVisible: false,
       priceLineVisible: false,
     });
@@ -148,7 +154,7 @@ export class IndicatorLayer {
             color: keySpec.color ?? '#d29922',
             lineWidth: 1,
             lineStyle: keySpec.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid,
-            title: `${spec.label} · ${keySpec.label}`,
+            title: this.title(spec.label, keySpec.label),
             lastValueVisible: false,
             priceLineVisible: false,
             ...(range ? { autoscaleInfoProvider: () => ({ priceRange: { minValue: range.min, maxValue: range.max } }) } : {}),
@@ -183,6 +189,11 @@ export class IndicatorLayer {
     if (paneIndex > 0 && panes.length === panesBefore && panes[paneIndex]?.getSeries().length === 0) {
       this.chart.removePane(paneIndex);
     }
+  }
+
+  /** A series' title on the chart: "<indicator> · <line>", or none at all when labels are off (T-047). */
+  private title(seriesLabel: string, keyLabel: string): string {
+    return this.labels() ? `${seriesLabel} · ${keyLabel}` : '';
   }
 
   /** Number of indicator line series currently shown (§3.1's timeframe rule) — an e2e test hook. */
