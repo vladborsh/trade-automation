@@ -139,6 +139,32 @@ describe('WorkspaceComponent', () => {
     expect(engine.setTimeframe.mock.calls).toEqual([['15m'], ['1m']]);
   });
 
+  it('T-052: Play steps the engine every 0.5 s; a hidden tab and a new engine pause it', async () => {
+    vi.useFakeTimers();
+    try {
+      const { fixture, store, engine, el } = await render();
+      engine.started.set(true);
+      fixture.detectChanges();
+      el.querySelector<HTMLButtonElement>('[data-testid="replay-play"]')!.click();
+      vi.advanceTimersByTime(1_500);
+      expect(engine.step).toHaveBeenCalledTimes(3);
+
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      vi.advanceTimersByTime(2_000);
+      expect(engine.step).toHaveBeenCalledTimes(3);
+      expect(fixture.componentInstance.autoplay.playing()).toBe(false);
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+
+      fixture.componentInstance.autoplay.play();
+      store.engine.set({ ...engine }); // a reload builds a new engine
+      fixture.detectChanges();
+      expect(fixture.componentInstance.autoplay.playing()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('?viewAt&order opens the view-only rewind: → is inert, [ ] still switch timeframe (§9.3)', async () => {
     const { store, engine } = fakeStore();
     (engine as { viewOnly: boolean }).viewOnly = true;

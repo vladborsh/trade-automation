@@ -20,7 +20,11 @@
         [openRisk]="store.positions().openRisk"
         [marginUtilisation]="store.marginUtilisation()"
         [error]="e.error()"
+        [playing]="autoplay.playing()"
+        [speedMs]="autoplay.speedMs()"
         (step)="step()"
+        (playToggle)="autoplay.toggle()"
+        (speedChange)="setAutoplaySpeed($event)"
         (timeframeChange)="setTimeframe($event)"
       >
         <!-- one element per @if: a block projects into the toolbar's [toolbarEnd] slot only with a single root -->

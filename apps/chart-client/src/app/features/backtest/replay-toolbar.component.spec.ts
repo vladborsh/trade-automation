@@ -89,4 +89,38 @@ describe('ReplayToolbarComponent', () => {
     expect(margin(0.81)!.classList.contains('amber')).toBe(true);
     expect(margin(null)).toBeNull();
   });
+
+  it('T-052: Play emits a toggle and shows Pause while playing; the speed picker emits the chosen seconds', () => {
+    const { el, cmp, fixture } = render();
+    const toggles: unknown[] = [];
+    const speeds: number[] = [];
+    cmp.playToggle.subscribe(() => toggles.push(1));
+    cmp.speedChange.subscribe((ms) => speeds.push(ms));
+    const play = el.querySelector<HTMLButtonElement>('[data-testid="replay-play"]')!;
+    expect(play.textContent?.trim()).toBe('▶ Play');
+    expect(play.getAttribute('aria-pressed')).toBe('false');
+    play.click();
+    expect(toggles).toHaveLength(1);
+    fixture.componentRef.setInput('playing', true);
+    fixture.detectChanges();
+    expect(play.textContent?.trim()).toBe('❚❚ Pause');
+    const speed = el.querySelector<HTMLSelectElement>('[data-testid="replay-speed"]')!;
+    expect([...speed.options].map((o) => o.textContent?.trim())).toEqual(['0.25 s', '0.5 s', '1 s', '2 s']);
+    expect(speed.value).toBe('500'); // the default
+    speed.value = '1000';
+    speed.dispatchEvent(new Event('change'));
+    expect(speeds).toEqual([1000]);
+  });
+
+  it('T-052: Play is off where a step is — not started, the end, completed — and absent while viewing', () => {
+    const play = (extra: Record<string, unknown>) => {
+      TestBed.resetTestingModule();
+      return render(extra).el.querySelector<HTMLButtonElement>('[data-testid="replay-play"]');
+    };
+    expect(play({ stepReady: false })!.disabled).toBe(true);
+    expect(play({ atEnd: true })!.disabled).toBe(true);
+    expect(play({ completed: true })!.disabled).toBe(true);
+    expect(play({ viewingAt: Date.UTC(2026, 8, 18, 10) })).toBeNull();
+    expect(play({ atEnd: true, playing: true })!.disabled).toBe(false); // playing at the end, Pause still works
+  });
 });

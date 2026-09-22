@@ -86,6 +86,11 @@ export class ReplayEngine {
 
   private readonly tapes: PanelTape[];
   private busy = false;
+
+  /** T-052: a step or a switch is running right now (auto-play skips its tick rather than queue). */
+  get inFlight(): boolean {
+    return this.busy;
+  }
   /** BUG-009: the store is replacing this engine (a reload) — blocked for good. */
   private retired = false;
   private serverCursor: number;

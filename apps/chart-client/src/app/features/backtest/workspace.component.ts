@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, type OnDestroy, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import type { Timeframe } from '@trade-automation/contracts';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
@@ -11,6 +11,7 @@ import { TradeControlsComponent } from './trade-controls.component';
 import { JournalComponent } from './journal.component';
 import { StatsSummaryComponent } from './stats-summary.component';
 import { adjacentTimeframe, keyAllowed, replayKeyAction } from './replay-keys';
+import { AutoPlay, type AutoPlaySpeedMs } from '../../core/replay/auto-play';
 
 /**
  * backtest-app-system-design.md §2.3, §5.4 — `/sessions/:id`: the replay toolbar over the panel
@@ -40,7 +41,7 @@ import { adjacentTimeframe, keyAllowed, replayKeyAction } from './replay-keys';
   templateUrl: './workspace.component.html',
   styleUrl: './workspace.component.scss',
 })
-export class WorkspaceComponent {
+export class WorkspaceComponent implements OnDestroy {
   /** The `:id` route parameter. */
   readonly id = input.required<string>();
   /** `?viewAt=<ms>&order=<id>` — §9.3 view-only rewind ("Show on chart" from a trade's detail). */
@@ -65,6 +66,21 @@ export class WorkspaceComponent {
       contract: this.store.instruments.contractOf(instrument), // T-054: unit, step, minimums, cap
     };
   });
+  /**
+   * T-052: Play / Pause. Steps through the same path as `→`; pauses by itself at the period end or
+   * completion, and here on a new engine (a reload, view-only) and when the tab is hidden.
+   */
+  readonly autoplay = new AutoPlay({
+    step: () => this.step(),
+    canStep: () => {
+      const e = this.engine();
+      return !!e && e.started() && !e.viewOnly && !e.atEnd() && !e.completed();
+    },
+    stepPending: () => {
+      const e = this.engine();
+      return !e || e.inFlight || e.blocked() || e.stepQueued();
+    },
+  });
   /** T-045: the order popup, open at the submit step — for as long as there is an active draft. */
   readonly orderPopup = signal(false);
   readonly popupDraft = computed(() => (this.orderPopup() ? this.activeDraft() : null));
@@ -76,6 +92,11 @@ export class WorkspaceComponent {
       const view = Number.isFinite(viewAt) && viewAt > 0 ? { viewAt, orderId: this.viewOrder() ?? null } : null;
       untracked(() => void this.store.open(id, view));
     });
+    // T-052: a new engine (a reload, view-only, another session) starts paused
+    effect(() => {
+      this.engine();
+      untracked(() => this.autoplay.pause());
+    });
     // the draft went away (removed, placed from elsewhere, a reload): the popup goes with it
     effect(() => {
       if (this.orderPopup() && !this.activeDraft()) this.orderPopup.set(false);
@@ -84,6 +105,20 @@ export class WorkspaceComponent {
 
   step(): void {
     void this.engine()?.step();
+  }
+
+  setAutoplaySpeed(ms: AutoPlaySpeedMs): void {
+    this.autoplay.setSpeed(ms);
+  }
+
+  /** T-052: a hidden tab pauses auto-play (it would step unseen, and timers are throttled there). */
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.hidden) this.autoplay.pause();
+  }
+
+  ngOnDestroy(): void {
+    this.autoplay.pause();
   }
 
   setTimeframe(tf: Timeframe): void {

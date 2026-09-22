@@ -29,6 +29,33 @@
     Step &#x2192;
   </button>
 
+  @if (viewingAt() === null) {
+    <!-- T-052: auto-advance -->
+    <button
+      type="button"
+      class="play"
+      data-testid="replay-play"
+      [class.playing]="playing()"
+      [disabled]="!playing() && !canPlay()"
+      [attr.aria-pressed]="playing()"
+      [title]="playing() ? 'Pause auto-advance' : 'Play: step automatically'"
+      (click)="playToggle.emit()"
+    >
+      {{ playing() ? '❚❚ Pause' : '▶ Play' }}
+    </button>
+    <select
+      class="speed"
+      data-testid="replay-speed"
+      aria-label="Seconds per candle"
+      title="Seconds per candle"
+      (change)="onSpeed($any($event.target).value)"
+    >
+      @for (ms of speeds; track ms) {
+        <option [value]="ms" [selected]="ms === speedMs()">{{ ms / 1000 }} s</option>
+      }
+    </select>
+  }
+
   @if (viewingAt() !== null) {
     <span class="status viewing" data-testid="replay-viewing" role="status">viewing {{ cursorText() }} — read only</span>
     <a class="back-to-session" data-testid="replay-back" [routerLink]="['/sessions', sessionId()]">Back to the session</a>

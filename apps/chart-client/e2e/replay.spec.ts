@@ -198,3 +198,29 @@ test('T-046: the positions list is a toolbar dropdown; after clicking it the hot
   await toggle.click(); // and so does a second click on the button
   await expect(dropdown).toHaveCount(0);
 });
+
+// T-052: Play at the default 0.5 s per candle for 3 s → about six steps; Pause stops it, and every
+// step the client took is persisted (the queue coalesces the advances).
+test('T-052: play 3 s at 0.5 s/candle steps about six times; pause stops it', async ({ page }) => {
+  const request = page.context().request;
+  const session = await createSession(request, FRIDAY_2140 + 3 * 86_400_000);
+  const cursor = page.getByTestId('replay-cursor');
+  const play = page.getByTestId('replay-play');
+  const steps = async () => (Date.parse(`${(await cursor.innerText()).replace(' UTC', '')}Z`) - FRIDAY_2140) / 300_000;
+
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  await expect(play).toHaveText('▶ Play');
+  await play.click();
+  await expect(play).toHaveText('❚❚ Pause');
+  await page.waitForTimeout(3_000);
+  await play.click();
+  await expect(play).toHaveText('▶ Play');
+
+  const taken = await steps();
+  expect(taken).toBeGreaterThanOrEqual(5); // six at 0.5 s; one of slack either side for the browser's timers
+  expect(taken).toBeLessThanOrEqual(7);
+  await page.waitForTimeout(1_500);
+  expect(await steps()).toBe(taken); // paused: nothing more
+  await serverCursorReaches(request, session.id, FRIDAY_2140 + taken * 300_000);
+});

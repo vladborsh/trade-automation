@@ -57,9 +57,25 @@
   border-color: #26a69a;
   font-weight: 600;
 }
-.step:disabled {
+.step:disabled,
+.play:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* T-052: auto-advance — a quiet button that turns up-colour while playing, and its speed */
+.play,
+.speed {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.play.playing {
+  color: #26a69a;
+  border-color: #26a69a;
 }
 .status {
   color: #8b949e;

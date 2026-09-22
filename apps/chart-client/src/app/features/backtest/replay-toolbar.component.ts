@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { Timeframe } from '@trade-automation/contracts';
 import { formatBalance, formatCursorUtc } from './replay-format';
 import { REPLAY_TIMEFRAMES } from './replay-keys';
+import { AUTOPLAY_SPEEDS_MS, type AutoPlaySpeedMs } from '../../core/replay/auto-play';
 
 /**
  * backtest-app-system-design.md §2.3 — the workspace's top bar: session name, cursor (UTC),
@@ -43,8 +44,16 @@ export class ReplayToolbarComponent {
   readonly openRisk = input(0);
   /** T-054: used margin ÷ equity (D12); null when the account cannot be marked. */
   readonly marginUtilisation = input<number | null>(null);
+  /** T-052: auto-play is running, and its seconds per candle. */
+  readonly playing = input(false);
+  readonly speedMs = input<AutoPlaySpeedMs>(500);
 
   readonly step = output<void>();
+  readonly playToggle = output<void>();
+  readonly speedChange = output<AutoPlaySpeedMs>();
+  readonly speeds = AUTOPLAY_SPEEDS_MS;
+  /** Play needs what a step needs: a started, live, unfinished session. */
+  readonly canPlay = computed(() => this.stepReady() && !this.atEnd() && !this.completed() && this.viewingAt() === null);
   readonly timeframeChange = output<Timeframe>();
 
   readonly timeframes = REPLAY_TIMEFRAMES;
@@ -59,4 +68,8 @@ export class ReplayToolbarComponent {
   });
   /** Above 80 % of equity in margin (design §6 D12). */
   readonly marginAmber = computed(() => (this.marginUtilisation() ?? 0) > 0.8);
+
+  onSpeed(value: string): void {
+    this.speedChange.emit(Number(value) as AutoPlaySpeedMs);
+  }
 }
