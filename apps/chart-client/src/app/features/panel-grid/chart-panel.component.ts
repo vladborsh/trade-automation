@@ -53,7 +53,7 @@ export class ChartPanelComponent {
   );
   readonly pointerPriceHook = signal<number | null>(null);
   /** The chart's crosshair and picture (a template ref, so a spec's stub chart satisfies it too). */
-  private readonly chart = viewChild<{ crosshairPrice: Signal<number | null>; takeScreenshot?(): HTMLCanvasElement | null }>('chart');
+  private readonly chart = viewChild<{ crosshairPrice: Signal<number | null>; crosshairTime?: Signal<number | null>; takeScreenshot?(): HTMLCanvasElement | null }>('chart');
   private readonly sync = inject(ChartSyncService, { optional: true });
   /** The newest bar, as e2e hooks on the panel body (the chart itself is a canvas). */
   readonly lastBar = computed(() => this.candles().at(-1) ?? null);
@@ -89,8 +89,10 @@ export class ChartPanelComponent {
     effect(() => {
       const tools = this.source().positionTools;
       if (!tools) return;
-      const price = this.sync?.crosshair()?.origin === this.panel().id ? (this.chart()?.crosshairPrice() ?? null) : null;
-      tools.setPointerPrice(price);
+      const driving = this.sync?.crosshair()?.origin === this.panel().id;
+      const price = driving ? (this.chart()?.crosshairPrice() ?? null) : null;
+      const timeSec = driving ? (this.chart()?.crosshairTime?.() ?? null) : null;
+      tools.setPointerPrice(price, timeSec === null ? null : timeSec * 1000); // T-050: a draft anchors at that bar
       this.pointerPriceHook.set(price);
     });
     // §9.2 (T-026): the source takes this panel's picture through the chart, while it exists.

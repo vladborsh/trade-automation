@@ -53,8 +53,8 @@ test('position tool: two drafts, handle drags without panning, click to activate
   };
   const y1 = box.y + box.height * 0.25;
   const y2 = box.y + box.height * 0.65;
-  const p1 = await priceAt(y1);
-  const p2 = await priceAt(y2);
+  let p1 = await priceAt(y1);
+  let p2 = await priceAt(y2);
   const yOf = (price: number) => y1 + ((price - p1) * (y2 - y1)) / (p2 - p1);
 
   // two drafts with the pointer off the chart: both at the last close (market)
@@ -66,6 +66,15 @@ test('position tool: two drafts, handle drags without panning, click to activate
     ['short', 'market', true],
   ]);
   const [long0, short0] = await tools(page);
+
+  // T-050: both are anchored at the newest bar, flush with the right edge; pan into the future so the
+  // drawings have room (the tools move with the candles), then measure the price ↔ y mapping again
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.08);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6 - 350, box.y + box.height * 0.08, { steps: 8 });
+  await page.mouse.up();
+  p1 = await priceAt(y1);
+  p2 = await priceAt(y2);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/1-two-drafts.png` });
 
   const visibleFrom = await container.getAttribute('data-visible-from');
@@ -215,4 +224,80 @@ test('T-048: by clicks only — Buy / Sell draw tools, Place opens the order pop
   await popup.getByTestId('order-cancel').click();
   await expect(popup).toHaveCount(0);
   expect((await tools(page)).length).toBe(2);
+});
+
+test('T-050: a tool stays anchored at its bar and price — it pans with the candles instead of sticking to the right edge', async ({ page }) => {
+  const created = await page.context().request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name: `e2e tool anchor ${Date.now()}`,
+      layout: { id: 'ta-e2e', name: 'TA e2e', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+      timeframe: '5m',
+      periodFromMs: FRIDAY_2140,
+      periodToMs: FRIDAY_2140 + 3 * 86_400_000,
+      initialBalance: 10_000,
+      defaultRiskPct: 1,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+    },
+  });
+  const session = (await created.json()) as Session;
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  const body = page.locator('.chart-panel[data-panel-id="btc"] .panel-body');
+  const container = body.locator('.chart-container');
+  const box = (await container.boundingBox())!;
+
+  // the price ↔ y mapping, measured again after every pan (the price axis may re-fit)
+  const mapping = async () => {
+    const at = async (y: number) => {
+      await page.mouse.move(box.x + box.width * 0.2, y);
+      await expect(body).toHaveAttribute('data-pointer-price', /\d/);
+      return Number(await body.getAttribute('data-pointer-price'));
+    };
+    const y1 = box.y + box.height * 0.25, y2 = box.y + box.height * 0.75;
+    const p1 = await at(y1), p2 = await at(y2);
+    return (price: number) => y1 + ((price - p1) * (y2 - y1)) / (p2 - p1);
+  };
+  /** The x of the tool's stop handle, found by scanning its level for the hover hook. */
+  const handleX = async (id: string, sl: number) => {
+    const y = (await mapping())(sl);
+    for (let x = box.x + 2; x < box.x + box.width - 2; x += 2) {
+      await page.mouse.move(x, y);
+      if ((await container.getAttribute('data-position-tool-hover')) === `handle:sl:${id}`) return x;
+    }
+    return null;
+  };
+
+  // B with the pointer over a bar in the middle of the chart: the draft is anchored at that bar
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.keyboard.press('b');
+  await expect.poll(async () => (await tools(page)).length).toBe(1);
+  const [draft] = await tools(page);
+  const x0 = await handleX(draft.id, draft.sl);
+  expect(x0, 'the draft starts where it was drawn, mid-chart').not.toBeNull();
+  expect(x0!).toBeLessThan(box.x + box.width * 0.6);
+
+  /** The bar time under screen x (the crosshair snaps to bars): what the tool must stay on. */
+  const timeAt = async (x: number) => {
+    await page.mouse.move(x, box.y + box.height * 0.08);
+    await expect(container).toHaveAttribute('data-crosshair-time', /\d/);
+    return Number(await container.getAttribute('data-crosshair-time'));
+  };
+  const pan = async (dx: number) => {
+    const y = box.y + box.height * 0.08; // empty chart area above the tool: a drag here pans
+    await page.mouse.move(box.x + box.width * 0.3, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.3 + dx, y, { steps: 6 });
+    await page.mouse.up();
+  };
+  const bar0 = await timeAt(x0!);
+
+  await pan(120); // back in time: the candles move right — and the tool with them, on the same bar
+  const x1 = await handleX(draft.id, draft.sl);
+  expect(x1!).toBeGreaterThan(x0! + 20); // it moved…
+  expect(await timeAt(x1!)).toBe(bar0); // …exactly with its bar
+
+  await pan(-200); // forward: both move left
+  const x2 = await handleX(draft.id, draft.sl);
+  expect(x2!).toBeLessThan(x1! - 20);
+  expect(await timeAt(x2!)).toBe(bar0);
 });

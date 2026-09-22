@@ -67,8 +67,11 @@ export interface PanelCapture {
 export interface PanelPositionTools {
   readonly view: Signal<PositionToolsView>;
   apply(change: PositionToolChange): void;
-  /** The price under the pointer while it is over this panel's chart, else null. */
-  setPointerPrice(price: number | null): void;
+  /**
+   * The price under the pointer while it is over this panel's chart, else null — and (T-050) the
+   * time of the bar under it, ms, so a new draft is anchored there.
+   */
+  setPointerPrice(price: number | null, timeMs?: number | null): void;
 }
 
 /** The live feed's own per-panel stores, for the research badge only (see `PanelSource`). */

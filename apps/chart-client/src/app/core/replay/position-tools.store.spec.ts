@@ -29,6 +29,16 @@ describe('PositionToolsStore (design §9.1, decision 29)', () => {
     expect(deps.activated).toHaveBeenCalledTimes(2);
   });
 
+  it('T-050: a draft is anchored at the bar under the pointer — never later than the last bar — or at the last bar off-chart', () => {
+    const { store } = setup(); // the last bar opens at 5 000
+    store.create('long');
+    store.pointerTime.set(3_000); // the pointer over an older bar
+    store.create('long');
+    store.pointerTime.set(9_000); // over the empty space right of the last bar
+    store.create('short');
+    expect(store.tools().map((t) => t.anchorTime)).toEqual([5_000, 3_000, 5_000]);
+  });
+
   it('clicking a tool activates it; deactivate clears it (another panel took over)', () => {
     const { store } = setup();
     store.create('long');

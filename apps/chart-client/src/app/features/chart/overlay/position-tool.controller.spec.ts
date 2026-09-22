@@ -157,11 +157,18 @@ describe('PositionToolController (design §9.1)', () => {
     expect(changes).toEqual([]);
   });
 
-  it('a tool anchored at the right edge is drawn at least 200 px wide, so its handles stay reachable', () => {
+  it('T-050: a tool is hit at its own anchor x — never clamped away from the right edge — and not at all once it starts off-screen right', () => {
     const edge = setup();
-    (edge.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 790, width: () => 800 });
-    edge.fire('pointerdown', 600 + HANDLE_OFFSET_PX, 505); // left edge clamped to 800 − 200 = 600
+    (edge.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 700, width: () => 800 });
+    edge.fire('pointerdown', 600 + HANDLE_OFFSET_PX, 505); // where the old 200 px clamp put it: nothing there now
+    expect(edge.changes).toEqual([]);
+    edge.fire('pointerdown', 700 + HANDLE_OFFSET_PX, 505); // at its anchor
     expect(edge.changes).toEqual([{ type: 'activate', id: 't1' }]);
+
+    const gone = setup();
+    (gone.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 850, width: () => 800 });
+    gone.fire('pointerdown', 780, 505); // panned back in time: the tool starts right of the pane
+    expect(gone.changes).toEqual([]);
   });
 
   it('detach removes every listener', () => {

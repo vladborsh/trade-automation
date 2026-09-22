@@ -20,24 +20,25 @@ const ENTRY = '#c9d1d9';
 const MUTED = '#8b949e';
 const HANDLE_SIZE = 8;
 
-/** A drawing is at least this wide, so its handles and labels stay usable at the right edge. */
-export const TOOL_MIN_WIDTH_PX = 200;
-
 /**
- * The x of a tool's left edge: its anchor time on this chart, but never closer than
- * `TOOL_MIN_WIDTH_PX` to the right edge (the anchor is usually the newest bar, which sits right
- * against the price scale) and never left of the pane.
+ * The x of a tool's left edge: its anchor time on this chart — the bar it was drawn, placed or
+ * filled at — so the drawing pans and zooms with the candles (T-050). It may lie left of the pane
+ * (the tool started earlier than the visible range; its lines still reach into view) or right of it
+ * (off-screen: not drawn, not hittable). A time with no bar of its own (a live order anchored at its
+ * placement cursor) takes the nearest bar. Null when the time cannot be placed at all.
  */
-export function anchorX(chart: IChartApi, anchorTimeMs: number): number {
+export function anchorX(chart: IChartApi, anchorTimeMs: number): number | null {
   const timeScale = chart.timeScale();
   const time = Math.floor(anchorTimeMs / 1000) as UTCTimestamp;
-  // not a bar's open (a live order is anchored at its placement cursor): the nearest bar
-  let x = timeScale.timeToCoordinate(time);
-  if (x === null) {
-    const index = timeScale.timeToIndex(time, true);
-    x = index === null ? null : timeScale.logicalToCoordinate(index as unknown as Logical);
-  }
-  return Math.max(0, Math.min(x ?? 0, timeScale.width() - TOOL_MIN_WIDTH_PX));
+  const x = timeScale.timeToCoordinate(time);
+  if (x !== null) return x;
+  const index = timeScale.timeToIndex(time, true);
+  return index === null ? null : timeScale.logicalToCoordinate(index as unknown as Logical);
+}
+
+/** True when a tool anchored at `x` starts inside a pane `width` wide or left of it (visible). */
+export function anchorVisible(x: number | null, width: number): x is number {
+  return x !== null && x < width;
 }
 
 /**
@@ -119,7 +120,9 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
       // inactive first, so the active tool is painted on top
       const tools = [...view.tools].sort((a, b) => Number(a.active) - Number(b.active));
       for (const tool of tools) {
-        const g = toolGeometry(tool, anchorX(chart, tool.anchorTime), priceToY);
+        const x = anchorX(chart, tool.anchorTime);
+        if (!anchorVisible(x, mediaSize.width)) continue; // it starts right of the visible range (T-050)
+        const g = toolGeometry(tool, x, priceToY, mediaSize.width);
         if (!g) continue;
         const width = mediaSize.width - g.x;
         const alpha = tool.active ? 0.28 : 0.12;

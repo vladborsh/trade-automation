@@ -1,7 +1,7 @@
 import type { ChartOptions, DeepPartial, IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
 import { applyDrag, draggableParts, hitTest, toolGeometry, type HitTarget } from './position-tool.geometry';
 import type { PositionToolChange, PositionToolState, PositionToolsView } from './position-tool.model';
-import { anchorX } from './position-tool.primitive';
+import { anchorVisible, anchorX } from './position-tool.primitive';
 
 /** What the controller reads from its chart, at call time. */
 export interface PositionToolHost {
@@ -83,8 +83,12 @@ export class PositionToolController {
     if (!this.el || !chart || !series || !view || !this.host.enabled()) return null;
     const { x, y } = this.local(e);
     const priceToY = (p: number) => series.priceToCoordinate(p);
+    const width = chart.timeScale().width();
     const geometries = view.tools
-      .map((t) => toolGeometry(t, anchorX(chart, t.anchorTime), priceToY))
+      .map((t) => {
+        const x = anchorX(chart, t.anchorTime);
+        return anchorVisible(x, width) ? toolGeometry(t, x, priceToY, width) : null; // off-screen right: not hittable
+      })
       .filter((g): g is NonNullable<typeof g> => g !== null);
     const target = hitTest(x, y, geometries, new Map(view.tools.map((t) => [t.id, t.kind])), HIT_TOLERANCE_PX);
     return target ? { target, tool: view.tools.find((t) => t.id === target.toolId)!, y } : null;

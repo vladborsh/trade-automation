@@ -1,6 +1,7 @@
 import type { CanvasRenderingTarget2D } from 'fancy-canvas';
 import type { SeriesAttachedParameter, Time } from 'lightweight-charts';
-import { PositionToolPrimitive } from './position-tool.primitive';
+import type { IChartApi } from 'lightweight-charts';
+import { PositionToolPrimitive, anchorVisible, anchorX } from './position-tool.primitive';
 import type { PositionToolState, PositionToolsView } from './position-tool.model';
 
 const RISK = '#ef5350';
@@ -80,5 +81,46 @@ describe('PositionToolPrimitive rendering (T-049)', () => {
     expect(draw(tool({ tp: null })).zones.map((z) => z.fillStyle)).toEqual([RISK]);
     expect(draw(tool({ tp: null, kind: 'position', orderId: 'o1', order: { qty: 1, riskAmount: 2 } })).zones).toEqual([]);
     expect(draw(tool({ tp: null, kind: 'position', orderId: 'o1', order: { qty: 1, riskAmount: 2 } })).lines).toHaveLength(2);
+  });
+});
+
+describe('anchorX / anchorVisible (T-050)', () => {
+  const chartAt = (coord: number | null, indexCoord: number | null = null) =>
+    ({
+      timeScale: () => ({
+        timeToCoordinate: () => coord,
+        timeToIndex: () => (indexCoord === null ? null : 7),
+        logicalToCoordinate: () => indexCoord,
+        width: () => 800,
+      }),
+    }) as unknown as IChartApi;
+
+  it('the anchor bar’s own x — not clamped to the right edge (the old 200 px rule) nor to 0', () => {
+    expect(anchorX(chartAt(790), 1_000)).toBe(790);
+    expect(anchorX(chartAt(-120), 1_000)).toBe(-120); // started before the visible range
+    expect(anchorX(chartAt(950), 1_000)).toBe(950); // after it: off-screen right
+  });
+
+  it('a time with no bar of its own takes the nearest bar; none at all is null', () => {
+    expect(anchorX(chartAt(null, 333), 1_000)).toBe(333);
+    expect(anchorX(chartAt(null, null), 1_000)).toBeNull();
+  });
+
+  it('visible while it starts inside the pane or left of it', () => {
+    expect(anchorVisible(-120, 800)).toBe(true);
+    expect(anchorVisible(799, 800)).toBe(true);
+    expect(anchorVisible(800, 800)).toBe(false);
+    expect(anchorVisible(null, 800)).toBe(false);
+  });
+
+  it('a tool starting right of the pane is not painted at all', () => {
+    const primitive = new PositionToolPrimitive();
+    const chart = chartAt(1_200);
+    primitive.attached({ chart, series: { priceToCoordinate: (p: number) => p }, requestUpdate: () => undefined } as unknown as SeriesAttachedParameter<Time>);
+    primitive.setView({ tools: [tool({})], balance: 10_000, riskPct: 1, pricePrecision: 2 });
+    const { ctx, calls } = recordingContext();
+    const target = { useMediaCoordinateSpace: (cb: (s: unknown) => void) => cb({ context: ctx, mediaSize: { width: 900, height: 600 } }) };
+    primitive.paneViews()[0].renderer()!.draw(target as unknown as CanvasRenderingTarget2D);
+    expect(calls).toEqual([]);
   });
 });

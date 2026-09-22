@@ -20,7 +20,7 @@ export interface PositionToolsDeps {
 
 /**
  * backtest-app-system-design.md §9.1 — one panel's position tools. `B`/`S` create a draft at the
- * pointer's price (or the last close when the pointer is off this chart); the last created or
+ * pointer's price and bar (or the last close and last bar when the pointer is off this chart; T-050); the last created or
  * clicked tool is active (decision 29, one active tool across the workspace, coordinated through
  * `deps.activated`); `Esc` removes the active draft. Drag changes from the chart are applied
  * through `apply`. Drafts place no orders yet (T-023). Held by the session store per panel, so
@@ -30,6 +30,8 @@ export class PositionToolsStore {
   private readonly list = signal<PositionToolState[]>([]);
   /** The price under the pointer while it is over this panel's chart; null otherwise. */
   readonly pointerPrice = signal<number | null>(null);
+  /** T-050: the time (ms) of the bar under the pointer, while it is over this panel's chart. */
+  readonly pointerTime = signal<number | null>(null);
   readonly tools: Signal<readonly PositionToolState[]> = this.list.asReadonly();
   /** The active draft, if the active tool is a draft. */
   readonly active = computed(() => this.list().find((t) => t.active) ?? null);
@@ -52,7 +54,8 @@ export class PositionToolsStore {
       price: this.pointerPrice() ?? lastClose,
       lastClose,
       precision: this.deps.precision(),
-      anchorTime,
+      // T-050: at the bar under the pointer (never later than the last bar), else the last bar
+      anchorTime: Math.min(this.pointerTime() ?? anchorTime, anchorTime),
       atr: this.deps.atr?.() ?? null,
     });
     if (hint) this.deps.hint(hint);

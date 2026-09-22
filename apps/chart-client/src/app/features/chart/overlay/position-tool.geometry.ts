@@ -105,12 +105,18 @@ export const HANDLE_OFFSET_PX = 12;
  * tool's left edge (its anchor time, clamped to the pane by the caller). A handle per draggable
  * part: three on a draft, stop and target on a live order, none on a read-only drawing.
  */
-export function toolGeometry(tool: PositionToolState, xStart: number, priceToY: (price: number) => number | null): ToolGeometry | null {
+export function toolGeometry(
+  tool: PositionToolState,
+  xStart: number,
+  priceToY: (price: number) => number | null,
+  paneWidth = Number.POSITIVE_INFINITY,
+): ToolGeometry | null {
   const yEntry = priceToY(tool.entry);
   const ySl = priceToY(tool.sl);
   if (yEntry === null || ySl === null) return null;
   const yTp = tool.tp === null ? null : priceToY(tool.tp);
-  const x = xStart + HANDLE_OFFSET_PX;
+  // T-050: a tool anchored at the newest bar may be only a few px wide; its handles stay inside the pane
+  const x = Math.min(xStart + HANDLE_OFFSET_PX, paneWidth - HANDLE_OFFSET_PX);
   const handles: ToolHandle[] = [];
   const parts = draggableParts(tool);
   if (parts.includes('entry')) handles.push({ part: 'entry', x, y: yEntry });

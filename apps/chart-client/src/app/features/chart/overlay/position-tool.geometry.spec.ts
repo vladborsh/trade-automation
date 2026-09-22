@@ -172,3 +172,13 @@ describe('showsZones (T-049)', () => {
     expect(showsZones({ kind: 'position' })).toBe(false);
   });
 });
+
+describe('toolGeometry handles near the right edge (T-050)', () => {
+  it('a tool anchored a few px from the pane edge keeps its handles inside the pane', () => {
+    const t = { id: 't', side: 'long', mode: 'market', entry: 100, sl: 99, tp: 102, kind: 'draft', active: true, anchorTime: 0 } as const;
+    const g = toolGeometry({ ...t }, 795, (p) => 1000 - p, 800)!;
+    expect(g.x).toBe(795); // the lines still start at the anchor bar
+    expect(g.handles.every((h) => h.x === 800 - HANDLE_OFFSET_PX)).toBe(true);
+    expect(toolGeometry({ ...t }, 300, (p) => 1000 - p, 800)!.handles[0].x).toBe(300 + HANDLE_OFFSET_PX); // room: unchanged
+  });
+});

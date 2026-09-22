@@ -254,7 +254,10 @@ export class ReplaySessionStore implements OnDestroy {
         change.type === 'update' && change.tool.kind !== 'draft' && change.tool.orderId
           ? this.dragOrderLevels(panelId, change.tool, change.final)
           : store.apply(change),
-      setPointerPrice: (price) => store.pointerPrice.set(price),
+      setPointerPrice: (price, timeMs) => {
+        store.pointerPrice.set(price);
+        store.pointerTime.set(timeMs ?? null);
+      },
     };
   }
 

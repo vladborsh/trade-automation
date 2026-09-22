@@ -38,6 +38,7 @@ class ChartStubComponent {
   readonly positionToolChange = output<PositionToolChange>();
   readonly loadOlderRequested = output<void>();
   readonly crosshairPrice = signal<number | null>(null);
+  readonly crosshairTime = signal<number | null>(null);
 }
 
 const PANEL: Panel = { id: 'replay-btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false };
@@ -137,20 +138,21 @@ describe('ChartPanelComponent with a stub PanelSource (not a PanelFeed)', () => 
     expect(tools.apply).toHaveBeenCalledWith({ type: 'activate', id: 't1' });
   });
 
-  it('reports the pointer price only while this panel drives the shared crosshair', () => {
+  it('reports the pointer price — and its bar time, ms (T-050) — only while this panel drives the shared crosshair', () => {
     TestBed.configureTestingModule({ providers: [ChartSyncService] });
     const tools = { view: signal({ tools: [], balance: 1, riskPct: 1, pricePrecision: 2 }), apply: vi.fn(), setPointerPrice: vi.fn() };
     const { fixture, chart } = render({ ...stubSource(), positionTools: tools });
     const sync = TestBed.inject(ChartSyncService);
 
     chart.crosshairPrice.set(101.5);
+    chart.crosshairTime.set(1_700_000_000); // seconds, as the chart's crosshair keeps it
     sync.setCrosshair('replay-btc', 1_000);
     fixture.detectChanges();
-    expect(tools.setPointerPrice).toHaveBeenLastCalledWith(101.5);
+    expect(tools.setPointerPrice).toHaveBeenLastCalledWith(101.5, 1_700_000_000_000);
 
     sync.setCrosshair('another-panel', 1_000); // this panel only follows: not where the user points
     fixture.detectChanges();
-    expect(tools.setPointerPrice).toHaveBeenLastCalledWith(null);
+    expect(tools.setPointerPrice).toHaveBeenLastCalledWith(null, null);
   });
 
   it('T-060: no venue dot for a source without a live connection (replay)', () => {
