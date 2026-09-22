@@ -82,9 +82,17 @@ describe('ReplaySessionStore (T-021)', () => {
     expect(client.getStats).toHaveBeenCalledTimes(1); // on open
     await store.engine()!.step();
     await store.engine()!.step();
-    await new Promise((r) => setTimeout(r, 80));
-    expect(client.advance).toHaveBeenCalledTimes(2);
-    expect(client.getStats).toHaveBeenCalledTimes(2); // one refresh for the drained queue
+    // until the queue has drained, not a fixed sleep (a loaded machine overran 80 ms)
+    await vi.waitFor(
+      () => {
+        expect(client.advance).toHaveBeenCalledTimes(2);
+        expect(store.pendingMutations).toBe(0);
+        expect(client.getStats).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 5_000 },
+    );
+    await settle();
+    expect(client.getStats).toHaveBeenCalledTimes(2); // one refresh for the drained queue, not one per response
   });
 
   it('locks the workspace when a response says complete', async () => {
@@ -158,9 +166,14 @@ describe('ReplaySessionStore (T-021)', () => {
     await settle();
     expect(store.retrying()).toBe(true);
     fail = false;
-    await new Promise((r) => setTimeout(r, 300)); // first backoff is 250 ms
-    expect(store.retrying()).toBe(false);
-    expect(store.session()?.cursorMs).toBe(T0 + 5 * M);
+    // after the first backoff (250 ms); waited for, not slept past
+    await vi.waitFor(
+      () => {
+        expect(store.retrying()).toBe(false);
+        expect(store.session()?.cursorMs).toBe(T0 + 5 * M);
+      },
+      { timeout: 5_000 },
+    );
   });
 
   it('GUARD (§9.3): view-only never sends a mutating request, and a normal open resumes at the persisted cursor', async () => {
