@@ -62,6 +62,7 @@ describe('layout-edit (T-029)', () => {
     const cat = (id: string, ccy: string, cov: [number, number] | null): BacktestInstrument => ({
       id: id as BacktestInstrument['id'], displayName: id, assetClass: 'crypto-perp', sessionCurrency: ccy, pricePrecision: 2,
       coverage: cov && { from: cov[0], to: cov[1] },
+      contract: null,
     });
     const session = { sessionCurrency: 'USD', periodFromMs: T0 + 10 * DAY, periodToMs: T0 + 20 * DAY, layout: L };
     const out = addableInstruments(

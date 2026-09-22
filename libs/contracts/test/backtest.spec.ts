@@ -539,7 +539,7 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
     expect(() => ScreenshotKindSchema.parse('preview')).toThrow();
   });
 
-  it('parses a valid BacktestInstrument with coverage', () => {
+  it('parses a valid BacktestInstrument with coverage and a contract block (D12)', () => {
     const instrument = {
       id: 'binance:BTCUSDT' as const,
       displayName: 'BTC/USDT Perp',
@@ -547,11 +547,12 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
       sessionCurrency: 'USD',
       pricePrecision: 2,
       coverage: { from: 1_600_000_000_000, to: 1_726_000_000_000 },
+      contract: { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 50, maxLeverage: 125 },
     };
     expect(BacktestInstrumentSchema.parse(instrument)).toEqual(instrument);
   });
 
-  it('parses a valid BacktestInstrument with null coverage', () => {
+  it('parses a valid BacktestInstrument with null coverage and no contract block', () => {
     const instrument = {
       id: 'binance:BTCUSDT' as const,
       displayName: 'BTC/USDT Perp',
@@ -559,6 +560,7 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
       sessionCurrency: 'USD',
       pricePrecision: 2,
       coverage: null,
+      contract: null,
     };
     expect(BacktestInstrumentSchema.parse(instrument)).toEqual(instrument);
   });

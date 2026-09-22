@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CandleSchema } from './candle';
-import { AssetClassSchema, InstrumentIdSchema } from './instrument';
+import { AssetClassSchema, ContractSpecSchema, InstrumentIdSchema } from './instrument';
 import { LayoutGridSchema } from './layout';
 import { TimeframeSchema } from './timeframe';
 
@@ -199,6 +199,13 @@ export const OrderSchema = z.object({
   entryPrice: z.number().nullable(),
   entryTimeMs: z.number().int().nonnegative().nullable(),
   qty: z.number().nonnegative(),
+  /**
+   * D12: the contract multiplier snapshotted at placement (notional = qty × multiplier × price);
+   * absent means 1, which is every configured instrument today.
+   * TODO(T-053): becomes required (z.number().positive(), no default) together with migration 004's
+   * orders.contract_multiplier column, the row mapper and every fixture (Tech Lead ruling on T-035).
+   */
+  contractMultiplier: z.number().positive().optional(),
   riskPct: z.number().positive(),
   riskAmountCcy: z.number().nonnegative(),
   slInitial: z.number(),
@@ -482,6 +489,8 @@ export const BacktestInstrumentSchema = z.object({
   sessionCurrency: z.string().min(1),
   pricePrecision: z.number().int().min(0),
   coverage: CoverageSchema.nullable(),
+  /** D12: the instrument's contract block from instruments.yaml; null when it has none. */
+  contract: ContractSpecSchema.nullable(),
 });
 export type BacktestInstrument = z.infer<typeof BacktestInstrumentSchema>;
 
@@ -523,6 +532,9 @@ export const BacktestErrorCodeSchema = z.enum([
   'ORDER_NOT_OPEN', // 409 — close on an order that is not open (mirror of ORDER_NOT_PENDING)
   // T-033 (§7.2 PATCH …/orders/:orderId), provisional pending Architect confirmation:
   'ORDER_NOT_ACTIVE', // 409 — a stop/target move on an order that is neither pending nor open
+  // D12 (§6 "Contract, sizing and margin", confirmed by the Architect 2026-09-22):
+  'SIZE_BELOW_MINIMUM', // 422 — the risk-sized qty is below the venue's minQty or minNotional
+  'INSUFFICIENT_MARGIN', // 422 — the order's initial margin exceeds equity − used margin
 ]);
 export type BacktestErrorCode = z.infer<typeof BacktestErrorCodeSchema>;
 

@@ -26,6 +26,7 @@ export class BacktestInstrumentsController {
         pricePrecision: instrument.pricePrecision,
         sessionCurrency: instrument.sessionCurrency,
         coverage: await this.store.coverage(instrument.id, '1m'),
+        contract: instrument.contract ?? null, // D12 (T-035); refusing an instrument without one is T-053's
       })),
     );
   }

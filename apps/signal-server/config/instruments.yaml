@@ -13,6 +13,15 @@ instruments:
     quoteCurrency: USDT
     sessionCurrency: USD
     sessionTimezone: UTC
+    # D12 (T-035): figures and sources in knowledge/venue-contract-specs.md §2.
+    # source: https://fapi.binance.com/fapi/v1/exchangeInfo (LOT_SIZE, MIN_NOTIONAL), read 2026-09-22; maxLeverage: the brief's 125× (first bracket)
+    contract:
+      unit: BTC
+      multiplier: 1
+      minQty: 0.001
+      qtyStep: 0.001
+      minNotional: 50
+      maxLeverage: 125
 
   - id: "binance:ETHUSDT"
     venue: binance
@@ -23,6 +32,14 @@ instruments:
     quoteCurrency: USDT
     sessionCurrency: USD
     sessionTimezone: UTC
+    # source: https://fapi.binance.com/fapi/v1/exchangeInfo (LOT_SIZE, MIN_NOTIONAL), read 2026-09-22; maxLeverage: the brief's 125× (first bracket)
+    contract:
+      unit: ETH
+      multiplier: 1
+      minQty: 0.001
+      qtyStep: 0.001
+      minNotional: 20
+      maxLeverage: 125
 
   - id: "capitalcom:US100"
     venue: capitalcom
@@ -32,6 +49,13 @@ instruments:
     pricePrecision: 1
     quoteCurrency: USD
     sessionTimezone: America/New_York
+    # source: https://capital.com/en-eu/markets/indices/us-tech-100-index-1, read 2026-09-22, entity CySEC 463/25 (EU retail: margin 5 % = 20:1, min 0.001); qtyStep = minQty until the API's minSizeIncrement is read
+    contract:
+      unit: contracts
+      multiplier: 1
+      minQty: 0.001
+      qtyStep: 0.001
+      maxLeverage: 20
 
   # architecture/vwap-band-reversal-plugin.md §5.1 — the cmc-bot VWAP band-reversal port's
   # four instruments. sessionTimezone here is each instrument's own session convention; the
@@ -45,6 +69,13 @@ instruments:
     pricePrecision: 1
     quoteCurrency: USD
     sessionTimezone: America/New_York
+    # source: https://capital.com/en-eu/markets/indices/us-500-index-1, read 2026-09-22, entity CySEC 463/25 (EU retail: margin 5 % = 20:1, min 0.01); qtyStep = minQty until the API's minSizeIncrement is read
+    contract:
+      unit: contracts
+      multiplier: 1
+      minQty: 0.01
+      qtyStep: 0.01
+      maxLeverage: 20
 
   - id: "capitalcom:EURCHF"
     venue: capitalcom
@@ -54,6 +85,14 @@ instruments:
     pricePrecision: 5
     quoteCurrency: CHF
     sessionTimezone: UTC
+    # source: https://capital.com/eur-chf-rate (min 100), read 2026-09-22; maxLeverage per the EU/UK retail regime (major pair 30:1, knowledge note §1); qtyStep = minQty until the API's minSizeIncrement is read
+    contract:
+      unit: EUR
+      multiplier: 1
+      minQty: 100
+      qtyStep: 100
+      maxLeverage: 30
+      displayLot: 100000
 
   - id: "capitalcom:GBPCHF"
     venue: capitalcom
@@ -63,6 +102,14 @@ instruments:
     pricePrecision: 5
     quoteCurrency: CHF
     sessionTimezone: UTC
+    # source: https://capital.com/en-gb/markets/forex/gbp-chf-rate, read 2026-09-22, entity FCA 793714 (margin 3.33 % = 30:1, min 100); qtyStep = minQty until the API's minSizeIncrement is read
+    contract:
+      unit: GBP
+      multiplier: 1
+      minQty: 100
+      qtyStep: 100
+      maxLeverage: 30
+      displayLot: 100000
 
   # backtest-app-system-design.md §10 (T-031) — the USD-quoted FX pairs for the backfill.
   # sessionCurrency USD puts them in the USD account-currency group (EURCHF/GBPCHF stay CHF).
@@ -75,6 +122,14 @@ instruments:
     quoteCurrency: USD
     sessionCurrency: USD
     sessionTimezone: UTC
+    # source: https://capital.com/en-eu/markets/forex/euro-us-dollar-rate-2, read 2026-09-22, entity CySEC 463/25 (margin 3.33 % = 30:1, min 100); qtyStep = minQty until the API's minSizeIncrement is read
+    contract:
+      unit: EUR
+      multiplier: 1
+      minQty: 100
+      qtyStep: 100
+      maxLeverage: 30
+      displayLot: 100000
 
   - id: "capitalcom:GBPUSD"
     venue: capitalcom
@@ -85,6 +140,14 @@ instruments:
     quoteCurrency: USD
     sessionCurrency: USD
     sessionTimezone: UTC
+    # source: https://capital.com/en-eu/markets/forex/british-pound-us-dollar-rate-2, read 2026-09-22, entity CySEC 463/25 (margin 3.33 % = 30:1, min 100); qtyStep = minQty until the API's minSizeIncrement is read
+    contract:
+      unit: GBP
+      multiplier: 1
+      minQty: 100
+      qtyStep: 100
+      maxLeverage: 30
+      displayLot: 100000
 
   # architecture/chart-layouts.md §5 — epic confirmed against the live Capital.com API:
   # instrumentType INDICES, streamingPricesAvailable true. Trading hours are near-continuous
@@ -98,3 +161,10 @@ instruments:
     pricePrecision: 2
     quoteCurrency: USD
     sessionTimezone: UTC
+    # source: https://capital.com/en-eu/markets/indices/us-dollar-index-index-1, read 2026-09-22, entity CySEC 463/25 (margin 10 % = 10:1, min 1); multiplier 1 inferred (knowledge note §2 ‡), qtyStep = minQty, both until the API's lotSize / minSizeIncrement are read
+    contract:
+      unit: contracts
+      multiplier: 1
+      minQty: 1
+      qtyStep: 1
+      maxLeverage: 10

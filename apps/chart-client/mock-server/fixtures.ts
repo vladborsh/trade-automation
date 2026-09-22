@@ -1,4 +1,4 @@
-import type { Candle, Instrument, InstrumentId, MetricObservation, Timeframe } from '@trade-automation/contracts';
+import type { Candle, ContractSpec, Instrument, InstrumentId, MetricObservation, Timeframe } from '@trade-automation/contracts';
 
 /** Deterministic PRNG (mulberry32) so fixture runs are reproducible across boots. */
 function mulberry32(seed: number): () => number {
@@ -12,6 +12,19 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * T-035 (D12): the contract blocks, the same figures as apps/signal-server/config/instruments.yaml
+ * (sources in knowledge/venue-contract-specs.md). The -MOCK instruments take their namesakes'.
+ */
+export const MOCK_CONTRACTS: Readonly<Record<string, ContractSpec>> = {
+  'binance:BTCUSDT': { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 50, maxLeverage: 125 },
+  'binance:ETHUSDT': { unit: 'ETH', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 20, maxLeverage: 125 },
+  'capitalcom:US100': { unit: 'contracts', multiplier: 1, minQty: 0.001, qtyStep: 0.001, maxLeverage: 20 },
+  'capitalcom:US500-MOCK': { unit: 'contracts', multiplier: 1, minQty: 0.01, qtyStep: 0.01, maxLeverage: 20 },
+  'capitalcom:DXY-MOCK': { unit: 'contracts', multiplier: 1, minQty: 1, qtyStep: 1, maxLeverage: 10 },
+  'capitalcom:EURCHF': { unit: 'EUR', multiplier: 1, minQty: 100, qtyStep: 100, maxLeverage: 30, displayLot: 100_000 },
+};
+
 export const FIXTURE_INSTRUMENTS: Instrument[] = [
   {
     id: 'binance:BTCUSDT',
@@ -22,6 +35,7 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
     pricePrecision: 2,
     quoteCurrency: 'USDT',
     sessionTimezone: 'UTC',
+    contract: MOCK_CONTRACTS['binance:BTCUSDT'],
   },
   {
     id: 'binance:ETHUSDT',
@@ -32,6 +46,7 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
     pricePrecision: 2,
     quoteCurrency: 'USDT',
     sessionTimezone: 'UTC',
+    contract: MOCK_CONTRACTS['binance:ETHUSDT'],
   },
   {
     id: 'capitalcom:US100',
@@ -42,6 +57,7 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
     pricePrecision: 1,
     quoteCurrency: 'USD',
     sessionTimezone: 'America/New_York',
+    contract: MOCK_CONTRACTS['capitalcom:US100'],
   },
   /**
    * architecture/chart-layouts.md §6.7 — the mock has no live Capital.com
@@ -58,6 +74,7 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
     pricePrecision: 3,
     quoteCurrency: 'USD',
     sessionTimezone: 'UTC',
+    contract: MOCK_CONTRACTS['capitalcom:DXY-MOCK'],
   },
   {
     id: 'capitalcom:US500-MOCK',
@@ -68,6 +85,7 @@ export const FIXTURE_INSTRUMENTS: Instrument[] = [
     pricePrecision: 1,
     quoteCurrency: 'USD',
     sessionTimezone: 'America/New_York',
+    contract: MOCK_CONTRACTS['capitalcom:US500-MOCK'],
   },
 ];
 

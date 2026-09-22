@@ -17,6 +17,29 @@ export const InstrumentIdSchema = z
 export const AssetClassSchema = z.enum(['crypto-perp', 'index-cfd', 'forex-cfd', 'equity']);
 export type AssetClass = z.infer<typeof AssetClassSchema>;
 
+/**
+ * backtest-app-system-design.md §6 "Contract, sizing and margin" (D12) — what one unit of `qty`
+ * is on the venue, and the venue's limits. `notional = qty × multiplier × price`. Figures and
+ * sources: knowledge/venue-contract-specs.md; the values live in instruments.yaml.
+ */
+export const ContractSpecSchema = z.object({
+  /** What `qty` counts, for display: 'BTC', 'contracts', 'EUR'. */
+  unit: z.string().min(1),
+  /** Quote-currency value of a 1.0 price move per 1 qty. */
+  multiplier: z.number().positive(),
+  /** The venue's minimum order size, in `unit`. */
+  minQty: z.number().positive(),
+  /** The venue's size increment; sizes are rounded down to it. */
+  qtyStep: z.number().positive(),
+  /** The venue's minimum order notional, in the quote currency, where it has one (Binance). */
+  minNotional: z.number().positive().optional(),
+  /** The leverage cap of the chosen regime (EU/UK retail for Capital.com; Binance's first bracket). */
+  maxLeverage: z.number().min(1),
+  /** FX only: units per standard lot, for display ("20,000 EUR (0.20 lots)"). */
+  displayLot: z.number().positive().optional(),
+});
+export type ContractSpec = z.infer<typeof ContractSpecSchema>;
+
 const InstrumentObjectSchema = z.object({
   id: InstrumentIdSchema,
   venue: VenueSchema,
@@ -33,6 +56,8 @@ const InstrumentObjectSchema = z.object({
    */
   sessionCurrency: z.string().min(1).optional(),
   sessionTimezone: z.string().min(1),
+  /** D12: the contract block. An instrument without one cannot be replayed (INSTRUMENT_NOT_AVAILABLE). */
+  contract: ContractSpecSchema.optional(),
 });
 
 export const InstrumentSchema = InstrumentObjectSchema.transform((instrument) => ({

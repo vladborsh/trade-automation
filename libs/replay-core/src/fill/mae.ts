@@ -1,10 +1,12 @@
 import { Order } from '@trade-automation/contracts';
+import { contractUnits } from '../costs';
 import { PathBar } from './types';
 
 /**
  * architecture/backtest-app-system-design.md §6 "MAE" (decision 26): the worst adverse excursion
  * on the 1m path between `entryTimeMs` and `exitTimeMs` — long `entry - min(low)`, short
- * `max(high) - entry`; `maeR = maePrice * qty / riskAmountCcy`. Computed once, at close.
+ * `max(high) - entry`; `maeR = maePrice * qty / riskAmountCcy` (`qty × contractMultiplier`, D12).
+ * Computed once, at close.
  *
  * Window: the exit candle is included. The entry candle is included for a **limit** order (the
  * position was open for part of its fill candle — the conservative choice) and excluded for a
@@ -13,7 +15,7 @@ import { PathBar } from './types';
  * the window are ignored, so the caller may pass a superset.
  */
 export function computeMae(
-  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'entryTimeMs' | 'exitTimeMs' | 'qty' | 'riskAmountCcy'>,
+  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'entryTimeMs' | 'exitTimeMs' | 'qty' | 'contractMultiplier' | 'riskAmountCcy'>,
   path: readonly PathBar[],
 ): { maePrice: number; maeR: number } {
   const { entryPrice: entry, entryTimeMs: from, exitTimeMs: to } = order;
@@ -27,5 +29,5 @@ export function computeMae(
     const excursion = order.side === 'long' ? entry - bar.low : bar.high - entry;
     if (excursion > maePrice) maePrice = excursion;
   }
-  return { maePrice, maeR: (maePrice * order.qty) / order.riskAmountCcy };
+  return { maePrice, maeR: (maePrice * contractUnits(order)) / order.riskAmountCcy };
 }

@@ -13,6 +13,7 @@ import {
   type Timeframe,
 } from '@trade-automation/contracts';
 import { readJsonBody, type SendJson } from './auth';
+import { MOCK_CONTRACTS } from './fixtures';
 import { replayAhead, replayHistory } from './replay-tape';
 import { screenshotPng, seededOrderDetail, seededOrders, seededStats } from './journal-seed';
 
@@ -43,10 +44,10 @@ const MIN = 60_000;
 const COVERAGE_TO = Date.UTC(2026, 5, 30, 23, 59);
 
 export const MOCK_BACKTEST_INSTRUMENTS: BacktestInstrument[] = [
-  { id: 'binance:BTCUSDT', displayName: 'BTC/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO } },
-  { id: 'binance:ETHUSDT', displayName: 'ETH/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2025, 0, 1), to: COVERAGE_TO } },
-  { id: 'capitalcom:EURCHF', displayName: 'EUR/CHF', assetClass: 'forex-cfd', sessionCurrency: 'CHF', pricePrecision: 5, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO } },
-  { id: 'capitalcom:US100', displayName: 'US Tech 100', assetClass: 'index-cfd', sessionCurrency: 'USD', pricePrecision: 1, coverage: null },
+  { id: 'binance:BTCUSDT', displayName: 'BTC/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['binance:BTCUSDT'] },
+  { id: 'binance:ETHUSDT', displayName: 'ETH/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2025, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['binance:ETHUSDT'] },
+  { id: 'capitalcom:EURCHF', displayName: 'EUR/CHF', assetClass: 'forex-cfd', sessionCurrency: 'CHF', pricePrecision: 5, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['capitalcom:EURCHF'] },
+  { id: 'capitalcom:US100', displayName: 'US Tech 100', assetClass: 'index-cfd', sessionCurrency: 'USD', pricePrecision: 1, coverage: null, contract: MOCK_CONTRACTS['capitalcom:US100'] },
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

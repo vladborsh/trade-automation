@@ -1,5 +1,5 @@
 import { Costs, FillEvent, Order } from '@trade-automation/contracts';
-import { direction, fee, spreadCost } from '../costs';
+import { contractUnits, direction, fee, spreadCost } from '../costs';
 
 export interface TradeResult {
   commissionCcy: number;
@@ -17,10 +17,11 @@ export interface TradeResult {
  *   only: the half-spread is already inside `entryPrice` / `exitEvent.price`;
  * - `pnl_ccy = dir * (exit - entry) * qty - commission_ccy`; `pnl_r = pnl_ccy / riskAmountCcy`.
  *
- * `costs` is the session's cost model (commission is not recoverable from the prices).
+ * `qty` here is `qty × contractMultiplier` (D12). `costs` is the session's cost model
+ * (commission is not recoverable from the prices).
  */
 export function computeTradeResult(
-  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'qty' | 'riskAmountCcy'>,
+  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'qty' | 'contractMultiplier' | 'riskAmountCcy'>,
   exitEvent: FillEvent,
   costs: Costs,
 ): TradeResult {
@@ -28,7 +29,8 @@ export function computeTradeResult(
     throw new Error(`order ${order.id}: computeTradeResult needs an exit event with a reason`);
   }
   if (order.entryPrice === null) throw new Error(`order ${order.id}: no entryPrice`);
-  const { entryPrice: entry, qty } = order;
+  const entry = order.entryPrice;
+  const qty = contractUnits(order);
   const exit = exitEvent.price;
 
   const commissionCcy = fee(entry * qty, costs) + fee(exit * qty, costs);

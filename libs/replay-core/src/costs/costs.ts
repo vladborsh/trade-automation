@@ -16,6 +16,15 @@ export function fee(notional: number, costs: Costs): number {
   return costs.enabled ? (notional * costs.commissionPct) / 100 : 0;
 }
 
+/**
+ * D12 (§6 "Contract, sizing and margin"): the quantity every money formula multiplies by,
+ * `qty × contractMultiplier` (notional = units × price). An absent multiplier is 1, which is every
+ * configured instrument today, so `units === qty` exactly and no existing number changes.
+ */
+export function contractUnits(order: { qty: number; contractMultiplier?: number }): number {
+  return order.qty * (order.contractMultiplier ?? 1);
+}
+
 /** +1 for long, -1 for short: `pnl = dir * (exit - entry) * qty`. */
 export function direction(side: OrderSide): 1 | -1 {
   return side === 'long' ? 1 : -1;

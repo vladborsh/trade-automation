@@ -19,9 +19,9 @@ const LAYOUT: SessionLayout = {
   ],
 };
 const CATALOGUE: BacktestInstrument[] = [
-  { id: 'binance:BTCUSDT', displayName: 'BTC/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: T0, to: T0 + 60 * DAY } },
-  { id: 'binance:SOLUSDT', displayName: 'SOL/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: T0, to: T0 + 60 * DAY } },
-  { id: 'capitalcom:EURCHF', displayName: 'EUR/CHF', assetClass: 'forex-cfd', sessionCurrency: 'CHF', pricePrecision: 5, coverage: { from: T0, to: T0 + 60 * DAY } },
+  { id: 'binance:BTCUSDT', displayName: 'BTC/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: T0, to: T0 + 60 * DAY }, contract: null },
+  { id: 'binance:SOLUSDT', displayName: 'SOL/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: T0, to: T0 + 60 * DAY }, contract: null },
+  { id: 'capitalcom:EURCHF', displayName: 'EUR/CHF', assetClass: 'forex-cfd', sessionCurrency: 'CHF', pricePrecision: 5, coverage: { from: T0, to: T0 + 60 * DAY }, contract: null },
 ];
 
 function session(over: Partial<Session> = {}): Session {
