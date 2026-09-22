@@ -27,6 +27,10 @@ export class ReplayToolbarComponent {
   readonly currency = input.required<string>();
   /** A step or a switch is waiting for candles. */
   readonly loading = input(false);
+  /** The engine takes step presses (started, not reloading); one pressed while busy is queued (T-037). */
+  readonly stepReady = input(true);
+  /** T-037: a step press waiting for the step or switch in flight. */
+  readonly stepQueued = input(false);
   readonly atEnd = input(false);
   /** The server has completed the session: nothing can be stepped or switched (decision 28). */
   readonly completed = input(false);

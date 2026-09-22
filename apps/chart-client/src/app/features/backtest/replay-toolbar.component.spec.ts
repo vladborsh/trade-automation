@@ -33,9 +33,20 @@ describe('ReplayToolbarComponent', () => {
     expect(tfs).toEqual(['1h']);
   });
 
-  it('shows loading and disables the step while candles are on their way', () => {
+  it('shows loading while candles are on their way; the step stays pressable, to queue one (T-037)', () => {
     const { el } = render({ loading: true });
     expect(el.querySelector('[data-testid="replay-loading"]')).not.toBeNull();
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-step"]')!.disabled).toBe(false);
+    expect(el.querySelector('[data-testid="replay-step-queued"]')).toBeNull();
+  });
+
+  it('shows the queued step (T-037)', () => {
+    const { el } = render({ loading: true, stepQueued: true });
+    expect(el.querySelector('[data-testid="replay-step-queued"]')?.textContent).toBe('+1 step queued');
+  });
+
+  it('disables the step while the engine takes no presses (not started yet, or reloading)', () => {
+    const { el } = render({ loading: true, stepReady: false });
     expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-step"]')!.disabled).toBe(true);
   });
 

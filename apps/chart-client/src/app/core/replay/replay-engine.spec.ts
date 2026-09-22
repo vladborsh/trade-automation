@@ -193,11 +193,81 @@ describe('ReplayEngine (backtest-app-system-design.md §5)', () => {
     expect(e.atEnd()).toBe(true);
   });
 
-  it('ignores a step pressed while another is in flight (the key is blocked, not queued)', async () => {
-    const e = engine(fakeServer({ pageCap: 3 }), at(18, 22, 0));
-    await e.start();
-    await Promise.all([e.step(), e.step(), e.step()]);
-    expect(e.cursor()).toBe(at(18, 22, 5));
+  describe('a step pressed while another is in flight (T-037)', () => {
+    /** Lets the queued step (started from the in-flight step's end) run to completion. */
+    const settle = () => new Promise((r) => setTimeout(r, 30));
+
+    it('is queued, shown, and runs as exactly one extra step', async () => {
+      const e = engine(fakeServer({ pageCap: 3 }), at(18, 22, 0)); // tiny pages: the step blocks on a fetch
+      await e.start();
+      const first = e.step();
+      void e.step(); // pressed while the first is in flight
+      expect(e.stepQueued()).toBe(true);
+      await first;
+      await settle();
+      expect(e.cursor()).toBe(at(18, 22, 10));
+      expect(e.stepQueued()).toBe(false);
+    });
+
+    it('many presses while busy are one step, not a backlog (holding →)', async () => {
+      const e = engine(fakeServer({ pageCap: 3 }), at(18, 22, 0));
+      await e.start();
+      const first = e.step();
+      for (let i = 0; i < 20; i++) void e.step();
+      await first;
+      await settle();
+      expect(e.cursor()).toBe(at(18, 22, 10)); // the in-flight step + one
+    });
+
+    it('a press during a timeframe switch steps once the switch is done', async () => {
+      const e = engine(fakeServer(), at(18, 22, 0));
+      await e.start();
+      const switching = e.setTimeframe('15m');
+      void e.step();
+      expect(e.stepQueued()).toBe(true);
+      await switching;
+      await settle();
+      expect(e.timeframe()).toBe('15m');
+      expect(e.cursor()).toBe(at(18, 22, 15));
+    });
+
+    it('a reload (retire) drops the queued step: nothing is carried across it', async () => {
+      const e = engine(fakeServer({ pageCap: 3 }), at(18, 22, 0));
+      await e.start();
+      const first = e.step();
+      void e.step();
+      e.retire();
+      expect(e.stepQueued()).toBe(false);
+      await first;
+      await settle();
+      expect(e.cursor()).toBe(at(18, 22, 5)); // only the step already in flight
+      void e.step(); // and a retired engine queues nothing either
+      expect(e.stepQueued()).toBe(false);
+    });
+
+    it('a session completed while the step was in flight runs no queued step', async () => {
+      const e = engine(fakeServer({ pageCap: 3 }), at(18, 22, 0));
+      await e.start();
+      const first = e.step();
+      void e.step();
+      e.complete(); // the advance answer said "complete"
+      await first;
+      await settle();
+      expect(e.cursor()).toBe(at(18, 22, 5));
+      expect(e.stepQueued()).toBe(false);
+    });
+
+    it('at the end of the period the queued press does nothing', async () => {
+      const e = engine(fakeServer(), at(21, 2, 55)); // one step before PERIOD_TO
+      await e.start();
+      const first = e.step();
+      void e.step();
+      await first;
+      await settle();
+      expect(e.cursor()).toBe(PERIOD_TO);
+      expect(e.atEnd()).toBe(true);
+      expect(e.stepQueued()).toBe(false);
+    });
   });
 
   it('a retired engine (BUG-009: the session is reloading) shows loading for good and ignores steps and switches', async () => {

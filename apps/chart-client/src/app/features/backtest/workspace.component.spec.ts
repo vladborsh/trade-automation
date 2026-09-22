@@ -30,6 +30,7 @@ function fakeStore() {
     timeframe: signal<Timeframe>('5m'),
     blocked: signal(false),
     started: signal(false),
+    stepQueued: signal(false),
     atEnd: signal(false),
     completed: signal(false),
     viewOnly: false,

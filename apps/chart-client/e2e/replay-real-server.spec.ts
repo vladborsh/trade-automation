@@ -417,3 +417,66 @@ test('view-only (show on chart): no key creates a draft, an order or a step', as
   expect((await get(page, `/backtest/sessions/${s.id}/orders`)).length).toBe(1);
   expect((await get(page, `/backtest/sessions/${s.id}`)).session.cursorMs).toBe(from);
 });
+
+test('T-037: a → pressed while a step or switch is in flight is queued, never lost; holding → steps continuously', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  const s = await createSession(page, { name: `rw hold ${Date.now()}`, from, to: from + 24 * 60 * MIN, tf: '5m' });
+  const serverCursor = async () => (await get(page, `/backtest/sessions/${s.id}`)).session.cursorMs as number;
+  const refused: number[] = [];
+  page.on('response', (r) => { if (r.url().endsWith('/advance') && r.status() >= 400) refused.push(r.status()); });
+  await openWorkspace(page, s.id);
+
+  // 1. the lost-key case, made deterministic: `]` starts a timeframe switch (a server round trip), → lands
+  //    while it is in flight. Before T-037 the → was dropped; now it is shown as queued and runs after the switch.
+  //    The switch's history request is held until → is in, so the press lands mid-switch every run.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route(/\/backtest\/sessions\/[^/]+\/candles\?/, async (route) => { await held; await route.continue(); });
+  await page.keyboard.press(']'); // 5m → 15m
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('replay-step-queued')).toHaveCount(1);
+  expect(await serverCursor()).toBe(from); // nothing stepped yet: the switch is still in flight
+  release();
+  await page.unroute(/\/backtest\/sessions\/[^/]+\/candles\?/);
+  await expect.poll(serverCursor, { timeout: 10_000 }).toBe(from + 15 * MIN);
+  await expect(page.getByTestId('replay-step-queued')).toHaveCount(0);
+  // back to 1m for many small steps below (a switch press is not queued — T-037 is about steps — so one at a time)
+  for (const tf of ['5m', '1m']) {
+    await page.keyboard.press('[');
+    await expect(page.locator('.tf-btn.active')).toHaveText(tf, { timeout: 10_000 });
+    await expect(page.getByTestId('replay-loading')).toHaveCount(0, { timeout: 10_000 });
+  }
+
+  // 2. hold → for 2 s (key repeat ≈ 30/s): the on-screen cursor keeps moving the whole time
+  await page.evaluate(() => {
+    const w = window as unknown as { cursorLog: [number, string][] };
+    w.cursorLog = [];
+    const el = () => document.querySelector('[data-testid="replay-cursor"]')?.textContent ?? '';
+    let last = '';
+    setInterval(() => { const t = el(); if (t !== last) { last = t; w.cursorLog.push([performance.now(), t]); } }, 10);
+  });
+  const before = await serverCursor();
+  const t0 = Date.now();
+  let presses = 0;
+  while (Date.now() - t0 < 2_000) {
+    await page.keyboard.down('ArrowRight'); // a held key: repeated keydowns
+    presses++;
+    await page.waitForTimeout(33);
+  }
+  await page.keyboard.up('ArrowRight');
+  const log = await page.evaluate(() => (window as unknown as { cursorLog: [number, string][] }).cursorLog);
+  const changes = log.length;
+  const gaps = log.slice(1).map(([t], i) => t - log[i][0]);
+  // released: a queued press still runs, then everything settles and the server agrees with the screen
+  await expect(page.getByTestId('replay-step-queued')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByTestId('replay-loading')).toHaveCount(0, { timeout: 10_000 });
+  const screen = await page.getByTestId('replay-cursor').innerText();
+  await expect.poll(async () => new Date(await serverCursor()).toISOString().slice(0, 16).replace('T', ' ') + ' UTC', { timeout: 10_000 }).toBe(screen);
+  const steps = ((await serverCursor()) - before) / MIN;
+  console.log(`T-037 hold: ${presses} keydowns in 2 s → ${steps} steps; ${changes} cursor changes on screen, longest pause ${Math.round(Math.max(...gaps))} ms`);
+  expect(steps).toBeGreaterThanOrEqual(20); // continuous: most repeats are steps
+  expect(steps).toBeLessThanOrEqual(presses); // never more steps than presses (no backlog replayed)
+  expect(Math.max(...gaps)).toBeLessThan(500); // no stall while the key was down
+  expect(refused).toEqual([]);
+});

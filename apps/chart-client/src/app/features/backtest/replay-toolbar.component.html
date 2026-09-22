@@ -22,7 +22,7 @@
     type="button"
     class="step"
     data-testid="replay-step"
-    [disabled]="loading() || atEnd() || completed() || viewingAt() !== null"
+    [disabled]="!stepReady() || atEnd() || completed() || viewingAt() !== null"
     title="Step forward one bar (→)"
     (click)="step.emit()"
   >
@@ -38,6 +38,9 @@
     <span class="status loading" data-testid="replay-loading" role="status">loading…</span>
   } @else if (atEnd()) {
     <span class="status" data-testid="replay-end">end of period</span>
+  }
+  @if (stepQueued()) {
+    <span class="status queued" data-testid="replay-step-queued" role="status" title="Runs as soon as the step in progress finishes">+1 step queued</span>
   }
   @if (retrying()) {
     <span class="status retrying" data-testid="replay-retrying" role="status">saving… retrying</span>

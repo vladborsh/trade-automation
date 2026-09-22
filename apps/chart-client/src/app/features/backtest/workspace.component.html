@@ -11,6 +11,8 @@
         [balance]="s.balance"
         [currency]="s.sessionCurrency"
         [loading]="e.blocked()"
+        [stepReady]="e.started()"
+        [stepQueued]="e.stepQueued()"
         [atEnd]="e.atEnd()"
         [completed]="e.completed()"
         [retrying]="store.retrying()"

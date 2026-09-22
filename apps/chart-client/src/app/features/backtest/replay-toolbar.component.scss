@@ -66,6 +66,12 @@
 .status.retrying {
   color: #ef5350;
 }
+.status.queued {
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  padding: 0 6px;
+}
 .tf-btn:disabled {
   opacity: 0.5;
   cursor: default;

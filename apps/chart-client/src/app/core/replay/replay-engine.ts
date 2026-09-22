@@ -69,6 +69,11 @@ export class ReplayEngine {
   readonly timeframe = signal<Timeframe>('5m');
   /** A step (or a timeframe switch) is waiting for data: the toolbar shows "loading". */
   readonly blocked = signal(false);
+  /**
+   * T-037: a `→` pressed while a step or a switch was in flight. At most one — further presses fold
+   * into it, so holding the key never builds a backlog — and it runs as soon as the work finishes.
+   */
+  readonly stepQueued = signal(false);
   /** `start()` has finished — the first history is in (or failed into `error`). An e2e hook (BUG-010). */
   readonly started = signal(false);
   /** The cursor has reached the end of the period. */
@@ -137,6 +142,7 @@ export class ReplayEngine {
     this.retired = true;
     this.blocked.set(true);
     this.started.set(false);
+    this.stepQueued.set(false); // never carried across a reload
   }
 
   /** An advance response: the server's cursor, which history requests may not pass. */
@@ -149,9 +155,17 @@ export class ReplayEngine {
     this.completed.set(true);
   }
 
-  /** `→`: ignored while a step or a switch is in flight — the key is blocked, never queued. */
+  /**
+   * `→`. While a step or a switch is in flight the press is queued (one at most, `stepQueued`) and
+   * runs when that finishes (T-037); a retired engine, the period end, a complete session and
+   * view-only ignore it.
+   */
   async step(): Promise<void> {
-    if (this.atEnd() || this.completed() || this.viewOnly) return;
+    if (this.atEnd() || this.completed() || this.viewOnly || this.retired) return;
+    if (this.busy) {
+      this.stepQueued.set(true);
+      return;
+    }
     await this.exclusive(async () => {
       for (;;) {
         try {
@@ -367,6 +381,10 @@ export class ReplayEngine {
     } finally {
       this.busy = false;
       this.blocked.set(this.retired);
+      if (this.stepQueued()) {
+        this.stepQueued.set(false);
+        void this.step(); // the queued press (T-037); it re-checks the end, completion and retirement
+      }
     }
   }
 
