@@ -251,3 +251,86 @@ describe('GET order detail and the session detail', () => {
     expect((await sessions.detail('alice', session.id)).openOrders.map((o) => o.id)).toEqual([limit.id, long.id]);
   });
 });
+
+describe('OrderService.modify (T-033, decision 23)', () => {
+  const mod = (orders: OrderService, sessionId: string, orderId: string, body: { cursorMs: number; sl?: number; tp?: number; opId?: string }) =>
+    orders.modify('alice', sessionId, orderId, { opId: randomUUID(), ...body });
+
+  it('open long: break-even and a trailing stop into profit are accepted, one row per changed field at the cursor', async () => {
+    const { place, orders, session, row } = await setup();
+    const long = (await place({ tp: 110 })).order; // entry 100.25, sl 99, riskAmount 100
+    row().cursorMs = session.periodFromMs + 3 * MIN; // lastClose 102
+
+    const be = await mod(orders, session.id, long.id, { cursorMs: row().cursorMs, sl: 100.25 });
+    expect(be).toMatchObject({ slCurrent: 100.25, slInitial: 99, tpCurrent: 110, riskAmountCcy: 100, qty: 100, status: 'open' });
+    const trail = await mod(orders, session.id, long.id, { cursorMs: row().cursorMs, sl: 101, tp: 105 });
+    expect(trail).toMatchObject({ slCurrent: 101, slInitial: 99, tpCurrent: 105, tpInitial: 110, riskAmountCcy: 100 });
+
+    const detail = await orders.get('alice', session.id, long.id);
+    expect(detail.order).toEqual(trail);
+    expect(detail.modifications.map(({ field, oldValue, newValue, cursorMs }) => ({ field, oldValue, newValue, cursorMs }))).toEqual([
+      { field: 'sl', oldValue: 99, newValue: 100.25, cursorMs: row().cursorMs },
+      { field: 'sl', oldValue: 100.25, newValue: 101, cursorMs: row().cursorMs },
+      { field: 'tp', oldValue: 110, newValue: 105, cursorMs: row().cursorMs },
+    ]);
+  });
+
+  it('open: a level at or through the last close is 422; a refusal writes nothing', async () => {
+    const { place, orders, session, row, repos } = await setup();
+    const long = (await place()).order;
+    const short = (await place({ side: 'short', sl: 101 })).order; // entry 99.75
+    row().cursorMs = session.periodFromMs + 3 * MIN; // lastClose 102
+    const c = row().cursorMs;
+
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c, sl: 102 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c, sl: 102.5 }))).resolves.toBe('422 SL_ON_WRONG_SIDE');
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c, tp: 101.5 }))).resolves.toBe('422 TP_ON_WRONG_SIDE');
+    await expect(code(mod(orders, session.id, short.id, { cursorMs: c, sl: 101.5 }))).resolves.toBe('422 SL_ON_WRONG_SIDE'); // the short is losing: 101.5 is through 102
+    await expect(code(mod(orders, session.id, short.id, { cursorMs: c, tp: 102.5 }))).resolves.toBe('422 TP_ON_WRONG_SIDE');
+    expect((await orders.get('alice', session.id, long.id)).order).toMatchObject({ slCurrent: 99, tpCurrent: null });
+    expect(repos.modificationRows).toEqual([]);
+  });
+
+  it('pending: checked against the limit as at placement, whatever the market', async () => {
+    const { place, orders, session } = await setup();
+    const limit = (await place({ type: 'limit', limitPrice: 99.5, sl: 99, tp: 101 })).order; // lastClose 100
+    const c = session.cursorMs;
+    await expect(code(mod(orders, session.id, limit.id, { cursorMs: c, sl: 99.6 }))).resolves.toBe('422 SL_ON_WRONG_SIDE'); // below the market, above the limit
+    await expect(code(mod(orders, session.id, limit.id, { cursorMs: c, sl: 99.5 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
+    await expect(code(mod(orders, session.id, limit.id, { cursorMs: c, tp: 99.4 }))).resolves.toBe('422 TP_ON_WRONG_SIDE');
+    expect(await mod(orders, session.id, limit.id, { cursorMs: c, sl: 98.5, tp: 99.8 })).toMatchObject({
+      status: 'pending', slCurrent: 98.5, tpCurrent: 99.8, slInitial: 99, qty: 200, riskAmountCcy: 100,
+    });
+  });
+
+  it('closed or cancelled is 409 ORDER_NOT_ACTIVE; the cursor, completion and an empty body are checked first', async () => {
+    const { place, orders, session, row } = await setup();
+    const limit = (await place({ type: 'limit', limitPrice: 99.5 })).order;
+    const long = (await place()).order;
+    const c = session.cursorMs;
+    await orders.cancel('alice', session.id, limit.id, { opId: randomUUID(), cursorMs: c });
+    await orders.close('alice', session.id, long.id, { opId: randomUUID(), cursorMs: c });
+
+    await expect(code(mod(orders, session.id, limit.id, { cursorMs: c, sl: 98 }))).resolves.toBe('409 ORDER_NOT_ACTIVE');
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c, sl: 98 }))).resolves.toBe('409 ORDER_NOT_ACTIVE');
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c + MIN, sl: 98 }))).resolves.toBe('409 CURSOR_MISMATCH');
+    await expect(code(mod(orders, session.id, randomUUID(), { cursorMs: c, sl: 98 }))).resolves.toBe('404');
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c }))).resolves.toBe('400');
+    row().status = 'complete';
+    await expect(code(mod(orders, session.id, long.id, { cursorMs: c, sl: 98 }))).resolves.toBe('409 SESSION_COMPLETE');
+  });
+
+  it('D9: a replayed opId returns the stored order and writes no second row; a move to the current value writes none', async () => {
+    const { place, orders, session, repos } = await setup();
+    const long = (await place({ tp: 110 })).order;
+    const req = { opId: randomUUID(), cursorMs: session.cursorMs, sl: 98 };
+    const first = await orders.modify('alice', session.id, long.id, req);
+    expect(await orders.modify('alice', session.id, long.id, req)).toEqual(first);
+    expect(repos.modificationRows).toHaveLength(1);
+    await expect(code(orders.modify('alice', session.id, long.id, { ...req, sl: 97 }))).resolves.toBe('409'); // BUG-004
+
+    const same = await mod(orders, session.id, long.id, { cursorMs: session.cursorMs, sl: 98, tp: 110 });
+    expect(same).toMatchObject({ slCurrent: 98, tpCurrent: 110 });
+    expect(repos.modificationRows).toHaveLength(1);
+  });
+});

@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UnauthorizedException } from '@nestjs/common';
 import {
   CancelRequest,
   CancelRequestSchema,
   CloseRequest,
   CloseRequestSchema,
   CloseResponse,
+  ModifyOrderRequest,
+  ModifyOrderRequestSchema,
   Order,
   OrderDetail,
   PlaceOrderRequest,
@@ -42,6 +44,17 @@ export class OrdersController {
   @Get(':orderId')
   get(@CurrentUser() user: User | undefined, @Param('id') id: string, @Param('orderId') orderId: string): Promise<OrderDetail> {
     return this.orders.get(this.ownerId(user), id, orderId);
+  }
+
+  /** T-033: move the stop and/or target of a pending or open order (decision 23). */
+  @Patch(':orderId')
+  modify(
+    @CurrentUser() user: User | undefined,
+    @Param('id') id: string,
+    @Param('orderId') orderId: string,
+    @Body(new ZodValidationPipe(ModifyOrderRequestSchema)) body: ModifyOrderRequest,
+  ): Promise<Order> {
+    return this.orders.modify(this.ownerId(user), id, orderId, body);
   }
 
   @Post(':orderId/cancel')

@@ -106,6 +106,54 @@ describe('AdvanceService (design §5.5) against a fixture 1m tape in the file st
     expect(res.orders[0]).toMatchObject({ closeReason: 'stop', slTpSameBar: true, exitTimeMs: C + 3 * MIN });
   });
 
+  describe('T-033: a stop moved before a later advance is the one that triggers', () => {
+    /** The market rallies to 102 from minute 5 on, then minute 20 dips to `dipLow` and recovers. */
+    async function rallyThenDip(dipLow: number) {
+      const overrides: Record<number, Row> = {};
+      for (let i = 5; i < 30; i++) overrides[i] = [102, 102.1, 101.9, 102];
+      overrides[20] = [102, 102, dipLow, 102];
+      await tape(store, BTC, C - 10 * MIN, 40, overrides);
+      await tape(store, ETH, C - 10 * MIN, 40);
+      await start();
+    }
+    const modify = (orderId: string, sl: number) =>
+      orders.modify('alice', session.id, orderId, { opId: randomUUID(), cursorMs: repos.rows.get(session.id)!.session.cursorMs, sl });
+
+    it('break-even: the dip to 100 (above the original 99) stops the trade at the entry, R anchored to the placement risk', async () => {
+      await rallyThenDip(100);
+      const long = (await place({ sl: 99 })).order; // entry 100.25, qty 100, riskAmount 100
+      expect((await advance(C + 15 * MIN)).events).toEqual([]); // lastClose 102
+      await modify(long.id, 100.25);
+
+      const res = await advance(C + 30 * MIN);
+      // exit at the moved stop 100.25 - half 0.25 = 100; gross -25; commission 4.01 + 4.00 → -33.01; R over the original 100
+      expect(res.events).toEqual([{ orderId: long.id, kind: 'exit', time: C + 20 * MIN, price: 100, reason: 'stop', resolution: '1m' }]);
+      expect(res.orders[0]).toMatchObject({ closeReason: 'stop', exitPrice: 100, slInitial: 99, slCurrent: 100.25, riskAmountCcy: 100 });
+      expect(res.orders[0].pnlCcy).toBeCloseTo(-33.01, 8);
+      expect(res.orders[0].pnlR).toBeCloseTo(-0.3301, 6);
+    });
+
+    it('trailing into profit: the stop moved to 101 exits the dip at 101 in profit', async () => {
+      await rallyThenDip(100.5);
+      const long = (await place({ sl: 99 })).order; // entry 100.25
+      await advance(C + 15 * MIN);
+      await modify(long.id, 101);
+
+      const res = await advance(C + 30 * MIN);
+      // 101 - 0.25 = 100.75; gross +50; commission 4.01 + 4.03 → +41.96 → +0.4196R
+      expect(res.events).toEqual([{ orderId: long.id, kind: 'exit', time: C + 20 * MIN, price: 100.75, reason: 'stop', resolution: '1m' }]);
+      expect(res.orders[0].pnlCcy).toBeCloseTo(41.96, 8);
+      expect(res.orders[0].pnlR).toBeCloseTo(0.4196, 6);
+    });
+
+    it('without the move, the same dip does not touch the original stop', async () => {
+      await rallyThenDip(100);
+      await place({ sl: 99 });
+      await advance(C + 15 * MIN);
+      expect((await advance(C + 30 * MIN)).events).toEqual([]);
+    });
+  });
+
   it('gap-through: a candle opening beyond the stop exits at its open, plus the half-spread', async () => {
     await tape(store, BTC, C - 10 * MIN, 30, { 2: [101.5, 102, 101.3, 101.8] });
     await tape(store, ETH, C - 10 * MIN, 30);

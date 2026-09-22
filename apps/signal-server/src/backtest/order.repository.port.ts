@@ -31,6 +31,21 @@ export interface NewOrder {
   fillResolution: FillResolution | null;
 }
 
+/** T-033: the levels a stop/target move sets; an absent one is left as it is. */
+export interface OrderLevelsUpdate {
+  sl?: number;
+  tp?: number;
+}
+
+/** Decision 23: one `order_modifications` row — a field's old and new value at the cursor. */
+export interface NewModification {
+  orderId: string;
+  cursorMs: number;
+  field: 'sl' | 'tp';
+  oldValue: number | null;
+  newValue: number | null;
+}
+
 /** The fields a close writes (§3, §6): exit, reason, costs, PnL in currency and R, MAE. */
 export interface OrderClose {
   exitPrice: number;
@@ -80,4 +95,12 @@ export interface OrderRepository {
   cancel(sessionId: string, orderId: string, cancelledAtMs: number): Promise<Order | null>;
   /** open → closed; null when no open order with that id. */
   close(sessionId: string, orderId: string, close: OrderClose): Promise<Order | null>;
+  /**
+   * T-033: `sl_current` / `tp_current` of a pending or open order; `sl_initial`, `tp_initial` and
+   * `risk_amount_ccy` never change (R stays anchored to the placement risk). Null when no pending
+   * or open order with that id.
+   */
+  updateLevels(sessionId: string, orderId: string, levels: OrderLevelsUpdate): Promise<Order | null>;
+  /** Decision 23: appends one modification row, as stored. */
+  insertModification(m: NewModification): Promise<OrderModification>;
 }

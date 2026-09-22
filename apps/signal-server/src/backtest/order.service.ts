@@ -4,6 +4,7 @@ import {
   CloseRequest,
   CloseResponse,
   FillEvent,
+  ModifyOrderRequest,
   Order,
   OrderDetail,
   OrderStatusSchema,
@@ -17,6 +18,8 @@ import {
   computeTradeResult,
   marketExitEvent,
   marketFillPrice,
+  modifyLevelError,
+  modifyReference,
   positionSize,
   toSessionAggregates,
 } from '@trade-automation/replay-core';
@@ -26,6 +29,7 @@ import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { lastRevealed1m } from './last-revealed';
 import { screenshotUrl } from './screenshot-url';
 import { orderLevelError, placementOverflows, plannedEntry } from './order-validation';
+import { money } from './pg/numeric';
 import { MutationOp, runSessionMutation, sessionNotFound, TxRepos } from './session-mutation';
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
 
@@ -151,6 +155,47 @@ export class OrderService {
     });
   }
 
+  /**
+   * PATCH …/orders/:orderId (decision 23, T-033) — moves the stop and/or target of a pending or open
+   * order (409 `ORDER_NOT_ACTIVE` otherwise). The new levels are checked by replay-core's
+   * `modifyLevelError`, the rule the client's handles apply too: a pending order against its limit
+   * (as at placement), an open one against the last revealed 1m close. `sl_initial` and
+   * `risk_amount_ccy` never change, so R stays anchored to the placement risk. One
+   * `order_modifications` row per level whose stored value changes, at the cursor, in the same
+   * transaction; a move to the current value changes nothing and writes no row.
+   */
+  modify(userId: string, sessionId: string, orderId: string, req: ModifyOrderRequest): Promise<Order> {
+    if (req.sl === undefined && req.tp === undefined) {
+      return Promise.reject(new BadRequestException('Nothing to modify: give sl, tp or both.'));
+    }
+    return this.mutate(userId, sessionId, { opId: req.opId, kind: 'modify', request: req, orderId }, async (tx, session) => {
+      assertTradable(session, req.cursorMs);
+      const order = await this.lockOrder(tx, session.id, orderId);
+      if (order.status !== 'pending' && order.status !== 'open') {
+        throw apiError(HttpStatus.CONFLICT, 'ORDER_NOT_ACTIVE', `Only a pending or open order can be modified (this one is ${order.status}).`);
+      }
+      const changes: { field: 'sl' | 'tp'; oldValue: number | null; newValue: number }[] = [];
+      if (req.sl !== undefined && money(req.sl) !== order.slCurrent) changes.push({ field: 'sl', oldValue: order.slCurrent, newValue: req.sl });
+      if (req.tp !== undefined && money(req.tp) !== order.tpCurrent) changes.push({ field: 'tp', oldValue: order.tpCurrent, newValue: req.tp });
+      if (changes.length === 0) return order;
+
+      const levels = Object.fromEntries(changes.map((c) => [c.field, c.newValue])) as { sl?: number; tp?: number };
+      const modifiable = { side: order.side, status: order.status, limitPrice: order.limitPrice };
+      const lastClose = order.status === 'open' ? (await this.lastBar(order.instrument, session.cursorMs)).close : NaN;
+      const levelError =
+        levels.sl !== undefined && money(levels.sl) === money(modifyReference(modifiable, lastClose))
+          ? 'STOP_DISTANCE_ZERO' // equal at column precision, as at placement
+          : modifyLevelError(modifiable, levels, lastClose);
+      if (levelError) throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, levelError, modifyMessage(levelError, order.status));
+
+      const updated = (await tx.orders.updateLevels(session.id, order.id, levels)) as Order;
+      for (const c of changes) {
+        await tx.orders.insertModification({ orderId: order.id, cursorMs: session.cursorMs, ...c });
+      }
+      return updated;
+    });
+  }
+
   /** GET …/orders?status= — the journal, by `seq`. */
   async list(userId: string, sessionId: string, status?: string): Promise<Order[]> {
     const parsed = OrderStatusSchema.optional().safeParse(status);
@@ -212,6 +257,19 @@ function assertTradable(session: SessionSummary, cursorMs: number): void {
   if (session.status === 'complete') throw apiError(HttpStatus.CONFLICT, 'SESSION_COMPLETE', 'The session is complete.');
   if (cursorMs !== session.cursorMs) {
     throw apiError(HttpStatus.CONFLICT, 'CURSOR_MISMATCH', `cursorMs ${cursorMs} does not match the session cursor ${session.cursorMs}.`);
+  }
+}
+
+/** T-033: what the moved level was checked against — the limit, or the market for an open position. */
+function modifyMessage(code: string, status: 'pending' | 'open'): string {
+  const against = status === 'pending' ? 'the limit' : 'the last close';
+  switch (code) {
+    case 'STOP_DISTANCE_ZERO':
+      return `The stop is too close to ${against}.`;
+    case 'SL_ON_WRONG_SIDE':
+      return `A long stop must be below ${against}, a short stop above it.`;
+    default:
+      return `A long target must be above ${against}, a short target below it.`;
   }
 }
 

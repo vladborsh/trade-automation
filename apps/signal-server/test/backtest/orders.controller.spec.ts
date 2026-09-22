@@ -112,6 +112,24 @@ describe('/api/backtest/sessions/:id/orders over HTTP (design §7.2)', () => {
     expect(detail.openOrders.every((o: { status: string }) => o.status === 'open' || o.status === 'pending')).toBe(true);
   });
 
+  it('T-033: PATCH moves the stop (200), refusals use the envelope, the detail lists the modification', async () => {
+    const long = (await json(call('alice', 'POST', orders(), market()))).order; // lastClose 100
+    expect((await call(null, 'PATCH', orders(`/${long.id}`), { opId: randomUUID(), cursorMs: C, sl: 98 })).status).toBe(401);
+
+    const moved = await call('alice', 'PATCH', orders(`/${long.id}`), { opId: randomUUID(), cursorMs: C, sl: 98 });
+    expect(moved.status).toBe(200);
+    expect(await json(moved)).toMatchObject({ id: long.id, slCurrent: 98, slInitial: 99 });
+
+    const through = await call('alice', 'PATCH', orders(`/${long.id}`), { opId: randomUUID(), cursorMs: C, sl: 100.5 });
+    expect(through.status).toBe(422);
+    expect(await json(through)).toEqual({ error: { code: 'SL_ON_WRONG_SIDE', message: expect.any(String) } });
+    expect((await call('alice', 'PATCH', orders(`/${long.id}`), { opId: 'nope', cursorMs: C, sl: 98 })).status).toBe(400);
+    expect((await call('bob', 'PATCH', orders(`/${long.id}`), { opId: randomUUID(), cursorMs: C, sl: 98 })).status).toBe(404);
+
+    const detail = await json(call('alice', 'GET', orders(`/${long.id}`)));
+    expect(detail.modifications).toEqual([expect.objectContaining({ field: 'sl', oldValue: 99, newValue: 98, cursorMs: C })]);
+  });
+
   it("another user's session and orders are 404", async () => {
     expect((await call('bob', 'GET', orders())).status).toBe(404);
     expect((await call('bob', 'POST', orders(), market())).status).toBe(404);

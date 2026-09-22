@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
-import { Candle, Coverage, InstrumentId, Order, SessionAggregates, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
+import { Candle, Coverage, InstrumentId, Order, OrderModification, SessionAggregates, SessionLayout, SessionSummary, Timeframe } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
 import type { OpKind } from '../../src/backtest/op-fingerprint';
 import { OpsRepository } from '../../src/backtest/ops.repository.port';
-import { NewOrder, OrderClose, OrderFill, OrderRepository } from '../../src/backtest/order.repository.port';
+import { NewModification, NewOrder, OrderClose, OrderFill, OrderLevelsUpdate, OrderRepository } from '../../src/backtest/order.repository.port';
 import { money, percent, rMultiple } from '../../src/backtest/pg/numeric';
 import { NewScreenshot, ScreenshotRecord, ScreenshotRepository } from '../../src/backtest/screenshot.repository.port';
 import { BacktestRepositories, NewSession, SessionRepository } from '../../src/backtest/session.repository.port';
@@ -18,6 +18,8 @@ export class FakeBacktestRepositories implements BacktestRepositories {
   readonly closedOrders = new Map<string, StatsOrder[]>();
   /** Every order row, by id (T-015). */
   readonly orderRows = new Map<string, Order>();
+  /** `order_modifications`, in insertion order (T-033). */
+  readonly modificationRows: OrderModification[] = [];
   /** `backtest_ops`, keyed `sessionId|opId`; the response stored as JSON text like the jsonb column. */
   readonly opRows = new Map<string, { response: string; kind: OpKind | null; fingerprint: string | null }>();
 
@@ -59,7 +61,7 @@ export class FakeBacktestRepositories implements BacktestRepositories {
     },
     list: async (sessionId, statuses) =>
       this.ordersOf(sessionId).filter((o) => !statuses || statuses.includes(o.status)).map((o) => ({ ...o })),
-    listModifications: async () => [],
+    listModifications: async (orderId) => this.modificationRows.filter((m) => m.orderId === orderId).map((m) => ({ ...m })),
     fill: async (sessionId, orderId, f: OrderFill) =>
       this.patchOrder(sessionId, orderId, 'pending', {
         status: 'open', entryPrice: money(f.entryPrice), entryTimeMs: f.entryTimeMs, fillResolution: f.fillResolution,
@@ -72,6 +74,22 @@ export class FakeBacktestRepositories implements BacktestRepositories {
         fillResolution: c.fillResolution, slTpSameBar: c.slTpSameBar, commissionCcy: money(c.commissionCcy), spreadCostCcy: money(c.spreadCostCcy),
         pnlCcy: money(c.pnlCcy), pnlR: rMultiple(c.pnlR), maePrice: money(c.maePrice), maeR: rMultiple(c.maeR),
       }),
+    updateLevels: async (sessionId, orderId, levels: OrderLevelsUpdate) => {
+      const row = this.orderRows.get(orderId);
+      if (!row || row.sessionId !== sessionId || (row.status !== 'pending' && row.status !== 'open')) return null;
+      if (levels.sl !== undefined) row.slCurrent = money(levels.sl) as number;
+      if (levels.tp !== undefined) row.tpCurrent = money(levels.tp);
+      row.updatedAt = this.clock++;
+      return { ...row };
+    },
+    insertModification: async (m: NewModification) => {
+      const row: OrderModification = {
+        id: this.modificationRows.length + 1, orderId: m.orderId, cursorMs: m.cursorMs, field: m.field,
+        oldValue: money(m.oldValue), newValue: money(m.newValue), createdAt: this.clock++,
+      };
+      this.modificationRows.push(row);
+      return { ...row };
+    },
   };
 
   readonly ops: OpsRepository = {

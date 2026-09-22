@@ -10,7 +10,7 @@ import type {
 } from '@trade-automation/contracts';
 import type { StatsOrder } from '@trade-automation/replay-core';
 import { DbHandle } from '../../db/db.port';
-import { NewOrder, OrderClose, OrderFill, OrderRepository } from '../order.repository.port';
+import { NewModification, NewOrder, OrderClose, OrderFill, OrderLevelsUpdate, OrderRepository } from '../order.repository.port';
 import { money, percent, rMultiple } from './numeric';
 
 /** numeric/bigint columns arrive as `number` (PgDatabase type parsers); timestamptz as `Date`. */
@@ -103,6 +103,20 @@ interface ModificationRow {
   created_at: Date;
 }
 
+const MODIFICATION_COLUMNS = 'id, order_id, cursor_ms, field, old_value, new_value, created_at';
+
+function toModification(r: ModificationRow): OrderModification {
+  return {
+    id: r.id,
+    orderId: r.order_id,
+    cursorMs: r.cursor_ms,
+    field: r.field,
+    oldValue: r.old_value,
+    newValue: r.new_value,
+    createdAt: r.created_at.getTime(),
+  };
+}
+
 export class PgOrderRepository implements OrderRepository {
   constructor(private readonly db: DbHandle) {}
 
@@ -187,19 +201,31 @@ export class PgOrderRepository implements OrderRepository {
 
   async listModifications(orderId: string): Promise<OrderModification[]> {
     const rows = await this.db.query<ModificationRow>(
-      `select id, order_id, cursor_ms, field, old_value, new_value, created_at
-         from order_modifications where order_id = $1 order by id`,
+      `select ${MODIFICATION_COLUMNS} from order_modifications where order_id = $1 order by id`,
       [orderId],
     );
-    return rows.map((r) => ({
-      id: r.id,
-      orderId: r.order_id,
-      cursorMs: r.cursor_ms,
-      field: r.field,
-      oldValue: r.old_value,
-      newValue: r.new_value,
-      createdAt: r.created_at.getTime(),
-    }));
+    return rows.map(toModification);
+  }
+
+  async updateLevels(sessionId: string, orderId: string, levels: OrderLevelsUpdate): Promise<Order | null> {
+    const [row] = await this.db.query<OrderRow>(
+      `update orders
+          set sl_current = coalesce($3, sl_current), tp_current = coalesce($4, tp_current), updated_at = now()
+        where id = $1 and session_id = $2 and status in ('pending', 'open')
+       returning ${COLUMNS}`,
+      [orderId, sessionId, money(levels.sl ?? null), money(levels.tp ?? null)],
+    );
+    return row ? toOrder(row) : null;
+  }
+
+  async insertModification(m: NewModification): Promise<OrderModification> {
+    const [row] = await this.db.query<ModificationRow>(
+      `insert into order_modifications (order_id, cursor_ms, field, old_value, new_value)
+       values ($1, $2, $3, $4, $5)
+       returning ${MODIFICATION_COLUMNS}`,
+      [m.orderId, m.cursorMs, m.field, money(m.oldValue), money(m.newValue)],
+    );
+    return toModification(row);
   }
 
   async fill(sessionId: string, orderId: string, f: OrderFill): Promise<Order | null> {

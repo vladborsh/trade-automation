@@ -521,6 +521,8 @@ export const BacktestErrorCodeSchema = z.enum([
   'BALANCE_NOT_POSITIVE', // 422 — the session balance is <= 0, so an order cannot be sized
   'NO_PRICE_AT_CURSOR', // 422 — no revealed 1m candle within the lookback, so no lastClose
   'ORDER_NOT_OPEN', // 409 — close on an order that is not open (mirror of ORDER_NOT_PENDING)
+  // T-033 (§7.2 PATCH …/orders/:orderId), provisional pending Architect confirmation:
+  'ORDER_NOT_ACTIVE', // 409 — a stop/target move on an order that is neither pending nor open
 ]);
 export type BacktestErrorCode = z.infer<typeof BacktestErrorCodeSchema>;
 

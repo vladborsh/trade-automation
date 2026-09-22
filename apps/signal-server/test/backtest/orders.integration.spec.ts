@@ -119,6 +119,60 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
     expect(after.statsComputedAt).not.toBeNull();
   });
 
+  it('T-033: a modify writes the new level and its history rows together, rounded to the column scale', async () => {
+    const s = await repos.sessions.insert(alice, NEW_SESSION);
+    const { order } = await service.place(alice, s.id, marketLong(s.id, { tp: 110 }));
+    await db.query(`update backtest_sessions set cursor_ms = $2 where id = $1`, [s.id, C + 3 * MIN]); // lastClose 102
+
+    const moved = await service.modify(alice, s.id, order.id, { opId: randomUUID(), cursorMs: C + 3 * MIN, sl: 100.250000004, tp: 105 });
+
+    expect(moved).toMatchObject({ slCurrent: 100.25, slInitial: 99, tpCurrent: 105, tpInitial: 110, riskAmountCcy: 100 });
+    expect(await repos.orders.findById(s.id, order.id)).toEqual(moved);
+    const rows = await repos.orders.listModifications(order.id);
+    expect(rows.map(({ field, oldValue, newValue, cursorMs }) => ({ field, oldValue, newValue, cursorMs }))).toEqual([
+      { field: 'sl', oldValue: 99, newValue: 100.25, cursorMs: C + 3 * MIN },
+      { field: 'tp', oldValue: 110, newValue: 105, cursorMs: C + 3 * MIN },
+    ]);
+    expect((await service.get(alice, s.id, order.id)).modifications).toEqual(rows);
+  });
+
+  it('T-033: concurrent identical modifies write one set of rows and all answer the same order', async () => {
+    const s = await repos.sessions.insert(alice, NEW_SESSION);
+    const { order } = await service.place(alice, s.id, marketLong(s.id));
+    const req = { opId: randomUUID(), cursorMs: C, sl: 98 };
+    const [first, ...rest] = await Promise.all([0, 1, 2, 3].map(() => service.modify(alice, s.id, order.id, req)));
+    for (const r of rest) expect(r).toEqual(first);
+    expect(await repos.orders.listModifications(order.id)).toHaveLength(1);
+  });
+
+  it('T-033: a failure while writing the history rolls back the level and the op', async () => {
+    const s = await repos.sessions.insert(alice, NEW_SESSION);
+    const { order } = await service.place(alice, s.id, marketLong(s.id, { tp: 110 }));
+    const failing: BacktestRepositories = {
+      ...repos,
+      transaction: (fn) =>
+        repos.transaction((tx) =>
+          fn({
+            ...tx,
+            // the real repository, with only the second history row failing (after the level was updated)
+            orders: Object.assign(Object.create(tx.orders), {
+              insertModification: (() => {
+                let n = 0;
+                return (m: Parameters<typeof tx.orders.insertModification>[0]) =>
+                  n++ === 0 ? tx.orders.insertModification(m) : Promise.reject(new Error('boom'));
+              })(),
+            }),
+          }),
+        ),
+    };
+    const opId = randomUUID();
+    await expect(new OrderService(failing, store).modify(alice, s.id, order.id, { opId, cursorMs: C, sl: 98, tp: 105 })).rejects.toThrow('boom');
+
+    expect(await repos.orders.findById(s.id, order.id)).toMatchObject({ slCurrent: 99, tpCurrent: 110 });
+    expect(await repos.orders.listModifications(order.id)).toEqual([]);
+    expect(await repos.ops.find(s.id, opId)).toBeNull();
+  });
+
   it('a failure after the order row is closed rolls back the order, the balance and the op', async () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);
     const { order } = await service.place(alice, s.id, marketLong(s.id));
