@@ -268,6 +268,28 @@ describe('WorkspaceComponent', () => {
     expect(store.removeActiveDraft).toHaveBeenCalledTimes(1);
   });
 
+  it('T-064: Esc with Details open only closes Details — the active draft is kept; the next Esc removes it', async () => {
+    const { fixture, store, el } = await render();
+    store.portfolio.stats.set({
+      trades: 2, winRate: 0.5, pnl: 10, pnlR: 0.5, profitFactor: 1.5, maxDrawdownCcy: 20, maxDrawdownR: 1, maxDrawdownPct: 0.2,
+      avgWin: 30, avgWinR: 1.5, avgLoss: -20, avgLossR: -1,
+    } as never);
+    fixture.detectChanges();
+    store.activeDraft = { kind: 'draft', id: 't1' };
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid="stats-details-toggle"]')!;
+    toggle.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="stats-details"]')).not.toBeNull();
+
+    press('Escape', toggle);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="stats-details"]')).toBeNull();
+    expect(store.removeActiveDraft).not.toHaveBeenCalled(); // the draft is kept
+
+    press('Escape'); // Details closed: Esc is the workspace's again
+    expect(store.removeActiveDraft).toHaveBeenCalledTimes(1);
+  });
+
   const DRAFT = { id: 't1', kind: 'draft', side: 'long', mode: 'limit', entry: 99, sl: 98, tp: 101, active: true, anchorTime: 0 };
 
   it('T-045: B/S never open the order popup; Enter on the active draft does, and a second Enter confirms', async () => {

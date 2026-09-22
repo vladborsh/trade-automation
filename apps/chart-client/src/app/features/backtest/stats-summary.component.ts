@@ -18,7 +18,7 @@ import { headlineStats, statsItems } from './stats-items';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './stats-summary.component.html',
   styleUrl: './stats-summary.component.scss',
-  host: { '(document:click)': 'onDocumentClick($event)', '(document:keydown.escape)': 'onEscape()' },
+  host: { '(document:click)': 'onDocumentClick($event)', '(document:keydown.escape)': 'onEscape($event)' },
 })
 export class StatsSummaryComponent {
   readonly stats = input.required<SessionStats | null>();
@@ -45,8 +45,14 @@ export class StatsSummaryComponent {
     if (this.detailsOpen() && !this.host.nativeElement.contains(event.target as Node)) this.detailsOpen.set(false);
   }
 
-  onEscape(): void {
+  /**
+   * Esc with Details open only closes Details: the event is consumed here (document, before it bubbles
+   * to the workspace's window listener), so it never also cancels the active draft.
+   */
+  onEscape(event: Event): void {
     if (!this.detailsOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
     this.detailsOpen.set(false);
     this.toggle()?.nativeElement.focus();
   }

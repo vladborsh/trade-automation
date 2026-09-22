@@ -98,7 +98,8 @@ async function openWorkspace(page: Page, id: string): Promise<void> {
   // on the blank page before the toolbar exists, and a key pressed during the load is blocked by design.
   await replayStarted(page);
   await openJournal(page); // T-043: collapsed by default; these tests read its rows
-  await openStatsDetails(page); // T-044: P&L only by default; these tests read every figure
+  // T-064: Details is an overlay that closes on any outside click and takes the first Esc, so it is
+  // opened only right before the figures are read (the journey), never left open under key presses
 }
 
 // ---------------------------------------------------------------------------------------------
