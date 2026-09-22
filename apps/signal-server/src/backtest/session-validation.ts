@@ -55,12 +55,20 @@ export function validateCreateSession(
   req: Pick<CreateSessionRequest, 'layout' | 'periodFromMs' | 'periodToMs'>,
   sessionCurrencyOf: ReadonlyMap<InstrumentId, string>,
   coverageOf: ReadonlyMap<InstrumentId, Coverage | null>,
+  hasContract?: ReadonlySet<InstrumentId>,
 ): ValidatedSession | SessionValidationError {
   const instruments = [...new Set(req.layout.panels.map((p) => p.instrument))];
 
   for (const id of instruments) {
     if (!sessionCurrencyOf.has(id) || !coverageOf.get(id)) {
       return { code: 'INSTRUMENT_NOT_AVAILABLE', message: `Instrument ${id} has no stored 1m history to replay.` };
+    }
+    // D12 (T-053): an order is sized against the contract block; without one it cannot be traded.
+    if (hasContract && !hasContract.has(id)) {
+      return {
+        code: 'INSTRUMENT_NOT_AVAILABLE',
+        message: `Instrument ${id} has no contract specification (size step, minimum size, leverage cap) configured, so its orders cannot be sized.`,
+      };
     }
   }
 
@@ -101,8 +109,14 @@ export function validateLayoutEdit(
   session: { sessionCurrency: string; periodFromMs: number; periodToMs: number },
   sessionCurrencyOf: ReadonlyMap<InstrumentId, string>,
   coverageOf: ReadonlyMap<InstrumentId, Coverage | null>,
+  hasContract?: ReadonlySet<InstrumentId>,
 ): SessionValidationError | null {
-  const verdict = validateCreateSession({ layout, periodFromMs: session.periodFromMs, periodToMs: session.periodToMs }, sessionCurrencyOf, coverageOf);
+  const verdict = validateCreateSession(
+    { layout, periodFromMs: session.periodFromMs, periodToMs: session.periodToMs },
+    sessionCurrencyOf,
+    coverageOf,
+    hasContract,
+  );
   if (isValidationError(verdict)) return verdict;
   if (verdict.sessionCurrency !== session.sessionCurrency) {
     return {

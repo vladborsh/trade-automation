@@ -192,7 +192,7 @@ export class MockBacktestState {
       id: randomUUID(), name: req.name, status: 'active', sessionCurrency: currencies[0], timeframe: req.timeframe,
       periodFromMs: req.periodFromMs, periodToMs: req.periodToMs, cursorMs: req.periodFromMs,
       initialBalance: req.initialBalance, balance: req.initialBalance, defaultRiskPct: req.defaultRiskPct, costs: req.costs,
-      skipWeekends: req.skipWeekends ?? true, notionalWarnMultiple: req.notionalWarnMultiple ?? 5, layout: req.layout,
+      skipWeekends: req.skipWeekends ?? true, layout: req.layout,
       createdAt: now, updatedAt: now, completedAt: null,
       tradesCount: 0, winsCount: 0, lossesCount: 0, pnlCcy: 0, pnlR: 0, profitFactor: null, maxDrawdownCcy: 0, maxDrawdownR: 0,
       avgWinCcy: null, avgWinR: null, avgLossCcy: null, avgLossR: null, statsComputedAt: null,

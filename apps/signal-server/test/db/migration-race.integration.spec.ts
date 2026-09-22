@@ -90,7 +90,7 @@ maybeDescribe('migrations: concurrent boots and tampering (Tester, bt-platform)'
     return c;
   }, made), DB_HOOK_TIMEOUT_MS);
 
-  it.each([2, 3, 4])('%i runners at once on a fresh database: exactly one applies all of 001–003, none fails, versions consistent', async (runners) => {
+  it.each([2, 3, 4])('%i runners at once on a fresh database: exactly one applies all of 001–004, none fails, versions consistent', async (runners) => {
     const url = await within('create database', PHASE_MS, freshDb());
     const results = await Promise.allSettled(
       Array.from({ length: runners }, (_, k) => within(`runner ${k + 1}/${runners}`, PHASE_MS, runMigrations({ connectionString: url }))),
@@ -98,9 +98,38 @@ maybeDescribe('migrations: concurrent boots and tampering (Tester, bt-platform)'
 
     expect(results.filter((r) => r.status === 'rejected')).toEqual([]);
     const applied = results.map((r) => (r as PromiseFulfilledResult<{ applied: unknown[] }>).value.applied.length);
-    expect(applied.filter((n) => n === 3)).toHaveLength(1);
+    expect(applied.filter((n) => n === 4)).toHaveLength(1);
     expect(applied.filter((n) => n === 0)).toHaveLength(runners - 1);
-    expect(await within('read versions', PHASE_MS, versions(url))).toEqual([0, 1, 2, 3]);
+    expect(await within('read versions', PHASE_MS, versions(url))).toEqual([0, 1, 2, 3, 4]);
+  }, 60_000);
+
+  it('migration 004 (T-053, D12) up and down: orders.contract_multiplier appears, notional_warn_multiple goes, and back', async () => {
+    const url = await within('create database', PHASE_MS, freshDb());
+    const columns = async (table: string): Promise<Record<string, string | null>> => {
+      const c = new Client({ connectionString: url });
+      await c.connect();
+      try {
+        const { rows } = await c.query<{ column_name: string; column_default: string | null }>(
+          'select column_name, column_default from information_schema.columns where table_name = $1',
+          [table],
+        );
+        return Object.fromEntries(rows.map((r) => [r.column_name, r.column_default]));
+      } finally {
+        await c.end();
+      }
+    };
+    await within('migrate to 004', PHASE_MS, runMigrations({ connectionString: url }));
+    expect(await versions(url)).toEqual([0, 1, 2, 3, 4]);
+    expect((await columns('orders')).contract_multiplier).toBe('1');
+    expect('notional_warn_multiple' in (await columns('backtest_sessions'))).toBe(false);
+
+    await within('undo 004', PHASE_MS, runMigrations({ connectionString: url, target: '3' }));
+    expect(await versions(url)).toEqual([0, 1, 2, 3]);
+    expect('contract_multiplier' in (await columns('orders'))).toBe(false);
+    expect((await columns('backtest_sessions')).notional_warn_multiple).toBe('5');
+
+    await within('redo 004', PHASE_MS, runMigrations({ connectionString: url }));
+    expect(await versions(url)).toEqual([0, 1, 2, 3, 4]);
   }, 60_000);
 
   it('an applied migration edited afterwards fails the checksum and applies nothing further', async () => {

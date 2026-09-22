@@ -2,7 +2,7 @@ import type { FillEvent, Order, SessionDetail, SessionStats } from '@trade-autom
 import { PortfolioStore } from './portfolio.store';
 
 const order = (id: string, seq: number, extra: Partial<Order> = {}) =>
-  ({ id, seq, status: 'pending', entryPrice: null, entryTimeMs: null, exitPrice: null, exitTimeMs: null, closeReason: null, fillResolution: null, qty: 1, pnlCcy: null, pnlR: null, ...extra }) as Order;
+  ({ id, seq, status: 'pending', entryPrice: null, entryTimeMs: null, exitPrice: null, exitTimeMs: null, closeReason: null, fillResolution: null, qty: 1, contractMultiplier: 1, pnlCcy: null, pnlR: null, ...extra }) as Order;
 const stats = { trades: 0 } as unknown as SessionStats;
 
 describe('PortfolioStore', () => {
@@ -54,7 +54,7 @@ describe('PortfolioStore — step previews (T-023)', () => {
   const limitLong: Order = {
     id: '00000000-0000-4000-8000-000000000001', sessionId: 's', seq: 1, panelId: 'p1', instrument: 'binance:BTCUSDT',
     side: 'long', type: 'limit', status: 'pending', placedAtMs: 0, limitPrice: 99.5, entryPrice: null, entryTimeMs: null,
-    qty: 200, riskPct: 1, riskAmountCcy: 100, slInitial: 99, slCurrent: 99, tpInitial: 102, tpCurrent: 102, exitPrice: null,
+    qty: 200, contractMultiplier: 1, riskPct: 1, riskAmountCcy: 100, slInitial: 99, slCurrent: 99, tpInitial: 102, tpCurrent: 102, exitPrice: null,
     exitTimeMs: null, closeReason: null, fillResolution: null, slTpSameBar: false, commissionCcy: 0, spreadCostCcy: 0,
     pnlCcy: null, pnlR: null, maePrice: null, maeR: null, cancelledAtMs: null, createdAt: 0, updatedAt: 0,
   };

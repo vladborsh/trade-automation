@@ -11,7 +11,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
 import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
-import { DAY, T0 } from './fake-backtest';
+import { DAY, T0, fakeInstrumentConfig } from './fake-backtest';
 
 /**
  * T-017 done-when against a real Postgres: a replayed advance moves nothing; an advance and a
@@ -40,7 +40,6 @@ const NEW_SESSION: NewSession = {
   defaultRiskPct: 1,
   costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
   skipWeekends: false,
-  notionalWarnMultiple: 5,
   layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: BTC, signals: false }] },
 };
 
@@ -79,7 +78,7 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
     await runMigrations({ connectionString: DATABASE_URL as string });
     db = new PgDatabase(DATABASE_URL as string);
     repos = new PgBacktestRepositories(db);
-    orders = new OrderService(repos, store);
+    orders = new OrderService(repos, store, fakeInstrumentConfig());
     advancer = new AdvanceService(repos, store);
     alice = (
       await db.query<{ id: string }>(`insert into users (email, password_hash, role) values ($1, 'x', 'user') returning id`, [

@@ -7,7 +7,7 @@ import { computeStats, toSessionAggregates } from '@trade-automation/replay-core
 import { AdvanceService } from '../../src/backtest/advance.service';
 import { OrderService } from '../../src/backtest/order.service';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
-import { DAY, FakeBacktestRepositories, T0, createBody, makeSessionService } from './fake-backtest';
+import { DAY, FakeBacktestRepositories, T0, createBody, makeSessionService, fakeInstrumentConfig } from './fake-backtest';
 
 const MIN = 60_000;
 const BTC: InstrumentId = 'binance:BTCUSDT';
@@ -47,7 +47,7 @@ describe('AdvanceService (design §5.5) against a fixture 1m tape in the file st
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'advance-'));
     store = new FileCandleStore(root);
     repos = new FakeBacktestRepositories();
-    orders = new OrderService(repos, store);
+    orders = new OrderService(repos, store, fakeInstrumentConfig());
     advancer = new AdvanceService(repos, store);
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));

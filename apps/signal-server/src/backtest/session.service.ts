@@ -29,9 +29,8 @@ import { SCREENSHOT_STORE, ScreenshotStore, sessionScreenshotPrefix } from '../s
 import { BACKTEST_REPOSITORIES, BacktestRepositories } from './session.repository.port';
 import { checkLayoutPanels, isValidationError, panelsLosingActiveOrders, periodShapeError, validateCreateSession, validateLayoutEdit } from './session-validation';
 
-/** §7.2 defaults: `skipWeekends` true (§13, decision 19), `notionalWarnMultiple` 5 (§13, decision 25). */
+/** §7.2 default: `skipWeekends` true (§13, decision 19). */
 export const DEFAULT_SKIP_WEEKENDS = true;
-export const DEFAULT_NOTIONAL_WARN_MULTIPLE = 5;
 
 const UuidSchema = z.string().uuid();
 
@@ -78,7 +77,7 @@ export class SessionService {
       await Promise.all(panelInstruments.map(async (id) => [id, await this.store.coverage(id, '1m')] as const)),
     );
 
-    const verdict = validateCreateSession(req, sessionCurrencyOf, coverageOf);
+    const verdict = validateCreateSession(req, sessionCurrencyOf, coverageOf, this.instrumentsWithContract());
     if (isValidationError(verdict)) throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, verdict.code, verdict.message);
 
     const created = await repos.sessions.insert(userId, {
@@ -91,7 +90,6 @@ export class SessionService {
       defaultRiskPct: req.defaultRiskPct,
       costs: req.costs,
       skipWeekends: req.skipWeekends ?? DEFAULT_SKIP_WEEKENDS,
-      notionalWarnMultiple: req.notionalWarnMultiple ?? DEFAULT_NOTIONAL_WARN_MULTIPLE,
       layout: req.layout,
     });
     return toSession(created);
@@ -172,14 +170,21 @@ export class SessionService {
     return toSession(updated);
   }
 
-  /** The configured currencies and each panel instrument's 1m coverage, for the layout checks. */
-  private async catalogueFor(layout: SessionLayout): Promise<[Map<InstrumentId, string>, Map<InstrumentId, Coverage | null>]> {
+  /** D12 (T-053): the configured instruments that carry a contract block, the only ones that can be sized. */
+  private instrumentsWithContract(): Set<InstrumentId> {
+    return new Set(this.config.instruments.filter((i) => i.contract).map((i) => i.id));
+  }
+
+  /** The configured currencies, each panel instrument's 1m coverage and the instruments with a contract, for the layout checks. */
+  private async catalogueFor(
+    layout: SessionLayout,
+  ): Promise<[Map<InstrumentId, string>, Map<InstrumentId, Coverage | null>, Set<InstrumentId>]> {
     const sessionCurrencyOf = new Map<InstrumentId, string>(this.config.instruments.map((i) => [i.id, i.sessionCurrency]));
     const instruments = [...new Set(layout.panels.map((p) => p.instrument))].filter((i) => sessionCurrencyOf.has(i));
     const coverageOf = new Map<InstrumentId, Coverage | null>(
       await Promise.all(instruments.map(async (i) => [i, await this.store.coverage(i, '1m')] as const)),
     );
-    return [sessionCurrencyOf, coverageOf];
+    return [sessionCurrencyOf, coverageOf, this.instrumentsWithContract()];
   }
 
 

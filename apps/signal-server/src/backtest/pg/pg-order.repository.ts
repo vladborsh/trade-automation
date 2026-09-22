@@ -28,6 +28,7 @@ interface OrderRow {
   entry_price: number | null;
   entry_time_ms: number | null;
   qty: number;
+  contract_multiplier: number;
   risk_pct: number;
   risk_amount_ccy: number;
   sl_initial: number;
@@ -51,7 +52,7 @@ interface OrderRow {
 }
 
 const COLUMNS = `id, session_id, seq, panel_id, instrument, side, type, status, placed_at_ms, limit_price,
-  entry_price, entry_time_ms, qty, risk_pct, risk_amount_ccy, sl_initial, sl_current, tp_initial,
+  entry_price, entry_time_ms, qty, contract_multiplier, risk_pct, risk_amount_ccy, sl_initial, sl_current, tp_initial,
   tp_current, exit_price, exit_time_ms, close_reason, fill_resolution, sl_tp_same_bar, commission_ccy,
   spread_cost_ccy, pnl_ccy, pnl_r, mae_price, mae_r, cancelled_at_ms, created_at, updated_at`;
 
@@ -70,6 +71,7 @@ export function toOrder(r: OrderRow): Order {
     entryPrice: r.entry_price,
     entryTimeMs: r.entry_time_ms,
     qty: r.qty,
+    contractMultiplier: r.contract_multiplier,
     riskPct: r.risk_pct,
     riskAmountCcy: r.risk_amount_ccy,
     slInitial: r.sl_initial,
@@ -155,8 +157,8 @@ export class PgOrderRepository implements OrderRepository {
       `insert into orders
          (session_id, seq, panel_id, instrument, side, type, status, placed_at_ms, limit_price, entry_price,
           entry_time_ms, qty, risk_pct, risk_amount_ccy, sl_initial, sl_current, tp_initial, tp_current,
-          fill_resolution)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $16, $17)
+          fill_resolution, contract_multiplier)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $16, $17, $18)
        returning ${COLUMNS}`,
       [
         o.sessionId,
@@ -176,6 +178,7 @@ export class PgOrderRepository implements OrderRepository {
         money(o.sl),
         money(o.tp),
         o.fillResolution,
+        money(o.contractMultiplier),
       ],
     );
     return toOrder(row);

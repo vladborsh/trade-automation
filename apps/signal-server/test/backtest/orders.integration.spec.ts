@@ -6,7 +6,7 @@ import { PgBacktestRepositories } from '../../src/backtest/pg/pg-backtest-reposi
 import { BacktestRepositories, NewSession } from '../../src/backtest/session.repository.port';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
-import { DAY, T0, candleStore, m1 } from './fake-backtest';
+import { DAY, T0, candleStore, m1, fakeInstrumentConfig } from './fake-backtest';
 import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
@@ -25,6 +25,7 @@ const maybeDescribe = DATABASE_URL ? describe : describe.skip;
 const MIN = 60_000;
 const BTC = 'binance:BTCUSDT' as const;
 const C = T0 + 5 * DAY;
+const BTC_CONTRACT = { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 50, maxLeverage: 125 };
 
 const NEW_SESSION: NewSession = {
   name: 'orders-it',
@@ -36,7 +37,6 @@ const NEW_SESSION: NewSession = {
   defaultRiskPct: 1,
   costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
   skipWeekends: false,
-  notionalWarnMultiple: 5,
   layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: BTC, signals: false }] },
 };
 
@@ -58,7 +58,7 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
     await runMigrations({ connectionString: DATABASE_URL as string });
     db = new PgDatabase(DATABASE_URL as string);
     repos = new PgBacktestRepositories(db);
-    service = new OrderService(repos, store);
+    service = new OrderService(repos, store, fakeInstrumentConfig());
     alice = (
       await db.query<{ id: string }>(`insert into users (email, password_hash, role) values ($1, 'x', 'user') returning id`, [
         `alice-${run}@orders-it.test`,
@@ -95,13 +95,82 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
 
   it('rounds to the column scale at the repository boundary', async () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);
-    // qty = 123.456 / |100 - 99.0000003| has more than 8 decimals → numeric(20,8); riskPct → numeric(8,4)
+    // D12: qty is on the 0.001 step (123.456); 1R = 123.456 × 0.9999997 has more than 8 decimals → numeric(20,8);
+    // riskPct → numeric(8,4)
     const { order } = await service.place(alice, s.id, marketLong(s.id, { sl: 99.0000003, riskPct: 1.23456 }));
-    const { qty } = positionSize(10_000, 1.23456, 100, 99.0000003);
-    expect(qty.toFixed(12)).not.toBe(qty.toFixed(8) + '0000');
-    expect(order.qty).toBe(Number(qty.toFixed(8)));
+    const { qty, riskAmount } = positionSize(10_000, 1.23456, 100, 99.0000003, BTC_CONTRACT);
+    expect(qty).toBe(123.456);
+    expect(order.qty).toBe(123.456);
+    expect(riskAmount.toFixed(12)).not.toBe(riskAmount.toFixed(8) + '0000');
+    expect(order.riskAmountCcy).toBe(Number(riskAmount.toFixed(8)));
     expect(order.riskPct).toBe(1.2346);
     expect(await repos.orders.findById(s.id, order.id)).toEqual(order);
+  });
+
+  describe('D12 place refusals and the contract snapshot (T-053)', () => {
+    const body = (e: unknown) => (e as { getStatus(): number; getResponse(): unknown }).getResponse();
+    const refusal = (p: Promise<unknown>) =>
+      p.then(
+        () => 'placed',
+        (e) => ({ status: (e as { getStatus(): number }).getStatus(), ...(body(e) as object) }),
+      );
+
+    it('a size under the venue minimum notional is 422 SIZE_BELOW_MINIMUM, naming the minimum and the risk % it needs', async () => {
+      const s = await repos.sessions.insert(alice, NEW_SESSION);
+      // 0.0001 % of 10 000 = 0.01 USD over a 1.0 stop → 0.01 BTC, notional 1 < 50
+      await expect(refusal(service.place(alice, s.id, marketLong(s.id, { riskPct: 0.0001 })))).resolves.toEqual({
+        status: 422,
+        error: {
+          code: 'SIZE_BELOW_MINIMUM',
+          message: 'Below the venue minimum: the smallest order is 0.500 BTC (at least 50 notional), which needs a risk of at least 0.01 % at this stop.',
+        },
+      });
+      expect(await count(`select id from orders where session_id = $1`, [s.id])).toBe(0);
+    });
+
+    it('a size that rounds below minQty is SIZE_BELOW_MINIMUM too', async () => {
+      const s = await repos.sessions.insert(alice, NEW_SESSION);
+      // 0.01 USD over a 50.0 stop → 0.0002 BTC → 0 on the 0.001 step
+      await expect(refusal(service.place(alice, s.id, marketLong(s.id, { riskPct: 0.0001, sl: 50 })))).resolves.toEqual({
+        status: 422,
+        error: {
+          code: 'SIZE_BELOW_MINIMUM',
+          message: 'Below the venue minimum: the smallest order is 0.500 BTC (at least 50 notional), which needs a risk of at least 0.25 % at this stop.',
+        },
+      });
+    });
+
+    it('an order whose margin exceeds the account is 422 INSUFFICIENT_MARGIN', async () => {
+      const s = await repos.sessions.insert(alice, NEW_SESSION);
+      // 100 % over a 0.5 stop → 20 000 BTC, 2 000 000 notional / 125 = 16 000 margin > 10 000
+      await expect(refusal(service.place(alice, s.id, marketLong(s.id, { riskPct: 100, sl: 99.5 })))).resolves.toEqual({
+        status: 422,
+        error: { code: 'INSUFFICIENT_MARGIN', message: 'Not enough margin: this order needs 16000.00 USD and 10000.00 USD is available.' },
+      });
+    });
+
+    it('a placed order row carries contract_multiplier', async () => {
+      const s = await repos.sessions.insert(alice, NEW_SESSION);
+      const { order } = await service.place(alice, s.id, marketLong(s.id));
+      expect(order.contractMultiplier).toBe(1);
+      const [row] = await db.query<{ contract_multiplier: number }>(`select contract_multiplier from orders where id = $1`, [order.id]);
+      expect(row.contract_multiplier).toBe(1);
+    });
+
+    it('pooled margin: a pending limit reserves margin against a second order, released when it is cancelled', async () => {
+      const s = await repos.sessions.insert(alice, NEW_SESSION);
+      // limit long at 99.8, stop 99: 60 % → 6 000 / 0.8 = 7 500 BTC; margin at the limit 7 500 × 99.8 / 125 = 5 988
+      const { order: pending } = await service.place(alice, s.id, marketLong(s.id, { type: 'limit', limitPrice: 99.8, riskPct: 60 }));
+      expect(pending).toMatchObject({ status: 'pending', qty: 7500 });
+      // a market long at 100, stop 99: 60 % → 6 000 BTC, margin 4 800: fits alone (10 000), not next to the pending one (4 012)
+      const second = marketLong(s.id, { riskPct: 60 });
+      await expect(refusal(service.place(alice, s.id, second))).resolves.toEqual({
+        status: 422,
+        error: { code: 'INSUFFICIENT_MARGIN', message: 'Not enough margin: this order needs 4800.00 USD and 4012.00 USD is available.' },
+      });
+      await service.cancel(alice, s.id, pending.id, { opId: randomUUID(), cursorMs: C });
+      await expect(service.place(alice, s.id, { ...second, opId: randomUUID() })).resolves.toMatchObject({ order: { qty: 6000, status: 'open' } });
+    });
   });
 
   it('a manual close writes order, balance and aggregates together', async () => {
@@ -167,7 +236,7 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
         ),
     };
     const opId = randomUUID();
-    await expect(new OrderService(failing, store).modify(alice, s.id, order.id, { opId, cursorMs: C, sl: 98, tp: 105 })).rejects.toThrow('boom');
+    await expect(new OrderService(failing, store, fakeInstrumentConfig()).modify(alice, s.id, order.id, { opId, cursorMs: C, sl: 98, tp: 105 })).rejects.toThrow('boom');
 
     expect(await repos.orders.findById(s.id, order.id)).toMatchObject({ slCurrent: 99, tpCurrent: 110 });
     expect(await repos.orders.listModifications(order.id)).toEqual([]);
@@ -195,7 +264,7 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
     };
     const opId = randomUUID();
 
-    await expect(new OrderService(failing, store).close(alice, s.id, order.id, { opId, cursorMs: C })).rejects.toThrow('boom');
+    await expect(new OrderService(failing, store, fakeInstrumentConfig()).close(alice, s.id, order.id, { opId, cursorMs: C })).rejects.toThrow('boom');
 
     expect((await repos.orders.findById(s.id, order.id))!.status).toBe('open');
     expect((await repos.sessions.findById(alice, s.id))!).toMatchObject({ balance: 10_000, tradesCount: 0 });

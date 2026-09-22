@@ -55,15 +55,15 @@ export const SessionLayoutSchema = z
 export type SessionLayout = z.infer<typeof SessionLayoutSchema>;
 
 // ---------------------------------------------------------------------------------------------
-// Numeric bounds (BUG-002/BUG-003 — provisional, pending Architect confirmation)
+// Numeric bounds (BUG-002/BUG-003; confirmed by the Architect 2026-09-22, item 4)
 // ---------------------------------------------------------------------------------------------
 
 /**
  * What the Postgres columns can hold (§3), with product-sane caps where a column allows absurd
  * values. Request fields are bounded here so an out-of-range body is a 400 from the schema, never
  * a pg 22003 overflow (500) or a silent round-to-zero. Money and prices are `numeric(20,8)` (max
- * < 1e12); percentages `numeric(8,4)` (resolution 0.0001); `notional_warn_multiple` is
- * `numeric(8,2)`. The client's form validation reuses these numbers.
+ * < 1e12); percentages `numeric(8,4)` (resolution 0.0001). The client's form validation reuses
+ * these numbers.
  */
 export const BACKTEST_BOUNDS = {
   /** exclusive upper bound of every numeric(20,8) money/price field */
@@ -72,7 +72,6 @@ export const BACKTEST_BOUNDS = {
   riskPctMin: 0.0001,
   riskPctMax: 100,
   commissionPctMax: 100,
-  notionalWarnMultipleMax: 999_999.99,
 } as const;
 
 const RiskPctSchema = z.number().min(BACKTEST_BOUNDS.riskPctMin).max(BACKTEST_BOUNDS.riskPctMax);
@@ -104,7 +103,6 @@ export const CreateSessionRequestSchema = z.object({
   defaultRiskPct: RiskPctSchema,
   costs: CostsSchema,
   skipWeekends: z.boolean().optional(),
-  notionalWarnMultiple: z.number().positive().max(BACKTEST_BOUNDS.notionalWarnMultipleMax).optional(),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 
@@ -130,7 +128,6 @@ const SessionCoreSchema = z.object({
   defaultRiskPct: z.number().positive(),
   costs: CostsSchema,
   skipWeekends: z.boolean(),
-  notionalWarnMultiple: z.number().positive(),
   layout: SessionLayoutSchema,
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
@@ -200,12 +197,10 @@ export const OrderSchema = z.object({
   entryTimeMs: z.number().int().nonnegative().nullable(),
   qty: z.number().nonnegative(),
   /**
-   * D12: the contract multiplier snapshotted at placement (notional = qty × multiplier × price);
-   * absent means 1, which is every configured instrument today.
-   * TODO(T-053): becomes required (z.number().positive(), no default) together with migration 004's
-   * orders.contract_multiplier column, the row mapper and every fixture (Tech Lead ruling on T-035).
+   * D12: the instrument's contract multiplier, snapshotted on the row at placement (migration 004)
+   * so a later instruments.yaml change cannot re-price the trade. notional = qty × multiplier × price.
    */
-  contractMultiplier: z.number().positive().optional(),
+  contractMultiplier: z.number().positive(),
   riskPct: z.number().positive(),
   riskAmountCcy: z.number().nonnegative(),
   slInitial: z.number(),
@@ -526,11 +521,11 @@ export const BacktestErrorCodeSchema = z.enum([
   'STOP_DISTANCE_ZERO',
   'ORDER_NOT_PENDING',
   'SCREENSHOT_EXISTS',
-  // T-015 (§7.2 orders), provisional pending Architect confirmation:
+  // T-015 (§7.2 orders), confirmed by the Architect 2026-09-22 (item 3):
   'BALANCE_NOT_POSITIVE', // 422 — the session balance is <= 0, so an order cannot be sized
   'NO_PRICE_AT_CURSOR', // 422 — no revealed 1m candle within the lookback, so no lastClose
   'ORDER_NOT_OPEN', // 409 — close on an order that is not open (mirror of ORDER_NOT_PENDING)
-  // T-033 (§7.2 PATCH …/orders/:orderId), provisional pending Architect confirmation:
+  // T-033 (§7.2 PATCH …/orders/:orderId), confirmed by the Architect 2026-09-22 (modify semantics adopted):
   'ORDER_NOT_ACTIVE', // 409 — a stop/target move on an order that is neither pending nor open
   // D12 (§6 "Contract, sizing and margin", confirmed by the Architect 2026-09-22):
   'SIZE_BELOW_MINIMUM', // 422 — the risk-sized qty is below the venue's minQty or minNotional

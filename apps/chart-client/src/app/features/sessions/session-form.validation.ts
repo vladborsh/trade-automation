@@ -26,13 +26,11 @@ export interface SessionFormFields {
   commissionPct: number | null;
   spread: number | null;
   skipWeekends: boolean;
-  notionalWarnMultiple: number | null;
 }
 
 export type SessionFormErrors = Partial<Record<keyof SessionFormFields, string>>;
 
 export const DEFAULT_RISK_PCT = 1;
-export const DEFAULT_NOTIONAL_WARN_MULTIPLE = 5;
 
 /** The covered span `[from, to + 1m)`: coverage `to` is the last stored 1m openTime. */
 export function coveredSpan(coverage: Coverage): { from: number; to: number } {
@@ -96,8 +94,6 @@ export function validateSessionForm(f: SessionFormFields, catalogue: ReadonlyMap
     if (!nonNegative(f.spread)) errors.spread = 'Spread must be 0 or more.';
     else if (f.spread! >= B.moneyMaxExclusive) errors.spread = 'Spread must be below 1 000 000 000 000.';
   }
-  if (!positive(f.notionalWarnMultiple)) errors.notionalWarnMultiple = 'Enter a multiple above 0.';
-  else if (f.notionalWarnMultiple! > B.notionalWarnMultipleMax) errors.notionalWarnMultiple = 'Enter a multiple of at most 999 999.99.';
   return errors;
 }
 
@@ -141,7 +137,6 @@ export function toCreateRequest(f: SessionFormFields, layout: SessionLayout): Cr
     defaultRiskPct: f.defaultRiskPct!,
     costs: { enabled: f.costsEnabled, commissionPct: f.costsEnabled ? f.commissionPct! : 0, spread: f.costsEnabled ? f.spread! : 0 },
     skipWeekends: f.skipWeekends,
-    notionalWarnMultiple: f.notionalWarnMultiple!,
   };
 }
 

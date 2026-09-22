@@ -29,7 +29,7 @@ describe('ContractSpec (D12)', () => {
     expect(() => BacktestInstrumentSchema.parse(base)).toThrow();
   });
 
-  it('an Order may carry contractMultiplier (absent until T-053 stores it); it must be positive', () => {
+  it('an Order carries a required, positive contractMultiplier (T-053: stored on the row)', () => {
     const order = {
       id: '00000000-0000-4000-8000-000000000001', sessionId: '00000000-0000-4000-8000-000000000002', seq: 1, panelId: 'p',
       instrument: 'binance:BTCUSDT', side: 'long', type: 'market', status: 'open', placedAtMs: 1, limitPrice: null, entryPrice: 100,
@@ -37,7 +37,7 @@ describe('ContractSpec (D12)', () => {
       exitPrice: null, exitTimeMs: null, closeReason: null, fillResolution: null, slTpSameBar: false, commissionCcy: 0,
       spreadCostCcy: 0, pnlCcy: null, pnlR: null, maePrice: null, maeR: null, cancelledAtMs: null, createdAt: 1, updatedAt: 1,
     };
-    expect(OrderSchema.parse(order).contractMultiplier).toBeUndefined();
+    expect(() => OrderSchema.parse(order)).toThrow(); // required since T-053
     expect(OrderSchema.parse({ ...order, contractMultiplier: 100 }).contractMultiplier).toBe(100);
     expect(() => OrderSchema.parse({ ...order, contractMultiplier: 0 })).toThrow();
   });

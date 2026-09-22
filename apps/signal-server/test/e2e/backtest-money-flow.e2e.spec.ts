@@ -10,6 +10,7 @@ import {
   FIXTURE_MIN,
   TRADE_RESULT_FIXTURES,
   fixtureTime,
+  floorToStep,
 } from '@trade-automation/replay-core';
 import { AdminController } from '../../src/api/rest/admin.controller';
 import { AuthController } from '../../src/api/rest/auth.controller';
@@ -211,13 +212,18 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
     expect(toExit.body.balance).toBeCloseTo(10_000 + ref.pnlCcy, 6); // 10 459.7
 
     // second order compounds: risk = 1 % of 10 459.7 = 104.597; short market, lastClose 1018 → entry 1017 (spread 1),
-    // stop 1030 → qty = 104.597 / |1018 - 1030| ; closed by hand after i=4 (close 1012) → exit 1012 + 1 = 1013
+    // stop 1030 → 104.597 / |1018 - 1030| = 8.7164…, rounded DOWN to BTC's 0.001 step (D12, T-053) → qty 8.716, and
+    // 1R is what that size actually risks, 8.716 × 12 = 104.592. Closed by hand after i=4 (close 1012) → exit 1013.
     const balance = 10_000 + ref.pnlCcy;
     const second = await place('alice', sid, J(4), { side: 'short', type: 'market', sl: 1030 });
     expect(second.status).toBe(201);
-    const qty2 = (balance * 0.01) / 12;
-    expect(second.body.order.riskAmountCcy).toBeCloseTo(balance * 0.01, 6);
-    expect(second.body.order.qty).toBeCloseTo(qty2, 6);
+    const qty2 = floorToStep((balance * 0.01) / 12, 0.001);
+    const risk2 = qty2 * 12;
+    expect(qty2).toBe(8.716);
+    expect(risk2).toBeLessThan(balance * 0.01); // never more than asked
+    expect(second.body.order.riskAmountCcy).toBeCloseTo(risk2, 6);
+    expect(second.body.order.riskPct).toBe(1); // the requested value is kept
+    expect(second.body.order.qty).toBe(qty2);
     expect(second.body.order).toMatchObject({ status: 'open', entryPrice: 1017, seq: 2 });
     const step = await advance('alice', sid, J(5)); // walks i=4 only: no stop, no target
     expect(step.body.events).toEqual([]);
@@ -228,7 +234,7 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
     expect(closed.body.order).toMatchObject({ status: 'closed', closeReason: 'manual', exitPrice: 1013 });
     expect(closed.body.order.commissionCcy).toBeCloseTo(fee2, 4);
     expect(closed.body.order.pnlCcy).toBeCloseTo(pnl2, 4);
-    expect(closed.body.order.pnlR).toBeCloseTo(pnl2 / (balance * 0.01), 4);
+    expect(closed.body.order.pnlR).toBeCloseTo(pnl2 / risk2, 4);
     const finalBalance = balance + pnl2;
     expect(closed.body.balance).toBeCloseTo(finalBalance, 4);
 

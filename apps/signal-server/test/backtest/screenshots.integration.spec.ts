@@ -38,7 +38,6 @@ const NEW_SESSION: NewSession = {
   defaultRiskPct: 1,
   costs: { enabled: false, commissionPct: 0, spread: 0 },
   skipWeekends: true,
-  notionalWarnMultiple: 5,
   layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
 };
 
@@ -125,7 +124,7 @@ maybeDescribe('screenshots against a real Postgres + file store (T-025 done-when
     const session = await repos.sessions.insert(alice, NEW_SESSION);
     const order = await repos.orders.insert({
       sessionId: session.id, seq: 1, panelId: 'btc', instrument: 'binance:BTCUSDT', side: 'long', type: 'market', status: 'open',
-      placedAtMs: NEW_SESSION.periodFromMs, limitPrice: null, entryPrice: 100, entryTimeMs: NEW_SESSION.periodFromMs - 60_000, qty: 1,
+      placedAtMs: NEW_SESSION.periodFromMs, limitPrice: null, entryPrice: 100, entryTimeMs: NEW_SESSION.periodFromMs - 60_000, qty: 1, contractMultiplier: 1,
       riskPct: 1, riskAmountCcy: 100, sl: 90, tp: null, fillResolution: '1m',
     });
     return { session, order };

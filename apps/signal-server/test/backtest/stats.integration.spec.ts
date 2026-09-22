@@ -43,7 +43,6 @@ const NEW_SESSION: NewSession = {
   defaultRiskPct: 1,
   costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
   skipWeekends: false,
-  notionalWarnMultiple: 5,
   layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: BTC, signals: false }] },
 };
 
@@ -70,7 +69,7 @@ maybeDescribe('stats drift against a real Postgres (T-018 done-when)', () => {
     await runMigrations({ connectionString: DATABASE_URL as string });
     db = new PgDatabase(DATABASE_URL as string);
     repos = new PgBacktestRepositories(db);
-    orders = new OrderService(repos, store);
+    orders = new OrderService(repos, store, fakeInstrumentConfig());
     advancer = new AdvanceService(repos, store);
     stats = new StatsService(repos, new SessionService(repos, fakeInstrumentConfig(), store as never, new FakeScreenshotStore()));
     alice = (

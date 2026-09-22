@@ -33,7 +33,6 @@ const NEW_SESSION: NewSession = {
   defaultRiskPct: 0.75,
   costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
   skipWeekends: false,
-  notionalWarnMultiple: 5,
   layout: {
     id: 'crypto',
     name: 'Crypto',

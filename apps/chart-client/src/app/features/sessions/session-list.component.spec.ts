@@ -23,7 +23,6 @@ function summary(over: Partial<SessionSummary> = {}): SessionSummary {
     defaultRiskPct: 1,
     costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
     skipWeekends: true,
-    notionalWarnMultiple: 5,
     layout: {
       id: 'l',
       name: 'L',

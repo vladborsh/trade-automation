@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Candle, PlaceOrderRequest, SessionSummary } from '@trade-automation/contracts';
 import { computeStats, toSessionAggregates } from '@trade-automation/replay-core';
 import { OrderService } from '../../src/backtest/order.service';
-import { FakeBacktestRepositories, candleStore, createBody, m1, makeSessionService } from './fake-backtest';
+import { FakeBacktestRepositories, candleStore, createBody, m1, makeSessionService, fakeInstrumentConfig } from './fake-backtest';
 
 const MIN = 60_000;
 const BTC = 'binance:BTCUSDT' as const;
@@ -27,7 +27,7 @@ async function setup(costs?: { enabled: boolean; commissionPct: number; spread: 
   const sessions = makeSessionService(repos);
   const session = await sessions.create('alice', createBody(costs ? { costs } : {}));
   const store = candleStore(tape(session.periodFromMs));
-  const orders = new OrderService(repos, store);
+  const orders = new OrderService(repos, store, fakeInstrumentConfig());
   const row = () => repos.rows.get(session.id)!.session as SessionSummary;
   const place = (over: Partial<PlaceOrderRequest> = {}) =>
     orders.place('alice', session.id, {
@@ -130,15 +130,19 @@ describe('OrderService.place — BUG-003 bounds on computed values', () => {
     const { place, repos } = await setup();
     await expect(code(place({ sl: 100 - 1e-12 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
     await expect(code(place({ sl: 99.9999 }))).resolves.toBe('422 STOP_DISTANCE_ZERO'); // inside the 0.001 minimum
-    const atMinimum = await place({ sl: 99.999 }); // exactly the minimum: qty = 100 / 0.001 (float: 99 999.9999995)
-    expect(atMinimum.order.qty).toBeCloseTo(100_000, 3);
+    // exactly the minimum distance is accepted. At 0.01 % risk: qty = 1 / 0.001 = 1 000 BTC (float 999.9999999995,
+    // kept on its 0.001 step), 100 000 notional, 800 margin at 125× (at 1 % it would need 80 000: INSUFFICIENT_MARGIN)
+    const atMinimum = await place({ sl: 99.999, riskPct: 0.01 });
+    expect(atMinimum.order.qty).toBe(1000);
     expect(repos.orderRows.size).toBe(1);
   });
 
-  it('a size that would not fit numeric(20,8) is refused with the same code (backstop)', async () => {
+  it('a size that would not fit numeric(20,8) is refused before it reaches the column (D12: margin first)', async () => {
     const { place, row } = await setup();
     row().balance = 999_999_999_999; // 100 % risk → 1R ≈ 1e12, qty = 1e12 / 0.001 ≈ 1e15
-    await expect(code(place({ sl: 99.999, riskPct: 100 }))).resolves.toBe('422 STOP_DISTANCE_ZERO');
+    // D12 refuses on margin before the overflow backstop (§6 order): 1e15 × 100 / 125 is far beyond the balance.
+    // The STOP_DISTANCE_ZERO backstop stays for what margin cannot catch (a huge size at a tiny price).
+    await expect(code(place({ sl: 99.999, riskPct: 100 }))).resolves.toBe('422 INSUFFICIENT_MARGIN');
   });
 
   it('a refused request does not burn its opId: the same opId with a valid body then succeeds', async () => {

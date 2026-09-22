@@ -6,7 +6,7 @@ import {
 } from '../src';
 
 /**
- * BUG-002 / BUG-003 (provisional bounds, pending Architect confirmation): every bounded request
+ * BUG-002 / BUG-003 (bounds confirmed by the Architect 2026-09-22): every bounded request
  * field accepts its edge and rejects just past it, and the exact values from the bug reports are
  * rejected by the schema (a 400 from the server's ZodValidationPipe, never a pg overflow).
  */
@@ -45,7 +45,6 @@ describe('BACKTEST_BOUNDS (BUG-002/BUG-003)', () => {
       riskPctMin: 0.0001,
       riskPctMax: 100,
       commissionPctMax: 100,
-      notionalWarnMultipleMax: 999_999.99,
     });
   });
 
@@ -72,9 +71,9 @@ describe('BACKTEST_BOUNDS (BUG-002/BUG-003)', () => {
       expect(ok(CreateSessionRequestSchema, costs({ spread: 1e12 }))).toBe(false);
     });
 
-    it('notionalWarnMultiple: > 0 and <= 999 999.99', () => {
-      expect(ok(CreateSessionRequestSchema, session({ notionalWarnMultiple: 999_999.99 }))).toBe(true);
-      expect(ok(CreateSessionRequestSchema, session({ notionalWarnMultiple: 1_000_000 }))).toBe(false);
+    it('notionalWarnMultiple is gone (D12, T-053): an old client sending it is not refused, the field is dropped', () => {
+      const parsed = CreateSessionRequestSchema.parse(session({ notionalWarnMultiple: 5 }));
+      expect('notionalWarnMultiple' in parsed).toBe(false);
     });
 
     it('rejects every BUG-002 reproduction value', () => {
@@ -83,7 +82,6 @@ describe('BACKTEST_BOUNDS (BUG-002/BUG-003)', () => {
         { initialBalance: 1e13 },
         { costs: { enabled: true, commissionPct: 100_000, spread: 0 } },
         { costs: { enabled: true, commissionPct: 0, spread: 1e13 } },
-        { notionalWarnMultiple: 1_000_000 },
       ]) {
         expect({ over, ok: ok(CreateSessionRequestSchema, session(over)) }).toEqual({ over, ok: false });
       }

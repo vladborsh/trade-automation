@@ -20,7 +20,6 @@ interface SessionRow {
   commission_pct: number;
   spread: number;
   skip_weekends: boolean;
-  notional_warn_multiple: number;
   layout: SessionLayout;
   trades_count: number;
   wins_count: number;
@@ -42,7 +41,7 @@ interface SessionRow {
 
 const COLUMNS = `id, name, status, session_currency, timeframe, period_from_ms, period_to_ms, cursor_ms,
   initial_balance, balance, default_risk_pct, costs_enabled, commission_pct, spread, skip_weekends,
-  notional_warn_multiple, layout, trades_count, wins_count, losses_count, pnl_ccy, pnl_r,
+  layout, trades_count, wins_count, losses_count, pnl_ccy, pnl_r,
   profit_factor, max_drawdown_ccy, max_drawdown_r, avg_win_ccy, avg_win_r, avg_loss_ccy,
   avg_loss_r, stats_computed_at, created_at, updated_at, completed_at`;
 
@@ -63,7 +62,6 @@ export function toSessionSummary(row: SessionRow): SessionSummary {
     defaultRiskPct: row.default_risk_pct,
     costs: { enabled: row.costs_enabled, commissionPct: row.commission_pct, spread: row.spread },
     skipWeekends: row.skip_weekends,
-    notionalWarnMultiple: row.notional_warn_multiple,
     layout: row.layout,
     createdAt: row.created_at.getTime(),
     updatedAt: row.updated_at.getTime(),
@@ -92,8 +90,8 @@ export class PgSessionRepository implements SessionRepository {
       `insert into backtest_sessions
          (user_id, name, status, session_currency, timeframe, period_from_ms, period_to_ms, cursor_ms,
           initial_balance, balance, default_risk_pct, costs_enabled, commission_pct, spread,
-          skip_weekends, notional_warn_multiple, layout)
-       values ($1, $2, 'active', $3, $4, $5, $6, $5, $7, $7, $8, $9, $10, $11, $12, $13, $14)
+          skip_weekends, layout)
+       values ($1, $2, 'active', $3, $4, $5, $6, $5, $7, $7, $8, $9, $10, $11, $12, $13)
        returning ${COLUMNS}`,
       [
         userId,
@@ -108,7 +106,6 @@ export class PgSessionRepository implements SessionRepository {
         s.costs.commissionPct,
         s.costs.spread,
         s.skipWeekends,
-        s.notionalWarnMultiple,
         JSON.stringify(s.layout),
       ],
     );

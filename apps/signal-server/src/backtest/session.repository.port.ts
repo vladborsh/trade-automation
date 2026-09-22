@@ -14,7 +14,6 @@ export interface NewSession {
   defaultRiskPct: number;
   costs: Costs;
   skipWeekends: boolean;
-  notionalWarnMultiple: number;
   layout: SessionLayout;
 }
 

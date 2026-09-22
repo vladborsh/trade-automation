@@ -7,7 +7,6 @@ import { AppNavComponent } from '../nav/app-nav.component';
 import { groupByCurrency } from './instrument-groups';
 import { InstrumentPickerComponent } from './instrument-picker.component';
 import {
-  DEFAULT_NOTIONAL_WARN_MULTIPLE,
   DEFAULT_RISK_PCT,
   commonCoverage,
   defaultPeriod,
@@ -62,7 +61,6 @@ export class SessionCreateComponent implements OnInit {
     commissionPct: 0.04,
     spread: 0,
     skipWeekends: true,
-    notionalWarnMultiple: DEFAULT_NOTIONAL_WARN_MULTIPLE,
   });
 
   readonly catalogue = computed(() => new Map<InstrumentId, BacktestInstrument>(this.instruments().map((i) => [i.id, i])));
@@ -95,7 +93,7 @@ export class SessionCreateComponent implements OnInit {
   }
 
   /** `<input type="number">` → number, or null when empty. */
-  setNumber(key: 'initialBalance' | 'defaultRiskPct' | 'commissionPct' | 'spread' | 'notionalWarnMultiple', raw: string): void {
+  setNumber(key: 'initialBalance' | 'defaultRiskPct' | 'commissionPct' | 'spread', raw: string): void {
     this.set(key, raw.trim() === '' ? null : Number(raw));
   }
 

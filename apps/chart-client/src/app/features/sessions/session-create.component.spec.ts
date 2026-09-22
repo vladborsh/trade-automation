@@ -91,7 +91,6 @@ describe('SessionCreateComponent', () => {
       initialBalance: 10_000,
       defaultRiskPct: 1,
       skipWeekends: true,
-      notionalWarnMultiple: 5,
       costs: { enabled: true, commissionPct: 0.04, spread: 0 },
     });
     expect(body.layout.panels).toEqual([{ id: 'binance-btcusdt', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }]);

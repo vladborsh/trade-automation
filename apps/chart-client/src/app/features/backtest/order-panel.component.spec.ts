@@ -4,7 +4,7 @@ import { OrderPanelComponent } from './order-panel.component';
 
 const DRAFT: PositionToolState = { id: 't1', side: 'long', mode: 'limit', entry: 100, sl: 99, tp: 102, kind: 'draft', active: true, anchorTime: 0 };
 
-function render(inputs: { draft?: PositionToolState | null; multiple?: number } = {}) {
+function render(inputs: { draft?: PositionToolState | null; } = {}) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [OrderPanelComponent] });
   const fixture = TestBed.createComponent(OrderPanelComponent);
@@ -13,7 +13,6 @@ function render(inputs: { draft?: PositionToolState | null; multiple?: number } 
   set('lastClose', 100.5);
   set('balance', 10_000);
   set('riskPct', 1);
-  set('notionalWarnMultiple', inputs.multiple ?? 5);
   set('currency', 'USD');
   fixture.detectChanges();
   return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -28,12 +27,11 @@ describe('OrderPanelComponent (T-023; a popup since T-045)', () => {
     expect(text).toContain('100.00 USD'); // 1R
     expect(text).toContain('2.00 R');
     expect(text).toContain('10,000.00 USD'); // notional
-    expect(el.querySelector('[data-testid="notional-warning"]')).toBeNull();
   });
 
-  it('warns when the notional is above balance × multiple', () => {
-    const { el } = render({ draft: { ...DRAFT, sl: 99.9 } }); // qty ≈ 1 000, notional ≈ 100 000 > 50 000
-    expect(el.querySelector('[data-testid="notional-warning"]')?.textContent).toContain('5× the balance');
+  it('no flat notional warning, however large the notional (D12, T-053)', () => {
+    const { el } = render({ draft: { ...DRAFT, sl: 99.9 } }); // qty ≈ 1 000, notional ≈ 100 000
+    expect(el.querySelector('[data-testid="notional-warning"]')).toBeNull();
   });
 
   it('T-045: a modal dialog with Confirm and Cancel', () => {

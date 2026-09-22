@@ -40,7 +40,6 @@ describe('SessionService (backtest-app-system-design.md §7.2)', () => {
         balance: 10_000,
         initialBalance: 10_000,
         skipWeekends: true,
-        notionalWarnMultiple: 5,
         costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
         completedAt: null,
       });
@@ -55,9 +54,10 @@ describe('SessionService (backtest-app-system-design.md §7.2)', () => {
       expect((await service.get(ALICE, session.id)).layout.name).toBe('Crypto');
     });
 
-    it('honours explicit skipWeekends / notionalWarnMultiple', async () => {
+    it('honours an explicit skipWeekends; a notionalWarnMultiple from an old client is ignored (D12, T-053)', async () => {
       const session = await service.create(ALICE, createBody({ skipWeekends: false, notionalWarnMultiple: 3 }));
-      expect(session).toMatchObject({ skipWeekends: false, notionalWarnMultiple: 3 });
+      expect(session).toMatchObject({ skipWeekends: false });
+      expect('notionalWarnMultiple' in session).toBe(false);
     });
 
     it.each([
@@ -176,7 +176,7 @@ describe('SessionService (backtest-app-system-design.md §7.2)', () => {
       repos.orders.insert({
         sessionId, seq: 1, panelId, instrument, side: 'long', type: status === 'pending' ? 'limit' : 'market', status,
         placedAtMs: T0 + 5 * DAY, limitPrice: status === 'pending' ? 90 : null, entryPrice: status === 'open' ? 100 : null,
-        entryTimeMs: status === 'open' ? T0 + 5 * DAY : null, qty: 1, riskPct: 1, riskAmountCcy: 10, sl: 80, tp: null,
+        entryTimeMs: status === 'open' ? T0 + 5 * DAY : null, qty: 1, contractMultiplier: 1, riskPct: 1, riskAmountCcy: 10, sl: 80, tp: null,
         fillResolution: status === 'open' ? '1m' : null,
       });
 

@@ -8,7 +8,7 @@ function orderFrom(f: (typeof FILL_TABLE_FIXTURES)[number]): Order {
   return {
     id: o.id, sessionId: '00000000-0000-4000-8000-0000000000aa', seq: 1, panelId: 'p1', instrument: 'binance:BTCUSDT',
     side: o.side, type: o.type, status: o.status, placedAtMs: 0, limitPrice: o.limitPrice, entryPrice: o.entryPrice,
-    entryTimeMs: o.entryTimeMs, qty: 10, riskPct: 1, riskAmountCcy: 100, slInitial: o.slCurrent, slCurrent: o.slCurrent,
+    entryTimeMs: o.entryTimeMs, qty: 10, contractMultiplier: 1, riskPct: 1, riskAmountCcy: 100, slInitial: o.slCurrent, slCurrent: o.slCurrent,
     tpInitial: o.tpCurrent, tpCurrent: o.tpCurrent, exitPrice: null, exitTimeMs: null, closeReason: null,
     fillResolution: o.status === 'open' ? '1m' : null, slTpSameBar: false, commissionCcy: 0, spreadCostCcy: 0,
     pnlCcy: null, pnlR: null, maePrice: null, maeR: null, cancelledAtMs: null, createdAt: 0, updatedAt: 0,

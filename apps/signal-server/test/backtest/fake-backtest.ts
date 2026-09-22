@@ -46,7 +46,7 @@ export class FakeBacktestRepositories implements BacktestRepositories {
         id: randomUUID(), sessionId: o.sessionId, seq: o.seq, panelId: o.panelId, instrument: o.instrument,
         side: o.side, type: o.type, status: o.status, placedAtMs: o.placedAtMs,
         limitPrice: money(o.limitPrice), entryPrice: money(o.entryPrice), entryTimeMs: o.entryTimeMs,
-        qty: money(o.qty), riskPct: percent(o.riskPct), riskAmountCcy: money(o.riskAmountCcy),
+        qty: money(o.qty), contractMultiplier: money(o.contractMultiplier), riskPct: percent(o.riskPct), riskAmountCcy: money(o.riskAmountCcy),
         slInitial: money(o.sl), slCurrent: money(o.sl), tpInitial: money(o.tp), tpCurrent: money(o.tp),
         exitPrice: null, exitTimeMs: null, closeReason: null, fillResolution: o.fillResolution, slTpSameBar: false,
         commissionCcy: 0, spreadCostCcy: 0, pnlCcy: null, pnlR: null, maePrice: null, maeR: null,
@@ -119,7 +119,6 @@ export class FakeBacktestRepositories implements BacktestRepositories {
         defaultRiskPct: s.defaultRiskPct,
         costs: s.costs,
         skipWeekends: s.skipWeekends,
-        notionalWarnMultiple: s.notionalWarnMultiple,
         layout: structuredClone(s.layout),
         createdAt: now,
         updatedAt: now,
@@ -201,11 +200,12 @@ export class FakeBacktestRepositories implements BacktestRepositories {
 export const DAY = 86_400_000;
 export const T0 = Date.UTC(2026, 0, 1);
 
+/** The configured catalogue the services see; contract blocks as in config/instruments.yaml (D12). */
 export const INSTRUMENTS = [
-  { id: 'binance:BTCUSDT', sessionCurrency: 'USD' },
-  { id: 'binance:ETHUSDT', sessionCurrency: 'USD' },
-  { id: 'capitalcom:EURCHF', sessionCurrency: 'CHF' },
-  { id: 'capitalcom:US100', sessionCurrency: 'USD' },
+  { id: 'binance:BTCUSDT', sessionCurrency: 'USD', contract: { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 50, maxLeverage: 125 } },
+  { id: 'binance:ETHUSDT', sessionCurrency: 'USD', contract: { unit: 'ETH', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 20, maxLeverage: 125 } },
+  { id: 'capitalcom:EURCHF', sessionCurrency: 'CHF', contract: { unit: 'EUR', multiplier: 1, minQty: 100, qtyStep: 100, maxLeverage: 30, displayLot: 100_000 } },
+  { id: 'capitalcom:US100', sessionCurrency: 'USD', contract: { unit: 'contracts', multiplier: 1, minQty: 0.001, qtyStep: 0.001, maxLeverage: 20 } },
 ] as const;
 
 /** 30 days of 1m for everything except US100, which has none. */

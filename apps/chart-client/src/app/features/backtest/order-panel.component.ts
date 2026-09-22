@@ -5,7 +5,7 @@ import { orderPanelView } from './order-panel.view';
 
 /**
  * T-023 — the order panel: the active draft's derived size, amount risked (1R), reward multiple,
- * notional and the notional warning (decision 25), with the risk % the order will use (the
+ * notional, with the risk % the order will use (the
  * session's default unless changed here).
  *
  * T-045 (the user's feedback, item 11): a popup, shown only at the submit step — `Enter` on an
@@ -25,7 +25,6 @@ export class OrderPanelComponent {
   readonly lastClose = input<number | null>(null);
   readonly balance = input.required<number>();
   readonly riskPct = input.required<number>();
-  readonly notionalWarnMultiple = input.required<number>();
   readonly currency = input.required<string>();
   readonly pricePrecision = input(2);
 
@@ -37,7 +36,7 @@ export class OrderPanelComponent {
     const draft = this.draft();
     const lastClose = this.lastClose();
     if (!draft || lastClose === null) return null;
-    return orderPanelView(draft, { balance: this.balance(), riskPct: this.riskPct(), lastClose, notionalWarnMultiple: this.notionalWarnMultiple() });
+    return orderPanelView(draft, { balance: this.balance(), riskPct: this.riskPct(), lastClose });
   });
 
   protected readonly money = (v: number | null) => formatMoney(v, this.currency());

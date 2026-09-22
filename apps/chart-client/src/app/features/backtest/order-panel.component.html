@@ -26,11 +26,6 @@
       Risk %
       <input type="number" name="riskPct" min="0.0001" max="100" step="any" [value]="riskPct()" (change)="onRiskInput($event)" />
     </label>
-    @if (v.notionalWarning) {
-      <p class="warning" role="alert" data-testid="notional-warning">
-        Notional is above {{ notionalWarnMultiple() }}× the balance. No leverage is modelled; check the size.
-      </p>
-    }
     @if (v.problem; as problem) {
       <p class="warning" role="alert" data-testid="order-problem">{{ problem }}</p>
     }

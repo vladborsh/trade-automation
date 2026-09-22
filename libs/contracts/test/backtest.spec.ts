@@ -56,6 +56,7 @@ function validOrder(overrides: Partial<Order> = {}): Order {
     closeReason: null,
     fillResolution: '1m',
     slTpSameBar: false,
+    contractMultiplier: 1,
     commissionCcy: 0.5,
     spreadCostCcy: 0.1,
     pnlCcy: null,
@@ -116,7 +117,6 @@ function validSession(overrides: Partial<Session> = {}): Session {
     defaultRiskPct: 1,
     costs: { enabled: true, commissionPct: 0.04, spread: 1 },
     skipWeekends: true,
-    notionalWarnMultiple: 5,
     layout: {
       id: 'session-1',
       name: 'BTC',
@@ -582,7 +582,7 @@ describe('backtest contracts (architecture/backtest-app-system-design.md)', () =
     expect(ErrorResponseSchema.parse(err)).toEqual(err);
   });
 
-  it('accepts the T-015 order codes (provisional, design §7.2)', () => {
+  it('accepts the T-015 order codes (confirmed, design §7.2)', () => {
     for (const code of ['BALANCE_NOT_POSITIVE', 'NO_PRICE_AT_CURSOR', 'ORDER_NOT_OPEN'] as const) {
       expect(ErrorResponseSchema.parse({ error: { code, message: 'x' } }).error.code).toBe(code);
     }

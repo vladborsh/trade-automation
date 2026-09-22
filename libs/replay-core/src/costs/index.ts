@@ -8,4 +8,5 @@ export {
   spreadCost,
   stopExitPrice,
   takeProfitExitPrice,
+  type MultiplierInput,
 } from './costs';

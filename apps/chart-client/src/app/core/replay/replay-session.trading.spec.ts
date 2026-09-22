@@ -10,7 +10,7 @@ const M = 60_000;
 const T0 = Date.UTC(2026, 8, 16, 10, 0);
 const SESSION = {
   id: 's1', name: 'test', status: 'active', sessionCurrency: 'USD', timeframe: '5m', periodFromMs: T0, periodToMs: T0 + 60 * M,
-  cursorMs: T0 + 5 * M, initialBalance: 10_000, balance: 10_000, defaultRiskPct: 1, skipWeekends: false, notionalWarnMultiple: 5,
+  cursorMs: T0 + 5 * M, initialBalance: 10_000, balance: 10_000, defaultRiskPct: 1, skipWeekends: false,
   costs: { enabled: false, commissionPct: 0, spread: 0 },
   layout: { id: 'l', name: 'l', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
 } as unknown as Session;

@@ -84,13 +84,6 @@
               <small class="field-error">{{ message }}</small>
             }
           </label>
-          <label class="field">
-            <span>Notional warning (× balance)</span>
-            <input type="number" name="notionalWarnMultiple" min="0" step="any" [value]="form().notionalWarnMultiple" (input)="setNumber('notionalWarnMultiple', $any($event.target).value)" />
-            @if (shown().notionalWarnMultiple; as message) {
-              <small class="field-error">{{ message }}</small>
-            }
-          </label>
         </div>
       </section>
 

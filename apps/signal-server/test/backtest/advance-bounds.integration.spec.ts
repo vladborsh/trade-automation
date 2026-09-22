@@ -43,7 +43,6 @@ const newSession = (initialBalance: number): NewSession => ({
   defaultRiskPct: 1,
   costs: { enabled: true, commissionPct: 0.04, spread: 0.5 },
   skipWeekends: false,
-  notionalWarnMultiple: 5,
   layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: BTC, signals: false }] },
 });
 
@@ -72,7 +71,7 @@ maybeDescribe('close paths with extreme values (BUG-002/003 ruling)', () => {
     await runMigrations({ connectionString: DATABASE_URL as string });
     db = new PgDatabase(DATABASE_URL as string);
     repos = new PgBacktestRepositories(db);
-    orders = new OrderService(repos, store);
+    orders = new OrderService(repos, store, fakeInstrumentConfig());
     advancer = new AdvanceService(repos, store);
     sessions = new SessionService(repos, fakeInstrumentConfig(), store as never, new FakeScreenshotStore());
     alice = (
@@ -90,30 +89,33 @@ maybeDescribe('close paths with extreme values (BUG-002/003 ruling)', () => {
 
   it('a trade of about 1.4 million R (beyond the old numeric(12,6)) closes and stores', async () => {
     const s = await repos.sessions.insert(alice, newSession(10_000));
-    // entry 100.25, stop 99.999 — exactly the 0.001 minimum below lastClose 100 — so qty ≈ 1e5
-    const { order } = await orders.place(alice, s.id, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99.999, tp: 1400, riskPct: 1 });
+    // entry 100.25, stop 99.999 (exactly the 0.001 minimum below lastClose 100). R is move / stop distance, so a
+    // tiny size gives the same extreme R: 0.001 % → 1R 0.1 → qty 100 (D12: 80 margin at 125×; 1 % would need 80 000)
+    const { order } = await orders.place(alice, s.id, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99.999, tp: 1400, riskPct: 0.001 });
 
     const res = await advancer.advance(alice, s.id, { opId: randomUUID(), toCursorMs: C + 15 * MIN });
 
     const row = (await repos.orders.findById(s.id, order.id))!;
     // the C+10 candle opens at 1500, beyond the 1400 target: a gap-through exit at the open (§6)
     expect(row).toMatchObject({ status: 'closed', closeReason: 'take-profit', exitPrice: 1500 });
-    expect(row.pnlR!).toBeGreaterThan(1_000_000); // (1500 − 100.25) × qty / 100 ≈ 1.4e6 R
+    expect(row.pnlR!).toBeGreaterThan(1_000_000); // (1500 − 100.25) × qty / 1R ≈ 1.4e6 R
     expect(res.stats.pnlR).toBeCloseTo(row.pnlR!, 6);
     const after = (await repos.sessions.findById(alice, s.id))!;
     expect(after).toMatchObject({ tradesCount: 1, winsCount: 1, pnlR: row.pnlR, avgWinR: row.pnlR });
   });
 
   it('a close whose PnL overflows numeric(20,8) rolls the whole advance back; the session stays readable', async () => {
-    // 1R = 5e8 at 100 % risk, stop 0.001 away → qty ≈ 5e11 (fits); a +100 move → pnl ≈ 5e13 (does not)
-    const s = await repos.sessions.insert(alice, newSession(500_000_000));
-    const { order } = await orders.place(alice, s.id, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99.999, tp: 200, riskPct: 100 });
+    // D12: the size must pass the margin check, so the balance carries it. Balance 1e10, 0.12 % risk, stop 0.001 away
+    // → 1R 1.2e7, qty 1.2e10 (fits numeric(20,8); margin 1.2e10 × 100 / 125 = 9.6e9 < 1e10). The next candle opens at
+    // 240, through the 200 target → pnl ≈ 1.2e10 × 140 ≈ 1.7e12, which does not fit.
+    const s = await repos.sessions.insert(alice, newSession(10_000_000_000));
+    const { order } = await orders.place(alice, s.id, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99.999, tp: 200, riskPct: 0.12 });
     const opId = randomUUID();
 
     await expect(advancer.advance(alice, s.id, { opId, toCursorMs: C + 15 * MIN })).rejects.toThrow(/numeric field overflow/);
 
     expect((await repos.orders.findById(s.id, order.id))!).toMatchObject({ status: 'open', exitPrice: null, pnlCcy: null });
-    expect((await repos.sessions.findById(alice, s.id))!).toMatchObject({ cursorMs: C, balance: 500_000_000, tradesCount: 0, status: 'active' });
+    expect((await repos.sessions.findById(alice, s.id))!).toMatchObject({ cursorMs: C, balance: 10_000_000_000, tradesCount: 0, status: 'active' });
     expect(await repos.ops.find(s.id, opId)).toBeNull();
     const detail = await sessions.detail(alice, s.id);
     expect(detail.openOrders.map((o) => o.id)).toEqual([order.id]);

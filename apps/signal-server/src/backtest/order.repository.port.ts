@@ -24,6 +24,8 @@ export interface NewOrder {
   entryPrice: number | null;
   entryTimeMs: number | null;
   qty: number;
+  /** D12: the instrument's contract multiplier at placement, snapshotted on the row. */
+  contractMultiplier: number;
   riskPct: number;
   riskAmountCcy: number;
   sl: number;

@@ -1,5 +1,5 @@
 import { Costs, FillEvent, Order } from '@trade-automation/contracts';
-import { contractUnits, direction, fee, spreadCost } from '../costs';
+import { contractUnits, direction, fee, spreadCost, type MultiplierInput } from '../costs';
 
 export interface TradeResult {
   commissionCcy: number;
@@ -21,7 +21,7 @@ export interface TradeResult {
  * (commission is not recoverable from the prices).
  */
 export function computeTradeResult(
-  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'qty' | 'contractMultiplier' | 'riskAmountCcy'>,
+  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'qty' | 'riskAmountCcy'> & MultiplierInput,
   exitEvent: FillEvent,
   costs: Costs,
 ): TradeResult {

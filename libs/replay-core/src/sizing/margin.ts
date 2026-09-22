@@ -1,5 +1,5 @@
 import type { ContractSpec, Costs, InstrumentId, Order } from '@trade-automation/contracts';
-import { contractUnits } from '../costs';
+import { contractUnits, type MultiplierInput } from '../costs';
 import { floatingPnl } from '../mark';
 import { ceilToStep, stepDecimals } from './sizing';
 
@@ -24,7 +24,7 @@ export function marginRequired(qty: number, price: number, contract: Pick<Contra
  * An open or pending order as the margin account sees it: its own snapshot multiplier (absent = 1)
  * and its instrument's leverage cap. Other statuses are ignored.
  */
-export type MarginOrder = Pick<Order, 'id' | 'instrument' | 'side' | 'status' | 'qty' | 'entryPrice' | 'limitPrice' | 'contractMultiplier'> & {
+export type MarginOrder = Pick<Order, 'id' | 'instrument' | 'side' | 'status' | 'qty' | 'entryPrice' | 'limitPrice'> & MultiplierInput & {
   maxLeverage: number;
 };
 

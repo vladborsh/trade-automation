@@ -1,8 +1,8 @@
 import { Costs, Order } from '@trade-automation/contracts';
-import { contractUnits, direction, fee, marketExitPrice } from '../costs';
+import { contractUnits, direction, fee, marketExitPrice, type MultiplierInput } from '../costs';
 
 /** The `Order` fields the floating mark reads; a contract `Order` in status `open` is assignable. */
-export type MarkablePosition = Pick<Order, 'id' | 'side' | 'entryPrice' | 'qty' | 'contractMultiplier'>;
+export type MarkablePosition = Pick<Order, 'id' | 'side' | 'entryPrice' | 'qty'> & MultiplierInput;
 
 /**
  * architecture/backtest-app-system-design.md §6 "Floating mark" (decision 35): what closing right

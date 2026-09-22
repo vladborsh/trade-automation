@@ -18,7 +18,6 @@ function fields(over: Partial<SessionFormFields> = {}): SessionFormFields {
     commissionPct: 0.04,
     spread: 0.5,
     skipWeekends: true,
-    notionalWarnMultiple: 5,
     ...over,
   };
 }
@@ -66,8 +65,8 @@ describe('validateSessionForm (mirrors the server session-validation.ts)', () =>
   });
 
   it('numbers: balance, risk and warning multiple above 0; costs 0 or more, checked only when enabled', () => {
-    const errors = validateSessionForm(fields({ initialBalance: 0, defaultRiskPct: null, notionalWarnMultiple: -1, commissionPct: -0.1, spread: Number.NaN }), CATALOGUE);
-    expect(Object.keys(errors).sort()).toEqual(['commissionPct', 'defaultRiskPct', 'initialBalance', 'notionalWarnMultiple', 'spread']);
+    const errors = validateSessionForm(fields({ initialBalance: 0, defaultRiskPct: null, commissionPct: -0.1, spread: Number.NaN }), CATALOGUE);
+    expect(Object.keys(errors).sort()).toEqual(['commissionPct', 'defaultRiskPct', 'initialBalance', 'spread']);
     expect(validateSessionForm(fields({ costsEnabled: false, commissionPct: null, spread: null }), CATALOGUE)).toEqual({});
   });
 
@@ -82,8 +81,6 @@ describe('validateSessionForm (mirrors the server session-validation.ts)', () =>
     expect(ok({ commissionPct: 100 })).toEqual({});
     expect(ok({ commissionPct: 100_000 }).commissionPct).toBe('Commission must be at most 100 %.');
     expect(ok({ spread: 1e13 }).spread).toBe('Spread must be below 1 000 000 000 000.');
-    expect(ok({ notionalWarnMultiple: 999_999.99 })).toEqual({});
-    expect(ok({ notionalWarnMultiple: 1_000_000 }).notionalWarnMultiple).toBe('Enter a multiple of at most 999 999.99.');
   });
 
   it('a blank name is refused', () => {
@@ -105,7 +102,6 @@ describe('toCreateRequest', () => {
       defaultRiskPct: 1,
       costs: { enabled: false, commissionPct: 0, spread: 0 },
       skipWeekends: false,
-      notionalWarnMultiple: 5,
     });
   });
 });

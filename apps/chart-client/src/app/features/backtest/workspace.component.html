@@ -54,7 +54,6 @@
           [pricePrecision]="a.precision"
           [balance]="s.balance"
           [riskPct]="store.riskPct()"
-          [notionalWarnMultiple]="s.notionalWarnMultiple"
           [currency]="s.sessionCurrency"
           (riskPctChange)="store.riskPctOverride.set($event)"
           (confirm)="confirmOrder()"

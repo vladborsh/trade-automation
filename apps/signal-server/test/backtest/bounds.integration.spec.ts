@@ -72,7 +72,7 @@ maybeDescribe('BUG-002 / BUG-003 reproductions against a real Postgres', () => {
       controllers: [SessionsController, OrdersController],
       providers: [
         { provide: SessionService, useValue: new SessionService(repos, fakeInstrumentConfig(), store as never, new FakeScreenshotStore()) },
-        { provide: OrderService, useValue: new OrderService(repos, store) },
+        { provide: OrderService, useValue: new OrderService(repos, store, fakeInstrumentConfig()) },
         { provide: APP_GUARD, useClass: StubGuard },
       ],
     })
@@ -112,7 +112,6 @@ maybeDescribe('BUG-002 / BUG-003 reproductions against a real Postgres', () => {
       { initialBalance: 1e13 },
       { costs: { enabled: true, commissionPct: 100_000, spread: 0 } },
       { costs: { enabled: true, commissionPct: 0, spread: 1e13 } },
-      { notionalWarnMultiple: 1_000_000 },
     ]) {
       const res = await post(base, sessionBody(over));
       expect({ over, status: res.status }).toEqual({ over, status: 400 });

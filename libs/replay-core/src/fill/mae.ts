@@ -1,5 +1,5 @@
 import { Order } from '@trade-automation/contracts';
-import { contractUnits } from '../costs';
+import { contractUnits, type MultiplierInput } from '../costs';
 import { PathBar } from './types';
 
 /**
@@ -15,7 +15,7 @@ import { PathBar } from './types';
  * the window are ignored, so the caller may pass a superset.
  */
 export function computeMae(
-  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'entryTimeMs' | 'exitTimeMs' | 'qty' | 'contractMultiplier' | 'riskAmountCcy'>,
+  order: Pick<Order, 'id' | 'side' | 'type' | 'entryPrice' | 'entryTimeMs' | 'exitTimeMs' | 'qty' | 'riskAmountCcy'> & MultiplierInput,
   path: readonly PathBar[],
 ): { maePrice: number; maeR: number } {
   const { entryPrice: entry, entryTimeMs: from, exitTimeMs: to } = order;

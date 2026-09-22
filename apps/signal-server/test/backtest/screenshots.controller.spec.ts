@@ -26,7 +26,7 @@ describe('PUT/GET …/orders/:orderId/screenshots/:kind over HTTP (design §7.2)
     const session = await makeSessionService(repos).create(alice, createBody());
     const order = await repos.orders.insert({
       sessionId: session.id, seq: 1, panelId: 'btc', instrument: 'binance:BTCUSDT', side: 'long', type: 'market', status: 'open',
-      placedAtMs: T0 + 5 * DAY, limitPrice: null, entryPrice: 100, entryTimeMs: T0 + 5 * DAY - 60_000, qty: 1, riskPct: 1,
+      placedAtMs: T0 + 5 * DAY, limitPrice: null, entryPrice: 100, entryTimeMs: T0 + 5 * DAY - 60_000, qty: 1, contractMultiplier: 1, riskPct: 1,
       riskAmountCcy: 100, sl: 90, tp: null, fillResolution: '1m',
     });
     const config = { env: { get: (k: string) => (k === 'SCREENSHOT_MAX_WIDTH_PX' ? 1280 : undefined) } } as never;

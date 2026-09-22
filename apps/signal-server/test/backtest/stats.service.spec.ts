@@ -5,7 +5,7 @@ import { computeStats } from '@trade-automation/replay-core';
 import { AdvanceService } from '../../src/backtest/advance.service';
 import { OrderService } from '../../src/backtest/order.service';
 import { StatsService } from '../../src/backtest/stats.service';
-import { DAY, FakeBacktestRepositories, T0, candleStore, createBody, m1, makeSessionService } from './fake-backtest';
+import { DAY, FakeBacktestRepositories, T0, candleStore, createBody, m1, makeSessionService, fakeInstrumentConfig } from './fake-backtest';
 
 const MIN = 60_000;
 const C = T0 + 5 * DAY;
@@ -33,7 +33,7 @@ describe('StatsService (design §7.2, decision 38)', () => {
     stats = new StatsService(repos, sessions);
 
     // T-015 + T-017 flows: a manual close, then an advance that stops a second position
-    const orders = new OrderService(repos, store);
+    const orders = new OrderService(repos, store, fakeInstrumentConfig());
     const place = () =>
       orders.place('alice', sessionId, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 });
     const first = (await place()).order;

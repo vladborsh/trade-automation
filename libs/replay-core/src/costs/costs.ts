@@ -17,11 +17,19 @@ export function fee(notional: number, costs: Costs): number {
 }
 
 /**
+ * D12: the multiplier a replay-core input may carry. A contract `Order` always has it (stored on the
+ * row since T-053); a caller that builds its own input may leave it out, and absent means 1.
+ */
+export interface MultiplierInput {
+  contractMultiplier?: number;
+}
+
+/**
  * D12 (§6 "Contract, sizing and margin"): the quantity every money formula multiplies by,
  * `qty × contractMultiplier` (notional = units × price). An absent multiplier is 1, which is every
  * configured instrument today, so `units === qty` exactly and no existing number changes.
  */
-export function contractUnits(order: { qty: number; contractMultiplier?: number }): number {
+export function contractUnits(order: { qty: number } & MultiplierInput): number {
   return order.qty * (order.contractMultiplier ?? 1);
 }
 

@@ -1,6 +1,7 @@
 import { BadRequestException, HttpStatus, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import {
   CancelRequest,
+  ContractSpec,
   CloseRequest,
   CloseResponse,
   FillEvent,
@@ -13,18 +14,26 @@ import {
   SessionSummary,
 } from '@trade-automation/contracts';
 import {
+  accountMargin,
   computeMae,
   computeStats,
   computeTradeResult,
+  insufficientMarginMessage,
+  marginRequired,
   marketExitEvent,
   marketFillPrice,
   modifyLevelError,
   modifyReference,
+  notional,
+  placementCheck,
   positionSize,
+  sizeBelowMinimumMessage,
   toSessionAggregates,
+  type MarginOrder,
 } from '@trade-automation/replay-core';
 import { z } from 'zod';
 import { apiError } from '../auth/auth-error';
+import { AppConfigService } from '../config/config.service';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { lastRevealed1m } from './last-revealed';
 import { screenshotUrl } from './screenshot-url';
@@ -51,12 +60,23 @@ export class OrderService {
   constructor(
     @Inject(BACKTEST_REPOSITORIES) private readonly repos: BacktestRepositories | null,
     @Inject(CANDLE_STORE) private readonly store: CandleStore,
+    private readonly config: AppConfigService,
   ) {}
 
   /**
    * POST …/orders. A market order fills now at `lastClose ± half` (`marketFillPrice`) with
    * `entry_time_ms` = the last revealed 1m candle's `openTime`; a limit order is `pending`.
    * `qty` / `riskAmount` come from `positionSize` over the current balance and are fixed here.
+   *
+   * D12 (§6 "Contract, sizing and margin"): the size is rounded down to the instrument's
+   * `qtyStep`, and 1R is what is actually at risk after rounding (`risk_pct` keeps the requested
+   * value). Then, in this order and before the overflow backstop:
+   * - `SIZE_BELOW_MINIMUM` (422) when the size is under the venue's `minQty` or `minNotional`;
+   * - `INSUFFICIENT_MARGIN` (422) when the order's initial margin at the planned entry exceeds the
+   *   session account's `equity − usedMargin`. The account pools the session's open orders
+   *   (margin at entry, each marked at its instrument's last revealed 1m close) and its pending
+   *   orders (margin at the limit), each with its own snapshot multiplier.
+   * The row snapshots the instrument's `contract_multiplier`.
    */
   place(userId: string, sessionId: string, req: PlaceOrderRequest): Promise<PlaceOrderResponse> {
     return this.mutate(userId, sessionId, { opId: req.opId, kind: 'place', request: req }, async (tx, session) => {
@@ -70,7 +90,18 @@ export class OrderService {
       if (!(session.balance > 0)) {
         throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'BALANCE_NOT_POSITIVE', 'The session balance is not positive; the order cannot be sized.');
       }
-      const { qty, riskAmount } = positionSize(session.balance, req.riskPct, plannedEntry(req, last.close), req.sl);
+      const contract = this.contractOf(panel.instrument);
+      const planned = plannedEntry(req, last.close);
+      const { qty, riskAmount } = positionSize(session.balance, req.riskPct, planned, req.sl, contract);
+      const required = marginRequired(qty, planned, contract);
+      const account = await this.marginAccount(tx, session, [[panel.instrument, last.close]]);
+      const refusal = placementCheck({ qty, notional: notional(qty, planned, contract), contract, marginRequired: required, available: account.available });
+      if (refusal === 'SIZE_BELOW_MINIMUM') {
+        throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, refusal, sizeBelowMinimumMessage(contract, planned, Math.abs(planned - req.sl), session.balance));
+      }
+      if (refusal === 'INSUFFICIENT_MARGIN') {
+        throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, refusal, insufficientMarginMessage(required, account.available, session.sessionCurrency));
+      }
       const market = req.type === 'market';
       const entryPrice = market ? marketFillPrice(req.side, last.close, session.costs) : null;
       if (placementOverflows({ qty, riskAmount, entryPrice })) {
@@ -90,6 +121,7 @@ export class OrderService {
         entryPrice,
         entryTimeMs: market ? last.openTime : null,
         qty,
+        contractMultiplier: contract.multiplier,
         riskPct: req.riskPct,
         riskAmountCcy: riskAmount,
         sl: req.sl,
@@ -236,6 +268,34 @@ export class OrderService {
     const order = UuidSchema.safeParse(orderId).success ? await tx.orders.findById(sessionId, orderId, { forUpdate: true }) : null;
     if (!order) throw new NotFoundException('Order not found.');
     return order;
+  }
+
+  /** D12: the instrument's contract block; an instrument without one cannot be sized (session create refuses it too). */
+  private contractOf(instrument: Order['instrument']): ContractSpec {
+    const contract = this.config.instruments.find((i) => i.id === instrument)?.contract;
+    if (!contract) {
+      throw apiError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'INSTRUMENT_NOT_AVAILABLE',
+        `Instrument ${instrument} has no contract specification (size step, minimum size, leverage cap) configured, so its orders cannot be sized.`,
+      );
+    }
+    return contract;
+  }
+
+  /**
+   * D12: the session account before this order, from its open and pending orders (with their own
+   * snapshot multipliers and their instrument's leverage cap). Every open order's instrument is
+   * marked at its last revealed 1m close (`known` passes closes already read).
+   */
+  private async marginAccount(tx: TxRepos, session: SessionSummary, known: [Order['instrument'], number][]) {
+    const active = await tx.orders.list(session.id, ['open', 'pending']);
+    const lastClose = new Map(known);
+    for (const instrument of new Set(active.filter((o) => o.status === 'open').map((o) => o.instrument))) {
+      if (!lastClose.has(instrument)) lastClose.set(instrument, (await this.lastBar(instrument, session.cursorMs)).close);
+    }
+    const orders: MarginOrder[] = active.map((o) => ({ ...o, maxLeverage: this.contractOf(o.instrument).maxLeverage }));
+    return accountMargin(session.balance, orders, lastClose, session.costs);
   }
 
   private async lastBar(instrument: Order['instrument'], cursorMs: number) {

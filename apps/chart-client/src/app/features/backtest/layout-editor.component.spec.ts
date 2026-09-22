@@ -28,7 +28,7 @@ function session(over: Partial<Session> = {}): Session {
   return {
     id: 's1', name: 'S', status: 'active', sessionCurrency: 'USD', timeframe: '5m', periodFromMs: T0 + 10 * DAY, periodToMs: T0 + 20 * DAY,
     cursorMs: T0 + 12 * DAY, initialBalance: 1000, balance: 1000, defaultRiskPct: 1, costs: { enabled: false, commissionPct: 0, spread: 0 },
-    skipWeekends: true, notionalWarnMultiple: 5, layout: LAYOUT, createdAt: 1, updatedAt: 1, completedAt: null, ...over,
+    skipWeekends: true, layout: LAYOUT, createdAt: 1, updatedAt: 1, completedAt: null, ...over,
   };
 }
 

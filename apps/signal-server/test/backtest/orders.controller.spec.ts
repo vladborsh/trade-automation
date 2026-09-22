@@ -10,7 +10,7 @@ import { AuthService } from '../../src/auth/auth.service';
 import { OrderService } from '../../src/backtest/order.service';
 import { SessionService } from '../../src/backtest/session.service';
 import { FakeAuthRepositories, fastHasher, makeAuthService } from '../auth/fake-auth';
-import { DAY, FakeBacktestRepositories, T0, candleStore, createBody, m1, makeSessionService } from './fake-backtest';
+import { DAY, FakeBacktestRepositories, T0, candleStore, createBody, m1, makeSessionService, fakeInstrumentConfig } from './fake-backtest';
 
 const MIN = 60_000;
 
@@ -47,7 +47,7 @@ describe('/api/backtest/sessions/:id/orders over HTTP (design §7.2)', () => {
     for (const name of ['alice', 'bob']) authRepos.addUser(`${name}@x.test`, await fastHasher().hash(`${name}-password`));
     const repos = new FakeBacktestRepositories();
     const store = candleStore([m1('binance:BTCUSDT', C - MIN, 100, 100.5, 99.5, 100)]);
-    ({ app, base } = await boot(makeAuthService(authRepos), makeSessionService(repos), new OrderService(repos, store)));
+    ({ app, base } = await boot(makeAuthService(authRepos), makeSessionService(repos), new OrderService(repos, store, fakeInstrumentConfig())));
     for (const name of ['alice', 'bob']) {
       const res = await fetch(`${base}/api/auth/login`, {
         method: 'POST',

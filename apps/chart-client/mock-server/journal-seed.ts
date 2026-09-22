@@ -17,6 +17,7 @@ export function seededOrders(s: SessionSummary): Order[] {
   const base = {
     sessionId: s.id, panelId: panel.id, instrument: panel.instrument, type: 'market' as const, riskPct: 1, riskAmountCcy: 100,
     limitPrice: null, tpInitial: null, tpCurrent: null, cancelledAtMs: null, slTpSameBar: false, createdAt: t(0), updatedAt: t(0),
+    contractMultiplier: 1, // D12 (T-053): stored on every order row
   };
   const closed = (
     n: number, side: Order['side'], entry: number, exit: number, sl: number, qty: number, pnl: number, r: number, mae: number,

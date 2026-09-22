@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { OrderService } from '../../src/backtest/order.service';
 import { MAX_SCREENSHOT_BYTES, ScreenshotService } from '../../src/backtest/screenshot.service';
 import { screenshotKey, sessionScreenshotPrefix } from '../../src/storage/screenshot-store.port';
-import { DAY, FakeBacktestRepositories, FakeScreenshotStore, T0, createBody, fakeStore, makeSessionService } from './fake-backtest';
+import { DAY, FakeBacktestRepositories, FakeScreenshotStore, T0, createBody, fakeStore, makeSessionService, fakeInstrumentConfig } from './fake-backtest';
 import { makePng } from './png-fixture';
 import { expectSameBytes } from '../bytes';
 
@@ -58,7 +58,7 @@ describe('ScreenshotService (design §7.2, §9.2)', () => {
       limitPrice: null,
       entryPrice: 100,
       entryTimeMs: placedAtMs - 60_000,
-      qty: 1,
+      qty: 1, contractMultiplier: 1,
       riskPct: 1,
       riskAmountCcy: 100,
       sl: 90,
@@ -122,7 +122,7 @@ describe('ScreenshotService (design §7.2, §9.2)', () => {
   });
 
   it('GET …/orders/:orderId lists the stored screenshots as relative API URLs', async () => {
-    const orders = new OrderService(repos, fakeStore());
+    const orders = new OrderService(repos, fakeStore(), fakeInstrumentConfig());
     expect((await orders.get(ALICE, sessionId, orderId)).screenshots).toEqual({});
     await service.put(ALICE, sessionId, orderId, 'entry', upload(makePng(5, 5)).upload);
     expect((await orders.get(ALICE, sessionId, orderId)).screenshots).toEqual({
