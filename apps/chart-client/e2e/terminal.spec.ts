@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import type { Candle } from '@trade-automation/contracts';
-import { DEEP_HISTORY_MOCK_PORT, FROZEN_MOCK_PORT, TAIL_GAP_MOCK_PORT, apiUrl, expect, routeConfigTo, test } from './fixtures';
+import { DEEP_HISTORY_MOCK_PORT, FROZEN_MOCK_PORT, TAIL_GAP_MOCK_PORT, apiUrl, expect, plotBox, routeConfigTo, test } from './fixtures';
 
 /**
  * architecture/chart-layouts.md §9 SE-5's e2e proof: boots on the `crypto`
@@ -20,22 +20,6 @@ function panelById(page: Page, id: string) {
 
 async function chartPanels(page: Page) {
   return page.locator('app-chart-panel');
-}
-
-/**
- * BUG-007: the plot area of a panel's chart — its pane canvas, the largest one — WITHOUT the
- * price axis. A drag must start inside it to pan: the container also holds the ~80 px price
- * axis, and a drag starting there rescales prices instead (the right-edge pan below used to
- * start at 0.8 of the container, on the axis, and passed only because a live bar moved `to`).
- */
-async function plotBox(container: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  const boxes = await container.locator('canvas').evaluateAll((els) =>
-    els.map((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    }),
-  );
-  return boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
 }
 
 /**

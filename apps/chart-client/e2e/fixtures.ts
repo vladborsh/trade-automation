@@ -1,4 +1,4 @@
-import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test as base, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { MOCK_ADMIN } from '../mock-server/auth';
 import { MOCK_PORT } from './ports';
 
@@ -56,6 +56,22 @@ export const test = base.extend({
  */
 export async function replayStarted(page: Page): Promise<void> {
   await expect(page.locator('.workspace[data-replay-started]')).toHaveCount(1, { timeout: 15_000 });
+}
+
+/**
+ * BUG-007: the plot area of a panel's chart — its pane canvas, the largest one — WITHOUT the
+ * price axis. A drag must start inside it to pan: the container also holds the ~80 px price
+ * axis, and a drag starting there rescales prices instead (the right-edge pan below used to
+ * start at 0.8 of the container, on the axis, and passed only because a live bar moved `to`).
+ */
+export async function plotBox(container: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  const boxes = await container.locator('canvas').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }),
+  );
+  return boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
 }
 
 export { expect };

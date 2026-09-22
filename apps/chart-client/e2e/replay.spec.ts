@@ -1,6 +1,6 @@
 import type { APIRequestContext } from '@playwright/test';
 import type { Session, SessionDetail } from '@trade-automation/contracts';
-import { apiUrl, expect, test } from './fixtures';
+import { apiUrl, expect, plotBox, replayStarted, test } from './fixtures';
 
 /**
  * backtest-app-system-design.md §5.4 against the mock's deterministic tape (mock-server/
@@ -107,4 +107,69 @@ test('a reload resumes at the persisted cursor; stepping to the period end compl
 
   await page.reload(); // complete on the server, so complete after a reload too
   await expect(page.getByTestId('replay-completed')).toHaveText('completed', { timeout: 15_000 });
+});
+
+// T-036: a step must not snap a panned chart back to the right edge. Every advance answer used to
+// rebuild the panel sources (the store's `sources` read the whole session, which each answer
+// updates), and a new source is a new chart — opened at the right edge.
+test('after a pan into history, ten steps keep the visible range; pinned to the right edge, a step still follows the new bar', async ({ page }) => {
+  const request = page.context().request;
+  const session = await createSession(request, FRIDAY_2140 + 3 * 86_400_000);
+  const cursor = page.getByTestId('replay-cursor');
+  const chart = page.locator('.chart-panel[data-panel-id="btc"] .chart-container');
+  const range = async () => ({ from: await chart.getAttribute('data-visible-from'), to: await chart.getAttribute('data-visible-to') });
+  /** The cursor after `n` 5m steps from 21:40, as the toolbar shows it. */
+  const at = (n: number) => `${new Date(FRIDAY_2140 + n * 300_000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  await expect(chart).toHaveAttribute('data-visible-to', /\d+/);
+
+  // pinned to the right edge (as opened): a step shifts the window by the new bar, as today
+  const opened = await range();
+  await page.keyboard.press('ArrowRight');
+  await expect(cursor).toHaveText(at(1));
+  await expect.poll(async () => Number((await range()).to)).toBeGreaterThan(Number(opened.to));
+  await serverCursorReaches(request, session.id, Date.UTC(2024, 2, 1, 21, 45));
+
+  // pan back into history, away from the right edge
+  const box = await plotBox(chart);
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.5, { steps: 15 });
+  await page.mouse.up();
+  await expect.poll(async () => Number((await range()).to)).toBeLessThan(Number(opened.to));
+  const panned = await range();
+
+  for (let i = 2; i <= 11; i++) {
+    await page.keyboard.press('ArrowRight');
+    await expect(cursor).toHaveText(at(i));
+  }
+  await serverCursorReaches(request, session.id, Date.UTC(2024, 2, 1, 22, 35)); // every answer has landed
+  expect(await range()).toEqual(panned);
+});
+
+test('T-036: after a wheel zoom, ten steps keep the zoomed width', async ({ page }) => {
+  const request = page.context().request;
+  const session = await createSession(request, FRIDAY_2140 + 3 * 86_400_000);
+  const cursor = page.getByTestId('replay-cursor');
+  const chart = page.locator('.chart-panel[data-panel-id="btc"] .chart-container');
+  const width = async () => Number(await chart.getAttribute('data-visible-to')) - Number(await chart.getAttribute('data-visible-from'));
+
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  await expect(chart).toHaveAttribute('data-visible-to', /\d+/);
+  const opened = await width();
+  const box = await plotBox(chart);
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.mouse.wheel(0, -600); // zoom in
+  await expect.poll(width).toBeLessThan(opened);
+  const zoomed = await width();
+
+  for (let i = 1; i <= 10; i++) {
+    await page.keyboard.press('ArrowRight');
+    await expect(cursor).toHaveText(`${new Date(FRIDAY_2140 + i * 300_000).toISOString().slice(0, 16).replace('T', ' ')} UTC`);
+  }
+  await serverCursorReaches(request, session.id, FRIDAY_2140 + 10 * 300_000);
+  expect(await width()).toBe(zoomed);
 });

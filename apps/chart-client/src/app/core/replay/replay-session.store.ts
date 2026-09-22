@@ -116,18 +116,26 @@ export class ReplaySessionStore implements OnDestroy {
   }
 
   /**
+   * T-036: the session's panels on their own. Every advance answer updates the session (cursor,
+   * balance, status) and keeps the layout, so this does not change on a step — only a layout edit
+   * (T-029) or a reload gives it a new value. `sources` must not read the whole session: new
+   * sources mean new charts, which open at the right edge and lose the user's pan and zoom.
+   */
+  private readonly layoutPanels = computed(() => this.session()?.layout.panels ?? null);
+
+  /**
    * Panel id → source, for the panel grid. New sources per timeframe, so the grid re-creates its
    * charts on a switch exactly as the live terminal's does on a feed rebuild.
    */
   readonly sources = computed(() => {
     const engine = this.engine();
-    const session = this.session();
-    if (!engine || !session) return new Map<string, ReplayPanelSource>();
+    const panels = this.layoutPanels();
+    if (!engine || !panels) return new Map<string, ReplayPanelSource>();
     engine.timeframe();
     const view = this.view();
     const viewed = view?.orderId ? this.portfolio.orders().find((o) => o.id === view.orderId) : undefined;
     return new Map(
-      session.layout.panels.map((p) => [
+      panels.map((p) => [
         p.id,
         // §9.3: view-only shows the viewed order as a read-only position tool; nothing is editable.
         new ReplayPanelSource(p, engine, view ? this.viewedBinding(p.id, viewed) : this.toolsBinding(p.id)),
@@ -526,7 +534,9 @@ export class ReplaySessionStore implements OnDestroy {
       ahead: (panelId, fromMs, limit) => this.client.getReplayAhead(id, panelId, fromMs, limit),
       patchTimeframe: async (tf: Timeframe) => {
         const session = await this.client.patchSession(id, { timeframe: tf });
-        this.session.set(session);
+        // T-036: the PATCH changes only the timeframe — keep the layout object, so the charts the
+        // switch just built are not rebuilt a second time when its answer lands
+        this.session.update((s) => (s ? { ...session, layout: s.layout } : session));
       },
     };
   }

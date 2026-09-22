@@ -153,6 +153,19 @@ describe('ReplaySessionStore (T-021)', () => {
     expect(client.advance).toHaveBeenCalledTimes(1); // only the refused one
   });
 
+  it('T-036: an advance answer keeps the panel sources (no chart rebuild); a layout change replaces them', async () => {
+    const client = fakeClient();
+    const store = await open(client);
+    const before = store.sources().get('btc');
+    await store.engine()!.step();
+    await settle();
+    expect(store.session()?.cursorMs).toBe(T0 + 5 * M); // the answer landed and updated the session…
+    expect(store.sources().get('btc')).toBe(before); // …and the chart's source is the same object
+
+    store.session.update((s) => (s ? { ...s, layout: { ...s.layout, panels: [...s.layout.panels] } } : s));
+    expect(store.sources().get('btc')).not.toBe(before);
+  });
+
   it('shows "retrying" while a network failure is being retried', async () => {
     const client = fakeClient();
     let fail = true;
