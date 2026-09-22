@@ -4,28 +4,41 @@
 .combo {
   position: relative;
 }
-.trigger {
+/* BUG-016: the bordered box holds the chips and, filling the rest of the row, the trigger button */
+.field {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  width: 100%;
   min-height: 34px;
-  padding: 4px 8px;
+  padding: 3px 4px 3px 8px;
   background: #0d1117;
-  color: #c9d1d9;
   border: 1px solid #30363d;
   border-radius: 4px;
-  font: inherit;
   font-size: 13px;
+}
+.field:hover,
+.field:focus-within,
+.field.open {
+  border-color: #8b949e;
+}
+.trigger {
+  flex: 1 1 120px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 4px;
+  background: transparent;
+  color: #c9d1d9;
+  border: none;
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.trigger:hover,
-.trigger:focus-visible,
-.trigger[aria-expanded='true'] {
-  border-color: #8b949e;
-  outline: none;
+.trigger:focus-visible {
+  outline: 1px solid #8b949e;
+  outline-offset: 1px;
 }
 .chip {
   display: inline-flex;
@@ -38,11 +51,17 @@
   font-size: 12px;
 }
 .remove {
+  padding: 0 2px;
+  background: transparent;
+  border: none;
   color: #8b949e;
+  font: inherit;
   cursor: pointer;
 }
-.remove:hover {
+.remove:hover,
+.remove:focus-visible {
   color: #ef5350;
+  outline: none;
 }
 .placeholder,
 .count,

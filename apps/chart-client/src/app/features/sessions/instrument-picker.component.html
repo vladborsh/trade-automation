@@ -1,27 +1,36 @@
 <div class="picker">
   <div class="combo">
-    <button
-      #trigger
-      type="button"
-      class="trigger"
-      data-testid="instrument-trigger"
-      aria-haspopup="listbox"
-      [attr.aria-expanded]="open()"
-      aria-controls="instrument-listbox"
-      (click)="open() ? close(true) : openPanel()"
-      (keydown)="onTriggerKeydown($event)"
-    >
+    <!--
+      BUG-016: the chips sit beside the trigger, not inside it. Each ✕ is its own button, so a click on
+      the trigger (its centre included) can only open or close the list, never remove an instrument.
+    -->
+    <div class="field" [class.open]="open()">
       @for (c of chosen(); track c.id) {
         <span class="chip" data-testid="instrument-chip">
           {{ c.name }}
-          <span class="remove" aria-hidden="true" title="Remove" (click)="remove(c.id, $event)">✕</span>
+          <button type="button" class="remove" data-testid="instrument-chip-remove" title="Remove" [attr.aria-label]="'Remove ' + c.name" (click)="remove(c.id, $event)">
+            ✕
+          </button>
         </span>
-      } @empty {
-        <span class="placeholder">Choose instruments…</span>
       }
-      <span class="count">{{ selected().length }} / {{ max }}</span>
-      <span class="caret" aria-hidden="true">▾</span>
-    </button>
+      <button
+        #trigger
+        type="button"
+        class="trigger"
+        data-testid="instrument-trigger"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="open()"
+        aria-controls="instrument-listbox"
+        (click)="open() ? close(true) : openPanel()"
+        (keydown)="onTriggerKeydown($event)"
+      >
+        @if (chosen().length === 0) {
+          <span class="placeholder">Choose instruments…</span>
+        }
+        <span class="count">{{ selected().length }} / {{ max }}</span>
+        <span class="caret" aria-hidden="true">▾</span>
+      </button>
+    </div>
 
     @if (open()) {
       <div class="panel" data-testid="instrument-panel">

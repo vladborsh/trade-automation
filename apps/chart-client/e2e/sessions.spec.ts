@@ -1,3 +1,4 @@
+import type { Session } from '@trade-automation/contracts';
 import { apiUrl, expect, replayStarted, test } from './fixtures';
 
 /**
@@ -169,4 +170,42 @@ test('T-042: at 1280 px a long session name still fits the sessions table — no
   });
   expect(fit.scrollW, `table ${fit.scrollW}px in a ${fit.clientW}px container`).toBeLessThanOrEqual(fit.clientW);
   if (process.env['T042_SHOTS']) await page.screenshot({ path: `${process.env['T042_SHOTS']}/sessions-1280.png` });
+});
+
+test('BUG-016: with two instruments chosen, a click at the trigger’s centre closes the list and removes nothing; the session gets both panels', async ({ page }) => {
+  const name = `e2e two instruments ${Date.now()}`;
+  await page.goto('/sessions/new');
+  await page.getByLabel('Name').fill(name);
+  const trigger = page.getByTestId('instrument-trigger');
+  await trigger.click();
+  await page.getByRole('option', { name: /BTC\/USDT/ }).click();
+  await page.getByRole('option', { name: /ETH\/USDT/ }).click();
+  await expect(page.getByTestId('instrument-chip')).toHaveText([/BTC\/USDT Perp/, /ETH\/USDT Perp/]);
+
+  // the natural "done" click: the middle of the trigger, as a real mouse click at its geometric centre
+  const box = (await trigger.boundingBox())!;
+  const cy = box.y + box.height / 2;
+  await page.mouse.click(box.x + box.width / 2, cy);
+  await expect(page.getByTestId('instrument-panel')).toHaveCount(0);
+  await expect(page.getByTestId('instrument-chip')).toHaveText([/BTC\/USDT Perp/, /ETH\/USDT Perp/]); // both still chosen
+  // whatever the chips' widths, no point on the trigger's midline removes an instrument: each click only
+  // opens or closes the list (before the fix, the chips' ✕ sat inside the trigger — the Tester hit one at its centre)
+  for (let x = box.x + 3; x < box.x + box.width - 3; x += 6) await page.mouse.click(x, cy);
+  await expect(page.getByTestId('instrument-chip')).toHaveText([/BTC\/USDT Perp/, /ETH\/USDT Perp/]);
+  if ((await page.getByTestId('instrument-panel').count()) > 0) await trigger.click(); // leave it closed
+  await expect(page.getByTestId('instrument-panel')).toHaveCount(0);
+  if (process.env['BUG016_SHOTS']) {
+    await page.locator('app-instrument-picker').screenshot({ path: `${process.env['BUG016_SHOTS']}/picker-closed.png` });
+    await trigger.click();
+    await page.screenshot({ path: `${process.env['BUG016_SHOTS']}/picker-open.png` });
+    await trigger.click();
+  }
+
+  const created = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/backtest/sessions'));
+  await page.getByRole('button', { name: 'Create session' }).click();
+  const session = (await (await created).json()) as Session;
+  expect(session.layout.panels.map((p) => p.instrument).sort()).toEqual(['binance:BTCUSDT', 'binance:ETHUSDT']);
+  await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}$`));
+  await replayStarted(page);
+  await expect(page.locator('.chart-panel')).toHaveCount(2);
 });

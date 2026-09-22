@@ -115,6 +115,24 @@ describe('InstrumentPickerComponent (T-039: dropdown multiselect)', () => {
     expect(q(el, '[data-testid="instrument-panel"]')).toBeNull(); // removing a chip does not open the list
   });
 
+  it('BUG-016: no chip or ✕ inside the trigger; each ✕ is its own labelled button; clicking the trigger with two chips only toggles the list', () => {
+    const { fixture, el, emitted } = setup(['binance:BTCUSDT', 'binance:ETHUSDT']);
+    const trigger = q(el, '[data-testid="instrument-trigger"]')!;
+    expect(trigger.querySelector('[data-testid="instrument-chip"], .remove, button')).toBeNull(); // no nested interactive content
+    const removes = [...el.querySelectorAll<HTMLElement>('[data-testid="instrument-chip-remove"]')];
+    expect(removes.map((r) => [r.tagName, r.getAttribute('type'), r.getAttribute('aria-label')])).toEqual([
+      ['BUTTON', 'button', 'Remove BTC/USDT Perp'],
+      ['BUTTON', 'button', 'Remove ETH/USDT Perp'],
+    ]);
+    trigger.click(); // open
+    fixture.detectChanges();
+    trigger.click(); // close — the click that used to land on the second chip's ✕
+    fixture.detectChanges();
+    expect(q(el, '[data-testid="instrument-panel"]')).toBeNull();
+    expect(emitted).toEqual([]); // nothing removed
+    expect(trigger.textContent).toContain('2 / 4');
+  });
+
   it('a click outside closes the list', () => {
     const { fixture, el } = setup([]);
     openPanel(fixture, el);
