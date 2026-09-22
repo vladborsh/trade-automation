@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, input, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import type { Timeframe } from '@trade-automation/contracts';
 import { LayoutsStore } from '../../core/state/layouts.store';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
@@ -58,6 +58,9 @@ export class WorkspaceComponent {
     const instrument = this.panels().find((p) => p.id === active.panelId)?.instrument;
     return { draft, lastClose: this.store.lastCloseOf(active.panelId), precision: (instrument && this.store.pricePrecision().get(instrument)) || 2 };
   });
+  /** T-045: the order popup, open at the submit step — for as long as there is an active draft. */
+  readonly orderPopup = signal(false);
+  readonly popupDraft = computed(() => (this.orderPopup() ? this.activeDraft() : null));
 
   constructor() {
     effect(() => {
@@ -65,6 +68,10 @@ export class WorkspaceComponent {
       const viewAt = Number(this.viewAt());
       const view = Number.isFinite(viewAt) && viewAt > 0 ? { viewAt, orderId: this.viewOrder() ?? null } : null;
       untracked(() => void this.store.open(id, view));
+    });
+    // the draft went away (removed, placed from elsewhere, a reload): the popup goes with it
+    effect(() => {
+      if (this.orderPopup() && !this.activeDraft()) this.orderPopup.set(false);
     });
   }
 
@@ -82,6 +89,15 @@ export class WorkspaceComponent {
     const action = engine ? replayKeyAction(event) : null;
     if (!engine || !action) return;
     if (!keyAllowed(action, { completed: engine.completed(), viewOnly: engine.viewOnly })) return;
+    if (this.orderPopup()) {
+      // the popup is modal: Enter confirms, Esc closes it (keeping the draft), nothing else acts.
+      // Keys inside it are its own (its form submits on Enter, closes on Esc).
+      if ((event.target as Element | null)?.closest?.('app-order-panel')) return;
+      event.preventDefault();
+      if (action === 'order') this.confirmOrder();
+      else if (action === 'cancel') this.orderPopup.set(false);
+      return;
+    }
     event.preventDefault(); // → would otherwise scroll the page
     switch (action) {
       case 'step':
@@ -100,8 +116,18 @@ export class WorkspaceComponent {
     }
   }
 
-  /** `Enter` (decision 29): places the active draft; with none, a hint and nothing else. */
+  /**
+   * `Enter` (decision 29): with an active draft, opens the order popup (T-045) — the submit step;
+   * with none, a hint and nothing else.
+   */
   order(): void {
+    if (this.activeDraft()) this.orderPopup.set(true);
+    else this.store.placeActiveDraft();
+  }
+
+  /** The popup's Confirm: places the draft through the queue as before. */
+  confirmOrder(): void {
+    this.orderPopup.set(false);
     this.store.placeActiveDraft();
   }
 }

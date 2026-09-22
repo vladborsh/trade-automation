@@ -135,3 +135,43 @@ test('position tool: two drafts, handle drags without panning, click to activate
   await page.mouse.up();
   await expect(container).not.toHaveAttribute('data-visible-from', visibleFrom!);
 });
+
+test('T-045: the order popup appears only at Enter; Esc, Cancel and a click outside close it and keep the draft', async ({ page }) => {
+  const created = await page.context().request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name: `e2e order popup ${Date.now()}`,
+      layout: { id: 'op-e2e', name: 'OP e2e', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+      timeframe: '5m',
+      periodFromMs: FRIDAY_2140,
+      periodToMs: FRIDAY_2140 + 3 * 86_400_000,
+      initialBalance: 10_000,
+      defaultRiskPct: 1,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+    },
+  });
+  const session = (await created.json()) as Session;
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  const popup = page.getByTestId('order-popup');
+
+  await page.keyboard.press('b');
+  await expect.poll(async () => (await tools(page)).length).toBe(1);
+  await expect(popup).toHaveCount(0); // drawing a draft never opens it
+
+  await page.keyboard.press('Enter');
+  await expect(popup).toBeVisible();
+  await expect(popup.getByTestId('order-qty')).toHaveText(/\d/);
+  await page.keyboard.press('ArrowRight'); // modal: no step while it is open
+  await expect(page.getByTestId('replay-cursor')).toHaveText('2024-03-01 21:40 UTC');
+  await page.keyboard.press('Escape');
+  await expect(popup).toHaveCount(0);
+
+  await page.keyboard.press('Enter');
+  await popup.getByTestId('order-cancel').click();
+  await expect(popup).toHaveCount(0);
+
+  await page.keyboard.press('Enter');
+  await page.getByTestId('order-popup-backdrop').click({ position: { x: 5, y: 5 } });
+  await expect(popup).toHaveCount(0);
+  expect((await tools(page)).length).toBe(1); // the draft is still there, after all three
+});

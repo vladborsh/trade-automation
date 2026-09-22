@@ -48,10 +48,12 @@ function fakeStore() {
     portfolio: new PortfolioStore(),
     pricePrecision: signal(new Map()),
     hint: signal<string | null>(null),
-    activeDraft: null as null | { kind: 'draft'; id: string },
+    activeDraft: null as null | Record<string, unknown>,
     removeActiveDraft: vi.fn(() => true),
     createDraft: vi.fn(),
-    activeTool: vi.fn((): unknown => (store.activeDraft ? { panelId: 'btc', store: { active: () => store.activeDraft, removeActiveDraft: store.removeActiveDraft } } : null)),
+    /** Bumped by a spec after changing `activeDraft`, so the workspace's computeds see it. */
+    draftVersion: signal(0),
+    activeTool: vi.fn((): unknown => (store.draftVersion() >= 0 && store.activeDraft ? { panelId: 'btc', store: { active: () => store.activeDraft, removeActiveDraft: store.removeActiveDraft } } : null)),
     showHint: vi.fn((message: string) => store.hint.set(message)),
     placeActiveDraft: vi.fn(),
     riskPct: signal(1),
@@ -194,7 +196,76 @@ describe('WorkspaceComponent', () => {
     expect(store.removeActiveDraft).toHaveBeenCalledTimes(1);
   });
 
-  it('Enter places the active draft through the store (which alone decides: T-023)', async () => {
+  const DRAFT = { id: 't1', kind: 'draft', side: 'long', mode: 'limit', entry: 99, sl: 98, tp: 101, active: true, anchorTime: 0 };
+
+  it('T-045: B/S never open the order popup; Enter on the active draft does, and a second Enter confirms', async () => {
+    const { fixture, store, engine, el } = await render();
+    press('b');
+    store.activeDraft = DRAFT; // the draft B created (the fake store does not create one)
+    store.draftVersion.update((v) => v + 1);
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull(); // the levels are set on the chart first
+
+    press('Enter');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="order-popup"]')).not.toBeNull();
+    expect(store.placeActiveDraft).not.toHaveBeenCalled(); // the popup is the submit step
+    press('ArrowRight'); // modal: nothing else acts
+    press('s');
+    expect(engine.step).not.toHaveBeenCalled();
+    expect(store.createDraft.mock.calls).toEqual([['long']]); // only the B from before
+    press('Enter');
+    fixture.detectChanges();
+    expect(store.placeActiveDraft).toHaveBeenCalledTimes(1);
+    expect(el.querySelector('app-order-panel')).toBeNull();
+  });
+
+  it('T-045: Esc closes the popup and keeps the draft; the popup Cancel does the same', async () => {
+    const { fixture, store, el } = await render();
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    press('Enter');
+    fixture.detectChanges();
+    press('Escape');
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+    expect(store.removeActiveDraft).not.toHaveBeenCalled();
+    press('Enter');
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="order-cancel"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+    expect(store.placeActiveDraft).not.toHaveBeenCalled();
+  });
+
+  it('T-045: keys typed inside the popup are its own, not the workspace hotkeys', async () => {
+    const { fixture, store, el } = await render();
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    press('Enter');
+    fixture.detectChanges();
+    const cancel = el.querySelector<HTMLButtonElement>('[data-testid="order-cancel"]')!;
+    press('Enter', cancel); // a focused button: the browser clicks it; the window handler must not confirm too
+    expect(store.placeActiveDraft).not.toHaveBeenCalled();
+  });
+
+  it('T-045: the popup closes when its draft goes away', async () => {
+    const { fixture, store, el } = await render();
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    press('Enter');
+    fixture.detectChanges();
+    store.activeDraft = null;
+    store.draftVersion.update((v) => v + 1);
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+    store.activeDraft = DRAFT; // a new draft later does not bring the popup back by itself
+    store.draftVersion.update((v) => v + 1);
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+  });
+
+  it('Enter without an active draft goes to the store, which only hints (decision 29)', async () => {
     const { fixture, store, el } = await render();
     press('Enter');
     expect(store.placeActiveDraft).toHaveBeenCalledTimes(1);
@@ -204,9 +275,9 @@ describe('WorkspaceComponent', () => {
     expect(store.createDraft).not.toHaveBeenCalled();
   });
 
-  it('shows the order and positions panels and the open risk (T-023)', async () => {
+  it('shows the positions panel and the open risk (T-023); the order panel only as the submit popup (T-045)', async () => {
     const { el } = await render();
-    expect(el.querySelector('app-order-panel')).not.toBeNull();
+    expect(el.querySelector('app-order-panel')).toBeNull();
     expect(el.querySelector('app-positions-panel')).not.toBeNull();
     expect(el.querySelector('[data-testid="replay-open-risk"]')?.textContent).toContain('0.00');
   });

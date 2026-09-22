@@ -36,17 +36,6 @@
         @if (!e.viewOnly) {
           <!-- placing, cancelling and closing are mutations too: none while viewing the past -->
           <aside class="side">
-            <app-order-panel
-              [draft]="activeDraft()?.draft ?? null"
-              [lastClose]="activeDraft()?.lastClose ?? null"
-              [pricePrecision]="activeDraft()?.precision ?? 2"
-              [balance]="s.balance"
-              [riskPct]="store.riskPct()"
-              [notionalWarnMultiple]="s.notionalWarnMultiple"
-              [currency]="s.sessionCurrency"
-              (riskPctChange)="store.riskPctOverride.set($event)"
-              (place)="order()"
-            />
             <app-positions-panel
               class="positions"
               [rows]="store.positions().rows"
@@ -58,6 +47,21 @@
           </aside>
         }
       </div>
+      @if (popupDraft(); as a) {
+        <!-- T-045: the order popup, only at the submit step (Enter on an active draft) -->
+        <app-order-panel
+          [draft]="a.draft"
+          [lastClose]="a.lastClose"
+          [pricePrecision]="a.precision"
+          [balance]="s.balance"
+          [riskPct]="store.riskPct()"
+          [notionalWarnMultiple]="s.notionalWarnMultiple"
+          [currency]="s.sessionCurrency"
+          (riskPctChange)="store.riskPctOverride.set($event)"
+          (confirm)="confirmOrder()"
+          (cancel)="orderPopup.set(false)"
+        />
+      }
       <div class="bottom">
         <app-journal
           class="journal"

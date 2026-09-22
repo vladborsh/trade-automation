@@ -76,6 +76,16 @@ async function tape(page: Page, s: Json, fromMs = s.periodFromMs - MIN): Promise
   }
 }
 
+/** T-045: B/S draws a draft (never the popup); Enter opens the order popup — the submit step; Enter confirms. */
+async function placeFromKeyboard(page: Page, key: 'b' | 's'): Promise<void> {
+  await page.keyboard.press(key);
+  await expect(page.getByTestId('order-popup')).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('order-popup')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('order-popup')).toHaveCount(0);
+}
+
 async function openWorkspace(page: Page, id: string): Promise<void> {
   await page.goto(`/sessions/${id}`);
   // BUG-009/BUG-010: the one readiness wait — the engine's first history is in. `replay-loading` count 0 also holds
@@ -157,10 +167,10 @@ test('journey: keyboard orders, a manual close, the period end; every number equ
   const settle = async (expected: number) => expect.poll(serverCursor, { timeout: 15_000 }).toBe(expected);
 
   await step(1); await settle(from + 5 * MIN);
-  await page.keyboard.press('b'); await page.keyboard.press('Enter');
+  await placeFromKeyboard(page, 'b');
   await expect(page.getByTestId('position-1')).toBeVisible();
   await step(3); await settle(from + 20 * MIN);
-  await page.keyboard.press('s'); await page.keyboard.press('Enter');
+  await placeFromKeyboard(page, 's');
   await expect(page.locator('[data-testid^="position-"]').filter({ hasText: 'short' })).toBeVisible();
   await step(2); await settle(from + 30 * MIN);
 
@@ -382,7 +392,7 @@ test('robustness: never a guessed order, quick stepping, a dropped network, a st
   const settled = before + 8 * 5 * MIN; // 3 + 3 steps of the drop test, then these 2
   await expect.poll(serverCursor, { timeout: 15_000 }).toBe(settled);
   await tab2.bringToFront();
-  await tab2.keyboard.press('b'); await tab2.keyboard.press('Enter'); // a stale placement
+  await placeFromKeyboard(tab2, 'b'); // a stale placement
   await expect(tab2.getByTestId('replay-notice')).toContainText('moved on elsewhere', { timeout: 10_000 });
   expect(await serverCursor()).toBe(settled);
   expect(await orderCount()).toBe(0); // the stale tab created nothing
@@ -480,4 +490,66 @@ test('T-037: a → pressed while a step or switch is in flight is queued, never 
   expect(steps).toBeLessThanOrEqual(presses); // never more steps than presses (no backlog replayed)
   expect(Math.max(...gaps)).toBeLessThan(500); // no stall while the key was down
   expect(refused).toEqual([]);
+});
+
+test('T-045: B → drag the stop → Enter → the order popup → Confirm → the order, with the dragged stop', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  const s = await createSession(page, { name: `rw popup ${Date.now()}`, from, to: from + 3 * 60 * MIN, tf: '5m' });
+  await openWorkspace(page, s.id);
+  const body = page.locator('.chart-panel[data-panel-id="btc"] .panel-body');
+  const container = body.locator('.chart-container');
+  const box = (await container.boundingBox())!;
+  const tools = async () => ((await body.getAttribute('data-position-tools')) ?? '').split(' ').filter(Boolean).map((t) => t.split(':'));
+  const priceAt = async (y: number) => {
+    await page.mouse.move(box.x + box.width * 0.4, y);
+    await expect(body).toHaveAttribute('data-pointer-price', /\d/);
+    return Number(await body.getAttribute('data-pointer-price'));
+  };
+  const y1 = box.y + box.height * 0.25, y2 = box.y + box.height * 0.75;
+  const p1 = await priceAt(y1), p2 = await priceAt(y2);
+  const yOf = (price: number) => y1 + ((price - p1) * (y2 - y1)) / (p2 - p1);
+
+  // B with the pointer off the chart: a market draft; no popup while its levels are set
+  await page.mouse.move(box.x + box.width / 2, box.y - 40);
+  await page.keyboard.press('b');
+  await expect.poll(async () => (await tools()).length).toBe(1);
+  const [id, , , , sl0] = (await tools())[0];
+  await expect(page.getByTestId('order-popup')).toHaveCount(0);
+
+  // drag its stop handle 25 px down (the handle is found by scanning its level for the hover hook)
+  const slY = yOf(Number(sl0));
+  let handleX: number | null = null;
+  for (let x = box.x + 2; x < box.x + box.width - 60 && handleX === null; x += 3) {
+    await page.mouse.move(x, slY);
+    if ((await container.getAttribute('data-position-tool-hover')) === `handle:sl:${id}`) handleX = x;
+  }
+  expect(handleX, 'the draft has a stop handle').not.toBeNull();
+  await page.mouse.down();
+  await page.mouse.move(handleX!, slY + 12, { steps: 3 });
+  await expect(page.getByTestId('order-popup')).toHaveCount(0); // dragging is unobstructed
+  await page.mouse.move(handleX!, slY + 25, { steps: 3 });
+  await page.mouse.up();
+  const sl1 = Number((await tools())[0][4]);
+  expect(sl1).toBeLessThan(Number(sl0));
+  await expect(page.getByTestId('order-popup')).toHaveCount(0);
+
+  // Enter: the submit step — the popup, sized from the dragged stop
+  await page.mouse.move(box.x + box.width / 2, box.y - 40);
+  await page.keyboard.press('Enter');
+  const popup = page.getByTestId('order-popup');
+  await expect(popup).toBeVisible();
+  const qtyShown = Number(await popup.getByTestId('order-qty').innerText());
+  expect((await get(page, `/backtest/sessions/${s.id}/orders`)).length).toBe(0); // nothing placed yet
+  if (process.env['T045_SHOTS']) await page.screenshot({ path: `${process.env['T045_SHOTS']}/order-popup.png` });
+
+  await popup.getByTestId('order-confirm').click();
+  await expect(popup).toHaveCount(0);
+  await expect.poll(async () => (await get(page, `/backtest/sessions/${s.id}/orders`)).length, { timeout: 10_000 }).toBe(1);
+  const [order] = await get(page, `/backtest/sessions/${s.id}/orders`);
+  expect(order).toMatchObject({ side: 'long', type: 'market', status: 'open', slInitial: sl1 });
+  // the popup sizes at the last close; the market fill is half a spread away, so the server's qty differs slightly
+  expect(Math.abs(order.qty - qtyShown) / qtyShown).toBeLessThan(0.01);
+  await expect(page.getByTestId('position-1')).toBeVisible();
+  if (process.env['T045_SHOTS']) await page.screenshot({ path: `${process.env['T045_SHOTS']}/after-confirm.png` });
 });

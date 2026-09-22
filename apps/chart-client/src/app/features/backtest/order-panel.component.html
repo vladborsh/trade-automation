@@ -1,9 +1,14 @@
-<section class="panel" aria-labelledby="order-panel-title">
-  <h2 id="order-panel-title">Order</h2>
-  <label class="risk">
-    Risk %
-    <input type="number" name="riskPct" min="0.0001" max="100" step="0.1" [value]="riskPct()" (change)="onRiskInput($event)" />
-  </label>
+<div class="backdrop" data-testid="order-popup-backdrop" (click)="cancel.emit()"></div>
+<form
+  class="order-popup"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="order-popup-title"
+  data-testid="order-popup"
+  (submit)="onSubmit($event)"
+  (keydown.escape)="cancel.emit()"
+>
+  <h2 id="order-popup-title">Place order</h2>
   @if (view(); as v) {
     <dl data-testid="order-panel">
       <dt>Order</dt>
@@ -17,16 +22,21 @@
       <dt>Notional</dt>
       <dd>{{ money(v.notional) }}</dd>
     </dl>
+    <label class="risk">
+      Risk %
+      <input type="number" name="riskPct" min="0.0001" max="100" step="any" [value]="riskPct()" (change)="onRiskInput($event)" />
+    </label>
     @if (v.notionalWarning) {
       <p class="warning" role="alert" data-testid="notional-warning">
         Notional is above {{ notionalWarnMultiple() }}× the balance. No leverage is modelled; check the size.
       </p>
     }
     @if (v.problem; as problem) {
-      <p class="warning" role="alert">{{ problem }}</p>
+      <p class="warning" role="alert" data-testid="order-problem">{{ problem }}</p>
     }
-    <button type="button" class="place" (click)="place.emit()">Place (Enter)</button>
-  } @else {
-    <p class="empty">No active draft — press B or S on a chart.</p>
+    <div class="actions">
+      <button type="button" class="cancel" data-testid="order-cancel" (click)="cancel.emit()">Cancel <kbd>Esc</kbd></button>
+      <button type="submit" class="confirm" data-testid="order-confirm" [disabled]="v.problem !== null">Confirm <kbd>Enter</kbd></button>
+    </div>
   }
-</section>
+</form>
