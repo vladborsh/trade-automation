@@ -1,9 +1,10 @@
 import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import type { Order, PlaceOrderRequest, Session, SessionDetail, SessionStats } from '@trade-automation/contracts';
+import type { FillEvent, Order, PlaceOrderRequest, Session, SessionDetail, SessionStats } from '@trade-automation/contracts';
 import { ApiError } from '../api/api-error';
 import { BacktestClient } from '../api/backtest.client';
 import { NO_ACTIVE_TOOL_HINT, ReplaySessionStore } from './replay-session.store';
+import { ScreenshotUploadQueue, type ScreenshotJob } from './screenshot-upload.queue';
 
 const M = 60_000;
 const T0 = Date.UTC(2026, 8, 16, 10, 0);
@@ -54,6 +55,8 @@ async function open(client = fakeClient()) {
   return { store, client };
 }
 const settle = () => new Promise((r) => setTimeout(r, 0));
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('ReplaySessionStore — the trading loop (T-023)', () => {
   it('Enter without an active draft never creates an order: a hint, and the transport sees no place', async () => {
@@ -145,5 +148,87 @@ describe('ReplaySessionStore — the trading loop (T-023)', () => {
     await settle();
     expect(client.cancelOrder).toHaveBeenCalledWith('s1', '00000000-0000-4000-8000-0000000000b1', { opId: expect.any(String), cursorMs: T0 + 5 * M });
     expect(store.positions().rows).toEqual([]); // the cancelled row is no longer live
+  });
+});
+
+describe('ReplaySessionStore — the trade screenshots (T-026, §9.2)', () => {
+  const O1 = '00000000-0000-4000-8000-0000000000b1';
+  const O2 = '00000000-0000-4000-8000-0000000000b2';
+
+  /** The store with a recording upload queue and a chart that logs when its picture is taken. */
+  async function openWithCamera(client = fakeClient()) {
+    const log: string[] = [];
+    const jobs: ScreenshotJob[] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb) => cb(new Blob(['png'], { type: 'image/png' })));
+    const placeOrder = client.placeOrder.getMockImplementation()!;
+    client.placeOrder.mockImplementation(async (id: string, body: PlaceOrderRequest) => {
+      log.push('place request');
+      return placeOrder(id, body);
+    });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ReplaySessionStore,
+        { provide: BacktestClient, useValue: client },
+        { provide: ScreenshotUploadQueue, useValue: { enqueue: (j: ScreenshotJob) => jobs.push(j) } },
+      ],
+    });
+    const store = TestBed.inject(ReplaySessionStore);
+    await store.open('s1');
+    // what ChartPanelComponent does with its chart
+    store.sources().get('btc')!.capture!.attach(() => {
+      log.push('picture taken');
+      return { width: 1600, height: 900 } as HTMLCanvasElement;
+    });
+    return { store, client, log, jobs };
+  }
+
+  const advanceWith = (events: FillEvent[], orders: Order[] = []) => ({
+    cursorMs: T0 + 10 * M, status: 'active', balance: 10_000, events, orders, stats: STATS,
+  });
+  const exitEvent = (orderId: string, reason: 'stop' | 'take-profit'): FillEvent =>
+    ({ orderId, kind: 'exit', time: T0 + 6 * M, price: 1, reason, resolution: '1m' }) as FillEvent;
+
+  it('entry: the picture is taken in the Enter handler before the place request, and uploaded with the new order id', async () => {
+    const { store, log, jobs } = await openWithCamera();
+    store.toolStore('btc').create('long');
+    store.placeActiveDraft();
+    expect(log).toEqual(['picture taken', 'place request']); // both in the Enter handler: the picture first
+    await settle();
+    expect(jobs).toEqual([{ sessionId: 's1', orderId: O1, kind: 'entry', png: expect.any(Promise) }]);
+    expect((await jobs[0].png).type).toBe('image/png');
+  });
+
+  it('a refused order (422) uploads nothing', async () => {
+    const client = fakeClient();
+    client.placeOrder.mockRejectedValueOnce(new ApiError(422, 'SL_ON_WRONG_SIDE', 'no'));
+    const { store, jobs } = await openWithCamera(client);
+    store.toolStore('btc').create('long');
+    store.placeActiveDraft();
+    await settle();
+    expect(jobs).toEqual([]);
+  });
+
+  it('a coalesced advance answer with two exits uploads two exit pictures (decision 27)', async () => {
+    const client = fakeClient();
+    const rows = [O1, O2].map((id) => ({ ...pending({ panelId: 'btc' } as PlaceOrderRequest), id, status: 'closed' }) as Order);
+    client.advance.mockResolvedValue(advanceWith([exitEvent(O1, 'stop'), exitEvent(O2, 'take-profit')], rows));
+    const { store, jobs, log } = await openWithCamera(client);
+    await store.engine()!.step(); // one step: one answer carrying both exits
+    await vi.waitFor(() => expect(jobs).toHaveLength(2));
+    expect(jobs.map((j) => [j.orderId, j.kind])).toEqual([
+      [O1, 'exit'],
+      [O2, 'exit'],
+    ]);
+    expect(log).toEqual(['picture taken', 'picture taken']);
+  });
+
+  it('a manual close uploads the exit picture (its answer carries no events)', async () => {
+    const client = fakeClient();
+    client.closeOrder.mockResolvedValue({ order: { ...pending({ panelId: 'btc' } as PlaceOrderRequest), status: 'closed', closeReason: 'manual' }, stats: STATS, balance: 9_990 });
+    const { store, jobs } = await openWithCamera(client);
+    store.closeOrder(O1);
+    await vi.waitFor(() => expect(jobs.map((j) => [j.orderId, j.kind])).toEqual([[O1, 'exit']]));
   });
 });

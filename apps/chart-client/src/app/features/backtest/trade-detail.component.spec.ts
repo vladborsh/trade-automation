@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import type { Order, OrderDetail, Session } from '@trade-automation/contracts';
 import { BacktestClient } from '../../core/api/backtest.client';
+import { ScreenshotUploadQueue } from '../../core/replay/screenshot-upload.queue';
 import { TradeDetailComponent } from './trade-detail.component';
 
 const T = Date.UTC(2026, 8, 16, 10, 4);
@@ -55,5 +56,33 @@ describe('TradeDetailComponent (§9.3)', () => {
     expect(client.fetchScreenshot).toHaveBeenCalledWith('/api/backtest/sessions/s1/orders/o1/screenshots/entry');
     expect(el.querySelector('[data-shot="entry"] img')?.getAttribute('src')).toMatch(/^blob:/);
     expect(el.querySelector('[data-shot="exit"] [data-testid="shot-placeholder"]')?.textContent).toBe('No exit screenshot');
+  });
+
+  it('T-026: a picture still uploading from the workspace says so, and is shown once it lands', async () => {
+    const { el, client, fixture } = await render({});
+    const uploads = TestBed.inject(ScreenshotUploadQueue);
+    uploads.pending.set(new Set(['o1:exit']));
+    fixture.detectChanges();
+    const exitShot = () => el.querySelector('[data-shot="exit"]')!;
+    expect(exitShot().querySelector('[data-testid="shot-placeholder"]')?.textContent).toBe('Uploading the exit screenshot…');
+    expect(el.querySelector('[data-shot="entry"] [data-testid="shot-placeholder"]')?.textContent).toBe('No entry screenshot');
+
+    client.getOrder.mockResolvedValue({ order: ORDER, modifications: [], screenshots: { exit: '/api/backtest/sessions/s1/orders/o1/screenshots/exit' } });
+    uploads.pending.set(new Set());
+    uploads.uploaded.set(new Set(['o1:exit']));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    expect(client.getOrder).toHaveBeenCalledTimes(2); // fetched again when the upload landed
+    expect(exitShot().querySelector('img')?.getAttribute('src')).toMatch(/^blob:/);
+  });
+
+  it('an upload of another order does not reload this one', async () => {
+    const { client, fixture } = await render({});
+    TestBed.inject(ScreenshotUploadQueue).uploaded.set(new Set(['o2:exit']));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(client.getOrder).toHaveBeenCalledTimes(1);
   });
 });

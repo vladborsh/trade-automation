@@ -16,6 +16,8 @@ import { panelAtr14 } from './panel-indicators';
 import { ReplayPanelSource } from './replay-panel-source';
 import { PositionToolsStore } from './position-tools.store';
 import { orderTool } from './view-only';
+import { ScreenshotUploadQueue } from './screenshot-upload.queue';
+import { TradeScreenshots } from './trade-screenshots';
 
 /** §9.3 view-only rewind: the cursor to view at, and the order whose drawing to show. */
 export interface ViewAt {
@@ -71,7 +73,17 @@ export class ReplaySessionStore implements OnDestroy {
     return positionRows(this.portfolio.orders(), (panelId) => this.lastCloseOf(panelId), costs);
   });
   /** Places sent and not yet answered, oldest first: which draft each 201 consumes. */
-  private readonly placing: Array<{ draftId: string; panelId: string }> = [];
+  private readonly placing: Array<{ draftId: string; panelId: string; entryShot: Promise<Blob> | null }> = [];
+  /** §9.2 (T-026): the entry and exit pictures, uploaded by the root queue. */
+  private readonly screenshots = new TradeScreenshots({
+    sessionId: () => this.sessionId,
+    captureOf: (panelId) => {
+      const capture = this.sources().get(panelId)?.capture;
+      return capture ? () => capture.take() : null;
+    },
+    enqueue: (job) => this.uploads.enqueue(job),
+  });
+  private readonly uploads = inject(ScreenshotUploadQueue);
 
   private queue: AdvanceQueue | null = null;
   private sessionId: string | null = null;
@@ -332,6 +344,7 @@ export class ReplaySessionStore implements OnDestroy {
     switch (outcome.kind) {
       case 'advance': {
         const { cursorMs, status, balance, events, orders, stats } = outcome.result;
+        this.screenshots.exits(events, (orderId) => this.panelOf(orderId, orders));
         engine?.confirmServerCursor(cursorMs);
         this.session.update((s) => (s ? { ...s, cursorMs, status, balance } : s));
         this.reportMismatches(this.portfolio.applyAdvance(cursorMs, orders));
@@ -348,11 +361,13 @@ export class ReplaySessionStore implements OnDestroy {
           store.removeDraft(placed.draftId);
           store.activate(outcome.result.order.id);
         }
+        this.screenshots.entryPlaced(outcome.result.order.id, placed?.entryShot);
         this.applyOrders([outcome.result.order]);
         this.portfolio.applyEvents(outcome.result.events);
         return;
       }
       case 'close':
+        this.screenshots.closed(outcome.result.order);
         this.portfolio.clearPending(outcome.result.order.id);
         this.applyOrders([outcome.result.order]);
         this.portfolio.stats.set(outcome.result.stats);
@@ -364,6 +379,11 @@ export class ReplaySessionStore implements OnDestroy {
         this.applyOrders([outcome.result]);
         return;
     }
+  }
+
+  /** An order's panel: from the rows in hand, else the journal. */
+  private panelOf(orderId: string, rows: readonly Order[]): string | undefined {
+    return (rows.find((o) => o.id === orderId) ?? this.portfolio.orders().find((o) => o.id === orderId))?.panelId;
   }
 
   private applyOrders(orders: Parameters<PortfolioStore['applyOrders']>[0]): void {
@@ -406,7 +426,8 @@ export class ReplaySessionStore implements OnDestroy {
     });
     if ('hint' in built) return this.showHint(built.hint);
     if (!this.queue) return this.showHint('The session is reloading — press Enter again in a moment.');
-    this.placing.push({ draftId: draft.id, panelId: active.panelId });
+    // the entry picture is of this moment: taken before the place request goes out (§9.2)
+    this.placing.push({ draftId: draft.id, panelId: active.panelId, entryShot: this.screenshots.captureEntry(active.panelId) });
     this.queue?.push(built.input);
   }
 

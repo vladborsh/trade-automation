@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, type OnDestroy, computed, effect, i
 import { RouterLink } from '@angular/router';
 import type { OrderDetail, Session } from '@trade-automation/contracts';
 import { BacktestClient } from '../../core/api/backtest.client';
+import { ScreenshotUploadQueue, shotKey } from '../../core/replay/screenshot-upload.queue';
 import { viewAtFor } from '../../core/replay/view-only';
 import { modificationText, tradeDetailFields } from './trade-detail-fields';
 
@@ -9,8 +10,8 @@ type ShotKind = 'entry' | 'exit';
 
 /**
  * backtest-app-system-design.md §9.3 — `/sessions/:id/trades/:orderId`: the order row, its costs,
- * R and MAE, the modification history and both screenshots (placeholders until T-026 uploads
- * them). "Show on chart" opens the workspace view-only at the trade (decision 32). Read-only.
+ * R and MAE, the modification history and both screenshots (a placeholder until the picture is on
+ * the server; one uploading from the workspace (T-026) is shown once it lands). "Show on chart" opens the workspace view-only at the trade (decision 32). Read-only.
  */
 @Component({
   selector: 'app-trade-detail',
@@ -26,6 +27,7 @@ export class TradeDetailComponent implements OnDestroy {
   readonly orderId = input.required<string>();
 
   private readonly client = inject(BacktestClient);
+  private readonly uploads = inject(ScreenshotUploadQueue);
 
   readonly session = signal<Session | null>(null);
   readonly detail = signal<OrderDetail | null>(null);
@@ -40,6 +42,16 @@ export class TradeDetailComponent implements OnDestroy {
     return d && s ? tradeDetailFields(d.order, s.sessionCurrency, this.precision()) : [];
   });
   readonly modifications = computed(() => (this.detail()?.modifications ?? []).map((m) => modificationText(m, this.precision())));
+  /** The kinds of this order's pictures still uploading from the workspace (T-026). */
+  readonly uploading = computed(() => {
+    const pending = this.uploads.pending();
+    return new Set<string>((['entry', 'exit'] as const).filter((k) => pending.has(shotKey(this.orderId(), k))));
+  });
+  /** How many of this order's pictures have landed since the app started: a change reloads. */
+  private readonly landed = computed(() => {
+    const uploaded = this.uploads.uploaded();
+    return (['entry', 'exit'] as const).filter((k) => uploaded.has(shotKey(this.orderId(), k))).length;
+  });
   /** Query params for "Show on chart" (§9.3). */
   readonly showOnChart = computed(() => {
     const order = this.detail()?.order;
@@ -50,6 +62,7 @@ export class TradeDetailComponent implements OnDestroy {
     effect(() => {
       const id = this.id();
       const orderId = this.orderId();
+      this.landed(); // a picture finishing its upload while the page is open: fetch again
       untracked(() => void this.load(id, orderId));
     });
   }

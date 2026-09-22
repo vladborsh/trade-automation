@@ -53,8 +53,8 @@ export class ChartPanelComponent {
     this.positionTools()?.tools.map((t) => `${t.id}:${t.side}:${t.mode}:${t.entry}:${t.sl}:${t.tp}:${t.active ? 'active' : ''}`).join(' '),
   );
   readonly pointerPriceHook = signal<number | null>(null);
-  /** The chart's crosshair (a template ref, so a spec's stub chart satisfies it too). */
-  private readonly chart = viewChild<{ crosshairPrice: Signal<number | null> }>('chart');
+  /** The chart's crosshair and picture (a template ref, so a spec's stub chart satisfies it too). */
+  private readonly chart = viewChild<{ crosshairPrice: Signal<number | null>; takeScreenshot?(): HTMLCanvasElement | null }>('chart');
   private readonly sync = inject(ChartSyncService, { optional: true });
   /** The newest bar, as e2e hooks on the panel body (the chart itself is a canvas). */
   readonly lastBar = computed(() => this.candles().at(-1) ?? null);
@@ -93,6 +93,13 @@ export class ChartPanelComponent {
       const price = this.sync?.crosshair()?.origin === this.panel().id ? (this.chart()?.crosshairPrice() ?? null) : null;
       tools.setPointerPrice(price);
       this.pointerPriceHook.set(price);
+    });
+    // §9.2 (T-026): the source takes this panel's picture through the chart, while it exists.
+    effect((onCleanup) => {
+      const capture = this.source().capture;
+      if (!capture) return;
+      capture.attach(() => this.chart()?.takeScreenshot?.() ?? null);
+      onCleanup(() => capture.attach(null));
     });
   }
 

@@ -60,6 +60,25 @@ describe('BacktestClient (backtest-app-system-design.md §7.2)', () => {
     expect(blob).not.toBeNull();
   });
 
+  it('PUTs a screenshot as a raw image/png body with the session cookie (T-026)', async () => {
+    const { client, fetchMock } = setup(jsonResponse(201, { key: 'k', width: 1280, height: 720, bytes: 3 }));
+    const png = new Blob(['png'], { type: 'image/png' });
+    await expect(client.uploadScreenshot('s 1', 'o1', 'exit', png)).resolves.toEqual({ key: 'k', width: 1280, height: 720, bytes: 3 });
+    expect(fetchMock).toHaveBeenLastCalledWith(`${API}/backtest/sessions/s%201/orders/o1/screenshots/exit`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'image/png' },
+      body: png,
+    });
+  });
+
+  it('a refused screenshot upload is an ApiError with the contract code', async () => {
+    const { client } = setup(jsonResponse(409, { error: { code: 'SCREENSHOT_EXISTS', message: 'exists' } }));
+    const err = await client.uploadScreenshot('s1', 'o1', 'entry', new Blob(['png'])).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 409, code: 'SCREENSHOT_EXISTS' });
+  });
+
   it('GETs the journal and the stats (T-024)', async () => {
     const { client, fetchMock } = setup(jsonResponse(200, []));
     await client.listOrders('s1');

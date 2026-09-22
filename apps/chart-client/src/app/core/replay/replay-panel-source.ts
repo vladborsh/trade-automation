@@ -1,6 +1,7 @@
 import { type Signal, computed, signal } from '@angular/core';
 import type { Candle, IndicatorPoint, IndicatorSeriesSpec, MetricPoint, OverlayPrimitive, Panel, SessionPanel } from '@trade-automation/contracts';
 import type { PanelPositionTools, PanelSource } from '../../features/panel-grid/panel-source';
+import { CaptureSlot } from './capture-chart';
 import { seriesBars } from './fold-on-step';
 import { panelIndicators } from './panel-indicators';
 import type { ReplayEngine } from './replay-engine';
@@ -21,6 +22,8 @@ export class ReplayPanelSource implements PanelSource {
   readonly overlays = NO_OVERLAYS;
   readonly indicatorPoints: Signal<readonly IndicatorPoint[]>;
   readonly indicatorSpecs: Signal<ReadonlyMap<string, IndicatorSeriesSpec>>;
+  /** The chart panel's picture, for the entry and exit screenshots (T-026). */
+  readonly capture = new CaptureSlot();
 
   constructor(
     readonly panel: Panel & Pick<SessionPanel, 'indicators'>,

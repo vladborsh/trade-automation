@@ -18,10 +18,13 @@ import type {
   Session,
   SessionDetail,
   SessionStatsResponse,
+  ScreenshotKind,
+  ScreenshotUploadResponse,
   SessionSummariesResponse,
   Timeframe,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/app-config.service';
+import { buildUrl, toApiError } from './api-error';
 import { RestClient } from './rest.client';
 import { serverUrl } from './server-url';
 
@@ -94,6 +97,23 @@ export class BacktestClient {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * §9.2 (T-026) — stores one trade screenshot: a raw `image/png` body, written once (409
+   * SCREENSHOT_EXISTS after that). Not JSON, so `fetch` directly, with the same credentials and
+   * `ApiError` as every other call.
+   */
+  async uploadScreenshot(id: string, orderId: string, kind: ScreenshotKind, png: Blob): Promise<ScreenshotUploadResponse> {
+    const path = `${orderPath(id, orderId)}/screenshots/${kind}`;
+    const res = await fetch(buildUrl(this.config.get().apiBaseUrl, path, window.location.origin), {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'image/png' },
+      body: png,
+    });
+    if (!res.ok) throw toApiError('PUT', path, res.status, await res.json().catch(() => null));
+    return (await res.json()) as ScreenshotUploadResponse;
   }
 
   /** §7.2, decision 38 — the full recompute plus the stored aggregates and whether they drifted. */

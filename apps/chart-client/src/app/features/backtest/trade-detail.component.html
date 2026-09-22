@@ -42,7 +42,7 @@
               @if (kind === 'entry' ? shots().entry : shots().exit; as url) {
                 <img [src]="url" [alt]="kind + ' screenshot'" />
               } @else {
-                <div class="placeholder" data-testid="shot-placeholder">No {{ kind }} screenshot</div>
+                <div class="placeholder" data-testid="shot-placeholder">{{ uploading().has(kind) ? 'Uploading the ' + kind + ' screenshot…' : 'No ' + kind + ' screenshot' }}</div>
               }
               <figcaption>{{ kind === 'entry' ? 'At placement' : 'At close' }}</figcaption>
             </figure>

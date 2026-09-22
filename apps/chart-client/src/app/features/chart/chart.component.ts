@@ -312,6 +312,11 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     this.indicatorSeriesCount.set(this.indicatorLayer.visibleSeriesCount());
   }
 
+  /** §9.2 (T-026): the chart with its primitives (the position tools), without the crosshair. */
+  takeScreenshot(): HTMLCanvasElement | null {
+    return this.chart?.takeScreenshot(true, false) ?? null;
+  }
+
   /** The shared timeframe (§6.3 — every panel in a grid is on it), in seconds. */
   private tfSec(): number {
     return TIMEFRAME_MS[this.timeframe()] / 1000;

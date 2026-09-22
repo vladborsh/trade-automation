@@ -38,7 +38,17 @@ export interface PanelSource {
    * workspace supplies it; without it the chart draws none and ignores pointer hits.
    */
   readonly positionTools?: PanelPositionTools;
+  /**
+   * backtest-app-system-design.md §9.2 (T-026): where the chart panel attaches its chart's
+   * picture, for the trade screenshots. Only the replay workspace supplies it.
+   */
+  readonly capture?: PanelCapture;
   loadOlder(): Promise<void>;
+}
+
+/** The chart's picture (with its primitives, without the crosshair) while the chart exists. */
+export interface PanelCapture {
+  attach(take: (() => HTMLCanvasElement | null) | null): void;
 }
 
 /** A panel's position tools as the chart kit sees them: what to draw, and where changes go. */
