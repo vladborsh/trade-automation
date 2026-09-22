@@ -5,6 +5,16 @@ type KeySpec = IndicatorSeriesSpec['keys'][number];
 /** A key's series: a line, or (T-057) a histogram. */
 type KeySeries = ISeriesApi<'Line'> | ISeriesApi<'Histogram'>;
 
+/**
+ * T-065: pane sizing. lightweight-charts' defaults gave the indicator panes half the chart between
+ * them (price 324 px, RSI 162, MACD 162 at 1280 px) and kept each scale's default margins (20 % top,
+ * 10 % bottom), so RSI's 0–100 axis ran to ~120 and every plot used ~70 % of its pane. Now each
+ * indicator pane is a quarter of the price pane's height, and its plot fills it.
+ */
+export const PRICE_PANE_STRETCH = 4;
+export const INDICATOR_PANE_STRETCH = 1;
+export const INDICATOR_SCALE_MARGINS = { top: 0.06, bottom: 0.04 } as const;
+
 /** T-057: histogram bars coloured by sign, from the AGENTS.md up/down palette. */
 const HISTOGRAM_UP = '#26a69a';
 const HISTOGRAM_DOWN = '#ef5350';
@@ -42,6 +52,10 @@ function groupKey(strategyId: string, seriesId: string): string {
  * T-047: `labels` off (the replay workspace) draws lines only — no series title text on the chart.
  * The live terminal keeps them: its research strategies' titles carry the "research, unvalidated"
  * wording (§6), and they come through this same layer.
+ *
+ * T-065: an indicator pane gets a stretch factor of 1 against the price pane's 4 (a quarter of its
+ * height) and small scale margins, so its plot fills it. Price-scale specs never make a pane: the
+ * live terminal, whose strategies emit only those, is unaffected.
  *
  * T-057: a key with `plot: 'histogram'` (MACD's `hist`) is a `HistogramSeries` in the same pane
  * instead of a line, each bar coloured by its sign (up ≥ 0, down < 0). Every other key — all the
@@ -165,6 +179,11 @@ export class IndicatorLayer {
         group.series.set(keySpec.key, this.addKeySeries(keySpec, this.title(spec.label, keySpec.label), paneIndex, extra));
       }
       const first = group.series.values().next().value;
+      // T-065: a quarter of the price pane's height, and the plot fills it (one scale per pane)
+      first?.priceScale().applyOptions({ scaleMargins: { ...INDICATOR_SCALE_MARGINS } });
+      const panes = chart.panes();
+      panes[0]?.setStretchFactor(PRICE_PANE_STRETCH);
+      panes[paneIndex]?.setStretchFactor(INDICATOR_PANE_STRETCH);
       for (const level of spec.levels ?? []) {
         const line = first?.createPriceLine({ price: level, color: '#8b949e', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
         if (line) group.lines.push(line);

@@ -102,3 +102,24 @@ test("T-057: MACD's histogram in its pane and the inverse FVGs as boxes on the p
   await page.getByRole('button', { name: 'Layout' }).click(); // close the editor for the picture
   if (process.env['T057_SHOTS']) await page.screenshot({ path: `${process.env['T057_SHOTS']}/macd-hist-fvg-boxes.png` });
 });
+
+// T-065: lightweight-charts draws each pane as a table row; the price pane dominates and every pane's
+// right price scale is the same width (so the plots stay aligned).
+test('T-065: with RSI and MACD each indicator pane is about a quarter of the price pane, scales aligned', async ({ page }) => {
+  await openSession(page);
+  await page.getByRole('button', { name: 'Layout' }).click();
+  await addIndicator(page, 'Relative strength index');
+  await addIndicator(page, 'MACD');
+  await page.getByRole('button', { name: 'Layout' }).click();
+  const chart = page.locator('.chart-panel[data-panel-id="btc"] [data-indicator-series-count]');
+  await expect(chart).toHaveAttribute('data-indicator-series-count', '4');
+  await expect
+    .poll(async () => {
+      const rows = await chart.locator('table tr').evaluateAll((trs) =>
+        trs.map((tr) => ({ h: tr.getBoundingClientRect().height, cells: [...tr.querySelectorAll(':scope > td')].map((td) => Math.round(td.getBoundingClientRect().width)) })),
+      );
+      const panes = rows.filter((r) => r.h > 40 && r.cells.length === 3); // the three plot rows, not separators or the time axis
+      return panes.length === 3 ? { ratios: panes.slice(1).map((p) => Math.round((p.h / panes[0].h) * 100) / 100), scales: panes.map((p) => p.cells[2]) } : null;
+    })
+    .toEqual({ ratios: [0.25, 0.25], scales: [80, 80, 80] });
+});

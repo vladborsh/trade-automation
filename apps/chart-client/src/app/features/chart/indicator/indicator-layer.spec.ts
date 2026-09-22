@@ -1,16 +1,19 @@
 import { vi } from 'vitest';
 import { HistogramSeries, LineSeries, type IChartApi } from 'lightweight-charts';
 import type { IndicatorPoint, IndicatorSeriesSpec } from '@trade-automation/contracts';
-import { IndicatorLayer } from './indicator-layer';
+import { INDICATOR_PANE_STRETCH, INDICATOR_SCALE_MARGINS, IndicatorLayer, PRICE_PANE_STRETCH } from './indicator-layer';
 
 /** A fake lightweight-charts chart: panes are arrays of fake series; empty panes are kept (LWC may or may not drop them). */
 function fakeChart() {
   const panes: FakeSeries[][] = [[]];
   const addCalls: unknown[][] = [];
+  /** T-065: stretch factors set per pane index (unset = the library default). */
+  const stretch: Record<number, number> = {};
   class FakeSeries {
     opts: Record<string, unknown>;
     data: unknown[] = [];
     lines: unknown[] = [];
+    scaleOptions: Record<string, unknown> | null = null;
     constructor(opts: Record<string, unknown>) {
       this.opts = { visible: true, ...opts };
     }
@@ -22,6 +25,9 @@ function fakeChart() {
     }
     setData(d: unknown[]) {
       this.data = d;
+    }
+    priceScale() {
+      return { applyOptions: (o: Record<string, unknown>) => void (this.scaleOptions = { ...this.scaleOptions, ...o }) };
     }
     createPriceLine(o: unknown) {
       this.lines.push(o);
@@ -47,10 +53,10 @@ function fakeChart() {
         if (i >= 0) p.splice(i, 1);
       }
     }),
-    panes: () => panes.map((p, i) => ({ paneIndex: () => i, getSeries: () => p })),
+    panes: () => panes.map((p, i) => ({ paneIndex: () => i, getSeries: () => p, setStretchFactor: (f: number) => void (stretch[i] = f) })),
     removePane: vi.fn((i: number) => void panes.splice(i, 1)),
   };
-  return { chart: chart as unknown as IChartApi, raw: chart, panes, addCalls };
+  return { chart: chart as unknown as IChartApi, raw: chart, panes, addCalls, stretch };
 }
 
 const point = (seriesId: string, time: number, values: Record<string, number | null>, timeframe: IndicatorPoint['timeframe'] = '5m'): IndicatorPoint => ({
@@ -206,6 +212,30 @@ describe('IndicatorLayer', () => {
       const spec: IndicatorSeriesSpec = { id: 'x', label: 'X', scale: 'price', keys: [{ key: 'a', label: 'A', plot: 'line' }, { key: 'b', label: 'B' }, { key: 'h', label: 'H', plot: 'histogram' }] };
       layer.render([point('x', 60_000, { a: 1, b: 2, h: -1 })], new Map([['replay:x', spec]]), '5m');
       expect(addCalls.map((c) => [c[0], c.length])).toEqual([[LineSeries, 2], [LineSeries, 2], [HistogramSeries, 2]]);
+    });
+  });
+
+  describe('T-065: indicator pane sizing', () => {
+    it('each indicator pane is a quarter of the price pane (stretch 4 : 1 : 1) and its scale margins are small', () => {
+      const { chart, panes, stretch } = fakeChart();
+      const layer = new IndicatorLayer(() => false);
+      layer.attach(chart);
+      layer.render([point('rsi-0', 60_000, { rsi: 55 }), point('macd-1', 60_000, { macd: 1, signal: 0.5 })], new Map([['replay:rsi-0', RSI], ['replay:macd-1', MACD]]), '5m');
+      expect(stretch).toEqual({ 0: PRICE_PANE_STRETCH, 1: INDICATOR_PANE_STRETCH, 2: INDICATOR_PANE_STRETCH });
+      expect(PRICE_PANE_STRETCH / INDICATOR_PANE_STRETCH).toBe(4);
+      const scale = (pane: number) => (panes[pane][0] as unknown as { scaleOptions: unknown }).scaleOptions;
+      expect(scale(1)).toEqual({ scaleMargins: { top: 0.06, bottom: 0.04 } }); // RSI's 0–100 range, without ~30 % dead space
+      expect(scale(2)).toEqual({ scaleMargins: INDICATOR_SCALE_MARGINS });
+      expect(INDICATOR_SCALE_MARGINS.top + INDICATOR_SCALE_MARGINS.bottom).toBeLessThanOrEqual(0.1);
+    });
+
+    it("price-scale specs (the live terminal's) set no stretch factor and touch no scale", () => {
+      const { chart, panes, stretch } = fakeChart();
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      layer.render([point('vwap', 60_000, { vwap: 10, top: 11 })], new Map([['replay:vwap', VWAP]]), '5m');
+      expect(stretch).toEqual({});
+      expect(panes[0].every((sr) => (sr as unknown as { scaleOptions: unknown }).scaleOptions === null)).toBe(true);
     });
   });
 });
