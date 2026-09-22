@@ -52,6 +52,7 @@ test('a mixed-currency selection cannot be submitted', async ({ page }) => {
   // keyboard only: focus the trigger, open, search, move, toggle, close
   await page.getByTestId('instrument-trigger').focus();
   await page.keyboard.press('ArrowDown');
+  await expect(page.getByLabel('Search instruments')).toBeFocused(); // focus moves after the panel renders
   await page.keyboard.type('eur');
   await expect(page.getByTestId('instrument-panel').getByRole('option')).toHaveCount(1); // native <option>s elsewhere share the role
   await page.keyboard.press('ArrowDown');
