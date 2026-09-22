@@ -1,4 +1,5 @@
 import { runMigrations } from '../../src/db/migration-runner';
+import { DB_HOOK_TIMEOUT_MS } from './scratch-db';
 
 /**
  * architecture/backtest-app-system-design.md T-004 "done when" — "with a local Postgres the
@@ -16,5 +17,5 @@ maybeDescribe('migration-runner against a real Postgres (T-004 done-when)', () =
 
     const second = await runMigrations({ connectionString: DATABASE_URL as string });
     expect(second.applied).toEqual([]);
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: each run takes the advisory lock other workers' migrations may hold
 });

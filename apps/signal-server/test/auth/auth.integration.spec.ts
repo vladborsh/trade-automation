@@ -14,6 +14,7 @@ import { SESSION_TTL_MS, sha256Hex } from '../../src/auth/session-cookie';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FakeClock, fakeConfig, fastHasher } from './fake-auth';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * T-007 done-when, against a real Postgres: invite accept succeeds exactly once under concurrent
@@ -44,7 +45,7 @@ maybeDescribe('auth against a real Postgres (T-007 done-when)', () => {
     db = new PgDatabase(DATABASE_URL as string);
     repos = new PgAuthRepositories(db);
     adminId = (await repos.users.insert({ email: email('inviter'), passwordHash: 'x', role: 'admin' })).id;
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   beforeEach(() => {
     clock = new FakeClock(Date.now());
@@ -55,7 +56,7 @@ maybeDescribe('auth against a real Postgres (T-007 done-when)', () => {
     // invites cascade from their creator
     await db.query(`delete from users where email like $1`, [`%-${run}@auth-it.test`]);
     await db.end();
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   async function createInvite(expiresAtMs: number): Promise<string> {
     const token = `inv-${randomUUID()}`;

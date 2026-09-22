@@ -12,6 +12,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
 import { DAY, fakeInstrumentConfig, FakeScreenshotStore, T0 } from './fake-backtest';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * BUG-002/003 ruling, the close paths against a real Postgres (migration 002 applied):
@@ -79,13 +80,13 @@ maybeDescribe('close paths with extreme values (BUG-002/003 ruling)', () => {
         `alice-${run}@advance-bounds.test`,
       ])
     )[0].id;
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
     await db.query(`delete from users where email like $1`, [`%-${run}@advance-bounds.test`]);
     await db.end();
     fs.rmSync(root, { recursive: true, force: true });
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   it('a trade of about 1.4 million R (beyond the old numeric(12,6)) closes and stores', async () => {
     const s = await repos.sessions.insert(alice, newSession(10_000));

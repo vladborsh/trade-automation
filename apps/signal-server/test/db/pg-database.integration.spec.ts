@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { runMigrations } from '../../src/db/migration-runner';
+import { DB_HOOK_TIMEOUT_MS } from './scratch-db';
 
 /**
  * architecture/backtest-app-system-design.md T-004 "done when" — proves transaction rollback
@@ -30,12 +31,12 @@ maybeDescribe('PgDatabase against a real Postgres (T-004 done-when)', () => {
   beforeAll(async () => {
     await runMigrations({ connectionString: DATABASE_URL as string });
     db = new PgDatabase(DATABASE_URL as string);
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
     await db.query('delete from users where email = $1', [testEmail]);
     await db.end();
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   it('rolls back every statement when the transaction function throws', async () => {
     await expect(

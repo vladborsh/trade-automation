@@ -7,6 +7,7 @@ import { BacktestRepositories, NewSession } from '../../src/backtest/session.rep
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { DAY, T0, candleStore, m1 } from './fake-backtest';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * T-015 done-when against a real Postgres: opId idempotency under concurrency (D9), a manual
@@ -63,12 +64,12 @@ maybeDescribe('orders against a real Postgres (T-015 done-when)', () => {
         `alice-${run}@orders-it.test`,
       ])
     )[0].id;
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
     await db.query(`delete from users where email like $1`, [`%-${run}@orders-it.test`]);
     await db.end();
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   const marketLong = (sessionId: string, over: Partial<PlaceOrderRequest> = {}): PlaceOrderRequest => ({
     opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1, ...over,

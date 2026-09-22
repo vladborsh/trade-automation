@@ -10,6 +10,7 @@ import { NewSession } from '../../src/backtest/session.repository.port';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 import { DAY, T0 } from './fake-backtest';
 
 /**
@@ -51,6 +52,18 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
   let orders: OrderService;
   let advancer: AdvanceService;
   let alice: string;
+  /**
+   * BUG-014: requests the race test has started and not yet seen settle. If that test times out,
+   * jest runs afterAll while these transactions still hold their row locks, and the cascading user
+   * delete deadlocked on them (dev-1's capture, load ≈ 30). afterAll waits for them first, and a
+   * timed-out loop (jest does not stop it) starts nothing new once teardown has begun.
+   */
+  const inFlight = new Set<Promise<unknown>>();
+  let tearingDown = false;
+  const tracked = <T>(work: Promise<T>): Promise<T> => {
+    inFlight.add(work);
+    return work.finally(() => inFlight.delete(work));
+  };
 
   beforeAll(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'advance-it-'));
@@ -73,13 +86,15 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
         `alice-${run}@advance-it.test`,
       ])
     )[0].id;
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
+    tearingDown = true;
+    await Promise.allSettled([...inFlight]); // never delete under a transaction still running (BUG-014)
     await db.query(`delete from users where email like $1`, [`%-${run}@advance-it.test`]);
     await db.end();
     fs.rmSync(root, { recursive: true, force: true });
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   const placeLong = (sessionId: string) =>
     orders.place(alice, sessionId, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 });
@@ -138,10 +153,11 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
   it('an advance and a place-order racing on one session serialise — never a half state', async () => {
     const outcomes = new Set<string>();
     for (let i = 0; i < 10; i++) {
-      const s = await repos.sessions.insert(alice, NEW_SESSION);
+      if (tearingDown) return; // this test timed out and afterAll has begun: start nothing under it
+      const s = await tracked(repos.sessions.insert(alice, NEW_SESSION));
       // alternate which request is issued first so both orderings occur
-      const doPlace = () => placeLong(s.id);
-      const doAdvance = () => advancer.advance(alice, s.id, { opId: randomUUID(), toCursorMs: C + 15 * MIN });
+      const doPlace = () => tracked(placeLong(s.id));
+      const doAdvance = () => tracked(advancer.advance(alice, s.id, { opId: randomUUID(), toCursorMs: C + 15 * MIN }));
       const [placed, advanced] =
         i % 2 === 0
           ? await Promise.allSettled([doPlace(), doAdvance()])
@@ -164,5 +180,5 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
     }
     // eslint-disable-next-line no-console
     console.log('advance/place race outcomes seen:', [...outcomes].join(', '));
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: 10 × (insert a session, two racing transactions, 2 reads) — seconds each under load
 });

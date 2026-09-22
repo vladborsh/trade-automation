@@ -14,6 +14,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
 import { DAY, fakeInstrumentConfig, FakeScreenshotStore, T0 } from './fake-backtest';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * T-018 done-when against a real Postgres: no drift after real closes (a manual close and an
@@ -78,14 +79,14 @@ maybeDescribe('stats drift against a real Postgres (T-018 done-when)', () => {
       ])
     )[0].id;
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
     warn.mockRestore();
     await db.query(`delete from users where email like $1`, [`%-${run}@stats-it.test`]);
     await db.end();
     fs.rmSync(root, { recursive: true, force: true });
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   it('no drift after real closes; drift naming pnlCcy after pnl_ccy is corrupted in SQL', async () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);

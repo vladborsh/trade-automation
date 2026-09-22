@@ -15,6 +15,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
 import { fakeInstrumentConfig, FakeScreenshotStore } from './fake-backtest';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * BUG-002 / BUG-003 reproductions, exactly as the bug lines state them, over HTTP against a real
@@ -79,14 +80,14 @@ maybeDescribe('BUG-002 / BUG-003 reproductions against a real Postgres', () => {
     app = (await Test.createTestingModule({ imports: [TestModule] }).compile()).createNestApplication({ logger: false });
     await app.listen(0);
     base = `${await app.getUrl()}/api/backtest/sessions`;
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
     await app.close();
     await db.query(`delete from users where email like $1`, [`%-${run}@bounds-it.test`]);
     await db.end();
     fs.rmSync(root, { recursive: true, force: true });
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   const post = (url: string, body: unknown) =>
     fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

@@ -14,6 +14,7 @@ import { ScreenshotObject, ScreenshotStore, screenshotKey, sessionScreenshotPref
 import { DAY, T0, fakeStore, makeSessionService } from './fake-backtest';
 import { makePng } from './png-fixture';
 import { expectSameBytes } from '../bytes';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * T-025 done-when against a real Postgres and a real file store in a tmp dir: write-once under a
@@ -108,7 +109,7 @@ maybeDescribe('screenshots against a real Postgres + file store (T-025 done-when
     db = new PgDatabase(DATABASE_URL as string);
     repos = new PgBacktestRepositories(db);
     alice = (await db.query<{ id: string }>(`insert into users (email, password_hash, role) values ($1, 'x', 'user') returning id`, [`alice-${run}@shots-it.test`]))[0].id;
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'shots-it-'));
     store = new ControlledStore(new FileScreenshotStore(root));
@@ -118,7 +119,7 @@ maybeDescribe('screenshots against a real Postgres + file store (T-025 done-when
   afterAll(async () => {
     await db.query(`delete from users where email like $1`, [`%-${run}@shots-it.test`]);
     await db.end();
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   async function sessionWithOrder() {
     const session = await repos.sessions.insert(alice, NEW_SESSION);

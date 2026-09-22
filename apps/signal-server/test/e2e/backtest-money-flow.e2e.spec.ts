@@ -26,6 +26,7 @@ import { DbModule } from '../../src/db/db.module';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
 import { StorageModule } from '../../src/storage/storage.module';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * Tester e2e for the money path of the backtest API (cluster bt-session-api): real Nest
@@ -179,7 +180,7 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
     await (app?.get(DB) as PgDatabase | undefined)?.end(); // the app's own pool: nothing closes it on app.close()
     await app?.close();
     restoreE2eEnv();
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this run's users and everything they own
 
   it('journey: limit fills, hits target, second order compounds on the new balance and is closed by hand', async () => {
     const J = (i: number) => journeyT0 + i * MIN;
@@ -261,7 +262,7 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
     expect((await call('bob', 'GET', `/backtest/sessions/${sid}/orders`)).status).toBe(404);
     expect((await call('bob', 'POST', `/backtest/sessions/${sid}/advance`, { opId: randomUUID(), toCursorMs: J(6) })).status).toBe(404);
     expect((await call(null, 'GET', `/backtest/sessions/${sid}/stats`)).status).toBe(401);
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: ~20 HTTP requests, each a Postgres transaction — timed out twice at load 180+
 
   it('end of session: the open position is force-closed at the last close, spread and commission applied', async () => {
     const E = (i: number) => journeyT0 + 5 * DAY + i * MIN;
@@ -288,7 +289,7 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
     const stats = await call('alice', 'GET', `/backtest/sessions/${sid}/stats`);
     expect(stats.body.drift).toBe(false);
     expect(stats.body.computed).toMatchObject({ trades: 1, endOfSessionCloses: 1 });
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: a session, two places, advances and stats over HTTP — the journey's pattern
 
   it('the §6 fill table, end to end: every reachable 1m fixture yields its reference events and no others', async () => {
     // guard against silent shrinkage: the fixture list may grow, but the API-reachable share must not vanish

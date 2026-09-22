@@ -6,6 +6,7 @@ import { NewSession } from '../../src/backtest/session.repository.port';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { DAY, fakeInstrumentConfig, FakeScreenshotStore, fakeStore, T0 } from './fake-backtest';
+import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
  * T-013 done-when against a real Postgres: the session repository round-trips every column,
@@ -60,12 +61,12 @@ maybeDescribe('backtest sessions against a real Postgres (T-013 done-when)', () 
       )[0].id;
     alice = await insertUser('alice');
     bob = await insertUser('bob');
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: migrates the slot database (waits on other workers' migration lock)
 
   afterAll(async () => {
     await db.query(`delete from users where email like $1`, [`%-${run}@sessions-it.test`]); // sessions cascade
     await db.end();
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: cascade-deletes this spec's users and everything they own
 
   it('inserts with cursor = periodFrom, balance = initialBalance, and round-trips every column', async () => {
     const s = await repos.sessions.insert(alice, NEW_SESSION);

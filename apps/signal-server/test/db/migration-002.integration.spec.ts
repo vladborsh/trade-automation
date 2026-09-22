@@ -103,5 +103,5 @@ maybeDescribe('migration 002: widen the R columns (up and down, data preserved)'
     await runMigrations({ connectionString: scratchUrl, target: '001' }); // down again
     expect(new Set((await precisions()).map((p) => p.split('=')[1]))).toEqual(new Set(['12,6']));
     expect(await values()).toEqual(before);
-  });
+  }, DB_HOOK_TIMEOUT_MS); // BUG-014: three migration runs on a fresh database — 5 s is not enough on a loaded Postgres
 });

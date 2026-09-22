@@ -69,9 +69,14 @@ export async function dropOwn(connect: () => Promise<Client>, names: readonly st
 }
 
 /**
- * Jest hook timeout for creating and dropping databases. `DROP DATABASE` takes 0.3-0.7 s on an idle
- * instance, but seconds on a busy one (a full with-DB run, a Postgres fresh from
- * a restart). Jest's default 5 s hook timeout failed teardown twice after the 2026-09-22 reboot
- * (BUG-012). This is a legitimately slow operation, not a masked test.
+ * Jest timeout for DB lifecycle work: creating, migrating and dropping databases, and the hooks
+ * that migrate the slot database or cascade-delete a spec's users. `DROP DATABASE` takes 0.3-0.7 s
+ * on an idle instance, but seconds on a busy one (a full with-DB run, a Postgres fresh from a
+ * restart); a migration also waits on the runner's advisory lock while another jest worker
+ * migrates the same database. Jest's 5 s default failed teardown twice after the 2026-09-22 reboot
+ * (BUG-012), then a migrating TEST (migration-002, load ≈ 29) and the advance/place race loop
+ * (load ≈ 30) (BUG-014). These are legitimately slow operations, not masked tests: assertions still
+ * fail at once, only a slow Postgres gets the time. Use it on the tests and hooks that do this
+ * work — not on ordinary DB specs.
  */
 export const DB_HOOK_TIMEOUT_MS = 60_000;
