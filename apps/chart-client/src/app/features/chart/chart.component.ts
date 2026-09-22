@@ -30,7 +30,7 @@ import type {
 import { TIMEFRAME_MS } from '@trade-automation/contracts';
 import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
 import { PaddingSeries } from './padding-series';
-import { CANDLE_SERIES_OPTIONS, CHART_OPTIONS } from './chart-options';
+import { CANDLE_SERIES_OPTIONS, chartOptions } from './chart-options';
 import { MetricSeriesRenderer } from './metric-series.renderer';
 import { renderDiff } from './render-diff';
 import { createOverlayLayer } from './overlay/chart-overlays';
@@ -78,6 +78,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly indicatorLabels = input(true);
   /** T-056: a replay panel's padded buckets (ms): time points without a bar, interior gaps included. */
   readonly whitespace = input<readonly number[]>([]);
+  /** T-063: a right margin in pixels, set when the chart is created (replay panels; the terminal: none). */
+  readonly rightMarginPx = input(0);
   readonly timeframe = input.required<Timeframe>();
   readonly panelId = input.required<string>();
   /** §9.1 position tools (replay only): what to draw, whether pointer hits are handled, the changes. */
@@ -223,7 +225,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     const el = this.container().nativeElement;
     const isCandles = this.kind() === 'candles';
     this.stopResizeObserver = observeResize(el, this.resizeSettle); // before createChart — see observeResize
-    this.chart = createChart(el, CHART_OPTIONS);
+    this.chart = createChart(el, chartOptions(this.rightMarginPx()));
 
     this.series = isCandles
       ? this.chart.addSeries(CandlestickSeries, CANDLE_SERIES_OPTIONS)

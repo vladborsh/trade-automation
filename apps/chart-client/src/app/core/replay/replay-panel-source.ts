@@ -7,6 +7,9 @@ import { padToBucket } from './pad-to-bucket';
 import { panelIndicators } from './panel-indicators';
 import type { ReplayEngine } from './replay-engine';
 
+/** T-063: the same on every replay panel, so the synced window agrees; ~a tool's width at the newest bar. */
+export const REPLAY_RIGHT_MARGIN_PX = 160;
+
 const NO_POINTS = signal<readonly MetricPoint[]>([]).asReadonly();
 const NO_OVERLAYS = signal<readonly OverlayPrimitive[]>([]).asReadonly();
 
@@ -27,6 +30,8 @@ export class ReplayPanelSource implements PanelSource {
   readonly capture = new CaptureSlot();
   /** T-047: indicators are lines only on replay panels. */
   readonly indicatorLabels = false;
+  /** T-063: room right of the newest bar, so a tool drawn there is usable without panning. */
+  readonly rightMarginPx = REPLAY_RIGHT_MARGIN_PX;
   /**
    * T-056 (ruling A): every bucket without a bar from the first bar to the cursor's, at the panel's
    * timeframe — only the chart sees it: `candles` (and so the indicators, the fills and the position

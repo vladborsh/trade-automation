@@ -17,6 +17,16 @@ export const CHART_OPTIONS: DeepPartial<TimeChartOptions> = {
   autoSize: true,
 };
 
+/**
+ * T-063: the chart's options with a right margin of `rightMarginPx` pixels (lightweight-charts keeps it
+ * constant in pixels across zoom), so a tool drawn at the newest bar has room without panning. `0` (the
+ * live terminal) is `CHART_OPTIONS` unchanged.
+ */
+export function chartOptions(rightMarginPx: number): DeepPartial<TimeChartOptions> {
+  if (rightMarginPx <= 0) return CHART_OPTIONS;
+  return { ...CHART_OPTIONS, timeScale: { ...CHART_OPTIONS.timeScale, rightOffsetPixels: rightMarginPx } };
+}
+
 /** The candlestick series' options — moved out of `ChartComponent.ngAfterViewInit` unchanged. */
 export const CANDLE_SERIES_OPTIONS: CandlestickSeriesPartialOptions = {
   upColor: '#26a69a',

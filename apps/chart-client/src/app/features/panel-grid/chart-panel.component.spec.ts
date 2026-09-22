@@ -33,6 +33,7 @@ class ChartStubComponent {
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   readonly indicatorLabels = input(true);
   readonly whitespace = input<readonly number[]>([]);
+  readonly rightMarginPx = input(0);
   readonly timeframe = input.required<Timeframe>();
   readonly positionTools = input<PositionToolsView | null>(null);
   readonly positionToolsEnabled = input(false);
@@ -106,6 +107,12 @@ describe('ChartPanelComponent with a stub PanelSource (not a PanelFeed)', () => 
     TestBed.resetTestingModule();
     const { chart } = render({ ...stubSource(), whitespace: signal<readonly number[]>([600_000, 900_000]) });
     expect(chart.whitespace()).toEqual([600_000, 900_000]);
+  });
+
+  it('T-063: a source\'s right margin goes to the chart; none from a live source', () => {
+    expect(render(stubSource()).chart.rightMarginPx()).toBe(0);
+    TestBed.resetTestingModule();
+    expect(render({ ...stubSource(), rightMarginPx: 160 }).chart.rightMarginPx()).toBe(160);
   });
 
   it('T-047: a source that turns indicator labels off (replay) passes that to the chart', () => {

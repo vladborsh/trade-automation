@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { Session } from '@trade-automation/contracts';
-import { apiUrl, expect, replayStarted, test } from './fixtures';
+import { apiUrl, expect, plotBox, replayStarted, test } from './fixtures';
 
 /**
  * T-022 done-line (backtest-app-system-design.md §9.1) against the mock's replay tape: two drafts
@@ -67,12 +67,8 @@ test('position tool: two drafts, handle drags without panning, click to activate
   ]);
   const [long0, short0] = await tools(page);
 
-  // T-050: both are anchored at the newest bar, flush with the right edge; pan into the future so the
-  // drawings have room (the tools move with the candles), then measure the price ↔ y mapping again
-  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.08);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.6 - 350, box.y + box.height * 0.08, { steps: 8 });
-  await page.mouse.up();
+  // T-050 anchors both at the newest bar; T-063's replay right margin gives them room there without a
+  // pan. The price ↔ y mapping is measured again with the drafts on the chart.
   p1 = await priceAt(y1);
   p2 = await priceAt(y2);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/1-two-drafts.png` });
@@ -300,4 +296,53 @@ test('T-050: a tool stays anchored at its bar and price — it pans with the can
   const x2 = await handleX(draft.id, draft.sl);
   expect(x2!).toBeLessThan(x1! - 20);
   expect(await timeAt(x2!)).toBe(bar0);
+});
+
+// T-063: a replay chart keeps a right margin, so a draft drawn at the newest bar (a market order at the
+// last close) is usable at once: its entry line is grabbable 150 px left of the plot's right edge,
+// without any pan (the hover hook is the controller's own hit test on the drawn tool).
+test('T-063: B at the newest bar gives a draft at least 150 px wide, without any pan', async ({ page }) => {
+  const created = await page.context().request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name: `e2e right margin ${Date.now()}`,
+      layout: { id: 'rm-e2e', name: 'RM e2e', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+      timeframe: '5m',
+      periodFromMs: FRIDAY_2140,
+      periodToMs: FRIDAY_2140 + 3 * 86_400_000,
+      initialBalance: 10_000,
+      defaultRiskPct: 1,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+    },
+  });
+  const session = (await created.json()) as Session;
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  const body = page.locator('.chart-panel[data-panel-id="btc"] .panel-body');
+  const container = body.locator('.chart-container');
+  const plot = await plotBox(container);
+  const visible = { from: await container.getAttribute('data-visible-from'), to: await container.getAttribute('data-visible-to') };
+
+  await page.mouse.move(plot.x + plot.width / 2, plot.y - 40); // off the chart: a market draft at the last close
+  await page.keyboard.press('b');
+  await expect.poll(async () => (await tools(page)).map((t) => [t.side, t.mode])).toEqual([['long', 'market']]);
+  const [draft] = await tools(page);
+
+  // the draft's entry y, from the chart's own price under the pointer at two heights
+  const priceAt = async (y: number) => {
+    await page.mouse.move(plot.x + plot.width * 0.3, y);
+    await expect(body).toHaveAttribute('data-pointer-price', /\d/);
+    return Number(await body.getAttribute('data-pointer-price'));
+  };
+  const ya = plot.y + plot.height * 0.25;
+  const yb = plot.y + plot.height * 0.75;
+  const [pa, pb] = [await priceAt(ya), await priceAt(yb)];
+  const entryY = ya + ((draft.entry - pa) * (yb - ya)) / (pb - pa);
+
+  // 150 px left of the right edge the pointer is on the draft: its entry line, or its entry handle (12 px
+  // right of the tool's left edge) when the tool starts just there — either way the tool reaches that far
+  await page.mouse.move(plot.x + plot.width - 150, entryY);
+  await expect(container).toHaveAttribute('data-position-tool-hover', new RegExp(`^(line:body|handle:entry):${draft.id}$`));
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/t063-draft-at-newest-bar.png` });
+  // and nothing panned
+  expect({ from: await container.getAttribute('data-visible-from'), to: await container.getAttribute('data-visible-to') }).toEqual(visible);
 });

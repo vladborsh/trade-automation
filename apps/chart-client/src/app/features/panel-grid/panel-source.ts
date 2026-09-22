@@ -61,6 +61,8 @@ export interface PanelSource {
    * a replay panel's axis has one point per bucket. Never candles. Live panels: none.
    */
   readonly whitespace?: Signal<readonly number[]>;
+  /** T-063: a right margin in pixels (replay: room for a tool at the newest bar). Absent: none, as the live terminal. */
+  readonly rightMarginPx?: number;
   loadOlder(): Promise<void>;
 }
 
