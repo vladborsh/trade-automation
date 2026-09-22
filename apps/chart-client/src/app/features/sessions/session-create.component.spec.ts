@@ -30,7 +30,7 @@ async function settle(fixture: ComponentFixture<SessionCreateComponent>): Promis
   fixture.detectChanges();
 }
 
-async function setup(createSession = vi.fn().mockResolvedValue({ id: 'new' })) {
+async function setup(createSession = vi.fn().mockResolvedValue({ id: 'created-session-id' })) {
   TestBed.configureTestingModule({
     imports: [SessionCreateComponent],
     providers: [
@@ -74,7 +74,7 @@ async function submit(fixture: ComponentFixture<SessionCreateComponent>): Promis
 const submitButton = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('button[type="submit"]')!;
 
 describe('SessionCreateComponent', () => {
-  it('creates a session with the defaults and the period moved inside the coverage, then goes to /sessions', async () => {
+  it('creates a session with the defaults and the period moved inside the coverage, then opens its workspace (T-040)', async () => {
     const { fixture, el, createSession, navigate } = await setup();
     type(fixture, 'name', 'BTC practice');
     check(fixture, 'BTC/USDT');
@@ -95,7 +95,7 @@ describe('SessionCreateComponent', () => {
       costs: { enabled: true, commissionPct: 0.04, spread: 0 },
     });
     expect(body.layout.panels).toEqual([{ id: 'binance-btcusdt', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }]);
-    expect(navigate).toHaveBeenCalledWith('/sessions');
+    expect(navigate).toHaveBeenCalledWith('/sessions/created-session-id');
   });
 
   it('a mixed-currency selection is flagged at once and cannot be submitted', async () => {

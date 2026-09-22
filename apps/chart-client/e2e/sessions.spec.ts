@@ -1,13 +1,13 @@
-import { test, expect } from './fixtures';
+import { expect, replayStarted, test } from './fixtures';
 
 /**
  * backtest-app-system-design.md §7.2 against the mock (mock-server/backtest.ts): a session is
- * created from the form, appears in the list and is deleted after the confirm; a mixed-currency
+ * created from the form, opens its workspace (T-040), appears in the list and is deleted after the confirm; a mixed-currency
  * selection cannot be submitted. Instruments are picked in the dropdown multiselect (T-039), by
  * mouse and by keyboard. Signed in as the mock admin by the default fixture.
  */
 
-test('create a session, see it in the list, delete it after the confirm', async ({ page }) => {
+test('create a session, land in its workspace with the chart loaded, see it in the list, delete it after the confirm', async ({ page }) => {
   const name = `e2e session ${Date.now()}`;
   await page.goto('/sessions');
   await page.getByRole('link', { name: 'New session' }).click();
@@ -21,7 +21,12 @@ test('create a session, see it in the list, delete it after the confirm', async 
   await expect(page.locator('input[name="periodTo"]')).toHaveValue('2026-07-01T00:00'); // end of the mock coverage: last 1m opens 23:59
   await page.getByRole('button', { name: 'Create session' }).click();
 
-  await expect(page).toHaveURL(/\/sessions$/);
+  // T-040: straight into the new session's workspace, with its chart loaded
+  await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]{36}$/);
+  await replayStarted(page);
+  await expect(page.locator('.chart-panel')).toHaveCount(1);
+
+  await page.goto('/sessions');
   const row = page.getByTestId('session-row').filter({ hasText: name });
   await expect(row).toContainText('BTCUSDT');
   await expect(row).toContainText('10,000.00 USD');

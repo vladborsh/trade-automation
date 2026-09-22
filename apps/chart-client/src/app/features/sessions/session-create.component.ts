@@ -132,8 +132,8 @@ export class SessionCreateComponent implements OnInit {
     this.submitError.set(null);
     try {
       const form = this.form();
-      await this.backtest.createSession(toCreateRequest(form, buildSessionLayout(form.instruments, this.preset())));
-      await this.router.navigateByUrl('/sessions');
+      const session = await this.backtest.createSession(toCreateRequest(form, buildSessionLayout(form.instruments, this.preset())));
+      await this.router.navigateByUrl(`/sessions/${session.id}`); // T-040: straight into the new session's workspace
     } catch (err) {
       this.submitError.set(createSessionErrorMessage(err));
     } finally {
