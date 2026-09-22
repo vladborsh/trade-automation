@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { replayStarted } from './fixtures';
+import { openJournal, replayStarted } from './fixtures';
 
 /**
  * Tester e2e (cluster bt-workspace): the P0 client flow against the REAL signal-server — the mock
@@ -81,6 +81,7 @@ async function openWorkspace(page: Page, id: string): Promise<void> {
   // BUG-009/BUG-010: the one readiness wait — the engine's first history is in. `replay-loading` count 0 also holds
   // on the blank page before the toolbar exists, and a key pressed during the load is blocked by design.
   await replayStarted(page);
+  await openJournal(page); // T-043: collapsed by default; these tests read its rows
 }
 
 // ---------------------------------------------------------------------------------------------

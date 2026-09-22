@@ -61,6 +61,7 @@
       <div class="bottom">
         <app-journal
           class="journal"
+          [collapsible]="true"
           [sessionId]="s.id"
           [orders]="store.portfolio.orders()"
           [currency]="s.sessionCurrency"

@@ -1,9 +1,28 @@
 <section class="journal" aria-label="Trade journal">
-  <h2>Journal</h2>
-  @if (rows().length === 0) {
-    <p class="empty">No orders yet.</p>
+  <h2>
+    @if (collapsible()) {
+      <button
+        type="button"
+        class="toggle"
+        data-testid="journal-toggle"
+        aria-controls="journal-body"
+        [attr.aria-expanded]="expanded()"
+        [title]="expanded() ? 'Hide the journal' : 'Show the journal'"
+        (click)="toggle()"
+      >
+        <span class="caret" aria-hidden="true">{{ expanded() ? '▾' : '▸' }}</span>
+        Journal <span class="count">({{ rows().length }})</span>
+      </button>
+    } @else {
+      <span class="title">Journal</span>
+    }
+  </h2>
+  @if (!expanded()) {
+    <!-- T-043: collapsed; the header alone -->
+  } @else if (rows().length === 0) {
+    <p class="empty" id="journal-body">No orders yet.</p>
   } @else {
-    <div class="scroll">
+    <div class="scroll" id="journal-body">
       <table>
         <thead>
           <tr>

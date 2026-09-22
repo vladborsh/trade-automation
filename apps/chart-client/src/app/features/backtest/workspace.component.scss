@@ -46,9 +46,16 @@
   flex: 1;
   min-width: 0;
 }
+/* T-043: with the journal collapsed the bottom area fits its content, the chart gets the rest */
+.bottom:has(> .journal.collapsed) {
+  height: auto;
+  min-height: 0;
+  max-height: 30%;
+}
 .bottom .stats {
   width: 300px;
   flex-shrink: 0;
+  overflow: auto;
   border-left: 1px solid #30363d;
 }
 .message {

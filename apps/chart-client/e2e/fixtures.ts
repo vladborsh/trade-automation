@@ -74,4 +74,12 @@ export async function plotBox(container: Locator): Promise<{ x: number; y: numbe
   return boxes.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
 }
 
+/** T-043: the workspace journal is collapsed by default; opens it (a no-op when already open). */
+export async function openJournal(page: Page): Promise<void> {
+  const toggle = page.getByTestId('journal-toggle');
+  await expect(toggle).toBeVisible({ timeout: 15_000 });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 export { expect };

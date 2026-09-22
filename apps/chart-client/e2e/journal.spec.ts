@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { Order, Session, SessionStatsResponse } from '@trade-automation/contracts';
-import { apiUrl, expect, test } from './fixtures';
+import { apiUrl, expect, openJournal, test } from './fixtures';
 
 /**
  * T-024 against the mock's fixed journal (mock-server/journal-seed.ts): the journal rows equal
@@ -28,6 +28,7 @@ test('the journal rows and the summary are the server\'s, field for field', asyn
   const stats = (await (await page.context().request.get(`${apiUrl()}/backtest/sessions/${session.id}/stats`)).json()) as SessionStatsResponse;
 
   await page.goto(`/sessions/${session.id}`);
+  await openJournal(page); // T-043: collapsed by default
   const rows = page.getByTestId('journal-row');
   await expect(rows).toHaveCount(orders.length, { timeout: 15_000 });
 
@@ -57,4 +58,28 @@ test('the summary says when the stored aggregates drifted', async ({ page }) => 
   const session = await createSession(page, `e2e drift ${Date.now()}`);
   await page.goto(`/sessions/${session.id}`);
   await expect(page.getByTestId('stats-drift')).toContainText('Stored aggregates differ', { timeout: 15_000 });
+});
+
+test('T-043: the journal is collapsed by default; the toggle opens and closes it, remembered across a reload', async ({ page }) => {
+  const session = await createSession(page, `e2e journal toggle ${Date.now()}`);
+  const toggle = page.getByTestId('journal-toggle');
+  const rows = page.getByTestId('journal-row');
+
+  await page.goto(`/sessions/${session.id}`);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false', { timeout: 15_000 });
+  await expect(toggle).toContainText(/Journal \(\d+\)/);
+  await expect(rows).toHaveCount(0);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(rows.first()).toBeVisible();
+  await page.reload();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 15_000 });
+  await expect(rows.first()).toBeVisible();
+
+  await toggle.click();
+  await expect(rows).toHaveCount(0);
+  await page.reload();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false', { timeout: 15_000 });
+  await expect(rows).toHaveCount(0);
 });

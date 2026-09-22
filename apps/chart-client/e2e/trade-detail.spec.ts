@@ -1,5 +1,5 @@
 import type { Order, Session, SessionDetail } from '@trade-automation/contracts';
-import { apiUrl, expect, test } from './fixtures';
+import { apiUrl, expect, openJournal, test } from './fixtures';
 
 /**
  * T-030 / design §9.3 against the mock: journal → trade detail (row, modifications, screenshot or
@@ -29,6 +29,7 @@ test('trade detail, show on chart view-only, and the session cursor is untouched
 
   // Journal → detail
   await page.goto(`/sessions/${session.id}`);
+  await openJournal(page); // T-043: collapsed by default
   await page.getByTestId('journal-row').first().locator('[data-field="seq"] a').click();
   await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}/trades/${first.id}$`));
   await expect(page.locator('h1')).toContainText('Trade #1');
