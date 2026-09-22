@@ -161,7 +161,7 @@ describe('OrderService — BUG-004 opId reuse', () => {
     const { orders, session, repos } = await setup();
     const req: PlaceOrderRequest = { opId: randomUUID(), cursorMs: session.cursorMs, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 };
     const first = await orders.place('alice', session.id, req);
-    await expect(code(orders.place('alice', session.id, { ...req, riskPct: 2 }))).resolves.toBe('409');
+    await expect(code(orders.place('alice', session.id, { ...req, riskPct: 2 }))).resolves.toBe('409 OP_ID_REUSED');
     await expect(orders.place('alice', session.id, { ...req })).resolves.toEqual(first);
     expect(repos.orderRows.size).toBe(1);
   });
@@ -173,8 +173,8 @@ describe('OrderService — BUG-004 opId reuse', () => {
     const long = (await place()).order;
     const req = { opId: randomUUID(), cursorMs: session.cursorMs };
     await orders.cancel('alice', session.id, a.id, req);
-    await expect(code(orders.cancel('alice', session.id, b.id, req))).resolves.toBe('409');
-    await expect(code(orders.close('alice', session.id, long.id, req))).resolves.toBe('409');
+    await expect(code(orders.cancel('alice', session.id, b.id, req))).resolves.toBe('409 OP_ID_REUSED');
+    await expect(code(orders.close('alice', session.id, long.id, req))).resolves.toBe('409 OP_ID_REUSED');
     expect((await orders.get('alice', session.id, b.id)).order.status).toBe('pending');
     expect((await orders.get('alice', session.id, long.id)).order.status).toBe('open');
   });
@@ -331,7 +331,7 @@ describe('OrderService.modify (T-033, decision 23)', () => {
     const first = await orders.modify('alice', session.id, long.id, req);
     expect(await orders.modify('alice', session.id, long.id, req)).toEqual(first);
     expect(repos.modificationRows).toHaveLength(1);
-    await expect(code(orders.modify('alice', session.id, long.id, { ...req, sl: 97 }))).resolves.toBe('409'); // BUG-004
+    await expect(code(orders.modify('alice', session.id, long.id, { ...req, sl: 97 }))).resolves.toBe('409 OP_ID_REUSED'); // BUG-004
 
     const same = await mod(orders, session.id, long.id, { cursorMs: session.cursorMs, sl: 98, tp: 110 });
     expect(same).toMatchObject({ slCurrent: 98, tpCurrent: 110 });

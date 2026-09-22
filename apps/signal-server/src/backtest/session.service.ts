@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   HttpStatus,
   Inject,
   Injectable,
@@ -161,7 +160,7 @@ export class SessionService {
         const active = await tx.orders.list(current.id, ['pending', 'open']);
         const losing = panelsLosingActiveOrders(patch.layout, active);
         if (losing.length > 0) {
-          throw new ConflictException(`Panel ${losing.map((p) => `'${p}'`).join(', ')} has pending or open orders; cancel or close them first.`);
+          throw apiError(HttpStatus.CONFLICT, 'PANEL_HAS_ORDERS', `Panel ${losing.map((p) => `'${p}'`).join(', ')} has pending or open orders; cancel or close them first.`);
         }
       }
       return tx.sessions.update(userId, id, { name: patch.name, timeframe: patch.timeframe, layout: patch.layout });

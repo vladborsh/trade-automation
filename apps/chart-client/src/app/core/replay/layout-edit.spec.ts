@@ -86,6 +86,8 @@ describe('layout-edit (T-029)', () => {
     expect(layoutEditErrorMessage(new ApiError(422, 'INSTRUMENT_NOT_AVAILABLE', 'x'))).toMatch(/no stored 1m/);
     expect(layoutEditErrorMessage(new ApiError(409, 'SESSION_COMPLETE', 'x'))).toMatch(/complete/);
     expect(layoutEditErrorMessage(new ApiError(409, null, 'x'))).toMatch(/pending or open orders/);
+    const panelMsg = "Panel 'eth' has pending or open orders; cancel or close them first.";
+    expect(layoutEditErrorMessage(new ApiError(409, 'PANEL_HAS_ORDERS', panelMsg))).toBe(panelMsg); // T-055: the server's own words
     expect(layoutEditErrorMessage(new ApiError(500, null, 'x'))).toMatch(/Could not change/);
     expect(layoutEditErrorMessage(new TypeError('Failed to fetch'))).toMatch(/Cannot reach/);
   });

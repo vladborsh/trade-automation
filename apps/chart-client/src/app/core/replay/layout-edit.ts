@@ -108,6 +108,8 @@ export function layoutEditErrorMessage(err: unknown): string {
       return "That instrument's history does not overlap the session period.";
     case 'SESSION_COMPLETE':
       return 'The session is complete; its layout can no longer change.';
+    case 'PANEL_HAS_ORDERS':
+      return err.message; // T-055: the server names the panel ("Panel 'eth' has pending or open orders; …")
     default:
       if (err.status === 409) return 'A panel with pending or open orders cannot be removed. Cancel or close them first.';
       return 'Could not change the layout. Try again.';

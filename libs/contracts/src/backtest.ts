@@ -530,6 +530,10 @@ export const BacktestErrorCodeSchema = z.enum([
   // D12 (§6 "Contract, sizing and margin", confirmed by the Architect 2026-09-22):
   'SIZE_BELOW_MINIMUM', // 422 — the risk-sized qty is below the venue's minQty or minNotional
   'INSUFFICIENT_MARGIN', // 422 — the order's initial margin exceeds equity − used margin
+  // T-055 (confirmation note item 5): codes for the three refusals that answered a bare Nest exception
+  'OP_ID_REUSED', // 409 — the opId was stored for a different operation or request body (BUG-004)
+  'PANEL_HAS_ORDERS', // 409 — a layout edit removes or re-points a panel that holds pending/open orders (T-029)
+  'CURSOR_OFF_MINUTE', // 400 — an advance's toCursorMs is not on a minute boundary
 ]);
 export type BacktestErrorCode = z.infer<typeof BacktestErrorCodeSchema>;
 

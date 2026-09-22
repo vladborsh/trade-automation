@@ -256,7 +256,7 @@ describe('AdvanceService (design §5.5) against a fixture 1m tape in the file st
     const opId = randomUUID();
     await advance(C + 15 * MIN, opId);
 
-    await expect(code(advance(C + 30 * MIN, opId))).resolves.toBe('409'); // same kind, different body
+    await expect(code(advance(C + 30 * MIN, opId))).resolves.toBe('409 OP_ID_REUSED'); // same kind, different body (T-055)
     expect(repos.rows.get(session.id)!.session.cursorMs).toBe(C + 15 * MIN);
 
     // an opId first used by a place, then sent with an advance
@@ -264,7 +264,7 @@ describe('AdvanceService (design §5.5) against a fixture 1m tape in the file st
     await orders.place('alice', session.id, { opId: placeOp, cursorMs: C + 15 * MIN, panelId: 'btc', side: 'long', type: 'market', sl: 99, riskPct: 1 });
     const err = await advance(C + 30 * MIN, placeOp).catch((e: { getStatus(): number; getResponse(): unknown }) => e);
     expect((err as { getStatus(): number }).getStatus()).toBe(409);
-    expect((err as { getResponse(): { message: string } }).getResponse().message).toBe('opId already used for a different request');
+    expect((err as { getResponse(): unknown }).getResponse()).toEqual({ error: { code: 'OP_ID_REUSED', message: 'opId already used for a different request' } });
     expect(repos.rows.get(session.id)!.session.cursorMs).toBe(C + 15 * MIN);
     expect(repos.opRows.size).toBe(2);
   });
@@ -289,7 +289,7 @@ describe('AdvanceService (design §5.5) against a fixture 1m tape in the file st
     await advance(C + 15 * MIN);
 
     await expect(code(advance(C))).resolves.toBe('409 CURSOR_BACKWARDS');
-    await expect(code(advance(C + 15 * MIN + 1))).resolves.toBe('400');
+    await expect(code(advance(C + 15 * MIN + 1))).resolves.toBe('400 CURSOR_OFF_MINUTE'); // T-055
     await expect(advance(C + 15 * MIN)).resolves.toMatchObject({ cursorMs: C + 15 * MIN, events: [], orders: [] });
     await expect(code(advancer.advance('bob', session.id, { opId: randomUUID(), toCursorMs: C + 30 * MIN }))).resolves.toBe('404');
   });

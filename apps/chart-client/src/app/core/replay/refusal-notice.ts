@@ -13,7 +13,8 @@ export function refusalNotice(err: unknown): string {
       case 'SESSION_COMPLETE':
         return 'This session is already complete — reloaded from the server.';
     }
-    if (err.status === 409) return 'Out of step with the server — reloaded the session.'; // "opId already used…" (BUG-004): a client bug
+    // T-055: OP_ID_REUSED ("opId already used…", BUG-004: a client bug) and any other 409 quote the server
+    if (err.status === 409) return `Out of step with the server (${err.message}) — reloaded the session.`;
   }
   const message = err instanceof Error ? err.message : String(err);
   return `The server refused a change (${message}) — reloaded the session.`;

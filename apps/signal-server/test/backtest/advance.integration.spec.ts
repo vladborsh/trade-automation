@@ -131,7 +131,7 @@ maybeDescribe('advance against a real Postgres (T-017 done-when)', () => {
 
     await expect(advancer.advance(alice, s.id, { opId, toCursorMs: C + 60 * MIN })).rejects.toMatchObject({
       status: 409,
-      response: expect.objectContaining({ message: 'opId already used for a different request' }),
+      response: { error: { code: 'OP_ID_REUSED', message: 'opId already used for a different request' } },
     });
     expect((await repos.sessions.findById(alice, s.id))!.cursorMs).toBe(C);
     const [row] = await db.query<{ kind: string; fingerprint: string }>(`select kind, fingerprint from backtest_ops where session_id = $1`, [s.id]);

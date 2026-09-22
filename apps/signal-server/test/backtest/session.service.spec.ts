@@ -224,13 +224,13 @@ describe('SessionService (backtest-app-system-design.md §7.2)', () => {
       });
     });
 
-    it('a panel with a pending or open order cannot be removed or re-pointed (plain 409); closed ones do not block', async () => {
+    it('a panel with a pending or open order cannot be removed or re-pointed (409 PANEL_HAS_ORDERS, T-055); closed ones do not block', async () => {
       const s = await service.create(ALICE, createBody()); // panels btc, eth
       await openOrder(s.id, 'eth', 'binance:ETHUSDT', 'open');
       const removeEth = layout({ id: 'btc', instrument: 'binance:BTCUSDT' });
       const err = await errorOf(service.patch(ALICE, s.id, { layout: removeEth }));
       expect(err.status).toBe(409);
-      expect(err.body).toMatchObject({ statusCode: 409, message: expect.stringMatching(/Panel 'eth' has pending or open orders/) });
+      expect(err.body).toEqual({ error: { code: 'PANEL_HAS_ORDERS', message: "Panel 'eth' has pending or open orders; cancel or close them first." } });
       const repoint = layout({ id: 'btc', instrument: 'binance:BTCUSDT' }, { id: 'eth', instrument: 'binance:BTCUSDT' });
       expect((await errorOf(service.patch(ALICE, s.id, { layout: repoint }))).status).toBe(409);
       // reordering and adding around it is fine

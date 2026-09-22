@@ -87,7 +87,7 @@ export class AdvanceService {
 
   private async apply(tx: TxRepos, userId: string, session: SessionSummary, requested: number): Promise<AdvanceResult> {
     if (session.status === 'complete') throw apiError(HttpStatus.CONFLICT, 'SESSION_COMPLETE', 'The session is complete.');
-    if (requested % MIN !== 0) throw new BadRequestException('toCursorMs must be on a minute boundary.');
+    if (requested % MIN !== 0) throw apiError(HttpStatus.BAD_REQUEST, 'CURSOR_OFF_MINUTE', 'toCursorMs must be on a minute boundary.');
     if (requested < session.cursorMs) {
       throw apiError(HttpStatus.CONFLICT, 'CURSOR_BACKWARDS', `toCursorMs ${requested} is before the cursor ${session.cursorMs}.`);
     }

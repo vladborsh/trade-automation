@@ -11,12 +11,14 @@ describe('refusalNotice', () => {
     expect(refusalNotice(new ApiError(409, 'SESSION_COMPLETE', 'x'))).toMatch(/already complete/);
   });
 
-  it('treats the codeless 409 (a reused opId) as being out of step', () => {
-    expect(refusalNotice(new ApiError(409, null, 'opId already used for a different request'))).toMatch(/Out of step/);
+  it('a reused opId (409 OP_ID_REUSED, T-055) is out of step, with the server message', () => {
+    expect(refusalNotice(new ApiError(409, 'OP_ID_REUSED', 'opId already used for a different request'))).toBe(
+      'Out of step with the server (opId already used for a different request) — reloaded the session.',
+    );
   });
 
-  it('quotes anything else', () => {
-    expect(refusalNotice(new ApiError(400, null, 'toCursorMs must be on a minute boundary.'))).toBe(
+  it('quotes anything else, e.g. 400 CURSOR_OFF_MINUTE (T-055)', () => {
+    expect(refusalNotice(new ApiError(400, 'CURSOR_OFF_MINUTE', 'toCursorMs must be on a minute boundary.'))).toBe(
       'The server refused a change (toCursorMs must be on a minute boundary.) — reloaded the session.',
     );
   });

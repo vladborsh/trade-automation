@@ -1,6 +1,7 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { HttpStatus, NotFoundException } from '@nestjs/common';
 import { SessionSummary } from '@trade-automation/contracts';
 import { z } from 'zod';
+import { apiError } from '../auth/auth-error';
 import { OpKind, opFingerprint } from './op-fingerprint';
 import { BacktestRepositories } from './session.repository.port';
 
@@ -46,7 +47,7 @@ export function runSessionMutation<T>(
     const stored = await tx.ops.find(session.id, op.opId);
     if (stored !== null) {
       if (stored.fingerprint !== null && (stored.kind !== op.kind || stored.fingerprint !== fingerprint)) {
-        throw new ConflictException('opId already used for a different request');
+        throw apiError(HttpStatus.CONFLICT, 'OP_ID_REUSED', 'opId already used for a different request');
       }
       return stored.response as T;
     }

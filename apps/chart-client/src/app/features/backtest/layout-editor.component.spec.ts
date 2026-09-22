@@ -135,6 +135,19 @@ describe('LayoutEditorComponent (T-029)', () => {
     expect(store.session()!.layout).toBe(LAYOUT);
   });
 
+  it('T-055: 409 PANEL_HAS_ORDERS (orders placed in another tab) keeps the panel and shows the server message inline, no reload', async () => {
+    const message = "Panel 'eth' has pending or open orders; cancel or close them first.";
+    const patch = vi.fn().mockRejectedValue(new ApiError(409, 'PANEL_HAS_ORDERS', message));
+    const { fixture, el, store, calls } = await setup({ patch }); // no local orders: only the server knows
+    button(el, 1, 'Remove panel').click();
+    await settle(fixture);
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(el.querySelector('[data-testid="layout-error"]')?.textContent?.trim()).toBe(message);
+    expect(store.session()!.layout).toBe(LAYOUT); // unchanged: the panel stays
+    expect(rows(el)).toEqual(['binance:BTCUSDT', 'binance:ETHUSDT']);
+    expect(calls).toEqual([]); // no tape change
+  });
+
   it('a complete session cannot be edited', async () => {
     const { el } = await setup({ status: 'complete' });
     expect(el.textContent).toContain('The session is complete');
