@@ -27,6 +27,9 @@ export interface MigrationResult {
 export async function runMigrations(options: MigrationRunnerOptions): Promise<MigrationResult> {
   const migrationPattern = options.migrationPattern ?? `${__dirname}/../../migrations/*`;
   const client = new Client({ connectionString: options.connectionString });
+  // BUG-013: a connection error must not surface as an unhandled 'error' event. The in-flight
+  // query rejects with it, so runMigrations still fails loudly, as an error rather than a crash.
+  client.on('error', () => undefined);
   await client.connect();
   try {
     await client.query(`SELECT pg_advisory_lock(${ADVISORY_LOCK_KEY})`);
