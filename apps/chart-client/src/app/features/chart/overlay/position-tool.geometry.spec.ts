@@ -14,6 +14,8 @@ import {
   DEFAULT_DRAFT_WIDTH_BARS,
   MIN_LIVE_WIDTH_PX,
   widthBarsAt,
+  compactLabel,
+  labelPlacement,
 } from './position-tool.geometry';
 
 const draft = (over: Partial<PositionToolState> = {}): PositionToolState => ({
@@ -240,5 +242,33 @@ describe('the tool’s right edge (BUG-018)', () => {
     expect(widthBarsAt(104, 100, 6)).toBe(1);
     expect(widthBarsAt(40, 100, 6)).toBe(1);
     expect(widthBarsAt(300, 100, 0)).toBe(DEFAULT_DRAFT_WIDTH_BARS);
+  });
+});
+
+describe('labelPlacement / compactLabel (T-066)', () => {
+  const at = (over: Partial<Parameters<typeof labelPlacement>[0]>) =>
+    labelPlacement({ textWidth: 200, compactWidth: 48, boxWidth: 48, roomRight: 0, draft: false, ...over });
+
+  it('the full label inside when it fits, else just right of the tool when there is room', () => {
+    expect(at({ boxWidth: 300 })).toEqual({ text: 'full', side: 'inside' });
+    expect(at({ roomRight: 300 })).toEqual({ text: 'full', side: 'right' });
+    expect(at({ boxWidth: 210, roomRight: 300, shift: 18 })).toEqual({ text: 'full', side: 'right' }); // the ✕'s room counts
+  });
+
+  it('then the compact one the same way — inside, then right — and only then inside, overhanging', () => {
+    expect(at({ boxWidth: 60 })).toEqual({ text: 'compact', side: 'inside' });
+    expect(at({ roomRight: 120 })).toEqual({ text: 'compact', side: 'right' }); // a just-placed order, T-063's margin too narrow for the full label
+    expect(at({ roomRight: 20 })).toEqual({ text: 'compact', side: 'inside' });
+  });
+
+  it('a draft keeps its full label inside, whatever its width', () => {
+    expect(at({ draft: true })).toEqual({ text: 'full', side: 'inside' });
+  });
+
+  it('a compact label is the level’s price only', () => {
+    const t = { entry: 65383.7, sl: 64184, tp: null };
+    expect(compactLabel(t, 'entry', 2)).toBe('65383.70');
+    expect(compactLabel(t, 'sl', 2)).toBe('64184.00');
+    expect(compactLabel(t, 'tp', 2)).toBe('');
   });
 });

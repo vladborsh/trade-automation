@@ -201,6 +201,46 @@ export function widthBarsAt(x: number, xStart: number, barSpacing: number): numb
   return barSpacing > 0 ? Math.max(1, Math.round((x - xStart) / barSpacing)) : DEFAULT_DRAFT_WIDTH_BARS;
 }
 
+/** T-066: which label a level shows, and on which side of the tool's right end. */
+export interface LabelPlacement {
+  text: 'full' | 'compact';
+  side: 'inside' | 'right';
+}
+
+/** Space kept between a label and the box's edge, px. */
+export const LABEL_PAD_PX = 8;
+
+/**
+ * T-066 (from BUG-018's review) — a label sits inside the box at its right end when it fits. A live
+ * tool's box can be narrower than its label (just placed: it ends at the cursor's bar); then the
+ * label goes just right of the tool's end — for a live tool that is the newest bar, so into T-063's
+ * empty margin. When the full label fits neither way, the compact one (the price only) is tried the
+ * same way, inside then right; only when even that fits nowhere does it sit inside and overhang.
+ * Drafts keep their full labels inside, as before.
+ */
+export function labelPlacement(input: {
+  textWidth: number;
+  compactWidth: number;
+  boxWidth: number;
+  roomRight: number;
+  draft: boolean;
+  shift?: number;
+}): LabelPlacement {
+  const inside = (w: number) => w + (input.shift ?? 0) + LABEL_PAD_PX <= input.boxWidth;
+  const right = (w: number) => w + LABEL_PAD_PX <= input.roomRight;
+  if (input.draft || inside(input.textWidth)) return { text: 'full', side: 'inside' };
+  if (right(input.textWidth)) return { text: 'full', side: 'right' };
+  if (inside(input.compactWidth)) return { text: 'compact', side: 'inside' };
+  if (right(input.compactWidth)) return { text: 'compact', side: 'right' };
+  return { text: 'compact', side: 'inside' };
+}
+
+/** T-066: a level's compact label — its price only (the level's colour says which it is). */
+export function compactLabel(tool: Pick<PositionToolState, 'entry' | 'sl' | 'tp'>, level: 'entry' | 'sl' | 'tp', precision: number): string {
+  const price = level === 'entry' ? tool.entry : level === 'sl' ? tool.sl : tool.tp;
+  return price === null ? '' : price.toFixed(precision);
+}
+
 export type DragResult = { tool: PositionToolState } | { hint: string };
 
 export interface DragInput {

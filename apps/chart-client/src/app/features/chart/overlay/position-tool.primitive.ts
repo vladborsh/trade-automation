@@ -11,7 +11,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import { DEFAULT_DRAFT_WIDTH_BARS, REMOVE_HALF_PX, labelFor, showsZones, toolGeometry } from './position-tool.geometry';
+import { DEFAULT_DRAFT_WIDTH_BARS, REMOVE_HALF_PX, compactLabel, labelFor, labelPlacement, showsZones, toolGeometry } from './position-tool.geometry';
 import type { PositionToolState, PositionToolsView } from './position-tool.model';
 
 const RISK = '#ef5350';
@@ -21,6 +21,8 @@ const MUTED = '#8b949e';
 const HANDLE_SIZE = 8;
 /** The entry label moves left of a live order's ✕ (BUG-017). */
 const REMOVE_LABEL_SHIFT_PX = 18;
+/** A label drawn right of a short live tool starts this far past its end (T-066). */
+const LABEL_OUTSIDE_GAP_PX = 6;
 
 /**
  * The x of a tool's left edge: its anchor time on this chart — the bar it was drawn, placed or
@@ -150,7 +152,8 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           if (g.yTp !== null) band(g.yTp, REWARD);
         }
 
-        const level = (y: number, color: string, label: string, labelShift = 0) => {
+        const level = (y: number, color: string, which: 'entry' | 'sl' | 'tp', labelShift = 0) => {
+          const label = labelFor(tool, which, view);
           context.save();
           context.globalAlpha = tool.active ? 1 : 0.7;
           context.strokeStyle = color;
@@ -163,11 +166,27 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           context.setLineDash([]);
           context.fillStyle = color;
           context.font = '10px ui-monospace, monospace';
-          context.textAlign = 'right';
-          context.fillText(label, g.xEnd - 4 - labelShift, y - 4); // inside the box, at its right end
+          // T-066: inside the box at its right end; a short live box's label goes just right of it, else compact
+          const compact = compactLabel(tool, which, view.pricePrecision);
+          const placement = labelPlacement({
+            textWidth: context.measureText(label).width,
+            compactWidth: context.measureText(compact).width,
+            boxWidth: g.xEnd - g.x,
+            roomRight: mediaSize.width - g.xEnd,
+            draft: tool.kind === 'draft',
+            shift: labelShift,
+          });
+          const text = placement.text === 'full' ? label : compact;
+          if (placement.side === 'right') {
+            context.textAlign = 'left';
+            context.fillText(text, g.xEnd + LABEL_OUTSIDE_GAP_PX, y - 4);
+          } else {
+            context.textAlign = 'right';
+            context.fillText(text, g.xEnd - 4 - labelShift, y - 4);
+          }
           context.restore();
         };
-        level(g.yEntry, tool.active ? ENTRY : MUTED, labelFor(tool, 'entry', view), g.remove ? REMOVE_LABEL_SHIFT_PX : 0);
+        level(g.yEntry, tool.active ? ENTRY : MUTED, 'entry', g.remove ? REMOVE_LABEL_SHIFT_PX : 0);
         if (g.remove) {
           // BUG-017: a live order's ✕ (its cancel / close, after a confirm)
           const r = REMOVE_HALF_PX - 1;
@@ -182,8 +201,8 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           context.stroke();
           context.restore();
         }
-        level(g.ySl, RISK, labelFor(tool, 'sl', view));
-        if (g.yTp !== null) level(g.yTp, REWARD, labelFor(tool, 'tp', view));
+        level(g.ySl, RISK, 'sl');
+        if (g.yTp !== null) level(g.yTp, REWARD, 'tp');
 
         for (const h of g.handles) {
           context.save();

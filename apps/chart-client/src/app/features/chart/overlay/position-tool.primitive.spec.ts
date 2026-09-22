@@ -27,6 +27,7 @@ function recordingContext() {
     fillRect: () => calls.push({ op: 'fillRect', fillStyle: state.fillStyle, alpha: state.globalAlpha }),
     strokeRect: () => calls.push({ op: 'strokeRect', strokeStyle: state.strokeStyle, alpha: state.globalAlpha }),
     fillText: () => calls.push({ op: 'fillText', fillStyle: state.fillStyle, alpha: state.globalAlpha }),
+    measureText: (text: string) => ({ width: text.length * 6 }), // 6 px a character
   };
   return { ctx, calls };
 }
@@ -170,5 +171,58 @@ describe('toolRightX and the painted right edge (BUG-018)', () => {
     const target = { useMediaCoordinateSpace: (cb: (s: unknown) => void) => cb({ context: ctx, mediaSize: { width: 900, height: 600 } }) };
     primitive.paneViews()[0].renderer()!.draw(target as unknown as CanvasRenderingTarget2D);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('labels on a short live tool (T-066)', () => {
+  /** Draws one tool and returns every label: its text, x and alignment. */
+  function labels(t: PositionToolState, anchor: number, end: number | null, paneWidth = 900) {
+    const primitive = new PositionToolPrimitive();
+    const chart = {
+      timeScale: () => ({
+        timeToCoordinate: (sec: number) => (sec === 9 ? end : anchor), // endTime 9 000 ms → second 9
+        timeToIndex: () => null, logicalToCoordinate: () => null, width: () => paneWidth, options: () => ({ barSpacing: 6 }),
+      }),
+    };
+    primitive.attached({ chart, series: { priceToCoordinate: (p: number) => 1000 - p * 5 }, requestUpdate: () => undefined } as unknown as SeriesAttachedParameter<Time>);
+    primitive.setView({ tools: [t], balance: 10_000, riskPct: 1, pricePrecision: 2 });
+    const out: { text: string; x: number; align: string }[] = [];
+    const { ctx } = recordingContext();
+    (ctx as unknown as { fillText: (s: string, x: number) => void }).fillText = (text: string, x: number) => void out.push({ text, x, align: ctx.textAlign });
+    const target = { useMediaCoordinateSpace: (cb: (s: unknown) => void) => cb({ context: ctx, mediaSize: { width: paneWidth, height: 600 } }) };
+    primitive.paneViews()[0].renderer()!.draw(target as unknown as CanvasRenderingTarget2D);
+    return out;
+  }
+  const live = (over: Partial<PositionToolState> = {}) =>
+    tool({ kind: 'position', orderId: 'o1', order: { qty: 1, riskAmount: 2 }, endTime: 9_000, ...over });
+
+  it('fits inside: a wide live box keeps its labels inside, at its right end', () => {
+    const out = labels(live(), 100, 700); // a 600 px box
+    expect(out.every((l) => l.align === 'right' && l.x <= 700)).toBe(true);
+    expect(out[0].text).toContain('Long position');
+  });
+
+  it('outside right: a just-placed order’s labels go just right of its end — into the empty margin', () => {
+    const out = labels(live(), 500, 500); // ends at its own bar: the 48 px minimum, 552 px of room right of it
+    expect(out.map((l) => [l.align, l.x])).toEqual([['left', 554], ['left', 554], ['left', 554]]);
+    expect(out[0].text).toContain('Long position'); // the full label, not a compact one
+  });
+
+  it('compact: no room for the full label either way — the price only, just right of the tool when it fits there', () => {
+    const out = labels(live(), 780, 780); // 48 px box at 780 → 828; 72 px before the pane's edge
+    // the entry's price must also clear the ✕ (18 px): it goes right; the stop's and target's fit inside the 48 px box
+    expect(out.map((l) => [l.text, l.align, l.x])).toEqual([['100.00', 'left', 834], ['98.00', 'right', 824], ['104.00', 'right', 824]]);
+  });
+
+  it('compact inside, overhanging, only when not even the price fits to the right (not at the newest bar)', () => {
+    const out = labels(live(), 830, 830); // 48 px box at 830 → 878; 22 px left
+    expect(out.map((l) => l.text)).toEqual(['100.00', '98.00', '104.00']);
+    expect(out.every((l) => l.align === 'right')).toBe(true);
+  });
+
+  it('a draft is unchanged: inside, full labels, even when narrow', () => {
+    const out = labels(tool({ widthBars: 2 }), 820, null); // 12 px wide
+    expect(out.every((l) => l.align === 'right')).toBe(true);
+    expect(out[0].text).toContain('Long limit');
   });
 });
