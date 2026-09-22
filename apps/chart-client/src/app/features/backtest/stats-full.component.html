@@ -1,25 +1,25 @@
 <main class="page fluid-page">
   <nav class="crumbs">
-    <a routerLink="/sessions">&#x2039; Сессии</a>
+    <a routerLink="/sessions">&#x2039; Sessions</a>
     @if (session(); as s) {
-      <a [routerLink]="['/sessions', s.id]">Вернуться к сессии</a>
+      <a [routerLink]="['/sessions', s.id]">Back to the session</a>
     }
   </nav>
 
   @if (error(); as message) {
-    <p class="error" role="alert">Не удалось загрузить статистику: {{ message }}</p>
+    <p class="error" role="alert">Could not load the statistics: {{ message }}</p>
   } @else if (stats(); as s) {
-    <h1>Статистика · {{ session()?.name }}</h1>
+    <h1>Statistics · {{ session()?.name }}</h1>
     @if (response()?.drift) {
       <p class="drift" data-testid="stats-drift" role="status">
-        Итоги, сохранённые в сессии, расходятся с полным пересчётом — здесь показан пересчёт.
+        The totals stored with the session differ from a full recompute — this page shows the recompute.
       </p>
     }
     @if (s.trades === 0) {
-      <p class="muted" data-testid="stats-empty">Закрытых сделок пока нет — цифры появятся после первой закрытой сделки.</p>
+      <p class="muted" data-testid="stats-empty">No closed trades yet — the figures appear after the first trade closes.</p>
     }
 
-    <section class="headline" aria-label="Итоги">
+    <section class="headline" aria-label="Summary">
       @for (item of headline(); track item.key) {
         <div class="figure" [attr.data-stat]="item.key" [attr.data-value]="item.raw" [title]="item.hint">
           <span class="label">{{ item.label }}</span>
@@ -30,23 +30,23 @@
 
     <section aria-labelledby="equity-h">
       <header class="section-head">
-        <h2 id="equity-h">Кривая капитала</h2>
-        <div class="toggle" role="group" aria-label="Единицы">
+        <h2 id="equity-h">Equity curve</h2>
+        <div class="toggle" role="group" aria-label="Units">
           <button type="button" [class.active]="unit() === 'ccy'" (click)="unit.set('ccy')">{{ session()?.sessionCurrency }}</button>
           <button type="button" [class.active]="unit() === 'r'" (click)="unit.set('r')">R</button>
         </div>
       </header>
       <p class="caption">
-        Счёт после каждой закрытой сделки — ступенька на каждое закрытие, начиная с баланса в начале периода. Красная область
-        внизу — насколько счёт в этот момент ниже своего прежнего максимума (просадка).
+        The balance after each closed trade — one step per close, starting from the balance at the start of the period. The red
+        area below is how far the balance is at that moment under its previous high (the drawdown).
       </p>
       <app-equity-chart [points]="s.equityCurve" [unit]="unit()" />
     </section>
 
     <div class="two">
       <section aria-labelledby="dist-h">
-        <h2 id="dist-h">Результаты сделок в R</h2>
-        <p class="caption">Сколько сделок закрылось с каким результатом. 1R — сумма, которой вы рисковали в сделке.</p>
+        <h2 id="dist-h">Trade results in R</h2>
+        <p class="caption">How many trades closed with which result. 1R is the amount you risked on the trade.</p>
         <ul class="histogram" data-testid="r-histogram">
           @for (bin of histogram(); track bin.label) {
             <li [attr.data-bin]="bin.label" [attr.data-count]="bin.count">
@@ -59,8 +59,8 @@
       </section>
 
       <section aria-labelledby="mae-h">
-        <h2 id="mae-h">Откат против позиции</h2>
-        <p class="caption">Насколько далеко цена уходила против вас, пока сделка была открыта, в R.</p>
+        <h2 id="mae-h">Adverse excursion</h2>
+        <p class="caption">How far the price moved against you while the trade was open, in R.</p>
         @for (item of mae(); track item.key) {
           <div class="row" [attr.data-stat]="item.key" [attr.data-value]="item.raw" [title]="item.hint" [class.callout]="item.key === 'pessimisticTrades' && s.pessimisticTrades > 0">
             <span class="label">{{ item.label }}</span>
@@ -69,24 +69,24 @@
         }
         @if (s.pessimisticTrades > 0) {
           <p class="callout-text" data-testid="pessimistic-callout">
-            {{ s.pessimisticTrades }} из {{ s.trades }} сделок посчитаны по барам, без минутных данных: если в одной свече цена задела и стоп,
-            и цель, засчитан стоп. Их результат может быть хуже реального.
+            {{ s.pessimisticTrades }} of {{ s.trades }} trades were resolved on bars, without 1-minute data: when one candle touched both
+            the stop and the target, the stop was taken. Their result may be worse than it really was.
           </p>
         }
       </section>
     </div>
 
     <div class="two">
-      @for (table of [{ title: 'По инструментам', rows: byInstrument() }, { title: 'По направлению', rows: bySide() }]; track table.title) {
+      @for (table of [{ title: 'By instrument', rows: byInstrument() }, { title: 'By side', rows: bySide() }]; track table.title) {
         <section>
           <h2>{{ table.title }}</h2>
           @if (table.rows.length === 0) {
-            <p class="muted">Нет закрытых сделок.</p>
+            <p class="muted">No closed trades.</p>
           } @else {
             <div class="table-scroll">
               <table>
                 <thead>
-                  <tr><th scope="col"></th><th scope="col">Сделок</th><th scope="col">Прибыльных</th><th scope="col">Результат</th><th scope="col">В R</th></tr>
+                  <tr><th scope="col"></th><th scope="col">Trades</th><th scope="col">Win rate</th><th scope="col">P&amp;L</th><th scope="col">P&amp;L (R)</th></tr>
                 </thead>
                 <tbody>
                   @for (row of table.rows; track row.key) {
@@ -116,6 +116,6 @@
       [units]="instruments.units()"
     />
   } @else {
-    <p class="muted" role="status">Загружаем статистику…</p>
+    <p class="muted" role="status">Loading statistics…</p>
   }
 </main>

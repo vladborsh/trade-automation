@@ -69,7 +69,7 @@ describe('StatsFullComponent', () => {
     expect(el.querySelectorAll('[data-testid="equity-points"] li')).toHaveLength(1);
     expect(el.querySelector('[data-stat="winRate"] .value')?.textContent).toBe('—');
     expect([...el.querySelectorAll('[data-testid="r-histogram"] li')].every((li) => li.getAttribute('data-count') === '0')).toBe(true);
-    expect(el.textContent).toContain('Нет закрытых сделок.');
+    expect(el.textContent).toContain('No closed trades.');
   });
 
   it('a one-trade session: its figures, its curve step and its bin', async () => {
@@ -104,7 +104,7 @@ describe('StatsFullComponent', () => {
       'byInstrument.binance:BTCUSDT', 'byInstrument.binance:ETHUSDT', 'bySide.long', 'bySide.short',
     ]);
     expect(value(el, 'byInstrument.binance:ETHUSDT.pnl')).toBe('-60');
-    expect(el.querySelector('[data-testid="pessimistic-callout"]')?.textContent).toContain('1 из 3 сделок посчитаны по барам');
+    expect(el.querySelector('[data-testid="pessimistic-callout"]')?.textContent).toContain('1 of 3 trades were resolved on bars');
     expect(el.querySelector('[data-testid="stats-drift"]')).not.toBeNull();
   });
 

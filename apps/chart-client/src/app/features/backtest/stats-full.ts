@@ -63,12 +63,12 @@ export interface HistogramBin {
 export function rHistogram(results: readonly number[], width = 0.5, limit = 3): HistogramBin[] {
   const edges: number[] = [];
   for (let e = -limit; e <= limit + 1e-9; e += width) edges.push(Number(e.toFixed(6)));
-  const bins: HistogramBin[] = [{ label: `до ${fmt(-limit)}`, count: 0, side: 'loss' }];
+  const bins: HistogramBin[] = [{ label: `below ${fmt(-limit)}`, count: 0, side: 'loss' }];
   for (let i = 0; i < edges.length - 1; i++) {
     const [a, b] = [edges[i], edges[i + 1]];
     bins.push({ label: `${fmt(a)} … ${fmt(b)}`, count: 0, side: b <= 0 ? 'loss' : a >= 0 ? 'win' : 'flat' });
   }
-  bins.push({ label: `от ${fmt(limit)}`, count: 0, side: 'win' });
+  bins.push({ label: `${fmt(limit)} and above`, count: 0, side: 'win' });
   for (const r of results) {
     if (r < -limit) bins[0].count++;
     else if (r >= limit) bins[bins.length - 1].count++;
@@ -95,19 +95,19 @@ export function fullStatsItems(s: SessionStats, ccy: string): FullStatsItem[] {
     key, label, hint, text, raw: s[key] as number | null,
   });
   return [
-    i('trades', 'Сделок', 'Сколько сделок закрыто.', String(s.trades)),
-    i('winRate', 'Доля прибыльных', 'Какая часть закрытых сделок принесла прибыль.', formatPercent(s.trades === 0 ? null : s.winRate * 100)),
-    i('pnl', 'Результат', 'Итог всех закрытых сделок в валюте счёта, с учётом комиссий и спреда.', formatSignedMoney(s.pnl, ccy)),
-    i('pnlR', 'Результат в R', 'Тот же итог в единицах риска: 1R — сумма, которой вы рисковали в сделке.', formatR(s.pnlR)),
-    i('expectancyR', 'Средняя сделка в R', 'Сколько R в среднем приносила одна сделка.', formatR(s.expectancyR)),
-    i('profitFactor', 'Профит-фактор', 'Вся прибыль, делённая на все убытки. Больше 1 — прибыли больше, чем убытков.', formatRatio(s.profitFactor)),
-    i('avgWin', 'Средняя прибыль', 'Средний результат прибыльной сделки.', formatSignedMoney(s.avgWin, ccy)),
-    i('avgWinR', 'Средняя прибыль в R', 'Средний результат прибыльной сделки в R.', formatR(s.avgWinR)),
-    i('avgLoss', 'Средний убыток', 'Средний результат убыточной сделки.', formatSignedMoney(s.avgLoss, ccy)),
-    i('avgLossR', 'Средний убыток в R', 'Средний результат убыточной сделки в R.', formatR(s.avgLossR)),
-    i('maxDrawdownCcy', 'Макс. просадка', 'Самое большое падение счёта от его прежнего максимума, по закрытым сделкам.', formatMoney(s.maxDrawdownCcy, ccy)),
-    i('maxDrawdownR', 'Макс. просадка в R', 'Та же просадка в единицах риска.', formatRAmount(s.maxDrawdownR)),
-    i('maxDrawdownPct', 'Макс. просадка в %', 'Та же просадка в процентах от максимума счёта.', formatPercent(s.maxDrawdownPct)),
+    i('trades', 'Trades', 'How many trades have closed.', String(s.trades)),
+    i('winRate', 'Win rate', 'The share of closed trades that made a profit.', formatPercent(s.trades === 0 ? null : s.winRate * 100)),
+    i('pnl', 'P&L', 'The result of all closed trades in the account currency, after commission and spread.', formatSignedMoney(s.pnl, ccy)),
+    i('pnlR', 'P&L (R)', 'The same result in units of risk: 1R is the amount you risked on the trade.', formatR(s.pnlR)),
+    i('expectancyR', 'Expectancy (R)', 'How many R one trade made on average.', formatR(s.expectancyR)),
+    i('profitFactor', 'Profit factor', 'All the profit divided by all the losses. Above 1 means more profit than loss.', formatRatio(s.profitFactor)),
+    i('avgWin', 'Average win', 'The average result of a winning trade.', formatSignedMoney(s.avgWin, ccy)),
+    i('avgWinR', 'Average win (R)', 'The average result of a winning trade, in R.', formatR(s.avgWinR)),
+    i('avgLoss', 'Average loss', 'The average result of a losing trade.', formatSignedMoney(s.avgLoss, ccy)),
+    i('avgLossR', 'Average loss (R)', 'The average result of a losing trade, in R.', formatR(s.avgLossR)),
+    i('maxDrawdownCcy', 'Max drawdown', 'The largest fall of the balance from its previous high, over closed trades.', formatMoney(s.maxDrawdownCcy, ccy)),
+    i('maxDrawdownR', 'Max drawdown (R)', 'The same drawdown in units of risk.', formatRAmount(s.maxDrawdownR)),
+    i('maxDrawdownPct', 'Max drawdown (%)', 'The same drawdown as a percentage of the balance high.', formatPercent(s.maxDrawdownPct)),
   ];
 }
 
@@ -117,10 +117,10 @@ export function maeItems(s: SessionStats): FullStatsItem[] {
     key, label, hint, text, raw: s[key] as number | null,
   });
   return [
-    i('maeAvg', 'Средний откат против позиции', 'Насколько в среднем цена уходила против вас до закрытия сделки, в R.', formatRAmount(s.maeAvg)),
-    i('maeWorst', 'Худший откат против позиции', 'Самый глубокий уход цены против позиции среди всех сделок, в R.', formatRAmount(s.maeWorst)),
-    i('pessimisticTrades', 'Сделок, посчитанных по барам', 'Для них не было минутных данных: исход считан по барам, и при касании стопа и цели в одной свече засчитан стоп.', String(s.pessimisticTrades)),
-    i('endOfSessionCloses', 'Закрыто в конце сессии', 'Позиции, которые были ещё открыты к концу периода и закрыты по последней цене.', String(s.endOfSessionCloses)),
+    i('maeAvg', 'Average adverse excursion', 'How far on average the price moved against you before the trade closed, in R.', formatRAmount(s.maeAvg)),
+    i('maeWorst', 'Worst adverse excursion', 'The furthest the price moved against a position across all trades, in R.', formatRAmount(s.maeWorst)),
+    i('pessimisticTrades', 'Trades resolved on bars', 'There was no 1-minute data for them: the outcome was read from bars, and when one candle touched both the stop and the target, the stop was taken.', String(s.pessimisticTrades)),
+    i('endOfSessionCloses', 'Closed at the session end', 'Positions still open at the end of the period, closed at the last price.', String(s.endOfSessionCloses)),
   ];
 }
 
@@ -141,7 +141,7 @@ export function breakdownRows(
   data: Readonly<Partial<Record<string, StatsBreakdown>>>,
   ccy: string,
 ): BreakdownRow[] {
-  const sideLabel: Record<string, string> = { long: 'Покупки (long)', short: 'Продажи (short)' };
+  const sideLabel: Record<string, string> = { long: 'Long', short: 'Short' };
   const entries = Object.entries(data).filter((e): e is [string, StatsBreakdown] => e[1] !== undefined);
   return entries.map(([k, b]) => ({
     key: `${group}.${k}`,

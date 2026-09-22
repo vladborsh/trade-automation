@@ -34,7 +34,7 @@ export const routes: Routes = [
       {
         path: 'sessions/:id/stats',
         loadComponent: () => import('./features/backtest/stats-full.component').then((m) => m.StatsFullComponent),
-        title: 'Статистика',
+        title: 'Statistics',
       },
       {
         path: 'sessions/:id/trades/:orderId',

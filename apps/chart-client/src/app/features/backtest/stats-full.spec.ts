@@ -42,7 +42,7 @@ describe('rHistogram', () => {
   it('bins R results half an R wide, with open bins beyond ±3R', () => {
     const bins = rHistogram([-5, -1, -0.99, 0.2, 1.97, 2.5, 3, 7]);
     const counts = Object.fromEntries(bins.filter((b) => b.count > 0).map((b) => [b.label, b.count]));
-    expect(counts).toEqual({ 'до −3R': 1, '−1R … −0.5R': 2, '0R … +0.5R': 1, '+1.5R … +2R': 1, '+2.5R … +3R': 1, 'от +3R': 2 });
+    expect(counts).toEqual({ 'below −3R': 1, '−1R … −0.5R': 2, '0R … +0.5R': 1, '+1.5R … +2R': 1, '+2.5R … +3R': 1, '+3R and above': 2 });
     expect(bins).toHaveLength(14);
     expect(bins.reduce((n, b) => n + b.count, 0)).toBe(8);
   });
@@ -50,10 +50,10 @@ describe('rHistogram', () => {
   it('colours loss, win and straddling bins', () => {
     const bins = rHistogram([], 1, 1);
     expect(bins.map((b) => [b.label, b.side])).toEqual([
-      ['до −1R', 'loss'],
+      ['below −1R', 'loss'],
       ['−1R … 0R', 'loss'],
       ['0R … +1R', 'win'],
-      ['от +1R', 'win'],
+      ['+1R and above', 'win'],
     ]);
   });
 });
@@ -67,7 +67,7 @@ const STATS = {
 describe('fullStatsItems / maeItems', () => {
   it('keeps the raw server value next to a Russian caption and a plain explanation', () => {
     const items = fullStatsItems(STATS, 'USD');
-    expect(items.find((x) => x.key === 'winRate')).toMatchObject({ label: 'Доля прибыльных', text: '25.0 %', raw: 0.25 });
+    expect(items.find((x) => x.key === 'winRate')).toMatchObject({ label: 'Win rate', text: '25.0 %', raw: 0.25 });
     expect(items.find((x) => x.key === 'pnl')?.text).toBe('−201.08 USD');
     expect(items.every((x) => x.hint.length > 0)).toBe(true);
     const mae = maeItems(STATS);
@@ -84,8 +84,8 @@ describe('breakdownRows', () => {
   it('one row per instrument or side, in Russian where it is a word', () => {
     const rows = breakdownRows('bySide', { long: { trades: 3, winRate: 1 / 3, pnl: -46.23, pnlR: -0.47 }, short: { trades: 1, winRate: 0, pnl: -154.85, pnlR: -1.55 } }, 'USD');
     expect(rows.map((r) => [r.key, r.label, r.trades, r.winRate, r.pnl, r.pnlR])).toEqual([
-      ['bySide.long', 'Покупки (long)', 3, '33.3 %', '−46.23 USD', '−0.47 R'],
-      ['bySide.short', 'Продажи (short)', 1, '0.0 %', '−154.85 USD', '−1.55 R'],
+      ['bySide.long', 'Long', 3, '33.3 %', '−46.23 USD', '−0.47 R'],
+      ['bySide.short', 'Short', 1, '0.0 %', '−154.85 USD', '−1.55 R'],
     ]);
     expect(breakdownRows('byInstrument', { 'binance:BTCUSDT': { trades: 0, winRate: 0, pnl: 0, pnlR: 0 } }, 'USD')[0]).toMatchObject({ label: 'binance:BTCUSDT', winRate: '—' });
   });

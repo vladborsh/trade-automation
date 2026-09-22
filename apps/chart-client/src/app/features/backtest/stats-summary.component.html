@@ -27,7 +27,7 @@
       </button>
     }
     @if (sessionId(); as id) {
-      <a class="more" data-testid="stats-full-link" [routerLink]="['/sessions', id, 'stats']" title="Подробная статистика" aria-label="Подробная статистика">&#x2197;</a>
+      <a class="more" data-testid="stats-full-link" [routerLink]="['/sessions', id, 'stats']" title="Full statistics" aria-label="Full statistics">&#x2197;</a>
     }
   </div>
   @if (drift()) {

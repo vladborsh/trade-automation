@@ -30,7 +30,7 @@ test('the full statistics screen equals GET …/stats, figure for figure and poi
   await page.goto(`/sessions/${session.id}`);
   await page.getByTestId('stats-full-link').click();
   await expect(page).toHaveURL(new RegExp(`/sessions/${session.id}/stats$`));
-  await expect(page.locator('h1')).toContainText('Статистика', { timeout: 15_000 });
+  await expect(page.locator('h1')).toContainText('Statistics', { timeout: 15_000 });
 
   const raw = (v: unknown) => (v === null || v === undefined ? null : String(v));
   const figures = await page.locator('[data-stat]').all();
@@ -48,7 +48,7 @@ test('the full statistics screen equals GET …/stats, figure for figure and poi
     await expect(points.nth(i)).toHaveAttribute('data-balance-r', String(p.balanceR));
   }
   await expect(page.locator('[data-testid="equity-chart"] canvas').first()).toBeVisible();
-  await expect(page.getByTestId('pessimistic-callout')).toContainText('посчитаны по барам');
+  await expect(page.getByTestId('pessimistic-callout')).toContainText('resolved on bars');
 
   await page.getByRole('button', { name: 'R', exact: true }).click(); // the R view of the same curve
   await expect(page.getByRole('button', { name: 'R', exact: true })).toHaveClass(/active/);
