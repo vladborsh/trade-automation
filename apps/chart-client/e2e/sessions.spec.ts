@@ -3,7 +3,8 @@ import { test, expect } from './fixtures';
 /**
  * backtest-app-system-design.md §7.2 against the mock (mock-server/backtest.ts): a session is
  * created from the form, appears in the list and is deleted after the confirm; a mixed-currency
- * selection cannot be submitted. Signed in as the mock admin by the default fixture.
+ * selection cannot be submitted. Instruments are picked in the dropdown multiselect (T-039), by
+ * mouse and by keyboard. Signed in as the mock admin by the default fixture.
  */
 
 test('create a session, see it in the list, delete it after the confirm', async ({ page }) => {
@@ -13,7 +14,10 @@ test('create a session, see it in the list, delete it after the confirm', async 
   await expect(page).toHaveURL(/\/sessions\/new$/);
 
   await page.getByLabel('Name').fill(name);
-  await page.getByRole('checkbox', { name: /BTC\/USDT/ }).check();
+  await page.getByTestId('instrument-trigger').click();
+  await page.getByRole('option', { name: /BTC\/USDT/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('instrument-chip')).toHaveText([/BTC\/USDT Perp/]);
   await expect(page.locator('input[name="periodTo"]')).toHaveValue('2026-07-01T00:00'); // end of the mock coverage: last 1m opens 23:59
   await page.getByRole('button', { name: 'Create session' }).click();
 
@@ -37,13 +41,24 @@ test('create a session, see it in the list, delete it after the confirm', async 
 test('a mixed-currency selection cannot be submitted', async ({ page }) => {
   await page.goto('/sessions/new');
   await page.getByLabel('Name').fill('mixed');
-  await page.getByRole('checkbox', { name: /BTC\/USDT/ }).check();
-  await page.getByRole('checkbox', { name: /EUR\/CHF/ }).check();
+  await page.getByTestId('instrument-trigger').click();
+  await page.getByRole('option', { name: /BTC\/USDT/ }).click();
+  await page.getByRole('option', { name: /EUR\/CHF/ }).click();
+  await page.keyboard.press('Escape');
 
   await expect(page.getByTestId('instruments-error')).toContainText('these mix USD and CHF');
   await expect(page.getByRole('button', { name: 'Create session' })).toBeDisabled();
 
-  await page.getByRole('checkbox', { name: /EUR\/CHF/ }).uncheck();
+  // keyboard only: focus the trigger, open, search, move, toggle, close
+  await page.getByTestId('instrument-trigger').focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.type('eur');
+  await expect(page.getByTestId('instrument-panel').getByRole('option')).toHaveCount(1); // native <option>s elsewhere share the role
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('instrument-trigger')).toBeFocused();
+  await expect(page.getByTestId('instrument-chip')).toHaveText([/BTC\/USDT Perp/]);
   await expect(page.getByTestId('instruments-error')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create session' })).toBeEnabled();
 });

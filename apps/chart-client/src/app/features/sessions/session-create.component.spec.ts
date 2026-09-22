@@ -47,13 +47,15 @@ async function setup(createSession = vi.fn().mockResolvedValue({ id: 'new' })) {
   return { fixture, createSession, navigate, el: fixture.nativeElement as HTMLElement };
 }
 
+/** Picks an instrument in the dropdown multiselect (T-039), opening it first if needed. */
 function check(fixture: ComponentFixture<SessionCreateComponent>, label: string): void {
   const el = fixture.nativeElement as HTMLElement;
-  const box = [...el.querySelectorAll<HTMLInputElement>('app-instrument-picker input[type="checkbox"]')].find((b) =>
-    b.closest('label')?.textContent?.includes(label),
-  )!;
-  box.checked = true;
-  box.dispatchEvent(new Event('change'));
+  if (!el.querySelector('[data-testid="instrument-panel"]')) {
+    el.querySelector<HTMLElement>('[data-testid="instrument-trigger"]')!.click();
+    fixture.detectChanges();
+  }
+  const option = [...el.querySelectorAll<HTMLElement>('app-instrument-picker [role="option"]')].find((o) => o.textContent?.includes(label))!;
+  option.click();
   fixture.detectChanges();
 }
 

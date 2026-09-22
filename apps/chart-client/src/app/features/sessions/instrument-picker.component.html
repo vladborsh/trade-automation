@@ -1,24 +1,77 @@
-<div class="picker" role="group" aria-label="Instruments">
-  @for (group of groups(); track group.currency) {
-    <fieldset class="group">
-      <legend>{{ group.currency }}</legend>
-      @for (instrument of group.instruments; track instrument.id) {
-        <label class="option" [class.checked]="isSelected(instrument.id)">
-          <input
-            type="checkbox"
-            [checked]="isSelected(instrument.id)"
-            [disabled]="full() && !isSelected(instrument.id)"
-            (change)="toggle(instrument.id, $any($event.target).checked)"
-          />
-          <span class="name">{{ instrument.displayName }}</span>
-          @if (instrument.coverage; as coverage) {
-            <span class="coverage">{{ day(coverage.from) }} → {{ day(coverage.to) }}</span>
-          }
-        </label>
+<div class="picker">
+  <div class="combo">
+    <button
+      #trigger
+      type="button"
+      class="trigger"
+      data-testid="instrument-trigger"
+      aria-haspopup="listbox"
+      [attr.aria-expanded]="open()"
+      aria-controls="instrument-listbox"
+      (click)="open() ? close(true) : openPanel()"
+      (keydown)="onTriggerKeydown($event)"
+    >
+      @for (c of chosen(); track c.id) {
+        <span class="chip" data-testid="instrument-chip">
+          {{ c.name }}
+          <span class="remove" aria-hidden="true" title="Remove" (click)="remove(c.id, $event)">✕</span>
+        </span>
+      } @empty {
+        <span class="placeholder">Choose instruments…</span>
       }
-    </fieldset>
-  } @empty {
-    <p class="muted">No instrument has stored 1m history yet.</p>
-  }
+      <span class="count">{{ selected().length }} / {{ max }}</span>
+      <span class="caret" aria-hidden="true">▾</span>
+    </button>
+
+    @if (open()) {
+      <div class="panel" data-testid="instrument-panel">
+        <input
+          #search
+          type="search"
+          class="search"
+          placeholder="Search instruments"
+          aria-label="Search instruments"
+          aria-controls="instrument-listbox"
+          [attr.aria-activedescendant]="active() ? optionDomId(active()!) : null"
+          [value]="query()"
+          (input)="onQuery($any($event.target).value)"
+          (keydown)="onSearchKeydown($event)"
+        />
+        <div class="options" id="instrument-listbox" role="listbox" aria-label="Instruments" aria-multiselectable="true">
+          @for (group of shown(); track group.currency) {
+            <div class="group" role="group" [attr.aria-label]="group.currency">
+              <div class="group-head">{{ group.currency }}</div>
+              @for (instrument of group.instruments; track instrument.id) {
+                <div
+                  class="option"
+                  role="option"
+                  [id]="optionDomId(instrument.id)"
+                  [attr.aria-selected]="isSelected(instrument.id)"
+                  [attr.aria-disabled]="isDisabled(instrument.id)"
+                  [class.checked]="isSelected(instrument.id)"
+                  [class.active]="active() === instrument.id"
+                  [class.disabled]="isDisabled(instrument.id)"
+                  (mousedown)="$event.preventDefault()"
+                  (click)="toggle(instrument.id)"
+                >
+                  <span class="tick" aria-hidden="true">{{ isSelected(instrument.id) ? '✓' : '' }}</span>
+                  <span class="name">{{ instrument.displayName }}</span>
+                  @if (instrument.coverage; as coverage) {
+                    <span class="coverage">{{ day(coverage.from) }} → {{ day(coverage.to) }}</span>
+                  }
+                </div>
+              }
+            </div>
+          } @empty {
+            @if (groups().length === 0) {
+              <p class="muted">No instrument has stored 1m history yet.</p>
+            } @else {
+              <p class="muted">No instrument matches “{{ query() }}”.</p>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
   <p class="hint">Up to {{ max }} instruments, all from one currency group.</p>
 </div>
