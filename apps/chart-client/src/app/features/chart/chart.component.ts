@@ -31,6 +31,7 @@ import { TIMEFRAME_MS } from '@trade-automation/contracts';
 import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
 import { CANDLE_SERIES_OPTIONS, CHART_OPTIONS } from './chart-options';
 import { MetricSeriesRenderer } from './metric-series.renderer';
+import { renderDiff } from './render-diff';
 import { OverlayLayer } from './overlay/overlay-layer';
 import { MarkerRenderer } from './overlay/marker.renderer';
 import { PriceLineRenderer } from './overlay/price-line.renderer';
@@ -350,23 +351,12 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const isIncrementalAppendOrUpdate =
-      this.lastRenderedCount > 0 &&
-      (candles.length === this.lastRenderedCount || candles.length === this.lastRenderedCount + 1);
-    // A prepend (scroll-back pagination) grows the series at the FRONT: the
-    // tail (newest bar) is unchanged but the count jumped by more than one.
-    const isPrepend =
-      !isIncrementalAppendOrUpdate &&
-      this.lastRenderedTime !== null &&
-      candles.length > this.lastRenderedCount &&
-      candles[candles.length - 1].openTime === this.lastRenderedTime;
-
+    const diff = renderDiff(this.lastRenderedCount, this.lastRenderedTime, candles.length, candles[candles.length - 1].openTime);
     const timesSec = candles.map((c) => c.openTime / 1000);
-    if (isIncrementalAppendOrUpdate) {
-      const last = candles[candles.length - 1];
-      series.update(toCandlestickData(last));
+    if (diff === 'update') {
+      series.update(toCandlestickData(candles[candles.length - 1]));
     } else {
-      this.rangeSync.withPreservedRangeOnPrepend(isPrepend, timesSec, () => series.setData(toCandlestickSeries(candles)));
+      this.rangeSync.withPreservedRangeOnPrepend(diff === 'prepend', timesSec, () => series.setData(toCandlestickSeries(candles)));
     }
     this.lastRenderedCount = candles.length;
     this.lastRenderedTime = candles[candles.length - 1].openTime;
@@ -396,21 +386,12 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const isIncrementalAppendOrUpdate =
-      this.lastRenderedCount > 0 &&
-      (points.length === this.lastRenderedCount || points.length === this.lastRenderedCount + 1);
-    const isPrepend =
-      !isIncrementalAppendOrUpdate &&
-      this.lastRenderedTime !== null &&
-      points.length > this.lastRenderedCount &&
-      points[points.length - 1].time === this.lastRenderedTime;
-
+    const diff = renderDiff(this.lastRenderedCount, this.lastRenderedTime, points.length, points[points.length - 1].time);
     const timesSec = points.map((p) => p.time / 1000);
-    if (isIncrementalAppendOrUpdate) {
-      const last = points[points.length - 1];
-      this.metricSeries.update(last);
+    if (diff === 'update') {
+      this.metricSeries.update(points[points.length - 1]);
     } else {
-      this.rangeSync.withPreservedRangeOnPrepend(isPrepend, timesSec, () => this.metricSeries.setData(points));
+      this.rangeSync.withPreservedRangeOnPrepend(diff === 'prepend', timesSec, () => this.metricSeries.setData(points));
     }
     this.lastRenderedCount = points.length;
     this.lastRenderedTime = points[points.length - 1].time;
