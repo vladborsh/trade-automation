@@ -8,20 +8,30 @@ const STATS = {
   avgWin: 30, avgWinR: 1.5, avgLoss: -20, avgLossR: -1,
 } as unknown as SessionStats;
 
-function render(stats: SessionStats | null, drift = false) {
+function render(stats: SessionStats | null, drift = false): HTMLElement & { fixture?: unknown } {
   TestBed.configureTestingModule({ imports: [StatsSummaryComponent], providers: [provideRouter([])] });
   const fixture = TestBed.createComponent(StatsSummaryComponent);
   fixture.componentRef.setInput('stats', stats);
   fixture.componentRef.setInput('currency', 'USD');
   fixture.componentRef.setInput('drift', drift);
   fixture.detectChanges();
-  return fixture.nativeElement as HTMLElement;
+  const el = fixture.nativeElement as HTMLElement;
+  return Object.assign(el, { detect: () => fixture.detectChanges() });
 }
 
 describe('StatsSummaryComponent', () => {
-  it('renders every summary figure with its raw value', () => {
-    const el = render(STATS);
+  it('T-044: shows only P&L (currency and R) until Details is clicked; then every figure, each with its raw value', () => {
+    const el = render(STATS) as HTMLElement & { detect: () => void };
+    expect([...el.querySelectorAll('[data-stat]')].map((i) => i.getAttribute('data-stat'))).toEqual(['pnl', 'pnlR']);
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid="stats-details-toggle"]')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    el.detect();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(el.querySelectorAll('[data-stat]')).toHaveLength(12);
+    toggle.click();
+    el.detect();
+    expect(el.querySelectorAll('[data-stat]')).toHaveLength(2);
     const pnl = el.querySelector('[data-stat="pnl"]')!;
     expect(pnl.querySelector('dd')?.textContent).toBe('+10.00 USD');
     expect(pnl.getAttribute('data-value')).toBe('10');
@@ -43,7 +53,9 @@ describe('StatsSummaryComponent', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="stats-full-link"]')?.getAttribute('href')).toBe('/sessions/s1/stats');
   });
 
-  it('renders nothing before the stats arrive', () => {
-    expect(render(null).querySelectorAll('[data-stat]')).toHaveLength(0);
+  it('renders nothing before the stats arrive (no Details button either)', () => {
+    const el = render(null);
+    expect(el.querySelectorAll('[data-stat]')).toHaveLength(0);
+    expect(el.querySelector('[data-testid="stats-details-toggle"]')).toBeNull();
   });
 });

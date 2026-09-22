@@ -1,5 +1,5 @@
 import type { SessionStats } from '@trade-automation/contracts';
-import { statsItems } from './stats-items';
+import { headlineStats, statsItems } from './stats-items';
 
 const STATS = {
   trades: 4, winRate: 0.5, pnl: 312.4, pnlR: 3.1, profitFactor: 2.25, maxDrawdownCcy: 150, maxDrawdownR: 1.5,
@@ -31,5 +31,15 @@ describe('statsItems', () => {
     expect(text['winRate']).toBe('—');
     expect(text['profitFactor']).toBe('n/a');
     expect(text['avgWin']).toBe('—');
+  });
+});
+
+describe('headlineStats (T-044)', () => {
+  it('P&L in currency and R up front; every other figure, in order, behind the button', () => {
+    const { headline, details } = headlineStats(statsItems(STATS, 'USD'));
+    expect(headline.map((i) => i.key)).toEqual(['pnl', 'pnlR']);
+    expect(details.map((i) => i.key)).toEqual([
+      'trades', 'winRate', 'profitFactor', 'maxDrawdownCcy', 'maxDrawdownR', 'maxDrawdownPct', 'avgWin', 'avgWinR', 'avgLoss', 'avgLossR',
+    ]);
   });
 });

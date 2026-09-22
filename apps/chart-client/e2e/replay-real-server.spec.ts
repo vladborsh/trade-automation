@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { openJournal, replayStarted } from './fixtures';
+import { openJournal, openStatsDetails, replayStarted } from './fixtures';
 
 /**
  * Tester e2e (cluster bt-workspace): the P0 client flow against the REAL signal-server — the mock
@@ -92,6 +92,7 @@ async function openWorkspace(page: Page, id: string): Promise<void> {
   // on the blank page before the toolbar exists, and a key pressed during the load is blocked by design.
   await replayStarted(page);
   await openJournal(page); // T-043: collapsed by default; these tests read its rows
+  await openStatsDetails(page); // T-044: P&L only by default; these tests read every figure
 }
 
 // ---------------------------------------------------------------------------------------------

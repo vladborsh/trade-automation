@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { Order, Session, SessionStatsResponse } from '@trade-automation/contracts';
-import { apiUrl, expect, openJournal, test } from './fixtures';
+import { apiUrl, expect, openJournal, openStatsDetails, test } from './fixtures';
 
 /**
  * T-024 against the mock's fixed journal (mock-server/journal-seed.ts): the journal rows equal
@@ -41,6 +41,7 @@ test('the journal rows and the summary are the server\'s, field for field', asyn
     }
   }
 
+  await openStatsDetails(page); // T-044: P&L only until asked
   for (const item of await page.locator('[data-stat]').all()) {
     const key = (await item.getAttribute('data-stat')) as keyof SessionStatsResponse['computed'];
     expect(await item.getAttribute('data-value'), `stats.${key}`).toBe(asRaw(stats.computed[key]));
@@ -82,4 +83,20 @@ test('T-043: the journal is collapsed by default; the toggle opens and closes it
   await page.reload();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false', { timeout: 15_000 });
   await expect(rows).toHaveCount(0);
+});
+
+test('T-044: the statistics show P&L only; Details reveals the rest and hides it again', async ({ page }) => {
+  const session = await createSession(page, `e2e stats details ${Date.now()}`);
+  const toggle = page.getByTestId('stats-details-toggle');
+  const figures = page.locator('.stats [data-stat]');
+
+  await page.goto(`/sessions/${session.id}`);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false', { timeout: 15_000 });
+  await expect(figures).toHaveCount(2);
+  expect(await figures.evaluateAll((els) => els.map((e) => e.getAttribute('data-stat')))).toEqual(['pnl', 'pnlR']);
+
+  await toggle.click();
+  await expect(figures).toHaveCount(12);
+  await toggle.click();
+  await expect(figures).toHaveCount(2);
 });

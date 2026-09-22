@@ -10,12 +10,34 @@
       Stored aggregates differ from a full recompute — showing the recompute.
     </p>
   }
-  <dl>
-    @for (item of items(); track item.key) {
+  <dl class="headline">
+    @for (item of items().headline; track item.key) {
       <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw">
         <dt>{{ item.label }}</dt>
         <dd>{{ item.text }}</dd>
       </div>
     }
   </dl>
+  @if (items().details.length > 0) {
+    <button
+      type="button"
+      class="details-toggle"
+      data-testid="stats-details-toggle"
+      aria-controls="stats-details"
+      [attr.aria-expanded]="detailsOpen()"
+      (click)="toggleDetails()"
+    >
+      <span class="caret" aria-hidden="true">{{ detailsOpen() ? '▾' : '▸' }}</span> Details
+    </button>
+  }
+  @if (detailsOpen()) {
+    <dl id="stats-details">
+      @for (item of items().details; track item.key) {
+        <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw">
+          <dt>{{ item.label }}</dt>
+          <dd>{{ item.text }}</dd>
+        </div>
+      }
+    </dl>
+  }
 </section>

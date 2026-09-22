@@ -29,3 +29,14 @@ export function statsItems(s: SessionStats, currency: string): StatsItem[] {
     { key: 'avgLossR', label: 'Average loss (R)', text: formatR(s.avgLossR), raw: s.avgLossR },
   ];
 }
+
+/** T-044: the figures the workspace always shows — P&L in currency and in R; the rest are details. */
+export const HEADLINE_STATS: readonly (keyof SessionStats)[] = ['pnl', 'pnlR'];
+
+/** Splits the summary into the always-shown headline and the details behind the button, order kept. */
+export function headlineStats(items: readonly StatsItem[]): { headline: StatsItem[]; details: StatsItem[] } {
+  return {
+    headline: items.filter((i) => HEADLINE_STATS.includes(i.key)),
+    details: items.filter((i) => !HEADLINE_STATS.includes(i.key)),
+  };
+}

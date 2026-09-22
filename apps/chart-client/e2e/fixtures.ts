@@ -82,4 +82,12 @@ export async function openJournal(page: Page): Promise<void> {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
+/** T-044: the workspace statistics show P&L only; opens the details (a no-op when already open). */
+export async function openStatsDetails(page: Page): Promise<void> {
+  const toggle = page.getByTestId('stats-details-toggle');
+  await expect(toggle).toBeVisible({ timeout: 15_000 });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 export { expect };
