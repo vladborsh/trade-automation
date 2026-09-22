@@ -4,7 +4,6 @@ import { ChartComponent } from '../chart/chart.component';
 import { ChartSyncService } from '../chart/chart-sync.service';
 import type { PositionToolChange } from '../chart/overlay/position-tool.model';
 import { ResearchBadgeComponent } from '../research-badge/research-badge.component';
-import { ConnectionStore } from '../../core/state/connection.store';
 import { InstrumentsStore } from '../../core/state/instruments.store';
 import { TimeframeStore } from '../../core/state/timeframe.store';
 import { LayoutsStore } from '../../core/state/layouts.store';
@@ -68,7 +67,8 @@ export class ChartPanelComponent {
   readonly caption = computed(() =>
     this.panel().kind === 'metric' ? metricSeriesCaption(this.tf()) : null,
   );
-  readonly venueStatus = computed(() => this.connection.statusFor(this.panel().instrument)?.venueStatus ?? 'down');
+  /** T-060: the header dot, only for a source with a live connection (never on replay panels). */
+  readonly venueStatus = computed(() => this.source().venueStatus?.() ?? null);
   /** §11.3: the last expanded panel's collapse button is disabled. */
   readonly canCollapse = computed(() => {
     const layout = this.layouts.active();
@@ -77,7 +77,6 @@ export class ChartPanelComponent {
 
   constructor(
     private readonly timeframes: TimeframeStore,
-    private readonly connection: ConnectionStore,
     private readonly instruments: InstrumentsStore,
     private readonly layouts: LayoutsStore,
     private readonly collapsed: CollapsedPanelsStore,

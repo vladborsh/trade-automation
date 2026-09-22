@@ -153,6 +153,20 @@ describe('ChartPanelComponent with a stub PanelSource (not a PanelFeed)', () => 
     expect(tools.setPointerPrice).toHaveBeenLastCalledWith(null);
   });
 
+  it('T-060: no venue dot for a source without a live connection (replay)', () => {
+    const { el } = render(stubSource());
+    expect(el.querySelector('.venue-dot')).toBeNull();
+  });
+
+  it('T-060: a live source\'s venue status is the header dot, and follows it', () => {
+    const status = signal<'up' | 'degraded' | 'down'>('up');
+    const { el, fixture } = render({ ...stubSource(), venueStatus: status });
+    expect(el.querySelector('.venue-dot')?.className).toBe('venue-dot venue-up');
+    status.set('down');
+    fixture.detectChanges();
+    expect(el.querySelector('.venue-dot')?.className).toBe('venue-dot venue-down');
+  });
+
   it('renders without a researchScope (no research strategy in replay)', () => {
     const { el } = render(stubSource());
     expect(el.querySelector('app-research-badge')).not.toBeNull();

@@ -6,6 +6,7 @@ import type {
   MetricPoint,
   OverlayPrimitive,
   Panel,
+  VenueStatus,
 } from '@trade-automation/contracts';
 import type { PositionToolChange, PositionToolsView } from '../chart/overlay/position-tool.model';
 import type { IndicatorsStore } from '../../core/state/indicators.store';
@@ -49,6 +50,11 @@ export interface PanelSource {
    * lines only.
    */
   readonly indicatorLabels?: boolean;
+  /**
+   * T-060: the live venue connection's status for this panel's instrument, shown as the header dot.
+   * Only the live terminal has one; a replay panel uses no live connection and shows no dot.
+   */
+  readonly venueStatus?: Signal<VenueStatus>;
   loadOlder(): Promise<void>;
 }
 

@@ -92,7 +92,7 @@ export class LayoutFeedService {
     }
     this.feedsByPanelId = nextFeeds;
     this.feedsSignal.set(
-      new Map([...nextFeeds].map(([panelId, feed]) => [panelId, panelFeedSource(feed, this.strategies.indicatorSpecs)])),
+      new Map([...nextFeeds].map(([panelId, feed]) => [panelId, panelFeedSource(feed, this.strategies.indicatorSpecs, this.connection)])),
     );
 
     await Promise.all([...nextFeeds.values()].map((feed) => feed.start()));

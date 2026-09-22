@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { signal } from '@angular/core';
 import type { IndicatorSeriesSpec, Panel, Signal as TradeSignal } from '@trade-automation/contracts';
+import { ConnectionStore } from '../../core/state/connection.store';
 import { PanelFeed, type PanelFeedDeps } from '../../core/state/panel-feed';
 import { signalsToOverlays } from '../chart/overlay/signal-to-overlays';
 import { panelFeedSource } from './panel-feed-source';
@@ -28,10 +29,11 @@ function feedFor(panel: Panel): PanelFeed {
 
 describe('panelFeedSource (backtest-app-system-design.md §2.3, D2)', () => {
   const specs = signal<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
+  const connection = new ConnectionStore();
 
   it('exposes the feed’s own store signals as-is', () => {
     const feed = feedFor({ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: true });
-    const source = panelFeedSource(feed, specs);
+    const source = panelFeedSource(feed, specs, connection);
 
     expect(source.panel).toBe(feed.panel);
     expect(source.candles).toBe(feed.candles.candles);
@@ -42,13 +44,14 @@ describe('panelFeedSource (backtest-app-system-design.md §2.3, D2)', () => {
   });
 
   it('derives overlays from signals on candle panels only, as ChartPanelComponent did', () => {
-    const candles = panelFeedSource(feedFor({ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: true }), specs);
+    const candles = panelFeedSource(feedFor({ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: true }), specs, connection);
     expect(candles.overlays()).toEqual(signalsToOverlays([entry]));
     expect(candles.overlays().length).toBeGreaterThan(0);
 
     const metric = panelFeedSource(
       feedFor({ id: 'btc-oi', kind: 'metric', instrument: 'binance:BTCUSDT', metric: 'openInterest', signals: false }),
       specs,
+      connection,
     );
     expect(metric.overlays()).toEqual([]);
   });
@@ -57,7 +60,17 @@ describe('panelFeedSource (backtest-app-system-design.md §2.3, D2)', () => {
     const feed = feedFor({ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false });
     const loadOlder = vi.spyOn(feed, 'loadOlder').mockResolvedValue(undefined);
 
-    await panelFeedSource(feed, specs).loadOlder();
+    await panelFeedSource(feed, specs, connection).loadOlder();
     expect(loadOlder).toHaveBeenCalledTimes(1);
+  });
+
+  it('T-060: the venue status is the live connection\'s for the panel\'s instrument, down until reported', () => {
+    const conn = new ConnectionStore();
+    const source = panelFeedSource(feedFor({ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }), specs, conn);
+    expect(source.venueStatus?.()).toBe('down');
+    conn.setVenueStatus('binance:BTCUSDT', 'up', null);
+    expect(source.venueStatus?.()).toBe('up');
+    conn.setVenueStatus('binance:ETHUSDT', 'degraded', null); // another instrument's status is not this panel's
+    expect(source.venueStatus?.()).toBe('up');
   });
 });

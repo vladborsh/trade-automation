@@ -4,7 +4,9 @@
     @if (caption(); as c) {
       <span class="metric-caption" data-testid="metric-caption" [title]="c.tooltip">{{ c.text }}</span>
     }
-    <span class="venue-dot" [class]="'venue-' + venueStatus()"></span>
+    @if (venueStatus(); as status) {
+      <span class="venue-dot" [class]="'venue-' + status"></span>
+    }
     <app-research-badge />
     <button
       type="button"
