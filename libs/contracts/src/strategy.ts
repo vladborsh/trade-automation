@@ -20,6 +20,9 @@ export type StrategyTier = z.infer<typeof StrategyTierSchema>;
  * pane below the price pane (RSI, MACD, Stochastic), with an optional fixed `range` and reference
  * `levels`. Additive: every existing spec is `'price'` and parses unchanged; live strategies keep
  * emitting `'price'`.
+ *
+ * T-057: a key's `plot` is `'line'` (the default when absent) or `'histogram'` — bars from zero,
+ * coloured by sign (MACD's `hist`). `style` stays the line's dash style.
  */
 export const IndicatorSeriesSpecSchema = z.object({
   id: z.string().min(1),
@@ -33,6 +36,7 @@ export const IndicatorSeriesSpecSchema = z.object({
       label: z.string().min(1),
       color: z.string().optional(),
       style: z.enum(['solid', 'dashed']).optional(),
+      plot: z.enum(['line', 'histogram']).optional(),
     }),
   ),
 });

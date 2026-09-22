@@ -1,4 +1,4 @@
-import type { Candle, IndicatorPoint, IndicatorSeriesSpec, InstrumentId, SessionPanelIndicator, Timeframe } from '@trade-automation/contracts';
+import type { Candle, IndicatorPoint, IndicatorSeriesSpec, InstrumentId, OverlayPrimitive, SessionPanelIndicator, Timeframe } from '@trade-automation/contracts';
 import { INDICATOR_CATALOG, computeAtr, defaultParams, indicatorById, type IndicatorCatalogEntry } from '@trade-automation/indicators';
 
 /**
@@ -16,6 +16,8 @@ const OUTPUT_COLORS = ['#d29922', '#58a6ff', '#bc8cff', '#26a69a', '#ef5350'];
 export interface PanelIndicatorsView {
   points: IndicatorPoint[];
   specs: Map<string, IndicatorSeriesSpec>;
+  /** T-057: the catalogue entries' chart primitives (the iFVG boxes), for the panel's `overlays`. */
+  overlays: OverlayPrimitive[];
 }
 
 /** The catalogue's defaults overlaid with the panel's stored params (unknown keys dropped). */
@@ -39,6 +41,8 @@ export function indicatorLabel(entry: IndicatorCatalogEntry, params: Readonly<Re
  * instance (outputs not yet defined are null, i.e. a gap) and one spec per instance —
  * `scale: 'pane'` for the catalogue's separate-pane entries. Unknown ids (e.g. an entry a newer
  * catalogue removed) and params the function refuses are skipped, never thrown into the chart.
+ * T-057: an output's `plot` (MACD's histogram) goes onto its key; an entry's `overlays` are
+ * collected into `overlays`.
  */
 export function panelIndicators(
   bars: readonly Candle[],
@@ -48,16 +52,20 @@ export function panelIndicators(
 ): PanelIndicatorsView {
   const points: IndicatorPoint[] = [];
   const specs = new Map<string, IndicatorSeriesSpec>();
+  const overlays: OverlayPrimitive[] = [];
   (indicators ?? []).forEach((ind, i) => {
     const entry = indicatorById(ind.id);
     if (!entry || bars.length === 0) return;
     const params = effectiveParams(entry, ind.params);
     let series: Record<string, { time: number; value: number }[]>;
+    let drawn: OverlayPrimitive[];
     try {
       series = entry.compute(bars, params);
+      drawn = entry.overlays?.(bars, params) ?? [];
     } catch {
       return; // invalid params: nothing drawn for this instance
     }
+    overlays.push(...drawn);
     const seriesId = `${entry.id}-${i}`;
     specs.set(`${REPLAY_INDICATOR_SOURCE}:${seriesId}`, {
       id: seriesId,
@@ -65,7 +73,7 @@ export function panelIndicators(
       scale: entry.pane === 'separate' ? 'pane' : 'price',
       ...(entry.range ? { range: { ...entry.range } } : {}),
       ...(entry.levels ? { levels: [...entry.levels] } : {}),
-      keys: entry.outputs.map((o, k) => ({ key: o.key, label: o.label, color: OUTPUT_COLORS[k % OUTPUT_COLORS.length] })),
+      keys: entry.outputs.map((o, k) => ({ key: o.key, label: o.label, color: OUTPUT_COLORS[k % OUTPUT_COLORS.length], ...(o.plot ? { plot: o.plot } : {}) })),
     });
     const byTime = new Map<number, Record<string, number | null>>();
     for (const o of entry.outputs) {
@@ -79,7 +87,7 @@ export function panelIndicators(
       points.push({ strategyId: REPLAY_INDICATOR_SOURCE, instrument, timeframe, tier: 'live', seriesId, time, values });
     }
   });
-  return { points, specs };
+  return { points, specs, overlays };
 }
 
 /** ATR(14) of the panel's closed bars (the default position-tool stop, T-028); null until defined. */

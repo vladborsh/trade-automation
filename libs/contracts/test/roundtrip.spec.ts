@@ -161,6 +161,16 @@ describe('contracts round-trip (architecture/live-signal-server.md §3)', () => 
     expect(() => IndicatorSeriesSpecSchema.parse({ ...spec, scale: 'volume' })).toThrow();
   });
 
+  it("a key's plot is 'line' or 'histogram', optional (T-057); an old spec without it parses unchanged", () => {
+    const spec = {
+      id: 'macd-0', label: 'MACD (12, 26, 9)', scale: 'pane' as const, levels: [0],
+      keys: [{ key: 'macd', label: 'MACD' }, { key: 'signal', label: 'Signal', plot: 'line' as const }, { key: 'hist', label: 'Histogram', plot: 'histogram' as const }],
+    };
+    expect(IndicatorSeriesSpecSchema.parse(spec)).toEqual(spec);
+    expect(IndicatorSeriesSpecSchema.parse(spec).keys[0].plot).toBeUndefined(); // absent = a line, nothing filled in
+    expect(() => IndicatorSeriesSpecSchema.parse({ ...spec, keys: [{ key: 'h', label: 'H', plot: 'area' }] })).toThrow();
+  });
+
   it('StrategyRequirements accepts optional minBars distinct from warmupBars', () => {
     const requirements: StrategyRequirements = {
       instruments: ['capitalcom:US100'],

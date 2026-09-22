@@ -11,19 +11,20 @@ import type { ReplayEngine } from './replay-engine';
 export const REPLAY_RIGHT_MARGIN_PX = 160;
 
 const NO_POINTS = signal<readonly MetricPoint[]>([]).asReadonly();
-const NO_OVERLAYS = signal<readonly OverlayPrimitive[]>([]).asReadonly();
 
 /**
  * backtest-app-system-design.md §2.3 (D2) — one replay panel as a `PanelSource`: the engine's
  * timeframe bars behind the cursor (closed + forming). Session layouts are candle panels only
  * (D10), so `points` is empty. The panel's `indicators` (T-028) are computed on the client over
- * those same bars on every step, timeframe switch and older page (decision 11). `positionTools`
+ * those same bars on every step, timeframe switch and older page (decision 11); their chart
+ * primitives (T-057: the iFVG boxes) are the panel's `overlays` — position-tool drawings stay on
+ * their own primitive. `positionTools`
  * are the panel's position tools (T-022). No `researchScope`: no research strategy runs in replay.
  */
 export class ReplayPanelSource implements PanelSource {
   readonly candles: Signal<readonly Candle[]>;
   readonly points = NO_POINTS;
-  readonly overlays = NO_OVERLAYS;
+  readonly overlays: Signal<readonly OverlayPrimitive[]>;
   readonly indicatorPoints: Signal<readonly IndicatorPoint[]>;
   readonly indicatorSpecs: Signal<ReadonlyMap<string, IndicatorSeriesSpec>>;
   /** The chart panel's picture, for the entry and exit screenshots (T-026). */
@@ -50,6 +51,7 @@ export class ReplayPanelSource implements PanelSource {
     const indicators = computed(() => panelIndicators(this.candles(), panel.indicators, panel.instrument, engine.timeframe()));
     this.indicatorPoints = computed(() => indicators().points);
     this.indicatorSpecs = computed(() => indicators().specs);
+    this.overlays = computed(() => indicators().overlays);
   }
 
   loadOlder(): Promise<void> {

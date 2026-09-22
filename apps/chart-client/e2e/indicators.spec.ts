@@ -48,7 +48,7 @@ test('overlay and separate-pane indicators: render, survive a tf switch and a re
   await expect(chart).toHaveAttribute('data-indicator-series-count', '1');
   await add('Relative strength index');
   await add('MACD');
-  await expect(chart).toHaveAttribute('data-indicator-series-count', '5'); // EMA + RSI + MACD's 3 lines
+  await expect(chart).toHaveAttribute('data-indicator-series-count', '5'); // EMA + RSI + MACD's 2 lines and histogram (T-057)
   await expect(page.getByTestId('indicator-row')).toHaveCount(3);
 
   // a parameter edit keeps the instance
@@ -82,10 +82,23 @@ test('T-034: the five lifted indicators come from the catalogue and draw', async
     'Average true range',
     'Range high / low (bars before the current one)',
     'Previous UTC hour high / low',
-    'Inverse FVG (latest)',
+    'Inverse FVGs',
   ]) {
     await addIndicator(page, name);
   }
   await expect(page.getByTestId('indicator-row')).toHaveCount(5);
-  await expect(chart).toHaveAttribute('data-indicator-series-count', '11'); // 3 + 1 + 3 + 2 + 2 lines
+  await expect(chart).toHaveAttribute('data-indicator-series-count', '9'); // 3 + 1 + 3 + 2 lines; the iFVGs are boxes (T-057)
+  await expect(chart).toHaveAttribute('data-rect-count', /^[1-9]\d*$/); // one rect per inverse FVG over the loaded bars
+});
+
+test("T-057: MACD's histogram in its pane and the inverse FVGs as boxes on the price pane", async ({ page }) => {
+  await openSession(page);
+  const chart = page.locator('.chart-panel[data-panel-id="btc"] [data-indicator-series-count]');
+  await page.getByRole('button', { name: 'Layout' }).click();
+  await addIndicator(page, 'MACD');
+  await addIndicator(page, 'Inverse FVGs');
+  await expect(chart).toHaveAttribute('data-indicator-series-count', '3'); // MACD, Signal and the Histogram series; FVG draws no series
+  await expect(chart).toHaveAttribute('data-rect-count', /^[1-9]\d*$/);
+  await page.getByRole('button', { name: 'Layout' }).click(); // close the editor for the picture
+  if (process.env['T057_SHOTS']) await page.screenshot({ path: `${process.env['T057_SHOTS']}/macd-hist-fvg-boxes.png` });
 });

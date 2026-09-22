@@ -1,5 +1,13 @@
-import { LineSeries, LineStyle, type IChartApi, type IPriceLine, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
+import { HistogramSeries, LineSeries, LineStyle, type IChartApi, type IPriceLine, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
 import type { IndicatorPoint, IndicatorSeriesSpec, Timeframe } from '@trade-automation/contracts';
+
+type KeySpec = IndicatorSeriesSpec['keys'][number];
+/** A key's series: a line, or (T-057) a histogram. */
+type KeySeries = ISeriesApi<'Line'> | ISeriesApi<'Histogram'>;
+
+/** T-057: histogram bars coloured by sign, from the AGENTS.md up/down palette. */
+const HISTOGRAM_UP = '#26a69a';
+const HISTOGRAM_DOWN = '#ef5350';
 
 function msToTime(ms: number): UTCTimestamp {
   return Math.floor(ms / 1000) as UTCTimestamp;
@@ -34,20 +42,24 @@ function groupKey(strategyId: string, seriesId: string): string {
  * T-047: `labels` off (the replay workspace) draws lines only — no series title text on the chart.
  * The live terminal keeps them: its research strategies' titles carry the "research, unvalidated"
  * wording (§6), and they come through this same layer.
+ *
+ * T-057: a key with `plot: 'histogram'` (MACD's `hist`) is a `HistogramSeries` in the same pane
+ * instead of a line, each bar coloured by its sign (up ≥ 0, down < 0). Every other key — all the
+ * terminal's strategy series — is a line, as before.
  */
 export class IndicatorLayer {
   constructor(private readonly labels: () => boolean = () => true) {}
 
   private chart: IChartApi | null = null;
-  private readonly series = new Map<string, ISeriesApi<'Line'>>();
+  private readonly series = new Map<string, KeySeries>();
   /** 'pane' groups by `${strategyId}:${seriesId}`: their series (by key) and level lines. */
-  private readonly paneGroups = new Map<string, { series: Map<string, ISeriesApi<'Line'>>; lines: IPriceLine[] }>();
+  private readonly paneGroups = new Map<string, { series: Map<string, KeySeries>; lines: IPriceLine[] }>();
 
   attach(chart: IChartApi): void {
     this.chart = chart;
   }
 
-  private ensureSeries(strategyId: string, seriesId: string, seriesLabel: string, key: IndicatorSeriesSpec['keys'][number]): ISeriesApi<'Line'> {
+  private ensureSeries(strategyId: string, seriesId: string, seriesLabel: string, key: KeySpec): KeySeries {
     const id = seriesKey(strategyId, seriesId, key.key);
     const existing = this.series.get(id);
     if (existing) {
@@ -56,16 +68,20 @@ export class IndicatorLayer {
     if (!this.chart) {
       throw new Error('IndicatorLayer.attach(chart) must be called before rendering');
     }
-    const created = this.chart.addSeries(LineSeries, {
-      color: key.color ?? '#d29922',
-      lineWidth: 1,
-      lineStyle: key.style === 'dashed' ? 2 : 0,
-      title: this.title(seriesLabel, key.label),
-      lastValueVisible: false,
-      priceLineVisible: false,
-    });
+    const created = this.addKeySeries(key, this.title(seriesLabel, key.label));
     this.series.set(id, created);
     return created;
+  }
+
+  /** One key's series: a line (the default) or, for `plot: 'histogram'`, a histogram (T-057). */
+  private addKeySeries(key: KeySpec, title: string, paneIndex?: number, extra: object = {}): KeySeries {
+    const chart = this.chart!;
+    const common = { title, lastValueVisible: false, priceLineVisible: false, ...extra };
+    // the price pane is the default: no pane argument at all there, exactly as before T-057
+    const pane = paneIndex === undefined ? [] : [paneIndex];
+    if (key.plot === 'histogram') return chart.addSeries(HistogramSeries, common, ...pane);
+    const line = { color: key.color ?? '#d29922', lineWidth: 1 as const, lineStyle: key.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid, ...common };
+    return chart.addSeries(LineSeries, line, ...pane);
   }
 
   /**
@@ -117,10 +133,7 @@ export class IndicatorLayer {
           lineSeries.applyOptions({ visible: false });
           continue;
         }
-        const data = sorted
-          .filter((p) => typeof p.values[keySpec.key] === 'number')
-          .map((p) => ({ time: msToTime(p.time), value: p.values[keySpec.key] as number }));
-        lineSeries.setData(data);
+        setKeyData(lineSeries, keySpec, sorted);
         lineSeries.applyOptions({ visible: true });
       }
     }
@@ -148,20 +161,8 @@ export class IndicatorLayer {
       const paneIndex = chart.panes().length; // a new pane below the existing ones
       const range = spec.range;
       for (const keySpec of spec.keys) {
-        const lineSeries = chart.addSeries(
-          LineSeries,
-          {
-            color: keySpec.color ?? '#d29922',
-            lineWidth: 1,
-            lineStyle: keySpec.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid,
-            title: this.title(spec.label, keySpec.label),
-            lastValueVisible: false,
-            priceLineVisible: false,
-            ...(range ? { autoscaleInfoProvider: () => ({ priceRange: { minValue: range.min, maxValue: range.max } }) } : {}),
-          },
-          paneIndex,
-        );
-        group.series.set(keySpec.key, lineSeries);
+        const extra = range ? { autoscaleInfoProvider: () => ({ priceRange: { minValue: range.min, maxValue: range.max } }) } : {};
+        group.series.set(keySpec.key, this.addKeySeries(keySpec, this.title(spec.label, keySpec.label), paneIndex, extra));
       }
       const first = group.series.values().next().value;
       for (const level of spec.levels ?? []) {
@@ -169,10 +170,9 @@ export class IndicatorLayer {
         if (line) group.lines.push(line);
       }
     }
-    for (const [key, lineSeries] of group.series) {
-      lineSeries.setData(
-        sorted.filter((p) => typeof p.values[key] === 'number').map((p) => ({ time: msToTime(p.time), value: p.values[key] as number })),
-      );
+    for (const keySpec of spec.keys) {
+      const keySeries = group.series.get(keySpec.key);
+      if (keySeries) setKeyData(keySeries, keySpec, sorted);
     }
   }
 
@@ -225,4 +225,19 @@ export class IndicatorLayer {
   paneCount(): number {
     return this.paneGroups.size;
   }
+}
+
+/** A key's points onto its series; a histogram's bars carry their sign colour (T-057). */
+function setKeyData(target: KeySeries, key: KeySpec, sorted: readonly IndicatorPoint[]): void {
+  const defined = sorted.filter((p) => typeof p.values[key.key] === 'number');
+  if (key.plot === 'histogram') {
+    (target as ISeriesApi<'Histogram'>).setData(
+      defined.map((p) => {
+        const value = p.values[key.key] as number;
+        return { time: msToTime(p.time), value, color: value >= 0 ? HISTOGRAM_UP : HISTOGRAM_DOWN };
+      }),
+    );
+    return;
+  }
+  (target as ISeriesApi<'Line'>).setData(defined.map((p) => ({ time: msToTime(p.time), value: p.values[key.key] as number })));
 }

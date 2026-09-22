@@ -1,7 +1,8 @@
 <div
   class="chart-container"
   #container
-  [attr.data-marker-count]="markerCount()"
+  [attr.data-marker-count]="overlayCounts().marker"
+  [attr.data-rect-count]="overlayCounts().rect"
   [attr.data-indicator-series-count]="indicatorSeriesCount()"
   [attr.data-visible-from]="visibleFrom()"
   [attr.data-visible-to]="visibleTo()"

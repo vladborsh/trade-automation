@@ -1,7 +1,7 @@
-import { Candle } from '@trade-automation/contracts';
+import { Candle, OverlayPrimitive } from '@trade-automation/contracts';
 import { atrSeries } from './atr-series';
 import { bollinger } from './bollinger';
-import { ifvgSeries } from './fvg-series';
+import { type IfvgBox, ifvgBoxes } from './fvg-series';
 import { macd } from './macd';
 import { ema, sma } from './moving-averages';
 import { previousHourSeries } from './previous-hour-series';
@@ -26,6 +26,8 @@ export interface IndicatorParamSpec {
 export interface IndicatorOutputSpec {
   key: string;
   label: string;
+  /** T-057: how the series is drawn; a line when absent (`IndicatorSeriesSpec` keys' `plot`). */
+  plot?: 'line' | 'histogram';
 }
 
 /**
@@ -33,6 +35,10 @@ export interface IndicatorOutputSpec {
  * name, where it draws (`overlay` on the price pane, or a `separate` pane below), its parameters
  * with defaults, its output series, and `compute`. `range` gives a separate pane its fixed scale
  * (0..100 for the oscillators) and `levels` its reference lines.
+ *
+ * T-057: `overlays`, when present, returns chart primitives drawn in addition to the series — over
+ * the same bars and params as `compute` (the iFVG boxes). Kept beside `compute` rather than in its
+ * result, so every series consumer reads `compute` unchanged.
  */
 export interface IndicatorCatalogEntry {
   id: IndicatorId;
@@ -43,6 +49,7 @@ export interface IndicatorCatalogEntry {
   range?: { min: number; max: number };
   levels?: readonly number[];
   compute(bars: readonly Candle[], params: Readonly<Record<string, number>>): IndicatorSeries;
+  overlays?(bars: readonly Candle[], params: Readonly<Record<string, number>>): OverlayPrimitive[];
 }
 
 export type IndicatorId = 'sma' | 'ema' | 'rsi' | 'macd' | 'bollinger' | 'stochastic' | 'vwap' | 'atr' | 'range' | 'prev-hour' | 'fvg';
@@ -106,7 +113,7 @@ export const INDICATOR_CATALOG: readonly IndicatorCatalogEntry[] = [
     outputs: [
       { key: 'macd', label: 'MACD' },
       { key: 'signal', label: 'Signal' },
-      { key: 'hist', label: 'Histogram' },
+      { key: 'hist', label: 'Histogram', plot: 'histogram' },
     ],
     levels: [0],
     compute: (bars, params) => macd(bars, { fast: p(params, 'fast'), slow: p(params, 'slow'), signal: p(params, 'signal') }),
@@ -170,18 +177,33 @@ export const INDICATOR_CATALOG: readonly IndicatorCatalogEntry[] = [
     ],
     compute: (bars) => previousHourSeries(bars),
   },
+  // T-057: every inverse FVG as a box (the gap's bars → the bar that pruned it), not the two lines of
+  // the latest one; no series. No label on the box (T-047: lines only on replay panels).
   {
     id: 'fvg',
-    name: 'Inverse FVG (latest)',
+    name: 'Inverse FVGs',
     pane: 'overlay',
     params: [],
-    outputs: [
-      { key: 'high', label: 'iFVG top' },
-      { key: 'low', label: 'iFVG bottom' },
-    ],
-    compute: (bars) => ifvgSeries(bars),
+    outputs: [],
+    compute: () => ({}),
+    overlays: (bars) => ifvgBoxes(bars).map(ifvgRect),
   },
 ];
+
+/**
+ * Up/down palette (AGENTS.md) at two strengths: a live box in the plain colour, a pruned one at 40 %.
+ * The chart's rect renderer (ShapesPrimitive) already fills at 15 % opacity, so these multiply to
+ * ~15 % and ~6 % on screen.
+ */
+const IFVG_FILL = {
+  bullish: { live: '#26a69a', pruned: 'rgba(38, 166, 154, 0.4)' },
+  bearish: { live: '#ef5350', pruned: 'rgba(239, 83, 80, 0.4)' },
+} as const;
+
+/** One iFVG box as the contracts' `rect` overlay (from/to/top/bottom, no label). */
+export function ifvgRect(box: IfvgBox): OverlayPrimitive {
+  return { type: 'rect', from: box.from, to: box.to, top: box.top, bottom: box.bottom, color: IFVG_FILL[box.side][box.live ? 'live' : 'pruned'] };
+}
 
 /** The catalog entry for `id`, or undefined. */
 export function indicatorById(id: string): IndicatorCatalogEntry | undefined {

@@ -43,6 +43,7 @@ import { ChartRangeSync } from './chart-range-sync';
 import { ChartSyncService } from './chart-sync.service';
 import { ResizeSettleTracker, observeResize } from './resize-settle';
 import { NEAR_START_BAR_MULTIPLIER, isNearOldestLoaded, logicalToTimeSec, mergeTimes, oldestLoadedMs } from './chart-time';
+import { countOverlays } from './overlay/overlay-counts';
 
 
 /**
@@ -61,9 +62,8 @@ import { NEAR_START_BAR_MULTIPLIER, isNearOldestLoaded, logicalToTimeSec, mergeT
   selector: 'app-chart',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // data-marker-count / data-indicator-series-count / data-visible-from
-  // / data-visible-to are test hooks (e2e asserts on them) — lightweight-charts
-  // draws to canvas, so there is nothing else in the DOM to assert on.
+  // data-marker-count / -rect-count / -indicator-series-count / -visible-from / -visible-to are e2e
+  // hooks — lightweight-charts draws to canvas, so there is nothing else in the DOM to assert on.
   templateUrl: './chart.component.html',
   styleUrl: './chart.component.scss',
 })
@@ -88,7 +88,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly positionToolChange = output<PositionToolChange>();
   readonly loadOlderRequested = output<void>();
 
-  readonly markerCount = computed(() => this.overlays().filter((o) => o.type === 'marker').length);
+  readonly overlayCounts = computed(() => countOverlays(this.overlays()));
   readonly indicatorSeriesCount = signal(0);
   readonly visibleFrom = signal<number | null>(null);
   readonly visibleTo = signal<number | null>(null);

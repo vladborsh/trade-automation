@@ -33,13 +33,27 @@ describe('panel-indicators (T-028)', () => {
     expect(view.specs.get('replay:rsi-3')).toMatchObject({ range: { min: 0, max: 100 }, levels: [30, 70] });
   });
 
+  it("T-057: MACD's hist key is a histogram; the fvg instance draws its boxes as the panel's overlays and has no series", () => {
+    // a bearish gap (bars 1..3, edges 94..95) inverted by bar 4: one live bullish iFVG
+    const gap = [[50, 51, 49, 50], [100, 100, 95, 98], [96, 97, 93, 95], [92, 94, 88, 90], [90, 97, 85, 96]].map(([open, high, low, close], i) => ({ ...B[i], open, high, low, close }));
+    const G = [...gap, ...B.slice(5, 40).map((b) => ({ ...b, open: 96, high: 96.5, low: 95.5, close: 96 }))]; // then quiet, above the box
+    const view = panelIndicators(G, [{ id: 'macd', params: {} }, { id: 'fvg', params: {} }, { id: 'ema', params: {} }], 'binance:BTCUSDT', '5m');
+    expect(view.specs.get('replay:macd-0')!.keys.map((k) => [k.key, k.plot])).toEqual([['macd', undefined], ['signal', undefined], ['hist', 'histogram']]);
+    expect(view.specs.get('replay:fvg-1')!.keys).toEqual([]);
+    expect(view.points.filter((p) => p.seriesId === 'fvg-1')).toEqual([]);
+    expect(view.overlays).toEqual([{ type: 'rect', from: G[1].openTime, to: G[G.length - 1].openTime, top: 95, bottom: 94, color: '#26a69a' }]);
+    expect(view.overlays).toEqual(indicatorById('fvg')!.overlays!(G, {}));
+    expect(view.overlays.every((o) => o.type === 'rect' && !('label' in o))).toBe(true);
+    expect(panelIndicators(B, [{ id: 'ema', params: {} }], 'binance:BTCUSDT', '5m').overlays).toEqual([]); // no fvg: no overlays
+  });
+
   it('two instances of one indicator are separate series; stored params override the defaults', () => {
     const view = panelIndicators(B, [{ id: 'ema', params: { length: 9 } }, { id: 'ema', params: { length: 21, junk: 'x' } }], 'binance:BTCUSDT', '5m');
     expect([...view.specs.values()].map((s) => s.label)).toEqual(['EMA (9)', 'EMA (21)']);
   });
 
   it('skips unknown ids and params the function refuses; nothing for an empty panel', () => {
-    expect(panelIndicators(B, [{ id: 'no-such-indicator', params: {} }, { id: 'ema', params: { length: 0 } }], 'binance:BTCUSDT', '5m')).toEqual({ points: [], specs: new Map() });
+    expect(panelIndicators(B, [{ id: 'no-such-indicator', params: {} }, { id: 'ema', params: { length: 0 } }], 'binance:BTCUSDT', '5m')).toEqual({ points: [], specs: new Map(), overlays: [] });
     expect(panelIndicators([], [{ id: 'ema', params: {} }], 'binance:BTCUSDT', '5m').specs.size).toBe(0);
     expect(panelIndicators(B, undefined, 'binance:BTCUSDT', '5m').points).toEqual([]);
   });

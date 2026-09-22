@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { LineSeries, type IChartApi } from 'lightweight-charts';
+import { HistogramSeries, LineSeries, type IChartApi } from 'lightweight-charts';
 import type { IndicatorPoint, IndicatorSeriesSpec } from '@trade-automation/contracts';
 import { IndicatorLayer } from './indicator-layer';
 
@@ -174,6 +174,38 @@ describe('IndicatorLayer', () => {
       layer.attach(chart);
       render(layer);
       expect(options(addCalls).map((o) => o.title)).toEqual(['VWAP · VWAP', 'VWAP · Top', 'RSI (14) · RSI', 'MACD · MACD', 'MACD · Signal']);
+    });
+  });
+
+  describe("T-057: a key's plot", () => {
+    const MACD_HIST: IndicatorSeriesSpec = { ...MACD, keys: [...MACD.keys, { key: 'hist', label: 'Histogram', color: '#bc8cff', plot: 'histogram' }] };
+    const pts = [point('macd-1', 60_000, { macd: 1, signal: 0.5, hist: 0.5 }), point('macd-1', 120_000, { macd: 0.2, signal: 0.6, hist: -0.4 }), point('macd-1', 180_000, { macd: 0.6, signal: 0.6, hist: 0 })];
+
+    it("'histogram' is a HistogramSeries in the indicator's own pane, bars coloured by sign (0 counts as up); the lines stay lines", () => {
+      const { chart, addCalls, panes } = fakeChart();
+      const layer = new IndicatorLayer(() => false);
+      layer.attach(chart);
+      layer.render(pts, new Map([['replay:macd-1', MACD_HIST]]), '5m');
+      expect(addCalls.map((c) => [c[0], c[2]])).toEqual([[LineSeries, 1], [LineSeries, 1], [HistogramSeries, 1]]);
+      expect(addCalls[2][1]).toEqual({ title: '', lastValueVisible: false, priceLineVisible: false }); // no line options on a histogram
+      const hist = panes[1][2] as unknown as { data: unknown[] };
+      expect(hist.data).toEqual([
+        { time: 60, value: 0.5, color: '#26a69a' },
+        { time: 120, value: -0.4, color: '#ef5350' },
+        { time: 180, value: 0, color: '#26a69a' },
+      ]);
+      const macdLine = panes[1][0] as unknown as { data: unknown[] };
+      expect(macdLine.data).toEqual([{ time: 60, value: 1 }, { time: 120, value: 0.2 }, { time: 180, value: 0.6 }]); // no colour on line points
+      expect(layer.visibleSeriesCount()).toBe(3);
+    });
+
+    it("'histogram' on a price-scale spec goes on the price pane (no pane argument); 'line' and an absent plot are lines", () => {
+      const { chart, addCalls } = fakeChart();
+      const layer = new IndicatorLayer();
+      layer.attach(chart);
+      const spec: IndicatorSeriesSpec = { id: 'x', label: 'X', scale: 'price', keys: [{ key: 'a', label: 'A', plot: 'line' }, { key: 'b', label: 'B' }, { key: 'h', label: 'H', plot: 'histogram' }] };
+      layer.render([point('x', 60_000, { a: 1, b: 2, h: -1 })], new Map([['replay:x', spec]]), '5m');
+      expect(addCalls.map((c) => [c[0], c.length])).toEqual([[LineSeries, 2], [LineSeries, 2], [HistogramSeries, 2]]);
     });
   });
 });
