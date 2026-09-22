@@ -142,6 +142,23 @@ function pnlOf(side: string, entry: number, exit: number, qty: number, risk: num
   return { pnl, r: pnl / risk, commission };
 }
 
+/**
+ * BUG-015: design §6 D12 — the size is rounded DOWN to the contract's qtyStep (written here, not
+ * imported from replay-core). A 1e-9 relative slack keeps a float a hair below a step on that step.
+ */
+function floorToStep(value: number, step: number): number {
+  const n = Math.floor((value / step) * (1 + 1e-9));
+  return n <= 0 ? 0 : n * step;
+}
+
+/** The instrument's D12 contract from `GET /backtest/instruments`; `null` (no block) sizes unrounded at multiplier 1. */
+async function contractOf(page: Page, instrument: string): Promise<{ multiplier: number; qtyStep: number } | null> {
+  const list: Json[] = await get(page, '/backtest/instruments');
+  const inst = list.find((i) => i.id === instrument);
+  expect(inst, `instrument ${instrument} listed`).toBeTruthy();
+  return inst.contract;
+}
+
 const close = (a: number, b: number, rel = 1e-6) => Math.abs(a - b) <= rel * Math.max(1, Math.abs(b));
 const fmtMoney = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(2)} USD`;
 
@@ -208,6 +225,8 @@ test('journey: keyboard orders, a manual close, the period end; every number equ
   expect(sess.status).toBe('complete');
   expect(orders.length).toBe(2);
   const lastClose = (cursor: number) => tp.filter((b) => b.t + MIN <= cursor).at(-1)!.c;
+  const contract = await contractOf(page, 'binance:BTCUSDT');
+  const multiplier = contract?.multiplier ?? 1;
   const results: { o: Json; pnl: number; r: number; exitCursor: number }[] = [];
   let balance = 10_000;
   for (const o of [...orders].sort((a, b) => a.seq - b.seq)) {
@@ -215,11 +234,17 @@ test('journey: keyboard orders, a manual close, the period end; every number equ
     const risk = balance * 0.01; // no earlier close changes the balance before the second placement unless it closed already
     // balance at placement: closed results whose exit happened at or before this placement
     const bal = 10_000 + results.filter((x) => x.exitCursor <= o.placedAtMs).reduce((a, x) => a + x.pnl, 0);
-    const riskAmount = bal * 0.01;
-    const qty = riskAmount / Math.abs(lc - o.slInitial);
+    const requestedRisk = bal * 0.01;
+    // D12 (BUG-015): sized at the last close, rounded down to the step; 1R = qty × distance × multiplier ≤ requested
+    const distance = Math.abs(lc - o.slInitial);
+    const raw = requestedRisk / (distance * multiplier);
+    const qty = contract ? floorToStep(raw, contract.qtyStep) : raw;
+    const riskAmount = qty * distance * multiplier;
     const entry = lc + (o.side === 'long' ? half() : -half());
-    expect(close(o.qty, qty, 1e-6), `#${o.seq} qty`).toBe(true);
-    expect(close(o.riskAmountCcy, riskAmount, 1e-6), `#${o.seq} risk`).toBe(true);
+    expect(close(o.qty, qty, 1e-6), `#${o.seq} qty ${o.qty} vs ${qty}`).toBe(true);
+    expect(close(o.riskAmountCcy, riskAmount, 1e-6), `#${o.seq} risk ${o.riskAmountCcy} vs ${riskAmount}`).toBe(true);
+    expect(o.riskAmountCcy, `#${o.seq} risk within the requested`).toBeLessThanOrEqual(requestedRisk * (1 + 1e-9));
+    expect(o.riskPct, `#${o.seq} riskPct is the requested one`).toBe(1);
     expect(close(o.entryPrice, entry), `#${o.seq} entry`).toBe(true);
     void risk;
     let exit: number; let exitCursor: number; let reason: string;
