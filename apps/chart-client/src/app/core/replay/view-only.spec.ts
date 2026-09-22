@@ -22,7 +22,7 @@ describe('orderTool (the viewed order as a read-only position tool)', () => {
   it('a filled order is a position at its fill bar, never active', () => {
     expect(orderTool(order, '1m')).toEqual({
       id: 'view-o1', orderId: 'o1', side: 'long', mode: 'market', entry: 100, sl: 95, tp: 110, kind: 'position', active: false, anchorTime: T,
-      order: { qty: 2, riskAmount: 10 },
+      order: { qty: 2, riskAmount: 10 }, readOnly: true,
     });
     // 10:04 has no x on a 5m or 1h chart: the anchor is that bar's open
     expect(orderTool(order, '5m')?.anchorTime).toBe(Date.UTC(2026, 8, 16, 10, 0));

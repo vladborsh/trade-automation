@@ -47,6 +47,8 @@ describe('isRejection (T-023)', () => {
     expect(isRejection(new ApiError(422, 'SL_ON_WRONG_SIDE', 'x'), place)).toBe(true);
     expect(isRejection(new ApiError(409, 'CURSOR_MISMATCH', 'x'), place)).toBe(false);
     expect(isRejection(new ApiError(422, 'NO_PRICE_AT_CURSOR', 'x'), { kind: 'close', cursorMs: 0, orderId: 'o' })).toBe(false);
+    expect(isRejection(new ApiError(422, 'SL_ON_WRONG_SIDE', 'x'), { kind: 'modify', cursorMs: 0, orderId: 'o', sl: 1 })).toBe(true); // T-033
+    expect(isRejection(new ApiError(409, 'ORDER_NOT_ACTIVE', 'x'), { kind: 'modify', cursorMs: 0, orderId: 'o', sl: 1 })).toBe(false);
     expect(isRejection(new TypeError('Failed to fetch'), place)).toBe(false);
   });
 });

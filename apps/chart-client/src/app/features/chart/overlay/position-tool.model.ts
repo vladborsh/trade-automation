@@ -27,6 +27,8 @@ export interface PositionToolState {
    * the current balance and risk % (that is only right for a draft).
    */
   order?: { qty: number; riskAmount: number };
+  /** §9.3 view-only: drawn, never editable — no handles, nothing draggable. */
+  readOnly?: boolean;
 }
 
 /** What the chart needs to draw and label the tools of one panel. */

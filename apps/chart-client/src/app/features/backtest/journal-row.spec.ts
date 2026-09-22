@@ -6,7 +6,7 @@ const ORDER = {
   placedAtMs: Date.UTC(2026, 8, 16, 10, 5), entryPrice: 76_800.5, entryTimeMs: Date.UTC(2026, 8, 16, 10, 5),
   exitPrice: 76_950, exitTimeMs: Date.UTC(2026, 8, 16, 11, 0), closeReason: 'take-profit', qty: 0.013,
   commissionCcy: 1.2, spreadCostCcy: 0.4, pnlCcy: 194.35, pnlR: 1.94, maeR: 0.35,
-  fillResolution: '1m', slTpSameBar: false,
+  fillResolution: '1m', slTpSameBar: false, slInitial: 76_700, slCurrent: 76_700,
 } as unknown as Order;
 
 describe('journalRow', () => {
@@ -14,13 +14,19 @@ describe('journalRow', () => {
     const row = journalRow(ORDER, 2, 'USD');
     expect(row.cells).toHaveLength(JOURNAL_COLUMNS.length);
     expect(row.cells.map((c) => c.text)).toEqual([
-      '3', 'binance:BTCUSDT', 'long', 'market', 'closed', '2026-09-16 10:05', '76800.50', '76950.00', 'take-profit', '0.013',
+      '3', 'binance:BTCUSDT', 'long', 'market', 'closed', '2026-09-16 10:05', '76800.50', '76700.00', '76950.00', 'take-profit', '0.013',
       '1.20 USD', '0.40 USD', '+194.35 USD', '+1.94 R', '0.35 R', // MAE unsigned: a magnitude
     ]);
     expect(row.cells.find((c) => c.field === 'pnlCcy')?.raw).toBe(194.35);
     expect(row.cells.find((c) => c.field === 'exitPrice')?.title).toBe('closed 2026-09-16 11:00 UTC');
     expect(row.pnlSign).toBe(1);
     expect(row.flags).toEqual([]);
+    expect(row.cells.find((c) => c.field === 'slCurrent')?.title).toBeUndefined();
+  });
+
+  it('T-033: a moved stop shows where it stands, and where it started on hover', () => {
+    const cell = journalRow({ ...ORDER, slCurrent: 76_800.5 }, 2, 'USD').cells.find((c) => c.field === 'slCurrent');
+    expect(cell).toEqual({ field: 'slCurrent', text: '76800.50', raw: 76_800.5, title: 'moved from 76700.00' });
   });
 
   it('a pending order shows dashes, no P&L sign, and never sums or derives anything', () => {

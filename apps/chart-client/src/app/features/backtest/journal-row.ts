@@ -50,6 +50,8 @@ export function journalRow(o: Order, pricePrecision: number | undefined, currenc
       cell('status', o.status, o.status),
       cell('placedAtMs', formatUtc(o.placedAtMs), o.placedAtMs),
       cell('entryPrice', price(o.entryPrice), o.entryPrice, o.entryTimeMs === null ? undefined : `filled ${formatUtc(o.entryTimeMs)} UTC`),
+      // T-033: the stop as it stands (or stood at the exit); a moved stop says where it started
+      cell('slCurrent', price(o.slCurrent), o.slCurrent, o.slCurrent === o.slInitial ? undefined : `moved from ${price(o.slInitial)}`),
       cell('exitPrice', price(o.exitPrice), o.exitPrice, o.exitTimeMs === null ? undefined : `closed ${formatUtc(o.exitTimeMs)} UTC`),
       cell('closeReason', o.closeReason ?? '—', o.closeReason),
       cell('qty', String(o.qty), o.qty),
@@ -65,5 +67,5 @@ export function journalRow(o: Order, pricePrecision: number | undefined, currenc
 
 /** Column headings, in the order of `JournalRow.cells`. */
 export const JOURNAL_COLUMNS = [
-  '#', 'Instrument', 'Side', 'Type', 'Status', 'Placed', 'Entry', 'Exit', 'Close', 'Qty', 'Commission', 'Spread', 'P&L', 'R', 'MAE',
+  '#', 'Instrument', 'Side', 'Type', 'Status', 'Placed', 'Entry', 'SL', 'Exit', 'Close', 'Qty', 'Commission', 'Spread', 'P&L', 'R', 'MAE',
 ] as const;

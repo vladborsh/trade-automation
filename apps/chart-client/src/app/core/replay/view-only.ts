@@ -39,5 +39,6 @@ export function orderTool(
     active: false,
     anchorTime: bucketStart(order.entryTimeMs ?? order.placedAtMs, tf),
     order: { qty: order.qty, riskAmount: order.riskAmountCcy }, // labelled with its own qty and R (T-023)
+    readOnly: true, // T-033: live tools have stop/target handles; a viewed one never does
   };
 }

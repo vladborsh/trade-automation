@@ -232,3 +232,60 @@ describe('ReplaySessionStore — the trade screenshots (T-026, §9.2)', () => {
     await vi.waitFor(() => expect(jobs.map((j) => [j.orderId, j.kind])).toEqual([[O1, 'exit']]));
   });
 });
+
+describe('ReplaySessionStore — moving a live stop or target (T-033)', () => {
+  const OPEN: Order = {
+    ...pending({ panelId: 'btc', side: 'long', type: 'market', cursorMs: T0, sl: 1, riskPct: 1 } as PlaceOrderRequest),
+    id: '00000000-0000-4000-8000-0000000000c1', status: 'open', entryPrice: 1.4, entryTimeMs: T0, qty: 100, riskAmountCcy: 40, tpCurrent: 3, tpInitial: 3,
+  } as Order;
+
+  async function withPosition() {
+    const client = { ...fakeClient(), listOrders: vi.fn(async () => [OPEN]), modifyOrder: vi.fn() };
+    const { store } = await open(client);
+    const tools = store.sources().get('btc')!.positionTools!;
+    const drawn = () => tools.view().tools.find((t) => t.orderId === OPEN.id)!;
+    const drop = (sl: number, final = true) => tools.apply({ type: 'update', tool: { ...drawn(), sl }, final });
+    return { store, client, tools, drawn, drop };
+  }
+
+  it('a dropped stop (break-even) is one modify with only that level; the drawing holds, then shows the server value; open risk follows', async () => {
+    const { store, client, drawn, drop } = await withPosition();
+    expect(store.positions().openRisk).toBeCloseTo(40, 9); // (1.4 - 1.0) * 100
+    let answer!: (o: Order) => void;
+    client.modifyOrder.mockImplementation(() => new Promise<Order>((r) => (answer = r)));
+
+    drop(1.2, false); // dragging: the drawing follows, nothing is sent
+    expect(drawn().sl).toBe(1.2);
+    drop(1.4); // the drop, at break-even
+    await settle();
+    expect(client.modifyOrder).toHaveBeenCalledTimes(1);
+    expect(client.modifyOrder.mock.calls[0][1]).toEqual(OPEN.id);
+    expect(client.modifyOrder.mock.calls[0][2]).toEqual({ opId: expect.any(String), cursorMs: T0 + 5 * M, sl: 1.4, tp: undefined });
+    expect(drawn().sl).toBe(1.4); // held while the request is in flight
+
+    answer({ ...OPEN, slCurrent: 1.4 });
+    await settle();
+    expect(drawn().sl).toBe(1.4); // now the server's own value
+    expect(store.portfolio.orders().find((o) => o.id === OPEN.id)?.slCurrent).toBe(1.4);
+    expect(store.positions().openRisk).toBe(0); // a stop at the entry risks nothing
+  });
+
+  it('a drop into the market is a hint and no request; the drawing snaps back', async () => {
+    const { store, client, drawn, drop } = await withPosition();
+    drop(1.6); // above the last close 1.5
+    await settle();
+    expect(client.modifyOrder).not.toHaveBeenCalled();
+    expect(store.hint()).toBe('A long stop must stay below the last close.');
+    expect(drawn().sl).toBe(1);
+  });
+
+  it('a 422 from the server snaps the drawing back with a hint; nothing is reloaded', async () => {
+    const { store, client, drawn, drop } = await withPosition();
+    client.modifyOrder.mockRejectedValueOnce(new ApiError(422, 'SL_ON_WRONG_SIDE', 'A long stop must be below the last close, a short stop above it.'));
+    drop(1.3);
+    await settle();
+    expect(store.hint()).toBe('Move refused: A long stop must be below the last close, a short stop above it.');
+    expect(drawn().sl).toBe(1);
+    expect(client.getSession).toHaveBeenCalledTimes(1);
+  });
+});

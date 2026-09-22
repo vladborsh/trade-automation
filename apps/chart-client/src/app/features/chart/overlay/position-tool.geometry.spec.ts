@@ -56,12 +56,14 @@ describe('position-tool geometry (design §9.1)', () => {
     expect(labelFor(draft({ kind: 'pending', order: { qty: 200, riskAmount: 100 } }), 'entry', CTX)).toBe('Long limit 100.00 · qty 200');
   });
 
-  it('draggable parts: a draft all of them, a live order none until stop-moving (P2)', () => {
+  it('draggable parts: a draft all of them, a live order its stop and target (T-033), a read-only drawing none', () => {
     expect(draggableParts(draft())).toEqual(['entry', 'sl', 'tp', 'body']);
-    expect(draggableParts(draft({ kind: 'position' }))).toEqual([]);
+    expect(draggableParts(draft({ kind: 'position' }))).toEqual(['sl', 'tp']);
+    expect(draggableParts(draft({ kind: 'pending' }))).toEqual(['sl', 'tp']);
+    expect(draggableParts(draft({ kind: 'position', readOnly: true }))).toEqual([]);
   });
 
-  it('toolGeometry: three handles on a draft, none on a live order, null off-scale', () => {
+  it('toolGeometry: three handles on a draft, stop and target on a live order, none read-only, null off-scale', () => {
     const g = toolGeometry(draft(), 40, priceToY)!;
     expect(g).toMatchObject({ x: 40, yEntry: 500, ySl: 505, yTp: 490 });
     expect(g.handles.map((h) => [h.part, h.x, h.y])).toEqual([
@@ -69,7 +71,8 @@ describe('position-tool geometry (design §9.1)', () => {
       ['sl', 40 + HANDLE_OFFSET_PX, 505],
       ['tp', 40 + HANDLE_OFFSET_PX, 490],
     ]);
-    expect(toolGeometry(draft({ kind: 'position' }), 40, priceToY)!.handles).toEqual([]);
+    expect(toolGeometry(draft({ kind: 'position' }), 40, priceToY)!.handles.map((h) => h.part)).toEqual(['sl', 'tp']);
+    expect(toolGeometry(draft({ kind: 'position', readOnly: true }), 40, priceToY)!.handles).toEqual([]);
     expect(toolGeometry(draft(), 40, () => null)).toBeNull();
   });
 
@@ -133,6 +136,23 @@ describe('position-tool geometry (design §9.1)', () => {
         tool: draft({ entry: 100.4, sl: 99.9, tp: 101.4, mode: 'market' }),
       });
       expect(applyDrag({ ...base, original: draft(), part: 'body', grabPrice: 100, price: 101 })).toMatchObject({ hint: expect.stringMatching(/Stop entries/) });
+    });
+
+    it("T-033: a position's stop and target are checked against the last close (the server rule), not the entry", () => {
+      const pos = draft({ kind: 'position', mode: 'market', entry: 100.25, sl: 99, tp: 110 });
+      const at102 = { ...base, lastClose: 102 };
+      expect(applyDrag({ ...at102, original: pos, part: 'sl', price: 100.25 })).toEqual({ tool: { ...pos, sl: 100.25 } }); // break-even
+      expect(applyDrag({ ...at102, original: pos, part: 'sl', price: 101 })).toEqual({ tool: { ...pos, sl: 101 } }); // trailing in profit
+      expect(applyDrag({ ...at102, original: pos, part: 'sl', price: 102.5 })).toEqual({ hint: 'A long stop must stay below the last close.' });
+      expect(applyDrag({ ...at102, original: pos, part: 'sl', price: 102 })).toEqual({ hint: 'The stop is too close to the last close.' });
+      expect(applyDrag({ ...at102, original: pos, part: 'tp', price: 101.5 })).toEqual({ hint: 'A long target must stay above the last close.' });
+      expect(applyDrag({ ...at102, original: pos, part: 'tp', price: 104 })).toEqual({ tool: { ...pos, tp: 104 } });
+    });
+
+    it('T-033: a pending order is checked against its limit, as at placement', () => {
+      const pending = draft({ kind: 'pending', entry: 99.5, sl: 99, tp: 101 });
+      expect(applyDrag({ ...base, original: pending, part: 'sl', price: 99.6 })).toEqual({ hint: 'A long stop must stay below the limit.' });
+      expect(applyDrag({ ...base, original: pending, part: 'sl', price: 98.5 })).toEqual({ tool: { ...pending, sl: 98.5 } });
     });
 
     it('a live order ignores entry/body drags', () => {

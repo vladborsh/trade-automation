@@ -1,4 +1,4 @@
-import { isStopTooClose, positionSize } from '@trade-automation/replay-core';
+import { isStopTooClose, modifyLevelError, positionSize } from '@trade-automation/replay-core';
 import type { PositionToolPart, PositionToolState, PositionToolsView } from './position-tool.model';
 
 /**
@@ -71,12 +71,13 @@ function liveLabel(
 }
 
 /**
- * Which parts of a tool can be dragged: a draft all of them. A live order none yet — moving its
- * stop or target is a server `modify` (P2, decision 23), and a drag that moved only the drawing
- * would lie about the order.
+ * Which parts of a tool can be dragged: a draft all of them; a live order its stop and target
+ * (T-033: dropping one is a server `modify`, decision 23), never its entry; a read-only drawing
+ * (view-only, §9.3) nothing.
  */
 export function draggableParts(tool: PositionToolState): readonly PositionToolPart[] {
-  return tool.kind === 'draft' ? ['entry', 'sl', 'tp', 'body'] : [];
+  if (tool.readOnly) return [];
+  return tool.kind === 'draft' ? ['entry', 'sl', 'tp', 'body'] : ['sl', 'tp'];
 }
 
 export interface ToolHandle {
@@ -100,8 +101,8 @@ export const HANDLE_OFFSET_PX = 12;
 
 /**
  * Screen geometry of `tool`, or null when its levels are off the price scale. `xStart` is the
- * tool's left edge (its anchor time, clamped to the pane by the caller). Drafts get three handles;
- * a live order none until its stop/target can be moved (§9.1 P2).
+ * tool's left edge (its anchor time, clamped to the pane by the caller). A handle per draggable
+ * part: three on a draft, stop and target on a live order, none on a read-only drawing.
  */
 export function toolGeometry(tool: PositionToolState, xStart: number, priceToY: (price: number) => number | null): ToolGeometry | null {
   const yEntry = priceToY(tool.entry);
@@ -110,10 +111,10 @@ export function toolGeometry(tool: PositionToolState, xStart: number, priceToY: 
   const yTp = tool.tp === null ? null : priceToY(tool.tp);
   const x = xStart + HANDLE_OFFSET_PX;
   const handles: ToolHandle[] = [];
-  if (tool.kind === 'draft') {
-    handles.push({ part: 'entry', x, y: yEntry }, { part: 'sl', x, y: ySl });
-    if (yTp !== null) handles.push({ part: 'tp', x, y: yTp });
-  }
+  const parts = draggableParts(tool);
+  if (parts.includes('entry')) handles.push({ part: 'entry', x, y: yEntry });
+  if (parts.includes('sl')) handles.push({ part: 'sl', x, y: ySl });
+  if (parts.includes('tp') && yTp !== null) handles.push({ part: 'tp', x, y: yTp });
   return { toolId: tool.id, x: xStart, yEntry, ySl, yTp, handles };
 }
 
@@ -183,6 +184,11 @@ export function applyDrag(input: DragInput): DragResult {
   const { original: t, part, precision } = input;
   const p = snapPrice(input.price, precision);
   const long = t.side === 'long';
+  if ((part === 'sl' || part === 'tp') && t.kind !== 'draft') {
+    // T-033: the server's own rule (replay-core), so a drag into the market is a hint, never a request
+    const hint = modifyHint(t, part === 'sl' ? { sl: p } : { tp: p }, input.lastClose);
+    return hint ? { hint } : { tool: { ...t, [part]: p } };
+  }
   if (part === 'sl') {
     if (long ? p >= t.entry : p <= t.entry) return { hint: `A ${t.side} stop must stay ${long ? 'below' : 'above'} the entry.` };
     return { tool: { ...t, sl: p } };
@@ -216,4 +222,20 @@ export function applyDrag(input: DragInput): DragResult {
   if (long ? entry <= t.sl : entry >= t.sl) return { hint: 'The entry cannot cross its stop.' };
   if (t.tp !== null && (long ? entry >= t.tp : entry <= t.tp)) return { hint: 'The entry cannot cross its target.' };
   return { tool: { ...t, entry, mode } };
+}
+
+/**
+ * T-033: why moving a live order's stop or target to `levels` would be refused, as a hint, or null.
+ * replay-core's `modifyLevelError` — the check the server applies to the PATCH: a pending order
+ * against its limit (the tool's entry), a position against the last close.
+ */
+export function modifyHint(tool: PositionToolState, levels: { sl?: number; tp?: number }, lastClose: number): string | null {
+  const order = { side: tool.side, status: tool.kind === 'pending' ? 'pending' : 'open', limitPrice: tool.entry } as const;
+  const code = modifyLevelError(order, levels, lastClose);
+  if (!code) return null;
+  const against = tool.kind === 'pending' ? 'the limit' : 'the last close';
+  const long = tool.side === 'long';
+  if (code === 'TP_ON_WRONG_SIDE') return `A ${tool.side} target must stay ${long ? 'above' : 'below'} ${against}.`;
+  if (code === 'SL_ON_WRONG_SIDE') return `A ${tool.side} stop must stay ${long ? 'below' : 'above'} ${against}.`;
+  return `The stop is too close to ${against}.`;
 }

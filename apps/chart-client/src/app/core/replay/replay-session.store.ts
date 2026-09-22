@@ -18,6 +18,8 @@ import { PositionToolsStore } from './position-tools.store';
 import { orderTool } from './view-only';
 import { ScreenshotUploadQueue } from './screenshot-upload.queue';
 import { TradeScreenshots } from './trade-screenshots';
+import { OrderLevelEdits, modifyFromDrop } from './order-level-edits';
+import type { MutationInput } from './mutation-rules';
 
 /** §9.3 view-only rewind: the cursor to view at, and the order whose drawing to show. */
 export interface ViewAt {
@@ -84,6 +86,8 @@ export class ReplaySessionStore implements OnDestroy {
     enqueue: (job) => this.uploads.enqueue(job),
   });
   private readonly uploads = inject(ScreenshotUploadQueue);
+  /** T-033: a live order's stop/target while its handle is dragged and its `modify` is in flight. */
+  private readonly levelEdits = new OrderLevelEdits();
 
   private queue: AdvanceQueue | null = null;
   private sessionId: string | null = null;
@@ -183,8 +187,7 @@ export class ReplaySessionStore implements OnDestroy {
         side: o.side,
         mode: o.type,
         entry: (o.entryPrice ?? o.limitPrice) as number,
-        sl: o.slCurrent,
-        tp: o.tpCurrent,
+        ...this.levelEdits.levelsOf(o),
         kind: o.status === 'open' ? 'position' : 'pending',
         orderId: o.id,
         active: o.id === activeOrderId,
@@ -212,7 +215,38 @@ export class ReplaySessionStore implements OnDestroy {
       riskPct: this.riskPct(),
       pricePrecision: this.precisionOf(panelId),
     }));
-    return { view, apply: (change) => store.apply(change), setPointerPrice: (price) => store.pointerPrice.set(price) };
+    return {
+      view,
+      apply: (change) =>
+        change.type === 'update' && change.tool.kind !== 'draft' && change.tool.orderId
+          ? this.dragOrderLevels(panelId, change.tool, change.final)
+          : store.apply(change),
+      setPointerPrice: (price) => store.pointerPrice.set(price),
+    };
+  }
+
+  /**
+   * T-033: a live order's stop or target handle. While dragging, the drawing follows (the
+   * controller has already refused a step into the market with a hint). On the drop, a changed
+   * level becomes a `modify` through the queue and the drawing stays there until the server's
+   * order replaces it (`reconcile`) or a refusal snaps it back (`rejected`).
+   */
+  private dragOrderLevels(panelId: string, tool: PositionToolState, final: boolean): void {
+    const orderId = tool.orderId as string;
+    if (!final) return this.levelEdits.set(orderId, { sl: tool.sl, tp: tool.tp });
+    const order = this.portfolio.orders().find((o) => o.id === orderId);
+    const engine = this.engine();
+    const lastClose = this.lastCloseOf(panelId);
+    const drop = order && engine && lastClose !== null ? modifyFromDrop(order, tool, lastClose, engine.cursor()) : null;
+    if (drop === null || 'hint' in drop || !this.queue) {
+      this.levelEdits.clear(orderId);
+      if (drop && 'hint' in drop) this.showHint(drop.hint);
+      else if (drop) this.showHint('The session is reloading — move it again in a moment.');
+      return;
+    }
+    this.levelEdits.set(orderId, { sl: tool.sl, tp: tool.tp });
+    this.portfolio.markPending(orderId);
+    this.queue.push(drop.input);
   }
 
   /**
@@ -240,6 +274,7 @@ export class ReplaySessionStore implements OnDestroy {
     this.sessionId = id;
     this.engine()?.retire(); // BUG-009: the old engine shows "loading" until the new one replaces it
     this.queue?.stop();
+    this.levelEdits.clearAll(); // the reloaded orders are the truth
     this.queue = null;
     this.view.set(view);
     this.loadError.set(null);
@@ -253,7 +288,7 @@ export class ReplaySessionStore implements OnDestroy {
       const queue = new AdvanceQueue(this.transport(id), {
         onOutcome: (outcome) => this.reconcile(outcome),
         onRefused: (err) => this.refused(err),
-        onRejected: (err) => this.rejected(err),
+        onRejected: (err, op) => this.rejected(err, op),
         onRetrying: (retrying) => this.retrying.set(retrying),
         onIdle: () => void this.refreshStats(id),
       });
@@ -377,6 +412,7 @@ export class ReplaySessionStore implements OnDestroy {
       case 'modify':
         this.portfolio.clearPending(outcome.result.id);
         this.applyOrders([outcome.result]);
+        this.levelEdits.clear(outcome.result.id); // the drawing shows the server's levels from now on
         return;
     }
   }
@@ -397,8 +433,17 @@ export class ReplaySessionStore implements OnDestroy {
     }
   }
 
-  /** A 422 on place (T-023): the server validated the order and changed nothing — a hint, the draft stays. */
-  private rejected(err: unknown): void {
+  /**
+   * A 422 (T-023 place, T-033 modify): the server validated the request and changed nothing — a
+   * hint. A refused place keeps its draft; a refused modify snaps the drawing back.
+   */
+  private rejected(err: unknown, op: MutationInput): void {
+    if (op.kind === 'modify') {
+      this.portfolio.clearPending(op.orderId);
+      this.levelEdits.clear(op.orderId);
+      this.showHint(isApiError(err) ? `Move refused: ${err.message}` : 'Move refused by the server.');
+      return;
+    }
     this.placing.shift();
     this.showHint(isApiError(err) ? `Order refused: ${err.message}` : 'Order refused by the server.');
   }
