@@ -17,6 +17,7 @@
       <table class="sessions">
         <thead>
           <tr>
+            <th class="play-col"><span class="visually-hidden">Play</span></th>
             <th>Name</th>
             <th>Instruments</th>
             <th>Period</th>
@@ -32,6 +33,18 @@
         <tbody>
           @for (s of sessions(); track s.id) {
             <tr data-testid="session-row">
+              <td class="play-col">
+                @if (s.status === 'complete') {
+                  <span class="play disabled" data-testid="session-play" aria-disabled="true" title="Session complete: nothing left to replay">
+                    <span aria-hidden="true">▶</span>
+                    <span class="visually-hidden">Play {{ s.name }} (complete, nothing left to replay)</span>
+                  </span>
+                } @else {
+                  <a class="play" data-testid="session-play" [routerLink]="['/sessions', s.id]" title="Open and continue the replay" [attr.aria-label]="'Play ' + s.name">
+                    <span aria-hidden="true">▶</span>
+                  </a>
+                }
+              </td>
               <td class="name">{{ s.name }}</td>
               <td>{{ instruments(s) }}</td>
               <td class="period">{{ period(s) }}</td>
@@ -42,16 +55,19 @@
               <td class="num" [class.up]="s.pnlR > 0" [class.down]="s.pnlR < 0">{{ pnlR(s) }}</td>
               <td class="num">{{ s.tradesCount }}</td>
               <td class="actions">
-                <a [routerLink]="['/sessions', s.id]">Open</a>
-                @if (s.status === 'complete') {
-                  <a [routerLink]="['/sessions', s.id, 'stats']" data-testid="session-stats-link">Статистика</a>
-                }
-                <button type="button" class="link danger" (click)="askDelete(s.id)" [disabled]="deleting() === s.id">Delete</button>
+                <!-- the flex row sits inside the cell: a display:flex <td> leaves the table layout (T-041) -->
+                <div class="actions-row">
+                  <a [routerLink]="['/sessions', s.id]">Open</a>
+                  @if (s.status === 'complete') {
+                    <a [routerLink]="['/sessions', s.id, 'stats']" data-testid="session-stats-link">Статистика</a>
+                  }
+                  <button type="button" class="link danger" (click)="askDelete(s.id)" [disabled]="deleting() === s.id">Delete</button>
+                </div>
               </td>
             </tr>
             @if (confirming() === s.id) {
               <tr class="confirm" data-testid="delete-confirm">
-                <td colspan="10">
+                <td colspan="11">
                   <p role="alertdialog" aria-label="Confirm delete">
                     Delete “{{ s.name }}”? This removes the session together with all its orders and screenshots.
                     This cannot be undone.

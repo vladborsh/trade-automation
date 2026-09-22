@@ -1,4 +1,4 @@
-import { expect, replayStarted, test } from './fixtures';
+import { apiUrl, expect, replayStarted, test } from './fixtures';
 
 /**
  * backtest-app-system-design.md §7.2 against the mock (mock-server/backtest.ts): a session is
@@ -67,4 +67,42 @@ test('a mixed-currency selection cannot be submitted', async ({ page }) => {
   await expect(page.getByTestId('instrument-chip')).toHaveText([/BTC\/USDT Perp/]);
   await expect(page.getByTestId('instruments-error')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create session' })).toBeEnabled();
+});
+
+test('T-041: the play icon on a row opens that session in its workspace; a complete session has an inert one with a tooltip', async ({ page }) => {
+  const request = page.context().request;
+  const from = Date.UTC(2024, 2, 1, 21, 40);
+  const make = async (name: string) => {
+    const res = await request.post(`${apiUrl()}/backtest/sessions`, {
+      data: {
+        name, timeframe: '5m', periodFromMs: from, periodToMs: from + 10 * 60_000, initialBalance: 10_000, defaultRiskPct: 1,
+        costs: { enabled: false, commissionPct: 0, spread: 0 },
+        layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+      },
+    });
+    expect(res.status()).toBe(201);
+    return (await res.json()) as { id: string; periodToMs: number };
+  };
+  const stamp = Date.now();
+  const active = await make(`e2e play ${stamp}`);
+  const done = await make(`e2e done ${stamp}`);
+  const advanced = await request.post(`${apiUrl()}/backtest/sessions/${done.id}/advance`, { data: { opId: crypto.randomUUID(), toCursorMs: done.periodToMs } });
+  expect(advanced.status()).toBe(200);
+
+  await page.goto('/sessions');
+  const doneRow = page.getByTestId('session-row').filter({ hasText: `e2e done ${stamp}` });
+  await expect(doneRow).toContainText('complete');
+  const inert = doneRow.getByTestId('session-play');
+  await expect(inert).toHaveAttribute('aria-disabled', 'true');
+  await expect(inert).toHaveAttribute('title', 'Session complete: nothing left to replay');
+  await expect(doneRow.getByRole('link', { name: /Play/ })).toHaveCount(0); // not a link
+  if (process.env['T041_SHOTS']) {
+    await page.getByTestId('session-row').filter({ hasText: `e2e play ${stamp}` }).getByTestId('session-play').hover();
+    await page.screenshot({ path: `${process.env['T041_SHOTS']}/sessions-play.png` });
+  }
+
+  await page.getByTestId('session-row').filter({ hasText: `e2e play ${stamp}` }).getByRole('link', { name: `Play e2e play ${stamp}` }).click();
+  await expect(page).toHaveURL(new RegExp(`/sessions/${active.id}$`));
+  await replayStarted(page);
+  await expect(page.getByTestId('replay-cursor')).toHaveText('2024-03-01 21:40 UTC');
 });

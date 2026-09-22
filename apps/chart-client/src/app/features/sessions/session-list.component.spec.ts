@@ -79,10 +79,23 @@ describe('SessionListComponent', () => {
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['/sessions/00000000-0000-4000-8000-0000000000c1/stats']);
   });
 
+  it('a play icon per row opens the replay workspace; a complete session gets a disabled one with a tooltip (T-041)', async () => {
+    const { el } = await setup({
+      listSessions: vi.fn().mockResolvedValue([summary({ id: '00000000-0000-4000-8000-0000000000c1', name: 'Done', status: 'complete' }), summary()]),
+    });
+    const [done, active] = [...el.querySelectorAll('[data-testid="session-row"]')].map((r) => r.querySelector('[data-testid="session-play"]')!);
+    expect(active.tagName).toBe('A');
+    expect(active.getAttribute('href')).toBe('/sessions/00000000-0000-4000-8000-0000000000a1');
+    expect(active.getAttribute('aria-label')).toBe('Play BTC practice');
+    expect(done.tagName).toBe('SPAN'); // not a link
+    expect(done.getAttribute('aria-disabled')).toBe('true');
+    expect(done.getAttribute('title')).toBe('Session complete: nothing left to replay');
+  });
+
   it('lists each session: name, instruments, period, tf, status, balance, PnL in currency and R, trades', async () => {
     const { el } = await setup({ listSessions: vi.fn().mockResolvedValue([summary()]) });
     const cells = [...el.querySelectorAll('[data-testid="session-row"] td')].map(text);
-    expect(cells.slice(0, 9)).toEqual([
+    expect(cells.slice(1, 10)).toEqual([ // cell 0 is the play icon (T-041)
       'BTC practice',
       'BTCUSDT, ETHUSDT',
       '2021-06-01 00:00 → 2021-07-01 00:00 UTC',

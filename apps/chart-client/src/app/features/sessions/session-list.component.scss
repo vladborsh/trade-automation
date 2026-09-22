@@ -66,7 +66,7 @@ th {
 .down {
   color: #ef5350;
 }
-.actions {
+.actions-row {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -118,4 +118,33 @@ button:disabled {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* T-041: the play icon per row */
+.play-col {
+  width: 1px;
+  padding-right: 4px;
+}
+.play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #26a69a;
+  border-radius: 50%;
+  color: #26a69a;
+  font-size: 10px;
+  text-decoration: none;
+}
+a.play:hover,
+a.play:focus-visible {
+  background: #26a69a;
+  color: #0d1117;
+  outline: none;
+}
+.play.disabled {
+  border-color: #30363d;
+  color: #8b949e;
+  cursor: not-allowed;
 }
