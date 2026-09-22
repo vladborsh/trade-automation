@@ -33,12 +33,7 @@ import { PaddingSeries } from './padding-series';
 import { CANDLE_SERIES_OPTIONS, CHART_OPTIONS } from './chart-options';
 import { MetricSeriesRenderer } from './metric-series.renderer';
 import { renderDiff } from './render-diff';
-import { OverlayLayer } from './overlay/overlay-layer';
-import { MarkerRenderer } from './overlay/marker.renderer';
-import { PriceLineRenderer } from './overlay/price-line.renderer';
-import { RectRenderer } from './overlay/rect.renderer';
-import { RayRenderer } from './overlay/ray.renderer';
-import { LineRenderer } from './overlay/line.renderer';
+import { createOverlayLayer } from './overlay/chart-overlays';
 import { ShapesPrimitive } from './overlay/shapes.primitive';
 import { PositionToolLayer } from './overlay/position-tool.layer';
 import type { PositionToolChange, PositionToolsView } from './overlay/position-tool.model';
@@ -118,8 +113,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
   private chart: IChartApi | null = null;
   private series: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | null = null;
-  private readonly overlayLayer = new OverlayLayer();
   private readonly shapesPrimitive = new ShapesPrimitive();
+  private readonly overlayLayer = createOverlayLayer(this.shapesPrimitive);
   private readonly indicatorLayer = new IndicatorLayer(() => this.indicatorLabels());
   private readonly metricSeries = new MetricSeriesRenderer();
   private readonly positionToolLayer = new PositionToolLayer({
@@ -161,12 +156,6 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   private stopResizeObserver: () => void = () => undefined;
 
   constructor() {
-    this.overlayLayer.register(new MarkerRenderer());
-    this.overlayLayer.register(new PriceLineRenderer());
-    this.overlayLayer.register(new RectRenderer(this.shapesPrimitive));
-    this.overlayLayer.register(new RayRenderer(this.shapesPrimitive));
-    this.overlayLayer.register(new LineRenderer(this.shapesPrimitive));
-
     effect(() => {
       if (this.kind() === 'candles') {
         this.renderCandles(this.candles(), this.whitespace());
