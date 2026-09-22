@@ -31,6 +31,8 @@ describe('position-tool geometry (design §9.1)', () => {
   it('labels: entry with qty from positionSize, SL with −1R, TP with its R multiple', () => {
     // 1 % of 10 000 = 100 risked over a 0.5 stop → qty 200
     expect(labelFor(draft(), 'entry', CTX)).toBe('Long limit 100.00 · qty 200');
+    // T-054: with the contract the qty is on the venue step, as the order popup sizes it (200 → 150 with a 75-step)
+    expect(labelFor(draft(), 'entry', { ...CTX, contract: { unit: 'x', multiplier: 1, minQty: 1, qtyStep: 75, maxLeverage: 10 } })).toBe('Long limit 100.00 · qty 150');
     expect(labelFor(draft(), 'sl', CTX)).toBe('SL 99.50 · −0.50 · −1R');
     expect(labelFor(draft(), 'tp', CTX)).toBe('TP 101.00 · +1.00 · 2.00R');
     const short = draft({ side: 'short', mode: 'market', sl: 100.5, tp: 99 });

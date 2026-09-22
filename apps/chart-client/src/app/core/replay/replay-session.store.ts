@@ -20,6 +20,8 @@ import { ScreenshotUploadQueue } from './screenshot-upload.queue';
 import { TradeScreenshots } from './trade-screenshots';
 import { OrderLevelEdits, modifyFromDrop } from './order-level-edits';
 import type { MutationInput } from './mutation-rules';
+import { InstrumentFacts } from './instrument-facts';
+import { lastClosesByInstrument, marginUtilisation, sessionMargin } from './session-margin';
 
 /** §9.3 view-only rewind: the cursor to view at, and the order whose drawing to show. */
 export interface ViewAt {
@@ -31,7 +33,6 @@ export interface ViewAt {
 const NOTICE_MS = 8_000;
 /** How long a position-tool hint (a refused drag, `Enter` with no active tool) stays up. */
 const HINT_MS = 3_000;
-const DEFAULT_PRICE_PRECISION = 2;
 export const NO_ACTIVE_TOOL_HINT = 'No active position tool — press B or S';
 
 /**
@@ -57,8 +58,10 @@ export class ReplaySessionStore implements OnDestroy {
   readonly retrying = signal(false);
   /** A one-line message: "resynced", "reloaded from the server", … */
   readonly notice = signal<string | null>(null);
-  /** Instrument → price decimals, for the journal (from `GET /backtest/instruments`). */
-  readonly pricePrecision = signal<ReadonlyMap<string, number>>(new Map());
+  /** Price precision and venue contract per instrument, from `GET /backtest/instruments` (T-054). */
+  readonly instruments = new InstrumentFacts();
+  /** Instrument → price decimals, for the journal and the positions. */
+  readonly pricePrecision = this.instruments.pricePrecision;
 
   /** A short position-tool message (T-022): a refused drag, `Enter` with no active tool, … */
   readonly hint = signal<string | null>(null);
@@ -74,6 +77,14 @@ export class ReplaySessionStore implements OnDestroy {
     const costs = session?.costs ?? { enabled: false, commissionPct: 0, spread: 0 };
     return positionRows(this.portfolio.orders(), (panelId) => this.lastCloseOf(panelId), costs);
   });
+  /** The session account at the cursor — equity, used and free margin (D12, T-054); null if it cannot be marked. */
+  readonly margin = computed(() => {
+    const session = this.session();
+    if (!session) return null;
+    const lastCloses = lastClosesByInstrument(session.layout.panels, (id) => this.lastCloseOf(id));
+    return sessionMargin(session.balance, this.portfolio.orders(), (id) => this.instruments.contractOf(id), lastCloses, session.costs);
+  });
+  readonly marginUtilisation = computed(() => marginUtilisation(this.margin()));
   /** Places sent and not yet answered, oldest first: which draft each 201 consumes. */
   private readonly placing: Array<{ draftId: string; panelId: string; entryShot: Promise<Blob> | null }> = [];
   /** §9.2 (T-026): the entry and exit pictures, uploaded by the root queue. */
@@ -206,8 +217,12 @@ export class ReplaySessionStore implements OnDestroy {
   }
 
   private precisionOf(panelId: string): number {
-    const instrument = this.session()?.layout.panels.find((p) => p.id === panelId)?.instrument;
-    return (instrument && this.pricePrecision().get(instrument)) ?? DEFAULT_PRICE_PRECISION;
+    return this.instruments.precisionOf(this.instrumentOf(panelId));
+  }
+
+  /** The instrument a panel shows. */
+  instrumentOf(panelId: string) {
+    return this.session()?.layout.panels.find((p) => p.id === panelId)?.instrument;
   }
 
   private toolsBinding(panelId: string): PanelPositionTools {
@@ -222,6 +237,7 @@ export class ReplaySessionStore implements OnDestroy {
       balance: this.session()?.balance ?? 0,
       riskPct: this.riskPct(),
       pricePrecision: this.precisionOf(panelId),
+      contract: this.instruments.contractOf(this.instrumentOf(panelId)),
     }));
     return {
       view,
@@ -359,7 +375,7 @@ export class ReplaySessionStore implements OnDestroy {
     ]);
     this.portfolio.setOrders(orders);
     this.portfolio.applyStatsResponse(stats);
-    this.pricePrecision.set(new Map(instruments.map((i) => [i.id, i.pricePrecision])));
+    this.instruments.set(instruments);
   }
 
   /** One `GET …/stats` after the queue has drained, so `drift` reflects the rows just written. */
@@ -476,6 +492,9 @@ export class ReplaySessionStore implements OnDestroy {
       lastClose,
       riskPct: this.riskPct(),
       balance: session.balance,
+      contract: this.instruments.contractOf(this.instrumentOf(active.panelId)),
+      account: this.margin(),
+      currency: session.sessionCurrency,
     });
     if ('hint' in built) return this.showHint(built.hint);
     if (!this.queue) return this.showHint('The session is reloading — press Enter again in a moment.');

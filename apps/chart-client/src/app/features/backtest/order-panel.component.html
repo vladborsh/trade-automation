@@ -10,18 +10,40 @@
 >
   <h2 id="order-popup-title">Place order</h2>
   @if (view(); as v) {
-    <dl data-testid="order-panel">
+    <dl data-testid="order-panel" [class.amber]="v.amber">
       <dt>Order</dt>
       <dd>{{ v.side }} {{ v.mode }} @ {{ price(v.entry) }}</dd>
       <dt>Size</dt>
-      <dd data-testid="order-qty">{{ v.qty === null ? '—' : v.qty.toPrecision(6) }}</dd>
+      <dd data-testid="order-qty">{{ v.sizeText ?? '—' }}</dd>
       <dt>Risk (1R)</dt>
-      <dd>{{ money(v.riskAmount) }}</dd>
+      <dd data-testid="order-risk">
+        {{ money(v.sizing?.riskAmount ?? null) }}
+        @if (v.sizing; as z) {
+          <span class="muted" [title]="'Asked for ' + pct(v.requestedRiskPct) + '; the size is rounded down to the venue step'">
+            {{ pct(z.effectiveRiskPct) }} of {{ pct(v.requestedRiskPct) }}
+          </span>
+        }
+      </dd>
       <dt>Reward</dt>
       <dd>{{ v.rMultiple === null ? 'no target' : v.rMultiple.toFixed(2) + ' R' }}</dd>
       <dt>Notional</dt>
-      <dd>{{ money(v.notional) }}</dd>
+      <dd>{{ money(v.sizing?.notional ?? null) }}</dd>
+      @if (v.sizing?.marginRequired !== null && v.sizing?.marginRequired !== undefined) {
+        <dt>Margin</dt>
+        <dd data-testid="order-margin">{{ money(v.sizing!.marginRequired) }}</dd>
+        @if (v.sizing!.availableAfter !== null) {
+          <dt>Free after</dt>
+          <dd data-testid="order-free-after" [class.down]="v.sizing!.availableAfter < 0">{{ money(v.sizing!.availableAfter) }}</dd>
+        }
+        @if (v.leverageText) {
+          <dt>Leverage</dt>
+          <dd data-testid="order-leverage" title="This order's notional against equity, and the instrument's cap">{{ v.leverageText }}</dd>
+        }
+      }
     </dl>
+    @if (v.amber) {
+      <p class="amber-note" role="status" data-testid="order-amber">Over 80 % of equity would be in margin after this order.</p>
+    }
     <label class="risk">
       Risk %
       <input type="number" name="riskPct" min="0.0001" max="100" step="any" [value]="riskPct()" (change)="onRiskInput($event)" />

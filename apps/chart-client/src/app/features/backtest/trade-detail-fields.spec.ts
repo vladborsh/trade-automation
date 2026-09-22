@@ -38,4 +38,8 @@ describe('modificationText', () => {
     const m = { id: 1, orderId: 'o1', cursorMs: T, field: 'sl', oldValue: 105, newValue: 104, createdAt: 0 } as OrderModification;
     expect(modificationText(m, 1)).toBe('2026-09-16 10:04 UTC — Stop 105.0 → 104.0');
   });
+
+  it('T-054: the quantity in its contract unit', () => {
+    expect(tradeDetailFields(ORDER, 'USD', 1, 'contracts').find((f) => f.field === 'qty')!.text).toBe('2 contracts');
+  });
 });

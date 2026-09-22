@@ -126,6 +126,21 @@ describe('ReplaySessionStore — the trading loop (T-023)', () => {
     expect(client.placeOrder).toHaveBeenCalledTimes(1);
   });
 
+  it('T-054: a size below the venue minimum is refused before sending, with the risk % it needs; the account is marked', async () => {
+    const client = fakeClient();
+    client.getInstruments.mockResolvedValue([
+      { id: 'binance:BTCUSDT', pricePrecision: 2, contract: { unit: 'BTC', multiplier: 1, minQty: 1_000_000, qtyStep: 1, maxLeverage: 10 } },
+    ] as never);
+    const { store } = await open(client);
+    expect(store.margin()).toEqual({ equity: 10_000, usedMargin: 0, available: 10_000 }); // nothing open yet
+    expect(store.marginUtilisation()).toBe(0);
+    store.toolStore('btc').create('long'); // a market draft at 1.5: 100 of risk sizes far below 1 000 000 BTC
+    store.placeActiveDraft();
+    await settle();
+    expect(client.placeOrder).not.toHaveBeenCalled();
+    expect(store.hint()).toMatch(/^Below the venue minimum: the smallest order is 1000000 BTC, which needs a risk of at least/);
+  });
+
   it('a client-side check refuses before sending (the limit is no longer below the last close)', async () => {
     const { store, client } = await open();
     const tools = store.toolStore('btc');

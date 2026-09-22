@@ -15,6 +15,11 @@ export function formatSignedMoney(v: number | null, currency: string): string {
   return `${sign(v)}${fixed(v, 2)} ${currency}`;
 }
 
+/** A quantity in its contract unit (T-054, D12): `0.076 BTC`; the bare number when the unit is unknown. */
+export function formatQtyUnit(qty: number, unit: string | undefined): string {
+  return unit ? `${qty} ${unit}` : String(qty);
+}
+
 /** An unsigned amount (costs, drawdown): `4.10 USD`. */
 export function formatMoney(v: number | null, currency: string): string {
   return v === null ? DASH : `${fixed(v, 2)} ${currency}`;

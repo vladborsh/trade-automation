@@ -30,4 +30,23 @@ describe('buildPlaceRequest (T-023)', () => {
     expect(hint({}, { balance: 0 })).toMatch(/balance is not positive/);
     expect(hint({ side: 'short', entry: 100.5, sl: 101, tp: 99 })).toBeNull();
   });
+
+  describe('with the instrument contract (T-054, D12)', () => {
+    const BTCISH = { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, minNotional: 100, maxLeverage: 125 };
+    const FREE = { equity: 10_000, usedMargin: 0, available: 10_000 };
+
+    it('a size the venue refuses is a hint before any request, in the server’s words', () => {
+      const tiny = buildPlaceRequest(draft(), { ...CTX, riskPct: 0.0001, contract: BTCISH, account: FREE, currency: 'USD' }); // 0.01 / 0.5 = 0.02 → notional ≈ 2 < 100
+      expect(tiny).toEqual({ hint: expect.stringMatching(/^Below the venue minimum: .* which needs a risk of at least/) });
+    });
+
+    it('not enough free margin is a hint too', () => {
+      const r = buildPlaceRequest(draft(), { ...CTX, contract: BTCISH, account: { equity: 10_000, usedMargin: 9_999, available: 1 }, currency: 'USD' });
+      expect(r).toEqual({ hint: expect.stringMatching(/^Not enough margin: this order needs [\d.]+ USD and 1\.00 USD is available\.$/) });
+    });
+
+    it('a size that passes both checks is sent unchanged — the server sizes it', () => {
+      expect(buildPlaceRequest(draft(), { ...CTX, contract: BTCISH, account: FREE, currency: 'USD' })).toMatchObject({ input: { kind: 'place', riskPct: 1 } });
+    });
+  });
 });

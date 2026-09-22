@@ -1,5 +1,5 @@
 import type { Order, OrderModification } from '@trade-automation/contracts';
-import { formatMoney, formatPrice, formatR, formatRAmount, formatSignedMoney, formatUtc, orderFlags } from './journal-format';
+import { formatMoney, formatPrice, formatR, formatRAmount, formatSignedMoney, formatUtc, orderFlags, formatQtyUnit } from './journal-format';
 
 export interface DetailField {
   field: keyof Order;
@@ -14,7 +14,7 @@ export interface DetailField {
  * and times, quantity, risk, the costs split into commission and spread, P&L in currency and R,
  * MAE, close reason and how the fill/exit was resolved. Display only: every figure is a server field.
  */
-export function tradeDetailFields(o: Order, currency: string, pricePrecision: number | undefined): DetailField[] {
+export function tradeDetailFields(o: Order, currency: string, pricePrecision: number | undefined, unit?: string): DetailField[] {
   const price = (v: number | null) => formatPrice(v, pricePrecision);
   const f = (field: keyof Order, label: string, text: string): DetailField => ({ field, label, text, raw: o[field] as DetailField['raw'] });
   return [
@@ -34,7 +34,7 @@ export function tradeDetailFields(o: Order, currency: string, pricePrecision: nu
     f('exitPrice', 'Exit', price(o.exitPrice)),
     f('exitTimeMs', 'Closed', o.exitTimeMs === null ? '—' : `${formatUtc(o.exitTimeMs)} UTC`),
     f('closeReason', 'Close reason', o.closeReason ?? '—'),
-    f('qty', 'Quantity', String(o.qty)),
+    f('qty', 'Quantity', formatQtyUnit(o.qty, unit)),
     f('riskPct', 'Risk', `${o.riskPct} %`),
     f('riskAmountCcy', 'Risk amount', formatMoney(o.riskAmountCcy, currency)),
     f('commissionCcy', 'Commission', formatMoney(o.commissionCcy, currency)),

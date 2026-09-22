@@ -39,4 +39,10 @@ describe('journalRow', () => {
     const row = journalRow({ ...ORDER, fillResolution: 'pessimistic-bar', closeReason: 'end-of-session' }, 2, 'USD');
     expect(row.flags.map((f) => f.key)).toEqual(['pessimistic-bar', 'end-of-session']);
   });
+
+  it('T-054: the qty in its contract unit, the raw value unchanged', () => {
+    const cell = journalRow(ORDER, 2, 'USD', 'BTC').cells.find((c) => c.field === 'qty')!;
+    expect(cell).toMatchObject({ text: '0.013 BTC', raw: 0.013 });
+    expect(journalRow(ORDER, 2, 'USD').cells.find((c) => c.field === 'qty')!.text).toBe('0.013');
+  });
 });

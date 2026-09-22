@@ -58,7 +58,12 @@ export class WorkspaceComponent {
     const draft = active?.store.active();
     if (!active || !draft || draft.kind !== 'draft') return null;
     const instrument = this.panels().find((p) => p.id === active.panelId)?.instrument;
-    return { draft, lastClose: this.store.lastCloseOf(active.panelId), precision: (instrument && this.store.pricePrecision().get(instrument)) || 2 };
+    return {
+      draft,
+      lastClose: this.store.lastCloseOf(active.panelId),
+      precision: (instrument && this.store.pricePrecision().get(instrument)) || 2,
+      contract: this.store.instruments.contractOf(instrument), // T-054: unit, step, minimums, cap
+    };
   });
   /** T-045: the order popup, open at the submit step — for as long as there is an active draft. */
   readonly orderPopup = signal(false);

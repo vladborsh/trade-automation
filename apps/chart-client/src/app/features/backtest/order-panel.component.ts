@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import type { ContractSpec } from '@trade-automation/contracts';
+import type { AccountMargin } from '@trade-automation/replay-core';
 import type { PositionToolState } from '../chart/overlay/position-tool.model';
 import { formatMoney, formatPrice } from './journal-format';
 import { orderPanelView } from './order-panel.view';
@@ -27,6 +29,10 @@ export class OrderPanelComponent {
   readonly riskPct = input.required<number>();
   readonly currency = input.required<string>();
   readonly pricePrecision = input(2);
+  /** T-054: the instrument's venue contract (unit, step, minimums, leverage cap; D12). */
+  readonly contract = input<ContractSpec | null>(null);
+  /** T-054: the session account at the cursor, for the margin figures; null when it cannot be marked. */
+  readonly account = input<AccountMargin | null>(null);
 
   readonly riskPctChange = output<number>();
   readonly confirm = output<void>();
@@ -36,11 +42,20 @@ export class OrderPanelComponent {
     const draft = this.draft();
     const lastClose = this.lastClose();
     if (!draft || lastClose === null) return null;
-    return orderPanelView(draft, { balance: this.balance(), riskPct: this.riskPct(), lastClose });
+    return orderPanelView(draft, {
+      balance: this.balance(),
+      riskPct: this.riskPct(),
+      lastClose,
+      contract: this.contract(),
+      account: this.account(),
+      currency: this.currency(),
+    });
   });
 
   protected readonly money = (v: number | null) => formatMoney(v, this.currency());
   protected readonly price = (v: number | null) => formatPrice(v, this.pricePrecision());
+  /** 3 significant digits: a requested 0.0001 % stays visible; 0.9997 % reads as 1 %. */
+  protected readonly pct = (v: number) => `${Number(v.toPrecision(3))} %`;
 
   protected onRiskInput(event: Event): void {
     this.applyRisk(event.target as HTMLInputElement);

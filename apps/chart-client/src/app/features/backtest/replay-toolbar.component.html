@@ -56,5 +56,8 @@
   <!-- the workspace's own controls on the right (T-048 trade controls, T-046 positions dropdown) -->
   <ng-content select="[toolbarEnd]" />
   <span class="open-risk" data-testid="replay-open-risk" title="Open risk: what the open positions' current stops would lose">risk {{ openRiskText() }}</span>
+  @if (marginText(); as margin) {
+    <span class="margin" data-testid="replay-margin" [class.amber]="marginAmber()" title="Margin in use: open and pending orders' initial margin as a share of equity">{{ margin }}</span>
+  }
   <span class="balance" data-testid="replay-balance" title="Balance">{{ balanceText() }}</span>
 </header>

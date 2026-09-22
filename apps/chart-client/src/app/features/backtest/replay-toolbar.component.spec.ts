@@ -77,4 +77,16 @@ describe('ReplayToolbarComponent', () => {
     expect(el.querySelector('[data-testid="replay-retrying"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="replay-notice"]')?.textContent).toBe('Resynced with the server.');
   });
+
+  it('T-054: margin utilisation next to open risk, amber above 80 %; none when the account cannot be marked', () => {
+    const margin = (u: number | null) => {
+      TestBed.resetTestingModule();
+      return render({ marginUtilisation: u }).el.querySelector('[data-testid="replay-margin"]');
+    };
+    expect(margin(0.34)?.textContent?.trim()).toBe('margin 34 %');
+    expect(margin(0.34)!.classList.contains('amber')).toBe(false);
+    expect(margin(0.8)!.classList.contains('amber')).toBe(false); // at 80 %: not yet
+    expect(margin(0.81)!.classList.contains('amber')).toBe(true);
+    expect(margin(null)).toBeNull();
+  });
 });

@@ -103,3 +103,19 @@ kbd {
   font-weight: 400;
   opacity: 0.7;
 }
+.muted {
+  margin-left: 6px;
+  color: #8b949e;
+}
+.down {
+  color: #ef5350;
+}
+/* D12: margin utilisation above 80 % after the order */
+dl.amber [data-testid='order-margin'],
+dl.amber [data-testid='order-free-after'],
+.amber-note {
+  color: #d29922;
+}
+.amber-note {
+  margin: 0 0 8px;
+}

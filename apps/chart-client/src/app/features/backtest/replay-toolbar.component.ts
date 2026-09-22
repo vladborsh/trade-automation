@@ -41,6 +41,8 @@ export class ReplayToolbarComponent {
   readonly error = input<string | null>(null);
   /** T-023: what every open position's current stop would lose (replay-core `openRisk`). */
   readonly openRisk = input(0);
+  /** T-054: used margin ÷ equity (D12); null when the account cannot be marked. */
+  readonly marginUtilisation = input<number | null>(null);
 
   readonly step = output<void>();
   readonly timeframeChange = output<Timeframe>();
@@ -51,4 +53,10 @@ export class ReplayToolbarComponent {
   readonly timeframeLocked = computed(() => this.completed() && this.viewingAt() === null);
   readonly balanceText = computed(() => formatBalance(this.balance(), this.currency()));
   readonly openRiskText = computed(() => formatBalance(this.openRisk(), this.currency()));
+  readonly marginText = computed(() => {
+    const u = this.marginUtilisation();
+    return u === null ? null : `margin ${Math.round(u * 100)} %`;
+  });
+  /** Above 80 % of equity in margin (design §6 D12). */
+  readonly marginAmber = computed(() => (this.marginUtilisation() ?? 0) > 0.8);
 }

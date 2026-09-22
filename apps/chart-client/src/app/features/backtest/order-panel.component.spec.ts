@@ -93,4 +93,31 @@ describe('OrderPanelComponent (T-023; a popup since T-045)', () => {
     el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     expect(got.confirms).toBe(0);
   });
+
+  it('T-054: the size in its unit, margin, free margin after, leverage vs the cap, effective vs requested risk', () => {
+    const { fixture, el } = render();
+    fixture.componentRef.setInput('contract', { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, maxLeverage: 20 });
+    fixture.componentRef.setInput('account', { equity: 10_000, usedMargin: 0, available: 10_000 });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="order-qty"]')!.textContent).toBe('100.000 BTC'); // 100 / 1.0 stop
+    expect(el.querySelector('[data-testid="order-margin"]')!.textContent).toBe('500.00 USD'); // 10 000 / 20
+    expect(el.querySelector('[data-testid="order-free-after"]')!.textContent).toBe('9,500.00 USD');
+    expect(el.querySelector('[data-testid="order-leverage"]')!.textContent).toBe('1.0x of 20x');
+    expect(el.querySelector('[data-testid="order-risk"]')!.textContent!.replace(/\s+/g, ' ')).toContain('1 % of 1 %');
+    expect(el.querySelector('[data-testid="order-amber"]')).toBeNull();
+  });
+
+  it('T-054: amber above 80 % utilisation; a refusal disables Confirm with the reason', () => {
+    const { fixture, el } = render();
+    fixture.componentRef.setInput('contract', { unit: 'BTC', multiplier: 1, minQty: 0.001, qtyStep: 0.001, maxLeverage: 20 });
+    fixture.componentRef.setInput('account', { equity: 10_000, usedMargin: 7_800, available: 2_200 }); // (7 800 + 500) / 10 000
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="order-amber"]')).not.toBeNull();
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="order-confirm"]')!.disabled).toBe(false);
+
+    fixture.componentRef.setInput('account', { equity: 10_000, usedMargin: 9_900, available: 100 }); // 500 > 100
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="order-problem"]')!.textContent).toBe('Not enough margin: this order needs 500.00 USD and 100.00 USD is available.');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="order-confirm"]')!.disabled).toBe(true);
+  });
 });

@@ -23,11 +23,12 @@ export function formatQty(qty: number): string {
   return String(Number(qty.toPrecision(4)));
 }
 
-type LabelContext = Pick<PositionToolsView, 'balance' | 'riskPct' | 'pricePrecision'>;
+type LabelContext = Pick<PositionToolsView, 'balance' | 'riskPct' | 'pricePrecision' | 'contract'>;
 
 /**
  * The right-edge label of one level: price, distance from the entry, R multiple, and on the
- * entry the qty that replay-core's `positionSize` gives at the session's balance and risk %.
+ * entry the qty that replay-core's `positionSize` gives at the session's balance and risk % (on the
+ * venue step when the contract is known, as the order popup sizes it; T-054).
  * A stop closer than the minimum distance (`isStopTooClose`, the server's own rule) says so on
  * the entry label instead of a qty, before T-023 ever tries to place the order.
  */
@@ -39,7 +40,7 @@ export function labelFor(tool: PositionToolState, level: 'entry' | 'sl' | 'tp', 
     const head = `${tool.side === 'long' ? 'Long' : 'Short'} ${tool.mode} ${fmt(tool.entry)}`;
     if (tool.entry === tool.sl || isStopTooClose(tool.entry, tool.sl)) return `${head} · stop too close`;
     try {
-      return `${head} · qty ${formatQty(positionSize(ctx.balance, ctx.riskPct, tool.entry, tool.sl).qty)}`;
+      return `${head} · qty ${formatQty(positionSize(ctx.balance, ctx.riskPct, tool.entry, tool.sl, ctx.contract ?? undefined).qty)}`;
     } catch {
       return `${head} · qty —`;
     }

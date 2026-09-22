@@ -32,6 +32,8 @@ export class TradeDetailComponent implements OnDestroy {
   readonly session = signal<Session | null>(null);
   readonly detail = signal<OrderDetail | null>(null);
   readonly precision = signal<number | undefined>(undefined);
+  /** The unit the order's qty is in (T-054). */
+  readonly unit = signal<string | undefined>(undefined);
   readonly error = signal<string | null>(null);
   /** Object URLs of the fetched screenshots; null = none (placeholder). */
   readonly shots = signal<Record<ShotKind, string | null>>({ entry: null, exit: null });
@@ -39,7 +41,7 @@ export class TradeDetailComponent implements OnDestroy {
   readonly fields = computed(() => {
     const d = this.detail();
     const s = this.session();
-    return d && s ? tradeDetailFields(d.order, s.sessionCurrency, this.precision()) : [];
+    return d && s ? tradeDetailFields(d.order, s.sessionCurrency, this.precision(), this.unit()) : [];
   });
   readonly modifications = computed(() => (this.detail()?.modifications ?? []).map((m) => modificationText(m, this.precision())));
   /** The kinds of this order's pictures still uploading from the workspace (T-026). */
@@ -81,7 +83,9 @@ export class TradeDetailComponent implements OnDestroy {
         this.client.getInstruments(),
       ]);
       this.session.set(session);
-      this.precision.set(instruments.find((i) => i.id === detail.order.instrument)?.pricePrecision);
+      const instrument = instruments.find((i) => i.id === detail.order.instrument);
+      this.precision.set(instrument?.pricePrecision);
+      this.unit.set(instrument?.contract?.unit);
       this.detail.set(detail);
       const [entry, exit] = await Promise.all([this.shot(detail.screenshots.entry), this.shot(detail.screenshots.exit)]);
       this.shots.set({ entry, exit });

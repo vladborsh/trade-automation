@@ -1,7 +1,7 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 6px 12px;
   border-bottom: 1px solid #30363d;
   font-size: 13px;
@@ -15,7 +15,7 @@
 }
 .toolbar > .name {
   flex-shrink: 1;
-  min-width: 0;
+  min-width: 4ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -105,4 +105,12 @@
   color: #8b949e;
   margin-right: 12px;
   font-size: 12px;
+}
+
+/* T-054: margin utilisation, amber above 80 % (D12) */
+.margin {
+  color: #8b949e;
+}
+.margin.amber {
+  color: #d29922;
 }

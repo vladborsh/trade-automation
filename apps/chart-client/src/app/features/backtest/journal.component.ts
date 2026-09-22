@@ -27,6 +27,8 @@ export class JournalComponent {
   readonly currency = input.required<string>();
   /** Instrument → price decimals. */
   readonly pricePrecision = input<ReadonlyMap<string, number>>(new Map());
+  /** Instrument → the unit its qty is in (T-054, D12). */
+  readonly units = input<ReadonlyMap<string, string>>(new Map());
   /** T-043: a toggle header, collapsed by default and remembered; off by default (always open). */
   readonly collapsible = input(false);
 
@@ -35,7 +37,7 @@ export class JournalComponent {
   readonly expanded = computed(() => !this.collapsible() || (this.toggled() ?? readJournalExpanded()));
   readonly columns = JOURNAL_COLUMNS;
   readonly rows = computed(() =>
-    this.orders().map((o) => journalRow(o, this.pricePrecision().get(o.instrument), this.currency())),
+    this.orders().map((o) => journalRow(o, this.pricePrecision().get(o.instrument), this.currency(), this.units().get(o.instrument))),
   );
 
   toggle(): void {

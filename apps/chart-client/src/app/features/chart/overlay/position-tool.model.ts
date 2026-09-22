@@ -1,3 +1,4 @@
+import type { ContractSpec } from '@trade-automation/contracts';
 /**
  * backtest-app-system-design.md §9.1 — the position tool's state and its change events, shared by
  * the primitive, the pointer controller and `core/replay/position-tools.store.ts`.
@@ -38,6 +39,8 @@ export interface PositionToolsView {
   balance: number;
   riskPct: number;
   pricePrecision: number;
+  /** T-054: the panel instrument's venue contract, so a draft's qty label is on the venue step (D12). */
+  contract?: ContractSpec | null;
 }
 
 /** Emitted by the controller; the panel's store applies it. */

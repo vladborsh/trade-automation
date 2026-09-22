@@ -18,6 +18,7 @@
         [retrying]="store.retrying()"
         [notice]="store.notice()"
         [openRisk]="store.positions().openRisk"
+        [marginUtilisation]="store.marginUtilisation()"
         [error]="e.error()"
         (step)="step()"
         (timeframeChange)="setTimeframe($event)"
@@ -57,6 +58,8 @@
           [draft]="a.draft"
           [lastClose]="a.lastClose"
           [pricePrecision]="a.precision"
+          [contract]="a.contract"
+          [account]="store.margin()"
           [balance]="s.balance"
           [riskPct]="store.riskPct()"
           [currency]="s.sessionCurrency"
@@ -73,6 +76,7 @@
           [orders]="store.portfolio.orders()"
           [currency]="s.sessionCurrency"
           [pricePrecision]="store.pricePrecision()"
+          [units]="store.instruments.units()"
         />
         <app-stats-summary
           class="stats"

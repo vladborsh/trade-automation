@@ -2,6 +2,7 @@ import type { Order } from '@trade-automation/contracts';
 import {
   type OrderFlag,
   formatMoney,
+  formatQtyUnit,
   formatPrice,
   formatR,
   formatRAmount,
@@ -34,7 +35,7 @@ const cell = (field: keyof Order, text: string, raw: JournalCell['raw'], title?:
  * backtest-app-system-design.md §7.2 — one order as a journal row. Display only: every figure is a
  * server field, formatted; costs are shown as the server's two columns, never summed.
  */
-export function journalRow(o: Order, pricePrecision: number | undefined, currency: string): JournalRow {
+export function journalRow(o: Order, pricePrecision: number | undefined, currency: string, unit?: string): JournalRow {
   const price = (v: number | null) => formatPrice(v, pricePrecision);
   return {
     id: o.id,
@@ -54,7 +55,7 @@ export function journalRow(o: Order, pricePrecision: number | undefined, currenc
       cell('slCurrent', price(o.slCurrent), o.slCurrent, o.slCurrent === o.slInitial ? undefined : `moved from ${price(o.slInitial)}`),
       cell('exitPrice', price(o.exitPrice), o.exitPrice, o.exitTimeMs === null ? undefined : `closed ${formatUtc(o.exitTimeMs)} UTC`),
       cell('closeReason', o.closeReason ?? '—', o.closeReason),
-      cell('qty', String(o.qty), o.qty),
+      cell('qty', formatQtyUnit(o.qty, unit), o.qty),
       cell('commissionCcy', formatMoney(o.commissionCcy, currency), o.commissionCcy),
       cell('spreadCostCcy', formatMoney(o.spreadCostCcy, currency), o.spreadCostCcy),
       cell('pnlCcy', formatSignedMoney(o.pnlCcy, currency), o.pnlCcy),

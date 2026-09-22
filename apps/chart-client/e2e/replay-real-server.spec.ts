@@ -574,7 +574,7 @@ test('T-045: B → drag the stop → Enter → the order popup → Confirm → t
   await page.keyboard.press('Enter');
   const popup = page.getByTestId('order-popup');
   await expect(popup).toBeVisible();
-  const qtyShown = Number(await popup.getByTestId('order-qty').innerText());
+  const qtyShown = Number((await popup.getByTestId('order-qty').innerText()).replace(/[^\d.]/g, '')); // "0.165 BTC" (T-054)
   expect((await get(page, `/backtest/sessions/${s.id}/orders`)).length).toBe(0); // nothing placed yet
   if (process.env['T045_SHOTS']) await page.screenshot({ path: `${process.env['T045_SHOTS']}/order-popup.png` });
 
@@ -584,8 +584,8 @@ test('T-045: B → drag the stop → Enter → the order popup → Confirm → t
   await showPositions(page);
   const [order] = await get(page, `/backtest/sessions/${s.id}/orders`);
   expect(order).toMatchObject({ side: 'long', type: 'market', status: 'open', slInitial: sl1 });
-  // the popup sizes at the last close; the market fill is half a spread away, so the server's qty differs slightly
-  expect(Math.abs(order.qty - qtyShown) / qtyShown).toBeLessThan(0.01);
+  // D12: both size at the planned entry (the last close) on the venue step — the spread never re-sizes it
+  expect(order.qty).toBe(qtyShown);
   await expect(page.getByTestId('position-1')).toBeVisible();
   if (process.env['T045_SHOTS']) await page.screenshot({ path: `${process.env['T045_SHOTS']}/after-confirm.png` });
 });
@@ -619,3 +619,40 @@ test('T-048: by clicks only — Buy → Place → Confirm places an order; Posit
   }
 });
 
+
+test('T-054: the popup sizes on the venue step with unit and margin; Confirm places that size; below the venue minimum it cannot be confirmed', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  const s = await createSession(page, { name: `rw margin ${Date.now()}`, from, to: from + 3 * 60 * MIN, tf: '5m' });
+  await openWorkspace(page, s.id);
+  const orders = async () => get(page, `/backtest/sessions/${s.id}/orders`) as Promise<Json[]>;
+  const popup = page.getByTestId('order-popup');
+
+  // B → Enter: size in BTC on the venue step, the margin, leverage against the 125× cap
+  await page.keyboard.press('b');
+  await page.keyboard.press('Enter');
+  await expect(popup).toBeVisible();
+  await expect(popup.getByTestId('order-qty')).toHaveText(/^\d+\.\d{3} BTC$/);
+  await expect(popup.getByTestId('order-margin')).toHaveText(/^[\d,]+\.\d{2} USD$/);
+  await expect(popup.getByTestId('order-leverage')).toHaveText(/x of 125x$/);
+  const shown = Number((await popup.getByTestId('order-qty').innerText()).replace(/[^\d.]/g, ''));
+  if (process.env['T054_SHOTS']) await page.screenshot({ path: `${process.env['T054_SHOTS']}/popup-margin.png` });
+  await popup.getByTestId('order-confirm').click();
+  await expect.poll(async () => (await orders()).length, { timeout: 10_000 }).toBe(1);
+  expect((await orders())[0].qty).toBe(shown); // the server sized exactly what the popup showed
+  await expect(page.getByTestId('replay-margin')).toHaveText(/^margin \d+ %$/);
+
+  // a second draft at a risk far too small for the venue minimum: the reason, the risk % needed, no Confirm
+  await page.keyboard.press('s');
+  await page.keyboard.press('Enter');
+  await expect(popup).toBeVisible();
+  await popup.locator('input[name="riskPct"]').fill('0.0001');
+  await popup.locator('input[name="riskPct"]').dispatchEvent('change');
+  await expect(popup.getByTestId('order-problem')).toContainText('Below the venue minimum');
+  await expect(popup.getByTestId('order-problem')).toContainText(/needs a risk of at least [\d.]+ %/);
+  await expect(popup.getByTestId('order-confirm')).toBeDisabled();
+  if (process.env['T054_SHOTS']) await page.screenshot({ path: `${process.env['T054_SHOTS']}/popup-below-minimum.png` });
+  await page.keyboard.press('Enter'); // Enter in the risk field submits the form: refused as well, nothing sent
+  await page.waitForTimeout(500);
+  expect((await orders()).length).toBe(1);
+});
