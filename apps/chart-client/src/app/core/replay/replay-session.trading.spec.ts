@@ -399,3 +399,40 @@ describe('ReplaySessionStore — removing a live order’s tool (BUG-017)', () =
     expect(store.removeRequest()).toBeNull();
   });
 });
+
+describe('ReplaySessionStore — live tools’ right edge and the confirm-time re-check (BUG-018)', () => {
+  const O1 = '00000000-0000-4000-8000-0000000000e1';
+  const row = (status: 'pending' | 'open' | 'closed') => ({ ...pending({ panelId: 'btc', cursorMs: T0 + 5 * M } as PlaceOrderRequest), id: O1, seq: 7, status }) as Order;
+
+  it('a pending order’s tool ends at the newest bar (the cursor’s), so it grows with each step', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([row('pending')]);
+    const { store } = await open(client);
+    const drawn = store.sources().get('btc')!.positionTools!.view().tools.find((t) => t.id === O1)!;
+    expect(drawn.endTime).toBe(T0); // the 5m bar at the cursor (T0 + 5m) opens at T0
+  });
+
+  it('the order closed by itself before the confirm (Play): a hint, and nothing is sent', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([row('open')]);
+    const { store } = await open(client);
+    store.requestRemove(O1);
+    store.portfolio.setOrders([{ ...row('closed'), closeReason: 'stop' }]); // the stop hit meanwhile
+    store.confirmRemove();
+    await settle();
+    expect(client.closeOrder).not.toHaveBeenCalled();
+    expect(store.hint()).toBe('Order #7 is already closed.');
+  });
+
+  it('a pending order that filled before the confirm: asked again, as the position it now is', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([row('pending')]);
+    const { store } = await open(client);
+    store.requestRemove(O1);
+    store.portfolio.setOrders([row('open')]);
+    store.confirmRemove();
+    await settle();
+    expect(client.cancelOrder).not.toHaveBeenCalled();
+    expect(store.removeRequest()).toMatchObject({ action: 'close', question: 'Close position #7 at market?' });
+  });
+});

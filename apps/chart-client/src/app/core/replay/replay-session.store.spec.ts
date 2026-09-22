@@ -270,7 +270,7 @@ describe('ReplaySessionStore (T-021)', () => {
 
     const tools = store.sources().get('btc')!.positionTools!;
     expect(tools.view().tools).toEqual([
-      { id: 'view-o0', orderId: 'o0', side: 'long', mode: 'market', entry: 1.5, sl: 1, tp: 2, kind: 'position', active: false, anchorTime: T0, order: { qty: 20, riskAmount: 10 }, readOnly: true },
+      { id: 'view-o0', orderId: 'o0', side: 'long', mode: 'market', entry: 1.5, sl: 1, tp: 2, kind: 'position', active: false, anchorTime: T0, endTime: T0, /* BUG-018: ends at the viewed cursor's bar */ order: { qty: 20, riskAmount: 10 }, readOnly: true },
     ]);
     const tool = tools.view().tools[0];
     tools.apply({ type: 'update', tool: { ...tool, sl: 0.5 }, final: true });

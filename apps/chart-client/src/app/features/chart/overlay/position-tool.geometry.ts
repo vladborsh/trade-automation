@@ -78,19 +78,26 @@ function liveLabel(
  */
 export function draggableParts(tool: PositionToolState): readonly PositionToolPart[] {
   if (tool.readOnly) return [];
-  return tool.kind === 'draft' ? ['entry', 'sl', 'tp', 'body'] : ['sl', 'tp'];
+  return tool.kind === 'draft' ? ['entry', 'sl', 'tp', 'body', 'end'] : ['sl', 'tp'];
 }
 
 export interface ToolHandle {
-  part: 'entry' | 'sl' | 'tp';
+  part: 'entry' | 'sl' | 'tp' | 'end';
   x: number;
   y: number;
 }
 
 /** Where one tool sits on screen: its left edge, each level's y, and its square handles. */
+/** BUG-018: a new draft spans this many bars of the panel's timeframe until its end handle is dragged. */
+export const DEFAULT_DRAFT_WIDTH_BARS = 20;
+/** BUG-018: a live tool is drawn at least this wide, so a just-placed order's handles and ✕ fit. */
+export const MIN_LIVE_WIDTH_PX = 48;
+
 export interface ToolGeometry {
   toolId: string;
   x: number;
+  /** BUG-018: the painted right end — the tool's own end, clipped to the pane. */
+  xEnd: number;
   yEntry: number;
   ySl: number;
   yTp: number | null;
@@ -117,21 +124,27 @@ export function toolGeometry(
   xStart: number,
   priceToY: (price: number) => number | null,
   paneWidth = Number.POSITIVE_INFINITY,
+  xRight = paneWidth,
 ): ToolGeometry | null {
   const yEntry = priceToY(tool.entry);
   const ySl = priceToY(tool.sl);
   if (yEntry === null || ySl === null) return null;
   const yTp = tool.tp === null ? null : priceToY(tool.tp);
-  // T-050: a tool anchored at the newest bar may be only a few px wide; its handles stay inside the pane
-  const x = Math.min(xStart + HANDLE_OFFSET_PX, paneWidth - HANDLE_OFFSET_PX);
+  // BUG-018: the tool ends at its own right edge (a live one at least MIN_LIVE_WIDTH_PX wide), painted up to the pane's
+  const right = Math.max(xRight, xStart + (tool.kind === 'draft' ? 1 : MIN_LIVE_WIDTH_PX));
+  const xEnd = Math.min(right, paneWidth);
+  // T-050: handles stay inside what is drawn, even on a narrow tool
+  const x = Math.min(xStart + HANDLE_OFFSET_PX, xEnd - HANDLE_OFFSET_PX);
   const handles: ToolHandle[] = [];
   const parts = draggableParts(tool);
   if (parts.includes('entry')) handles.push({ part: 'entry', x, y: yEntry });
   if (parts.includes('sl')) handles.push({ part: 'sl', x, y: ySl });
   if (parts.includes('tp') && yTp !== null) handles.push({ part: 'tp', x, y: yTp });
-  const removable = tool.kind !== 'draft' && !tool.readOnly && Number.isFinite(paneWidth);
-  const remove = removable ? { x: paneWidth - REMOVE_INSET_PX, y: yEntry } : null;
-  return { toolId: tool.id, x: xStart, yEntry, ySl, yTp, handles, remove };
+  // BUG-018: a draft's width handle, on its right edge (only while that edge is on screen)
+  if (parts.includes('end') && Number.isFinite(right) && right <= paneWidth) handles.push({ part: 'end', x: right, y: yEntry });
+  const removable = tool.kind !== 'draft' && !tool.readOnly && Number.isFinite(xEnd);
+  const remove = removable ? { x: xEnd - REMOVE_INSET_PX, y: yEntry } : null;
+  return { toolId: tool.id, x: xStart, xEnd, yEntry, ySl, yTp, handles, remove };
 }
 
 export interface HitTarget {
@@ -161,7 +174,7 @@ export function hitTest(px: number, py: number, geometries: readonly ToolGeometr
         consider({ toolId: g.toolId, part: h.part, kind: 'handle' }, Math.hypot(px - h.x, py - h.y), 0);
       }
     }
-    if (px < g.x - tolerancePx) continue;
+    if (px < g.x - tolerancePx || px > g.xEnd + tolerancePx) continue; // BUG-018: a line is only as long as its tool
     const lines: [PositionToolPart, number | null][] = [
       [kinds.get(g.toolId) === 'draft' ? 'body' : 'entry', g.yEntry],
       ['sl', g.ySl],
@@ -181,6 +194,11 @@ export function hitTest(px: number, py: number, geometries: readonly ToolGeometr
  */
 export function showsZones(tool: Pick<PositionToolState, 'kind'>): boolean {
   return tool.kind === 'draft';
+}
+
+/** BUG-018: a draft's width in whole bars when its right edge is dragged to `x` (at least one bar). */
+export function widthBarsAt(x: number, xStart: number, barSpacing: number): number {
+  return barSpacing > 0 ? Math.max(1, Math.round((x - xStart) / barSpacing)) : DEFAULT_DRAFT_WIDTH_BARS;
 }
 
 export type DragResult = { tool: PositionToolState } | { hint: string };

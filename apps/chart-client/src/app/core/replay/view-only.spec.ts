@@ -33,4 +33,10 @@ describe('orderTool (the viewed order as a read-only position tool)', () => {
     const tool = orderTool({ ...order, type: 'limit', status: 'cancelled', entryPrice: null, limitPrice: 98, entryTimeMs: null, tpCurrent: null }, '1m');
     expect(tool).toMatchObject({ kind: 'pending', mode: 'limit', entry: 98, tp: null, anchorTime: T + 60_000 });
   });
+
+  it('BUG-018: a closed trade ends at its exit bar; one still live at the viewed cursor ends at that bar', () => {
+    expect(orderTool({ ...order, exitTimeMs: T + 3_600_000 }, '5m')?.endTime).toBe(Date.UTC(2026, 8, 16, 11, 0));
+    expect(orderTool({ ...order, exitTimeMs: null }, '5m', T + 600_000)?.endTime).toBe(Date.UTC(2026, 8, 16, 10, 10));
+    expect(orderTool({ ...order, exitTimeMs: null }, '5m')?.endTime).toBeUndefined();
+  });
 });

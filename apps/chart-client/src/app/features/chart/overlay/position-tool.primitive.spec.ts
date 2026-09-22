@@ -1,7 +1,7 @@
 import type { CanvasRenderingTarget2D } from 'fancy-canvas';
 import type { SeriesAttachedParameter, Time } from 'lightweight-charts';
 import type { IChartApi } from 'lightweight-charts';
-import { PositionToolPrimitive, anchorVisible, anchorX } from './position-tool.primitive';
+import { PositionToolPrimitive, anchorVisible, anchorX, toolRightX } from './position-tool.primitive';
 import type { PositionToolState, PositionToolsView } from './position-tool.model';
 
 const RISK = '#ef5350';
@@ -33,7 +33,7 @@ function recordingContext() {
 
 function draw(tool: PositionToolState) {
   const primitive = new PositionToolPrimitive();
-  const chart = { timeScale: () => ({ timeToCoordinate: () => 100, timeToIndex: () => 0, logicalToCoordinate: () => 100, width: () => 900 }) };
+  const chart = { timeScale: () => ({ timeToCoordinate: () => 100, timeToIndex: () => 0, logicalToCoordinate: () => 100, width: () => 900, options: () => ({ barSpacing: 6 }) }) };
   const series = { priceToCoordinate: (p: number) => 1000 - p * 5 };
   primitive.attached({ chart, series, requestUpdate: () => undefined } as unknown as SeriesAttachedParameter<Time>);
   const view: PositionToolsView = { tools: [tool], balance: 10_000, riskPct: 1, pricePrecision: 2 };
@@ -58,7 +58,7 @@ describe('PositionToolPrimitive rendering (T-049)', () => {
     expect(d.zones.map((z) => z.fillStyle)).toEqual([RISK, REWARD]);
     expect(d.lines).toHaveLength(3);
     expect(d.labels).toHaveLength(3);
-    expect(d.handles).toHaveLength(3); // entry, SL, TP
+    expect(d.handles).toHaveLength(4); // entry, SL, TP, and its width handle on the right edge (BUG-018)
   });
 
   it('a pending order: lines, labels and its SL / TP handles — no fill', () => {
@@ -102,6 +102,7 @@ describe('anchorX / anchorVisible (T-050)', () => {
         timeToIndex: () => (indexCoord === null ? null : 7),
         logicalToCoordinate: () => indexCoord,
         width: () => 800,
+        options: () => ({ barSpacing: 6 }),
       }),
     }) as unknown as IChartApi;
 
@@ -128,6 +129,43 @@ describe('anchorX / anchorVisible (T-050)', () => {
     const chart = chartAt(1_200);
     primitive.attached({ chart, series: { priceToCoordinate: (p: number) => p }, requestUpdate: () => undefined } as unknown as SeriesAttachedParameter<Time>);
     primitive.setView({ tools: [tool({})], balance: 10_000, riskPct: 1, pricePrecision: 2 });
+    const { ctx, calls } = recordingContext();
+    const target = { useMediaCoordinateSpace: (cb: (s: unknown) => void) => cb({ context: ctx, mediaSize: { width: 900, height: 600 } }) };
+    primitive.paneViews()[0].renderer()!.draw(target as unknown as CanvasRenderingTarget2D);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('toolRightX and the painted right edge (BUG-018)', () => {
+  const chart = (coordOf: (t: number) => number | null) =>
+    ({ timeScale: () => ({ timeToCoordinate: (t: number) => coordOf(t), timeToIndex: () => null, logicalToCoordinate: () => null, width: () => 900, options: () => ({ barSpacing: 6 }) }) }) as unknown as IChartApi;
+
+  it('a live tool ends at its endTime’s bar; a draft at its width in bars × the bar spacing (20 by default)', () => {
+    const c = chart((t) => (t === 2_000 ? 480 : 100));
+    expect(toolRightX(c, { endTime: 2_000_000 }, 100)).toBe(480);
+    expect(toolRightX(c, {}, 100)).toBe(100 + 20 * 6);
+    expect(toolRightX(c, { widthBars: 5 }, 100)).toBe(130);
+  });
+
+  it('lines and labels end at the tool’s right edge, not the pane’s', () => {
+    const primitive = new PositionToolPrimitive();
+    primitive.attached({ chart: chart(() => 100), series: { priceToCoordinate: (p: number) => 1000 - p * 5 }, requestUpdate: () => undefined } as unknown as SeriesAttachedParameter<Time>);
+    primitive.setView({ tools: [tool({ widthBars: 10 })], balance: 10_000, riskPct: 1, pricePrecision: 2 }); // 100 → 160
+    const xs: number[] = [];
+    const texts: number[] = [];
+    const { ctx } = recordingContext();
+    (ctx as unknown as { lineTo: (x: number) => void }).lineTo = (x: number) => void xs.push(x);
+    (ctx as unknown as { fillText: (s: string, x: number) => void }).fillText = (_s: string, x: number) => void texts.push(x);
+    const target = { useMediaCoordinateSpace: (cb: (s: unknown) => void) => cb({ context: ctx, mediaSize: { width: 900, height: 600 } }) };
+    primitive.paneViews()[0].renderer()!.draw(target as unknown as CanvasRenderingTarget2D);
+    expect(new Set(xs)).toEqual(new Set([160])); // every level ray stops at the tool's end
+    expect(texts.every((x) => x === 156)).toBe(true); // labels inside the box, at its right end
+  });
+
+  it('a tool that ends left of the visible range is not painted', () => {
+    const primitive = new PositionToolPrimitive();
+    primitive.attached({ chart: chart(() => -500), series: { priceToCoordinate: (p: number) => p }, requestUpdate: () => undefined } as unknown as SeriesAttachedParameter<Time>);
+    primitive.setView({ tools: [tool({ widthBars: 10 })], balance: 10_000, riskPct: 1, pricePrecision: 2 }); // −500 → −440
     const { ctx, calls } = recordingContext();
     const target = { useMediaCoordinateSpace: (cb: (s: unknown) => void) => cb({ context: ctx, mediaSize: { width: 900, height: 600 } }) };
     primitive.paneViews()[0].renderer()!.draw(target as unknown as CanvasRenderingTarget2D);

@@ -794,7 +794,7 @@ test('BUG-017: a live tool is removed through its order — Delete on a pending 
   const pendY = y(pend.limitPrice);
   const pendX = await findX(pendY, `remove:entry:${pend.id}`);
   expect(pendX, 'the pending tool shows its ✕').not.toBeNull();
-  await page.mouse.click(pendX! - 40, pendY); // the entry line, left of the ✕: activates it
+  await page.mouse.click(pendX! - 20, pendY); // the entry line, left of the ✕ (a just-placed tool is ~48 px wide, BUG-018): activates it
   await page.mouse.move(box.x + box.width / 2, box.y - 40);
   await page.keyboard.press('Delete');
   await expect(page.getByTestId('remove-confirm-question')).toHaveText(`Cancel order #${pend.seq}?`);

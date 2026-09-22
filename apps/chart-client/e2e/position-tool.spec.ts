@@ -79,7 +79,12 @@ test('position tool: two drafts, handle drags without panning, click to activate
   // limit. BUG-010: the target is 20 px above the long's target line, not a fixed distance — a fixed
   // 40 px once landed the short's entry within 2 px of the long's TP, and the click further down then
   // (correctly) hit whichever line was nearer.
-  const lineX = box.x + box.width - 120;
+  // BUG-018: the drafts end 20 bars after their bar, no longer at the pane's edge — find the short's entry line by its hover
+  let lineX = box.x + box.width - 120;
+  for (let x = box.x + 2; x < box.x + box.width - 2; x += 3) {
+    await page.mouse.move(x, yOf(short0.entry));
+    if ((await container.getAttribute('data-position-tool-hover')) === `line:body:${short0.id}`) { lineX = x + 30; break; } // past the entry handle (12 px in)
+  }
   const dragTo = yOf(long0.tp) - 20;
   await page.mouse.move(lineX, yOf(short0.entry));
   await expect(container).toHaveAttribute('data-position-tool-hover', `line:body:${short0.id}`);
@@ -345,4 +350,88 @@ test('T-063: B at the newest bar gives a draft at least 150 px wide, without any
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/t063-draft-at-newest-bar.png` });
   // and nothing panned
   expect({ from: await container.getAttribute('data-visible-from'), to: await container.getAttribute('data-visible-to') }).toEqual(visible);
+});
+
+test('BUG-018: a tool has its own right edge — 20 bars for a new draft — and it pans with its bars instead of staying glued to the pane edge', async ({ page }) => {
+  const created = await page.context().request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name: `e2e tool right edge ${Date.now()}`,
+      layout: { id: 're-e2e', name: 'RE e2e', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+      timeframe: '5m',
+      periodFromMs: FRIDAY_2140,
+      periodToMs: FRIDAY_2140 + 3 * 86_400_000,
+      initialBalance: 10_000,
+      defaultRiskPct: 1,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+    },
+  });
+  const session = (await created.json()) as Session;
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  const body = page.locator('.chart-panel[data-panel-id="btc"] .panel-body');
+  const container = body.locator('.chart-container');
+  const box = (await container.boundingBox())!;
+  const yOf = async () => {
+    const at = async (y: number) => {
+      await page.mouse.move(box.x + box.width * 0.2, y);
+      await expect(body).toHaveAttribute('data-pointer-price', /\d/);
+      return Number(await body.getAttribute('data-pointer-price'));
+    };
+    const y1 = box.y + box.height * 0.25, y2 = box.y + box.height * 0.75;
+    const p1 = await at(y1), p2 = await at(y2);
+    return (price: number) => y1 + ((price - p1) * (y2 - y1)) / (p2 - p1);
+  };
+  /** The x of the draft's width handle (its right edge), found by scanning its entry level. */
+  const edgeX = async (id: string, entry: number) => {
+    const y = (await yOf())(entry);
+    for (let x = box.x + 2; x < box.x + box.width - 2; x += 2) {
+      await page.mouse.move(x, y);
+      if ((await container.getAttribute('data-position-tool-hover')) === `handle:end:${id}`) return x;
+    }
+    return null;
+  };
+  const timeAt = async (x: number) => {
+    await page.mouse.move(x, box.y + box.height * 0.06);
+    await expect(container).toHaveAttribute('data-crosshair-time', /\d/);
+    return Number(await container.getAttribute('data-crosshair-time'));
+  };
+  const pan = async (dx: number) => {
+    const y = box.y + box.height * 0.06;
+    await page.mouse.move(box.x + box.width * 0.4, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.4 + dx, y, { steps: 6 });
+    await page.mouse.up();
+  };
+
+  // a draft over a bar a third of the way in: 20 bars wide, its right edge well inside the pane
+  await page.mouse.move(box.x + box.width * 0.33, box.y + box.height * 0.5);
+  await page.keyboard.press('b');
+  await expect.poll(async () => (await tools(page)).length).toBe(1);
+  const [draft] = await tools(page);
+  const e0 = await edgeX(draft.id, draft.entry);
+  expect(e0, 'the draft has a right edge of its own').not.toBeNull();
+  expect(e0!).toBeLessThan(box.x + box.width * 0.75); // not glued to the pane's edge
+  const edgeBar = await timeAt(e0!);
+  if (process.env['BUG018_SHOTS']) await page.screenshot({ path: `${process.env['BUG018_SHOTS']}/after-1-start.png` });
+
+  await pan(-150); // into the future: the candles move left — and the right edge with them, on its bar
+  const e1 = await edgeX(draft.id, draft.entry);
+  expect(e1!).toBeLessThan(e0! - 20);
+  expect(await timeAt(e1!)).toBe(edgeBar);
+  if (process.env['BUG018_SHOTS']) await page.screenshot({ path: `${process.env['BUG018_SHOTS']}/after-2-panned-forward.png` });
+
+  await pan(250); // back in time: both move right, the edge still on its bar
+  const e2 = await edgeX(draft.id, draft.entry);
+  expect(e2!).toBeGreaterThan(e1! + 20);
+  expect(await timeAt(e2!)).toBe(edgeBar);
+  if (process.env['BUG018_SHOTS']) await page.screenshot({ path: `${process.env['BUG018_SHOTS']}/after-3-panned-back.png` });
+
+  // the width handle resizes it: dragged 60 px right, the edge lands later
+  const entryY = (await yOf())(draft.entry); // measured before the drag: measuring moves the mouse
+  await page.mouse.move(e2!, entryY);
+  await page.mouse.down();
+  await page.mouse.move(e2! + 60, entryY, { steps: 4 });
+  await page.mouse.up();
+  const e3 = await edgeX(draft.id, draft.entry);
+  expect(e3!).toBeGreaterThan(e2! + 40);
 });

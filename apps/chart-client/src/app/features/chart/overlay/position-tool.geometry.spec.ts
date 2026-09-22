@@ -11,6 +11,9 @@ import {
   toolGeometry,
   showsZones,
   REMOVE_INSET_PX,
+  DEFAULT_DRAFT_WIDTH_BARS,
+  MIN_LIVE_WIDTH_PX,
+  widthBarsAt,
 } from './position-tool.geometry';
 
 const draft = (over: Partial<PositionToolState> = {}): PositionToolState => ({
@@ -61,7 +64,7 @@ describe('position-tool geometry (design §9.1)', () => {
   });
 
   it('draggable parts: a draft all of them, a live order its stop and target (T-033), a read-only drawing none', () => {
-    expect(draggableParts(draft())).toEqual(['entry', 'sl', 'tp', 'body']);
+    expect(draggableParts(draft())).toEqual(['entry', 'sl', 'tp', 'body', 'end']); // + its width handle (BUG-018)
     expect(draggableParts(draft({ kind: 'position' }))).toEqual(['sl', 'tp']);
     expect(draggableParts(draft({ kind: 'pending' }))).toEqual(['sl', 'tp']);
     expect(draggableParts(draft({ kind: 'position', readOnly: true }))).toEqual([]);
@@ -179,7 +182,8 @@ describe('toolGeometry handles near the right edge (T-050)', () => {
     const t = { id: 't', side: 'long', mode: 'market', entry: 100, sl: 99, tp: 102, kind: 'draft', active: true, anchorTime: 0 } as const;
     const g = toolGeometry({ ...t }, 795, (p) => 1000 - p, 800)!;
     expect(g.x).toBe(795); // the lines still start at the anchor bar
-    expect(g.handles.every((h) => h.x === 800 - HANDLE_OFFSET_PX)).toBe(true);
+    expect(g.handles.filter((h) => h.part !== 'end').every((h) => h.x === 800 - HANDLE_OFFSET_PX)).toBe(true);
+    expect(g.handles.find((h) => h.part === 'end')?.x).toBe(800); // BUG-018: its width handle, on its right edge
     expect(toolGeometry({ ...t }, 300, (p) => 1000 - p, 800)!.handles[0].x).toBe(300 + HANDLE_OFFSET_PX); // room: unchanged
   });
 });
@@ -200,5 +204,41 @@ describe('the ✕ on a live order’s tool (BUG-017)', () => {
     const g = toolGeometry({ ...live }, 100, toY, 800)!;
     expect(hitTest(790, 500, [g], new Map([['o1', 'position']]))).toEqual({ toolId: 'o1', part: 'entry', kind: 'remove' });
     expect(hitTest(600, 500, [g], new Map([['o1', 'position']]))).toEqual({ toolId: 'o1', part: 'entry', kind: 'line' });
+  });
+});
+
+describe('the tool’s right edge (BUG-018)', () => {
+  const base = { id: 't', side: 'long', mode: 'market', entry: 100, sl: 99, tp: 102, active: true, anchorTime: 0 } as const;
+  const toY = (p: number) => 1000 - p * 5;
+
+  it('a tool ends at its own right edge, clipped to the pane — no longer at the pane’s edge', () => {
+    expect(toolGeometry({ ...base, kind: 'draft' }, 100, toY, 800, 220)!.xEnd).toBe(220);
+    expect(toolGeometry({ ...base, kind: 'draft' }, 700, toY, 800, 900)!.xEnd).toBe(800); // runs past the pane: painted to it
+  });
+
+  it('a live tool is at least MIN_LIVE_WIDTH_PX wide (a just-placed order ends at its own bar)', () => {
+    expect(toolGeometry({ ...base, kind: 'pending', orderId: 't' }, 100, toY, 800, 100)!.xEnd).toBe(100 + MIN_LIVE_WIDTH_PX);
+  });
+
+  it('its handles, its ✕ and its lines stay within it', () => {
+    const g = toolGeometry({ ...base, kind: 'position', orderId: 't' }, 100, toY, 800, 300)!;
+    expect(g.remove).toEqual({ x: 300 - REMOVE_INSET_PX, y: 500 });
+    const kinds = new Map([['t', 'position' as const]]);
+    expect(hitTest(250, 500, [g], kinds)?.kind).toBe('line');
+    expect(hitTest(400, 500, [g], kinds)).toBeNull(); // right of the tool: nothing there any more
+  });
+
+  it('a draft’s width handle sits on its right edge, while that edge is on screen', () => {
+    const on = toolGeometry({ ...base, kind: 'draft' }, 100, toY, 800, 220)!;
+    expect(on.handles.find((h) => h.part === 'end')).toEqual({ part: 'end', x: 220, y: 500 });
+    expect(toolGeometry({ ...base, kind: 'draft' }, 700, toY, 800, 900)!.handles.some((h) => h.part === 'end')).toBe(false);
+    expect(toolGeometry({ ...base, kind: 'pending', orderId: 't' }, 100, toY, 800, 220)!.handles.some((h) => h.part === 'end')).toBe(false);
+  });
+
+  it('widthBarsAt: whole bars from the left edge, never under one', () => {
+    expect(widthBarsAt(220, 100, 6)).toBe(20);
+    expect(widthBarsAt(104, 100, 6)).toBe(1);
+    expect(widthBarsAt(40, 100, 6)).toBe(1);
+    expect(widthBarsAt(300, 100, 0)).toBe(DEFAULT_DRAFT_WIDTH_BARS);
   });
 });

@@ -22,8 +22,10 @@ export function viewAtFor(order: Pick<Order, 'entryTimeMs' | 'placedAtMs'>): num
  * the primitive would fall back to the left edge). Read-only: never active.
  */
 export function orderTool(
-  order: Pick<Order, 'id' | 'panelId' | 'side' | 'type' | 'status' | 'entryPrice' | 'limitPrice' | 'slCurrent' | 'tpCurrent' | 'entryTimeMs' | 'placedAtMs' | 'qty' | 'riskAmountCcy'>,
+  order: Pick<Order, 'id' | 'panelId' | 'side' | 'type' | 'status' | 'entryPrice' | 'limitPrice' | 'slCurrent' | 'tpCurrent' | 'entryTimeMs' | 'placedAtMs' | 'qty' | 'riskAmountCcy'> &
+    Partial<Pick<Order, 'exitTimeMs'>>,
   tf: Timeframe,
+  viewAt?: number,
 ): PositionToolState | null {
   const entry = order.entryPrice ?? order.limitPrice;
   if (entry === null) return null;
@@ -38,6 +40,8 @@ export function orderTool(
     kind: order.entryPrice === null ? 'pending' : 'position',
     active: false,
     anchorTime: bucketStart(order.entryTimeMs ?? order.placedAtMs, tf),
+    // BUG-018: a closed trade spans fill / placement → its exit bar; one still live at the viewed cursor ends there
+    ...(order.exitTimeMs != null ? { endTime: bucketStart(order.exitTimeMs, tf) } : viewAt !== undefined ? { endTime: bucketStart(viewAt - 1, tf) } : {}),
     order: { qty: order.qty, riskAmount: order.riskAmountCcy }, // labelled with its own qty and R (T-023)
     readOnly: true, // T-033: live tools have stop/target handles; a viewed one never does
   };

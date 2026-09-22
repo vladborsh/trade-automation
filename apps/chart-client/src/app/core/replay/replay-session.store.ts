@@ -214,8 +214,14 @@ export class ReplaySessionStore implements OnDestroy {
   confirmRemove(): void {
     const removal = this.removeRequest();
     this.removeRequest.set(null);
-    if (removal?.action === 'cancel') this.cancelOrder(removal.orderId);
-    else if (removal?.action === 'close') this.closeOrder(removal.orderId);
+    if (!removal) return;
+    // it may have filled or closed by itself since the confirm opened (Play, BUG-017 review): ask again for what it is now
+    const now = this.portfolio.orders().find((o) => o.id === removal.orderId);
+    const current = now ? orderRemoval(now) : null;
+    if (!current) return this.showHint(`Order #${removal.seq} is already ${now?.status ?? 'gone'}.`);
+    if (current.action !== removal.action) return this.removeRequest.set(current);
+    if (current.action === 'cancel') this.cancelOrder(current.orderId);
+    else this.closeOrder(current.orderId);
   }
 
   dismissRemove(): void {
@@ -244,6 +250,7 @@ export class ReplaySessionStore implements OnDestroy {
 
   /** The panel's pending and open orders as drawings (T-023): a placed draft lives on as these. */
   private orderTools(panelId: string, activeOrderId: string | null): PositionToolState[] {
+    const newestBar = this.newestBarTime(panelId);
     return this.portfolio
       .orders()
       .filter((o) => o.panelId === panelId && (o.status === 'pending' || o.status === 'open'))
@@ -258,8 +265,16 @@ export class ReplaySessionStore implements OnDestroy {
         active: o.id === activeOrderId,
         // a position from the bar of its fill; a pending order from the last bar at its placement
         anchorTime: o.status === 'open' && o.entryTimeMs !== null ? o.entryTimeMs : o.placedAtMs - 1,
+        // BUG-018: it ends at the cursor's bar — the tool spans placement / fill → now, growing each step
+        ...(newestBar === null ? {} : { endTime: newestBar }),
         order: { qty: o.qty, riskAmount: o.riskAmountCcy },
       }));
+  }
+
+  /** The open time of the panel's newest bar (the one forming at, or closing at, the cursor). */
+  private newestBarTime(panelId: string): number | null {
+    const s = this.engine()?.seriesFor(panelId)();
+    return (s ? (s.forming ?? s.closed.at(-1))?.openTime : undefined) ?? null;
   }
 
   private precisionOf(panelId: string): number {
@@ -279,6 +294,7 @@ export class ReplaySessionStore implements OnDestroy {
       tools: [...store.tools(), ...this.orderTools(panelId, store.activeOrderId())].map((t) => ({
         ...t,
         anchorTime: bucketStart(t.anchorTime, this.engine()?.timeframe() ?? '1m'),
+        ...(t.endTime === undefined ? {} : { endTime: bucketStart(t.endTime, this.engine()?.timeframe() ?? '1m') }),
       })),
       balance: this.session()?.balance ?? 0,
       riskPct: this.riskPct(),
@@ -329,7 +345,7 @@ export class ReplaySessionStore implements OnDestroy {
    * never editable: changes and the pointer are ignored, so a drag snaps back.
    */
   private viewedBinding(panelId: string, order: Parameters<typeof orderTool>[0] | undefined): PanelPositionTools {
-    const tool = order && order.panelId === panelId ? orderTool(order, this.engine()?.timeframe() ?? '5m') : null;
+    const tool = order && order.panelId === panelId ? orderTool(order, this.engine()?.timeframe() ?? '5m', this.view()?.viewAt) : null;
     const view = computed(() => ({
       tools: tool ? [tool] : [],
       balance: this.session()?.balance ?? 0,

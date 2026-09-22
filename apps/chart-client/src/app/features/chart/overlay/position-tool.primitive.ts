@@ -11,8 +11,8 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import { REMOVE_HALF_PX, labelFor, showsZones, toolGeometry } from './position-tool.geometry';
-import type { PositionToolsView } from './position-tool.model';
+import { DEFAULT_DRAFT_WIDTH_BARS, REMOVE_HALF_PX, labelFor, showsZones, toolGeometry } from './position-tool.geometry';
+import type { PositionToolState, PositionToolsView } from './position-tool.model';
 
 const RISK = '#ef5350';
 const REWARD = '#26a69a';
@@ -36,6 +36,16 @@ export function anchorX(chart: IChartApi, anchorTimeMs: number): number | null {
   if (x !== null) return x;
   const index = timeScale.timeToIndex(time, true);
   return index === null ? null : timeScale.logicalToCoordinate(index as unknown as Logical);
+}
+
+/**
+ * BUG-018: the x of a tool's right edge — a live tool's `endTime` (the cursor's bar, or a closed
+ * trade's exit bar), else a draft's width in bars at the chart's current bar spacing. It moves with
+ * the candles like the left edge, so the tool no longer runs to the pane's edge.
+ */
+export function toolRightX(chart: IChartApi, tool: Pick<PositionToolState, 'endTime' | 'widthBars'>, xStart: number): number {
+  if (tool.endTime !== undefined) return anchorX(chart, tool.endTime) ?? xStart;
+  return xStart + (tool.widthBars ?? DEFAULT_DRAFT_WIDTH_BARS) * chart.timeScale().options().barSpacing;
 }
 
 /** True when a tool anchored at `x` starts inside a pane `width` wide or left of it (visible). */
@@ -124,9 +134,9 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
       for (const tool of tools) {
         const x = anchorX(chart, tool.anchorTime);
         if (!anchorVisible(x, mediaSize.width)) continue; // it starts right of the visible range (T-050)
-        const g = toolGeometry(tool, x, priceToY, mediaSize.width);
-        if (!g) continue;
-        const width = mediaSize.width - g.x;
+        const g = toolGeometry(tool, x, priceToY, mediaSize.width, toolRightX(chart, tool, x));
+        if (!g || g.xEnd < 0) continue; // it ends left of the visible range (BUG-018)
+        const width = g.xEnd - g.x;
         const alpha = tool.active ? 0.28 : 0.12;
         const band = (y: number, color: string) => {
           context.save();
@@ -148,13 +158,13 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           context.setLineDash(tool.kind === 'draft' ? [4, 3] : []);
           context.beginPath();
           context.moveTo(g.x, y);
-          context.lineTo(mediaSize.width, y);
+          context.lineTo(g.xEnd, y); // BUG-018: to the tool's own right edge
           context.stroke();
           context.setLineDash([]);
           context.fillStyle = color;
           context.font = '10px ui-monospace, monospace';
           context.textAlign = 'right';
-          context.fillText(label, mediaSize.width - 4 - labelShift, y - 4);
+          context.fillText(label, g.xEnd - 4 - labelShift, y - 4); // inside the box, at its right end
           context.restore();
         };
         level(g.yEntry, tool.active ? ENTRY : MUTED, labelFor(tool, 'entry', view), g.remove ? REMOVE_LABEL_SHIFT_PX : 0);
@@ -178,7 +188,7 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
         for (const h of g.handles) {
           context.save();
           context.fillStyle = '#0d1117';
-          context.strokeStyle = h.part === 'sl' ? RISK : h.part === 'tp' ? REWARD : ENTRY;
+          context.strokeStyle = h.part === 'sl' ? RISK : h.part === 'tp' ? REWARD : h.part === 'end' ? MUTED : ENTRY;
           context.lineWidth = tool.active ? 2 : 1;
           context.fillRect(h.x - HANDLE_SIZE / 2, h.y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
           context.strokeRect(h.x - HANDLE_SIZE / 2, h.y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);

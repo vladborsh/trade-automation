@@ -14,7 +14,7 @@ function setup(opts: { tools?: PositionToolState[]; enabled?: boolean; lastClose
   const chart = {
     options: vi.fn(() => saved),
     applyOptions: vi.fn(),
-    timeScale: () => ({ timeToCoordinate: () => 40, width: () => 800 }),
+    timeScale: () => ({ timeToCoordinate: () => 40, width: () => 800, options: () => ({ barSpacing: 6 }) }),
   };
   const series = {
     priceToCoordinate: (p: number) => 500 - (p - 100) * 10,
@@ -128,14 +128,14 @@ describe('PositionToolController (design §9.1)', () => {
     fire('pointerup', HX, 496.1);
 
     const body = setup();
-    body.fire('pointerdown', 300, 500); // the entry line, away from the handles: whole tool
-    body.fire('pointermove', 300, 510); // −1.0
+    body.fire('pointerdown', 120, 500); // the entry line, away from the handles: whole tool
+    body.fire('pointermove', 120, 510); // −1.0
     expect(body.changes.at(-1)).toEqual({ type: 'update', tool: tool({ entry: 99, sl: 98.5, tp: 100 }), final: false });
   });
 
   it("a live order's entry line only activates it (no drag); another pointer's moves are ignored", () => {
     const { controller, chart, changes, fire } = setup({ tools: [tool({ kind: 'position' })] });
-    fire('pointerdown', 300, 500);
+    fire('pointerdown', 120, 500);
     expect(changes).toEqual([{ type: 'activate', id: 't1' }]);
     expect(controller.dragging).toBe(false);
     expect(chart.applyOptions).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe('PositionToolController (design §9.1)', () => {
     const { el, fire, changes } = setup();
     fire('pointermove', HX, 505);
     expect([el.style.cursor, el.dataset['positionToolHover']]).toEqual(['ns-resize', 'handle:sl:t1']);
-    fire('pointermove', 300, 500);
+    fire('pointermove', 120, 500);
     expect([el.style.cursor, el.dataset['positionToolHover']]).toEqual(['move', 'line:body:t1']);
     fire('pointermove', 300, 300);
     expect([el.style.cursor, el.dataset['positionToolHover']]).toEqual(['', undefined]);
@@ -159,14 +159,14 @@ describe('PositionToolController (design §9.1)', () => {
 
   it('T-050: a tool is hit at its own anchor x — never clamped away from the right edge — and not at all once it starts off-screen right', () => {
     const edge = setup();
-    (edge.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 700, width: () => 800 });
+    (edge.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 700, width: () => 800, options: () => ({ barSpacing: 6 }) });
     edge.fire('pointerdown', 600 + HANDLE_OFFSET_PX, 505); // where the old 200 px clamp put it: nothing there now
     expect(edge.changes).toEqual([]);
     edge.fire('pointerdown', 700 + HANDLE_OFFSET_PX, 505); // at its anchor
     expect(edge.changes).toEqual([{ type: 'activate', id: 't1' }]);
 
     const gone = setup();
-    (gone.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 850, width: () => 800 });
+    (gone.chart as unknown as { timeScale: () => unknown }).timeScale = () => ({ timeToCoordinate: () => 850, width: () => 800, options: () => ({ barSpacing: 6 }) });
     gone.fire('pointerdown', 780, 505); // panned back in time: the tool starts right of the pane
     expect(gone.changes).toEqual([]);
   });
@@ -174,11 +174,22 @@ describe('PositionToolController (design §9.1)', () => {
   it('BUG-017: a click on a live order’s ✕ activates it and asks for its removal; the ✕ shows a pointer', () => {
     const live = { ...tool(), kind: 'position' as const, orderId: 't1', order: { qty: 1, riskAmount: 1 } };
     const { changes, fire, el } = setup({ tools: [live] });
-    fire('pointermove', 790, 500); // the ✕: 10 px left of the 800 px pane's edge, on the entry line (100 → y 500)
+    fire('pointermove', 150, 500); // the ✕: 10 px left of the tool's right end (40 + 20 bars × 6 px = 160), on the entry line (100 → y 500)
     expect(el.style.cursor).toBe('pointer');
     expect(el.dataset['positionToolHover']).toBe('remove:entry:t1');
-    fire('pointerdown', 790, 500);
+    fire('pointerdown', 150, 500);
     expect(changes).toEqual([{ type: 'activate', id: 't1' }, { type: 'remove', id: 't1' }]);
+  });
+
+  it('BUG-018: a draft’s right edge drags its width in whole bars (visual only); the edge shows a resize cursor', () => {
+    const { changes, fire, el } = setup(); // the draft: 40 → 40 + 20 bars × 6 px = 160
+    fire('pointermove', 160, 500);
+    expect([el.style.cursor, el.dataset['positionToolHover']]).toEqual(['ew-resize', 'handle:end:t1']);
+    fire('pointerdown', 160, 500);
+    fire('pointermove', 100, 500); // 60 px from the left edge: 10 bars
+    expect(changes.at(-1)).toEqual({ type: 'update', tool: { ...tool(), widthBars: 10 }, final: false });
+    fire('pointerup', 100, 500);
+    expect(changes.at(-1)).toEqual({ type: 'update', tool: { ...tool(), widthBars: 10 }, final: true });
   });
 
   it('detach removes every listener', () => {

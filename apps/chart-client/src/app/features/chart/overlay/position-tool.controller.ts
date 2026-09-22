@@ -1,7 +1,7 @@
 import type { ChartOptions, DeepPartial, IChartApi, ISeriesApi, SeriesType } from 'lightweight-charts';
-import { applyDrag, draggableParts, hitTest, toolGeometry, type HitTarget } from './position-tool.geometry';
+import { applyDrag, draggableParts, hitTest, toolGeometry, widthBarsAt, type HitTarget } from './position-tool.geometry';
 import type { PositionToolChange, PositionToolState, PositionToolsView } from './position-tool.model';
-import { anchorVisible, anchorX } from './position-tool.primitive';
+import { anchorVisible, anchorX, toolRightX } from './position-tool.primitive';
 
 /** What the controller reads from its chart, at call time. */
 export interface PositionToolHost {
@@ -88,7 +88,7 @@ export class PositionToolController {
     const geometries = view.tools
       .map((t) => {
         const x = anchorX(chart, t.anchorTime);
-        return anchorVisible(x, width) ? toolGeometry(t, x, priceToY, width) : null; // off-screen right: not hittable
+        return anchorVisible(x, width) ? toolGeometry(t, x, priceToY, width, toolRightX(chart, t, x)) : null; // off-screen right: not hittable
       })
       .filter((g): g is NonNullable<typeof g> => g !== null);
     const target = hitTest(x, y, geometries, new Map(view.tools.map((t) => [t.id, t.kind])), HIT_TOLERANCE_PX);
@@ -130,7 +130,8 @@ export class PositionToolController {
     const view = this.host.view();
     if (e.pointerId !== drag.pointerId || !series || !view) return;
     e.stopPropagation();
-    const { y } = this.local(e);
+    const { x, y } = this.local(e);
+    if (drag.target.part === 'end') return this.resize(drag, x); // BUG-018: a draft's right edge
     const price = series.coordinateToPrice(y);
     const lastClose = this.host.lastClose();
     if (price === null || lastClose === null) return;
@@ -153,6 +154,16 @@ export class PositionToolController {
     this.host.emit({ type: 'update', tool: result.tool, final: false });
   }
 
+  /** BUG-018: the draft's width follows the pointer, in whole bars (visual only, never sent). */
+  private resize(drag: Drag, x: number): void {
+    const chart = this.host.chart();
+    const start = chart ? anchorX(chart, drag.original.anchorTime) : null;
+    if (!chart || start === null) return;
+    const tool = { ...drag.original, widthBars: widthBarsAt(x, start, chart.timeScale().options().barSpacing) };
+    drag.latest = tool;
+    this.host.emit({ type: 'update', tool, final: false });
+  }
+
   private pointerEnd(e: PointerEvent): void {
     const drag = this.drag;
     if (!drag || e.pointerId !== drag.pointerId) return;
@@ -171,7 +182,9 @@ export class PositionToolController {
     const state = grabbable ? `${grabbable.kind}:${grabbable.part}:${grabbable.toolId}` : null;
     if (state === this.hovered) return;
     this.hovered = state;
-    this.el.style.cursor = grabbable ? (grabbable.kind === 'remove' ? 'pointer' : grabbable.part === 'body' ? 'move' : 'ns-resize') : '';
+    this.el.style.cursor = grabbable
+      ? grabbable.kind === 'remove' ? 'pointer' : grabbable.part === 'body' ? 'move' : grabbable.part === 'end' ? 'ew-resize' : 'ns-resize'
+      : '';
     if (state) this.el.dataset['positionToolHover'] = state;
     else delete this.el.dataset['positionToolHover'];
   }
