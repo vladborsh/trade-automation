@@ -95,3 +95,13 @@ export function isNearOldestLoaded(
   const thresholdMs = TIMEFRAME_MS[timeframe] * barMultiplier;
   return visibleFromSec * 1000 - oldestMs <= thresholdMs;
 }
+
+// How close (in bars' worth of calendar time) the visible range's `from` must get to the
+// panel's own oldest loaded bar before `loadOlder()` is requested. A time-based proximity
+// check rather than an absolute bar-index one: see the "loadOlder() pagination trigger
+// unreachable at real-data buffer depth" follow-up in
+// architecture/scroll-back-freeze-diagnosis.md — an index threshold assumes the visible
+// viewport can always reach it via zoom or pan, which lightweight-charts' own
+// `minBarSpacing` zoom floor breaks once a panel's loaded buffer (HISTORY_LIMIT) exceeds
+// roughly panelWidthPx / 0.5 bars, as it now routinely does against real backfilled data.
+export const NEAR_START_BAR_MULTIPLIER = 5;

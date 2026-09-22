@@ -1,5 +1,5 @@
 import { TIMEFRAME_MS } from '@trade-automation/contracts';
-import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart.component';
+import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart-time';
 
 // architecture/scroll-back-freeze-diagnosis.md's "loadOlder() pagination trigger unreachable
 // at real-data buffer depth" follow-up: the old NEAR_START_LOGICAL_INDEX check compared an

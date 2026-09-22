@@ -46,20 +46,8 @@ import { ChartCrosshair } from './chart-crosshair';
 import { ChartRangeSync } from './chart-range-sync';
 import { ChartSyncService } from './chart-sync.service';
 import { ResizeSettleTracker, observeResize } from './resize-settle';
-import { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical } from './chart-time';
+import { NEAR_START_BAR_MULTIPLIER, isNearOldestLoaded, logicalToTimeSec } from './chart-time';
 
-// Pure logical<->time helpers live in chart-time.ts; re-exported for existing importers.
-export { isNearOldestLoaded, logicalToTimeSec, nearestBarIndexByTime, timeSecToLogical };
-
-// How close (in bars' worth of calendar time) the visible range's `from` must get to the
-// panel's own oldest loaded bar before `loadOlder()` is requested. A time-based proximity
-// check rather than an absolute bar-index one: see the "loadOlder() pagination trigger
-// unreachable at real-data buffer depth" follow-up in
-// architecture/scroll-back-freeze-diagnosis.md — an index threshold assumes the visible
-// viewport can always reach it via zoom or pan, which lightweight-charts' own
-// `minBarSpacing` zoom floor breaks once a panel's loaded buffer (HISTORY_LIMIT) exceeds
-// roughly panelWidthPx / 0.5 bars, as it now routinely does against real backfilled data.
-const NEAR_START_BAR_MULTIPLIER = 5;
 
 /**
  * Owns the lightweight-charts instance (§5.2, extended by §6.6). Pure
