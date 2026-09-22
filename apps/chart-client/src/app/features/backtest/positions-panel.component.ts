@@ -3,7 +3,7 @@ import { formatMoney, formatPrice, formatSignedMoney } from './journal-format';
 import type { PositionRow } from './positions.view';
 
 /**
- * T-023 — pending and open orders: side, entry (fill or limit), stop, target, size, floating PnL
+ * T-023 — pending and open orders: instrument (T-046), side, entry (fill or limit), stop, target, size, floating PnL
  * (open only, marked at the last close adjusted for spread) and risk; cancel for pending,
  * close-at-market for open. The actions go through the queue (the workspace wires them).
  */

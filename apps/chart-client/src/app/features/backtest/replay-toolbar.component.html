@@ -53,6 +53,8 @@
   @if (error(); as message) {
     <span class="error" role="alert">{{ message }}</span>
   }
+  <!-- the workspace's own controls on the right (T-046: the positions dropdown) -->
+  <ng-content select="[toolbarEnd]" />
   <span class="open-risk" data-testid="replay-open-risk" title="Open risk: what the open positions' current stops would lose">risk {{ openRiskText() }}</span>
   <span class="balance" data-testid="replay-balance" title="Balance">{{ balanceText() }}</span>
 </header>

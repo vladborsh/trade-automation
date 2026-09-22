@@ -31,8 +31,10 @@ th {
   font-weight: 500;
 }
 th:first-child,
+th:nth-child(2),
 td:first-child,
-td:nth-child(2) {
+td:nth-child(2),
+td:nth-child(3) {
   text-align: left;
 }
 .up {

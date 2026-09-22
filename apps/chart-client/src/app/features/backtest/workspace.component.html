@@ -21,7 +21,19 @@
         [error]="e.error()"
         (step)="step()"
         (timeframeChange)="setTimeframe($event)"
-      />
+      >
+        @if (!e.viewOnly) {
+          <!-- T-046: open and pending orders behind a toolbar button; cancel / close are mutations: none while viewing -->
+          <app-positions-dropdown
+            toolbarEnd
+            [rows]="store.positions().rows"
+            [currency]="s.sessionCurrency"
+            [pricePrecision]="store.pricePrecision()"
+            (cancel)="store.cancelOrder($event)"
+            (close)="store.closeOrder($event)"
+          />
+        }
+      </app-replay-toolbar>
       @if (store.hint(); as hint) {
         <p class="hint" role="status">{{ hint }}</p>
       }
@@ -33,19 +45,6 @@
         <div class="grid">
           <app-panel-grid [panels]="panels()" [sources]="store.sources()" [timeframe]="e.timeframe()" />
         </div>
-        @if (!e.viewOnly) {
-          <!-- placing, cancelling and closing are mutations too: none while viewing the past -->
-          <aside class="side">
-            <app-positions-panel
-              class="positions"
-              [rows]="store.positions().rows"
-              [currency]="s.sessionCurrency"
-              [pricePrecision]="store.pricePrecision()"
-              (cancel)="store.cancelOrder($event)"
-              (close)="store.closeOrder($event)"
-            />
-          </aside>
-        }
       </div>
       @if (popupDraft(); as a) {
         <!-- T-045: the order popup, only at the submit step (Enter on an active draft) -->

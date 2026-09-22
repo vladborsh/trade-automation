@@ -76,6 +76,12 @@ async function tape(page: Page, s: Json, fromMs = s.periodFromMs - MIN): Promise
   }
 }
 
+/** T-046: the positions list is a toolbar dropdown; opens it unless it is open already. */
+async function showPositions(page: Page): Promise<void> {
+  if ((await page.getByTestId('positions-dropdown').count()) === 0) await page.getByTestId('positions-toggle').click();
+  await expect(page.getByTestId('positions-dropdown')).toBeVisible();
+}
+
 /** T-045: B/S draws a draft (never the popup); Enter opens the order popup — the submit step; Enter confirms. */
 async function placeFromKeyboard(page: Page, key: 'b' | 's'): Promise<void> {
   await page.keyboard.press(key);
@@ -169,13 +175,16 @@ test('journey: keyboard orders, a manual close, the period end; every number equ
 
   await step(1); await settle(from + 5 * MIN);
   await placeFromKeyboard(page, 'b');
+  await showPositions(page);
   await expect(page.getByTestId('position-1')).toBeVisible();
   await step(3); await settle(from + 20 * MIN);
   await placeFromKeyboard(page, 's');
+  await showPositions(page);
   await expect(page.locator('[data-testid^="position-"]').filter({ hasText: 'short' })).toBeVisible();
   await step(2); await settle(from + 30 * MIN);
 
-  // one open position is closed by hand from the positions panel
+  // one open position is closed by hand from the positions dropdown
+  await showPositions(page);
   const closeBtn = page.getByRole('button', { name: 'Close' }).first();
   await expect(closeBtn, 'a position must still be open at 10:30 for the manual-close leg of this window').toBeVisible();
   await closeBtn.click();
@@ -547,6 +556,7 @@ test('T-045: B → drag the stop → Enter → the order popup → Confirm → t
   await popup.getByTestId('order-confirm').click();
   await expect(popup).toHaveCount(0);
   await expect.poll(async () => (await get(page, `/backtest/sessions/${s.id}/orders`)).length, { timeout: 10_000 }).toBe(1);
+  await showPositions(page);
   const [order] = await get(page, `/backtest/sessions/${s.id}/orders`);
   expect(order).toMatchObject({ side: 'long', type: 'market', status: 'open', slInitial: sl1 });
   // the popup sizes at the last close; the market fill is half a spread away, so the server's qty differs slightly

@@ -1,0 +1,24 @@
+<button
+  type="button"
+  class="toggle"
+  data-testid="positions-toggle"
+  aria-haspopup="true"
+  [attr.aria-expanded]="open()"
+  [class.active]="open()"
+  [title]="openCount() + ' open, ' + (count() - openCount()) + ' pending'"
+  (click)="toggle($event)"
+>
+  Positions <span class="count" data-testid="positions-count">{{ count() }}</span>
+  <span class="caret" aria-hidden="true">&#x25BE;</span>
+</button>
+@if (open()) {
+  <div class="dropdown" data-testid="positions-dropdown" (keydown.escape)="open.set(false)">
+    <app-positions-panel
+      [rows]="rows()"
+      [currency]="currency()"
+      [pricePrecision]="pricePrecision()"
+      (cancel)="cancel.emit($event)"
+      (close)="close.emit($event)"
+    />
+  </div>
+}

@@ -22,20 +22,6 @@
   min-height: 0;
   min-width: 0;
 }
-.side {
-  display: flex;
-  flex-direction: column;
-  width: 320px;
-  flex-shrink: 0;
-  border-left: 1px solid #30363d;
-  min-height: 0;
-}
-.side .positions {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border-top: 1px solid #30363d;
-}
 .bottom {
   display: flex;
   height: 30%;

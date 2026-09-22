@@ -24,6 +24,7 @@ describe('PositionsPanelComponent (T-023)', () => {
     const { el } = render();
     const open = el.querySelector('[data-testid="position-1"]')!;
     expect(open.textContent!.replace(/\s+/g, ' ')).toContain('100.25');
+    expect(open.querySelector('[data-testid="position-instrument"]')!.textContent).toBe('binance:BTCUSDT'); // T-046
     expect(open.querySelector('[data-testid="position-pnl"]')!.textContent!.trim()).toBe('+12.50 USD');
     const pending = el.querySelector('[data-testid="position-2"]')!;
     expect(pending.getAttribute('data-status')).toBe('pending');

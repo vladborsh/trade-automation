@@ -275,11 +275,34 @@ describe('WorkspaceComponent', () => {
     expect(store.createDraft).not.toHaveBeenCalled();
   });
 
-  it('shows the positions panel and the open risk (T-023); the order panel only as the submit popup (T-045)', async () => {
+  it('the positions behind a toolbar dropdown (T-046), the open risk; the order panel only as the submit popup (T-045)', async () => {
     const { el } = await render();
     expect(el.querySelector('app-order-panel')).toBeNull();
-    expect(el.querySelector('app-positions-panel')).not.toBeNull();
+    expect(el.querySelector('app-positions-panel')).toBeNull(); // no always-visible list
+    expect(el.querySelector('app-replay-toolbar app-positions-dropdown [data-testid="positions-toggle"]')).not.toBeNull();
+    expect(el.querySelector('.side')).toBeNull(); // the chart grid has the full width
     expect(el.querySelector('[data-testid="replay-open-risk"]')?.textContent).toContain('0.00');
+  });
+
+  it('T-046: keys on the positions dropdown are its own — Enter on a Close button opens no order popup, Esc removes no draft', async () => {
+    const { fixture, store, el } = await render();
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid="positions-toggle"]')!;
+    press('Enter', toggle);
+    press('Escape', toggle);
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+    expect(store.removeActiveDraft).not.toHaveBeenCalled();
+  });
+
+  it('T-046: with focus left on the positions toggle, → and B still act', async () => {
+    const { store, engine, el } = await render();
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid="positions-toggle"]')!;
+    press('ArrowRight', toggle);
+    press('b', toggle);
+    expect(engine.step).toHaveBeenCalledTimes(1);
+    expect(store.createDraft).toHaveBeenCalledWith('long');
   });
 
   it('B / S / Esc / Enter are ignored while typing', async () => {

@@ -7,6 +7,7 @@
       <thead>
         <tr>
           <th scope="col">#</th>
+          <th scope="col">Instrument</th>
           <th scope="col">Side</th>
           <th scope="col">Entry</th>
           <th scope="col">SL</th>
@@ -20,6 +21,7 @@
         @for (row of rows(); track row.order.id) {
           <tr [attr.data-testid]="'position-' + row.order.seq" [attr.data-status]="row.order.status">
             <td>{{ row.order.seq }}</td>
+            <td data-testid="position-instrument">{{ row.order.instrument }}</td>
             <td [class.up]="row.order.side === 'long'" [class.down]="row.order.side === 'short'">
               {{ row.order.side }} {{ row.order.status === 'pending' ? 'limit' : '' }}
             </td>

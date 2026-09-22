@@ -173,3 +173,28 @@ test('T-036: after a wheel zoom, ten steps keep the zoomed width', async ({ page
   await serverCursorReaches(request, session.id, FRIDAY_2140 + 10 * 300_000);
   expect(await width()).toBe(zoomed);
 });
+
+test('T-046: the positions list is a toolbar dropdown; after clicking it the hotkeys still act', async ({ page }) => {
+  const session = await createSession(page.context().request, FRIDAY_2140 + 3 * 86_400_000);
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  const toggle = page.getByTestId('positions-toggle');
+  const dropdown = page.getByTestId('positions-dropdown');
+
+  await expect(toggle).toContainText('Positions');
+  await expect(page.getByTestId('positions-count')).toHaveText('0'); // the mock holds no orders
+  await expect(page.locator('app-positions-panel')).toHaveCount(0); // no always-visible list
+  await expect(dropdown).toHaveCount(0);
+
+  await toggle.click();
+  await expect(dropdown).toBeVisible();
+  await expect(dropdown).toContainText('No pending or open orders.');
+  await page.keyboard.press('ArrowRight'); // focus went back to the page: the step hotkey acts
+  await expect(page.getByTestId('replay-cursor')).toHaveText('2024-03-01 21:45 UTC');
+
+  await page.mouse.click(10, (page.viewportSize()?.height ?? 720) - 10); // a click outside (well clear of the list) closes it
+  await expect(dropdown).toHaveCount(0);
+  await toggle.click();
+  await toggle.click(); // and so does a second click on the button
+  await expect(dropdown).toHaveCount(0);
+});
