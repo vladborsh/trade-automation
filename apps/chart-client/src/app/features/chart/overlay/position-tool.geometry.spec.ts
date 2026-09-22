@@ -9,6 +9,7 @@ import {
   rMultiple,
   snapPrice,
   toolGeometry,
+  showsZones,
 } from './position-tool.geometry';
 
 const draft = (over: Partial<PositionToolState> = {}): PositionToolState => ({
@@ -161,5 +162,13 @@ describe('position-tool geometry (design §9.1)', () => {
       const pos = draft({ kind: 'position' });
       expect(applyDrag({ ...base, original: pos, part: 'body', price: 90 })).toEqual({ tool: pos });
     });
+  });
+});
+
+describe('showsZones (T-049)', () => {
+  it('only a draft shows its risk / reward fill; a pending order and a position are lines only', () => {
+    expect(showsZones({ kind: 'draft' })).toBe(true);
+    expect(showsZones({ kind: 'pending' })).toBe(false);
+    expect(showsZones({ kind: 'position' })).toBe(false);
   });
 });

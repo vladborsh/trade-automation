@@ -155,6 +155,15 @@ export function hitTest(px: number, py: number, geometries: readonly ToolGeometr
   return best === null ? null : (best as { target: HitTarget }).target;
 }
 
+/**
+ * T-049 (the user's feedback, item 15): only a draft shows its risk / reward zones. Once the order
+ * exists (pending or open) the tool is its entry, SL and TP lines with their labels and handles —
+ * no red/green fill over the chart it is trading.
+ */
+export function showsZones(tool: Pick<PositionToolState, 'kind'>): boolean {
+  return tool.kind === 'draft';
+}
+
 export type DragResult = { tool: PositionToolState } | { hint: string };
 
 export interface DragInput {

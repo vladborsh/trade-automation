@@ -11,7 +11,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import { labelFor, toolGeometry } from './position-tool.geometry';
+import { labelFor, showsZones, toolGeometry } from './position-tool.geometry';
 import type { PositionToolsView } from './position-tool.model';
 
 const RISK = '#ef5350';
@@ -42,8 +42,9 @@ export function anchorX(chart: IChartApi, anchorTimeMs: number): number {
 
 /**
  * backtest-app-system-design.md §9.1 — the position tools of one candle series, drawn in one canvas
- * pass with `ShapesPrimitive`'s vocabulary (which stays untouched): a translucent rect from entry
- * to SL in #ef5350 and entry to TP in #26a69a, a ray at each level with a right-edge label (price,
+ * pass with `ShapesPrimitive`'s vocabulary (which stays untouched): on a draft a translucent rect
+ * from entry to SL in #ef5350 and entry to TP in #26a69a (a live order has none, T-049), a ray at
+ * each level with a right-edge label (price,
  * distance, R, qty on the entry), square handles (three on a draft, SL/TP on a live order). The
  * active tool is drawn brighter. Render-only: pointer handling is `PositionToolController`'s.
  */
@@ -129,8 +130,10 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           context.fillRect(g.x, Math.min(g.yEntry, y), width, Math.abs(y - g.yEntry));
           context.restore();
         };
-        band(g.ySl, RISK);
-        if (g.yTp !== null) band(g.yTp, REWARD);
+        if (showsZones(tool)) {
+          band(g.ySl, RISK);
+          if (g.yTp !== null) band(g.yTp, REWARD);
+        }
 
         const level = (y: number, color: string, label: string) => {
           context.save();
