@@ -10,6 +10,7 @@ import { PositionsDropdownComponent } from './positions-dropdown.component';
 import { TradeControlsComponent } from './trade-controls.component';
 import { TradeCloseSnackbarComponent } from './trade-close-snackbar.component';
 import { CloseSoundToggleComponent } from './close-sound-toggle.component';
+import { OrderRemoveConfirmComponent } from './order-remove-confirm.component';
 import { CloseSoundSetting } from '../../core/replay/close-sound.setting';
 import { JournalComponent } from './journal.component';
 import { StatsSummaryComponent } from './stats-summary.component';
@@ -40,6 +41,7 @@ import { AutoPlay, type AutoPlaySpeedMs } from '../../core/replay/auto-play';
     TradeControlsComponent,
     TradeCloseSnackbarComponent,
     CloseSoundToggleComponent,
+    OrderRemoveConfirmComponent,
   ],
   providers: [ReplaySessionStore, LayoutsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -149,6 +151,14 @@ export class WorkspaceComponent implements OnDestroy {
     if ((action === 'order' || action === 'cancel') && (event.target as Element | null)?.closest?.('app-positions-dropdown, app-trade-controls')) return;
     // T-059: a halted session is as locked as a complete one
     if (!keyAllowed(action, { completed: engine.completed() || engine.halted(), viewOnly: engine.viewOnly })) return;
+    if (this.store.removeRequest()) {
+      // BUG-017: the remove confirm is modal — Enter confirms, Esc keeps the order; keys inside it are its own
+      if ((event.target as Element | null)?.closest?.('app-order-remove-confirm')) return;
+      event.preventDefault();
+      if (action === 'order') this.store.confirmRemove();
+      else if (action === 'cancel') this.store.dismissRemove();
+      return;
+    }
     if (this.orderPopup()) {
       // the popup is modal: Enter confirms, Esc closes it (keeping the draft), nothing else acts.
       // Keys inside it are its own (its form submits on Enter, closes on Esc).
@@ -169,8 +179,16 @@ export class WorkspaceComponent implements OnDestroy {
       case 'short':
         return this.store.createDraft(action);
       case 'cancel':
-        this.store.activeTool()?.store.removeActiveDraft();
+        // a draft is removed; a live order's tool is only deselected (BUG-017)
+        if (!this.store.activeTool()?.store.removeActiveDraft()) this.store.deselectLive();
         return;
+      case 'remove': {
+        // Delete / Backspace: a draft goes; a live order's tool asks to cancel / close it (BUG-017)
+        if (this.store.activeTool()?.store.removeActiveDraft()) return;
+        const liveOrderId = this.store.activeLiveOrderId();
+        if (liveOrderId) this.store.requestRemove(liveOrderId);
+        return;
+      }
       case 'order':
         return this.order();
     }

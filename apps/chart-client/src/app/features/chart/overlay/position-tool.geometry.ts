@@ -95,7 +95,14 @@ export interface ToolGeometry {
   ySl: number;
   yTp: number | null;
   handles: ToolHandle[];
+  /** BUG-017: where a live order's ✕ sits (its cancel / close); null on drafts and read-only tools. */
+  remove: { x: number; y: number } | null;
 }
+
+/** The ✕'s centre, this far left of the pane's right edge on the entry line. */
+export const REMOVE_INSET_PX = 10;
+/** Half the ✕'s clickable box. */
+export const REMOVE_HALF_PX = 5;
 
 /** How far right of the tool's left edge the handles sit, in px. */
 export const HANDLE_OFFSET_PX = 12;
@@ -122,13 +129,16 @@ export function toolGeometry(
   if (parts.includes('entry')) handles.push({ part: 'entry', x, y: yEntry });
   if (parts.includes('sl')) handles.push({ part: 'sl', x, y: ySl });
   if (parts.includes('tp') && yTp !== null) handles.push({ part: 'tp', x, y: yTp });
-  return { toolId: tool.id, x: xStart, yEntry, ySl, yTp, handles };
+  const removable = tool.kind !== 'draft' && !tool.readOnly && Number.isFinite(paneWidth);
+  const remove = removable ? { x: paneWidth - REMOVE_INSET_PX, y: yEntry } : null;
+  return { toolId: tool.id, x: xStart, yEntry, ySl, yTp, handles, remove };
 }
 
 export interface HitTarget {
   toolId: string;
   part: PositionToolPart;
-  kind: 'handle' | 'line';
+  /** `remove`: a live order's ✕ (BUG-017; its part is `entry`, never dragged). */
+  kind: 'handle' | 'line' | 'remove';
 }
 
 /**
@@ -143,6 +153,9 @@ export function hitTest(px: number, py: number, geometries: readonly ToolGeometr
     if (!best || rank < best.rank || (rank === best.rank && distance <= best.distance)) best = { target, distance, rank };
   };
   for (const g of geometries) {
+    if (g.remove && Math.abs(px - g.remove.x) <= REMOVE_HALF_PX + 2 && Math.abs(py - g.remove.y) <= REMOVE_HALF_PX + 2) {
+      consider({ toolId: g.toolId, part: 'entry', kind: 'remove' }, Math.hypot(px - g.remove.x, py - g.remove.y), 0);
+    }
     for (const h of g.handles) {
       if (Math.abs(px - h.x) <= tolerancePx && Math.abs(py - h.y) <= tolerancePx) {
         consider({ toolId: g.toolId, part: h.part, kind: 'handle' }, Math.hypot(px - h.x, py - h.y), 0);

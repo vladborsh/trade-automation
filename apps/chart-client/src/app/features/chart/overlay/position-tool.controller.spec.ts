@@ -171,6 +171,16 @@ describe('PositionToolController (design §9.1)', () => {
     expect(gone.changes).toEqual([]);
   });
 
+  it('BUG-017: a click on a live order’s ✕ activates it and asks for its removal; the ✕ shows a pointer', () => {
+    const live = { ...tool(), kind: 'position' as const, orderId: 't1', order: { qty: 1, riskAmount: 1 } };
+    const { changes, fire, el } = setup({ tools: [live] });
+    fire('pointermove', 790, 500); // the ✕: 10 px left of the 800 px pane's edge, on the entry line (100 → y 500)
+    expect(el.style.cursor).toBe('pointer');
+    expect(el.dataset['positionToolHover']).toBe('remove:entry:t1');
+    fire('pointerdown', 790, 500);
+    expect(changes).toEqual([{ type: 'activate', id: 't1' }, { type: 'remove', id: 't1' }]);
+  });
+
   it('detach removes every listener', () => {
     const { controller, changes, fire } = setup();
     controller.detach();

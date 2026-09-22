@@ -11,7 +11,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import { labelFor, showsZones, toolGeometry } from './position-tool.geometry';
+import { REMOVE_HALF_PX, labelFor, showsZones, toolGeometry } from './position-tool.geometry';
 import type { PositionToolsView } from './position-tool.model';
 
 const RISK = '#ef5350';
@@ -19,6 +19,8 @@ const REWARD = '#26a69a';
 const ENTRY = '#c9d1d9';
 const MUTED = '#8b949e';
 const HANDLE_SIZE = 8;
+/** The entry label moves left of a live order's ✕ (BUG-017). */
+const REMOVE_LABEL_SHIFT_PX = 18;
 
 /**
  * The x of a tool's left edge: its anchor time on this chart — the bar it was drawn, placed or
@@ -138,7 +140,7 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           if (g.yTp !== null) band(g.yTp, REWARD);
         }
 
-        const level = (y: number, color: string, label: string) => {
+        const level = (y: number, color: string, label: string, labelShift = 0) => {
           context.save();
           context.globalAlpha = tool.active ? 1 : 0.7;
           context.strokeStyle = color;
@@ -152,10 +154,24 @@ class PositionToolRenderer implements IPrimitivePaneRenderer {
           context.fillStyle = color;
           context.font = '10px ui-monospace, monospace';
           context.textAlign = 'right';
-          context.fillText(label, mediaSize.width - 4, y - 4);
+          context.fillText(label, mediaSize.width - 4 - labelShift, y - 4);
           context.restore();
         };
-        level(g.yEntry, tool.active ? ENTRY : MUTED, labelFor(tool, 'entry', view));
+        level(g.yEntry, tool.active ? ENTRY : MUTED, labelFor(tool, 'entry', view), g.remove ? REMOVE_LABEL_SHIFT_PX : 0);
+        if (g.remove) {
+          // BUG-017: a live order's ✕ (its cancel / close, after a confirm)
+          const r = REMOVE_HALF_PX - 1;
+          context.save();
+          context.strokeStyle = tool.active ? ENTRY : MUTED;
+          context.lineWidth = 1.5;
+          context.beginPath();
+          context.moveTo(g.remove.x - r, g.remove.y - r);
+          context.lineTo(g.remove.x + r, g.remove.y + r);
+          context.moveTo(g.remove.x + r, g.remove.y - r);
+          context.lineTo(g.remove.x - r, g.remove.y + r);
+          context.stroke();
+          context.restore();
+        }
         level(g.ySl, RISK, labelFor(tool, 'sl', view));
         if (g.yTp !== null) level(g.yTp, REWARD, labelFor(tool, 'tp', view));
 

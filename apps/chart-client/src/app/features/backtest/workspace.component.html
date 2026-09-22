@@ -49,6 +49,10 @@
           <app-close-sound-toggle toolbarEnd />
         }
       </app-replay-toolbar>
+      @if (store.removeRequest(); as removal) {
+        <!-- BUG-017: removing a live order's tool is its cancel / close — asked first -->
+        <app-order-remove-confirm [removal]="removal" (confirm)="store.confirmRemove()" (dismiss)="store.dismissRemove()" />
+      }
       @if (!e.viewOnly) {
         <!-- T-051: one snackbar per trade the server closed while watching -->
         <app-trade-close-snackbar

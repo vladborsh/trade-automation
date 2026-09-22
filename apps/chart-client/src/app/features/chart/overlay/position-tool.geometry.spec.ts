@@ -10,6 +10,7 @@ import {
   snapPrice,
   toolGeometry,
   showsZones,
+  REMOVE_INSET_PX,
 } from './position-tool.geometry';
 
 const draft = (over: Partial<PositionToolState> = {}): PositionToolState => ({
@@ -180,5 +181,24 @@ describe('toolGeometry handles near the right edge (T-050)', () => {
     expect(g.x).toBe(795); // the lines still start at the anchor bar
     expect(g.handles.every((h) => h.x === 800 - HANDLE_OFFSET_PX)).toBe(true);
     expect(toolGeometry({ ...t }, 300, (p) => 1000 - p, 800)!.handles[0].x).toBe(300 + HANDLE_OFFSET_PX); // room: unchanged
+  });
+});
+
+describe('the ✕ on a live order’s tool (BUG-017)', () => {
+  const live = { id: 'o1', side: 'long', mode: 'market', entry: 100, sl: 99, tp: 102, kind: 'position', active: true, anchorTime: 0, orderId: 'o1' } as const;
+  const toY = (p: number) => 1000 - p * 5; // entry 100 → y 500
+
+  it('sits on the entry line near the pane’s right edge — only on a live, editable tool with a known pane', () => {
+    expect(toolGeometry({ ...live }, 100, toY, 800)!.remove).toEqual({ x: 800 - REMOVE_INSET_PX, y: 500 });
+    expect(toolGeometry({ ...live, kind: 'pending' }, 100, toY, 800)!.remove).not.toBeNull();
+    expect(toolGeometry({ ...live, kind: 'draft' }, 100, toY, 800)!.remove).toBeNull();
+    expect(toolGeometry({ ...live, readOnly: true }, 100, toY, 800)!.remove).toBeNull();
+    expect(toolGeometry({ ...live }, 100, toY)!.remove).toBeNull(); // no pane width: nowhere to put it
+  });
+
+  it('a click on it is a remove hit, ahead of the entry line under it', () => {
+    const g = toolGeometry({ ...live }, 100, toY, 800)!;
+    expect(hitTest(790, 500, [g], new Map([['o1', 'position']]))).toEqual({ toolId: 'o1', part: 'entry', kind: 'remove' });
+    expect(hitTest(600, 500, [g], new Map([['o1', 'position']]))).toEqual({ toolId: 'o1', part: 'entry', kind: 'line' });
   });
 });

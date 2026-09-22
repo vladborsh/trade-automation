@@ -53,6 +53,12 @@ function fakeStore() {
     instruments: { contractOf: vi.fn((): unknown => null), units: signal(new Map()) },
     margin: signal<unknown>(null),
     closeNotices: new CloseNotices(),
+    removeRequest: signal<unknown>(null),
+    activeLiveOrderId: vi.fn((): string | null => null),
+    requestRemove: vi.fn(),
+    confirmRemove: vi.fn(),
+    dismissRemove: vi.fn(),
+    deselectLive: vi.fn(),
     marginUtilisation: signal<number | null>(null),
     hint: signal<string | null>(null),
     activeDraft: null as null | Record<string, unknown>,
@@ -430,6 +436,42 @@ describe('WorkspaceComponent', () => {
     fixture.detectChanges();
     expect(el.querySelector<HTMLButtonElement>('[data-testid="trade-buy"]')!.disabled).toBe(true);
     expect(el.querySelector<HTMLButtonElement>('[data-testid="trade-place"]')!.disabled).toBe(true);
+  });
+
+  it('BUG-017: Delete / Backspace on a live order’s tool asks to remove it; on a draft it removes the draft', async () => {
+    const { store } = await render();
+    store.activeLiveOrderId.mockReturnValue('o7');
+    press('Delete');
+    press('Backspace');
+    expect(store.requestRemove.mock.calls).toEqual([['o7'], ['o7']]);
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    press('Delete');
+    expect(store.removeActiveDraft).toHaveBeenCalled();
+    expect(store.requestRemove).toHaveBeenCalledTimes(2); // the draft went, nothing was asked
+  });
+
+  it('BUG-017: Esc on a live order’s tool only deselects it', async () => {
+    const { store } = await render();
+    store.removeActiveDraft.mockReturnValue(false);
+    press('Escape');
+    expect(store.deselectLive).toHaveBeenCalledTimes(1);
+    expect(store.requestRemove).not.toHaveBeenCalled();
+  });
+
+  it('BUG-017: the remove confirm is modal — Enter confirms, Esc keeps, nothing else acts', async () => {
+    const { fixture, store, engine, el } = await render();
+    store.removeRequest.set({ orderId: 'o7', seq: 7, action: 'close', question: 'Close position #7 at market?', confirmLabel: 'Close position' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="remove-confirm-question"]')!.textContent).toBe('Close position #7 at market?');
+    press('ArrowRight');
+    press('b');
+    expect(engine.step).not.toHaveBeenCalled();
+    expect(store.createDraft).not.toHaveBeenCalled();
+    press('Escape');
+    expect(store.dismissRemove).toHaveBeenCalledTimes(1);
+    press('Enter');
+    expect(store.confirmRemove).toHaveBeenCalledTimes(1);
   });
 
   it('B / S / Esc / Enter are ignored while typing', async () => {

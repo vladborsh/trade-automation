@@ -47,4 +47,6 @@ export interface PositionToolsView {
 export type PositionToolChange =
   | { type: 'activate'; id: string }
   | { type: 'update'; tool: PositionToolState; final: boolean }
-  | { type: 'hint'; message: string };
+  | { type: 'hint'; message: string }
+  /** BUG-017: the ✕ on a live order's tool — its cancel / close, after the user confirms. */
+  | { type: 'remove'; id: string };

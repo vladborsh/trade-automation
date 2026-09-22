@@ -95,7 +95,8 @@ export class PositionToolsStore {
   apply(change: PositionToolChange): void {
     if (change.type === 'activate') this.activate(change.id);
     else if (change.type === 'hint') this.deps.hint(change.message);
-    else this.list.update((tools) => tools.map((t) => (t.id === change.tool.id ? { ...change.tool, active: t.active } : t)));
+    else if (change.type === 'update') this.list.update((tools) => tools.map((t) => (t.id === change.tool.id ? { ...change.tool, active: t.active } : t)));
+    // 'remove' is a live order's (BUG-017): the session store handles it before this store sees it
   }
 
   /**

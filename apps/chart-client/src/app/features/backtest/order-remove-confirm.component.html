@@ -1,0 +1,18 @@
+<div class="backdrop" data-testid="remove-confirm-backdrop" (click)="dismiss.emit()"></div>
+<form
+  class="confirm-box"
+  role="alertdialog"
+  aria-modal="true"
+  aria-labelledby="remove-confirm-question"
+  data-testid="remove-confirm"
+  (submit)="onSubmit($event)"
+  (keydown.escape)="dismiss.emit()"
+>
+  <p id="remove-confirm-question" class="question" data-testid="remove-confirm-question">{{ removal().question }}</p>
+  <div class="actions">
+    <button type="button" class="keep" data-testid="remove-keep" (click)="dismiss.emit()">Keep <kbd>Esc</kbd></button>
+    <button type="submit" class="go" data-testid="remove-confirm-button" [class.close]="removal().action === 'close'">
+      {{ removal().confirmLabel }} <kbd>Enter</kbd>
+    </button>
+  </div>
+</form>

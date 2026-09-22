@@ -359,3 +359,43 @@ describe('ReplaySessionStore — trade-close notices (T-051)', () => {
     expect(played).toEqual([]);
   });
 });
+
+describe('ReplaySessionStore — removing a live order’s tool (BUG-017)', () => {
+  const O1 = '00000000-0000-4000-8000-0000000000d1';
+  const row = (status: 'pending' | 'open' | 'closed') => ({ ...pending({ panelId: 'btc' } as PlaceOrderRequest), id: O1, seq: 7, status }) as Order;
+
+  it('a pending order: Delete → "Cancel order #7?" → confirm sends the cancel through the queue', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([row('pending')]);
+    const { store } = await open(client);
+    store.requestRemove(O1);
+    expect(store.removeRequest()).toMatchObject({ action: 'cancel', question: 'Cancel order #7?' });
+    expect(client.cancelOrder).not.toHaveBeenCalled(); // nothing before the confirm
+    store.confirmRemove();
+    await vi.waitFor(() => expect(client.cancelOrder).toHaveBeenCalledWith('s1', O1, expect.objectContaining({ opId: expect.any(String) })));
+    expect(store.removeRequest()).toBeNull();
+  });
+
+  it('an open position: "Close position #7 at market?" → confirm sends the close; keep sends nothing', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([row('open')]);
+    client.closeOrder.mockResolvedValue({ order: { ...row('closed'), closeReason: 'manual' }, stats: STATS, balance: 10_000 });
+    const { store } = await open(client);
+    store.requestRemove(O1);
+    expect(store.removeRequest()).toMatchObject({ action: 'close', question: 'Close position #7 at market?' });
+    store.dismissRemove();
+    await settle();
+    expect(client.closeOrder).not.toHaveBeenCalled();
+    store.requestRemove(O1);
+    store.confirmRemove();
+    await vi.waitFor(() => expect(client.closeOrder).toHaveBeenCalledTimes(1));
+  });
+
+  it('an order that is already over asks nothing', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([row('closed')]);
+    const { store } = await open(client);
+    store.requestRemove(O1);
+    expect(store.removeRequest()).toBeNull();
+  });
+});

@@ -31,7 +31,8 @@ interface Drag {
  * primitive. Listens on the chart's container (capture phase, so it runs before the chart's own
  * handlers):
  * - pointerdown: hit-test every tool (6 px). A hit activates that tool (decision 29, "last
- *   clicked") and, on a draggable part, starts a drag: the chart's scroll and scale are switched
+ *   clicked"); on a live order's ✕ it asks for that order's removal (BUG-017); on a draggable part
+ *   it starts a drag: the chart's scroll and scale are switched
  *   off and the pointer is captured. A miss does nothing, so the chart pans as usual.
  * - pointermove without a drag: hover feedback — a resize cursor over a stop/target or handle, a
  *   move cursor over a draft's entry line (mirrored in `data-position-tool-hover` for e2e);
@@ -104,6 +105,7 @@ export class PositionToolController {
     e.stopPropagation();
     e.preventDefault();
     this.host.emit({ type: 'activate', id: tool.id });
+    if (target.kind === 'remove') return this.host.emit({ type: 'remove', id: tool.id }); // BUG-017: the ✕
     const grabPrice = series.coordinateToPrice(y);
     if (!draggableParts(tool).includes(target.part) || grabPrice === null) return;
 
@@ -164,11 +166,12 @@ export class PositionToolController {
   private hover(e: PointerEvent): void {
     if (!this.el) return;
     const hit = this.hit(e);
-    const grabbable = hit && draggableParts(hit.tool).includes(hit.target.part) ? hit.target : null;
+    const grabbable =
+      hit && (hit.target.kind === 'remove' || draggableParts(hit.tool).includes(hit.target.part)) ? hit.target : null;
     const state = grabbable ? `${grabbable.kind}:${grabbable.part}:${grabbable.toolId}` : null;
     if (state === this.hovered) return;
     this.hovered = state;
-    this.el.style.cursor = grabbable ? (grabbable.part === 'body' ? 'move' : 'ns-resize') : '';
+    this.el.style.cursor = grabbable ? (grabbable.kind === 'remove' ? 'pointer' : grabbable.part === 'body' ? 'move' : 'ns-resize') : '';
     if (state) this.el.dataset['positionToolHover'] = state;
     else delete this.el.dataset['positionToolHover'];
   }

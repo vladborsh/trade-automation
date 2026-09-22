@@ -2,12 +2,14 @@ import type { Timeframe } from '@trade-automation/contracts';
 
 const ORDER: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
-export type ReplayKeyAction = 'step' | 'finer' | 'coarser' | 'long' | 'short' | 'cancel' | 'order';
+export type ReplayKeyAction = 'step' | 'finer' | 'coarser' | 'long' | 'short' | 'cancel' | 'order' | 'remove';
 
 /**
  * Brief decision 37b hotkeys for the workspace: `→` steps, `[` / `]` switch to the next finer /
- * coarser timeframe, `B` / `S` place a long / short position tool, `Esc` removes the active draft,
- * `Enter` opens an order from the active tool (T-023; with none, a hint only). Ignored while the
+ * coarser timeframe, `B` / `S` place a long / short position tool, `Esc` removes the active draft
+ * (a live order's tool: deselects it), `Delete` / `Backspace` removes the active tool — a live order
+ * through its cancel / close after a confirm (BUG-017) — `Enter` opens an order from the active tool
+ * (T-023; with none, a hint only). Ignored while the
  * user types in a form control, and with a modifier held (so browser and OS shortcuts keep working).
  */
 export function replayKeyAction(event: Pick<KeyboardEvent, 'key' | 'target' | 'altKey' | 'ctrlKey' | 'metaKey'>): ReplayKeyAction | null {
@@ -31,6 +33,9 @@ export function replayKeyAction(event: Pick<KeyboardEvent, 'key' | 'target' | 'a
       return 'cancel';
     case 'Enter':
       return 'order';
+    case 'Delete':
+    case 'Backspace':
+      return 'remove';
     default:
       return null;
   }

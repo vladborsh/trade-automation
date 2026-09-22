@@ -739,3 +739,79 @@ test('T-051: a trade closed while watching gets one snackbar; a reload does not 
   await page.waitForTimeout(500);
   await expect(notices).toHaveCount(0); // the journal's closed trade is history
 });
+
+test('BUG-017: a live tool is removed through its order — Delete on a pending one cancels it, the ✕ on an open one closes it (both confirmed); its stop drags', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  const s = await createSession(page, { name: `rw remove ${Date.now()}`, from, to: from + 3 * 60 * MIN, tf: '5m' });
+  const tp = await tape(page, s);
+  const last = tp[0].c;
+  const place = async (body: Json) =>
+    (await (await page.context().request.post(`${API}/backtest/sessions/${s.id}/orders`, { data: { opId: crypto.randomUUID(), cursorMs: from, panelId: 'btc', riskPct: 1, ...body } })).json()).order as Json;
+  const open = await place({ side: 'long', type: 'market', sl: Math.round(last - 400), tp: Math.round(last + 800) });
+  const pend = await place({ side: 'short', type: 'limit', limitPrice: Math.round(last + 250), sl: Math.round(last + 500), tp: Math.round(last - 250) });
+  const row = async (id: string) => ((await get(page, `/backtest/sessions/${s.id}/orders`)) as Json[]).find((o) => o.id === id);
+  const patches: string[] = [];
+  page.on('request', (r) => { if (r.method() === 'PATCH') patches.push(r.url()); });
+  await openWorkspace(page, s.id);
+
+  const body = page.locator('.chart-panel[data-panel-id="btc"] .panel-body');
+  const container = body.locator('.chart-container');
+  const box = (await container.boundingBox())!;
+  const yOf = async () => {
+    const at = async (y: number) => {
+      await page.mouse.move(box.x + box.width * 0.2, y);
+      await expect(body).toHaveAttribute('data-pointer-price', /\d/);
+      return Number(await body.getAttribute('data-pointer-price'));
+    };
+    const y1 = box.y + box.height * 0.2, y2 = box.y + box.height * 0.8;
+    const p1 = await at(y1), p2 = await at(y2);
+    return (price: number) => y1 + ((price - p1) * (y2 - y1)) / (p2 - p1);
+  };
+  /** Scans a level from the right for the hover hook (`kind:part:id`); the x where it shows, or null. */
+  const findX = async (y: number, hover: string) => {
+    for (let x = box.x + box.width - 2; x > box.x + 2; x -= 2) {
+      await page.mouse.move(x, y);
+      if ((await container.getAttribute('data-position-tool-hover')) === hover) return x;
+    }
+    return null;
+  };
+
+  // 1. the stop of an open position drags: a PATCH, and the server's stop moves
+  let y = await yOf();
+  const slY = y(open.slCurrent);
+  const hx = await findX(slY, `handle:sl:${open.id}`);
+  expect(hx, 'the open position has a stop handle').not.toBeNull();
+  await page.mouse.down();
+  await page.mouse.move(hx!, slY + 10, { steps: 3 });
+  await page.mouse.move(hx!, slY + 20, { steps: 3 });
+  await page.mouse.up();
+  await expect.poll(async () => (await row(open.id)).slCurrent, { timeout: 10_000 }).toBeLessThan(open.slCurrent);
+  expect(patches).toHaveLength(1);
+
+  // 2. select the pending order's tool (its entry line), Delete → "Cancel order #2?" → Enter → cancelled
+  y = await yOf();
+  const pendY = y(pend.limitPrice);
+  const pendX = await findX(pendY, `remove:entry:${pend.id}`);
+  expect(pendX, 'the pending tool shows its ✕').not.toBeNull();
+  await page.mouse.click(pendX! - 40, pendY); // the entry line, left of the ✕: activates it
+  await page.mouse.move(box.x + box.width / 2, box.y - 40);
+  await page.keyboard.press('Delete');
+  await expect(page.getByTestId('remove-confirm-question')).toHaveText(`Cancel order #${pend.seq}?`);
+  expect((await row(pend.id)).status).toBe('pending'); // nothing before the confirm
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await row(pend.id)).status, { timeout: 10_000 }).toBe('cancelled');
+  await expect(page.getByTestId('remove-confirm')).toHaveCount(0);
+
+  // 3. the ✕ on the open position → "Close position #1 at market?" → confirm → closed / manual, and T-051's snackbar
+  y = await yOf();
+  const openY = y(open.entryPrice);
+  const openX = await findX(openY, `remove:entry:${open.id}`);
+  expect(openX, 'the open tool shows its ✕').not.toBeNull();
+  await page.mouse.click(openX!, openY);
+  await expect(page.getByTestId('remove-confirm-question')).toHaveText(`Close position #${open.seq} at market?`);
+  if (process.env['BUG017_SHOTS']) await page.screenshot({ path: `${process.env['BUG017_SHOTS']}/confirm-close.png` });
+  await page.getByTestId('remove-confirm-button').click();
+  await expect.poll(async () => [(await row(open.id)).status, (await row(open.id)).closeReason], { timeout: 10_000 }).toEqual(['closed', 'manual']);
+  await expect(page.getByTestId('close-notice')).toContainText('closed by hand');
+});

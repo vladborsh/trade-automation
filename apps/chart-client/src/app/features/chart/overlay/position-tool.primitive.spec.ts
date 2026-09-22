@@ -64,7 +64,7 @@ describe('PositionToolPrimitive rendering (T-049)', () => {
   it('a pending order: lines, labels and its SL / TP handles — no fill', () => {
     const d = draw(tool({ kind: 'pending', orderId: 'o1', order: { qty: 1, riskAmount: 2 } }));
     expect(d.zones).toEqual([]);
-    expect(d.lines).toHaveLength(3);
+    expect(d.lines).toHaveLength(4); // 3 levels + the ✕ (BUG-017)
     expect(d.labels).toHaveLength(3);
     expect(d.handles).toHaveLength(2);
   });
@@ -73,14 +73,24 @@ describe('PositionToolPrimitive rendering (T-049)', () => {
     for (const active of [false, true]) {
       const d = draw(tool({ kind: 'position', active, orderId: 'o1', order: { qty: 1, riskAmount: 2 } }));
       expect(d.zones).toEqual([]);
-      expect(d.lines).toHaveLength(3);
+      expect(d.lines).toHaveLength(4); // 3 levels + the ✕
     }
   });
 
   it('without a target: two lines, one zone on a draft, none on a live order', () => {
     expect(draw(tool({ tp: null })).zones.map((z) => z.fillStyle)).toEqual([RISK]);
     expect(draw(tool({ tp: null, kind: 'position', orderId: 'o1', order: { qty: 1, riskAmount: 2 } })).zones).toEqual([]);
-    expect(draw(tool({ tp: null, kind: 'position', orderId: 'o1', order: { qty: 1, riskAmount: 2 } })).lines).toHaveLength(2);
+    expect(draw(tool({ tp: null, kind: 'position', orderId: 'o1', order: { qty: 1, riskAmount: 2 } })).lines).toHaveLength(3); // 2 levels + the ✕
+  });
+});
+
+describe('the ✕ on a live order’s tool (BUG-017)', () => {
+  it('a pending order and an open position get one; a draft and a read-only (view-only) tool do not', () => {
+    const live = { orderId: 'o1', order: { qty: 1, riskAmount: 2 } };
+    expect(draw(tool({ kind: 'pending', ...live })).lines).toHaveLength(4);
+    expect(draw(tool({ kind: 'position', ...live })).lines).toHaveLength(4);
+    expect(draw(tool({})).lines).toHaveLength(3);
+    expect(draw(tool({ kind: 'position', readOnly: true, ...live })).lines).toHaveLength(3);
   });
 });
 

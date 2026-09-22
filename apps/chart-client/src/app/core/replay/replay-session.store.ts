@@ -22,6 +22,7 @@ import { OrderLevelEdits, modifyFromDrop } from './order-level-edits';
 import { isTerminal, type MutationInput } from './mutation-rules';
 import { InstrumentFacts } from './instrument-facts';
 import { CloseNotices } from './close-notices';
+import { type OrderRemoval, orderRemoval } from './order-removal';
 import { CloseSoundSetting } from './close-sound.setting';
 import { lastClosesByInstrument, marginUtilisation, sessionMargin } from './session-margin';
 
@@ -68,6 +69,8 @@ export class ReplaySessionStore implements OnDestroy {
    * opened again. Persistent, unlike `notice`.
    */
   readonly halted = signal<string | null>(null);
+  /** BUG-017: a live order's tool asked to be removed — its cancel / close, waiting for the user's confirm. */
+  readonly removeRequest = signal<OrderRemoval | null>(null);
   /** T-051: the trades the server closed while the user watched — one snackbar notice each. */
   readonly closeNotices = new CloseNotices();
   private readonly closeSound = inject(CloseSoundSetting);
@@ -195,6 +198,35 @@ export class ReplaySessionStore implements OnDestroy {
     return null;
   }
 
+  /** The live order whose tool is active (T-023), if any. */
+  activeLiveOrderId(): string | null {
+    for (const store of this.toolStores.values()) if (store.activeOrderId()) return store.activeOrderId();
+    return null;
+  }
+
+  /** BUG-017: Delete / the ✕ on a live order's tool — asks before cancelling or closing it. */
+  requestRemove(orderId: string): void {
+    const order = this.portfolio.orders().find((o) => o.id === orderId);
+    const removal = order ? orderRemoval(order) : null;
+    if (removal) this.removeRequest.set(removal);
+  }
+
+  confirmRemove(): void {
+    const removal = this.removeRequest();
+    this.removeRequest.set(null);
+    if (removal?.action === 'cancel') this.cancelOrder(removal.orderId);
+    else if (removal?.action === 'close') this.closeOrder(removal.orderId);
+  }
+
+  dismissRemove(): void {
+    this.removeRequest.set(null);
+  }
+
+  /** Esc on a live order's tool: deselects it (removing needs Delete or its ✕, and a confirm). */
+  deselectLive(): void {
+    for (const store of this.toolStores.values()) if (store.activeOrderId()) store.deactivate();
+  }
+
   /** `B`/`S`: on the panel under the pointer, else the active tool's panel, else the first panel. */
   createDraft(side: 'long' | 'short'): void {
     if (this.halted()) return this.showHint(this.halted() as string);
@@ -256,9 +288,11 @@ export class ReplaySessionStore implements OnDestroy {
     return {
       view,
       apply: (change) =>
-        change.type === 'update' && change.tool.kind !== 'draft' && change.tool.orderId
-          ? this.dragOrderLevels(panelId, change.tool, change.final)
-          : store.apply(change),
+        change.type === 'remove'
+          ? this.requestRemove(change.id) // BUG-017: a live tool's ✕ (its id is the order id)
+          : change.type === 'update' && change.tool.kind !== 'draft' && change.tool.orderId
+            ? this.dragOrderLevels(panelId, change.tool, change.final)
+            : store.apply(change),
       setPointerPrice: (price, timeMs) => {
         store.pointerPrice.set(price);
         store.pointerTime.set(timeMs ?? null);
