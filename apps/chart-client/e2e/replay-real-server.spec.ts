@@ -564,3 +564,33 @@ test('T-045: B → drag the stop → Enter → the order popup → Confirm → t
   await expect(page.getByTestId('position-1')).toBeVisible();
   if (process.env['T045_SHOTS']) await page.screenshot({ path: `${process.env['T045_SHOTS']}/after-confirm.png` });
 });
+
+test('T-048: by clicks only — Buy → Place → Confirm places an order; Positions → Close closes it', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  const s = await createSession(page, { name: `rw clicks ${Date.now()}`, from, to: from + 3 * 60 * MIN, tf: '5m' });
+  await openWorkspace(page, s.id);
+  const orders = async () => get(page, `/backtest/sessions/${s.id}/orders`) as Promise<Json[]>;
+
+  await page.getByTestId('trade-buy').click();
+  await page.getByTestId('trade-place').click();
+  const popup = page.getByTestId('order-popup');
+  await expect(popup).toBeVisible();
+  expect(await orders()).toEqual([]); // the popup is the submit step
+  await popup.getByTestId('order-confirm').click();
+  await expect(popup).toHaveCount(0);
+  await expect.poll(async () => (await orders()).map((o) => [o.side, o.type, o.status]), { timeout: 10_000 }).toEqual([['long', 'market', 'open']]);
+
+  // closed by hand before any step: a step could reach the draft's tight default stop first
+  await page.getByTestId('positions-toggle').click();
+  await page.getByTestId('positions-dropdown').getByRole('button', { name: 'Close' }).click();
+  await expect.poll(async () => (await orders()).map((o) => [o.status, o.closeReason]), { timeout: 10_000 }).toEqual([['closed', 'manual']]);
+
+  await page.getByTestId('replay-step').click(); // and a step by click too
+  await expect.poll(async () => (await get(page, `/backtest/sessions/${s.id}`)).session.cursorMs, { timeout: 10_000 }).toBe(from + 5 * MIN);
+  if (process.env['T048_SHOTS']) {
+    await page.getByTestId('trade-buy').hover();
+    await page.screenshot({ path: `${process.env['T048_SHOTS']}/toolbar-trade-controls.png`, clip: { x: 0, y: 0, width: page.viewportSize()!.width, height: 120 } });
+  }
+});
+

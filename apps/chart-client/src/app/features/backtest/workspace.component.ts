@@ -7,6 +7,7 @@ import { LayoutEditorComponent } from './layout-editor.component';
 import { ReplayToolbarComponent } from './replay-toolbar.component';
 import { OrderPanelComponent } from './order-panel.component';
 import { PositionsDropdownComponent } from './positions-dropdown.component';
+import { TradeControlsComponent } from './trade-controls.component';
 import { JournalComponent } from './journal.component';
 import { StatsSummaryComponent } from './stats-summary.component';
 import { adjacentTimeframe, keyAllowed, replayKeyAction } from './replay-keys';
@@ -32,6 +33,7 @@ import { adjacentTimeframe, keyAllowed, replayKeyAction } from './replay-keys';
     StatsSummaryComponent,
     OrderPanelComponent,
     PositionsDropdownComponent,
+    TradeControlsComponent,
   ],
   providers: [ReplaySessionStore, LayoutsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,9 +90,9 @@ export class WorkspaceComponent {
     const engine = this.engine();
     const action = engine ? replayKeyAction(event) : null;
     if (!engine || !action) return;
-    // Enter and Esc on the positions dropdown's own buttons are theirs (Enter clicks a Close, Esc
-    // closes the list; T-046) — the other hotkeys still work with focus left on its toggle
-    if ((action === 'order' || action === 'cancel') && (event.target as Element | null)?.closest?.('app-positions-dropdown')) return;
+    // Enter and Esc on the toolbar's own buttons (the positions dropdown, T-046; the trade controls,
+    // T-048) are theirs — Enter clicks the focused button — the other hotkeys still work there
+    if ((action === 'order' || action === 'cancel') && (event.target as Element | null)?.closest?.('app-positions-dropdown, app-trade-controls')) return;
     if (!keyAllowed(action, { completed: engine.completed(), viewOnly: engine.viewOnly })) return;
     if (this.orderPopup()) {
       // the popup is modal: Enter confirms, Esc closes it (keeping the draft), nothing else acts.

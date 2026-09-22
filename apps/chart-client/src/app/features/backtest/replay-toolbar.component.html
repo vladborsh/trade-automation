@@ -1,6 +1,6 @@
 <header class="toolbar">
   <a class="back" routerLink="/sessions" title="All sessions">&#x2039; Sessions</a>
-  <span class="name">{{ sessionName() }}</span>
+  <span class="name" [title]="sessionName()">{{ sessionName() }}</span>
 
   <span class="cursor" data-testid="replay-cursor" title="Replay cursor (UTC)">{{ cursorText() }}</span>
 
@@ -53,7 +53,7 @@
   @if (error(); as message) {
     <span class="error" role="alert">{{ message }}</span>
   }
-  <!-- the workspace's own controls on the right (T-046: the positions dropdown) -->
+  <!-- the workspace's own controls on the right (T-048 trade controls, T-046 positions dropdown) -->
   <ng-content select="[toolbarEnd]" />
   <span class="open-risk" data-testid="replay-open-risk" title="Open risk: what the open positions' current stops would lose">risk {{ openRiskText() }}</span>
   <span class="balance" data-testid="replay-balance" title="Balance">{{ balanceText() }}</span>

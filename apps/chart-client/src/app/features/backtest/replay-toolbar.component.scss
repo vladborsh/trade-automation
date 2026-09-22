@@ -1,11 +1,23 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   padding: 6px 12px;
   border-bottom: 1px solid #30363d;
   font-size: 13px;
   color: #c9d1d9;
+}
+/* T-048: with the trade controls the bar is full at 1280 px — keep every item on one line; only the
+   session name gives way (ellipsis) */
+.toolbar > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.toolbar > .name {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .back {
   color: #8b949e;

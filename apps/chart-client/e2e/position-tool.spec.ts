@@ -175,3 +175,44 @@ test('T-045: the order popup appears only at Enter; Esc, Cancel and a click outs
   await expect(popup).toHaveCount(0);
   expect((await tools(page)).length).toBe(1); // the draft is still there, after all three
 });
+
+test('T-048: by clicks only — Buy / Sell draw tools, Place opens the order popup, Cancel keeps the draft', async ({ page }) => {
+  const created = await page.context().request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name: `e2e trade controls ${Date.now()}`,
+      layout: { id: 'tc-e2e', name: 'TC e2e', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+      timeframe: '5m',
+      periodFromMs: FRIDAY_2140,
+      periodToMs: FRIDAY_2140 + 3 * 86_400_000,
+      initialBalance: 10_000,
+      defaultRiskPct: 1,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+    },
+  });
+  const session = (await created.json()) as Session;
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+
+  await expect(page.getByTestId('trade-buy')).toHaveAttribute('title', /hotkey B/);
+  await expect(page.getByTestId('trade-sell')).toHaveAttribute('title', /hotkey S/);
+  await expect(page.getByTestId('trade-place')).toHaveAttribute('title', /hotkey Enter/);
+
+  await page.getByTestId('trade-buy').click();
+  await page.getByTestId('trade-sell').click();
+  await expect.poll(async () => (await tools(page)).map((t) => [t.side, t.mode, t.active])).toEqual([
+    ['long', 'market', false],
+    ['short', 'market', true],
+  ]);
+
+  if (process.env['T048_SHOTS']) {
+    await page.getByTestId('trade-sell').hover();
+    await page.screenshot({ path: `${process.env['T048_SHOTS']}/toolbar-trade-controls.png`, clip: { x: 0, y: 0, width: page.viewportSize()!.width, height: 120 } });
+  }
+  await page.getByTestId('trade-place').click();
+  const popup = page.getByTestId('order-popup');
+  await expect(popup).toBeVisible();
+  await expect(popup.getByTestId('order-panel')).toContainText('short market');
+  await popup.getByTestId('order-cancel').click();
+  await expect(popup).toHaveCount(0);
+  expect((await tools(page)).length).toBe(2);
+});

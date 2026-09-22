@@ -1,0 +1,36 @@
+.trade-controls {
+  display: inline-flex;
+  gap: 6px;
+}
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: transparent;
+  color: #c9d1d9;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: #8b949e;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.buy {
+  color: #26a69a;
+  border-color: #26a69a;
+}
+.sell {
+  color: #ef5350;
+  border-color: #ef5350;
+}
+kbd {
+  font: inherit;
+  font-size: 0.85em;
+  color: #8b949e;
+}

@@ -1,0 +1,32 @@
+<div class="trade-controls" role="group" aria-label="Trade">
+  <button
+    type="button"
+    class="buy"
+    data-testid="trade-buy"
+    title="Buy: draw a long position tool (hotkey B)"
+    [disabled]="disabled()"
+    (click)="clicked($event, () => draw.emit('long'))"
+  >
+    Buy <kbd>B</kbd>
+  </button>
+  <button
+    type="button"
+    class="sell"
+    data-testid="trade-sell"
+    title="Sell: draw a short position tool (hotkey S)"
+    [disabled]="disabled()"
+    (click)="clicked($event, () => draw.emit('short'))"
+  >
+    Sell <kbd>S</kbd>
+  </button>
+  <button
+    type="button"
+    class="place"
+    data-testid="trade-place"
+    title="Place the active position tool as an order (hotkey Enter)"
+    [disabled]="disabled()"
+    (click)="clicked($event, () => place.emit())"
+  >
+    Place <kbd>Enter</kbd>
+  </button>
+</div>

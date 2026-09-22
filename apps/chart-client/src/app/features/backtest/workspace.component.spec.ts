@@ -305,6 +305,39 @@ describe('WorkspaceComponent', () => {
     expect(store.createDraft).toHaveBeenCalledWith('long');
   });
 
+  it('T-048: Buy / Sell / Place in the toolbar run the same paths as B / S / Enter', async () => {
+    const { fixture, store, el } = await render();
+    const btn = (id: string) => el.querySelector<HTMLButtonElement>(`app-replay-toolbar [data-testid="trade-${id}"]`)!;
+    btn('buy').click();
+    btn('sell').click();
+    expect(store.createDraft.mock.calls).toEqual([['long'], ['short']]);
+
+    btn('place').click(); // no active draft: the store's hint only (decision 29)
+    expect(store.placeActiveDraft).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    btn('place').click(); // with one: the order popup, as Enter
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="order-popup"]')).not.toBeNull();
+    expect(store.placeActiveDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('T-048: the trade controls are disabled once the session is complete; Enter on them is theirs', async () => {
+    const { fixture, store, engine, el } = await render();
+    store.activeDraft = DRAFT;
+    store.draftVersion.update((v) => v + 1);
+    press('Enter', el.querySelector('[data-testid="trade-buy"]')!); // the focused button's own Enter
+    fixture.detectChanges();
+    expect(el.querySelector('app-order-panel')).toBeNull();
+    engine.completed.set(true);
+    fixture.detectChanges();
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="trade-buy"]')!.disabled).toBe(true);
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="trade-place"]')!.disabled).toBe(true);
+  });
+
   it('B / S / Esc / Enter are ignored while typing', async () => {
     const { store, el } = await render();
     const input = document.createElement('input');
