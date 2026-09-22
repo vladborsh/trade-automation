@@ -105,6 +105,16 @@
         </section>
       }
     </div>
+
+    <!-- T-042: the trade journal, always open (no collapsible); rows link to each trade's detail -->
+    <app-journal
+      class="journal"
+      [sessionId]="id()"
+      [orders]="orders()"
+      [currency]="session()?.sessionCurrency ?? ''"
+      [pricePrecision]="instruments.pricePrecision()"
+      [units]="instruments.units()"
+    />
   } @else {
     <p class="muted" role="status">Загружаем статистику…</p>
   }

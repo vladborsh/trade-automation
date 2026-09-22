@@ -71,12 +71,19 @@ async function setup(client: Partial<Record<keyof BacktestClient, ReturnType<typ
 const text = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
 describe('SessionListComponent', () => {
-  it('offers the full statistics for a complete session only (T-032)', async () => {
+  it("T-042: every session offers 'Open statistics' and Delete; the play icon is the only way into the workspace", async () => {
     const { el } = await setup({
       listSessions: vi.fn().mockResolvedValue([summary({ id: '00000000-0000-4000-8000-0000000000c1', status: 'complete' }), summary({ id: '00000000-0000-4000-8000-0000000000a1' })]),
     });
     const links = [...el.querySelectorAll('[data-testid="session-stats-link"]')];
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/sessions/00000000-0000-4000-8000-0000000000c1/stats']);
+    expect(links.map((a) => [a.textContent?.trim(), a.getAttribute('href')])).toEqual([
+      ['Open statistics', '/sessions/00000000-0000-4000-8000-0000000000c1/stats'],
+      ['Open statistics', '/sessions/00000000-0000-4000-8000-0000000000a1/stats'],
+    ]);
+    const actions = [...el.querySelectorAll('td.actions')].map((td) => [...td.querySelectorAll('a, button')].map((c) => c.textContent?.trim()));
+    expect(actions).toEqual([['Open statistics', 'Delete'], ['Open statistics', 'Delete']]);
+    const workspaceLinks = [...el.querySelectorAll('a')].filter((a) => /^\/sessions\/[0-9a-f-]{36}$/.test(a.getAttribute('href') ?? ''));
+    expect(workspaceLinks.map((a) => a.getAttribute('data-testid'))).toEqual(['session-play']); // only the active row's play icon
   });
 
   it('a play icon per row opens the replay workspace; a complete session gets a disabled one with a tooltip (T-041)', async () => {

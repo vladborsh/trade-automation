@@ -106,3 +106,67 @@ test('T-041: the play icon on a row opens that session in its workspace; a compl
   await replayStarted(page);
   await expect(page.getByTestId('replay-cursor')).toHaveText('2024-03-01 21:40 UTC');
 });
+
+async function createMockSession(page: import('@playwright/test').Page, name: string): Promise<{ id: string; periodToMs: number }> {
+  const from = Date.UTC(2024, 2, 1, 21, 40);
+  const res = await page.context().request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name, timeframe: '5m', periodFromMs: from, periodToMs: from + 10 * 60_000, initialBalance: 10_000, defaultRiskPct: 1,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+      layout: { id: 'l', name: 'L', grid: { columns: 1, rows: 1 }, panels: [{ id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false }] },
+    },
+  });
+  expect(res.status()).toBe(201);
+  return res.json();
+}
+
+test("T-042: 'Open statistics' from the list opens the stats page with the whole journal, row for row equal to GET …/orders", async ({ page }) => {
+  const name = `e2e journal ${Date.now()}`;
+  const s = await createMockSession(page, name);
+  const orders = (await (await page.context().request.get(`${apiUrl()}/backtest/sessions/${s.id}/orders`)).json()) as Array<{ id: string; seq: number; status: string; pnlCcy: number | null }>;
+  expect(orders.length).toBeGreaterThan(1);
+
+  await page.goto('/sessions');
+  const row = page.getByTestId('session-row').filter({ hasText: name });
+  await expect(row.getByRole('link', { name: 'Open', exact: true })).toHaveCount(0); // the play icon replaced it
+  await row.getByRole('link', { name: 'Open statistics' }).click();
+  await expect(page).toHaveURL(new RegExp(`/sessions/${s.id}/stats$`));
+
+  const journal = page.locator('app-journal');
+  await expect(journal.getByTestId('journal-row')).toHaveCount(orders.length, { timeout: 15_000 });
+  await expect(journal.getByTestId('journal-toggle')).toHaveCount(0); // always open on this page
+  const rows = await journal.getByTestId('journal-row').evaluateAll((trs) =>
+    trs.map((tr) => ({
+      id: tr.getAttribute('data-order-id'),
+      seq: tr.querySelector('[data-field="seq"]')?.getAttribute('data-value'),
+      status: tr.querySelector('[data-field="status"]')?.getAttribute('data-value'),
+      pnlCcy: tr.querySelector('[data-field="pnlCcy"]')?.getAttribute('data-value') ?? null,
+    })),
+  );
+  const raw = (v: unknown) => (v === null || v === undefined ? null : String(v));
+  expect(rows).toEqual([...orders].sort((a, b) => a.seq - b.seq).map((o) => ({ id: o.id, seq: String(o.seq), status: o.status, pnlCcy: raw(o.pnlCcy) })));
+
+  if (process.env['T042_SHOTS']) {
+    await journal.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${process.env['T042_SHOTS']}/stats-journal.png`, fullPage: true });
+  }
+  // a row links to its trade detail
+  const first = [...orders].sort((a, b) => a.seq - b.seq)[0];
+  await journal.locator(`[data-order-id="${first.id}"] [data-field="seq"] a`).click();
+  await expect(page).toHaveURL(new RegExp(`/sessions/${s.id}/trades/${first.id}$`));
+});
+
+test('T-042: at 1280 px a long session name still fits the sessions table — no sideways scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const LONG_NAME = 'London open breakout — BTC & ETH practice 2024'; // a fixed, realistic long name (46 chars)
+  const s = await createMockSession(page, LONG_NAME);
+  await page.context().request.post(`${apiUrl()}/backtest/sessions/${s.id}/advance`, { data: { opId: crypto.randomUUID(), toCursorMs: s.periodToMs } }); // complete: the widest status
+  await page.goto('/sessions');
+  await expect(page.getByTestId('session-row').filter({ hasText: LONG_NAME }).first()).toBeVisible();
+  const fit = await page.evaluate(() => {
+    const w = document.querySelector('.table-scroll')!;
+    return { scrollW: w.scrollWidth, clientW: w.clientWidth };
+  });
+  expect(fit.scrollW, `table ${fit.scrollW}px in a ${fit.clientW}px container`).toBeLessThanOrEqual(fit.clientW);
+  if (process.env['T042_SHOTS']) await page.screenshot({ path: `${process.env['T042_SHOTS']}/sessions-1280.png` });
+});

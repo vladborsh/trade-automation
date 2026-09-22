@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { RouterLink } from '@angular/router';
 import type { Order, Session, SessionStatsResponse } from '@trade-automation/contracts';
 import { BacktestClient } from '../../core/api/backtest.client';
+import { InstrumentFacts } from '../../core/replay/instrument-facts';
 import { EquityChartComponent } from './equity-chart.component';
+import { JournalComponent } from './journal.component';
 import { type EquityUnit, breakdownRows, fullStatsItems, maeItems, rHistogram } from './stats-full';
 
 /**
@@ -11,11 +13,13 @@ import { type EquityUnit, breakdownRows, fullStatsItems, maeItems, rHistogram } 
  * `pnlR` of the closed orders. A route rather than a workspace tab: it opens a complete session from
  * the list without starting the replay engine, and it is its own lazy chunk. Captions are in plain
  * Russian — this screen is read by the trader (PROJECT.md "Communicating with the user").
+ * T-042: below the figures, the session's whole trade journal (the workspace's journal component,
+ * always open here), each row linking to its trade detail.
  */
 @Component({
   selector: 'app-stats-full',
   standalone: true,
-  imports: [RouterLink, EquityChartComponent],
+  imports: [RouterLink, EquityChartComponent, JournalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './stats-full.component.html',
   styleUrl: './stats-full.component.scss',
@@ -28,7 +32,11 @@ export class StatsFullComponent {
 
   readonly session = signal<Session | null>(null);
   readonly response = signal<SessionStatsResponse | null>(null);
-  readonly closed = signal<readonly Order[]>([]);
+  /** Every order of the session (`GET …/orders`): the journal; the closed ones feed the R distribution. */
+  readonly orders = signal<readonly Order[]>([]);
+  readonly closed = computed(() => this.orders().filter((o) => o.status === 'closed'));
+  /** Price decimals and qty units for the journal (T-054's facts). */
+  readonly instruments = new InstrumentFacts();
   readonly error = signal<string | null>(null);
   readonly unit = signal<EquityUnit>('ccy');
 
@@ -57,14 +65,16 @@ export class StatsFullComponent {
   private async load(id: string): Promise<void> {
     this.error.set(null);
     try {
-      const [{ session }, stats, closed] = await Promise.all([
+      const [{ session }, stats, orders, instruments] = await Promise.all([
         this.client.getSession(id),
         this.client.getStats(id),
-        this.client.listOrders(id, 'closed'),
+        this.client.listOrders(id),
+        this.client.getInstruments(),
       ]);
+      this.instruments.set(instruments);
       this.session.set(session);
       this.response.set(stats);
-      this.closed.set(closed);
+      this.orders.set(orders);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
     }

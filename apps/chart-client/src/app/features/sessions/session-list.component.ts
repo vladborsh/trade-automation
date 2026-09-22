@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { SessionSummary } from '@trade-automation/contracts';
 import { BacktestClient } from '../../core/api/backtest.client';
 import { AppNavComponent } from '../nav/app-nav.component';
-import { formatMoney, formatPeriod, formatPnl, formatR, layoutInstruments } from './session-format';
+import { formatMoney, formatPnl, formatR, formatUtcMinute, layoutInstruments } from './session-format';
 import { deleteSessionErrorMessage, loadErrorMessage } from './session-messages';
 
 /**
@@ -30,7 +30,8 @@ export class SessionListComponent implements OnInit {
   readonly deleting = signal<string | null>(null);
   readonly deleteError = signal<{ id: string; message: string } | null>(null);
 
-  readonly period = (s: SessionSummary) => formatPeriod(s.periodFromMs, s.periodToMs);
+  readonly periodFrom = (s: SessionSummary) => formatUtcMinute(s.periodFromMs);
+  readonly periodTo = (s: SessionSummary) => formatUtcMinute(s.periodToMs);
   readonly instruments = (s: SessionSummary) => layoutInstruments(s.layout);
   readonly balance = (s: SessionSummary) => formatMoney(s.balance, s.sessionCurrency);
   readonly pnl = (s: SessionSummary) => formatPnl(s.pnlCcy, s.sessionCurrency);

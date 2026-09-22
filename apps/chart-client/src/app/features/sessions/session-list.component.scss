@@ -50,9 +50,16 @@ th {
 .name {
   color: #c9d1d9;
   font-weight: 600;
+  /* T-042: a long name wraps rather than widening the table past a 1280 px window */
+  white-space: normal;
+  min-width: 16ch;
 }
 .period {
   color: #8b949e;
+  white-space: normal;
+}
+.period .part {
+  white-space: nowrap;
 }
 .status {
   color: #26a69a;

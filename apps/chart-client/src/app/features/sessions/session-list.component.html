@@ -47,7 +47,8 @@
               </td>
               <td class="name">{{ s.name }}</td>
               <td>{{ instruments(s) }}</td>
-              <td class="period">{{ period(s) }}</td>
+              <!-- T-042: may wrap, but only at the arrow (1280 px with the play column and a long name) -->
+              <td class="period"><span class="part">{{ periodFrom(s) }} →</span>&ngsp;<span class="part">{{ periodTo(s) }} UTC</span></td>
               <td>{{ s.timeframe }}</td>
               <td><span class="status" [class.complete]="s.status === 'complete'">{{ s.status }}</span></td>
               <td class="num">{{ balance(s) }}</td>
@@ -57,10 +58,8 @@
               <td class="actions">
                 <!-- the flex row sits inside the cell: a display:flex <td> leaves the table layout (T-041) -->
                 <div class="actions-row">
-                  <a [routerLink]="['/sessions', s.id]">Open</a>
-                  @if (s.status === 'complete') {
-                    <a [routerLink]="['/sessions', s.id, 'stats']" data-testid="session-stats-link">Статистика</a>
-                  }
+                  <!-- T-042: the play icon opens the workspace; statistics for every session -->
+                  <a [routerLink]="['/sessions', s.id, 'stats']" data-testid="session-stats-link">Open statistics</a>
                   <button type="button" class="link danger" (click)="askDelete(s.id)" [disabled]="deleting() === s.id">Delete</button>
                 </div>
               </td>

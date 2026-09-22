@@ -23,12 +23,23 @@ const fakeChart = () => {
   return { addSeries: vi.fn(() => s), priceScale: () => ({ applyOptions: vi.fn() }), timeScale: () => ({ fitContent: vi.fn() }), remove: vi.fn() };
 };
 
-async function render(computed: SessionStats, closed: Partial<Order>[] = [], drift = false) {
+/** A full order row (the journal renders every field); closed by default. */
+let seq = 0;
+const order = (extra: Partial<Order> = {}): Order =>
+  ({
+    id: `o${++seq}`, seq, instrument: 'binance:BTCUSDT', side: 'long', type: 'market', status: 'closed', placedAtMs: T0, entryPrice: 100,
+    entryTimeMs: T0, exitPrice: 110, exitTimeMs: T0 + 60_000, closeReason: 'take-profit', qty: 0.1, commissionCcy: 0, spreadCostCcy: 0,
+    pnlCcy: 1, pnlR: 0.1, maeR: 0.2, fillResolution: '1m', slTpSameBar: false, slInitial: 95, slCurrent: 95, ...extra,
+  }) as Order;
+
+/** `orders` is every order of the session (`GET …/orders`, T-042); partials become full closed rows. */
+async function render(computed: SessionStats, orders: Partial<Order>[] = [], drift = false) {
   const errors: unknown[] = [];
   const client = {
     getSession: vi.fn(async () => ({ session: SESSION })),
     getStats: vi.fn(async () => ({ computed, stored: {}, drift })),
-    listOrders: vi.fn(async () => closed as Order[]),
+    listOrders: vi.fn(async () => orders.map((o) => order(o))),
+    getInstruments: vi.fn(async () => [{ id: 'binance:BTCUSDT', pricePrecision: 1, contract: { unit: 'BTC' } }]),
   };
   TestBed.configureTestingModule({
     imports: [StatsFullComponent],
@@ -53,7 +64,7 @@ describe('StatsFullComponent', () => {
   it('an empty session renders, says there are no trades yet, and shows the seed point only', async () => {
     const { el, errors, client } = await render(stats({}));
     expect(errors).toEqual([]);
-    expect(client.listOrders).toHaveBeenCalledWith('s1', 'closed');
+    expect(client.listOrders).toHaveBeenCalledWith('s1'); // every order: the journal (T-042)
     expect(el.querySelector('[data-testid="stats-empty"]')).not.toBeNull();
     expect(el.querySelectorAll('[data-testid="equity-points"] li')).toHaveLength(1);
     expect(el.querySelector('[data-stat="winRate"] .value')?.textContent).toBe('—');
@@ -95,5 +106,19 @@ describe('StatsFullComponent', () => {
     expect(value(el, 'byInstrument.binance:ETHUSDT.pnl')).toBe('-60');
     expect(el.querySelector('[data-testid="pessimistic-callout"]')?.textContent).toContain('1 из 3 сделок посчитаны по барам');
     expect(el.querySelector('[data-testid="stats-drift"]')).not.toBeNull();
+  });
+
+  it('T-042: the whole journal below the figures — every order, always open, rows linking to the trade detail; the R bins count closed trades only', async () => {
+    const orders = [{ pnlR: 1.5 }, { status: 'open', exitPrice: null, exitTimeMs: null, closeReason: null, pnlCcy: null, pnlR: null }, { status: 'cancelled', pnlR: null }] as Partial<Order>[];
+    const { el, errors } = await render(stats({ trades: 1 }), orders);
+    expect(errors).toEqual([]);
+    const rows = [...el.querySelectorAll('app-journal [data-testid="journal-row"]')];
+    expect(rows.map((r) => r.querySelector('[data-field="status"]')?.getAttribute('data-value'))).toEqual(['closed', 'open', 'cancelled']);
+    const first = rows[0].getAttribute('data-order-id');
+    expect(rows[0].querySelector('[data-field="seq"] a')?.getAttribute('href')).toBe(`/sessions/s1/trades/${first}`);
+    expect(el.querySelector('[data-testid="journal-toggle"]')).toBeNull(); // not collapsible here
+    expect(rows[0].querySelector('[data-field="entryPrice"]')?.textContent?.trim()).toBe('100.0'); // the instrument's precision
+    const counts = [...el.querySelectorAll('[data-testid="r-histogram"] li')].map((li) => Number(li.getAttribute('data-count')));
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(1); // the open and the cancelled order are not in the distribution
   });
 });
