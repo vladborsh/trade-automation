@@ -1,4 +1,4 @@
-<main class="page">
+<main class="page fluid-page">
   <nav class="crumbs">
     <a routerLink="/sessions">&#x2039; Сессии</a>
     @if (session(); as s) {
@@ -83,22 +83,24 @@
           @if (table.rows.length === 0) {
             <p class="muted">Нет закрытых сделок.</p>
           } @else {
-            <table>
-              <thead>
-                <tr><th scope="col"></th><th scope="col">Сделок</th><th scope="col">Прибыльных</th><th scope="col">Результат</th><th scope="col">В R</th></tr>
-              </thead>
-              <tbody>
-                @for (row of table.rows; track row.key) {
-                  <tr [attr.data-breakdown]="row.key">
-                    <th scope="row">{{ row.label }}</th>
-                    <td [attr.data-stat]="row.key + '.trades'" [attr.data-value]="row.raw.trades">{{ row.trades }}</td>
-                    <td [attr.data-stat]="row.key + '.winRate'" [attr.data-value]="row.raw.winRate">{{ row.winRate }}</td>
-                    <td [attr.data-stat]="row.key + '.pnl'" [attr.data-value]="row.raw.pnl">{{ row.pnl }}</td>
-                    <td [attr.data-stat]="row.key + '.pnlR'" [attr.data-value]="row.raw.pnlR">{{ row.pnlR }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th scope="col"></th><th scope="col">Сделок</th><th scope="col">Прибыльных</th><th scope="col">Результат</th><th scope="col">В R</th></tr>
+                </thead>
+                <tbody>
+                  @for (row of table.rows; track row.key) {
+                    <tr [attr.data-breakdown]="row.key">
+                      <th scope="row">{{ row.label }}</th>
+                      <td [attr.data-stat]="row.key + '.trades'" [attr.data-value]="row.raw.trades">{{ row.trades }}</td>
+                      <td [attr.data-stat]="row.key + '.winRate'" [attr.data-value]="row.raw.winRate">{{ row.winRate }}</td>
+                      <td [attr.data-stat]="row.key + '.pnl'" [attr.data-value]="row.raw.pnl">{{ row.pnl }}</td>
+                      <td [attr.data-stat]="row.key + '.pnlR'" [attr.data-value]="row.raw.pnlR">{{ row.pnlR }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           }
         </section>
       }

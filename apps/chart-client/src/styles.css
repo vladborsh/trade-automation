@@ -11,3 +11,23 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/*
+ * T-038: the page frame shared by the sessions list, session create, full statistics and trade
+ * detail. Full width, no max-width cap, with side padding that grows with the viewport
+ * (16 px on a phone, 40 px on a wide screen). The replay workspace keeps its own full-bleed layout.
+ */
+.fluid-page {
+  display: block;
+  width: 100%;
+  padding: 20px clamp(16px, 3vw, 40px) 32px;
+}
+
+/*
+ * T-038: a wide table scrolls inside its own box on a narrow screen instead of widening the page.
+ * `position: relative` keeps absolutely positioned content (a visually-hidden header label) inside it.
+ */
+.fluid-page .table-scroll {
+  position: relative;
+  overflow-x: auto;
+}

@@ -1,7 +1,8 @@
 .app-nav {
   display: flex;
+  flex-wrap: wrap; /* T-038: on a narrow screen the account block drops to a second row */
   align-items: center;
-  gap: 16px;
+  gap: 8px 16px;
   padding: 8px 16px;
   border-bottom: 1px solid #30363d;
   font-size: 13px;
