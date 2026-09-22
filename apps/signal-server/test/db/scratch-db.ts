@@ -36,8 +36,15 @@ export async function dropLeftovers(admin: Client, prefix: string): Promise<stri
 }
 
 /**
- * Force-drops this run's own databases concurrently, one admin connection each (from `connect`),
- * and logs any drop that took over 2 s, so a slow teardown is visible rather than a bare timeout.
+ * Drops this run's own databases concurrently, one admin connection each (from `connect`), and logs
+ * any drop that took over 2 s, so a slow teardown is visible rather than a bare timeout.
+ *
+ * A plain `DROP DATABASE` comes first; `FORCE` only if the database is still in use after that
+ * (55006). pg-pool's `end()` resolves as soon as it has told its clients to end, before their
+ * server backends have exited. An immediate `WITH (FORCE)` then terminates a backend that is
+ * already shutting down (57P01), and the pool re-emits that as an unhandled `error`, which failed
+ * a suite (BUG-012, run 5). A plain drop waits for those backends (Postgres allows up to 5 s)
+ * instead of killing them.
  */
 export async function dropOwn(connect: () => Promise<Client>, names: readonly string[]): Promise<void> {
   await Promise.all(
@@ -45,7 +52,13 @@ export async function dropOwn(connect: () => Promise<Client>, names: readonly st
       const started = Date.now();
       const admin = await connect();
       try {
-        await admin.query(`drop database if exists ${name} with (force)`);
+        try {
+          await admin.query(`drop database if exists ${name}`);
+        } catch (err) {
+          if ((err as { code?: string }).code !== '55006') throw err; // object_in_use: something still holds it
+          await admin.query(`drop database if exists ${name} with (force)`);
+          process.stderr.write(`scratch-db: ${name} was still in use after 5 s; dropped WITH (FORCE)\n`);
+        }
       } finally {
         await admin.end();
       }
@@ -56,8 +69,8 @@ export async function dropOwn(connect: () => Promise<Client>, names: readonly st
 }
 
 /**
- * Jest hook timeout for creating and dropping databases. `DROP DATABASE ... WITH (FORCE)` takes
- * 0.3-0.7 s on an idle instance, but seconds on a busy one (a full with-DB run, a Postgres fresh from
+ * Jest hook timeout for creating and dropping databases. `DROP DATABASE` takes 0.3-0.7 s on an idle
+ * instance, but seconds on a busy one (a full with-DB run, a Postgres fresh from
  * a restart). Jest's default 5 s hook timeout failed teardown twice after the 2026-09-22 reboot
  * (BUG-012). This is a legitimately slow operation, not a masked test.
  */
