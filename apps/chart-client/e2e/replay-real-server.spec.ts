@@ -288,6 +288,7 @@ test('journey: keyboard orders, a manual close, the period end; every number equ
     }
     expect(r['closeReason']).toBe(o.closeReason);
   }
+  await openStatsDetails(page); // T-064: the Details overlay closes on any click elsewhere, so open it for the read
   const shown = await stats(page);
   for (const [k, v] of [['trades', c.trades], ['pnl', c.pnl], ['pnlR', c.pnlR], ['maxDrawdownCcy', c.maxDrawdownCcy], ['maxDrawdownR', c.maxDrawdownR]] as const) {
     expect(close(Number(shown[k]), v, 1e-9), `summary ${k}: ${shown[k]} vs ${v}`).toBe(true);

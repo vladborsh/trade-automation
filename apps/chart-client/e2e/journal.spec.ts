@@ -100,3 +100,40 @@ test('T-044: the statistics show P&L only; Details reveals the rest and hides it
   await toggle.click();
   await expect(figures).toHaveCount(2);
 });
+
+test('T-064: the statistics are one line; Details opens upward over the chart without moving the chart area, and closes on Esc or outside', async ({ page }) => {
+  const session = await createSession(page, `e2e stats line ${Date.now()}`);
+  const toggle = page.getByTestId('stats-details-toggle');
+  const overlay = page.getByTestId('stats-details');
+  for (const width of [1280, 1920]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(`/sessions/${session.id}`);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false', { timeout: 15_000 });
+
+    const line = (await page.locator('app-stats-summary .line').boundingBox())!;
+    const pnl = (await page.locator('app-stats-summary [data-stat="pnl"]').boundingBox())!;
+    const t = (await toggle.boundingBox())!;
+    expect(Math.abs(pnl.y + pnl.height / 2 - (t.y + t.height / 2)), `${width}px: P&L and Details on one line`).toBeLessThan(4);
+    expect(line.height, `${width}px: the line is one text row`).toBeLessThan(32);
+
+    const chartBefore = (await page.locator('.main').boundingBox())!;
+    await toggle.click();
+    await expect(overlay).toBeVisible();
+    const chartAfter = (await page.locator('.main').boundingBox())!;
+    expect(chartAfter, `${width}px: the chart area does not move`).toEqual(chartBefore);
+    const o = (await overlay.boundingBox())!;
+    expect(o.y + o.height, `${width}px: the overlay grows upward from the toggle`).toBeLessThanOrEqual(t.y + 1);
+    expect(o.y, `${width}px: and over the chart`).toBeLessThan(chartBefore.y + chartBefore.height);
+    await expect(page.locator('.stats [data-stat]')).toHaveCount(12);
+    if (process.env['T064_SHOTS']) await page.screenshot({ path: `${process.env['T064_SHOTS']}/details-open-${width}.png` });
+
+    await page.keyboard.press('Escape');
+    await expect(overlay).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+    await toggle.click();
+    await expect(overlay).toBeVisible();
+    await page.locator('.toolbar .name').click(); // outside
+    await expect(overlay).toHaveCount(0);
+    if (process.env['T064_SHOTS']) await page.screenshot({ path: `${process.env['T064_SHOTS']}/line-${width}.png` });
+  }
+});

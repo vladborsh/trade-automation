@@ -1,22 +1,62 @@
+/* T-064: one line, and the Details overlay above it — so nothing here may clip or scroll */
+:host {
+  display: block;
+  position: relative;
+}
 .stats {
-  height: 100%;
-  overflow: auto;
-}
-h2 .more {
-  float: right;
-  color: #26a69a;
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
-}
-h2 {
-  margin: 0;
-  padding: 6px 12px;
   font-size: 12px;
-  font-weight: 600;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+.headline {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.headline .item {
+  display: inline-flex;
+  gap: 6px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.more {
+  color: #26a69a;
+  text-decoration: none;
+}
+.more:hover,
+.more:focus-visible {
+  color: #c9d1d9;
+}
+.details-toggle {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
   color: #8b949e;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font: inherit;
+  cursor: pointer;
+}
+.details-toggle:hover,
+.details-toggle:focus-visible,
+.details-toggle[aria-expanded='true'] {
+  color: #c9d1d9;
+}
+.caret {
+  display: inline-block;
+  width: 1em;
 }
 .drift {
   margin: 0 12px 6px;
@@ -24,35 +64,25 @@ h2 {
   border: 1px solid #ef5350;
   border-radius: 4px;
   color: #ef5350;
-  font-size: 12px;
 }
-dl {
+/* the overlay: anchored to this box, growing upward over the chart; no layout shift */
+.details {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  margin-bottom: 4px;
+  padding: 6px 12px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45);
+}
+.details dl {
   margin: 0;
-  padding: 0 12px 8px;
-  font-size: 12px;
 }
-dl.headline {
-  padding-bottom: 2px;
-}
-.details-toggle {
-  margin: 0 6px 4px;
-  padding: 2px 6px;
-  border: 0;
-  background: none;
-  color: #8b949e;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.details-toggle:hover,
-.details-toggle:focus-visible {
-  color: #c9d1d9;
-}
-.caret {
-  display: inline-block;
-  width: 1em;
-}
-.item {
+.details .item {
   display: flex;
   justify-content: space-between;
   gap: 12px;

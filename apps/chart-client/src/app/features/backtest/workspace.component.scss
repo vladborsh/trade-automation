@@ -41,7 +41,7 @@
 .bottom .stats {
   width: 300px;
   flex-shrink: 0;
-  overflow: auto;
+  overflow: visible; /* T-064: its Details overlay grows upward, out of this box */
   border-left: 1px solid #30363d;
 }
 .message {

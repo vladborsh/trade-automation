@@ -38,6 +38,54 @@ describe('StatsSummaryComponent', () => {
     expect(el.querySelector('[data-testid="stats-drift"]')).toBeNull();
   });
 
+  it('T-064: headline, Details toggle and full-stats link on one line; Details is an overlay (not in the line), closed by a second click', () => {
+    const el = render(STATS) as HTMLElement & { detect: () => void };
+    const line = el.querySelector('.line')!;
+    expect([...line.querySelectorAll('[data-stat]')].map((i) => i.getAttribute('data-stat'))).toEqual(['pnl', 'pnlR']);
+    expect(line.querySelector('[data-testid="stats-details-toggle"]')).not.toBeNull();
+    expect([...el.querySelectorAll('dt')].map((d) => [d.textContent, d.classList.contains('visually-hidden')])).toEqual([
+      ['P&L', false],
+      ['P&L (R)', true], // the R figure's label is read out, not shown: the line stays short
+    ]);
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid="stats-details-toggle"]')!;
+    expect(toggle.textContent).toContain('▴'); // opens upward
+    toggle.click();
+    el.detect();
+    const overlay = el.querySelector('[data-testid="stats-details"]')!;
+    expect(overlay.classList.contains('details')).toBe(true);
+    expect(line.contains(overlay)).toBe(false);
+    expect(overlay.querySelectorAll('[data-stat]')).toHaveLength(10);
+    toggle.click();
+    el.detect();
+    expect(el.querySelector('[data-testid="stats-details"]')).toBeNull();
+  });
+
+  it('T-064: Esc closes Details and gives the focus back to the toggle; a click outside closes it, a click inside does not', () => {
+    const el = render(STATS) as HTMLElement & { detect: () => void };
+    document.body.appendChild(el);
+    try {
+      const toggle = el.querySelector<HTMLButtonElement>('[data-testid="stats-details-toggle"]')!;
+      toggle.click();
+      el.detect();
+      el.querySelector<HTMLElement>('[data-testid="stats-details"] dd')!.click(); // inside the overlay
+      el.detect();
+      expect(el.querySelector('[data-testid="stats-details"]')).not.toBeNull();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      el.detect();
+      expect(el.querySelector('[data-testid="stats-details"]')).toBeNull();
+      expect(document.activeElement).toBe(toggle);
+
+      toggle.click();
+      el.detect();
+      document.body.click(); // outside
+      el.detect();
+      expect(el.querySelector('[data-testid="stats-details"]')).toBeNull();
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    } finally {
+      el.remove();
+    }
+  });
+
   it('shows the drift notice when the stored aggregates differ', () => {
     const el = render(STATS, true);
     expect(el.querySelector('[data-testid="stats-drift"]')?.textContent).toMatch(/Stored aggregates differ/);

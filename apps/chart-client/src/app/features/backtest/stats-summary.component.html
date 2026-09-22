@@ -1,43 +1,50 @@
+<!--
+  T-064: one compact line — the headline (P&L in currency and R), the Details toggle and the link to
+  the full screen. Details opens as an overlay anchored to this box and growing UPWARD over the chart,
+  so nothing below or above it moves.
+-->
 <section class="stats" aria-label="Statistics">
-  <h2>
-    Statistics
-    @if (sessionId(); as id) {
-      <a class="more" data-testid="stats-full-link" [routerLink]="['/sessions', id, 'stats']">Подробная статистика &#x203A;</a>
+  <div class="line">
+    <dl class="headline">
+      @for (item of items().headline; track item.key) {
+        <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw" [title]="item.label + ': ' + item.text">
+          <dt [class.visually-hidden]="!$first">{{ item.label }}</dt>
+          <dd>{{ item.text }}</dd>
+        </div>
+      }
+    </dl>
+    @if (items().details.length > 0) {
+      <button
+        #toggle
+        type="button"
+        class="details-toggle"
+        data-testid="stats-details-toggle"
+        aria-controls="stats-details"
+        [attr.aria-expanded]="detailsOpen()"
+        (click)="toggleDetails()"
+      >
+        <span class="caret" aria-hidden="true">{{ detailsOpen() ? '▾' : '▴' }}</span> Details
+      </button>
     }
-  </h2>
+    @if (sessionId(); as id) {
+      <a class="more" data-testid="stats-full-link" [routerLink]="['/sessions', id, 'stats']" title="Подробная статистика" aria-label="Подробная статистика">&#x2197;</a>
+    }
+  </div>
   @if (drift()) {
     <p class="drift" data-testid="stats-drift" role="status">
       Stored aggregates differ from a full recompute — showing the recompute.
     </p>
   }
-  <dl class="headline">
-    @for (item of items().headline; track item.key) {
-      <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw">
-        <dt>{{ item.label }}</dt>
-        <dd>{{ item.text }}</dd>
-      </div>
-    }
-  </dl>
-  @if (items().details.length > 0) {
-    <button
-      type="button"
-      class="details-toggle"
-      data-testid="stats-details-toggle"
-      aria-controls="stats-details"
-      [attr.aria-expanded]="detailsOpen()"
-      (click)="toggleDetails()"
-    >
-      <span class="caret" aria-hidden="true">{{ detailsOpen() ? '▾' : '▸' }}</span> Details
-    </button>
-  }
   @if (detailsOpen()) {
-    <dl id="stats-details">
-      @for (item of items().details; track item.key) {
-        <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw">
-          <dt>{{ item.label }}</dt>
-          <dd>{{ item.text }}</dd>
-        </div>
-      }
-    </dl>
+    <div class="details" id="stats-details" data-testid="stats-details" role="region" aria-label="Statistics details">
+      <dl>
+        @for (item of items().details; track item.key) {
+          <div class="item" [attr.data-stat]="item.key" [attr.data-value]="item.raw">
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.text }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
   }
 </section>
