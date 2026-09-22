@@ -29,6 +29,7 @@ import type {
 } from '@trade-automation/contracts';
 import { TIMEFRAME_MS } from '@trade-automation/contracts';
 import { metricPlottedClose, toCandlestickData, toCandlestickSeries } from './chart-data.adapter';
+import { PaddingSeries } from './padding-series';
 import { CANDLE_SERIES_OPTIONS, CHART_OPTIONS } from './chart-options';
 import { MetricSeriesRenderer } from './metric-series.renderer';
 import { renderDiff } from './render-diff';
@@ -46,7 +47,7 @@ import { ChartCrosshair } from './chart-crosshair';
 import { ChartRangeSync } from './chart-range-sync';
 import { ChartSyncService } from './chart-sync.service';
 import { ResizeSettleTracker, observeResize } from './resize-settle';
-import { NEAR_START_BAR_MULTIPLIER, isNearOldestLoaded, logicalToTimeSec } from './chart-time';
+import { NEAR_START_BAR_MULTIPLIER, isNearOldestLoaded, logicalToTimeSec, mergeTimes, oldestLoadedMs } from './chart-time';
 
 
 /**
@@ -80,6 +81,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   /** T-047: indicator series titles on the chart (off on replay panels). */
   readonly indicatorLabels = input(true);
+  /** T-056: a replay panel's padded buckets (ms): time points without a bar, interior gaps included. */
+  readonly whitespace = input<readonly number[]>([]);
   readonly timeframe = input.required<Timeframe>();
   readonly panelId = input.required<string>();
   /** §9.1 position tools (replay only): what to draw, whether pointer hits are handled, the changes. */
@@ -94,12 +97,13 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
   readonly visibleTo = signal<number | null>(null);
 
   private readonly sync = inject(ChartSyncService);
+  private readonly barTimesSec = computed(() => (this.kind() === 'candles' ? this.candles().map((c) => c.openTime / 1000) : this.points().map((p) => p.time / 1000)));
   private readonly crosshair = new ChartCrosshair(
     {
       chart: () => this.chart,
       series: () => this.series,
       panelId: () => this.panelId(),
-      timesSec: () => this.lastTimesSec,
+      timesSec: () => this.barTimesSec(), // real bars only: `valueAt` indexes them, padding has no value
       tfSec: () => this.tfSec(),
       valueAt: (idx) =>
         this.kind() === 'candles' ? this.candles()[idx]?.close : metricPlottedClose(this.points()[idx]),
@@ -136,6 +140,8 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
    * inline, so the Follow effect's prepend-preservation reads the PRE-`setData` array.
    */
   private lastTimesSec: number[] = [];
+  /** T-056: the hidden helper series that gives a replay panel's padded buckets their time points. */
+  private readonly padding = new PaddingSeries();
 
   /** Follow, Drive and the reentrancy guards between them (chart-range-sync.ts). */
   private readonly rangeSync = new ChartRangeSync(
@@ -163,7 +169,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
     effect(() => {
       if (this.kind() === 'candles') {
-        this.renderCandles(this.candles());
+        this.renderCandles(this.candles(), this.whitespace());
       } else {
         this.renderPoints(this.points());
       }
@@ -235,6 +241,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
       : this.metricSeries.attach(this.chart, this.timeframe());
 
     if (isCandles) {
+      this.padding.attach(this.chart); // T-056
       this.overlayLayer.attachAll(this.chart, this.series);
       this.positionToolLayer.attach(el, this.series);
     }
@@ -293,7 +300,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
 
     // re-run pending effects now that chart/series exist
     if (isCandles) {
-      this.renderCandles(this.candles());
+      this.renderCandles(this.candles(), this.whitespace());
       this.overlayLayer.render(this.overlays());
     } else {
       this.renderPoints(this.points());
@@ -312,16 +319,6 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     return TIMEFRAME_MS[this.timeframe()] / 1000;
   }
 
-  /** Oldest loaded bar's open/point time, ms-epoch (wire scale) — null if nothing's loaded yet. */
-  private oldestLoadedTimeMs(): number | null {
-    if (this.kind() === 'candles') {
-      const candles = this.candles();
-      return candles.length > 0 ? candles[0].openTime : null;
-    }
-    const points = this.points();
-    return points.length > 0 ? points[0].time : null;
-  }
-
   /**
    * Time-based near-start check (replaces the old absolute logical-index one) for this panel's
    * own oldest loaded bar. Invariant to total buffer size and to which gesture (zoom vs. pan)
@@ -329,10 +326,11 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
    * comment.
    */
   private isNearThisPanelsOldestLoaded(visibleFromSec: number): boolean {
-    return isNearOldestLoaded(visibleFromSec, this.oldestLoadedTimeMs(), this.timeframe(), NEAR_START_BAR_MULTIPLIER);
+    const oldestMs = oldestLoadedMs(this.kind(), this.candles(), this.points());
+    return isNearOldestLoaded(visibleFromSec, oldestMs, this.timeframe(), NEAR_START_BAR_MULTIPLIER);
   }
 
-  private renderCandles(candles: Candle[]): void {
+  private renderCandles(candles: Candle[], whitespace: readonly number[]): void {
     if (!this.series || this.kind() !== 'candles') {
       return;
     }
@@ -340,6 +338,7 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     const wasEmpty = this.lastRenderedCount === 0;
     if (candles.length === 0) {
       series.setData([]);
+      this.padding.render([]);
       this.lastRenderedCount = 0;
       this.lastRenderedTime = null;
       this.lastTimesSec = [];
@@ -347,12 +346,10 @@ export class ChartComponent implements AfterViewInit, OnDestroy {
     }
 
     const diff = renderDiff(this.lastRenderedCount, this.lastRenderedTime, candles.length, candles[candles.length - 1].openTime);
-    const timesSec = candles.map((c) => c.openTime / 1000);
-    if (diff === 'update') {
-      series.update(toCandlestickData(candles[candles.length - 1]));
-    } else {
-      this.rangeSync.withPreservedRangeOnPrepend(diff === 'prepend', timesSec, () => series.setData(toCandlestickSeries(candles)));
-    }
+    // T-056: a replay panel's padded buckets (padding-series.ts) take their own time points
+    const timesSec = mergeTimes(this.barTimesSec(), whitespace.map((t) => t / 1000));
+    const draw = () => (diff === 'update' ? series.update(toCandlestickData(candles[candles.length - 1])) : series.setData(toCandlestickSeries(candles)));
+    this.rangeSync.withPreservedRangeOnPrepend(diff === 'prepend', timesSec, () => (draw(), this.padding.render(whitespace)));
     this.lastRenderedCount = candles.length;
     this.lastRenderedTime = candles[candles.length - 1].openTime;
     this.lastTimesSec = timesSec;

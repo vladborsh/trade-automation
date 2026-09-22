@@ -3,6 +3,7 @@ import type { Candle, IndicatorPoint, IndicatorSeriesSpec, MetricPoint, OverlayP
 import type { PanelPositionTools, PanelSource } from '../../features/panel-grid/panel-source';
 import { CaptureSlot } from './capture-chart';
 import { seriesBars } from './fold-on-step';
+import { padToBucket } from './pad-to-bucket';
 import { panelIndicators } from './panel-indicators';
 import type { ReplayEngine } from './replay-engine';
 
@@ -26,6 +27,12 @@ export class ReplayPanelSource implements PanelSource {
   readonly capture = new CaptureSlot();
   /** T-047: indicators are lines only on replay panels. */
   readonly indicatorLabels = false;
+  /**
+   * T-056 (ruling A): every bucket without a bar from the first bar to the cursor's, at the panel's
+   * timeframe — only the chart sees it: `candles` (and so the indicators, the fills and the position
+   * tools) stay real bars.
+   */
+  readonly whitespace: Signal<readonly number[]>;
 
   constructor(
     readonly panel: Panel & Pick<SessionPanel, 'indicators'>,
@@ -34,6 +41,7 @@ export class ReplayPanelSource implements PanelSource {
   ) {
     const series = engine.seriesFor(panel.id);
     this.candles = computed(() => seriesBars(series()));
+    this.whitespace = computed(() => padToBucket(this.candles(), engine.timeframe(), engine.cursor()));
     const indicators = computed(() => panelIndicators(this.candles(), panel.indicators, panel.instrument, engine.timeframe()));
     this.indicatorPoints = computed(() => indicators().points);
     this.indicatorSpecs = computed(() => indicators().specs);

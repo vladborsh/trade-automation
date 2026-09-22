@@ -31,6 +31,7 @@ import { screenshotPng, seededOrderDetail, seededOrders, seededStats } from './j
  *   binance:ETHUSDT   USD  2025-01-01 .. 2026-06-30
  *   capitalcom:EURCHF CHF  2024-01-01 .. 2026-06-30   (a second currency, to demo mixing)
  *   capitalcom:US100  USD  no stored 1m (coverage null)
+ *   capitalcom:DXY-MOCK USD 2024-01-01 .. 2026-06-30, closed Fri 21:00 → Sun 22:00 UTC (T-056)
  * Sessions are per user id; the mock holds no orders, so every session is empty.
  * Replay candles (`…/candles`, `…/candles/ahead`) come from the deterministic tape in replay-tape.ts.
  * `POST …/advance` moves the stored cursor like the real one (T-017 + BUG-004): minute-aligned or
@@ -47,6 +48,7 @@ export const MOCK_BACKTEST_INSTRUMENTS: BacktestInstrument[] = [
   { id: 'binance:BTCUSDT', displayName: 'BTC/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['binance:BTCUSDT'] },
   { id: 'binance:ETHUSDT', displayName: 'ETH/USDT Perp', assetClass: 'crypto-perp', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2025, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['binance:ETHUSDT'] },
   { id: 'capitalcom:EURCHF', displayName: 'EUR/CHF', assetClass: 'forex-cfd', sessionCurrency: 'CHF', pricePrecision: 5, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['capitalcom:EURCHF'] },
+  { id: 'capitalcom:DXY-MOCK', displayName: 'US Dollar Index (mock)', assetClass: 'index-cfd', sessionCurrency: 'USD', pricePrecision: 2, coverage: { from: Date.UTC(2024, 0, 1), to: COVERAGE_TO }, contract: MOCK_CONTRACTS['capitalcom:DXY-MOCK'] },
   { id: 'capitalcom:US100', displayName: 'US Tech 100', assetClass: 'index-cfd', sessionCurrency: 'USD', pricePrecision: 1, coverage: null, contract: MOCK_CONTRACTS['capitalcom:US100'] },
 ];
 

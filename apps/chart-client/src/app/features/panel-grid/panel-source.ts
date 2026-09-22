@@ -55,6 +55,12 @@ export interface PanelSource {
    * Only the live terminal has one; a replay panel uses no live connection and shows no dot.
    */
   readonly venueStatus?: Signal<VenueStatus>;
+  /**
+   * T-056 (design §5.4, ruling A): the open times (ms) of every bucket from the first bar to the cursor's
+   * that holds no bar — interior gaps and a tape that ends early — which the chart gives time points, so
+   * a replay panel's axis has one point per bucket. Never candles. Live panels: none.
+   */
+  readonly whitespace?: Signal<readonly number[]>;
   loadOlder(): Promise<void>;
 }
 

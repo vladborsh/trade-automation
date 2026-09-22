@@ -105,3 +105,19 @@ export function isNearOldestLoaded(
 // `minBarSpacing` zoom floor breaks once a panel's loaded buffer (HISTORY_LIMIT) exceeds
 // roughly panelWidthPx / 0.5 bars, as it now routinely does against real backfilled data.
 export const NEAR_START_BAR_MULTIPLIER = 5;
+
+/** Oldest loaded bar's open/point time, ms-epoch (wire scale) — null if nothing's loaded yet. */
+export function oldestLoadedMs(kind: 'candles' | 'metric', candles: readonly { openTime: number }[], points: readonly { time: number }[]): number | null {
+  if (kind === 'candles') return candles.length > 0 ? candles[0].openTime : null;
+  return points.length > 0 ? points[0].time : null;
+}
+
+/** T-056: two ascending time lists as one ascending list (the chart's time points: bars plus padding). */
+export function mergeTimes(a: readonly number[], b: readonly number[]): number[] {
+  if (b.length === 0) return [...a];
+  const out: number[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) out.push(j >= b.length || (i < a.length && a[i] <= b[j]) ? a[i++] : b[j++]);
+  return out;
+}

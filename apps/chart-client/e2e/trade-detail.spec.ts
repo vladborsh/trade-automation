@@ -1,5 +1,5 @@
 import type { Order, Session, SessionDetail } from '@trade-automation/contracts';
-import { apiUrl, expect, openJournal, test } from './fixtures';
+import { apiUrl, expect, openJournal, replayStarted, test } from './fixtures';
 
 /**
  * T-030 / design §9.3 against the mock: journal → trade detail (row, modifications, screenshot or
@@ -48,6 +48,7 @@ test('trade detail, show on chart view-only, and the session cursor is untouched
   const viewing = page.getByTestId('replay-viewing');
   await expect(viewing).toHaveText(`viewing ${new Date(viewAt).toISOString().slice(0, 16).replace('T', ' ')} UTC — read only`, { timeout: 15_000 });
   await expect(page.getByTestId('replay-step')).toBeDisabled();
+  await replayStarted(page); // the keys below act only once the view's history is in (BUG-009)
   const cursorText = await page.getByTestId('replay-cursor').textContent();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('replay-cursor')).toHaveText(cursorText!);

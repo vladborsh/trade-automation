@@ -6,7 +6,9 @@ import { foldOneMinute } from '@trade-automation/replay-core';
  * backtest-app-system-design.md §5.3, §7.2 — the mock's replay tape, so the workspace runs
  * against :4300 without a database. Deterministic 1m candles, generated from the time alone:
  * every minute of the instrument's mock coverage has a candle, except a daily empty stretch
- * 12:00–12:30 UTC (so stepping shows the empty-stretch jump). History is `foldOneMinute` over the
+ * 12:00–12:30 UTC (so stepping shows the empty-stretch jump), and the weekend-closed instruments
+ * (T-056: DXY) have none from Friday 21:00 to Sunday 22:00 UTC, like the real Capital.com hours — so
+ * a crypto + DXY session has one panel whose tape ends while the other carries on. History is `foldOneMinute` over the
  * tape — the function the real server's history endpoint uses — so the mock's forming bar is
  * the real one's.
  */
@@ -23,8 +25,19 @@ export interface TapeRange {
   to: number;
 }
 
-function hasCandle(openTime: number, range: TapeRange): boolean {
+/** T-056: instruments whose market closes over the weekend (Fri 21:00 → Sun 22:00 UTC). */
+const WEEKEND_CLOSED: ReadonlySet<InstrumentId> = new Set(['capitalcom:DXY-MOCK' as InstrumentId]);
+
+function weekendClosed(openTime: number): boolean {
+  const d = new Date(openTime);
+  const day = d.getUTCDay();
+  const hour = d.getUTCHours();
+  return (day === 5 && hour >= 21) || day === 6 || (day === 0 && hour < 22);
+}
+
+function hasCandle(instrument: InstrumentId, openTime: number, range: TapeRange): boolean {
   if (openTime < range.from || openTime > range.to) return false;
+  if (WEEKEND_CLOSED.has(instrument) && weekendClosed(openTime)) return false;
   const minuteOfDay = (openTime / M) % 1440;
   return minuteOfDay < GAP_FROM_MIN || minuteOfDay >= GAP_TO_MIN;
 }
@@ -53,7 +66,7 @@ function candleAt(instrument: InstrumentId, openTime: number): Candle {
 export function tape1m(instrument: InstrumentId, range: TapeRange, from: number, to: number): Candle[] {
   const out: Candle[] = [];
   for (let t = Math.ceil(Math.max(from, range.from) / M) * M; t < to && t <= range.to; t += M) {
-    if (hasCandle(t, range)) out.push(candleAt(instrument, t));
+    if (hasCandle(instrument, t, range)) out.push(candleAt(instrument, t));
   }
   return out;
 }
@@ -62,8 +75,12 @@ export function tape1m(instrument: InstrumentId, range: TapeRange, from: number,
 export function replayHistory(instrument: InstrumentId, range: TapeRange, tf: Timeframe, before: number, limit: number): ReplayHistoryResponse {
   const tfMs = TIMEFRAME_MS[tf];
   const bars = Math.min(limit, HISTORY_CAP);
-  const from = Math.floor(before / tfMs) * tfMs - bars * tfMs;
-  const { closed, forming } = foldOneMinute(tape1m(instrument, range, from, before), tf, before);
+  const window = (from: number) => foldOneMinute(tape1m(instrument, range, from, before), tf, before);
+  let folded = window(Math.floor(before / tfMs) * tfMs - bars * tfMs);
+  // a weekend-closed instrument (T-056) on a Sunday: look back three days so it still gets its Friday
+  // bars, as the real server's "the last N bars" would — only then, so ordinary requests stay cheap
+  if (folded.closed.length < bars) folded = window(Math.min(Math.floor(before / tfMs) * tfMs - bars * tfMs, before - 3 * 1440 * M));
+  const { closed, forming } = folded;
   return { bars: closed.slice(-bars), forming };
 }
 
@@ -72,7 +89,7 @@ export function replayAhead(instrument: InstrumentId, range: TapeRange, fromMs: 
   const end = Math.min(periodToMs - M + 1, range.to + 1); // a candle is in the period if it closes by periodToMs
   const found: Candle[] = [];
   for (let t = Math.ceil(fromMs / M) * M; t < end && found.length <= limit; t += M) {
-    if (hasCandle(t, range)) found.push(candleAt(instrument, t));
+    if (hasCandle(instrument, t, range)) found.push(candleAt(instrument, t));
   }
   return {
     candles: found.slice(0, limit).map((c) => [c.openTime, c.open, c.high, c.low, c.close, c.volume]),

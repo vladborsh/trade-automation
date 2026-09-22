@@ -12,6 +12,8 @@ import { metricSeriesCaption, metricSeriesStyle } from '../chart/metric-series-s
 import { panelTitle, plottedMetricUnit } from './panel-title';
 import type { PanelSource } from './panel-source';
 
+const NO_WHITESPACE: readonly number[] = [];
+
 /**
  * architecture/chart-layouts.md §6.1 — one panel: header (title, venue
  * status dot) + `<app-chart>`, bound to this panel's own `PanelSource`
@@ -45,6 +47,8 @@ export class ChartPanelComponent {
   readonly points = computed(() => this.source().points() as MetricPoint[]);
   readonly overlays = computed(() => this.source().overlays() as OverlayPrimitive[]);
   readonly indicatorPoints = computed(() => this.source().indicatorPoints() as IndicatorPoint[]);
+  /** T-056: a replay panel's padded buckets; none on live panels. */
+  readonly whitespace = computed(() => this.source().whitespace?.() ?? NO_WHITESPACE);
   /** §9.1 position tools, when the source has them (the replay workspace). */
   readonly positionTools = computed(() => this.source().positionTools?.view() ?? null);
   /** e2e hooks (the tools are drawn on a canvas): each tool, and the price under the pointer. */

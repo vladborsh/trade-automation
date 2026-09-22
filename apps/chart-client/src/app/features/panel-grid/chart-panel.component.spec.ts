@@ -32,6 +32,7 @@ class ChartStubComponent {
   readonly indicatorPoints = input<IndicatorPoint[]>([]);
   readonly indicatorSpecs = input<ReadonlyMap<string, IndicatorSeriesSpec>>(new Map());
   readonly indicatorLabels = input(true);
+  readonly whitespace = input<readonly number[]>([]);
   readonly timeframe = input.required<Timeframe>();
   readonly positionTools = input<PositionToolsView | null>(null);
   readonly positionToolsEnabled = input(false);
@@ -98,6 +99,13 @@ describe('ChartPanelComponent with a stub PanelSource (not a PanelFeed)', () => 
     expect(chart.overlays()).toBe(source.overlays());
     expect(chart.indicatorSpecs()).toBe(source.indicatorSpecs());
     expect(chart.indicatorLabels()).toBe(true); // T-047: no preference on the source → labels, as the live terminal
+  });
+
+  it('T-056: a source\'s whitespace goes to the chart; none from a live source', () => {
+    expect(render(stubSource()).chart.whitespace()).toEqual([]);
+    TestBed.resetTestingModule();
+    const { chart } = render({ ...stubSource(), whitespace: signal<readonly number[]>([600_000, 900_000]) });
+    expect(chart.whitespace()).toEqual([600_000, 900_000]);
   });
 
   it('T-047: a source that turns indicator labels off (replay) passes that to the chart', () => {

@@ -270,3 +270,56 @@ test('T-062: at 1280, 1400 and 1920 px every toolbar item is readable and a 24-c
     await page.getByTestId('replay-play').click(); // pause before leaving
   }
 });
+
+// T-056 (design §5.4): DXY's mock tape closes Fri 21:00 → Sun 22:00 UTC. A BTC + DXY session opened on
+// Sunday 21:30 has DXY's last bar more than a day behind — far past lightweight-charts' right-offset
+// cap — so without whitespace DXY could not show the shared window. With it, both panels show the
+// same window on open and after every step across the 22:00 reopen, where real bars replace the
+// whitespace.
+test('T-056: a panel whose tape ends early (DXY over the weekend) keeps the shared window, stepping across the reopen', async ({ page }) => {
+  const request = page.context().request;
+  const SUNDAY_2130 = Date.UTC(2024, 2, 3, 21, 30);
+  const created = await request.post(`${apiUrl()}/backtest/sessions`, {
+    data: {
+      name: `e2e whitespace ${Date.now()}`,
+      layout: {
+        id: 'ws',
+        name: 'WS',
+        grid: { columns: 2, rows: 1 },
+        panels: [
+          { id: 'btc', kind: 'candles', instrument: 'binance:BTCUSDT', signals: false },
+          { id: 'dxy', kind: 'candles', instrument: 'capitalcom:DXY-MOCK', signals: false },
+        ],
+      },
+      timeframe: '5m',
+      periodFromMs: SUNDAY_2130,
+      periodToMs: SUNDAY_2130 + 86_400_000,
+      initialBalance: 10_000,
+      defaultRiskPct: 1,
+      skipWeekends: false,
+      costs: { enabled: false, commissionPct: 0, spread: 0 },
+    },
+  });
+  expect(created.status()).toBe(201);
+  const session = (await created.json()) as Session;
+  const cursor = page.getByTestId('replay-cursor');
+  const range = (id: string) =>
+    page.locator(`.chart-panel[data-panel-id="${id}"] .chart-container`).evaluate((el) => ({ from: el.getAttribute('data-visible-from'), to: el.getAttribute('data-visible-to') }));
+  const synced = async (cursorMs: number) => {
+    await expect.poll(async () => JSON.stringify(await range('dxy'))).toBe(JSON.stringify(await range('btc')));
+    const dxy = await range('dxy');
+    expect(Number(dxy.to) * 1000).toBeGreaterThanOrEqual(cursorMs - 300_000); // DXY's window reaches the cursor's bar
+  };
+
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  await expect(cursor).toHaveText('2024-03-03 21:30 UTC');
+  await synced(SUNDAY_2130);
+
+  for (let i = 1; i <= 12; i++) {
+    await page.keyboard.press('ArrowRight');
+    const at = SUNDAY_2130 + i * 300_000;
+    await expect(cursor).toHaveText(`${new Date(at).toISOString().slice(0, 16).replace('T', ' ')} UTC`);
+    await synced(at);
+  }
+});
