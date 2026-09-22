@@ -112,6 +112,19 @@ export class PortfolioStore {
     return mismatches;
   }
 
+  /**
+   * T-059: the advances these previews were waiting for will never be answered (the session halted
+   * on `VALUE_OUT_OF_RANGE`, the server rolled them back). Every previewed order shows its state
+   * from before its first preview again: the server's last word.
+   */
+  discardPreviews(): void {
+    if (this.stepPreviews.size === 0) return;
+    const next = new Map(this.byId());
+    for (const [id, log] of this.stepPreviews) next.set(id, log[0].before);
+    this.stepPreviews.clear();
+    this.byId.set(next);
+  }
+
   /** A cancel or close for this order was queued: previews leave it alone until the answer. */
   markPending(orderId: string): void {
     this.pendingOps.add(orderId);

@@ -53,11 +53,11 @@ async function get(page: Page, path: string): Promise<Json> {
   return res.json();
 }
 
-async function createSession(page: Page, o: { name: string; from: number; to: number; tf: string; costs?: typeof COSTS }): Promise<Json> {
+async function createSession(page: Page, o: { name: string; from: number; to: number; tf: string; costs?: typeof COSTS; initialBalance?: number }): Promise<Json> {
   const res = await page.context().request.post(`${API}/backtest/sessions`, {
     data: {
       name: o.name, layout: LAYOUT, timeframe: o.tf, periodFromMs: o.from, periodToMs: o.to,
-      initialBalance: 10_000, defaultRiskPct: 1, costs: o.costs ?? COSTS,
+      initialBalance: o.initialBalance ?? 10_000, defaultRiskPct: 1, costs: o.costs ?? COSTS,
     },
   });
   expect(res.status()).toBe(201);
@@ -655,4 +655,59 @@ test('T-054: the popup sizes on the venue step with unit and margin; Confirm pla
   await page.keyboard.press('Enter'); // Enter in the risk field submits the form: refused as well, nothing sent
   await page.waitForTimeout(500);
   expect((await orders()).length).toBe(1);
+});
+
+test('T-059: a close past the numeric limit is a terminal 422 — one request, no retry, no reload; the session halts', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  // 1e4 below the 1e12 limit, costs off: any winning close lifts the balance past numeric(20,8)
+  const s = await createSession(page, { name: `rw limit ${Date.now()}`, from, to: from + 3 * 60 * MIN, tf: '5m', costs: { enabled: false, commissionPct: 0, spread: 0 }, initialBalance: 1e12 - 1e4 });
+  const tp = await tape(page, s);
+  const lc0 = tp.filter((b) => b.t + MIN <= from).at(-1)!.c;
+  // a long whose target the tape reaches, with a stop below every low before it (never stopped first)
+  const hitAt = tp.findIndex((b) => b.t >= from && b.h >= lc0 + 20);
+  expect(hitAt, 'the window must rally 20 above the first close').toBeGreaterThan(0);
+  const sl = Math.floor(Math.min(...tp.slice(0, hitAt + 1).map((b) => b.l)) - 50);
+  const placed = await page.context().request.post(`${API}/backtest/sessions/${s.id}/orders`, {
+    data: { opId: crypto.randomUUID(), cursorMs: from, panelId: 'btc', side: 'long', type: 'market', sl, tp: lc0 + 20, riskPct: 1 },
+  });
+  expect(placed.status(), await placed.text()).toBe(201);
+
+  await openWorkspace(page, s.id);
+  const advances: number[] = [];
+  const sessionGets: string[] = [];
+  page.on('response', (r) => {
+    if (r.request().method() === 'POST' && r.url().endsWith('/advance')) advances.push(r.status());
+    if (r.request().method() === 'GET' && r.url().endsWith(`/backtest/sessions/${s.id}`)) sessionGets.push(r.url());
+  });
+  for (let i = 0; i < 40 && (await page.getByTestId('replay-halted').count()) === 0; i++) {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(100);
+  }
+  await expect(page.getByTestId('replay-halted')).toHaveText('This session has reached the numeric limit; create a new session');
+  await page.waitForTimeout(1_500); // past the first backoffs: a retried 5xx would show here
+  expect(advances.filter((st) => st !== 200)).toEqual([422]); // one refusal, never resent
+  expect(sessionGets).toEqual([]); // and never reloaded
+
+  // the server rolled the closing advance back: the order is open, the balance untouched
+  const [order] = await get(page, `/backtest/sessions/${s.id}/orders`);
+  expect(order.status).toBe('open');
+  const sess = (await get(page, `/backtest/sessions/${s.id}`)).session;
+  expect(sess.balance).toBe(1e12 - 1e4);
+  // …and so does the client: the journal drops its preview of that close (the row is open again)
+  const rows = await journal(page);
+  expect(rows[order.id]['status']).toBe('open');
+
+  // halted: no step, no draft, no order; the notice stays
+  const sent = advances.length;
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('b');
+  await expect(page.getByTestId('replay-step')).toBeDisabled();
+  await expect(page.getByTestId('trade-buy')).toBeDisabled();
+  await expect(page.getByTestId('replay-play')).toBeDisabled(); // T-052's auto-advance cannot start either
+  await page.waitForTimeout(500);
+  expect(advances.length).toBe(sent);
+  expect(await get(page, `/backtest/sessions/${s.id}/orders`)).toHaveLength(1);
+  await expect(page.getByTestId('replay-halted')).toBeVisible();
+  if (process.env['T059_SHOTS']) await page.screenshot({ path: `${process.env['T059_SHOTS']}/halted.png` });
 });

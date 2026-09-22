@@ -15,6 +15,7 @@
         [stepQueued]="e.stepQueued()"
         [atEnd]="e.atEnd()"
         [completed]="e.completed()"
+        [halted]="store.halted()"
         [retrying]="store.retrying()"
         [notice]="store.notice()"
         [openRisk]="store.positions().openRisk"
@@ -30,7 +31,7 @@
         <!-- one element per @if: a block projects into the toolbar's [toolbarEnd] slot only with a single root -->
         @if (!e.viewOnly) {
           <!-- T-048: Buy / Sell / Place — the same paths as B / S / Enter -->
-          <app-trade-controls toolbarEnd [disabled]="e.completed()" (draw)="store.createDraft($event)" (place)="order()" />
+          <app-trade-controls toolbarEnd [disabled]="e.completed() || e.halted()" (draw)="store.createDraft($event)" (place)="order()" />
         }
         @if (!e.viewOnly) {
           <!-- T-046: open and pending orders behind a toolbar button; cancel / close are mutations: none while viewing -->

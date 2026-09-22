@@ -94,6 +94,10 @@
 .status.retrying {
   color: #ef5350;
 }
+.status.halted {
+  color: #ef5350;
+  font-weight: 600;
+}
 .status.queued {
   color: #c9d1d9;
   border: 1px solid #30363d;

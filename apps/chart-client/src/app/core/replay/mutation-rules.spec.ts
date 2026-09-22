@@ -1,5 +1,5 @@
 import { ApiError } from '../api/api-error';
-import { advanceTarget, backoffMs, coalesceHead, isRejection, isRetryable, type MutationInput } from './mutation-rules';
+import { advanceTarget, backoffMs, coalesceHead, isRejection, isRetryable, isTerminal, type MutationInput } from './mutation-rules';
 
 const adv = (m: number): MutationInput => ({ kind: 'advance', toCursorMs: m * 60_000 });
 const cancel: MutationInput = { kind: 'cancel', cursorMs: 0, orderId: 'o1' };
@@ -50,5 +50,22 @@ describe('isRejection (T-023)', () => {
     expect(isRejection(new ApiError(422, 'SL_ON_WRONG_SIDE', 'x'), { kind: 'modify', cursorMs: 0, orderId: 'o', sl: 1 })).toBe(true); // T-033
     expect(isRejection(new ApiError(409, 'ORDER_NOT_ACTIVE', 'x'), { kind: 'modify', cursorMs: 0, orderId: 'o', sl: 1 })).toBe(false);
     expect(isRejection(new TypeError('Failed to fetch'), place)).toBe(false);
+  });
+
+  it('T-059: a 422 VALUE_OUT_OF_RANGE is never a rejection, not even on place or modify', () => {
+    const overflow = new ApiError(422, 'VALUE_OUT_OF_RANGE', 'x');
+    expect(isRejection(overflow, place)).toBe(false);
+    expect(isRejection(overflow, { kind: 'modify', cursorMs: 0, orderId: 'o', sl: 1 })).toBe(false);
+  });
+});
+
+describe('isTerminal (T-059)', () => {
+  it('only VALUE_OUT_OF_RANGE: not retried (a 4xx), and final for the session', () => {
+    const overflow = new ApiError(422, 'VALUE_OUT_OF_RANGE', 'values must stay below 1e12');
+    expect(isTerminal(overflow)).toBe(true);
+    expect(isRetryable(overflow)).toBe(false);
+    expect(isTerminal(new ApiError(422, 'SL_ON_WRONG_SIDE', 'x'))).toBe(false);
+    expect(isTerminal(new ApiError(500, null, 'numeric field overflow'))).toBe(false);
+    expect(isTerminal(new TypeError('Failed to fetch'))).toBe(false);
   });
 });

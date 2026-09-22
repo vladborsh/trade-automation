@@ -6,8 +6,9 @@
  *
  * Known limit: `balance` and `pnl_ccy` are `numeric(20,8)` (< 1e12). Compounding past that from a
  * < 1e12 starting balance is not reachable in a realistic session; if it ever happens the closing
- * transaction fails (pg 22003 → 500) and rolls back whole, leaving the session readable
- * (advance.integration spec "a close that overflows its column rolls back").
+ * transaction fails and rolls back whole, leaving the session readable, and the request answers
+ * 422 `VALUE_OUT_OF_RANGE` (pg 22003, mapped in `runSessionMutation` since T-059; before, a 500)
+ * (advance-bounds.integration spec "a close whose PnL overflows numeric(20,8)").
  */
 function roundTo(scale: number) {
   return <T extends number | null>(value: T): T => (value === null ? value : (Number(value.toFixed(scale)) as T));

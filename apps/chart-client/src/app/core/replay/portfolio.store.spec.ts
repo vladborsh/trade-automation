@@ -105,6 +105,25 @@ describe('PortfolioStore — step previews (T-023)', () => {
     expect(p.orders()[0]).toEqual(limitLong);
   });
 
+  it('T-059: discardPreviews shows every previewed order as it was before its first preview (the halted session)', () => {
+    const p = seeded();
+    p.previewStep(5 * M, new Map([['p1', [bar(0, 99.4)]]]), COSTS); // fill
+    p.previewStep(10 * M, new Map([['p1', [bar(5, 98.9)]]]), COSTS); // stop
+    expect(p.orders()[0].status).toBe('closed');
+    p.discardPreviews();
+    expect(p.orders()[0]).toEqual(limitLong);
+    expect(p.applyAdvance(5 * M, [])).toEqual([]); // nothing left to disagree with
+  });
+
+  it('T-059: discardPreviews keeps the rows an answer already confirmed', () => {
+    const p = seeded();
+    p.previewStep(5 * M, new Map([['p1', [bar(0, 99.4)]]]), COSTS);
+    p.applyAdvance(5 * M, [filled]);
+    p.previewStep(10 * M, new Map([['p1', [bar(5, 98.9)]]]), COSTS); // unanswered
+    p.discardPreviews();
+    expect(p.orders()[0]).toEqual(filled);
+  });
+
   it('an order with a cancel or close on its way is not previewed', () => {
     const p = seeded();
     p.markPending(limitLong.id);

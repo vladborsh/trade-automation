@@ -19,7 +19,7 @@ import { orderTool } from './view-only';
 import { ScreenshotUploadQueue } from './screenshot-upload.queue';
 import { TradeScreenshots } from './trade-screenshots';
 import { OrderLevelEdits, modifyFromDrop } from './order-level-edits';
-import type { MutationInput } from './mutation-rules';
+import { isTerminal, type MutationInput } from './mutation-rules';
 import { InstrumentFacts } from './instrument-facts';
 import { lastClosesByInstrument, marginUtilisation, sessionMargin } from './session-margin';
 
@@ -34,6 +34,8 @@ const NOTICE_MS = 8_000;
 /** How long a position-tool hint (a refused drag, `Enter` with no active tool) stays up. */
 const HINT_MS = 3_000;
 export const NO_ACTIVE_TOOL_HINT = 'No active position tool — press B or S';
+/** T-059: the persistent notice once the server answers `VALUE_OUT_OF_RANGE`. */
+export const VALUE_LIMIT_NOTICE = 'This session has reached the numeric limit; create a new session';
 
 /**
  * backtest-app-system-design.md §2.3, §5.4–5.5 — one open backtest session in the workspace: the
@@ -58,6 +60,12 @@ export class ReplaySessionStore implements OnDestroy {
   readonly retrying = signal(false);
   /** A one-line message: "resynced", "reloaded from the server", … */
   readonly notice = signal<string | null>(null);
+  /**
+   * T-059: set (to `VALUE_LIMIT_NOTICE`) when the server refused a mutation as `VALUE_OUT_OF_RANGE`:
+   * the queue has stopped, nothing is reloaded, stepping and placing stay off until the session is
+   * opened again. Persistent, unlike `notice`.
+   */
+  readonly halted = signal<string | null>(null);
   /** Price precision and venue contract per instrument, from `GET /backtest/instruments` (T-054). */
   readonly instruments = new InstrumentFacts();
   /** Instrument → price decimals, for the journal and the positions. */
@@ -184,6 +192,7 @@ export class ReplaySessionStore implements OnDestroy {
 
   /** `B`/`S`: on the panel under the pointer, else the active tool's panel, else the first panel. */
   createDraft(side: 'long' | 'short'): void {
+    if (this.halted()) return this.showHint(this.halted() as string);
     const panels = this.session()?.layout.panels ?? [];
     const hovered = panels.find((p) => this.toolStores.get(p.id)?.pointerPrice() != null);
     const panelId = hovered?.id ?? this.activeTool()?.panelId ?? panels[0]?.id;
@@ -262,7 +271,7 @@ export class ReplaySessionStore implements OnDestroy {
     const engine = this.engine();
     const lastClose = this.lastCloseOf(panelId);
     const drop = order && engine && lastClose !== null ? modifyFromDrop(order, tool, lastClose, engine.cursor()) : null;
-    if (drop === null || 'hint' in drop || !this.queue) {
+    if (drop === null || 'hint' in drop || !this.queue || this.halted()) {
       this.levelEdits.clear(orderId);
       if (drop && 'hint' in drop) this.showHint(drop.hint);
       else if (drop) this.showHint('The session is reloading — move it again in a moment.');
@@ -302,6 +311,7 @@ export class ReplaySessionStore implements OnDestroy {
     this.queue = null;
     this.view.set(view);
     this.loadError.set(null);
+    this.halted.set(null);
     try {
       const detail = await this.client.getSession(id);
       const { session } = detail;
@@ -482,6 +492,7 @@ export class ReplaySessionStore implements OnDestroy {
     const draft = active?.store.active();
     const engine = this.engine();
     const session = this.session();
+    if (this.halted()) return this.showHint(this.halted() as string);
     if (!active || !draft || draft.kind !== 'draft' || !engine || !session) return this.showHint(NO_ACTIVE_TOOL_HINT);
     if (this.placing.some((p) => p.draftId === draft.id)) return this.showHint('This order is already on its way.');
     const lastClose = this.lastCloseOf(active.panelId);
@@ -514,7 +525,7 @@ export class ReplaySessionStore implements OnDestroy {
 
   private orderOp(kind: 'cancel' | 'close', orderId: string): void {
     const engine = this.engine();
-    if (!engine || !this.queue) return;
+    if (!engine || !this.queue || this.halted()) return;
     this.portfolio.markPending(orderId);
     this.queue.push({ kind, cursorMs: engine.cursor(), orderId });
   }
@@ -526,9 +537,24 @@ export class ReplaySessionStore implements OnDestroy {
   }
 
   private refused(err: unknown): void {
+    if (isTerminal(err)) return this.halt(err);
     console.warn('[ReplaySessionStore] the server refused a mutation — reloading the session', err);
     this.showNotice(refusalNotice(err));
     if (this.sessionId) void this.open(this.sessionId);
+  }
+
+  /**
+   * T-059: `VALUE_OUT_OF_RANGE` is final — the same request would fail again, so no reload (a
+   * reload would only loop). The queue has already stopped; the engine stops stepping, the drafts
+   * waiting for an answer are dropped and the notice stays up.
+   */
+  private halt(err: unknown): void {
+    console.warn('[ReplaySessionStore] the session reached the numeric limit — stepping and placing are off', err);
+    this.engine()?.halt();
+    this.placing.length = 0;
+    this.levelEdits.clearAll(); // a dragged stop/target snaps back to the server's level
+    this.portfolio.discardPreviews(); // the refused advance was rolled back: no preview of it stays
+    this.halted.set(VALUE_LIMIT_NOTICE);
   }
 
   private showNotice(text: string): void {

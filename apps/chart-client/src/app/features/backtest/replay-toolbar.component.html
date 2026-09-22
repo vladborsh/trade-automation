@@ -22,7 +22,7 @@
     type="button"
     class="step"
     data-testid="replay-step"
-    [disabled]="!stepReady() || atEnd() || completed() || viewingAt() !== null"
+    [disabled]="!stepReady() || atEnd() || completed() || halted() !== null || viewingAt() !== null"
     title="Step forward one bar (→)"
     (click)="step.emit()"
   >
@@ -59,6 +59,8 @@
   @if (viewingAt() !== null) {
     <span class="status viewing" data-testid="replay-viewing" role="status">viewing {{ cursorText() }} — read only</span>
     <a class="back-to-session" data-testid="replay-back" [routerLink]="['/sessions', sessionId()]">Back to the session</a>
+  } @else if (halted(); as message) {
+    <span class="status halted" data-testid="replay-halted" role="alert">{{ message }}</span>
   } @else if (completed()) {
     <span class="status completed" data-testid="replay-completed">completed</span>
   } @else if (loading()) {

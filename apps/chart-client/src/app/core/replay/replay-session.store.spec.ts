@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import type { AdvanceResult, Order, Session, SessionDetail, SessionStats } from '@trade-automation/contracts';
 import { ApiError } from '../api/api-error';
 import { BacktestClient } from '../api/backtest.client';
-import { ReplaySessionStore } from './replay-session.store';
+import { ReplaySessionStore, VALUE_LIMIT_NOTICE } from './replay-session.store';
 
 const M = 60_000;
 const T0 = Date.UTC(2026, 8, 16, 10, 0); // a Wednesday
@@ -124,6 +124,41 @@ describe('ReplaySessionStore (T-021)', () => {
     expect(store.notice()).toMatch(/another tab/);
     expect(store.engine()).not.toBe(first); // a fresh engine…
     expect(store.engine()!.cursor()).toBe(T0 + 20 * M); // …at the server's cursor
+  });
+
+  it('T-059: 422 VALUE_OUT_OF_RANGE is terminal — no retry, no reload loop; a persistent notice; stepping and placing are off', async () => {
+    const client = fakeClient();
+    client.advance.mockRejectedValue(new ApiError(422, 'VALUE_OUT_OF_RANGE', 'values must stay below 1e12'));
+    const store = await open(client);
+    const engine = store.engine()!;
+
+    await engine.step();
+    await settle();
+    await new Promise((r) => setTimeout(r, 300)); // past the first retry backoff (250 ms): nothing is resent
+
+    expect(client.advance).toHaveBeenCalledTimes(1); // no retry
+    expect(client.getSession).toHaveBeenCalledTimes(1); // no reload (it would only fail again)
+    expect(store.engine()).toBe(engine);
+    expect(store.halted()).toBe(VALUE_LIMIT_NOTICE);
+    expect(store.halted()).toBe('This session has reached the numeric limit; create a new session');
+    expect(engine.halted()).toBe(true);
+    expect(store.notice()).toBeNull(); // not the reload notice
+
+    const cursor = engine.cursor();
+    await engine.step(); // inert
+    store.createDraft('long'); // refused with the notice as a hint
+    store.placeActiveDraft();
+    store.closeOrder('o0');
+    await settle();
+    expect(engine.cursor()).toBe(cursor);
+    expect(store.activeTool()).toBeNull();
+    expect(store.hint()).toBe(VALUE_LIMIT_NOTICE);
+    expect(client.advance).toHaveBeenCalledTimes(1);
+    expect(client.getSession).toHaveBeenCalledTimes(1);
+
+    await store.open('s1'); // opening the session again starts clean (the server decides again)
+    expect(store.halted()).toBeNull();
+    expect(store.engine()!.halted()).toBe(false);
   });
 
   it('BUG-009: while the reload is loading, the old engine shows loading and a step is ignored, not lost', async () => {

@@ -35,6 +35,8 @@ export class ReplayToolbarComponent {
   readonly atEnd = input(false);
   /** The server has completed the session: nothing can be stepped or switched (decision 28). */
   readonly completed = input(false);
+  /** T-059: the session reached the server's numeric limit — this message stays; nothing can be stepped or switched. */
+  readonly halted = input<string | null>(null);
   /** A request to the server is being retried after a network failure. */
   readonly retrying = input(false);
   /** A one-line message: resynced, reloaded from the server, … */
@@ -52,14 +54,14 @@ export class ReplayToolbarComponent {
   readonly playToggle = output<void>();
   readonly speedChange = output<AutoPlaySpeedMs>();
   readonly speeds = AUTOPLAY_SPEEDS_MS;
-  /** Play needs what a step needs: a started, live, unfinished session. */
-  readonly canPlay = computed(() => this.stepReady() && !this.atEnd() && !this.completed() && this.viewingAt() === null);
+  /** Play needs what a step needs: a started, live, unfinished (T-059: and not halted) session. */
+  readonly canPlay = computed(() => this.stepReady() && !this.atEnd() && !this.completed() && this.halted() === null && this.viewingAt() === null);
   readonly timeframeChange = output<Timeframe>();
 
   readonly timeframes = REPLAY_TIMEFRAMES;
   readonly cursorText = computed(() => formatCursorUtc(this.cursorMs()));
-  /** In view-only mode the timeframe can still change (not persisted); only a live, complete session locks it. */
-  readonly timeframeLocked = computed(() => this.completed() && this.viewingAt() === null);
+  /** In view-only mode the timeframe can still change (not persisted); only a live, complete (or halted) session locks it. */
+  readonly timeframeLocked = computed(() => (this.completed() || this.halted() !== null) && this.viewingAt() === null);
   readonly balanceText = computed(() => formatBalance(this.balance(), this.currency()));
   readonly openRiskText = computed(() => formatBalance(this.openRisk(), this.currency()));
   readonly marginText = computed(() => {

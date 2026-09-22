@@ -81,6 +81,8 @@ export class ReplayEngine {
   readonly error = signal<string | null>(null);
   /** The server has completed the session: stepping and switching are inert (decision 28). */
   readonly completed = signal(false);
+  /** T-059: the session hit the server's numeric limit — stepping and switching are inert for good. */
+  readonly halted = signal(false);
   /** §9.3: viewing the past; nothing can be stepped or persisted. */
   readonly viewOnly: boolean;
 
@@ -160,13 +162,19 @@ export class ReplayEngine {
     this.completed.set(true);
   }
 
+  /** T-059: the server refused a mutation as `VALUE_OUT_OF_RANGE`; nothing more can be persisted. */
+  halt(): void {
+    this.halted.set(true);
+    this.stepQueued.set(false);
+  }
+
   /**
    * `→`. While a step or a switch is in flight the press is queued (one at most, `stepQueued`) and
-   * runs when that finishes (T-037); a retired engine, the period end, a complete session and
-   * view-only ignore it.
+   * runs when that finishes (T-037); a retired engine, the period end, a complete or halted
+   * (T-059) session and view-only ignore it.
    */
   async step(): Promise<void> {
-    if (this.atEnd() || this.completed() || this.viewOnly || this.retired) return;
+    if (this.atEnd() || this.completed() || this.halted() || this.viewOnly || this.retired) return;
     if (this.busy) {
       this.stepQueued.set(true);
       return;
@@ -194,7 +202,7 @@ export class ReplayEngine {
    * boundary at or before the server cursor, and the 1m from there folded with `foldOneMinute`.
    */
   async setTimeframe(tf: Timeframe): Promise<void> {
-    if (tf === this.timeframe() || (this.completed() && !this.viewOnly)) return;
+    if (tf === this.timeframe() || ((this.completed() || this.halted()) && !this.viewOnly)) return;
     if (this.viewOnly) return this.viewTimeframe(tf);
     await this.exclusive(async () => {
       this.blocked.set(true);

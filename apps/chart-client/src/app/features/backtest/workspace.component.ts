@@ -74,7 +74,7 @@ export class WorkspaceComponent implements OnDestroy {
     step: () => this.step(),
     canStep: () => {
       const e = this.engine();
-      return !!e && e.started() && !e.viewOnly && !e.atEnd() && !e.completed();
+      return !!e && e.started() && !e.viewOnly && !e.atEnd() && !e.completed() && !e.halted(); // T-059: halted pauses it
     },
     stepPending: () => {
       const e = this.engine();
@@ -133,7 +133,8 @@ export class WorkspaceComponent implements OnDestroy {
     // Enter and Esc on the toolbar's own buttons (the positions dropdown, T-046; the trade controls,
     // T-048) are theirs — Enter clicks the focused button — the other hotkeys still work there
     if ((action === 'order' || action === 'cancel') && (event.target as Element | null)?.closest?.('app-positions-dropdown, app-trade-controls')) return;
-    if (!keyAllowed(action, { completed: engine.completed(), viewOnly: engine.viewOnly })) return;
+    // T-059: a halted session is as locked as a complete one
+    if (!keyAllowed(action, { completed: engine.completed() || engine.halted(), viewOnly: engine.viewOnly })) return;
     if (this.orderPopup()) {
       // the popup is modal: Enter confirms, Esc closes it (keeping the draft), nothing else acts.
       // Keys inside it are its own (its form submits on Enter, closes on Esc).

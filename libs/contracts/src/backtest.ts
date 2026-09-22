@@ -534,6 +534,8 @@ export const BacktestErrorCodeSchema = z.enum([
   'OP_ID_REUSED', // 409 — the opId was stored for a different operation or request body (BUG-004)
   'PANEL_HAS_ORDERS', // 409 — a layout edit removes or re-points a panel that holds pending/open orders (T-029)
   'CURSOR_OFF_MINUTE', // 400 — an advance's toCursorMs is not on a minute boundary
+  // T-059 (confirmation note item 9): terminal — the client stops stepping and placing on this session
+  'VALUE_OUT_OF_RANGE', // 422 — a balance, PnL or R the mutation would store does not fit its numeric column (< 1e12)
 ]);
 export type BacktestErrorCode = z.infer<typeof BacktestErrorCodeSchema>;
 

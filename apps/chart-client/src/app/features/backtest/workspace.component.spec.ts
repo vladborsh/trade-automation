@@ -33,6 +33,7 @@ function fakeStore() {
     stepQueued: signal(false),
     atEnd: signal(false),
     completed: signal(false),
+    halted: signal(false),
     viewOnly: false,
     error: signal<string | null>(null),
     step: vi.fn().mockResolvedValue(undefined),
@@ -44,6 +45,7 @@ function fakeStore() {
     loadError: signal<string | null>(null),
     retrying: signal(false),
     notice: signal<string | null>(null),
+    halted: signal<string | null>(null),
     sources: signal(new Map()),
     portfolio: new PortfolioStore(),
     pricePrecision: signal(new Map()),
@@ -165,6 +167,30 @@ describe('WorkspaceComponent', () => {
     }
   });
 
+  it('T-059 × T-052: a halt while playing pauses Play by itself; Play is disabled while halted', async () => {
+    vi.useFakeTimers();
+    try {
+      const { fixture, store, engine, el } = await render();
+      engine.started.set(true);
+      fixture.detectChanges();
+      el.querySelector<HTMLButtonElement>('[data-testid="replay-play"]')!.click();
+      vi.advanceTimersByTime(1_000);
+      expect(engine.step).toHaveBeenCalledTimes(2);
+
+      engine.halted.set(true); // the server answered VALUE_OUT_OF_RANGE
+      store.halted.set('This session has reached the numeric limit; create a new session');
+      vi.advanceTimersByTime(2_000);
+      fixture.detectChanges();
+      expect(engine.step).toHaveBeenCalledTimes(2); // no further tick stepped
+      expect(fixture.componentInstance.autoplay.playing()).toBe(false);
+      expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-play"]')!.disabled).toBe(true);
+      fixture.componentInstance.autoplay.play(); // and it cannot be restarted
+      expect(fixture.componentInstance.autoplay.playing()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('?viewAt&order opens the view-only rewind: → is inert, [ ] still switch timeframe (§9.3)', async () => {
     const { store, engine } = fakeStore();
     (engine as { viewOnly: boolean }).viewOnly = true;
@@ -203,6 +229,21 @@ describe('WorkspaceComponent', () => {
     expect(engine.step).not.toHaveBeenCalled();
     expect(engine.setTimeframe).not.toHaveBeenCalled();
     expect(el.querySelector('[data-testid="replay-completed"]')).not.toBeNull();
+  });
+
+  it('T-059: once halted (numeric limit) keys are inert, the Buy/Sell/Place controls are off and the notice stays', async () => {
+    const { store, engine, fixture, el } = await render();
+    engine.halted.set(true);
+    store.halted.set('This session has reached the numeric limit; create a new session');
+    fixture.detectChanges();
+    for (const key of ['ArrowRight', ']', 'b', 's', 'Enter']) press(key);
+    expect(engine.step).not.toHaveBeenCalled();
+    expect(engine.setTimeframe).not.toHaveBeenCalled();
+    expect(store.createDraft).not.toHaveBeenCalled();
+    expect(store.placeActiveDraft).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="replay-halted"]')?.textContent).toBe('This session has reached the numeric limit; create a new session');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="trade-buy"]')!.disabled).toBe(true);
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="trade-place"]')!.disabled).toBe(true);
   });
 
   it('ignores the hotkeys while typing', async () => {

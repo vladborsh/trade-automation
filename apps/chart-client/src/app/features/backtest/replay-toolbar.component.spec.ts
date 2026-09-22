@@ -63,6 +63,18 @@ describe('ReplayToolbarComponent', () => {
     expect([...el.querySelectorAll<HTMLButtonElement>('.tf-btn')].every((b) => b.disabled)).toBe(true);
   });
 
+  it('T-059: a halted session shows the numeric-limit message persistently and cannot be stepped or switched', () => {
+    const message = 'This session has reached the numeric limit; create a new session';
+    const { el } = render({ halted: message });
+    const status = el.querySelector('[data-testid="replay-halted"]')!;
+    expect(status.textContent).toBe(message);
+    expect(status.getAttribute('role')).toBe('alert');
+    expect(el.querySelector('[data-testid="replay-completed"]')).toBeNull(); // not "completed": it is not
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-step"]')!.disabled).toBe(true);
+    expect([...el.querySelectorAll<HTMLButtonElement>('.tf-btn')].every((b) => b.disabled)).toBe(true);
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="replay-play"]')!.disabled).toBe(true); // T-052's Play too
+  });
+
   it('view-only: "viewing … — read only", no stepping, the timeframe still switchable, a way back', () => {
     const { el } = render({ viewingAt: Date.UTC(2026, 8, 16, 10, 5), cursorMs: Date.UTC(2026, 8, 16, 10, 5), completed: true });
     expect(el.querySelector('[data-testid="replay-viewing"]')?.textContent).toBe('viewing 2026-09-16 10:05 UTC — read only');

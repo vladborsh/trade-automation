@@ -175,6 +175,36 @@ describe('AdvanceQueue (backtest-app-system-design.md §5.5)', () => {
     expect(refused).toEqual([invalid]);
   });
 
+  it('T-059: a 422 VALUE_OUT_OF_RANGE is terminal — on an advance or a place: one request, no retry, a refusal, the queue stops', async () => {
+    for (const op of [
+      { kind: 'advance', toCursorMs: 5 * M },
+      { kind: 'place', cursorMs: 0, panelId: 'p', side: 'long', type: 'market', sl: 1, riskPct: 1 },
+    ] as const) {
+      const { transport, sent } = fakeTransport();
+      const refused: unknown[] = [];
+      const rejected: unknown[] = [];
+      const delays: number[] = [];
+      const queue = new AdvanceQueue(
+        transport,
+        { onOutcome: () => undefined, onRefused: (e) => refused.push(e), onRejected: (e) => rejected.push(e) },
+        { delay: async (ms) => void delays.push(ms) },
+      );
+      queue.push(op);
+      queue.push({ kind: 'cancel', cursorMs: 5 * M, orderId: 'o1' });
+      await flush();
+      const overflow = new ApiError(422, 'VALUE_OUT_OF_RANGE', 'values must stay below 1e12');
+      sent[0].fail(overflow);
+      await flush();
+      expect(refused, op.kind).toEqual([overflow]);
+      expect(rejected, op.kind).toEqual([]); // not the place/modify "carry on" path
+      expect(delays, op.kind).toEqual([]); // never retried
+      expect(sent.map((s) => s.kind), op.kind).toEqual([op.kind]); // the rest was dropped
+      queue.push({ kind: 'advance', toCursorMs: 10 * M });
+      await flush();
+      expect(sent, op.kind).toHaveLength(1);
+    }
+  });
+
   it('rounds a target that is not on a minute up (the server clamps it to the period end)', async () => {
     const { queue, sent } = setup();
     queue.push({ kind: 'advance', toCursorMs: 5 * M + 30_000 });

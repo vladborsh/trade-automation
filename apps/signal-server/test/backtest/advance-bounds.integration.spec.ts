@@ -2,9 +2,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { HttpException } from '@nestjs/common';
 import { Candle, InstrumentId } from '@trade-automation/contracts';
 import { AdvanceService } from '../../src/backtest/advance.service';
 import { OrderService } from '../../src/backtest/order.service';
+import { VALUE_OUT_OF_RANGE_MESSAGE } from '../../src/backtest/session-mutation';
 import { PgBacktestRepositories } from '../../src/backtest/pg/pg-backtest-repositories';
 import { NewSession } from '../../src/backtest/session.repository.port';
 import { SessionService } from '../../src/backtest/session.service';
@@ -17,8 +19,8 @@ import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 /**
  * BUG-002/003 ruling, the close paths against a real Postgres (migration 002 applied):
  * - a trade over 1e6 R — beyond the old numeric(12,6) — now closes and stores;
- * - a close whose currency PnL overflows numeric(20,8) (the documented residual limit) fails,
- *   and the whole advance rolls back: order still open, cursor and balance unchanged, no op row,
+ * - a close whose currency PnL overflows numeric(20,8) (the documented residual limit) fails
+ *   with 422 VALUE_OUT_OF_RANGE (T-059; a 500 before), and the whole advance rolls back: order still open, cursor and balance unchanged, no op row,
  *   the session still readable.
  * Skipped without DATABASE_URL:  DATABASE_URL=postgres://backtest@localhost:5432/backtest_dev2 npm test
  */
@@ -104,7 +106,7 @@ maybeDescribe('close paths with extreme values (BUG-002/003 ruling)', () => {
     expect(after).toMatchObject({ tradesCount: 1, winsCount: 1, pnlR: row.pnlR, avgWinR: row.pnlR });
   });
 
-  it('a close whose PnL overflows numeric(20,8) rolls the whole advance back; the session stays readable', async () => {
+  it('a close whose PnL overflows numeric(20,8) is a 422 VALUE_OUT_OF_RANGE (T-059), rolls the whole advance back; the session stays readable', async () => {
     // D12: the size must pass the margin check, so the balance carries it. Balance 1e10, 0.12 % risk, stop 0.001 away
     // → 1R 1.2e7, qty 1.2e10 (fits numeric(20,8); margin 1.2e10 × 100 / 125 = 9.6e9 < 1e10). The next candle opens at
     // 240, through the 200 target → pnl ≈ 1.2e10 × 140 ≈ 1.7e12, which does not fit.
@@ -112,7 +114,14 @@ maybeDescribe('close paths with extreme values (BUG-002/003 ruling)', () => {
     const { order } = await orders.place(alice, s.id, { opId: randomUUID(), cursorMs: C, panelId: 'btc', side: 'long', type: 'market', sl: 99.999, tp: 200, riskPct: 0.12 });
     const opId = randomUUID();
 
-    await expect(advancer.advance(alice, s.id, { opId, toCursorMs: C + 15 * MIN })).rejects.toThrow(/numeric field overflow/);
+    const err = await advancer.advance(alice, s.id, { opId, toCursorMs: C + 15 * MIN }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(HttpException);
+    expect((err as HttpException).getStatus()).toBe(422);
+    expect((err as HttpException).getResponse()).toEqual({ error: { code: 'VALUE_OUT_OF_RANGE', message: VALUE_OUT_OF_RANGE_MESSAGE } });
+    expect(VALUE_OUT_OF_RANGE_MESSAGE).toMatch(/below 1e12/);
 
     expect((await repos.orders.findById(s.id, order.id))!).toMatchObject({ status: 'open', exitPrice: null, pnlCcy: null });
     expect((await repos.sessions.findById(alice, s.id))!).toMatchObject({ cursorMs: C, balance: 10_000_000_000, tradesCount: 0, status: 'active' });

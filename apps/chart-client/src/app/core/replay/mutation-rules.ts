@@ -52,7 +52,16 @@ export function isRetryable(err: unknown): boolean {
  * stops the queue (§5.5).
  */
 export function isRejection(err: unknown, op: MutationInput): boolean {
-  return (op.kind === 'place' || op.kind === 'modify') && isApiError(err, 422);
+  return (op.kind === 'place' || op.kind === 'modify') && isApiError(err, 422) && !isTerminal(err);
+}
+
+/**
+ * T-059: `VALUE_OUT_OF_RANGE` (422) — a balance, PnL or R that no longer fits the server's numeric
+ * columns (< 1e12). Final for the whole session, whatever the op: the queue stops, nothing is
+ * reloaded (the same request would fail again), stepping and placing stay disabled.
+ */
+export function isTerminal(err: unknown): boolean {
+  return isApiError(err) && err.code === 'VALUE_OUT_OF_RANGE';
 }
 
 /** Capped exponential backoff: 250 ms, 500, 1 s, 2 s, 4 s, then 8 s for every further attempt. */
