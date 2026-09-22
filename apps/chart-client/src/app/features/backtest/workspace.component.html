@@ -44,7 +44,19 @@
             (close)="store.closeOrder($event)"
           />
         }
+        @if (!e.viewOnly) {
+          <!-- T-051: the trade-close sound, mutable, remembered per browser -->
+          <app-close-sound-toggle toolbarEnd />
+        }
       </app-replay-toolbar>
+      @if (!e.viewOnly) {
+        <!-- T-051: one snackbar per trade the server closed while watching -->
+        <app-trade-close-snackbar
+          [notices]="store.closeNotices.notices()"
+          [currency]="s.sessionCurrency"
+          (dismiss)="store.closeNotices.dismiss($event)"
+        />
+      }
       @if (store.hint(); as hint) {
         <p class="hint" role="status">{{ hint }}</p>
       }

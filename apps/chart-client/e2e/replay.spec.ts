@@ -323,3 +323,16 @@ test('T-056: a panel whose tape ends early (DXY over the weekend) keeps the shar
     await synced(at);
   }
 });
+
+test('T-051: the trade-close sound toggle is remembered across a reload', async ({ page }) => {
+  const session = await createSession(page.context().request, FRIDAY_2140 + 3 * 86_400_000);
+  await page.goto(`/sessions/${session.id}`);
+  await replayStarted(page);
+  const toggle = page.getByTestId('close-sound-toggle');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true'); // on by default
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await page.reload();
+  await replayStarted(page);
+  await expect(page.getByTestId('close-sound-toggle')).toHaveAttribute('aria-pressed', 'false');
+});

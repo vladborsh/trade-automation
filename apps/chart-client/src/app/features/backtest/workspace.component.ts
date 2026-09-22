@@ -8,6 +8,9 @@ import { ReplayToolbarComponent } from './replay-toolbar.component';
 import { OrderPanelComponent } from './order-panel.component';
 import { PositionsDropdownComponent } from './positions-dropdown.component';
 import { TradeControlsComponent } from './trade-controls.component';
+import { TradeCloseSnackbarComponent } from './trade-close-snackbar.component';
+import { CloseSoundToggleComponent } from './close-sound-toggle.component';
+import { CloseSoundSetting } from '../../core/replay/close-sound.setting';
 import { JournalComponent } from './journal.component';
 import { StatsSummaryComponent } from './stats-summary.component';
 import { adjacentTimeframe, keyAllowed, replayKeyAction } from './replay-keys';
@@ -35,6 +38,8 @@ import { AutoPlay, type AutoPlaySpeedMs } from '../../core/replay/auto-play';
     OrderPanelComponent,
     PositionsDropdownComponent,
     TradeControlsComponent,
+    TradeCloseSnackbarComponent,
+    CloseSoundToggleComponent,
   ],
   providers: [ReplaySessionStore, LayoutsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -125,8 +130,17 @@ export class WorkspaceComponent implements OnDestroy {
     void this.engine()?.setTimeframe(tf);
   }
 
+  private readonly closeSound = inject(CloseSoundSetting);
+
+  /** Any click in the workspace is a user gesture: the browser may then play the close chime (T-051). */
+  @HostListener('pointerdown')
+  armSound(): void {
+    this.closeSound.arm();
+  }
+
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
+    this.closeSound.arm(); // a keypress is a gesture too (T-051)
     const engine = this.engine();
     const action = engine ? replayKeyAction(event) : null;
     if (!engine || !action) return;

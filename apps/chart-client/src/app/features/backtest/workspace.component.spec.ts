@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import type { Panel, Session, Timeframe } from '@trade-automation/contracts';
 import { ReplaySessionStore } from '../../core/replay/replay-session.store';
 import { PortfolioStore } from '../../core/replay/portfolio.store';
+import { CloseNotices } from '../../core/replay/close-notices';
 import { PanelGridComponent } from '../panel-grid/panel-grid.component';
 import { WorkspaceComponent } from './workspace.component';
 
@@ -51,6 +52,7 @@ function fakeStore() {
     pricePrecision: signal(new Map()),
     instruments: { contractOf: vi.fn((): unknown => null), units: signal(new Map()) },
     margin: signal<unknown>(null),
+    closeNotices: new CloseNotices(),
     marginUtilisation: signal<number | null>(null),
     hint: signal<string | null>(null),
     activeDraft: null as null | Record<string, unknown>,

@@ -1,0 +1,11 @@
+<button
+  type="button"
+  class="sound"
+  data-testid="close-sound-toggle"
+  [attr.aria-pressed]="sound.on()"
+  [attr.aria-label]="sound.on() ? 'Trade-close sound on' : 'Trade-close sound off'"
+  [title]="sound.on() ? 'Sound when a trade closes: on (click to mute)' : 'Sound when a trade closes: off (click to turn on)'"
+  (click)="sound.toggle()"
+>
+  <span aria-hidden="true">{{ sound.on() ? '🔔' : '🔕' }}</span>
+</button>

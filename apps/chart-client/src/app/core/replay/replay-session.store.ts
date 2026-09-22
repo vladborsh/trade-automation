@@ -21,6 +21,8 @@ import { TradeScreenshots } from './trade-screenshots';
 import { OrderLevelEdits, modifyFromDrop } from './order-level-edits';
 import { isTerminal, type MutationInput } from './mutation-rules';
 import { InstrumentFacts } from './instrument-facts';
+import { CloseNotices } from './close-notices';
+import { CloseSoundSetting } from './close-sound.setting';
 import { lastClosesByInstrument, marginUtilisation, sessionMargin } from './session-margin';
 
 /** §9.3 view-only rewind: the cursor to view at, and the order whose drawing to show. */
@@ -66,6 +68,9 @@ export class ReplaySessionStore implements OnDestroy {
    * opened again. Persistent, unlike `notice`.
    */
   readonly halted = signal<string | null>(null);
+  /** T-051: the trades the server closed while the user watched — one snackbar notice each. */
+  readonly closeNotices = new CloseNotices();
+  private readonly closeSound = inject(CloseSoundSetting);
   /** Price precision and venue contract per instrument, from `GET /backtest/instruments` (T-054). */
   readonly instruments = new InstrumentFacts();
   /** Instrument → price decimals, for the journal and the positions. */
@@ -387,6 +392,7 @@ export class ReplaySessionStore implements OnDestroy {
       this.client.getInstruments(),
     ]);
     this.portfolio.setOrders(orders);
+    this.closeNotices.remember(orders); // closed before this load: history, never announced (T-051)
     this.portfolio.applyStatsResponse(stats);
     this.instruments.set(instruments);
   }
@@ -417,6 +423,7 @@ export class ReplaySessionStore implements OnDestroy {
       case 'advance': {
         const { cursorMs, status, balance, events, orders, stats } = outcome.result;
         this.screenshots.exits(events, (orderId) => this.panelOf(orderId, orders));
+        this.announceCloses(orders.filter((o) => events.some((e) => e.kind === 'exit' && e.orderId === o.id)));
         engine?.confirmServerCursor(cursorMs);
         this.session.update((s) => (s ? { ...s, cursorMs, status, balance } : s));
         this.reportMismatches(this.portfolio.applyAdvance(cursorMs, orders));
@@ -440,6 +447,7 @@ export class ReplaySessionStore implements OnDestroy {
       }
       case 'close':
         this.screenshots.closed(outcome.result.order);
+        this.announceCloses([outcome.result.order]);
         this.portfolio.clearPending(outcome.result.order.id);
         this.applyOrders([outcome.result.order]);
         this.portfolio.stats.set(outcome.result.stats);
@@ -452,6 +460,11 @@ export class ReplaySessionStore implements OnDestroy {
         this.levelEdits.clear(outcome.result.id); // the drawing shows the server's levels from now on
         return;
     }
+  }
+
+  /** T-051: a snackbar notice per newly closed order, and one sound per answer. */
+  private announceCloses(orders: readonly Order[]): void {
+    if (this.closeNotices.closed(orders) > 0) this.closeSound.play();
   }
 
   /** An order's panel: from the rows in hand, else the journal. */

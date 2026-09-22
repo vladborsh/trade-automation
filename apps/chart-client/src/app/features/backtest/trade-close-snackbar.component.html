@@ -1,0 +1,17 @@
+@if (notices().length > 0) {
+  <div class="stack" role="status" aria-live="polite" data-testid="close-notices">
+    @for (n of notices(); track n.id) {
+      <div
+        class="notice"
+        data-testid="close-notice"
+        [attr.data-order-seq]="n.seq"
+        [class.win]="(n.pnlCcy ?? 0) > 0"
+        [class.loss]="(n.pnlCcy ?? 0) < 0"
+      >
+        <span class="what">#{{ n.seq }} {{ n.instrument }} {{ n.side }} — {{ reason(n) }}</span>
+        <span class="pnl" data-testid="close-notice-pnl">{{ pnl(n) }}</span>
+        <button type="button" class="close" aria-label="Dismiss" (click)="dismiss.emit(n.id)">×</button>
+      </div>
+    }
+  </div>
+}

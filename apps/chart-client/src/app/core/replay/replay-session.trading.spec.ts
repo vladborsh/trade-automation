@@ -5,6 +5,7 @@ import { ApiError } from '../api/api-error';
 import { BacktestClient } from '../api/backtest.client';
 import { NO_ACTIVE_TOOL_HINT, ReplaySessionStore } from './replay-session.store';
 import { ScreenshotUploadQueue, type ScreenshotJob } from './screenshot-upload.queue';
+import { CloseSoundSetting } from './close-sound.setting';
 
 const M = 60_000;
 const T0 = Date.UTC(2026, 8, 16, 10, 0);
@@ -302,5 +303,59 @@ describe('ReplaySessionStore — moving a live stop or target (T-033)', () => {
     expect(store.hint()).toBe('Move refused: A long stop must be below the last close, a short stop above it.');
     expect(drawn().sl).toBe(1);
     expect(client.getSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReplaySessionStore — trade-close notices (T-051)', () => {
+  const O1 = '00000000-0000-4000-8000-0000000000c1';
+  const O2 = '00000000-0000-4000-8000-0000000000c2';
+  const closedRow = (id: string, reason: 'stop' | 'take-profit' | 'manual', pnl: number) =>
+    ({ ...pending({ panelId: 'btc' } as PlaceOrderRequest), id, status: 'closed', closeReason: reason, pnlCcy: pnl, pnlR: pnl / 100 }) as Order;
+  const exitEvent = (orderId: string): FillEvent => ({ orderId, kind: 'exit', time: T0 + 6 * M, price: 1, reason: 'stop', resolution: '1m' }) as FillEvent;
+
+  async function openWithSound(client = fakeClient(), on = true) {
+    const played: number[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ReplaySessionStore,
+        { provide: BacktestClient, useValue: client },
+        { provide: CloseSoundSetting, useValue: { on: () => on, play: () => on && played.push(1), arm: () => undefined } }, // muting is the setting's (its own spec)
+      ],
+    });
+    const store = TestBed.inject(ReplaySessionStore);
+    await store.open('s1');
+    return { store, client, played };
+  }
+
+  it('an advance answer closing two trades: two notices, one sound', async () => {
+    const client = fakeClient();
+    client.advance.mockResolvedValue({ cursorMs: T0 + 10 * M, status: 'active', balance: 10_100, events: [exitEvent(O1), exitEvent(O2)], orders: [closedRow(O1, 'stop', -100), closedRow(O2, 'take-profit', 200)], stats: STATS });
+    const { store, played } = await openWithSound(client);
+    await store.engine()!.step();
+    await vi.waitFor(() => expect(store.closeNotices.notices()).toHaveLength(2));
+    expect(store.closeNotices.notices().map((n) => [n.reason, n.pnlCcy])).toEqual([['stop', -100], ['take-profit', 200]]);
+    expect(played).toEqual([1]);
+  });
+
+  it('trades already closed when the session loads are history: never announced', async () => {
+    const client = fakeClient();
+    client.listOrders.mockResolvedValue([closedRow(O1, 'stop', -100)]);
+    client.advance.mockResolvedValue({ cursorMs: T0 + 10 * M, status: 'active', balance: 10_000, events: [exitEvent(O1)], orders: [closedRow(O1, 'stop', -100)], stats: STATS });
+    const { store, played } = await openWithSound(client);
+    expect(store.closeNotices.notices()).toEqual([]);
+    await store.engine()!.step(); // even if a row of it came back again
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.closeNotices.notices()).toEqual([]);
+    expect(played).toEqual([]);
+  });
+
+  it('a manual close is announced; muted, it makes no sound', async () => {
+    const client = fakeClient();
+    client.closeOrder.mockResolvedValue({ order: closedRow(O1, 'manual', 12), stats: STATS, balance: 10_012 });
+    const { store, played } = await openWithSound(client, false);
+    store.closeOrder(O1);
+    await vi.waitFor(() => expect(store.closeNotices.notices().map((n) => n.reason)).toEqual(['manual']));
+    expect(played).toEqual([]);
   });
 });

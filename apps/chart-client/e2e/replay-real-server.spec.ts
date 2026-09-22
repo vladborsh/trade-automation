@@ -711,3 +711,29 @@ test('T-059: a close past the numeric limit is a terminal 422 — one request, n
   await expect(page.getByTestId('replay-halted')).toBeVisible();
   if (process.env['T059_SHOTS']) await page.screenshot({ path: `${process.env['T059_SHOTS']}/halted.png` });
 });
+
+test('T-051: a trade closed while watching gets one snackbar; a reload does not announce it again', async ({ page }) => {
+  await signIn(page);
+  const from = Date.UTC(2024, 2, 4, 10, 0);
+  const s = await createSession(page, { name: `rw notify ${Date.now()}`, from, to: from + 3 * 60 * MIN, tf: '5m' });
+  await openWorkspace(page, s.id);
+  const notices = page.getByTestId('close-notice');
+
+  await page.getByTestId('trade-buy').click();
+  await page.getByTestId('trade-place').click();
+  await page.getByTestId('order-popup').getByTestId('order-confirm').click();
+  await expect.poll(async () => (await get(page, `/backtest/sessions/${s.id}/orders`)).length, { timeout: 10_000 }).toBe(1);
+  await expect(notices).toHaveCount(0); // placing is not a close
+
+  await page.getByTestId('positions-toggle').click();
+  await page.getByTestId('positions-dropdown').getByRole('button', { name: 'Close' }).click();
+  await expect(notices).toHaveCount(1);
+  await expect(notices.first()).toContainText('#1 binance:BTCUSDT long — closed by hand');
+  await expect(notices.first().getByTestId('close-notice-pnl')).toContainText(/USD · .*R$/);
+  if (process.env['T051_SHOTS']) await page.screenshot({ path: `${process.env['T051_SHOTS']}/close-snackbar.png` });
+
+  await page.reload();
+  await replayStarted(page);
+  await page.waitForTimeout(500);
+  await expect(notices).toHaveCount(0); // the journal's closed trade is history
+});
