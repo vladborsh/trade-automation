@@ -252,6 +252,7 @@ the prose definition, for whoever reads this next.
 | [`derivatives-positioning.md`](knowledge/derivatives-positioning.md) | OI/top-trader-ratio/taker-flow definitions; redundancy-control methodology; all three hypotheses closed |
 | [`smart-money-ict.md`](knowledge/smart-money-ict.md) | ICT true-open levels, premium/discount, proximal-edge iFVG; the `cmc-bot` H1-bias → M1-iFVG strategy as coded |
 | [`opening-range-breakout.md`](knowledge/opening-range-breakout.md) | Opening-range breakout at the NY cash open: OR/trigger/stop/exit definitions, eligibility calendar, the imported crypto anchor; measurement conventions of the `orb-ny-open` pass |
+| [`venue-contract-specs.md`](knowledge/venue-contract-specs.md) | Binance perp and Capital.com CFD contract specs: quantity unit, multiplier, minimum/step, leverage cap per regulated entity (EU/UK retail chosen), sources, and the API request that confirms them; feeds `instruments.yaml` `contract:` blocks |
 
 ## Architecture
 

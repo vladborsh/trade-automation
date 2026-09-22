@@ -2,6 +2,11 @@
 
 **Author:** Architect · **Date:** 2026-09-21 · **Status:** system design,
 decomposed into `tasks.jsonl` (T-001 … T-033) for the Tech Lead.
+**Amended 2026-09-22** after the P0 clusters were confirmed
+(`architecture/backtest-app-confirmation-2026-09-22.md`): §1 D12, §2.1,
+§2.3, §3, §5.4, §5.5, §6, §7.1, §7.2, §8, §13. Paragraphs marked
+*[2026-09-22]* are the amended ones; decision 25 (no leverage model) is
+replaced by the contract/margin model in §6.
 
 This is role-to-role technical material, not user-facing (see `PROJECT.md` →
 "Communicating with the user").
@@ -60,6 +65,7 @@ candles stay in the existing file/S3 `CandleStore`.
 | D9 | **Every mutating backtest request carries a client `opId`** and the server stores the response; a retry replays it. | Steps are fire-and-forget from the user's point of view; a retried `advance` or `orders` POST must not double-fill. |
 | D10 | Session layouts are **candle panels only, ≤ 4**, a JSON copy on the session row; presets from `layouts.yaml` are offered with metric panels stripped. | Decisions 10, 39. There is no open-interest history in replay and `signals` has no meaning there. |
 | D11 | Instruments gain a **`sessionCurrency`** field (defaults to `quoteCurrency`; `USDT` pairs declare `USD`). Session creation rejects mixed `sessionCurrency`. | Decision 36 and the coordinator's ruling of 2026-09-21: exactly two groups, USD and CHF, enforced from configuration, never from code. |
+| D12 *[2026-09-22]* | Instruments carry a **`contract`** block (`unit`, `multiplier`, `minQty`, `qtyStep`, `minNotional?`, `maxLeverage`, `displayLot?`) in `instruments.yaml`; `replay-core/sizing` rounds the risk-derived size to the venue step, refuses sizes below the venue minimum and orders whose initial margin exceeds the account's free margin. Replaces decision 25's flat notional warning. | The user's feedback of 2026-09-22 (item 1): practise against the venue's real caps and lot sizes. Figures and regime in `knowledge/venue-contract-specs.md`; configuration, never code (decision 15). |
 
 ---
 
@@ -113,8 +119,8 @@ on `contracts`. No Node imports — this package runs in the browser.
 | `calendar/` | `barCloseAfter(cursorMs, tf)`, `isWeekend(ms)`, `nextCursor(...)` (§5.2) | client `ReplayEngine`, server `AdvanceService` (for end-of-period clamp and validation) |
 | `fill/` | `evaluateOrder(order, path, costs) → FillEvent[]` (§6), `walk1m`, `walkBarsPessimistic` | client (preview), server (authoritative) |
 | `costs/` | `marketFillPrice`, `stopExitPrice`, `commission`, `spreadCost` | fill, mark, sizing |
-| `sizing/` | `positionSize(balance, riskPct, entry, sl)` | client order panel, server `OrderService` |
-| `mark/` | `floatingPnl(position, lastClose, costs)`, `openRisk(positions)` | client positions panel; server on end-of-session close |
+| `sizing/` | `positionSize(balance, riskPct, entry, sl, contract)` → `{ qty, riskAmount, requestedRisk }` (rounded down to `contract.qtyStep`); `MIN_STOP_DISTANCE_FRACTION`, `isStopTooClose`; `modifyLevelError` (T-033); *[2026-09-22]* `marginRequired(qty, price, contract)`, `accountMargin(balance, orders, lastCloses, contracts)` → `{ equity, usedMargin, available }`, `placementCheck(...)` → `SIZE_BELOW_MINIMUM \| INSUFFICIENT_MARGIN \| null` (§6) | client order popup and place pre-check, server `OrderService` |
+| `mark/` | `floatingPnl(position, lastClose, costs)`, `openRisk(positions)` — both over `qty × contractMultiplier` | client positions panel; server on end-of-session close |
 | `stats/` | `computeStats(closedTrades) → SessionStats` (§8) | server (stored aggregates + full recompute), client (nothing recomputed locally — it displays server numbers) |
 
 Every function is deterministic over plain data, and each has a spec file
@@ -165,16 +171,24 @@ currently take a `PanelFeed`. They will take a `PanelSource`:
 export interface PanelSource {
   readonly panel: Panel;
   readonly candles: Signal<readonly Candle[]>;
+  readonly points: Signal<readonly MetricPoint[]>;            // metric panels (live only; empty in replay)
   readonly overlays: Signal<readonly OverlayPrimitive[]>;
   readonly indicatorPoints: Signal<readonly IndicatorPoint[]>;
   readonly indicatorSpecs: Signal<ReadonlyMap<string, IndicatorSeriesSpec>>;
+  readonly researchScope?: PanelResearchScope;                // live only: the research badge's signal/indicator scope
+  readonly positionTools?: PanelPositionTools;                // replay only: view, apply(change), setPointerPrice
+  readonly capture?: PanelCapture;                            // replay only: attach(takeScreenshot) for T-026
   loadOlder(): Promise<void>;
 }
 ```
 
-`PanelFeed` implements it with an adapter (no behaviour change); the replay
-workspace supplies a `ReplayPanelSource` per panel. The `ChartComponent` is
-untouched by this — it already takes plain inputs.
+*[2026-09-22]* As built (T-016, T-022, T-026, T-028): the live-only and
+replay-only concerns are **optional** members, so each feed supplies only
+what it has and the chart kit renders from the union. `PanelFeed`
+implements it with an adapter (no behaviour change); the replay workspace
+supplies a `ReplayPanelSource` per panel. The `ChartComponent` is untouched
+by this — it already takes plain inputs. A `ReplayPanelSource` has no live
+connection: the panel's venue-status dot must not render for it (T-060).
 
 ---
 
@@ -236,19 +250,21 @@ create table backtest_sessions (
   commission_pct         numeric(8,4)  not null,   -- of notional, per side
   spread                 numeric(20,8) not null,   -- full bid-ask width, price units
   skip_weekends          boolean not null default true,
-  notional_warn_multiple numeric(8,2)  not null default 5,
+  -- notional_warn_multiple: added in 001 (decision 25), dropped in 004 (D12, T-053)
   layout                 jsonb not null,      -- owned copy of Layout, candle panels only, <= 4
   -- stored aggregates (decision 38); rewritten inside every closing transaction
+  -- R multiples and profit_factor are numeric(20,6) since migration 002: a stop-out cannot be
+  -- refused, so an R overflow must not wedge the advance (BUG-003 follow-up, confirmed 2026-09-22)
   trades_count           integer not null default 0,
   wins_count             integer not null default 0,
   losses_count           integer not null default 0,
   pnl_ccy                numeric(20,8) not null default 0,
-  pnl_r                  numeric(12,6) not null default 0,
-  profit_factor          numeric(12,6),
+  pnl_r                  numeric(20,6) not null default 0,
+  profit_factor          numeric(20,6),
   max_drawdown_ccy       numeric(20,8) not null default 0,
-  max_drawdown_r         numeric(12,6) not null default 0,
-  avg_win_ccy            numeric(20,8), avg_win_r numeric(12,6),
-  avg_loss_ccy           numeric(20,8), avg_loss_r numeric(12,6),
+  max_drawdown_r         numeric(20,6) not null default 0,
+  avg_win_ccy            numeric(20,8), avg_win_r numeric(20,6),
+  avg_loss_ccy           numeric(20,8), avg_loss_r numeric(20,6),
   stats_computed_at      timestamptz,
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now(),
@@ -271,9 +287,10 @@ create table orders (                         -- one row = one order's whole lif
   limit_price            numeric(20,8),       -- limit orders only
   entry_price            numeric(20,8),       -- actual fill incl. spread
   entry_time_ms          bigint,              -- openTime of the 1m candle that filled it
-  qty                    numeric(20,8) not null,
-  risk_pct               numeric(8,4)  not null,
-  risk_amount_ccy        numeric(20,8) not null,   -- 1R in currency, fixed at placement
+  qty                    numeric(20,8) not null,   -- in the instrument's contract unit, on the venue step (D12)
+  contract_multiplier    numeric(20,8) not null default 1,  -- migration 004: snapshot of contract.multiplier at placement (D12)
+  risk_pct               numeric(8,4)  not null,   -- the risk % requested
+  risk_amount_ccy        numeric(20,8) not null,   -- 1R in currency = qty × |entry − sl| × multiplier after rounding, fixed at placement
   sl_initial             numeric(20,8) not null,   -- decision 21: never null
   sl_current             numeric(20,8) not null,
   tp_initial             numeric(20,8),
@@ -286,9 +303,9 @@ create table orders (                         -- one row = one order's whole lif
   commission_ccy         numeric(20,8) not null default 0,
   spread_cost_ccy        numeric(20,8) not null default 0,
   pnl_ccy                numeric(20,8),       -- net of all costs
-  pnl_r                  numeric(12,6),       -- pnl_ccy / risk_amount_ccy
+  pnl_r                  numeric(20,6),       -- pnl_ccy / risk_amount_ccy (widened in 002)
   mae_price              numeric(20,8),       -- decision 26; computed at close from the 1m path
-  mae_r                  numeric(12,6),
+  mae_r                  numeric(20,6),
   cancelled_at_ms        bigint,
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now(),
@@ -321,10 +338,14 @@ create table screenshots (                    -- decisions 6, 27, 30b
 create table backtest_ops (                   -- D9 idempotency
   session_id uuid not null references backtest_sessions(id) on delete cascade,
   op_id      uuid not null,
+  kind       text,                            -- migration 003 (BUG-004): 'place'|'cancel'|'close'|'advance'|'modify'
+  fingerprint text,                           -- sha256(kind \n canonicalJson(request minus opId) \n orderId)
   response   jsonb not null,
   created_at timestamptz not null default now(),
   primary key (session_id, op_id)
 );
+-- A stored opId replays its response only for the same kind and fingerprint; anything else is
+-- 409 OP_ID_REUSED (T-055). Rows with a null fingerprint (pre-003) replay unconditionally.
 ```
 
 **Cascade rules.** `users → backtest_sessions → orders → order_modifications
@@ -465,20 +486,52 @@ On `→`:
 5. The cursor signal moves; the chart, order panel and positions panel react.
 
 Timeframe switch (`[`/`]` or picker, decision 12): the cursor does not move.
-The engine re-fetches history behind the cursor at the new tf (§7,
-`GET …/candles?timeframe=new&before=cursor`), which returns closed bars plus
-the forming bar built server-side from 1m up to the cursor, re-sizes the
-ahead caches (nothing is discarded; only `target1m`/`refill1m` change), and
-queues `PATCH sessions/:id {timeframe}`. The forming bar appears partially
-formed at exactly the same cursor (decision 18).
+*[2026-09-22, replaces `before = cursor`]* The client cursor runs ahead of
+the server's while advances are in flight, so `before = cursor` would be
+refused with `FUTURE_REQUESTED`. The engine therefore anchors at
+
+```
+anchor = bucketStart(min(cursor, serverCursor), tf)
+```
+
+where `serverCursor` is the last cursor the server acknowledged (raised
+monotonically from every advance response). Per panel it (1) extends the 1m
+cache backwards to `anchor` if the cache starts later (ahead pages sized to
+the missing minutes), (2) fetches `GET …/candles?timeframe=new&before=anchor`
+— closed bars at the new tf up to the anchor, which the server can always
+serve — and (3) folds the revealed 1m candles from `anchor` to `cursor`
+with `foldOneMinute` into the closed bars after the anchor plus the forming
+bar. The fold uses the same function the server's history endpoint uses, so
+the result is bit-identical to what `before = cursor` would have returned
+had the server been caught up (asserted by the engine's parity specs). The
+tf and every panel's bars are committed together, the ahead caches are
+re-sized (nothing is discarded; only `target1m`/`refill1m` change), and
+`PATCH sessions/:id {timeframe}` is queued. The forming bar appears
+partially formed at exactly the same cursor (decision 18). The initial load
+and view-only use `before = cursor` directly, which is the same expression
+because there `cursor == serverCursor` by construction.
+
+*[2026-09-22, BUG-007 ruling]* A panel whose tape ends before the bucket
+containing the cursor (DXY over a weekend in a crypto session) cannot follow
+the shared window, because lightweight-charts caps how far a chart can
+scroll past its last bar. The `ReplayPanelSource` **pads with whitespace
+points** (time only, no OHLC) from its last bar to the cursor's bucket at
+the panel's tf, so every panel's time domain reaches the cursor. Whitespace
+is not a candle: not folded, not an indicator input, not a fill path, not
+counted by the ahead cache, and replaced by the real bar when one arrives.
+Live panels are unaffected (T-056).
 
 ### 5.5 What the server does on `advance` (decision 5, D4)
 
 `POST …/advance {opId, toCursorMs}`:
 
 1. Load session `FOR UPDATE`; reject `toCursorMs < cursor_ms` (409
-   `CURSOR_BACKWARDS`), `toCursorMs > period_to_ms` is clamped to
-   `period_to_ms`. Idempotent on `(session_id, op_id)`.
+   `CURSOR_BACKWARDS`), an off-minute `toCursorMs` (400 `CURSOR_OFF_MINUTE`,
+   T-055), a complete session (409 `SESSION_COMPLETE`); `toCursorMs >
+   period_to_ms` is clamped to `period_to_ms`. Idempotent on `(session_id,
+   op_id)` for the same kind and request fingerprint (§3 `backtest_ops`).
+   An equal cursor is a no-op that still returns a full `AdvanceResult` and
+   stores it.
 2. For every instrument that has a pending or open order: `CandleStore.query
    (instrument, '1m', cursor_ms, toCursorMs - 1)` — the 1m path for the span.
    If empty, `query(instrument, session.timeframe, …)` — if *that* has bars,
@@ -490,11 +543,19 @@ formed at exactly the same cursor (decision 18).
    between `entry_time_ms` and `exit_time_ms`, one extra `query`).
 4. `balance += pnl_ccy` per close, in exit-time order; aggregates recomputed
    by `computeStats` over the session's closed orders and written to the
-   session row. All in one transaction with the cursor update.
+   session row — the balance and aggregate columns only when something
+   closed, the cursor always. All in one transaction with the cursor update.
+   A value that does not fit its column (≥ 1e12) rolls the whole mutation
+   back as 422 `VALUE_OUT_OF_RANGE` (T-059); the client treats that code as
+   terminal for the session rather than retrying.
 5. If `toCursorMs == period_to_ms`: every open position is closed at the last
    1m close as a **market exit** (spread and commission apply — §13),
    `close_reason='end-of-session'`; pending orders → `cancelled`; `status=
-   'complete'`, `completed_at` set (decision 28).
+   'complete'`, `completed_at` set (decision 28). *[2026-09-22]* "Last 1m
+   close" is searched back as far as the position's entry time; an
+   instrument with no 1m at all closes on the last fully closed session-tf
+   bar, flagged `pessimistic-bar`; neither → 422 `NO_PRICE_AT_CURSOR` and
+   the advance rolls back.
 6. Response: `{ cursorMs, status, balance, events: FillEvent[], orders:
    Order[] (every row touched), stats }`. The client **replaces** its preview
    state for those orders with the server rows. A mismatch between preview
@@ -547,13 +608,55 @@ commissionPct / 100 : 0`.
 | Manual close / end of session | `lastClose - half` | `lastClose + half` |
 
 - `lastClose` = close of the last 1m candle revealed at the cursor.
+- **Entry candle** *[2026-09-22]*: an order already open from an earlier
+  advance is evaluated only on candles after its `entry_time_ms` (a market
+  order's entry candle is the last *revealed* one, behind the cursor); a
+  limit order filled in the current walk is evaluated for exits on its fill
+  candle, stop first, as the table says. MAE skips the entry candle for
+  market orders for the same reason.
 - **Pessimistic fallback** (decision 4): the same table applied to bars of
   the session timeframe when no 1m exists for the span; `fill_resolution =
   'pessimistic-bar'`; the journal flags the trade.
-- **Sizing** (decision 21): `riskAmount = balance * riskPct / 100`; `qty =
-  riskAmount / |plannedEntry - sl|` where `plannedEntry` is the tool's entry
-  (limit level, or last close for market). `qty` and `riskAmount` are fixed at
-  placement; the spread does not re-size the order.
+- **Minimum stop distance** *[2026-09-22, BUG-003]*: `|plannedEntry − sl| ≥
+  plannedEntry × MIN_STOP_DISTANCE_FRACTION` (1e-5), else 422
+  `STOP_DISTANCE_ZERO`; the constant lives in `sizing/` and the client
+  applies it before sending. It keeps `qty` and R inside their columns; it
+  is not a trading rule.
+- **Contract, sizing and margin** *[2026-09-22, D12 — replaces decision 25's
+  flat notional warning; figures and sources in
+  `knowledge/venue-contract-specs.md`]*. Each instrument's `contract` block
+  (`unit`, `multiplier`, `minQty`, `qtyStep`, `minNotional?`, `maxLeverage`,
+  `displayLot?`) comes from `instruments.yaml` over
+  `GET /backtest/instruments`; an instrument without one cannot be replayed
+  (`INSTRUMENT_NOT_AVAILABLE`). `notional = qty × multiplier × price`, and
+  every formula below that says `qty` means `qty × multiplier` (all nine
+  configured multipliers are 1, so no existing number changes).
+  - *Size from risk* (decision 21): `requestedRisk = balance × riskPct /
+    100`; `raw = requestedRisk / (|plannedEntry − sl| × multiplier)`; `qty =
+    floorToStep(raw, qtyStep)` — rounded **down**, never up. `riskAmount`
+    (1R) is the amount actually at risk after rounding, `qty × |plannedEntry
+    − sl| × multiplier`; `risk_pct` stores the requested value and the popup
+    shows the effective one. Both fixed at placement; the spread does not
+    re-size the order.
+  - *Venue minimum*: `qty < minQty`, or `minNotional` set and `notional <
+    minNotional` → **refused**, 422 `SIZE_BELOW_MINIMUM`, message naming the
+    minimum and the risk % it would need. Never sized up silently.
+  - *Margin*: `marginRequired = notional / maxLeverage` at the planned entry;
+    `usedMargin = Σ` initial margin of the session's **open and pending**
+    orders (each at its entry or limit, with its own snapshot multiplier);
+    `equity = balance + Σ floatingPnl(open)`; `available = equity −
+    usedMargin`. `marginRequired > available` → **refused**, 422
+    `INSUFFICIENT_MARGIN`. Checked per order at placement only; modify,
+    cancel, close and advance never re-check (qty never changes). One pooled
+    account per session (§13). The popup shows margin required, available
+    after, implied leverage against the cap, and turns amber above 80 %
+    utilisation; the toolbar shows utilisation next to open risk.
+  - *Still no liquidation* (the surviving half of decision 25): no
+    maintenance margin, no margin call; a gap through a stop can take the
+    balance negative, and a non-positive balance refuses new orders
+    (`BALANCE_NOT_POSITIVE`).
+  - The order row snapshots `contract_multiplier` at placement (§3) so a
+    later YAML change cannot re-price a trade.
 - **Costs**: `commission_ccy = fee(entry notional) + fee(exit notional)`;
   `spread_cost_ccy = half * qty * (sides that paid it)` — reported, and
   already embedded in the fill prices. `pnl_ccy = dir * (exit - entry) * qty -
@@ -563,13 +666,9 @@ commissionPct / 100 : 0`.
   - entry`; `mae_r = mae_price * qty / riskAmount`. Computed at close only.
 - **Floating mark** (decision 35): `mark = lastClose ∓ half`; `floating =
   dir * (mark - entry) * qty - fee(entry notional) - fee(mark notional)`.
-  `openRisk` = Σ over open positions of `|entry - sl_current| * qty` (what the
-  current stops would lose, spread aside), shown on screen (decision 22).
-- **Notional warning** (decision 25): the order panel warns when `qty *
-  plannedEntry > balance * notional_warn_multiple`; default multiple **5**
-  (session-configurable; open item resolved here).
-- **No leverage model** (decision 25): balance may go negative; nothing
-  liquidates.
+  `openRisk` = Σ over open positions of `max(0, dir × (entry − sl_current)) ×
+  qty` (what the current stops would lose, spread aside; a stop in profit
+  counts 0), shown on screen (decision 22).
 
 `evaluateOrder(order, path, costs) → FillEvent[]` is the single entry point;
 `FillEvent` is `{ orderId, kind: 'fill' | 'exit', time, price, reason?,
@@ -594,7 +693,7 @@ belonging to another user is a 404, never a 403.
 | POST | `/auth/logout` | auth | → 204, cookie cleared, `auth_sessions` row deleted |
 | GET | `/auth/me` | auth | → `{user}`; 401 otherwise (the client's boot probe) |
 | GET | `/auth/invites/:token` | public | → `{email \| null, expiresAt}`; 404 `INVITE_UNKNOWN`; 410 `INVITE_USED` / `INVITE_EXPIRED` |
-| POST | `/auth/invites/:token/accept` | public | `{email, password}` → 201 `{user}` + cookie. Atomic: `UPDATE invites SET used_at=now(), used_by=$u WHERE token_hash=$h AND used_at IS NULL AND expires_at > now()` must affect one row; 409 `EMAIL_TAKEN` |
+| POST | `/auth/invites/:token/accept` | public | `{email, password}` → 201 `{user}` + cookie. Atomic, one transaction *[2026-09-22]*: (1) claim the invite — `UPDATE invites SET used_at=now() WHERE token_hash=$h AND used_at IS NULL AND expires_at > now() RETURNING id` must affect one row (the row lock serialises concurrent accepts); (2) insert the user; (3) set `used_by`; (4) issue the session. A taken email rolls the claim back and answers 409 `EMAIL_TAKEN`, so the invite stays usable. (The original single UPDATE setting `used_by` before the user exists was impossible under the FK.) |
 | GET | `/admin/users` | admin | → `[{id, email, role, createdAt, disabledAt}]` — no session data (decision 30) |
 | POST | `/admin/users/:id/disable` · `/enable` | admin | → 204; disable also deletes the user's `auth_sessions` |
 | POST | `/admin/invites` | admin | `{email?}` → 201 `{id, url, expiresAt}` — `url = APP_BASE_URL + '/invite/' + token`, the token is returned **once** |
@@ -625,23 +724,23 @@ the bundle same-origin (the existing `ServeStaticModule`).
 
 | Method | Path | Request → Response |
 |---|---|---|
-| GET | `/backtest/instruments` | → `[{id, displayName, assetClass, sessionCurrency, pricePrecision, coverage: {from, to} \| null}]` — `coverage` from `CandleStore.coverage(id, '1m')`; the create form offers only `coverage != null` (decisions 16, 5b) |
+| GET | `/backtest/instruments` | → `[{id, displayName, assetClass, sessionCurrency, pricePrecision, contract: ContractSpec \| null, coverage: {from, to} \| null}]` — `coverage` from `CandleStore.coverage(id, '1m')`; `contract` from `instruments.yaml` (D12, T-053); the create form offers only `coverage != null && contract != null` (decisions 16, 5b) |
 | GET | `/layouts` (existing) | presets; the client strips metric panels and enforces ≤ 4 (D10) |
-| POST | `/backtest/sessions` | `CreateSession {name, layout, timeframe, periodFromMs, periodToMs, initialBalance, defaultRiskPct, costs: {enabled, commissionPct, spread}, skipWeekends?, notionalWarnMultiple?}` → 201 `Session`. 422 codes: `LAYOUT_TOO_MANY_PANELS`, `LAYOUT_NOT_CANDLES`, `MIXED_SESSION_CURRENCY`, `INSTRUMENT_NOT_AVAILABLE`, `PERIOD_OUTSIDE_COVERAGE` (period must intersect every panel's 1m coverage). `cursor_ms = periodFromMs`, `balance = initialBalance`, `status='active'` |
+| POST | `/backtest/sessions` | `CreateSession {name, layout, timeframe, periodFromMs, periodToMs, initialBalance, defaultRiskPct, costs: {enabled, commissionPct, spread}, skipWeekends?}` (`notionalWarnMultiple` removed by T-053) → 201 `Session`. 422 codes: `LAYOUT_TOO_MANY_PANELS`, `LAYOUT_NOT_CANDLES` (checked on the raw body, before the schema, so they stay reachable), `MIXED_SESSION_CURRENCY`, `INSTRUMENT_NOT_AVAILABLE` (not configured, no 1m, or no `contract`), `PERIOD_OUTSIDE_COVERAGE` (period must intersect every panel's 1m coverage). A malformed period (`from ≥ to`) and any field outside its column bounds (`BACKTEST_BOUNDS`: risk % [0.0001, 100], balance (0, 1e12), commission % [0, 100], spread [0, 1e12), levels (0, 1e12)) are 400. `cursor_ms = periodFromMs`, `balance = initialBalance`, `status='active'` |
 | GET | `/backtest/sessions` | → `SessionSummary[]` (config + aggregates; no orders) for the list (decision 38) |
 | GET | `/backtest/sessions/:id` | → `SessionDetail {session, openOrders: Order[] (pending+open), stats}` |
-| PATCH | `/backtest/sessions/:id` | `{name?, timeframe?, layout?}` → `Session`. `layout` is validated like create (P1 edit-inside-session, decision 10); 409 `SESSION_COMPLETE` for timeframe/layout on a complete session (view-only still allows the *client* to change tf locally without persisting) |
+| PATCH | `/backtest/sessions/:id` | `{name?, timeframe?, layout?}` → `Session`. `layout` is validated like create against the session's own period and currency (P1 edit-inside-session, decision 10; a panel in another currency is 422 `MIXED_SESSION_CURRENCY`); a panel that has pending or open orders cannot be removed or re-pointed at another instrument — 409 `PANEL_HAS_ORDERS` (T-055); 409 `SESSION_COMPLETE` for timeframe/layout on a complete session (view-only still allows the *client* to change tf locally without persisting) |
 | DELETE | `/backtest/sessions/:id` | → 204 (S3 prefix first, then row; §3) |
 | GET | `/backtest/sessions/:id/candles` | `?panelId&timeframe&before=<ms>&limit=<≤1500>` → `{bars: Candle[], forming: Candle \| null}`. Closed `timeframe` bars with `openTime + tfMs <= before`, the last `limit` of them, plus the forming bar from 1m in `[floor(before/tfMs)*tfMs, before)` when `before` is on no boundary. `before` must be `<= cursor_ms` (422 `FUTURE_REQUESTED`). Source: the store's persisted derived tf where present, else on-demand `foldOneMinute` from 1m (logged at `warn` so the derive job can be run) |
 | GET | `/backtest/sessions/:id/candles/ahead` | `?panelId&fromMs&limit=<≤5000>` → `{candles: [openTime,o,h,l,c,v][], endOfTape: boolean}`; 1m with `openTime >= fromMs`, clamped to `period_to_ms` |
-| POST | `/backtest/sessions/:id/advance` | `{opId, toCursorMs}` → `AdvanceResult {cursorMs, status, balance, events, orders, stats}` (§5.5). 409 `CURSOR_BACKWARDS`; 409 `SESSION_COMPLETE` |
-| POST | `/backtest/sessions/:id/orders` | `{opId, cursorMs, panelId, side, type, limitPrice?, sl, tp?, riskPct}` → 201 `{order, events}`. Server computes `qty`/`riskAmount` from the session balance; a market order fills immediately at `lastClose ± half` with `entry_time_ms = openTime of the last revealed 1m candle`; a limit order is `pending`. 422 `SL_ON_WRONG_SIDE`, `TP_ON_WRONG_SIDE`, `LIMIT_ON_WRONG_SIDE` (a long limit must be below `lastClose`, a short above — stop entries are not in v1), `STOP_DISTANCE_ZERO`; 409 `CURSOR_MISMATCH`, `SESSION_COMPLETE` |
+| POST | `/backtest/sessions/:id/advance` | `{opId, toCursorMs}` → `AdvanceResult {cursorMs, status, balance, events, orders, stats}` (§5.5). 409 `CURSOR_BACKWARDS`; 409 `SESSION_COMPLETE`; 400 `CURSOR_OFF_MINUTE`; 422 `NO_PRICE_AT_CURSOR` (end-of-session close with no price); 422 `VALUE_OUT_OF_RANGE` (T-059) |
+| POST | `/backtest/sessions/:id/orders` | `{opId, cursorMs, panelId, side, type, limitPrice?, sl, tp?, riskPct}` → 201 `{order, events}`. Server computes `qty`/`riskAmount` from the session balance and the instrument's contract (§6); a market order fills immediately at `lastClose ± half` with `entry_time_ms = openTime of the last revealed 1m candle`; a limit order is `pending`. 422 `LIMIT_ON_WRONG_SIDE` (a long limit must be below `lastClose`, a short above — stop entries are not in v1), `STOP_DISTANCE_ZERO`, `SL_ON_WRONG_SIDE`, `TP_ON_WRONG_SIDE` (in that order), `BALANCE_NOT_POSITIVE`, `SIZE_BELOW_MINIMUM`, `INSUFFICIENT_MARGIN` (T-053), `NO_PRICE_AT_CURSOR`; 409 `CURSOR_MISMATCH`, `SESSION_COMPLETE`. Every mutation: 409 `OP_ID_REUSED` when the opId was stored for a different kind or request (T-055) |
 | POST | `/backtest/sessions/:id/orders/:orderId/cancel` | `{opId, cursorMs}` → `Order`; only `pending` (409 `ORDER_NOT_PENDING`) |
-| POST | `/backtest/sessions/:id/orders/:orderId/close` | `{opId, cursorMs}` → `{order, stats, balance}`; only `open`; market exit at the cursor, `close_reason='manual'` |
-| PATCH | `/backtest/sessions/:id/orders/:orderId` | `{opId, cursorMs, sl?, tp?}` → `Order` + `order_modifications` rows; only `pending`/`open`; the wrong-side checks apply (P2, decision 23) |
+| POST | `/backtest/sessions/:id/orders/:orderId/close` | `{opId, cursorMs}` → `{order, stats, balance}`; only `open` (409 `ORDER_NOT_OPEN`); market exit at the cursor, `close_reason='manual'` |
+| PATCH | `/backtest/sessions/:id/orders/:orderId` | `{opId, cursorMs, sl?, tp?}` → `Order` + `order_modifications` rows; only `pending`/`open` (409 `ORDER_NOT_ACTIVE`); an empty body is 400. *[2026-09-22, T-033]* The wrong-side and minimum-distance checks apply against the **last revealed 1m close** for an open position (so break-even and trailing stops are allowed) and against the **limit** for a pending order; `sl_initial` and `risk_amount_ccy` never change; a move to the current value writes no history row (P2, decision 23) |
 | GET | `/backtest/sessions/:id/orders` | `?status=` → `Order[]` ordered by `seq` (the journal) |
 | GET | `/backtest/sessions/:id/orders/:orderId` | → `OrderDetail {order, modifications, screenshots: {entry?: url, exit?: url}}` |
-| GET | `/backtest/sessions/:id/stats` | → `{computed: SessionStats, stored: SessionStats, drift: boolean}` — full recompute from the `orders` table (decision 38) |
+| GET | `/backtest/sessions/:id/stats` | → `{computed: SessionStats, stored: SessionAggregates, drift: boolean}` — full recompute from the `orders` table (decision 38). *[2026-09-22]* `stored` is the session row's aggregate subset; `drift` compares the projection of `computed` with it after rounding each field to its column scale (money 8, R 6). Detection only, logged at `warn`; the stored row is never repaired from here |
 | PUT | `/backtest/sessions/:id/orders/:orderId/screenshots/:kind` | body `image/png`, ≤ 2 MB → 201 `{key, width, height, bytes}`; `kind ∈ {entry, exit}`; 409 `SCREENSHOT_EXISTS` (a screenshot is written once) |
 | GET | `/backtest/sessions/:id/orders/:orderId/screenshots/:kind` | → the PNG bytes, `Cache-Control: private, max-age=31536000` (proxied; the bucket stays private, no presigned URLs) |
 
@@ -654,14 +753,17 @@ Nothing here is a WebSocket. Replay is request/response by construction.
 Input: closed orders sorted by `exit_time_ms`, then `seq`. Output
 `SessionStats`, every money figure in both currency and R:
 
-- `trades`, `wins`, `losses`, `breakeven` (`pnl == 0`), `winRate`;
-- `pnl` total; `grossProfit`, `grossLoss`, `profitFactor` (`null` when no
-  losses);
+- `trades`, `wins`, `losses`, `breakeven` (`pnl == 0`), `winRate = wins /
+  trades` (a breakeven trade is not a win);
+- `pnl`/`pnlR` total; `grossProfit`/`grossProfitR`, `grossLoss`/`grossLossR`
+  (signed, ≤ 0), `profitFactor` (`null` when no losses);
 - `equityCurve: {time, balance, balanceR}[]` — one point per close, starting
-  at `(period_from_ms, initial_balance)` (decision 26); `maxDrawdown` measured
-  on that stepped curve, as currency, R and % of peak;
-- `avgWin`, `avgLoss`, `expectancyR`;
-- `mae: {avg, worst}` in price-R terms (decision 26, separate from drawdown);
+  at `(period_from_ms, initial_balance, 0)`, `balanceR` cumulative R
+  (decision 26); `maxDrawdownCcy` and `maxDrawdownR` measured on that stepped
+  curve (the R one on the R curve itself), `maxDrawdownPct` in percent of
+  the running balance peak;
+- `avgWin`/`avgWinR`, `avgLoss`/`avgLossR` (signed), `expectancyR`;
+- `maeAvg`, `maeWorst` in R (decision 26, separate from drawdown);
 - `pessimisticTrades` (count of `fill_resolution='pessimistic-bar'`),
   `endOfSessionCloses`;
 - per-instrument and per-side breakdowns (`trades`, `pnl`, `winRate`) — the
@@ -906,7 +1008,9 @@ files with specs.
 | 22 — several positions incl. opposing | Positions are independent rows; an opposing position does not net against an existing one. |
 | 23 — cancel / move | Manual **market close** of an open position is included (P0) — the brief's "trade close" needs an exit path other than SL/TP. |
 | 29 — entry type | A draft tool is `market` while its entry sits on the last close and `limit` once dragged to the limit side; a stop-entry (entry on the wrong side) is refused with a hint — stop-entries are not in the brief. |
-| 25 — warning multiple | **5×** deposit, per session. |
+| 25 — "no leverage or margin model; a warning above a multiple of the deposit" | **Superseded 2026-09-22 by the user's feedback (item 1) → D12, §6.** Sizes are rounded to the venue step, refused below the venue minimum, and refused when their initial margin at the instrument's leverage cap exceeds the account's free margin. "No liquidation" survives: no maintenance margin, no margin call. The 5× multiple is gone. |
+| D12 — one account per session | The session's single balance (decision 36) backs orders on both venues. Real accounts are separate (Binance USDT wallet, Capital.com CFD account); pooling their margin is a simplification stated here, not modelled. |
+| D12 — leverage regime | EU/UK retail (ESMA/FCA): 30× FX majors, 20× US100/US500, 10× DXY; Binance 125× first bracket. Chosen because the user's own "~30×" for FX is that regime and it is the conservative one; a different entity is a YAML change (`knowledge/venue-contract-specs.md` §1, §4). |
 | 36 — one quote currency | `USDT`-quoted instruments declare `sessionCurrency: USD` in `instruments.yaml`; groups are derived from that field only. |
 | 31 — timeframes | Sessions may be created and switched on all six timeframes. |
 
