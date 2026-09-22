@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
+import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
  * Migration 002 (BUG-002/003 ruling): the R columns and profit_factor go from numeric(12,6) to
@@ -28,28 +29,32 @@ const R_COLUMNS: ReadonlyArray<[string, string]> = [
 ];
 
 maybeDescribe('migration 002: widen the R columns (up and down, data preserved)', () => {
-  const name = `backtest_mig_${randomUUID().slice(0, 8)}`;
   // Built in beforeAll, not here: describe.skip still runs this body, and without DATABASE_URL a
   // describe-level `new URL(undefined)` throws and fails the whole suite.
+  let name: string;
   let scratchUrl: string;
   let admin: Client;
   let db: PgDatabase;
 
+  // BUG-012: creating and dropping a database can outlast jest's 5 s hook default on a busy
+  // Postgres, so both hooks get an explicit timeout (see DB_HOOK_TIMEOUT_MS).
   beforeAll(async () => {
+    const prefix = scratchPrefix('backtest_mig', DATABASE_URL as string);
+    name = `${prefix}${randomUUID().slice(0, 8)}`;
     const url = new URL(DATABASE_URL as string);
     url.pathname = `/${name}`;
     scratchUrl = url.toString();
     admin = new Client({ connectionString: DATABASE_URL });
     await admin.connect();
+    await dropLeftovers(admin, prefix); // this slot's leftovers from an earlier failed teardown
     await admin.query(`create database ${name}`);
     db = new PgDatabase(scratchUrl);
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await db.end();
-    await admin.query(`drop database if exists ${name} with (force)`);
-    await admin.end();
-  });
+    await dropOwn(async () => admin, [name]); // on the spec's own admin connection, which it then ends
+  }, DB_HOOK_TIMEOUT_MS);
 
   const precisions = async () =>
     (

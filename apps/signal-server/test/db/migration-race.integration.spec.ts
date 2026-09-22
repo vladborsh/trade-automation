@@ -4,6 +4,7 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { runMigrations } from '../../src/db/migration-runner';
+import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
  * Tester (cluster bt-platform): what the existing migration specs do not cover — several servers
@@ -63,7 +64,7 @@ const PHASE_MS = 20_000;
 maybeDescribe('migrations: concurrent boots and tampering (Tester, bt-platform)', () => {
   const made: string[] = [];
   const freshDb = async (): Promise<string> => {
-    const name = `bt_mig_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const name = `${scratchPrefix('bt_mig', DATABASE_URL as string)}${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     await admin((c) => c.query(`create database ${name}`));
     made.push(name);
     return urlFor(name);
@@ -78,9 +79,16 @@ maybeDescribe('migrations: concurrent boots and tampering (Tester, bt-platform)'
     }
   };
 
-  afterAll(async () => {
-    for (const name of made) await admin((c) => c.query(`drop database if exists ${name} with (force)`));
-  });
+  // BUG-012: this slot's leftovers from an earlier run whose teardown failed (never another slot's).
+  beforeAll(() => admin((c) => dropLeftovers(c, scratchPrefix('bt_mig', DATABASE_URL as string))), DB_HOOK_TIMEOUT_MS);
+
+  // BUG-012: four forced drops can outlast jest's 5 s hook default on a busy Postgres, so they run
+  // concurrently with an explicit timeout (see DB_HOOK_TIMEOUT_MS), and a slow drop is logged.
+  afterAll(() => dropOwn(async () => {
+    const c = new Client({ connectionString: urlFor('postgres') });
+    await c.connect();
+    return c;
+  }, made), DB_HOOK_TIMEOUT_MS);
 
   it.each([2, 3, 4])('%i runners at once on a fresh database: exactly one applies all of 001–003, none fails, versions consistent', async (runners) => {
     const url = await within('create database', PHASE_MS, freshDb());
