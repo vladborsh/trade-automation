@@ -64,6 +64,17 @@ describe('bucketFor', () => {
   });
 });
 
+describe('the labels are all in ONE language', () => {
+  it('no label mixes scripts with its neighbours', () => {
+    // The dashboard will follow the member's `lang` once IB-030's string mechanism exists
+    // (dashboard design §11; IB-BUG-004 retrofits this page). Until then these labels are
+    // English, and what this guards is that they stay CONSISTENT — a half-translated screen is
+    // the one outcome the ruling singles out, and it is the easy mistake during the retrofit.
+    const cyrillic = RANGE_PRESETS.filter((p) => /[А-Яа-я]/.test(p.label));
+    expect(cyrillic.length === 0 || cyrillic.length === RANGE_PRESETS.length).toBe(true);
+  });
+});
+
 describe('findPreset', () => {
   it('returns null for an unknown key rather than a default, so a bad URL is visible', () => {
     expect(findPreset('nonsense')).toBeNull();

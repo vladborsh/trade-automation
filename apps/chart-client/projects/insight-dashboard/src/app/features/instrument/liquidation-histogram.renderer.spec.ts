@@ -92,15 +92,23 @@ describe('LiquidationHistogramRenderer', () => {
 describe('liquidationPaneTitle', () => {
   it('states the Binance undercount in the title, not in a footnote nobody opens', () => {
     const title = liquidationPaneTitle('1m', 'all', true);
-    expect(title).toContain('видимые');
-    expect(title).toContain('1 события в секунду');
+    expect(title).toContain('visible only');
+    expect(title).toContain('1 event/s per symbol');
   });
 
   it('does not claim the undercount when it does not apply', () => {
-    expect(liquidationPaneTitle('1h', 'bybit', false)).toBe('Ликвидации (1h, bybit)');
+    expect(liquidationPaneTitle('1h', 'bybit', false)).toBe('Liquidations (1h, bybit)');
   });
 
   it('names the bucket and the venue scope', () => {
-    expect(liquidationPaneTitle('15m', 'all', false)).toBe('Ликвидации (15m, все биржи)');
+    expect(liquidationPaneTitle('15m', 'all', false)).toBe('Liquidations (15m, all venues)');
+  });
+
+  it('keeps the venue and bucket as codes, whatever language the prose ends up in', () => {
+    // IB-BUG-004 will translate the prose per the member's `lang`; tickers, venues and bucket
+    // codes stay English by the same ruling, so they are asserted here rather than left to the
+    // retrofit to remember.
+    expect(liquidationPaneTitle('15m', 'okx', false)).toContain('okx');
+    expect(liquidationPaneTitle('15m', 'okx', false)).toContain('15m');
   });
 });

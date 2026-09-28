@@ -14,18 +14,26 @@ export type RangeKey = '1d' | '3d' | '1w' | '1m' | '3m' | '1y';
 
 export interface RangePreset {
   key: RangeKey;
-  /** Russian, like the rest of the member-facing UI. */
+  /**
+   * Currently English, matching the shell and the other pages.
+   *
+   * The ruled policy (dashboard design §11) is that the dashboard follows the member's `lang`
+   * from `/auth/me`, ru by default, through a shared string table that **IB-030 owns and has
+   * not built yet** — so this page deliberately does not invent a second mechanism. IB-BUG-004
+   * retrofits the shell and this view together. What matters until then is that the page is
+   * consistent in one language; a half-translated screen is the outcome the ruling forbids.
+   */
   label: string;
   days: number;
 }
 
 export const RANGE_PRESETS: readonly RangePreset[] = [
-  { key: '1d', label: '1 день', days: 1 },
-  { key: '3d', label: '3 дня', days: 3 },
-  { key: '1w', label: 'неделя', days: 7 },
-  { key: '1m', label: 'месяц', days: 30 },
-  { key: '3m', label: '3 месяца', days: 90 },
-  { key: '1y', label: 'год', days: 365 },
+  { key: '1d', label: '1 day', days: 1 },
+  { key: '3d', label: '3 days', days: 3 },
+  { key: '1w', label: '1 week', days: 7 },
+  { key: '1m', label: '1 month', days: 30 },
+  { key: '3m', label: '3 months', days: 90 },
+  { key: '1y', label: '1 year', days: 365 },
 ];
 
 export const TIMEFRAMES: readonly WebTimeframe[] = ['1m', '15m', '1h', '4h', '1d'];

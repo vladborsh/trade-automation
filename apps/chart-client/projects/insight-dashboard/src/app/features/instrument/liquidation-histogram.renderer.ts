@@ -72,7 +72,7 @@ export class LiquidationHistogramRenderer {
  * footnote nobody opens is not knowing.
  */
 export function liquidationPaneTitle(bucket: string, venue: string, undercounted: boolean): string {
-  const scope = venue === 'all' ? 'все биржи' : venue;
-  const base = `Ликвидации (${bucket}, ${scope})`;
-  return undercounted ? `${base} — видимые: Binance шлёт не чаще 1 события в секунду на символ` : base;
+  const scope = venue === 'all' ? 'all venues' : venue;
+  const base = `Liquidations (${bucket}, ${scope})`;
+  return undercounted ? `${base} — visible only: Binance sends at most 1 event/s per symbol` : base;
 }

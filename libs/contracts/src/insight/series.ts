@@ -34,10 +34,17 @@ export type WebVenueFilter = z.infer<typeof WebVenueFilterSchema>;
 export const WebLiquidationBucketSchema = z.enum(['1m', '15m', '1h']);
 export type WebLiquidationBucket = z.infer<typeof WebLiquidationBucketSchema>;
 
-/** Epoch seconds, as the charting library wants them. */
+/**
+ * **Epoch SECONDS**, on every series in this file, because that is what the charting library
+ * takes. One unit per wire (Tech Lead's ruling, IB-031): the single place it changes is the
+ * dashboard's `series.adapter.ts`, which converts to milliseconds for `MetricPoint` — the
+ * backtest type that means ms — and specs that conversion. Nobody should have to infer this
+ * from a value, so every field below is named `time` and documented here.
+ */
 const TimeSec = z.number().int().nonnegative();
 
 export const WebCandleSchema = z.object({
+  /** Bar open, epoch seconds. */
   time: TimeSec,
   open: z.number(),
   high: z.number(),
@@ -64,6 +71,7 @@ export type WebCandlesResponse = z.infer<typeof WebCandlesResponseSchema>;
  * Settled funding is a step (it holds until the next settlement); predicted is a line sampled
  * per minute. They are different shapes and are never merged into one series.
  */
+/** `time` is epoch seconds (see TimeSec). */
 export const WebFundingPointSchema = z.object({ time: TimeSec, rate: z.number() });
 export type WebFundingPoint = z.infer<typeof WebFundingPointSchema>;
 
@@ -89,6 +97,7 @@ export type WebLongShortResponse = z.infer<typeof WebLongShortResponseSchema>;
  * two-colour and the sides must never be summed into one bar.
  */
 export const WebLiquidationBarSchema = z.object({
+  /** Bucket start, epoch seconds. */
   time: TimeSec,
   /** Notional of longs liquidated in the bucket. */
   long: z.number().nonnegative(),
