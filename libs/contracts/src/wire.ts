@@ -118,6 +118,14 @@ export const HealthResponseSchema = z.object({
       gapCount24h: z.number().int().nonnegative(),
       feedLag: z.number().nonnegative().nullable(),
       /**
+       * BUG-021 — the venue's own view of this instrument's feed, as the adapter reports it
+       * through `health()`. Additive with a default, like `metrics` below, so an older server's
+       * response still validates. It is not the same thing as `lastClosedCandleAge`: a venue can
+       * be failing every poll while the last stored bar is still recent (a rejected API key), and
+       * a market can be legitimately quiet while the venue is perfectly healthy.
+       */
+      venueStatus: VenueStatusSchema.default('up'),
+      /**
        * §12.3/§12.5 item 5 — one entry per configured `Timeframe`. Only `1m` currently tracks a
        * real Phase 2 pass; every other timeframe reads `'complete'` (native coarse timeframes
        * finish synchronously in Phase 1, and 5m/15m ride along with 1m's own deepening without

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { Candle, Instrument, TIMEFRAME_MS, Timeframe, VenueStatus } from '@trade-automation/contracts';
 import { VenueAdapter } from '../venue-adapter.port';
 import { CapitalComSession } from './capitalcom.session';
@@ -26,6 +26,20 @@ const BOUNDARY_JITTER_MS = 2000;
  */
 export class CapComPriceNotFoundError extends Error {}
 
+/**
+ * BUG-021: how many consecutive failed polls make the venue degraded.
+ *
+ * `streamCandles` polls once per bar boundary, so `failuresToDegrade: 3` is about three minutes of
+ * a venue that answers nothing usable — past any single 429 or a one-off 5xx, and well short of the
+ * hours a rejected API key (T-061) would otherwise go unreported. Injectable so the specs drive the
+ * transitions on fake timers.
+ */
+export interface CapitalComHealthPolicy {
+  failuresToDegrade: number;
+}
+
+export const DEFAULT_CAPITALCOM_HEALTH: CapitalComHealthPolicy = { failuresToDegrade: 3 };
+
 export class CapitalComAdapter implements VenueAdapter {
   readonly venue = 'capitalcom' as const;
   private readonly logger = new Logger(CapitalComAdapter.name);
@@ -33,7 +47,56 @@ export class CapitalComAdapter implements VenueAdapter {
   constructor(
     private readonly baseUrl: string,
     private readonly session: CapitalComSession,
+    private readonly healthPolicy: CapitalComHealthPolicy = DEFAULT_CAPITALCOM_HEALTH,
   ) {}
+
+  /**
+   * BUG-021: the venue's live status, replayed to every subscriber.
+   *
+   * It used to be a constant `'up'`, so a venue that failed every poll still reported healthy —
+   * the coordinator's Capital.com instruments sat 25-41 h stale with the API key rejected and
+   * `/api/health` said nothing. This is the same shape BUG-019 gave the Binance adapter: a
+   * `BehaviorSubject` plus a count of the streams currently failing.
+   *
+   * The status is **venue-wide, not per instrument**, because `VenueAdapter.health()` takes no
+   * instrument (the ingestion service subscribes it once per instrument and writes the value
+   * against that instrument's id). One failing instrument therefore degrades the venue, which is
+   * the right reading for the case this fixes — a rejected key fails every instrument at once.
+   */
+  private readonly status = new BehaviorSubject<VenueStatus>('up');
+  private readonly consecutiveFailures = new Map<string, number>();
+  private readonly failing = new Set<string>();
+
+  private recordPollFailure(instrumentId: string): void {
+    const failures = (this.consecutiveFailures.get(instrumentId) ?? 0) + 1;
+    this.consecutiveFailures.set(instrumentId, failures);
+    if (failures >= this.healthPolicy.failuresToDegrade && !this.failing.has(instrumentId)) {
+      this.failing.add(instrumentId);
+      this.logger.warn(
+        `Capital.com ${instrumentId} has failed ${failures} polls in a row — venue reported degraded`,
+      );
+      this.publishStatus();
+    }
+  }
+
+  private recordPollSuccess(instrumentId: string): void {
+    this.consecutiveFailures.set(instrumentId, 0);
+    if (this.failing.delete(instrumentId)) {
+      this.logger.log(`Capital.com ${instrumentId} is answering again`);
+      this.publishStatus();
+    }
+  }
+
+  /** Drops a torn-down stream out of the count, so unsubscribing never leaves the venue degraded. */
+  private forgetStream(instrumentId: string): void {
+    this.consecutiveFailures.delete(instrumentId);
+    if (this.failing.delete(instrumentId)) this.publishStatus();
+  }
+
+  private publishStatus(): void {
+    const next: VenueStatus = this.failing.size > 0 ? 'degraded' : 'up';
+    if (next !== this.status.value) this.status.next(next);
+  }
 
   /**
    * §12.5 item 3: same `/prices` endpoint, `resolution` set to the matching `CAP_COM_RESOLUTION`
@@ -121,8 +184,10 @@ export class CapitalComAdapter implements VenueAdapter {
               subscriber.next(closedCandle);
             }
           }
+          this.recordPollSuccess(instrument.id);
         } catch (err) {
           this.logger.warn(`Capital.com poll error for ${instrument.symbol}: ${(err as Error).message}`);
+          this.recordPollFailure(instrument.id);
         } finally {
           if (!stopped) timer = setTimeout(poll, msToNextBoundary());
         }
@@ -133,13 +198,12 @@ export class CapitalComAdapter implements VenueAdapter {
       return () => {
         stopped = true;
         clearTimeout(timer);
+        this.forgetStream(instrument.id);
       };
     });
   }
 
   health(): Observable<VenueStatus> {
-    return new Observable<VenueStatus>((subscriber) => {
-      subscriber.next('up');
-    });
+    return this.status.asObservable();
   }
 }

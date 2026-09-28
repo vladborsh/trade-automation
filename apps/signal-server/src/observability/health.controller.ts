@@ -36,6 +36,7 @@ export class HealthController {
         lastClosedCandleAge,
         gapCount24h: s.gapCount24h.length,
         feedLag,
+        venueStatus: s.venueStatus,
         backfillStatus: (Object.keys(TIMEFRAME_MS) as (keyof typeof TIMEFRAME_MS)[]).map((timeframe) => ({
           timeframe,
           status: this.status.getBackfillStatus(instrument.id, timeframe),
@@ -43,8 +44,15 @@ export class HealthController {
       };
     });
 
+    // BUG-021: a stale bar is one way to be degraded and the venue saying so is another — a venue
+    // failing every poll (a rejected key) can still have a recent last bar, which is exactly how
+    // Capital.com sat 25-41 h stale with `/api/health` reporting `ok`. Only `'degraded'` counts
+    // here, not `'down'` or `'closed'`: an instrument is `'down'` until its warm-up finishes, and a
+    // closed market is not a fault, so neither should colour the whole server's status.
     const degraded = instruments.some(
-      (i) => i.lastClosedCandleAge !== null && i.lastClosedCandleAge > 15_000 + 60_000,
+      (i) =>
+        (i.lastClosedCandleAge !== null && i.lastClosedCandleAge > 15_000 + 60_000) ||
+        i.venueStatus === 'degraded',
     );
 
     return {
