@@ -28,6 +28,12 @@ export interface BinanceWsKline {
   c: string;
   v: string;
   x: boolean; // is this kline closed
+  // IB-002: present on both futures and spot kline streams; optional here so a caller's older
+  // fixture (signal-server's specs) still type-checks and simply yields no activity fields.
+  q?: string; // quote asset volume
+  n?: number; // number of trades
+  V?: string; // taker buy base asset volume
+  Q?: string; // taker buy quote asset volume
 }
 
 export interface BinanceWsKlineMessage {
@@ -47,9 +53,25 @@ export interface BinanceWsKlineMessage {
  * §12.1/§12.5 item 3's native coarser fetch (`5m`/`15m`/`1h`/`4h`/`1d`) passes the requested `tf`
  * and gets `source: 'venue-native'` instead, so the cache's overlap-window priority rule can
  * tell a native pull apart from the 1m-resampled series it is a depth extension behind.
+ *
+ * IB-002: both mappers also carry the venue's activity fields (quote volume, trades, taker-buy
+ * base and quote) when the payload has them — REST columns 7–10, WS `q`/`n`/`V`/`Q`. The shapes are
+ * identical on USD-M futures and spot, so one pair of mappers serves both (design §2.2, §4.2). A
+ * field the payload omits is left out entirely rather than written as 0: zero volume is a fact,
+ * "not reported" is not.
  */
+
+/** The four optional activity fields of a Candle, from raw strings/numbers; omits what is absent. */
+function activity(quote?: string, trades?: number, takerBase?: string, takerQuote?: string) {
+  return {
+    ...(quote === undefined ? {} : { quoteVolume: Number(quote) }),
+    ...(trades === undefined ? {} : { trades }),
+    ...(takerBase === undefined ? {} : { takerBuyVolume: Number(takerBase) }),
+    ...(takerQuote === undefined ? {} : { takerBuyQuoteVolume: Number(takerQuote) }),
+  };
+}
 export function mapRestKline(instrument: InstrumentId, kline: BinanceRestKline, tf: Timeframe = '1m'): Candle {
-  const [openTime, open, high, low, close, volume] = kline;
+  const [openTime, open, high, low, close, volume, , quoteVolume, trades, takerBuyVolume, takerBuyQuoteVolume] = kline;
   return {
     instrument,
     timeframe: tf,
@@ -61,6 +83,7 @@ export function mapRestKline(instrument: InstrumentId, kline: BinanceRestKline, 
     volume: Number(volume),
     closed: true,
     source: tf === '1m' ? 'venue-rest' : 'venue-native',
+    ...activity(quoteVolume, trades, takerBuyVolume, takerBuyQuoteVolume),
   };
 }
 
@@ -77,5 +100,6 @@ export function mapWsKline(instrument: InstrumentId, msg: BinanceWsKlineMessage)
     volume: Number(k.v),
     closed: k.x,
     source: 'venue-stream',
+    ...activity(k.q, k.n, k.V, k.Q),
   };
 }

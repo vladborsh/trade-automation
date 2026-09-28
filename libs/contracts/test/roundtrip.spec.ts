@@ -81,6 +81,29 @@ describe('contracts round-trip (architecture/live-signal-server.md §3)', () => 
     expect(roundTripped).toEqual(candle);
   });
 
+  it('IB-002: the four activity fields are optional and additive — a candle without them still parses', () => {
+    const base: Candle = {
+      instrument: 'binance:BTCUSDT', timeframe: '1m', openTime: 1_726_000_000_000,
+      open: 63000, high: 63100, low: 62900, close: 63050, volume: 12.5, closed: true, source: 'venue-stream',
+    };
+    expect(CandleSchema.parse(base)).toEqual(base); // nothing existing changes
+    expect(CandleSchema.parse(base).takerBuyVolume).toBeUndefined();
+
+    const withActivity: Candle = { ...base, quoteVolume: 788_000.25, trades: 1234, takerBuyVolume: 6.25, takerBuyQuoteVolume: 394_000.5 };
+    expect(CandleSchema.parse(JSON.parse(JSON.stringify(CandleSchema.parse(withActivity))))).toEqual(withActivity);
+  });
+
+  it('IB-002: activity fields must be non-negative, and trades a whole number', () => {
+    const base = {
+      instrument: 'binance:BTCUSDT', timeframe: '1m', openTime: 1, open: 1, high: 1, low: 1, close: 1,
+      volume: 0, closed: true, source: 'venue-stream',
+    };
+    for (const bad of [{ quoteVolume: -1 }, { takerBuyVolume: -0.5 }, { takerBuyQuoteVolume: -1 }, { trades: -1 }, { trades: 1.5 }]) {
+      expect(() => CandleSchema.parse({ ...base, ...bad })).toThrow();
+    }
+    expect(CandleSchema.parse({ ...base, trades: 0, quoteVolume: 0, takerBuyVolume: 0, takerBuyQuoteVolume: 0 }).trades).toBe(0);
+  });
+
   it('parses a Signal with discriminated overlay primitives', () => {
     const signal: Signal = {
       id: '11111111-1111-1111-1111-111111111111',
