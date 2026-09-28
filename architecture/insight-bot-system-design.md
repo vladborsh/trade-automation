@@ -1007,3 +1007,14 @@ is an average, ≈ 150 instantaneous — §4.5 states both. Also ratified: the
 poller registering inside IB-005's `CollectorsModule.register()` (one switch,
 `DATABASE_URL`), and the one-line dependency change in `binance-perp.service`
 that makes both loops share the tracker.
+
+---
+
+## 17. Web dashboard (addendum, 2026-09-28)
+
+Brief Q24 was revised by the user; the dashboard is designed in
+`architecture/insight-bot-web-dashboard.md` (second Angular project in the
+`apps/chart-client` workspace, served by insight-bot, one-time login link
+from the bot, Cloudflare Tunnel, slice 1 = stage-0 health + data browser;
+IB-029 … IB-035). §8.6's "no web admin" no longer holds for admin *reading
+and configuration*; signal actions stay in Telegram.

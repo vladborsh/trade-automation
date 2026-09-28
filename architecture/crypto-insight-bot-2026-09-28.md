@@ -250,3 +250,14 @@ orders.
 - Flow: Architect → system design + `tasks/insight-bot.jsonl` → Tech Lead
   dispatches. Research-gate tasks (P1/P2 full form, P4 spot-lead) go to the
   Researcher through the research contour as usual.
+
+---
+
+## Revisions
+
+- **2026-09-28, Q24 revised by the user** (relayed via the zinc-raven session:
+  «дай архитектору подумать над тем что б мы сделали веб дашборд для нашего
+  приложения, не все удобно в телеграм смотреть»): a web dashboard is wanted
+  before stage 3. Design: `architecture/insight-bot-web-dashboard.md`; tasks
+  IB-029 … IB-035. Admin bot commands stay; the web adds reading, charts,
+  stats and admin pages.

@@ -45,13 +45,13 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   that is not yours will collide with another agent's running instance and give you (or
   them) someone else's state.
 
-  | Slot | Signal server | Client dev server | Insight bot | Insight-bot database |
-  |---|---|---|---|---|
-  | Coordinator / Tech Lead checkout | `:3000` | `:4200` | `:3005` | `insight_coord` |
-  | dev-1 | `:3010` | `:4210` | `:3015` | `insight_dev1` |
-  | dev-2 | `:3020` | `:4220` | `:3025` | `insight_dev2` |
-  | dev-3 | `:3030` | `:4230` | `:3035` | `insight_dev3` |
-  | Tester | `:3040` | `:4240` | `:3045` | `insight_tester` |
+  | Slot | Signal server | Client dev server | Insight bot | Insight dashboard dev server | Insight-bot database |
+  |---|---|---|---|---|---|
+  | Coordinator / Tech Lead checkout | `:3000` | `:4200` | `:3005` | `:4205` | `insight_coord` |
+  | dev-1 | `:3010` | `:4210` | `:3015` | `:4215` | `insight_dev1` |
+  | dev-2 | `:3020` | `:4220` | `:3025` | `:4225` | `insight_dev2` |
+  | dev-3 | `:3030` | `:4230` | `:3035` | `:4235` | `insight_dev3` |
+  | Tester | `:3040` | `:4240` | `:3045` | `:4245` | `insight_tester` |
 
   The mock server (`npm run mock-server` in `apps/chart-client`) stays on its default
   `:4300`. Once the backtest app's database exists, each slot also gets **its own
