@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
+import { ApiError } from '@backtest-core/api/api-error';
+import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
 
@@ -20,6 +22,7 @@ import type { StringKey } from '../../i18n/keys';
 export class LoginComponent {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
+  private readonly api = inject(InsightApiClient);
   readonly t = this.i18n.t.bind(this.i18n);
 
   /** Bound from the query string by `withComponentInputBinding()`. */
@@ -27,6 +30,19 @@ export class LoginComponent {
 
   readonly state = signal<'idle' | 'exchanging' | 'failed'>('idle');
   readonly message = signal<string | null>(null);
+
+  constructor() {
+    // The link IS the sign-in: arriving with a token exchanges it straight away. Waiting for a
+    // click asks a member to confirm what they already did by opening the bot's link, and the
+    // token is one-use and ten minutes old, so the click only spends it later.
+    //
+    // This was lost once already — IB-BUG-004's i18n rewrite of this file dropped it, because
+    // nothing failed when it went. `login.component.spec.ts` now covers it for that reason.
+    effect(() => {
+      const token = this.t_();
+      if (token) untracked(() => void this.exchange());
+    });
+  }
 
   toggleLang(): void {
     this.i18n.setLang(this.i18n.lang() === 'ru' ? 'en' : 'ru');
@@ -40,23 +56,14 @@ export class LoginComponent {
     }
     this.state.set('exchanging');
     try {
-      const response = await fetch('/api/web/auth/exchange', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-      if (!response.ok) {
-        const { key, params } = loginFailure(response.status);
-        this.fail(key, params);
-        return;
-      }
+      const { user } = await this.api.exchange(token);
       // the member exists now, so their own language decides every screen from here
-      const body = (await response.json()) as { user?: { lang?: unknown } };
-      this.i18n.setLangFromUser(body.user?.lang);
+      this.i18n.setLangFromUser(user?.lang);
       await this.router.navigateByUrl('/health');
-    } catch {
-      this.fail('login.unreachable');
+    } catch (error) {
+      if (!(error instanceof ApiError)) return this.fail('login.unreachable');
+      const { key, params } = loginFailure(error.code, error.status);
+      this.fail(key, params);
     }
   }
 
@@ -67,12 +74,22 @@ export class LoginComponent {
 }
 
 /**
- * Pure: which string a failure gets. IB-029 defines the codes, and each is reachable by an ordinary
- * mistake — forwarding the link, opening it twice, letting it sit for ten minutes — so each gets its
- * own sentence with the way out in it rather than a shared "failed".
+ * Pure: which string a failure gets, chosen by the server's `code` — not by the status.
+ *
+ * `TOKEN_USED` and `TOKEN_EXPIRED` are BOTH HTTP 410 and mean different things to the person
+ * holding the link: one forwarded it or opened it twice, the other let it go stale. Branching on
+ * the status cannot tell them apart, and this file did exactly that for a while after IB-BUG-004's
+ * rewrite — which is what the spec below now prevents.
  */
-export function loginFailure(status: number): { key: StringKey; params?: Record<string, string | number> } {
-  if (status === 401) return { key: 'login.invalid' };
-  if (status === 410) return { key: 'login.used' };
-  return { key: 'login.failed', params: { status } };
+export function loginFailure(code: string | null | undefined, status: number): { key: StringKey; params?: Record<string, string | number> } {
+  switch (code) {
+    case 'TOKEN_INVALID':
+      return { key: 'login.invalid' };
+    case 'TOKEN_USED':
+      return { key: 'login.used' };
+    case 'TOKEN_EXPIRED':
+      return { key: 'login.expired' };
+    default:
+      return { key: 'login.failed', params: { status } };
+  }
 }

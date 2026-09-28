@@ -5,7 +5,10 @@
     @case ('failed') { <p class="error" role="alert">{{ message() }}</p> }
     @default {
       <p class="muted">{{ t('login.hint') }}</p>
-      <button type="button" (click)="exchange()">{{ t('login.continue') }}</button>
+      @if (t_()) {
+        <!-- a retry for a link that failed; with no token there is nothing to retry -->
+        <button type="button" (click)="exchange()">{{ t('login.continue') }}</button>
+      }
     }
   }
   <!-- §11: the login page has no user yet, so it carries its own switch; it affects this page only. -->

@@ -27,6 +27,7 @@ export type StringKey =
   | 'login.noToken'
   | 'login.invalid'
   | 'login.used'
+  | 'login.expired'
   | 'login.failed'
   | 'login.unreachable'
   | 'login.switchLang'
