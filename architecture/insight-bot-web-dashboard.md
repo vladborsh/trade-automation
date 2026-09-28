@@ -50,7 +50,8 @@ stage-1 producers.
 |---|---|---|
 | **Health** — streams (mode ws/degraded, last message age, reconnects), Binance weight gauges (futures, spot), open gaps, **the last 14 daily gap reports** as a grid (symbol × day, missing 1m bars / OI slots), DB size and partition horizon | now (stage 0) | IB-011 |
 | **Coverage** — per symbol × series: first row, last row, missing months (the IB-012 coverage report, live) | now | IB-012 |
-| **Data browser** — one symbol: 1m/15m/1h/4h candles (perp and spot) with taker-buy delta and CVD panes; funding (settled per venue, predicted); OI and L/S ratios; liquidations per side as bars, plus a table of the largest events; time range picker | now | IB-005…IB-009 |
+| **Instrument view** (user must-have 1) — picker over the **top-20** of the collected universe (rank = the same 30-day quote-volume rank that builds `universe.yaml`; the picker shows the first 20, the rest reachable by typing); for the chosen coin, **time-aligned on one screen**: price (1m/15m/1h/4h, perp; spot toggle), **OI** (reusing the backtest SPA's `MetricPoint` renderer as is), **liquidations** long vs short as bars (aggregated across venues by default, per-venue toggle; the Binance undercount stated in the pane title), plus taker-buy delta / CVD, funding (settled per venue, predicted), L/S ratios; table of the largest liquidations; time-range picker | now | IB-005…IB-009 |
+| **Market context** (user must-haves 2, 3) — **Fear & Greed** (alternative.me, daily, full history since 2018 back-filled in one call, shown as a gauge + history line) and **BTC vs the other top coins by market cap**: BTC dominance of total market cap (forward-collected), each top-20 coin's share, and the ratio BTC cap / Σ top-20 caps (one year of history from per-coin caps). Context only, never a trigger (draft §3.4) | now (collectors ungated) | IB-036 |
 | **Signals** — list (filters: playbook, arm, status live/shadow, symbol, outcome), detail: candles around the trigger with entry / stop / targets / actual path, outcome (R, MFE/MAE), feature snapshot, regime, vetoes, who took it | stage 1 | IB-023 |
 | **Playbooks** — stats per (playbook, version, arm), gated vs unconditional side by side, by regime context, equity-in-R curve; **admin**: status live/shadow/off, parameter change → new version, with the change log | stage 1 | IB-024 |
 | **Members (admin)** — users, invites (create → link shown once), disable | stage 1 | IB-021 |
@@ -110,7 +111,9 @@ in `libs/contracts/src/insight/`.
 | GET | `/coverage` | auth | per symbol × series first/last/missing months (materialised by IB-012's job into `coverage` table; live query otherwise) |
 | GET | `/series/candles?venue&market&symbol&tf&from&to` | auth | ≤ 5,000 bars per call; `candles_1m` / `candles_agg` |
 | GET | `/series/funding?symbol&from&to` | auth | settled per venue + predicted (1m, downsampled server-side to ≤ 5,000 points) |
-| GET | `/series/oi`, `/series/ls?kind`, `/series/liquidations?bucket=1m|15m|1h` | auth | bucketed sums per side; plus `/series/liquidations/top?n=50` |
+| GET | `/series/oi`, `/series/ls?kind`, `/series/liquidations?bucket=1m|15m|1h&venue=all|binance|bybit|okx` | auth | OI served in the `MetricPoint` wire shape of `libs/contracts/src/metric.ts` so the backtest SPA's renderer draws it unchanged; liquidations bucketed per side; plus `/series/liquidations/top?n=50` |
+| GET | `/context/fear-greed?from&to`, `/context/market-cap?from&to` | auth | F&G daily rows; market-cap rows: BTC dominance (of total), per-coin share and cap for the top 20, BTC / Σ top-20 ratio |
+| GET | `/universe/top?n=20` | auth | the picker's list, from `symbols` ordered by the stored 30-day volume rank |
 | GET | `/signals`, `/signals/:id` | auth | slice 2; members see all signals (shared, brief §1), own actions marked |
 | GET | `/playbooks/stats?by=version|arm|regime` | auth | slice 2 |
 | POST | `/admin/playbooks/:id/status`, `/admin/playbooks/:id/params` | admin | same code path as the Telegram admin commands (one service, two front doors) |
@@ -202,3 +205,38 @@ assets — no measurable RSS.
 If `/health` ever shows the Node RSS above 400 MB for more than a minute
 (add `ib_process_rss_bytes` to §6.1's gauges in IB-030), that is a bug in a
 reader, not a reason to size up the instance.
+
+## 10. Addendum 2 — the user's must-haves (2026-09-28) and the data-source rulings
+
+User: *«возможность выбрать инструмент (топ 20 монет на бинанс), увидеть
+график инструмента, OI по нему, ликвидации; индекс страха жадности;
+соотношение btc к остальным топ монетам по капитализации»*. Folded into §2
+(Instrument view, Market context) and §4. Sources, **probed live on
+2026-09-28** (HTTP codes recorded here so nobody re-derives them):
+
+| Need | Source | Verified | Ruling |
+|---|---|---|---|
+| Fear & Greed | `https://api.alternative.me/fng/?limit=0` | free, keyless, daily, full history in one call (200) | collect daily at 00:05 UTC into `fear_greed(day, value, classification)`; one-shot backfill on first run |
+| BTC dominance of total market cap | CoinGecko `/api/v3/global` | free, keyless, **current only** (`market_cap_percentage`, `total_market_cap`) — 200 | **collect forward from now**: every 10 min → `market_cap_global(ts, total_usd, btc_pct, eth_pct, …)` (144 req/day) |
+| Historical global market cap | CoinGecko `/global/market_cap_chart` | **paid** — 401 on the free tier | not used; no free history exists, hence forward collection |
+| Per-coin market cap | CoinGecko `/coins/{id}/market_chart?days=365&interval=daily` | free for **365 days** (200); `days=max` is paid (401, error 10012) | daily at 00:10 UTC for the top-20 coins → `market_cap_coin(day, coin, cap_usd, price_usd)`; one-shot 365-day backfill (20 requests) |
+| CMC | — | not probed | not needed; no key requested |
+
+Rate: ≈ 165 CoinGecko requests/day keyless (well under its public limit of
+~5–15/min); alternative.me 1/day. Both collectors are stage-2 collection,
+**ungated** (brief §6), in cluster C, and start as soon as a developer is
+free so the dominance chart has depth by the time the page ships. Derived
+series (computed at read time, not stored): BTC share of Σ top-20 caps
+(365 days of history from day one), each coin's share of Σ top-20.
+
+Top-20 rule: the picker takes the first 20 of the universe's stored 30-day
+quote-volume rank (`symbols.volume_rank`, written by the same measurement
+that builds `universe.yaml`); market-cap pages use the same 20 coins mapped
+to CoinGecko ids in `universe.yaml` (`coingecko_id`).
+
+Reuse confirmed in `apps/chart-client`: `features/chart/metric-series.renderer.ts`
++ `metric-series-style.ts` draw an OI pane from `MetricPoint[]` and are
+instrument-agnostic; `core/state/metric-points.store.ts` and
+`features/panel-grid/chart-panel.component.ts` give the aligned multi-pane
+layout. The instrument view imports these through the path alias; the only
+new renderer is a two-colour histogram for liquidations per side.
