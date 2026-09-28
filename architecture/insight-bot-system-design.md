@@ -792,3 +792,56 @@ A and B.
 **Research contour, in parallel:** `research/squeeze-full-form/` (P1/P2 gate)
 and `research/spot-lead/` (P4 arm (b)); their verdicts add or close the P1/P2
 build task.
+
+---
+
+## 16. Rulings after dispatch
+
+### 16.1 Binance USD-M WS mute from the local network (IB-013 probe, 2026-09-28)
+
+**Finding** (`reports/dev3-IB-013-probe-escalation.md`): from the developers'
+local network `fstream.binance.com` accepts the WS handshake and sends nothing
+(three URL forms, 30 s), while Binance spot WS, Bybit, OKX and Binance futures
+REST all work. This is the symptom D14 anticipated, one hop earlier than
+expected. It says nothing about `ap-northeast-1`; the box probe stays the
+deciding test for all three venues.
+
+**Ruling — option (a) with a real degraded mode, not a paper exemption:**
+
+1. **The Binance perp collector gets a `degraded` mode that is a production
+   feature**, not a test shim: when the combined socket is mute (no data 30 s
+   after open, or 90 s of silence later — the *later* case is the one
+   signal-server's fallback does not cover, see 16.2), the collector switches
+   per stream to REST polling: klines via `/fapi/v1/klines?limit=2` per
+   symbol every 3 s only for the signal set and every 15 s for the rest
+   (weight ≈ 3 × 20 + 27 × 4 ≈ 170/min — stated in the module header;
+   acceptable only in degraded mode), mark/predicted funding via
+   `/fapi/v1/premiumIndex` with no symbol (all symbols, weight 10) once per
+   minute, **forceOrder has no REST equivalent and is simply missing** in
+   degraded mode; the gap is recorded in `collector_gaps` with
+   `repaired = 0` and `/health` shows `mode: degraded` per stream. The socket
+   is retried every 5 min; recovery returns to WS. §4.1 and D14 are amended
+   by this paragraph.
+2. **Local acceptance of IB-005** = recorded-fixture specs for every mapper
+   and the sampling/rollover logic **plus** a ≥ 30 min live run *in degraded
+   mode* (klines and mark rows present every minute, liquidations absent and
+   declared). **WS-path live acceptance of the perp streams happens on the
+   Tokyo box**, as the first step of IB-026 (Tester), after the user's AWS
+   go-ahead. IB-005's and IB-026's descriptions in `tasks/insight-bot.jsonl`
+   are updated accordingly.
+3. IB-008 / IB-009 (Bybit, OKX) are **not** affected locally and keep their
+   done-lines; their Tokyo reachability is still unverified and is confirmed
+   by the same IB-026 step.
+4. No other task changes. The Tech Lead may dispatch IB-005 now.
+
+### 16.2 Consequence for signal-server (backtest stream, for its own queue)
+
+The coordinator's live `/api/health` shows Binance candles ~25 h stale. In
+`binance.adapter.ts` the REST fallback arms only when the socket has **never**
+delivered a message (`sawMessage === false`); a socket that goes mute *after*
+delivering reconnects only on `close`, which a silently blocked socket never
+emits. That is a signal-server bug, not an insight-bot one; I recommend the
+Tech Lead files it as `BUG-` in the backtest stream: "REST fallback / reconnect
+on N seconds of silence after open, not only before the first message".
+`libs/binance-client` (IB-001) must lift the code **as is**; the fix lands in
+the lib afterwards as its own task so both apps get it.
