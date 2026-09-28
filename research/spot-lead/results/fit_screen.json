@@ -1,0 +1,41 @@
+{
+ "L1": {
+  "floor": true,
+  "stat": false,
+  "placebo": true,
+  "shadow_i": false,
+  "shadow_ii": false,
+  "contrast_i": false,
+  "contrast_ii": false,
+  "proj_holdout_n": 1719.4239441092411,
+  "SCREEN_IN": false
+ },
+ "L2": {
+  "floor": true,
+  "stat": false,
+  "placebo": false,
+  "shadow_i": false,
+  "shadow_ii": false,
+  "proj_holdout_n": 615.7634804699906,
+  "SCREEN_IN": false
+ },
+ "L3": {
+  "floor": true,
+  "stat": false,
+  "placebo": false,
+  "shadow_i": false,
+  "shadow_ii": false,
+  "proj_holdout_n": 581.9874245792315,
+  "SCREEN_IN": false
+ },
+ "L4": {
+  "floor": true,
+  "stat": false,
+  "keep": true,
+  "placebo": true,
+  "shadow_i": false,
+  "shadow_ii": false,
+  "proj_holdout_n": 1719.4239441092411,
+  "SCREEN_IN": false
+ }
+}

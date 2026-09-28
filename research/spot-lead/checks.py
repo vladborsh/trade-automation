@@ -47,15 +47,14 @@ for s in SYMBOLS:
 for s in ("BTCUSDT", "DOGEUSDT"):
     t = Tape(s)
     b = B[B.symbol == s].reset_index(drop=True)
-    # 2. CVD identity, independent loop over 50 random valid bars
+    # 2. CVD identity from the RAW parquet rows (not the dense arrays)
+    raw = {"cvd_spot": load_leg(s, "spot1m"), "cvd_perp": load_leg(s, "perp1m")}
     vb = b[b.valid].sample(50, random_state=1)
     err = 0.0
     for _, r in vb.iterrows():
-        a, z = int(r.bar) * BAR_MIN, (int(r.bar) + 1) * BAR_MIN
-        for leg, col in ((t.s, "cvd_spot"), (t.p, "cvd_perp")):
-            tbv, vol = leg["taker_buy_volume"][a:z], leg["volume"][a:z]
-            ok = np.isfinite(vol)
-            ref = float(np.sum(2 * tbv[ok] - vol[ok]))
+        for col, d in raw.items():
+            w = d[(d.ts >= r["T"]) & (d.ts < r["t_close"])]
+            ref = float((2 * w.taker_buy_volume - w.volume).sum())
             err = max(err, abs(ref - r[col]) / max(1.0, abs(ref)))
     check(f"2_cvd_identity_{s}", err < 1e-9, f"max_rel_err={err:.2e}")
 
@@ -123,9 +122,9 @@ for s in SYMBOLS:
     oo = O[O.symbol == s].sample(300, random_state=3)
     t_entry = pd.DatetimeIndex(oo.t_entry)
     t_exit = pd.DatetimeIndex(oo.t_exit)
-    fts = f.ts.to_numpy()
+    fts = pd.DatetimeIndex(f.ts)
     for te, tx, n in zip(t_entry, t_exit, oo.n_settle):
-        ref = int(((fts > te.to_datetime64()) & (fts < tx.to_datetime64())).sum())
+        ref = int(((fts > te) & (fts < tx)).sum())
         bad_f += ref != n
 check("6_settlements_strictly_inside_hold", bad_f == 0, f"mismatches={bad_f}/2400")
 # sign: long pays positive funding, short receives

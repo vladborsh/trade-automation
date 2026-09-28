@@ -1,0 +1,41 @@
+check,ok,detail
+1_taker_rule_after_neutralising_BTCUSDT,True,neutralised_minutes=0
+1_tape_BTCUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_BTCUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_ETHUSDT,True,neutralised_minutes=0
+1_tape_ETHUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_ETHUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_SOLUSDT,True,neutralised_minutes=0
+1_tape_SOLUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_SOLUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_BNBUSDT,True,neutralised_minutes=0
+1_tape_BNBUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_BNBUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_XRPUSDT,True,neutralised_minutes=1
+1_tape_XRPUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=False
+1_tape_XRPUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_DOGEUSDT,True,neutralised_minutes=0
+1_tape_DOGEUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_DOGEUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_ADAUSDT,True,neutralised_minutes=0
+1_tape_ADAUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_ADAUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_taker_rule_after_neutralising_LINKUSDT,True,neutralised_minutes=0
+1_tape_LINKUSDT_perp1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+1_tape_LINKUSDT_spot1m,True,sorted_unique=True hl_consistent=True raw_taker_in_range=True
+2_cvd_identity_BTCUSDT,True,max_rel_err=0.00e+00
+3_prefix_stability_BTCUSDT,True,mismatches=0/20
+2_cvd_identity_DOGEUSDT,True,max_rel_err=0.00e+00
+3_prefix_stability_DOGEUSDT,True,mismatches=0/20
+4_labels_match_table,True,n_valid=113265 invalid_labelled=0
+4_shadow_labels,True,
+5_stop_fills_at_or_beyond,True,
+5_target_is_plus_1R,True,
+5_no_exit_before_entry_hold_le_5d,True,
+5_same_minute_both_is_stop,True,"long=(1, 98.0, 0, 2) short=(1, 102.0, 0, 2)"
+5_gap_stop_fills_at_open,True,"(1, 95.0, 0, 2)"
+6_settlements_strictly_inside_hold,True,mismatches=0/2400
+6_funding_sign_long_pays_positive,True,mean long fundingR sign opposes mean rate sign
+7_non_overlap_all_arms,True,overlaps=0
+8_mirror_symmetry,True,mismatches=0/50
+9_fit_exits_by_boundary,True,max_fit_exit=2025-08-01 00:00:00+00:00 boundary_exits=62

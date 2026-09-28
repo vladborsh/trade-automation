@@ -382,3 +382,21 @@ only. 6. `REPORT.md`, `HANDOFF.md`, `RESEARCH-LOG.md` Запись, backlog stat
   total (SOL). No duplicates. No SOL blackout is applied: the note registers
   none, and the hedged carry's blackout was a basis-anomaly rule for a
   two-legged position, which this single-leg perp template does not hold.
+
+---
+
+## 10. Screen decision (fit period, §6.1) — committed before any holdout R
+
+Source: `results/fit_arms.csv`, `fit_margins.json`, `fit_screen.json`
+(`stage1.py`). `checks.py`: 40 checks, 0 failed.
+
+| arm | fit n | fit stat | placebo p | shadow margin (diff, 90 % CI) | other | screen |
+|---|---|---|---|---|---|---|
+| L1 | 9 265 | −0.0078R | 0.000 | +0.003 [−0.036, +0.043] | contrast vs L1c +0.005 [−0.041, +0.051] | **OUT** (stat, margin, contrast) |
+| L2 | 3 318 | −0.0501R | 0.998 | −0.035 [−0.083, +0.012] | — | **OUT** (stat, placebo, margin) |
+| L3 | 3 136 | −0.0596R | 0.428 | −0.071 [−0.129, −0.013] | — | **OUT** (stat, placebo, margin) |
+| L4 | F 9 265 / B 10 984 | Δ = +0.0001R | 0.002 | +0.003 [−0.036, +0.043] | keep 84 % | **OUT** (Δ, margin) |
+
+**All four arms SCREENED OUT — NO EDGE, fit-period kill.** Per §6.1 the
+holdout (2025-08-01 .. 2026-07-31) is **not simulated for any arm**; no
+holdout R exists. The package proceeds directly to REPORT/HANDOFF.
