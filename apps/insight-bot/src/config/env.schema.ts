@@ -46,6 +46,17 @@ export const EnvSchema = z.object({
   BYBIT_WS_URL: z.string().default('wss://stream.bybit.com/v5/public/linear'),
   OKX_WS_URL: z.string().default('wss://ws.okx.com:8443/ws/v5/public'),
 
+  // §2.1 collectors/calendar, §3.3 — the ForexFactory weekly feed (IB-010). The cadence is
+  // signal-server's (architecture/economic-calendar.md §3.2): the default interval, the hot one
+  // while a high-impact event is within ±20 min and through the Sunday feed rollover, and never
+  // two requests less than 60 s apart.
+  CALENDAR_ENABLED: booleanFlag(true),
+  CALENDAR_FEED_BASE_URL: z.string().default('https://nfs.faireconomy.media/ff_calendar_thisweek'),
+  CALENDAR_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
+  CALENDAR_POLL_HOT_INTERVAL_MS: z.coerce.number().int().positive().default(120_000),
+  // How far back the collector seeds its diff picture from calendar_events at boot.
+  CALENDAR_CACHE_LOOKBACK_DAYS: z.coerce.number().int().positive().default(30),
+
   // §6.2 — the watchdog alerts once when a stream has been silent for this many minutes.
   WATCHDOG_SILENCE_MIN: z.coerce.number().int().positive().default(3),
   // brief §1 — the per-user daily alert budget the gate enforces (§8.5).

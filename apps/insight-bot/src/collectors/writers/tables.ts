@@ -188,31 +188,41 @@ export function liquidationTuple(row: LiquidationRow): unknown[] {
   return [row.venue, row.symbol, row.ts, row.side, row.price, row.qty, row.notional, row.orderStatus ?? null, row.source];
 }
 
+/** §9.3, §16.7 — the vocabulary of `calendar_events.status`; the veto reads `'scheduled'`. */
+export type CalendarEventStatus = 'scheduled' | 'cancelled' | 'rescheduled';
+
 export interface CalendarEventRow {
   id: string;
   revision: number;
   source: string;
+  seriesId?: string | null;
   eventTime: Date;
   currency?: string | null;
   title?: string | null;
   impact?: string | null;
+  status: CalendarEventStatus;
   forecast?: string | null;
   previous?: string | null;
   actual?: string | null;
+  actualSource?: string | null;
   fetchedAt: Date;
 }
 
 export const CALENDAR_EVENTS: TableSpec = {
   table: 'calendar_events',
-  columns: ['id', 'revision', 'source', 'event_time', 'currency', 'title', 'impact', 'forecast', 'previous', 'actual', 'fetched_at'],
+  columns: [
+    'id', 'revision', 'source', 'series_id', 'event_time', 'currency', 'title', 'impact',
+    'status', 'forecast', 'previous', 'actual', 'actual_source', 'fetched_at',
+  ],
   conflict: ['id', 'revision'],
 };
 
 export function calendarEventTuple(row: CalendarEventRow): unknown[] {
   return [
-    row.id, row.revision, row.source, row.eventTime,
-    row.currency ?? null, row.title ?? null, row.impact ?? null,
-    row.forecast ?? null, row.previous ?? null, row.actual ?? null, row.fetchedAt,
+    row.id, row.revision, row.source, row.seriesId ?? null, row.eventTime,
+    row.currency ?? null, row.title ?? null, row.impact ?? null, row.status,
+    row.forecast ?? null, row.previous ?? null, row.actual ?? null, row.actualSource ?? null,
+    row.fetchedAt,
   ];
 }
 

@@ -204,7 +204,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
         { venue: 'binance', symbol: 'FUNDUSDT', fundingTime: new Date(Date.UTC(2035, 5, 1)), rate: 0.0001, source: 'rest' },
       ]);
       await new BatchWriter(db, t.CALENDAR_EVENTS, t.calendarEventTuple).write([
-        { id: 'ff-1', revision: 1, source: 'forexfactory', eventTime: new Date(Date.UTC(2035, 5, 1)), fetchedAt: new Date() },
+        { id: 'ff-1', revision: 1, source: 'forexfactory', eventTime: new Date(Date.UTC(2035, 5, 1)), status: 'scheduled', fetchedAt: new Date() },
       ]);
       const [{ count }] = await db.query<{ count: number }>(
         "select count(*)::int as count from funding_settlements where symbol = 'FUNDUSDT'",

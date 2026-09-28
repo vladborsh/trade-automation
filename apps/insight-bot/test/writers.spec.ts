@@ -50,7 +50,7 @@ describe('the §3.3 table specs', () => {
     ['open_interest_5m', t.OPEN_INTEREST_5M, t.openInterestTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), oiBase: 100, source: 'rest' }],
     ['long_short_5m', t.LONG_SHORT_5M, t.longShortTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), kind: 'taker', source: 'rest' }],
     ['liquidations', t.LIQUIDATIONS, t.liquidationTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), side: 'long', price: 1, qty: 2, notional: 2, source: 'ws' }],
-    ['calendar_events', t.CALENDAR_EVENTS, t.calendarEventTuple as never, { id: 'e1', revision: 1, source: 'ff', eventTime: new Date(0), fetchedAt: new Date(0) }],
+    ['calendar_events', t.CALENDAR_EVENTS, t.calendarEventTuple as never, { id: 'e1', revision: 1, source: 'ff', eventTime: new Date(0), status: 'scheduled', fetchedAt: new Date(0) }],
     ['collector_gaps', t.COLLECTOR_GAPS, t.collectorGapTuple as never, { stream: 's', venue: 'binance', gapFrom: new Date(0), gapTo: new Date(0), expected: 3, detectedAt: new Date(0) }],
   ];
 
