@@ -1,6 +1,5 @@
 import { Candle, Instrument } from '@trade-automation/contracts';
-import { GapRepair } from '../../src/market-data/gap-repair';
-import { VenueAdapter } from '../../src/market-data/venue-adapter.port';
+import { CandleSource, GapRepair } from '../src/gap-repair';
 
 const MIN = 60_000;
 
@@ -31,17 +30,8 @@ function bar(openTime: number): Candle {
   };
 }
 
-function fakeAdapter(fetchImpl: VenueAdapter['fetchCandles']): VenueAdapter {
-  return {
-    venue: 'binance',
-    fetchCandles: fetchImpl,
-    streamCandles: () => {
-      throw new Error('not used in this test');
-    },
-    health: () => {
-      throw new Error('not used in this test');
-    },
-  };
+function fakeAdapter(fetchImpl: CandleSource['fetchCandles']): CandleSource {
+  return { fetchCandles: fetchImpl };
 }
 
 describe('GapRepair ordering (architecture/live-signal-server.md §4.1)', () => {

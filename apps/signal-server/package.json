@@ -14,7 +14,9 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@trade-automation/binance-client": "0.1.0",
     "@trade-automation/contracts": "0.1.0",
+    "@trade-automation/market-data-core": "0.1.0",
     "@trade-automation/indicators": "0.1.0",
     "@trade-automation/replay-core": "0.1.0",
     "@nestjs/common": "^10.4.4",

@@ -1,5 +1,13 @@
-import { Candle, Instrument, TIMEFRAME_MS, VenueStatus } from '@trade-automation/contracts';
-import { VenueAdapter } from './venue-adapter.port';
+import { Candle, Instrument, TIMEFRAME_MS, Timeframe, VenueStatus } from '@trade-automation/contracts';
+
+/**
+ * What `GapRepair` needs of a venue adapter: the REST backfill call, nothing else. signal-server's
+ * `VenueAdapter` satisfies it structurally, so lifting this file out of the app (IB-001) moved no
+ * port and changed no type there.
+ */
+export interface CandleSource {
+  fetchCandles(instrument: Instrument, tf: Timeframe, from: number, to: number): Promise<Candle[]>;
+}
 
 export interface GapRepairResult {
   /** Bars to forward downstream, in ascending order: any repaired bars, then `candle`. */
@@ -19,7 +27,7 @@ export class GapRepair {
   async onClosed1m(
     instrument: Instrument,
     candle: Candle,
-    adapter: VenueAdapter,
+    adapter: CandleSource,
     venueStatus: VenueStatus,
   ): Promise<GapRepairResult> {
     const key = instrument.id;

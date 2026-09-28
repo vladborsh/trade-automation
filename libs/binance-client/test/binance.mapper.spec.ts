@@ -1,4 +1,4 @@
-import { mapRestKline, mapWsKline, BinanceRestKline, BinanceWsKlineMessage } from '../../src/market-data/binance/binance.mapper';
+import { mapRestKline, mapWsKline, BinanceRestKline, BinanceWsKlineMessage } from '../src/binance.mapper';
 
 // Fixture shapes taken from Binance's real futures REST/WS payloads
 // (https://binance-docs.github.io/apidocs/futures/en/#kline-candlestick-data,

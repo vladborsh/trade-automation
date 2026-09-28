@@ -1,22 +1,45 @@
-import { Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import WebSocket from 'ws';
 import { Candle, Instrument, TIMEFRAME_MS, Timeframe, VenueStatus } from '@trade-automation/contracts';
-import { VenueAdapter } from '../venue-adapter.port';
 import { BinanceRestKline, BinanceWsKlineMessage, mapRestKline, mapWsKline } from './binance.mapper';
+
+/**
+ * Where this client's warnings go (IB-001): signal-server passes its Nest `Logger`, which has these
+ * two methods; a caller that passes nothing gets the console.
+ */
+export interface BinanceClientLogger {
+  log(message: string): void;
+  warn(message: string): void;
+}
+
+const CONSOLE_LOGGER: BinanceClientLogger = {
+  // eslint-disable-next-line no-console
+  log: (message) => console.log(message),
+  // eslint-disable-next-line no-console
+  warn: (message) => console.warn(message),
+};
+
+/**
+ * A Binance combined-stream message: `{"stream":"btcusdt@kline_1m","data":{…}}`. The `/stream?streams=…`
+ * URL form wraps every payload this way, including a socket that carries one stream.
+ */
+interface BinanceCombinedMessage {
+  stream?: string;
+  data?: unknown;
+}
 
 // Binance futures kline REST page size — fapi/v1/klines `limit` max, per venue docs
 // (https://binance-docs.github.io/apidocs/futures/en/#kline-candlestick-data), mirrored from
 // cmc-bot-main's BinanceClient which requests the same endpoint.
 const REST_PAGE_LIMIT = 1500;
 
-export class BinanceAdapter implements VenueAdapter {
+export class BinanceAdapter {
   readonly venue = 'binance' as const;
-  private readonly logger = new Logger(BinanceAdapter.name);
 
   constructor(
     private readonly restBaseUrl: string,
     private readonly wsBaseUrl: string,
+    private readonly logger: BinanceClientLogger = CONSOLE_LOGGER,
   ) {}
 
   /**
@@ -113,8 +136,18 @@ export class BinanceAdapter implements VenueAdapter {
   }
 
   streamCandles(instrument: Instrument): Observable<Candle> {
-    const stream = `${instrument.symbol.toLowerCase()}@kline_1m`;
-    const url = `${this.wsBaseUrl}/ws/${stream}`;
+    return this.streamKlines([`${instrument.symbol.toLowerCase()}@kline_1m`], instrument);
+  }
+
+  /**
+   * One socket for `streams` on the combined-stream URL (`/stream?streams=a/b/c`), so a later caller
+   * can multiplex many symbols on one connection (IB-001); Binance wraps every payload as
+   * `{stream, data}` there, which `onMessage` unwraps, so a single-stream caller sees exactly what
+   * the old `/ws/<stream>` path gave it. Backoff, the silent-socket REST fallback and the parse
+   * guard below are unchanged.
+   */
+  streamKlines(streams: readonly string[], instrument: Instrument): Observable<Candle> {
+    const url = `${this.wsBaseUrl}/stream?streams=${streams.join('/')}`;
 
     return new Observable<Candle>((subscriber) => {
       let ws: WebSocket | null = null;
@@ -170,7 +203,8 @@ export class BinanceAdapter implements VenueAdapter {
             }
           }
           try {
-            const msg = JSON.parse(data.toString()) as BinanceWsKlineMessage;
+            const raw = JSON.parse(data.toString()) as BinanceCombinedMessage | BinanceWsKlineMessage;
+            const msg = ('stream' in raw && raw.data !== undefined ? raw.data : raw) as BinanceWsKlineMessage;
             if (msg.e === 'kline') {
               subscriber.next(mapWsKline(instrument.id, msg));
             }

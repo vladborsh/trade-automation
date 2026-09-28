@@ -1,9 +1,10 @@
+import { Logger } from '@nestjs/common';
 import { Venue } from '@trade-automation/contracts';
+import { BinanceAdapter } from '@trade-automation/binance-client';
 import { Env } from '../config/env.schema';
 import { AppConfigService } from '../config/config.service';
 import { VenueAdapter } from './venue-adapter.port';
 import { ReplayAdapter } from './replay/replay.adapter';
-import { BinanceAdapter } from './binance/binance.adapter';
 import { CapitalComAdapter } from './capitalcom/capitalcom.adapter';
 import { CapitalComSession } from './capitalcom/capitalcom.session';
 
@@ -54,7 +55,11 @@ export type LiveVenueEnv = Pick<
  * no live adapter.
  */
 export function buildLiveVenueAdapter(venue: Venue, env: LiveVenueEnv): VenueAdapter | undefined {
-  if (venue === 'binance') return new BinanceAdapter(env.BINANCE_REST_BASE_URL, env.BINANCE_WS_BASE_URL);
+  // IB-001: the client lives in libs now and takes the logger it writes through; this is the Nest
+  // Logger it constructed for itself before, with the same name.
+  if (venue === 'binance') {
+    return new BinanceAdapter(env.BINANCE_REST_BASE_URL, env.BINANCE_WS_BASE_URL, new Logger(BinanceAdapter.name));
+  }
   if (venue === 'capitalcom') {
     const { CAPITAL_COM_IDENTIFIER: identifier, CAPITAL_COM_PASSWORD: password, CAPITAL_COM_API_KEY: apiKey } = env;
     if (!identifier || !password || !apiKey) {
