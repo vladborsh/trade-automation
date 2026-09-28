@@ -74,3 +74,9 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   pointed at that slot's insight bot on `:30x5`.
 - Binance REST budget is 2400 weight/min and we use ~1 %. Any design that adds a polling
   loop against a venue must state its weight per minute.
+- **A measured venue fact is a rule only after repetition.** Before a limit, edge, retention
+  window or payload convention goes into a code comment, a task or an architecture note, say
+  how many times you observed it and when (≥ 5 repetitions per boundary, on two occasions
+  minutes apart for anything that can drift). One probe is a note marked as such. Established
+  2026-09-28 after a single-probe retention claim was ratified into design text and was wrong
+  (`reports/dev-2-BUG-022.md`).

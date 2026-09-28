@@ -316,11 +316,16 @@ per-symbol and can exceed the +20 s offset, and with `limit=1` a slot that
 was late is never fetched again; the upsert is idempotent so re-writing is
 free. On boot, the poller backfills the venue's 30-day window (500 rows per
 page, paginating **backward** by `endTime`) for every symbol whose last
-stored row is older than 5 minutes. Measured 2026-09-28: retention is
-enforced on **`endTime`** (−31 d → `-1130`), while a too-old `startTime` is
-silently clamped — so `-1130` on `endTime` is the clean end of data, and the
-retention edge is not recorded as a gap (a symbol returning nothing at all
-is).
+stored row is older than 5 minutes. Re-measured 2026-09-28 (5 repetitions per boundary, `reports/dev-2-BUG-022.md`,
+superseding an earlier single-probe claim): **both** `startTime` and
+`endTime` are validated (each rejected with `-1130` naming itself), the edge
+sits between 31 and 32 days and **drifts** (the same request rejected at
+21:01 UTC, accepted 5/5 at 21:04), and inside the valid window but past the
+data the venue returns an **empty array**, not an error. A pager therefore
+ends on **either** `-1130` (kept rows retained, wall logged) **or** an empty
+page; the 30-day clamp is a conservative guard inside the real edge, never
+the only thing between the code and a `-1130`. The retention edge is not
+recorded as a gap (a symbol returning nothing at all is).
 
 ### 4.2 Binance spot (`collectors/binance-spot`)
 
@@ -1026,11 +1031,12 @@ plus a removal with nothing linking them. §3.3's comment is corrected.
 the task's "expose the gauge from the header" is satisfied by the shared
 `BinanceWeightTracker` (header authoritative, estimate fills in) — ratified
 as the substitute, and the tracker is now the design's rule for every
-Binance futures loop, including IB-005's. (2) Retention is on `endTime`
-(`-1130`), `startTime` is clamped silently — §4.1 corrected; note for the
-backtest stream: signal-server's adapter header says the opposite, and a
-backfill that waits for a `startTime` rejection would never stop (the Tech
-Lead may file it there). (3) `limit=3` per poll, idempotent re-write —
+Binance futures loop, including IB-005's. (2) **Corrected 2026-09-28 (BUG-022):** the ratified claim "retention on
+`endTime`, `startTime` clamped" came from one probe straddling a moving
+edge and was wrong in the same way as the comment it replaced; the
+re-measured rule (both parameters validated, drifting edge, empty page past
+the data) is in §4.1, and both apps' pagers end on `-1130` or an empty page.
+My error too: I ratified a single measurement into design text. (3) `limit=3` per poll, idempotent re-write —
 ratified. (4) The retention edge is not a gap — ratified. (5) 30 weight/min
 is an average, ≈ 150 instantaneous — §4.5 states both. Also ratified: the
 poller registering inside IB-005's `CollectorsModule.register()` (one switch,
@@ -1076,3 +1082,11 @@ it reads only `complete = true` buckets, re-checks at +30 s / +60 s, then
 writes `complete = false` with a reason, and recomputes when the bucket
 heals; incomplete frames can never arm or trigger. IB-015's description is
 updated (it is unassigned).
+
+### 16.11 Standing rule — a measured venue claim needs repetition before it becomes design text (2026-09-28)
+
+From BUG-022: a venue fact enters a mapper header, a task description or
+this design only with **how many times it was observed and when** (≥ 5
+repetitions at each boundary, on at least two occasions minutes apart when
+the fact is a limit or an edge); one probe is a note, not a rule. Written
+into `AGENTS.md` so it binds every agent, not only this stream.
