@@ -1,4 +1,4 @@
-import { coverageSummary, toCoverageViews } from './coverage.rows';
+import { coverageCounts, toCoverageViews } from './coverage.rows';
 
 const rows = [
   { symbol: 'BTCUSDT', series: 'candles_1m', firstRow: Date.UTC(2024, 0, 1), lastRow: Date.UTC(2026, 8, 28), missingMonths: [] },
@@ -30,16 +30,17 @@ describe('toCoverageViews', () => {
   });
 });
 
-describe('coverageSummary', () => {
-  it('says so when everything is complete', () => {
-    expect(coverageSummary(toCoverageViews([rows[0]]))).toBe('1 series, all complete');
+describe('coverageCounts', () => {
+  it('counts the total, the empty and the holed — the three numbers the summary needs', () => {
+    expect(coverageCounts(toCoverageViews(rows))).toEqual({ total: 3, empty: 1, holes: 1 });
   });
 
-  it('counts the empty and the holed separately — they are different problems', () => {
-    expect(coverageSummary(toCoverageViews(rows))).toBe('3 series: 1 empty, 1 with missing months');
+  it('reports a complete set as no problems, rather than as a sentence', () => {
+    // §11: the counts are pure, the sentence lives in the string table
+    expect(coverageCounts(toCoverageViews([rows[0]]))).toEqual({ total: 1, empty: 0, holes: 0 });
   });
 
-  it('does not claim completeness when nothing was reported', () => {
-    expect(coverageSummary([])).toBe('no series reported');
+  it('counts nothing as nothing', () => {
+    expect(coverageCounts([])).toEqual({ total: 0, empty: 0, holes: 0 });
   });
 });
