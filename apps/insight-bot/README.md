@@ -184,9 +184,50 @@ The **retention edge is not a gap**: it drifts while a page is in flight, so the
 requested is routinely one the venue no longer publishes. Gaps are measured from the oldest slot
 actually served; a symbol that returns nothing at all is still one gap over the whole window.
 
+## The Bybit collector (IB-008)
+
+`src/collectors/bybit/` — one socket to `wss://stream.bybit.com/v5/public/linear` carrying
+`tickers.{symbol}` and `allLiquidation.{symbol}` for every universe symbol that has a
+`bybit_linear` mapping (28 of the 30 today; the rest are skipped and simply never register).
+
+Three venue facts this is built on, each checked against the live venue on 2026-09-28 rather than
+taken from the task text:
+
+1. **The liquidation topic is `allLiquidation.{symbol}`.** The old `liquidation.{symbol}` is gone:
+   subscribing returns `{"success":false,"ret_msg":"error:handler not found,topic:liquidation.BTCUSDT"}`.
+   A refused subscription is logged loudly — never swallowed.
+2. **`tickers` is snapshot-then-delta.** Deltas carry only the changed fields (the second live
+   message had no `markPrice` and no `fundingRate` at all), so `TickerState` merges them onto the
+   last snapshot. Reading a mark price off each message would store mostly nulls.
+3. **Bybit's liquidation side is the inverse of Binance's.** Bybit's doc for this topic:
+   *"When you receive a Buy update, this means that a long position has been liquidated"*, while
+   Binance's `!forceOrder` reports the side the engine submits (`SELL` closes a long). Both mappers
+   normalise to §3.3's "the side liquidated", and one spec pins the two venues side by side.
+
+**Write rules** (§3.3's volume rule): `mark_funding_1m` **once per minute for the signal set**
+(BTC/ETH/SOL) and **once per settlement for every other symbol** — the settlement row carries the
+last prediction before the venue rolled `nextFundingTime`. Liquidations are written as they arrive.
+
+**Funding history depth, measured** (`/v5/market/funding/history`, `category=linear`, 200/page):
+
+| Symbol | Rows | Oldest | Pages |
+|---|---|---|---|
+| BTCUSDT | 7 134 | 2020-03-25 | 36 |
+| ETHUSDT | 6 505 | 2020-10-21 | 33 |
+| SOLUSDT | 6 112 | 2021-06-29 | 31 |
+
+So the venue serves from listing. The boot backfill pages **backwards until it reaches rows already
+stored**, which makes a cold start ~30–36 requests per symbol and a restart exactly one. It runs
+**in the background**: the socket opens first, because `allLiquidation` is websocket-only and
+anything missed while backfilling is lost for good.
+
+**Rate limits are Bybit's own** — nothing here touches `ib_binance_weight_used_1m`, which is scoped
+to the Binance futures budget (§4.5). Steady state is ~0.06 REST requests/minute.
+
 ## Endpoints
 
 - `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode`).
+  Streams registered today: `binance-perp:{kline_1m,markPrice,forceOrder}`, `bybit:{tickers,allLiquidation}`.
   `lagSec` is still `null` (IB-004's tables exist, but nothing measures lag yet).
 - `GET /metrics` → prom-client: `ib_stream_last_message_age_seconds{stream}`,
   `ib_rows_written_total{table}`, `ib_gaps_detected_total{stream}`,

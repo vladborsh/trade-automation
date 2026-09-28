@@ -16,3 +16,18 @@ export async function lastCandleOpenTimes(db: Db, venue: string, market: Market)
   );
   return new Map(rows.map((row) => [row.symbol, new Date(row.open_time).getTime()]));
 }
+
+/**
+ * IB-008: the earliest settlement stored per symbol for a venue, so the boot funding backfill can
+ * stop as soon as it reaches known rows instead of paging the venue's whole depth every restart.
+ */
+export async function earliestFundingTimes(db: Db, venue: string): Promise<Map<string, number>> {
+  const rows = await db.query<{ symbol: string; funding_time: Date }>(
+    `select symbol, min(funding_time) as funding_time
+       from funding_settlements
+      where venue = $1
+      group by symbol`,
+    [venue],
+  );
+  return new Map(rows.map((row) => [row.symbol, new Date(row.funding_time).getTime()]));
+}

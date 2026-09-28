@@ -93,5 +93,7 @@ describe('IB-005 funding settlement mapping (§4.1)', () => {
 
   it('refuses a rate that is not a number rather than writing NaN', () => {
     expect(() => fundingSettlementRow({ symbol: 'BTCUSDT', fundingTime: 1, fundingRate: 'n/a' })).toThrow(RangeError);
+    // Number('') is 0: an empty field must be refused, not stored as a zero rate
+    expect(() => fundingSettlementRow({ symbol: 'BTCUSDT', fundingTime: 1, fundingRate: '' })).toThrow(RangeError);
   });
 });

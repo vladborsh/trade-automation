@@ -17,7 +17,9 @@ function num(value: string | undefined): number | null {
 
 /** Same, for a field the row requires. */
 function requiredNum(value: string, field: string): number {
-  const n = Number(value);
+  // `Number('')` is 0, so an empty string would slip through as a real zero price. A field the
+  // venue left empty is missing data, not a zero — refuse it.
+  const n = value === '' ? NaN : Number(value);
   if (!Number.isFinite(n)) throw new RangeError(`${field}: expected a number, got ${JSON.stringify(value)}`);
   return n;
 }
