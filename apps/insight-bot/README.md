@@ -43,20 +43,49 @@ no partition of relation "candles_1m" found for row
 ```
 
 Nothing breaks until a write lands in that window — the 1st of a month, 00:00–07:00 UTC — so a
-database can look healthy right up to the boundary. Check yours:
+database can look healthy right up to the boundary.
+
+**Most slots do not need this repair.** Check before you touch anything, and **do not judge it by
+reading the bound in a non-UTC session**: `pg_get_expr` renders a `timestamptz` in the *session's*
+timezone, so a **correct** bound also prints with a `-07` suffix (`2026-10-01 00:00:00+00` shows
+as `2026-09-30 17:00:00-07`). The instants differ; the suffix does not. An earlier version of this
+section said "a bound ending `-07` is skewed" — that is wrong, it false-positives on a healthy
+database, and acting on it cost one slot its data. Ask in UTC instead:
 
 ```sh
-psql -U backtest -d insight_dev2 -c \
+# your own slot's database, and only ever your own — every command below uses it
+SLOT_DB=insight_dev<N>
+
+PGTZ=UTC psql -U backtest -d "$SLOT_DB" -c \
   "select relname, pg_get_expr(relpartbound, oid) from pg_class where relname like 'candles_1m_2026%'"
 ```
 
-A bound ending in `-07` (or any offset other than `+00`) is skewed. The code fix only applies to
-partitions created **after** it, so existing ones must be rebuilt. On a dev slot, whose data is
-reproducible, drop and recreate the database — the fastest and safest repair:
+A correct October partition then reads `FROM ('2026-10-01 00:00:00+00')`. Better still, test the
+behaviour rather than the text — insert a probe row on the boundary and see which partition takes
+it:
 
 ```sh
-psql -U backtest -d postgres -c 'drop database if exists insight_dev2'
-psql -U backtest -d postgres -c 'create database insight_dev2'
+psql -U backtest -d "$SLOT_DB" -c "
+  insert into candles_1m (venue,market,symbol,open_time,open,high,low,close,volume,source)
+    values ('probe','perp','PROBE','2026-10-01 00:00:00+00',1,1,1,1,1,'rest');
+  select tableoid::regclass::text from candles_1m where venue='probe';
+  delete from candles_1m where venue='probe';"
+```
+
+`candles_1m_2026_10` means the database is fine and you should stop here. A failure (`no partition
+of relation ... found for row`) or a landing in `candles_1m_2026_09` means it is skewed.
+
+Only then repair. The code fix applies only to partitions created **after** it, so existing ones
+must be rebuilt. On a dev slot, whose data is reproducible, drop and recreate — but **stop your
+collector first**: a drop landing on a running collector is how one slot lost a run mid-flight.
+
+```sh
+# $SLOT_DB is your own slot's database from above, and nothing else. This is a drop: there is no
+# undo, and another slot's database is someone else's running work. It stays a variable rather
+# than a pasteable literal on purpose — a destructive command in a shared doc must not carry one
+# slot's name where another slot can copy it.
+psql -U backtest -d postgres -c "drop database if exists $SLOT_DB"
+psql -U backtest -d postgres -c "create database $SLOT_DB"
 # migrations and correct partitions are recreated on the next boot
 ```
 
