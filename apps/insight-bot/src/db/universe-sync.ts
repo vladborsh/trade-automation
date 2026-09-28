@@ -19,11 +19,15 @@ export interface UniverseSyncResult {
  */
 export async function syncUniverse(db: DbHandle, universe: UniverseFile): Promise<UniverseSyncResult> {
   const signalSet = new Set(universe.signal_set);
-  for (const s of universe.symbols) {
+  for (const [index, s] of universe.symbols.entries()) {
+    // IB-031: the file is ordered by 30-day quote volume by construction, so position IS the
+    // rank unless the revision states one. Derived rather than hand-maintained, so the order
+    // the file reads in and the order the picker shows can never disagree.
+    const volumeRank = s.volume_rank ?? index + 1;
     await db.query(
       `insert into symbols (id, base, quote, binance_perp, binance_spot, bybit_linear, okx_swap,
-                            listed_perp, in_signal_set, active)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+                            listed_perp, in_signal_set, active, volume_rank, coingecko_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11)
        on conflict (id) do update set
          base          = excluded.base,
          quote         = excluded.quote,
@@ -33,7 +37,9 @@ export async function syncUniverse(db: DbHandle, universe: UniverseFile): Promis
          okx_swap      = excluded.okx_swap,
          listed_perp   = excluded.listed_perp,
          in_signal_set = excluded.in_signal_set,
-         active        = true`,
+         active        = true,
+         volume_rank   = excluded.volume_rank,
+         coingecko_id  = excluded.coingecko_id`,
       [
         s.id,
         s.base,
@@ -44,6 +50,8 @@ export async function syncUniverse(db: DbHandle, universe: UniverseFile): Promis
         s.okx_swap ?? null,
         s.listed_perp,
         signalSet.has(s.id),
+        volumeRank,
+        s.coingecko_id ?? null,
       ],
     );
   }

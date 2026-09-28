@@ -9,3 +9,6 @@ export * from './auth';
 // IB-030 — the dashboard's health and coverage surfaces.
 export * from './health';
 export * from './coverage';
+// IB-031 — the instrument view.
+export * from './series';
+export * from './universe';

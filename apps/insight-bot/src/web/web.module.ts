@@ -8,6 +8,8 @@ import { WebAuthGuard } from './auth/web-auth.guard';
 import { WebAuthService } from './auth/web-auth.service';
 import { WebCoverageController } from './coverage.controller';
 import { WebHealthController } from './health.controller';
+import { SeriesController } from './series/series.controller';
+import { UniverseController } from './universe.controller';
 
 /**
  * IB-029 — the dashboard's server surface (architecture/insight-bot-web-dashboard.md §4).
@@ -37,9 +39,12 @@ export class WebModule {
       // OpsModule owns and exports — the same instances /health and /metrics report, so the
       // dashboard cannot drift from the ops view by reading a second copy.
       imports: [AppConfigModule, DbModule, OpsModule],
-      // IB-030's two read surfaces: no guard decorator on either — they are authenticated by the
-      // APP_GUARD above, which is the whole point of it being module-wide.
-      controllers: [WebAuthController, WebHealthController, WebCoverageController],
+      // No guard decorator on any of these — they are authenticated by the APP_GUARD above,
+      // which is the whole point of it being module-wide.
+      controllers: [
+        WebAuthController, WebHealthController, WebCoverageController,
+        SeriesController, UniverseController,
+      ],
       providers: [WebAuthService, { provide: APP_GUARD, useClass: WebAuthGuard }],
       exports: [WebAuthService],
     };

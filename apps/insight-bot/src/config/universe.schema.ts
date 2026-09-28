@@ -24,6 +24,13 @@ export const UniverseSymbolSchema = z
     // A `date` in SQL (§3.2). yaml parses an unquoted 2020-01-01 to a JS Date, so accept either
     // and normalise to the ISO day — the value is a calendar day, never an instant.
     listed_perp: z.union([z.string(), z.date()]).transform(toIsoDay),
+    // IB-031: the dashboard's "top 20" picker. Optional because the file is ALREADY ordered by
+    // 30-day quote volume by construction (see its header), so the rank is the position unless
+    // a revision wants to state it explicitly.
+    volume_rank: z.number().int().positive().optional(),
+    // IB-037: CoinGecko's id for the base asset, for market-cap and dominance joins. Never
+    // guessed from the ticker — absent means we have no mapping.
+    coingecko_id: z.string().min(1).optional(),
   })
   .strict();
 export type UniverseSymbol = z.infer<typeof UniverseSymbolSchema>;
