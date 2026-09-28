@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in. Nothing here is secret: the Telegram tokens and the
+# database password live in SSM SecureStrings the user creates (RUNBOOK §4), never in Terraform.
+
+# S3 bucket names are globally unique — pick one with the account id or a suffix.
+backup_bucket_name = "insight-bot-backups-CHANGE-ME"
+
+# Leave both empty to skip the CI deploy role; fill them to let GitHub Actions assume it.
+# github_oidc_provider_arn = "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
+# deploy_role_github_sub   = "repo:<owner>/<repo>:ref:refs/heads/master"
+
+# region                = "ap-northeast-1"
+# instance_type         = "t4g.small"
+# root_volume_gb        = 50
+# backup_retention_days = 35

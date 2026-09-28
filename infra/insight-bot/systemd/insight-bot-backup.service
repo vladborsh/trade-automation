@@ -1,0 +1,12 @@
+[Unit]
+Description=insight-bot daily pg_dump to S3 (design §7)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=AWS_REGION=ap-northeast-1
+ExecStart=/opt/insight-bot/backup.sh
+# A failed backup must be visible: `systemctl status insight-bot-backup.service`.
+StandardOutput=journal
+StandardError=journal

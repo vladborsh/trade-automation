@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Bootstrap for the insight-bot box (Amazon Linux 2023, arm64). Runs once at first boot.
+# Installs docker + compose, drops the repo's compose file and scripts onto the host, and enables
+# the backup timer. It does NOT start the app: the first image comes from the deploy job.
+#
+# The files below are the repo's own (infra/insight-bot/{compose,scripts,systemd}), inlined by
+# Terraform's templatefile() so there is one source of truth and the box needs no repo access.
+set -euxo pipefail
+
+dnf -y update
+dnf -y install docker
+systemctl enable --now docker
+
+# compose v2 as a docker CLI plugin (arm64)
+install -d /usr/local/lib/docker/cli-plugins
+curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \
+  https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# SSM agent ships with AL2023; make sure it is running (the only way in).
+systemctl enable --now amazon-ssm-agent
+
+install -d -m 0755 /opt/insight-bot
+install -d -m 0700 /opt/insight-bot/pgdata
+
+cat >/opt/insight-bot/docker-compose.yml <<'COMPOSE_EOF'
+${compose_file}
+COMPOSE_EOF
+
+cat >/opt/insight-bot/render-env.sh <<'RENDER_EOF'
+${render_env_sh}
+RENDER_EOF
+
+cat >/opt/insight-bot/deploy.sh <<'DEPLOY_EOF'
+${deploy_sh}
+DEPLOY_EOF
+
+cat >/opt/insight-bot/backup.sh <<'BACKUP_EOF'
+${backup_sh}
+BACKUP_EOF
+
+cat >/opt/insight-bot/restore.sh <<'RESTORE_EOF'
+${restore_sh}
+RESTORE_EOF
+
+cat >/etc/systemd/system/insight-bot-backup.service <<'SERVICE_EOF'
+${backup_service}
+SERVICE_EOF
+
+cat >/etc/systemd/system/insight-bot-backup.timer <<'TIMER_EOF'
+${backup_timer}
+TIMER_EOF
+
+chmod 0755 /opt/insight-bot/*.sh
+
+# Static facts the scripts read instead of hardcoding.
+printf '%s' "${backup_bucket}" >/opt/insight-bot/backup-bucket
+printf '%s' "${image_repo_url}" >/opt/insight-bot/ecr-repo-url
+printf 'AWS_REGION=%s\nSSM_PREFIX=%s\n' "${region}" "${ssm_prefix}" >/etc/profile.d/insight-bot.sh
+chmod 0644 /etc/profile.d/insight-bot.sh
+
+systemctl daemon-reload
+systemctl enable --now insight-bot-backup.timer
+
+echo "bootstrap done: run /opt/insight-bot/deploy.sh <tag> once the image is in ECR" >/opt/insight-bot/BOOTSTRAP-OK

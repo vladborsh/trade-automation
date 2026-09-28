@@ -1,0 +1,62 @@
+# The box's compose file (design §7). Lives at /opt/insight-bot/docker-compose.yml, written by
+# user_data and updated by the deploy step. Local development does NOT use this file — it uses
+# apps/insight-bot/docker-compose.yml against the single local Postgres (IB-003).
+#
+# Both services read /opt/insight-bot/.env, which the deploy step renders from SSM SecureStrings
+# (root-only, 0600). No secret is baked into the image or this file.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Design §7: data on the EBS volume, shared_buffers 512MB, max_connections 50 (2 GB box).
+    command: >-
+      postgres
+      -c shared_buffers=512MB
+      -c max_connections=50
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c wal_compression=on
+    environment:
+      POSTGRES_DB: insight
+      POSTGRES_USER: insight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in /opt/insight-bot/.env from SSM}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - /opt/insight-bot/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U insight -d insight']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # No ports: published. Only the bot and, through SSM port-forward, an operator reach it.
+    expose:
+      - '5432'
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+  insight-bot:
+    image: ${IMAGE:?set by the deploy step}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - /opt/insight-bot/.env
+    environment:
+      NODE_ENV: production
+      PORT: '3005'
+      DATABASE_URL: postgres://insight:${POSTGRES_PASSWORD}@postgres:5432/insight
+    expose:
+      - '3005'
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:3005/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }

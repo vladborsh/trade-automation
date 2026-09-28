@@ -1,0 +1,88 @@
+# IB-013 — build the arm64 image, push it to ECR, then have SSM run the box's deploy script
+# (design §7). Manual by default; the push trigger is commented out until the stack exists and the
+# user has approved deploys.
+#
+# Needs these repository variables (no secrets: auth is GitHub OIDC → the insight-bot-deploy role):
+#   AWS_REGION            ap-northeast-1
+#   AWS_DEPLOY_ROLE_ARN   arn:aws:iam::<account>:role/insight-bot-deploy   (Terraform output)
+#   ECR_REPOSITORY_URL    <account>.dkr.ecr.ap-northeast-1.amazonaws.com/insight-bot
+#   INSTANCE_ID           i-…                                             (Terraform output)
+name: insight-bot deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or branch to build
+        required: false
+        default: master
+  # push:
+  #   branches: [master]
+  #   paths: ['apps/insight-bot/**', 'libs/**', 'infra/insight-bot/**', '.github/workflows/insight-bot-deploy.yml']
+
+concurrency:
+  group: insight-bot-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-qemu-action@v3 # arm64 on an x86 runner
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push linux/arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/insight-bot/Dockerfile
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: |
+            ${{ vars.ECR_REPOSITORY_URL }}:sha-${{ github.sha }}
+            ${{ vars.ECR_REPOSITORY_URL }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The box has no inbound port: the deploy runs through SSM (design §7, D11).
+      - name: Run deploy.sh on the instance
+        id: send
+        run: |
+          set -euo pipefail
+          command_id=$(aws ssm send-command \
+            --instance-ids "${{ vars.INSTANCE_ID }}" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy sha-${{ github.sha }}" \
+            --parameters "commands=['/opt/insight-bot/deploy.sh sha-${{ github.sha }}']" \
+            --query 'Command.CommandId' --output text)
+          echo "command_id=$command_id" >>"$GITHUB_OUTPUT"
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "${{ vars.INSTANCE_ID }}" || true
+
+      - name: Report the deploy output
+        run: |
+          aws ssm get-command-invocation \
+            --command-id "${{ steps.send.outputs.command_id }}" \
+            --instance-id "${{ vars.INSTANCE_ID }}" \
+            --query '{status:Status,stdout:StandardOutputContent,stderr:StandardErrorContent}' \
+            --output text
+          status=$(aws ssm get-command-invocation \
+            --command-id "${{ steps.send.outputs.command_id }}" \
+            --instance-id "${{ vars.INSTANCE_ID }}" --query Status --output text)
+          test "$status" = "Success"

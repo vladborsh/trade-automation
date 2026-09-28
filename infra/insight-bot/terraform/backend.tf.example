@@ -1,0 +1,13 @@
+# State lives locally until the stack is approved and applied once. Moving it to S3 needs a bucket
+# and a lock table, which are themselves AWS resources — so this stays an example, not a file
+# Terraform loads. Rename to backend.tf and `terraform init -migrate-state` when the user wants it.
+#
+# terraform {
+#   backend "s3" {
+#     bucket       = "insight-bot-tfstate-CHANGE-ME"
+#     key          = "insight-bot/terraform.tfstate"
+#     region       = "ap-northeast-1"
+#     encrypt      = true
+#     use_lockfile = true
+#   }
+# }
