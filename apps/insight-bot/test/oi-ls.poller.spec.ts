@@ -167,14 +167,21 @@ describe('OiLsPoller.pollOnce', () => {
     expect(gaps[0]).toMatchObject({ stream: STREAM_ID, symbol: 'BROKENUSDT', expected: 1, repaired: 0 });
   });
 
-  it('publishes the tracker\'s reading onto the metric at the poll instant', async () => {
-    // The counting itself lives in FuturesDataClient (its own spec); what the poller owes is to
-    // push the trailing-minute figure onto ib_binance_weight_used_1m on every pass.
-    const { poller, metrics, weight } = build({ symbols: ['BTCUSDT', 'ETHUSDT'] });
-    const at = SLOT_TS + 20_000;
-    for (let i = 0; i < 10; i += 1) weight.recordCall(1, at - 1_000); // 5 endpoints x 2 symbols
-    await poller.pollOnce(at);
+  it('exposes the weight as a LIVE reading, which decays instead of going stale', async () => {
+    // Caught on the acceptance run: the gauge was set at the end of each poll and then held that
+    // figure for the whole five minutes to the next one, long after those calls had aged out of
+    // the trailing minute. It now reads the tracker at the instant it is asked.
+    const { metrics, weight } = build({ symbols: ['BTCUSDT', 'ETHUSDT'] });
+    const t0 = Date.now();
+    for (let i = 0; i < 10; i += 1) weight.recordCall(1, t0); // 5 endpoints x 2 symbols
     expect(metrics.getBinanceWeightUsed1m()).toBe(10);
+
+    jest.spyOn(Date, 'now').mockReturnValue(t0 + 61_000);
+    try {
+      expect(metrics.getBinanceWeightUsed1m()).toBe(0); // the calls have aged out
+    } finally {
+      jest.spyOn(Date, 'now').mockRestore();
+    }
   });
 });
 

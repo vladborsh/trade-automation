@@ -28,8 +28,13 @@ const PERIOD = '5m';
  * 5 m, polled at every 5-minute boundary **+ 20 s** (the venue publishes on the boundary with a
  * lag), for every active universe symbol.
  *
- * **REST weight: 5 calls × 30 symbols per 5 min = 30 weight/min = 1.25 % of the 2400/min
- * budget** (§4.5's line for this loop, D15). The boot backfill is a one-off on top: at most
+ * **REST weight: 5 calls × 30 symbols per 5 min = 150 calls per 5 min, i.e. §4.5's 30
+ * weight/min AVERAGED over the interval (1.25 % of 2400).** Measured on the acceptance run, the
+ * instantaneous trailing-minute figure during a pass is ~150, not 30: a pass takes about a
+ * minute of wall clock, so its calls land inside one minute rather than spread across the five.
+ * That peak is 6.25 % of the budget and well inside it, but `ib_binance_weight_used_1m` reads
+ * ~150 while a pass is running and decays to 0 between passes — which is the true picture, and
+ * the reason the gauge must be a live reading rather than a number pushed once per poll. The boot backfill is a one-off on top: at most
  * ⌈30 days / (500 slots × 5 min)⌉ = 18 pages per series per symbol, 5 × 18 × 30 = 2700 calls,
  * paced at `BACKFILL_PACING_MS` so it spreads over minutes rather than bursting through the
  * budget.
@@ -82,6 +87,9 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
         weight: this.weight,
       });
     this.streams.register(STREAM_ID, VENUE);
+    // Read live at scrape time, so the gauge decays with the trailing minute instead of holding
+    // the last poll's figure for five minutes.
+    this.metrics.setBinanceWeightSource(() => this.weight.used1m());
   }
 
   /**
@@ -157,7 +165,6 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     await this.writers.openInterest.write(oiRows);
     await this.writers.longShort.write(lsRows);
     this.streams.recordMessage(STREAM_ID, at);
-    this.metrics.setBinanceWeightUsed1m(this.weight.used1m(at));
 
     if (failed.length > 0) {
       await this.recordGaps(slot, slot, failed, `poll failed for ${failed.length} symbol(s)`);
@@ -212,7 +219,6 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
       await this.recordMissing(symbol, from, now, stored);
     }
 
-    this.metrics.setBinanceWeightUsed1m(this.weight.used1m());
     this.logger.log(`OI/LS backfill: ${stale.length} symbol(s), ${oi} OI rows, ${longShort} long/short rows.`);
     return { symbols: stale.length, oi, longShort };
   }

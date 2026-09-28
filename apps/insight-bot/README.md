@@ -4,8 +4,9 @@ Crypto insight bot: venue collectors → features → playbooks → Telegram.
 Design: [`architecture/insight-bot-system-design.md`](../../architecture/insight-bot-system-design.md);
 settled product brief: `architecture/crypto-insight-bot-2026-09-28.md`.
 
-IB-003 is the scaffold: env, universe, database, `/health`, `/metrics`, image. The collectors,
-the pipeline and the bot itself arrive with the later IB tasks (`tasks/insight-bot.jsonl`).
+IB-003 scaffolded it (env, universe, database, `/health`, `/metrics`, image), IB-004 added the
+partitioned time-series schema and the writers, IB-007 the first collector. The rest of the
+pipeline and the bot itself arrive with the later IB tasks (`tasks/insight-bot.jsonl`).
 
 ## Your slot's port and database
 
@@ -152,12 +153,19 @@ per symbol — `openInterestHist` → `open_interest_5m`, and `topLongShortPosit
 `topLongShortAccountRatio`, `globalLongShortAccountRatio`, `takerlongshortRatio` →
 `long_short_5m` under the four `kind`s.
 
-**Weight: 5 calls × 30 symbols per 5 min = 30 weight/min = 1.25 % of the 2400/min budget**
-(§4.5, D15). On boot it backfills the venue's 30-day window for every symbol whose newest stored
-slot is stale, paging **backward** by `endTime`, paced so it does not burst.
+**Weight: 5 calls × 30 symbols per 5 min = 150 calls per 5 min — §4.5's 30 weight/min averaged
+over the interval, 1.25 % of the 2400/min budget** (D15). Measured: a pass takes ~1 minute of
+wall clock, so `ib_binance_weight_used_1m` peaks near **150** (6.25 % of budget, comfortably
+inside) while a pass runs and decays to 0 between passes. The gauge is read live at scrape time,
+so it shows that decay rather than holding the last pass's figure.
 
-Two things about these endpoints, **measured 2026-09-28**, that differ from what the older
-signal-server adapter recorded:
+On boot it backfills the venue's 30-day window for every symbol whose newest stored slot is
+stale, paging **backward** by `endTime`, paced so it does not burst. A 30-day reach-back touches
+months the boot partition maintenance has not prepared, so it calls `ensureRange()` for its own
+window first (§3.1).
+
+Three things about these endpoints, **measured 2026-09-28**, that differ from what the task text
+and the older signal-server adapter assumed:
 
 - **`/futures/data/*` sends no `X-MBX-USED-WEIGHT-1M` header** (`/fapi/*` does). So
   `ib_binance_weight_used_1m` is this app's own trailing-minute count while only this poller is
@@ -166,6 +174,15 @@ signal-server adapter recorded:
 - **The ~30-day retention is enforced on `endTime`, not `startTime`**, and it is a `-1130`
   rejection, which the pager treats as "no more history" rather than an error. A `startTime`
   older than 30 days is now silently accepted and clamped, so it is useless as a stop signal.
+- **The publication lag is per-symbol and outlives the +20 s offset**: 169 s past a boundary,
+  BTCUSDT was still a slot behind while four other symbols had published. `limit=1` would drop a
+  slot for good whenever the lag varies (a poll returning 13:50 then one returning 14:00 never
+  fetches 13:55), so each poll takes the last **three** rows — same weight, and re-writing an
+  already-stored slot is free because the upsert is idempotent (D12).
+
+The **retention edge is not a gap**: it drifts while a page is in flight, so the oldest slot
+requested is routinely one the venue no longer publishes. Gaps are measured from the oldest slot
+actually served; a symbol that returns nothing at all is still one gap over the whole window.
 
 ## Endpoints
 

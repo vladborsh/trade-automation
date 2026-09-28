@@ -12,7 +12,16 @@ import { StreamRegistry } from './stream-registry';
 export class MetricsService {
   readonly registry = new client.Registry();
 
-  /** §4.5 — the REST weight used in the trailing minute, against Binance's 2400/min budget. */
+  /**
+   * §4.5 — the REST weight used in the trailing minute, against Binance's 2400/min budget.
+   *
+   * A **live source**, not a value pushed in on each poll: a pushed figure goes stale the moment
+   * the poll ends and then misreports for the whole gap until the next one. Measured on IB-007's
+   * acceptance run — the gauge sat at 150 for five minutes after a pass whose calls had long
+   * since aged out of the trailing minute. The collector registers its tracker here at boot and
+   * both `/metrics` and `/health` read it at the instant they are asked.
+   */
+  private weightSource: (() => number) | null = null;
   private binanceWeightUsed1m = 0;
 
   readonly rowsWritten = new client.Counter({
@@ -65,17 +74,22 @@ export class MetricsService {
       help: 'Binance REST weight used in the trailing minute (budget 2400/min, §4.5)',
       registers: [this.registry],
       collect() {
-        this.set(self.binanceWeightUsed1m);
+        this.set(self.getBinanceWeightUsed1m());
       },
     });
   }
 
-  /** Called by the Binance REST client's weight tracker (IB-005); 0 until one exists. */
+  /** Registers the live reader. The collector calls this once, at boot. */
+  setBinanceWeightSource(source: () => number): void {
+    this.weightSource = source;
+  }
+
+  /** Fallback for a process with no collector running (the scaffold's 0). */
   setBinanceWeightUsed1m(weight: number): void {
     this.binanceWeightUsed1m = weight;
   }
 
   getBinanceWeightUsed1m(): number {
-    return this.binanceWeightUsed1m;
+    return this.weightSource !== null ? this.weightSource() : this.binanceWeightUsed1m;
   }
 }
