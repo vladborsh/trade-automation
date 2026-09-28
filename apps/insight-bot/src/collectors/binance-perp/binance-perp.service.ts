@@ -6,6 +6,7 @@ import { lastCandleOpenTimes } from '../../db/pg/collector-reads';
 import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { Writers } from '../writers/batch-writer';
+import { BinanceWeightTracker } from './binance-weight.tracker';
 import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collector';
 import { PerpSocket } from './perp-socket';
 import { PerpRest } from './rest';
@@ -29,6 +30,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     private readonly writers: Writers,
     private readonly registry: StreamRegistry,
     private readonly metrics: MetricsService,
+    private readonly weight: BinanceWeightTracker,
     @Inject(DB) private readonly db: Db | null,
   ) {}
 
@@ -41,7 +43,11 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
 
     const restBaseUrl = this.config.env.get('BINANCE_FUTURES_REST_BASE_URL');
     const wsBaseUrl = this.config.env.get('BINANCE_FUTURES_WS_BASE_URL');
-    const rest = new PerpRest({ baseUrl: restBaseUrl, onWeight: (w) => this.metrics.setBinanceWeightUsed1m(w) });
+    // IB-007: both Binance loops share one IP budget, so they share one tracker rather than each
+    // pushing its own number at the gauge. This one is the authoritative half — /fapi/* answers
+    // carry `x-mbx-used-weight-1m`, and a header always beats the poller's local estimate (the
+    // /futures/data/* endpoints send no header at all, measured 2026-09-28).
+    const rest = new PerpRest({ baseUrl: restBaseUrl, onWeight: (w) => this.weight.recordHeader(w) });
     const adapter = new BinanceAdapter(restBaseUrl, wsBaseUrl, {
       log: (m) => this.logger.log(m),
       warn: (m) => this.logger.warn(m),

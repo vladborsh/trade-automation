@@ -1,3 +1,5 @@
+import { BinancePerpService } from '../../src/collectors/binance-perp/binance-perp.service';
+import { OiLsPoller } from '../../src/collectors/binance-perp/oi-ls.poller';
 import { CollectorsModule } from '../../src/collectors/collectors.module';
 
 /**
@@ -12,10 +14,12 @@ describe('CollectorsModule.register()', () => {
     else process.env.DATABASE_URL = original;
   });
 
-  it('provides the collector when DATABASE_URL is set', () => {
+  it('provides the collectors when DATABASE_URL is set', () => {
     process.env.DATABASE_URL = 'postgres://user@localhost:5432/insight_test';
     const module = CollectorsModule.register();
-    expect(module.providers ?? []).toHaveLength(1);
+    // Named, not counted: every new collector joins this list (IB-007 added the OI/LS poller),
+    // and a bare count would fail each time without saying anything about what is registered.
+    expect(module.providers ?? []).toEqual(expect.arrayContaining([BinancePerpService, OiLsPoller]));
     expect((module.imports ?? []).length).toBeGreaterThan(0);
   });
 

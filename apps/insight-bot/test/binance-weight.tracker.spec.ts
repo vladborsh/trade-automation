@@ -57,4 +57,18 @@ describe('BinanceWeightTracker', () => {
     expect(150 / 5).toBe(30); // per minute, §4.5's line
     expect((150 / 5 / 2400) * 100).toBeCloseTo(1.25, 2); // 1.25 % of the budget, D15
   });
+
+  it('lets the /fapi header override the /futures/data estimate — one IP, one budget', () => {
+    // IB-005's perp collector reports x-mbx-used-weight-1m from /fapi/*; IB-007's poller counts
+    // its own /futures/data/* calls, which carry no header. Both feed this one tracker, and the
+    // venue's own figure is the truthful one whenever it is fresh.
+    const tracker = new BinanceWeightTracker();
+    for (let i = 0; i < 150; i += 1) tracker.recordCall(1, 1_000); // a poller pass
+    expect(tracker.used1m(1_500)).toBe(150);
+    expect(tracker.isEstimate(1_500)).toBe(true);
+
+    tracker.recordHeader(612, 2_000); // a /fapi answer: the venue's real number for this IP
+    expect(tracker.used1m(2_500)).toBe(612);
+    expect(tracker.isEstimate(2_500)).toBe(false);
+  });
 });
