@@ -1,0 +1,5 @@
+arm,n_fit,mean_netR,shadow_n,shadow_mean,margin,margin_ci90_lo,margin_ci90_hi,shadow_state,placebo_p,verdict
+P1-M,0,,122,-0.1877,,,,ok,,UNDERPOWERED (fit n < 60) — holdout not read
+P1-A,0,,298,-0.0492,,,,ok,,UNDERPOWERED (fit n < 60) — holdout not read
+P2-M,0,,14,0.2339,,,,unreliable (<30),,UNDERPOWERED (fit n < 60) — holdout not read
+P2-A,6,-0.0133,21,-0.1903,0.1770,-0.4409,0.8635,unreliable (<30),0.4630,UNDERPOWERED (fit n < 60) — holdout not read
