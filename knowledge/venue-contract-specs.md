@@ -178,3 +178,16 @@ marginFactor`; `minDealSize` → `minQty`; `minSizeIncrement` → `qtyStep`;
 - [binance-lev]: https://www.binance.com/en/futures/trading-rules/perpetual/leverage-margin — bracket table (client-rendered; not readable without a browser).
 - Capital.com API field names (`lotSize`, `marginFactor`, `dealingRules.minSizeIncrement`, …): https://open-api.capital.com/ and https://github.com/capital-com-sv/capital-api-postman.
 - Capital.com help centre pages ("What is the maximum leverage?", "What is the minimum trade size?") returned 403 to automated fetches on 2026-09-22; their content as quoted by search engines (indices min 0.1 "depends on the instrument", forex min 500 units) is *older* than the market pages above and was not used.
+
+## OKX USDT-margined perpetual swaps — contract size (insight bot, measured 2026-09-28)
+
+OKX quotes swap quantities in **contracts**, not base units: `/api/v5/public/instruments`
+(`instType=SWAP`) gives `ctVal` per instrument — `BTC-USDT-SWAP` 0.01, `ETH` 0.1, `SOL` 1,
+`DOGE` 1000. A liquidation `sz: "12"` is 0.12 BTC on one instrument and 12,000 DOGE on
+another. The insight bot loads the table at boot and converts before writing
+`liquidations.qty`; an instrument without a usable `ctVal` is skipped with a warning, never
+guessed (`apps/insight-bot/src/collectors/okx/contract-size.ts`). Two more OKX facts that
+the field names hide: `fundingTime` is the *upcoming* settlement and `nextFundingTime` the
+one after; in `liquidation-orders`, `posSide` is the liquidated side and `side` is the
+closing order's side (always the inverse). Source: `reports/dev-2-IB-009.md`,
+`architecture/insight-bot-system-design.md` §4.3, §16.9.

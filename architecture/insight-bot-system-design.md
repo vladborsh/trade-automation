@@ -343,11 +343,24 @@ a later additive task if a playbook needs them).
 | settled funding | REST `/v5/market/funding/history` (200/page) | REST `/api/v5/public/funding-rate-history` (100/page) |
 | heartbeat | client `{"op":"ping"}` every 20 s | client `ping` text every 25 s |
 
-Topic names and payload fields are to be **confirmed against the venues'
-current docs at build time and recorded in each mapper's header comment**
-(the repo convention for measured facts); the table above is the design's
-expectation, not a guarantee. Bybit and OKX both name the liquidated side
-differently from Binance; the mapper normalises to `long|short`.
+Topic names and payload fields are **confirmed at build time and recorded
+in each mapper's header** (the repo convention for measured facts). OKX,
+measured 2026-09-28 (IB-009, §16.9): `sz` is in **contracts** (`ctVal` per
+instrument: BTC 0.01, ETH 0.1, SOL 1, DOGE 1000) and is converted to base
+units from the instruments table loaded at boot — an instrument without a
+usable size is skipped with a warning, never written with a guess;
+`fundingTime` is the *upcoming* settlement and `nextFundingTime` the one
+after (the reverse of the names), so `next_funding_time` takes `fundingTime`;
+`posSide` is the liquidated side and `side` is always its inverse (asserted
+by the mapper, so a venue change throws instead of inverting the table);
+`mark-price` carries no index, so `index_price` is null for OKX.
+
+**Degraded mode is per venue, dictated by what the venue's REST offers, not a
+shared policy.** Binance has REST equivalents for klines and mark/funding
+(§16.1) and so degrades to polling; Bybit and OKX have **no REST equivalent
+for liquidations**, so their sockets carry only the silence watchdog (90 s →
+reconnect) and no degraded state. This is the intended asymmetry; no
+"one policy across three venues" refactor is wanted.
 
 ### 4.4 Restart and idempotency
 
@@ -1018,3 +1031,18 @@ Brief Q24 was revised by the user; the dashboard is designed in
 from the bot, Cloudflare Tunnel, slice 1 = stage-0 health + data browser;
 IB-029 … IB-035). §8.6's "no web admin" no longer holds for admin *reading
 and configuration*; signal actions stay in Telegram.
+
+### 16.9 IB-009 OKX collector — measured facts and two judgement calls ratified (2026-09-28)
+
+`reports/dev-2-IB-009.md`. Ratified: contract-size conversion (`ctVal`),
+`fundingTime` semantics, `posSide` invariant with assertion, null index
+price — all written into §4.3 and `knowledge/venue-contract-specs.md`. (1)
+No degraded REST mode for OKX (as Bybit): correct, and now stated in §4.3 as
+the rule — no cross-venue policy task. (2) Achieved funding depth recorded as
+`collector_gaps` rows with `expected == repaired`: accepted as the interim
+home (they are excluded from §6.2's report twice over, verified by dev-2);
+the durable home is IB-012's coverage table, which the dashboard's
+`/coverage` endpoint (IB-030) reads — when that table exists the depth rows
+move there in the same change, no separate task. Also noted: OKX pages
+funding history backward with `after`; a bare `User-Agent` request to
+`www.okx.com` is answered 403.
