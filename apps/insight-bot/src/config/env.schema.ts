@@ -45,6 +45,8 @@ export const EnvSchema = z.object({
   BINANCE_ARCHIVE_BASE_URL: z.string().default('https://s3-ap-northeast-1.amazonaws.com/data.binance.vision'),
   BYBIT_WS_URL: z.string().default('wss://stream.bybit.com/v5/public/linear'),
   OKX_WS_URL: z.string().default('wss://ws.okx.com:8443/ws/v5/public'),
+  // §4.3 — settled funding history (`/api/v5/public/funding-rate-history`), IB-009.
+  OKX_REST_BASE_URL: z.string().default('https://www.okx.com'),
 
   // §2.1 collectors/calendar, §3.3 — the ForexFactory weekly feed (IB-010). The cadence is
   // signal-server's (architecture/economic-calendar.md §3.2): the default interval, the hot one

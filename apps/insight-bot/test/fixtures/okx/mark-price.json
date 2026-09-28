@@ -1,0 +1,44 @@
+[
+  {
+    "arg": {
+      "channel": "mark-price",
+      "instId": "BTC-USDT-SWAP"
+    },
+    "data": [
+      {
+        "instId": "BTC-USDT-SWAP",
+        "instType": "SWAP",
+        "markPx": "83928.0",
+        "ts": "1790617342850"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "mark-price",
+      "instId": "BTC-USDT-SWAP"
+    },
+    "data": [
+      {
+        "instId": "BTC-USDT-SWAP",
+        "instType": "SWAP",
+        "markPx": "83928.3",
+        "ts": "1790617343053"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "mark-price",
+      "instId": "BTC-USDT-SWAP"
+    },
+    "data": [
+      {
+        "instId": "BTC-USDT-SWAP",
+        "instType": "SWAP",
+        "markPx": "83925.1",
+        "ts": "1790617343257"
+      }
+    ]
+  }
+]

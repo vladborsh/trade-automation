@@ -1,0 +1,152 @@
+[
+  {
+    "arg": {
+      "channel": "liquidation-orders",
+      "instType": "SWAP"
+    },
+    "data": [
+      {
+        "details": [
+          {
+            "bkLoss": "0",
+            "bkPx": "1550.63",
+            "ccy": "",
+            "posSide": "long",
+            "side": "sell",
+            "sz": "23",
+            "ts": "1790606832984"
+          }
+        ],
+        "instFamily": "ZEC-USDT",
+        "instId": "ZEC-USDT-SWAP",
+        "instType": "SWAP",
+        "uly": "ZEC-USDT"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "liquidation-orders",
+      "instType": "SWAP"
+    },
+    "data": [
+      {
+        "details": [
+          {
+            "bkLoss": "0",
+            "bkPx": "249.07",
+            "ccy": "",
+            "posSide": "long",
+            "side": "sell",
+            "sz": "7.48",
+            "ts": "1790606834586"
+          }
+        ],
+        "instFamily": "MRVL-USDT",
+        "instId": "MRVL-USDT-SWAP",
+        "instType": "SWAP",
+        "uly": "MRVL-USDT"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "liquidation-orders",
+      "instType": "SWAP"
+    },
+    "data": [
+      {
+        "details": [
+          {
+            "bkLoss": "0",
+            "bkPx": "94.39",
+            "ccy": "",
+            "posSide": "long",
+            "side": "sell",
+            "sz": "32.67",
+            "ts": "1790606835527"
+          }
+        ],
+        "instFamily": "AAOI-USDT",
+        "instId": "AAOI-USDT-SWAP",
+        "instType": "SWAP",
+        "uly": "AAOI-USDT"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "liquidation-orders",
+      "instType": "SWAP"
+    },
+    "data": [
+      {
+        "details": [
+          {
+            "bkLoss": "0",
+            "bkPx": "0.12524",
+            "ccy": "",
+            "posSide": "long",
+            "side": "sell",
+            "sz": "5.5",
+            "ts": "1790614854353"
+          }
+        ],
+        "instFamily": "HBAR-USDT",
+        "instId": "HBAR-USDT-SWAP",
+        "instType": "SWAP",
+        "uly": "HBAR-USDT"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "liquidation-orders",
+      "instType": "SWAP"
+    },
+    "data": [
+      {
+        "details": [
+          {
+            "bkLoss": "0",
+            "bkPx": "1.495",
+            "ccy": "",
+            "posSide": "long",
+            "side": "sell",
+            "sz": "19.09",
+            "ts": "1790614855037"
+          }
+        ],
+        "instFamily": "XRP-USDT",
+        "instId": "XRP-USDT-SWAP",
+        "instType": "SWAP",
+        "uly": "XRP-USDT"
+      }
+    ]
+  },
+  {
+    "arg": {
+      "channel": "liquidation-orders",
+      "instType": "SWAP"
+    },
+    "data": [
+      {
+        "details": [
+          {
+            "bkLoss": "0",
+            "bkPx": "0.08381",
+            "ccy": "",
+            "posSide": "short",
+            "side": "buy",
+            "sz": "5",
+            "ts": "1790617355823"
+          }
+        ],
+        "instFamily": "KII-USDT",
+        "instId": "KII-USDT-SWAP",
+        "instType": "SWAP",
+        "uly": "KII-USDT"
+      }
+    ]
+  }
+]
