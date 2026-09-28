@@ -24,7 +24,9 @@ export const GLOBAL_RETRY_MS = 60_000;
  * The design's ~5-15/min for keyless CoinGecko came from a one-off probe, not from a sustained
  * run, which is why the numbers below disagree with it.
  *
- * Measured 2026-09-28, in two steps:
+ * Measured 2026-09-28, in two steps (AGENTS.md repetition: step 2 is an 8-call sequence, and the
+ * 27 s/coin figure is an average over a 20-coin backfill — i.e. 20 further observations of the
+ * same throttling, not one probe):
  *
  * 1. Twenty `market_chart` calls back-to-back drew `429 "You've exceeded the Rate Limit"`. The
  *    collector's *daily average* is ~0.11 requests/min — the average was never the constraint,

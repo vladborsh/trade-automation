@@ -7,10 +7,11 @@ const MINUTE_MS = 60_000;
  * 2400 weight/min, for `/health`'s `budget.binanceWeightUsed1m` and the
  * `ib_binance_weight_used_1m` gauge (§6.1).
  *
- * **Measured 2026-09-28 (IB-007): the `/futures/data/*` endpoints return NO
- * `X-MBX-USED-WEIGHT-1M` header** — only the `/fapi/*` ones do (verified side by side against
- * `/fapi/v1/openInterest`, which does send it). So this poller, which calls nothing but
- * `/futures/data/*`, cannot read its own usage back from the venue.
+ * **`/futures/data/*` returns NO `X-MBX-USED-WEIGHT-1M` header; `/fapi/*` does.**
+ * Measured 2026-09-28 per AGENTS.md's repetition rule: **5 requests to each endpoint on two
+ * occasions, 21:11 and 21:16 UTC — the header was absent 0/5 and 0/5 on `/futures/data/`
+ * `openInterestHist`, and present 5/5 and 5/5 on `/fapi/v1/openInterest`.** So this poller,
+ * which calls nothing but `/futures/data/*`, cannot read its own usage back from the venue.
  *
  * Hence two inputs, and the reading prefers the truthful one:
  * - `recordHeader(n)` — authoritative, from any `/fapi/*` response that carries the header

@@ -6,6 +6,12 @@
  * below are copied from the messages that arrived, which are kept verbatim as fixtures in
  * `test/fixtures/okx/`. Every numeric field is a string, as everywhere in OKX v5.
  *
+ * On AGENTS.md's repetition rule: these are **payload shapes, not boundaries**, and each is
+ * pinned by a committed fixture that the specs parse — a shape that changed would fail the
+ * suite, which is stronger than re-probing. The two claims below that ARE behavioural (the
+ * `fundingTime`/`nextFundingTime` ordering and the `posSide`/`side` invariant) each say how many
+ * observations they rest on.
+ *
  * Subscription arguments, as accepted (each answered with `{"event":"subscribe", ...}`):
  *   { channel: 'liquidation-orders', instType: 'SWAP' }   // one channel, ALL swaps
  *   { channel: 'mark-price',   instId: 'BTC-USDT-SWAP' }  // per instrument
@@ -40,7 +46,8 @@ export interface OkxMarkPrice {
  *   "nextFundingRate":"","nextFundingTime":"1790668800000","prevFundingTime":"1790611200000",
  *   "settFundingRate":"0.0000709507874477","settState":"settled","method":"current_period", ...}`
  *
- * **The naming trap, verified against the REST history:** `fundingTime` is the **upcoming**
+ * **The naming trap, verified two independent ways (one WS payload plus the REST history, which
+ * is a cross-check rather than a repetition — re-probe if this ever matters more):** `fundingTime` is the **upcoming**
  * settlement and `fundingRate` its current prediction; `nextFundingTime` is the interval *after*
  * that one. The observed values differ by exactly 8 h in each direction
  * (prev 1790611200000 → funding 1790640000000 → next 1790668800000), and
@@ -70,9 +77,11 @@ export interface OkxFundingRate {
  *
  * Two things measured over a 45 s sample (9 messages, `test/fixtures/okx/liquidation-orders.json`):
  *
- * 1. **`posSide` is the liquidated side directly.** Only two combinations ever occurred —
- *    `long/sell` (6) and `short/buy` (3) — i.e. `side` is the *closing order's* side and is
- *    always the inverse of `posSide`, the same relationship Binance's `forceOrder` has. The
+ * 1. **`posSide` is the liquidated side directly.** Over a 45 s live sample, **9 events across 9
+ *    messages**, only two combinations ever occurred — `long/sell` (6) and `short/buy` (3) —
+ *    i.e. `side` is the *closing order's* side and is always the inverse of `posSide`, the same
+ *    relationship Binance's `forceOrder` has. Nine events is a sample, not a proof, which is why
+ *    the mapper ASSERTS the invariant at runtime rather than trusting it. The
  *    mapper takes `posSide` and asserts the invariant, so a change in the venue's convention
  *    fails loudly instead of silently inverting every liquidation.
  * 2. **The channel carries every swap, including inverse ones** (`LINK-USD-SWAP` arrived

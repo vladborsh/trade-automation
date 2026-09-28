@@ -3,7 +3,10 @@ import { OkxFundingHistoryRow, OkxInstrument } from './payloads';
 /**
  * IB-009 — the two OKX REST endpoints this collector needs (design §4.3).
  *
- * Measured 2026-09-28 on `/api/v5/public/funding-rate-history?instId=BTC-USDT-SWAP`:
+ * **Single probe, 2026-09-28** on `/api/v5/public/funding-rate-history?instId=BTC-USDT-SWAP`
+ * (AGENTS.md: one observation is a note, not a rule — these are page-shape facts the pager does
+ * not depend on for correctness, since it stops on an empty page and on the retention edge
+ * whatever the page size turns out to be):
  * - `limit=100` returned 100 rows spanning 2026-08-26 16:00 → 2026-09-28 16:00 (8 h intervals);
  * - **`after=<oldest fundingTime>` pages BACKWARD** — the next page came back
  *   2026-07-24 08:00 → 2026-08-26 08:00, i.e. strictly older;
@@ -74,9 +77,10 @@ export class OkxRest {
    *   a floor set inside the wall (its `OKX_FUNDING_DAYS = 97`, against a wall measured at ~98
    *   days) means the usual outcome is `false`.
    *
-   * `after` is **exclusive** (measured 2026-09-28: page 2 with `after=<page 1's oldest>` does not
-   * repeat that row), so neither this nor the copy it replaces could double-count. The de-dup on
-   * `fundingTime` below is belt-and-braces.
+   * `after` is **exclusive**: page 2 with `after=<page 1's oldest>` does not repeat that row.
+   * Measured 2026-09-28 per AGENTS.md's repetition rule — **5 trials on each of two occasions,
+   * 21:11 and 21:16 UTC, exclusive 5/5 and 5/5.** So neither this nor the copy it replaces could
+   * double-count; the de-dup on `fundingTime` below is belt-and-braces.
    *
    * Rows come back oldest-first.
    */

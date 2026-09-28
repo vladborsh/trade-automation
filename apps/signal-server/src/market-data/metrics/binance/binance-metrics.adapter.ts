@@ -23,7 +23,9 @@ const HIST_PAGE_LIMIT = 500;
  * openInterestHist retention — **RE-MEASURED 2026-09-28 (BUG-022)**, correcting two earlier
  * comments that were each half right.
  *
- * What this endpoint actually does, from `fapi.binance.com`, BTCUSDT, `period=5m`:
+ * What this endpoint actually does, from `fapi.binance.com`, BTCUSDT, `period=5m`. **5
+ * repetitions at each boundary, on two occasions minutes apart** (21:01 and 21:04 UTC) — which
+ * is what caught the drift in fact 2, and is now AGENTS.md's rule for any measured venue fact:
  *
  * | request | result |
  * |---|---|

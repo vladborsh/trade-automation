@@ -49,10 +49,17 @@ export const BACKFILL_PACING_MS = 120;
  * Rows fetched per series per poll.
  *
  * §4.1 says the venue "publishes on the boundary with a lag", which the +20 s offset is meant to
- * absorb. **Measured 2026-09-28: the lag is per-symbol and routinely longer than that** — at
- * 169 s past the 13:50 boundary, ETH/ONE/QNT/MARSCOIN had published 13:50 but BTCUSDT was still
- * a slot behind. Over a 30-symbol pass (~60 s) different symbols therefore land in different
- * slots, which is exactly what the first live run showed (23 symbols on 13:45, 8 on 13:50).
+ * absorb. It does not always absorb it.
+ *
+ * **The load-bearing evidence is the live collector, not a hand probe** (AGENTS.md: a rule needs
+ * repetition; this is 30 symbols in one pass rather than one symbol once). On 2026-09-28 the
+ * 14:50 slot held **7 of 30 symbols** right after its own poll at boundary + 20 s, and **30 of
+ * 30** after the next pass. The first run showed the same shape: 23 symbols on 13:45, 8 on 13:50.
+ *
+ * Sampling the lag directly, the picture is intermittent rather than constant — 8 symbols probed
+ * at 21:12 UTC: **1 of 8 lagging at 128 s past the boundary (XRPUSDT), 0 of 8 at 152 s**; an
+ * earlier single probe at 169 s caught BTCUSDT behind. So **which** symbol lags moves around,
+ * which is the point: you cannot predict it, so you cannot safely fetch only the newest row.
  *
  * With `limit=1` that is not merely late, it **loses slots permanently**: if 13:55's poll returns
  * 13:50 and 14:00's returns 14:00, nothing ever fetches 13:55. Asking for the last three rows

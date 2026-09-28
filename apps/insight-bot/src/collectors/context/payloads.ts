@@ -3,6 +3,10 @@
  * (architecture/insight-bot-web-dashboard.md §10, which records the probe results). Payloads are
  * kept verbatim in `test/fixtures/context/`.
  *
+ * On AGENTS.md's repetition rule: the endpoint/paid-tier facts below come from the Architect's
+ * probe plus my own single confirmation each — **notes, not rules**. The one that governs
+ * behaviour, the request rate, is measured repeatedly and lives in `schedule.ts`.
+ *
  * **Neither source needs a key and none was requested.** The endpoints that do need one are not
  * used: `/global/market_cap_chart` (401 on the free tier) and `market_chart?days=max`
  * (401, error 10012).
