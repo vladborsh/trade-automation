@@ -1,0 +1,9 @@
+check,ok,detail
+"1 ts unit: spot us from 2025-01, ms before; perp ms",True,"spot files 661, off-rule 0, perp files 625"
+"2 spot 15m archive == sum of spot 1m (BTCUSDT 2025-03, us era)",True,"bars 2976, unit us, max err 1.60e-15"
+3 perp 15m/1h resampled from 1m == archive 15m/1h (BTCUSDT 2023-05),True,15m bars 2976 err 1.62e-15; 1h bars 744 err 0.00e+00
+4 prefix-stable observables (inputs truncated at T; no look-ahead),True,19 cols x 2 symbols identical up to cut
+5 venue state / OI re-derived independently at 300 instants,True,mismatches 0
+6 failed-high count re-derived (pivots confirmed by T),True,mismatches 0/200
+"7-12 trades: entry in armed window, stop>0, stop=-1R/target=+1R, hold<=5d, no overlap, settlements recounted, placebo reproduces, P1 trigger",True,"BTC+SOL, both sides, R0"
+13 effective start measurable for every symbol,True,BTC 2020-09-02; ETH 2021-12-02; SOL 2021-12-02; BNB 2021-12-02; XRP 2021-12-02; DOGE 2021-12-02; ADA 2021-12-02; LINK 2021-12-02
