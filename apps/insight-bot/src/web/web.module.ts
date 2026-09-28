@@ -2,9 +2,12 @@ import { Module, type DynamicModule, Logger } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
+import { OpsModule } from '../ops/ops.module';
 import { WebAuthController } from './auth/web-auth.controller';
 import { WebAuthGuard } from './auth/web-auth.guard';
 import { WebAuthService } from './auth/web-auth.service';
+import { WebCoverageController } from './coverage.controller';
+import { WebHealthController } from './health.controller';
 
 /**
  * IB-029 — the dashboard's server surface (architecture/insight-bot-web-dashboard.md §4).
@@ -30,8 +33,13 @@ export class WebModule {
     }
     return {
       module: WebModule,
-      imports: [AppConfigModule, DbModule],
-      controllers: [WebAuthController],
+      // IB-030: the health page reads the live StreamRegistry and the weight gauges, which
+      // OpsModule owns and exports — the same instances /health and /metrics report, so the
+      // dashboard cannot drift from the ops view by reading a second copy.
+      imports: [AppConfigModule, DbModule, OpsModule],
+      // IB-030's two read surfaces: no guard decorator on either — they are authenticated by the
+      // APP_GUARD above, which is the whole point of it being module-wide.
+      controllers: [WebAuthController, WebHealthController, WebCoverageController],
       providers: [WebAuthService, { provide: APP_GUARD, useClass: WebAuthGuard }],
       exports: [WebAuthService],
     };

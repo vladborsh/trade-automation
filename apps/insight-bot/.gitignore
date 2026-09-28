@@ -1,0 +1,4 @@
+
+# IB-030: the dashboard bundle is a build artifact — the Dockerfile stage produces it from
+# apps/chart-client (ng build insight-dashboard), and ServeStaticModule reads it from here.
+public/

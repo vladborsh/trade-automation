@@ -64,7 +64,13 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   `:30x0`/`:30x5`/`:42x0` triple and say which one you took.
 - `apps/chart-client/public/config.json` may carry an uncommitted local change in the
   coordinator's checkout — never commit or revert a change to it you did not make.
-- Client tests: `npx ng test --watch=false` from `apps/chart-client` (no `--browsers`
-  flag — it fails). All must stay green; report the count.
+- Client tests: **`npm test` from `apps/chart-client`** (no `--browsers` flag — it fails). All must
+  stay green; report the count. Since IB-030 that workspace holds **two** Angular projects, so a
+  bare `npx ng test` is ambiguous: the CLI picks one, and it reports 18 green while saying nothing
+  about the backtest SPA's 944. `npm test` runs both (`ng test chart-client`, then
+  `ng test insight-dashboard`); `npm run test:chart-client` / `npm run test:insight-dashboard` run
+  one. `ng build` and `ng serve` are project-named scripts for the same reason.
+- The dashboard dev server is `ng serve insight-dashboard --port 42x5` (your slot's column above),
+  pointed at that slot's insight bot on `:30x5`.
 - Binance REST budget is 2400 weight/min and we use ~1 %. Any design that adds a polling
   loop against a venue must state its weight per minute.

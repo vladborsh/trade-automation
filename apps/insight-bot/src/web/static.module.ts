@@ -1,0 +1,58 @@
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { Logger, Module, type DynamicModule } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+
+/** Where the built dashboard lands: the Dockerfile copies `dist/insight-dashboard/browser` here. */
+export const DASHBOARD_ROOT = join(__dirname, '..', '..', 'public');
+
+/** The paths the SPA fallback must never answer — pinned in `test/web/static.module.spec.ts`. */
+export const DASHBOARD_EXCLUDE = ['/api', '/api/(.*)', '/health', '/metrics'];
+
+/**
+ * IB-030 (design §2 W2, §3) — insight-bot serves the dashboard bundle itself, same origin as
+ * `/api/web/*`, so the session cookie is same-site and there is no CORS to configure.
+ *
+ * **The exclusions are the whole point of this file.** `ServeStaticModule`'s SPA fallback answers
+ * any unmatched GET with `index.html`; without `exclude`, a typo'd API path or a monitoring probe
+ * would get 200 and a page of HTML instead of a 404 or its JSON — and the ops `/health` that the
+ * watchdog and the box's health check read would start returning the dashboard. So `/api/*`,
+ * `/health` and `/metrics` are excluded, and they keep answering as themselves.
+ *
+ * Registered only when the bundle is actually present: in development nobody has run
+ * `ng build insight-dashboard`, and a missing root would make every unmatched route a 500 rather
+ * than the 404 it should be. `ng serve insight-dashboard` on the slot's `:42x5` is the dev path.
+ */
+@Module({})
+export class DashboardStaticModule {
+  static register(): DynamicModule {
+    if (!existsSync(join(DASHBOARD_ROOT, 'index.html'))) {
+      new Logger(DashboardStaticModule.name).log(
+        `no dashboard bundle at ${DASHBOARD_ROOT} — static serving off (use \`ng serve insight-dashboard\` in development)`,
+      );
+      return { module: DashboardStaticModule };
+    }
+    return {
+      module: DashboardStaticModule,
+      imports: [
+        ServeStaticModule.forRoot({
+          rootPath: DASHBOARD_ROOT,
+          // the SPA fallback must never swallow the API or the ops endpoints
+          // NB: @nestjs/serve-static 4 vendors path-to-regexp **0.2.5**, not the version Nest's
+          // docs assume, and it tests `pathname + '/'`. The documented `/api/{*splat}` compiles
+          // to a regex that matches nothing here — silently, so the fallback swallowed
+          // `/api/web/anything-unrouted` and answered it with index.html. These three are checked
+          // against the vendored matcher in `static.module.spec.ts`; do not "modernise" them
+          // without running that spec.
+          exclude: DASHBOARD_EXCLUDE,
+          serveStaticOptions: {
+            // hashed assets are immutable; index.html must not be, or a deploy would not be seen
+            setHeaders: (res, path) => {
+              if (!path.endsWith('index.html')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            },
+          },
+        }),
+      ],
+    };
+  }
+}

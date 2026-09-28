@@ -19,6 +19,7 @@
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.4.4",
     "@nestjs/platform-express": "^10.4.4",
+    "@nestjs/serve-static": "^4.0.2",
     "@trade-automation/binance-client": "0.1.0",
     "@trade-automation/contracts": "0.1.0",
     "@trade-automation/market-data-core": "0.1.0",

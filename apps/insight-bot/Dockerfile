@@ -16,6 +16,22 @@ COPY apps/insight-bot apps/insight-bot
 
 RUN npm run build --workspace=@trade-automation/insight-bot
 
+# IB-030 (design §3 "Angular build: never on the box") — the dashboard is built HERE, on the
+# runner, because `ng build` peaks around 1.5 GB and the production box is a t4g.small. The image
+# carries only the ~1-2 MB of hashed static files it produces.
+FROM node:22-slim AS dashboard
+WORKDIR /workspace
+
+COPY package.json package-lock.json* ./
+COPY apps/chart-client/package.json apps/chart-client/package.json
+RUN npm install --workspace=@trade-automation/chart-client --include-workspace-root
+
+COPY tsconfig.base.json ./
+COPY libs libs
+COPY apps/chart-client apps/chart-client
+RUN npm run build --workspace=@trade-automation/contracts \
+ && cd apps/chart-client && npx ng build insight-dashboard
+
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /workspace
@@ -29,6 +45,8 @@ RUN npm install --omit=dev --workspace=@trade-automation/insight-bot --include-w
 COPY --from=build /workspace/apps/insight-bot/dist apps/insight-bot/dist
 # universe.yaml and the migrations are read at runtime (§2.3, §3.2), so they ship in the image —
 # public reference data, not secrets.
+# the dashboard bundle: ServeStaticModule serves it from apps/insight-bot/public (§3)
+COPY --from=dashboard /workspace/apps/chart-client/dist/insight-dashboard/browser apps/insight-bot/public
 COPY apps/insight-bot/config apps/insight-bot/config
 COPY apps/insight-bot/migrations apps/insight-bot/migrations
 
