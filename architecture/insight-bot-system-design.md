@@ -364,8 +364,8 @@ Same tables, `source = 'archive'`:
 | 1m candles perp | `data/futures/um/monthly/klines/<S>/1m/`, daily for the current month, REST for the tail | from `listed_perp` (BTC 2019-09) |
 | 1m candles spot | `data/spot/monthly/klines/<S>/1m/` (+ daily, + REST tail); µs time unit per file from 2025-01 | spot listing (earlier than perp) |
 | settled funding, Binance | `data/futures/um/monthly/fundingRate/<S>/` (verified 0 missing slots on 8 symbols in `research/funding-rate-signals`) + REST tail | 2020-01 |
-| OI, 4 × L/S at 5 m, Binance | `data/futures/um/daily/metrics/<S>/` (monthly prefix does not exist — measured in `research/deriv-positioning/fetch_metrics.py`) + `openInterestHist` for the last 30 days | archive start (~2021-12 for majors; measured per symbol and logged) |
-| settled funding, Bybit / OKX | REST history pages, as far back as each venue serves; the achieved depth is **measured and written to the coverage report**, not assumed | venue-dependent |
+| OI, 4 × L/S at 5 m, Binance | `data/futures/um/daily/metrics/<S>/` (monthly prefix does not exist — measured in `research/deriv-positioning/fetch_metrics.py`) + `openInterestHist` for the last 30 days | **BTCUSDT 2020-09-01; every other symbol 2021-12-01** (measured in `research/squeeze-full-form/`, 404 before that) |
+| settled funding, Bybit / OKX | REST history pages, as far back as each venue serves; depth **measured** in `research/squeeze-full-form/results/venue_depth.csv` | **Bybit full from listing (BTC 2020-03); OKX ≈ 97 days only** — every day OKX is not collected is lost |
 | liquidations, predicted funding, mark | none — **forward only from the day the collectors start** | — |
 
 Throttle: ≤ 600 Binance weight/min, reading `X-MBX-USED-WEIGHT-1M` and
@@ -670,13 +670,19 @@ by the squeeze pass on its own merits.
 ±60 min. Members get one quiet notice at T−60 ("новых сигналов до HH:MM не
 будет"). The trading half of P5 is not built (brief §2, §5).
 
-### 9.4 P1 / P2 — long / short squeeze: **behind the research gate**
+### 9.4 P1 / P2 — long / short squeeze: **gate failed, CLOSED (2026-09-28)**
 
-Not coded in stage 1. The Researcher's pre-registration is
-`research/squeeze-full-form/ARCHITECT-NOTE.md`; if the full form passes, the
-Architect adds the build task with the passing thresholds as v1 config. The
-feature frame (§8.2) already carries every observable the full form needs, so
-the gate blocks only `playbooks/p1.ts`, `p2.ts`.
+Not built. `research/squeeze-full-form/` (Запись 37; §16.5): the full form
+co-occurs ~never (P1 zero times, P2 six times in 66,678 decision instants
+over 8 perps), every rung of the ablation ladder with power is zero or
+negative, the well-powered P1 shadow is −0.188R, and two-venue extreme
+funding never occurred in the holdout year. The user's gate ("build only if
+the extra filters demonstrably rescue the shape") is not met; the squeeze
+family is treated as closed for this bot. No `playbooks/p1.ts`, `p2.ts`. The
+frame keys introduced for them (`structure.failed_highs_24h`,
+`structure.impulse_low_15m`, `oi.at_7d_high`) **stay in `frame_version` 1**
+as context: they are cheap, and the snapshot record is what any future
+registration would need. Stage 1 therefore has **one entry playbook, P3**.
 
 ### 9.5 Later playbooks
 
@@ -897,3 +903,30 @@ engineering convenience, so it stands until the user says otherwise. (2)
 the universe is meant to be measured, and the feature layer already treats
 missing history as `null`. (3) `null` venue mappings and `listed_perp` = first
 archive bar — ratified. The monthly hand-revision keeps the same rule.
+
+### 16.5 P1/P2 full-form squeeze gate — UNDERPOWERED, family CLOSED (2026-09-28)
+
+`research/squeeze-full-form/` (Researcher, Запись 37). Formal verdict on all
+four arms: UNDERPOWERED (fit n = 0 / 0 / 0 / 6 against a floor of 60);
+holdout unread. Ruling: **closed for this bot, no build** — the gate required
+a demonstrated rescue and none is possible when the form does not fire;
+every rung with power on the ablation ladder is zero or negative (second
+venue removes 30–35 % of setups and improves nothing; "OI at a 7-day high"
+removes 97 %); the P1-M shadow (−0.188R, CI [−0.343, −0.028]) is the third
+independent negative reading of "short the first break after a rally" on
+this tape. The STAGE-0 audit's holdout *frequency* count (two-venue extreme
+never occurred) is a count of arming conditions with no outcome read; I rule
+it does **not** spend the holdout, and it is declared in the α ledger. The
+package is admissible (DESIGN before R, 8/8 checks, gated holdout runner that
+refused to run). Consequences: §9.4 closed; frame keys kept; §5 depth table
+corrected (OKX funding ≈ 97 days over REST, Binance OI archive 2021-12 for
+non-BTC). Draft P1's structural T1 ("VWAP of the rise") is geometrically on
+the stop side of the trigger — recorded so no future squeeze draft repeats it.
+
+**Consequence the user should see:** stage 1 now has one entry playbook,
+**P3**, which has no history and lives in `SHADOW`; the brief's stage-2 gate
+for AI consumers ("≥ 1 playbook passed history and 4+ weeks SHADOW agreeing
+in sign") cannot be met by P3's history until months of liquidation data
+exist. The gate stands as the user set it; the timeline behind it just got
+longer, and P6 (unlocks, stage 2) becomes the next candidate with testable
+history.
