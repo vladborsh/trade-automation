@@ -1132,7 +1132,11 @@ plausible daily sd (SE ≈ 1–2 % p.a. on two years); the level bar is.
 
 ## Spot–perp basis and spot-lead signals (Binance spot vs USD-M perp)
 
-**Status:** **prioritized** (user review, 2026-08-26); **2026-09-16 — the
+**Status:** **arm (b) spot-lead confirmation DISPATCHED 2026-09-28** to the
+Researcher as the research gate for the insight bot's P4 label —
+pre-registration `research/spot-lead/ARCHITECT-NOTE.md` (four arms, α = 0.0125,
+price shadow gating). Arm (a) basis-extreme convergence stays parked.
+Previously: **prioritized** (user review, 2026-08-26); **2026-09-16 — the
 hedged carry became its own family** (`research/hedged-carry/`, next entry),
 taking the spot-data pull and the funding-adjusted basis accounting with it.
 What stays parked here: (a) basis-extreme convergence traded on the perp leg
@@ -1574,3 +1578,49 @@ Also logged in the same note, as standing discipline rather than research:
 a Stage B clause (fit-only ML feature study + "filter can only subtract"
 economics row + price-shadow control) for every future family after a REAL
 EDGE; an ML leakage check in `checks.py`; no standalone regime classifier.
+
+---
+
+## Crypto insight bot — forced-flow playbooks (liquidation cascades, squeezes, funding, unlocks, macro) delivered over Telegram
+
+**Status:** **product stream opened 2026-09-28.** Settled brief
+`architecture/crypto-insight-bot-2026-09-28.md` (25 user decisions), design
+`architecture/insight-bot-system-design.md`, build queue
+`tasks/insight-bot.jsonl` (IB-001…IB-028; collectors + EC2 first, ranked above
+any new backtest-app work). Two research gates dispatched the same day:
+- **P1/P2 full-form squeeze** → `research/squeeze-full-form/ARCHITECT-NOTE.md`.
+  A *rescue* pass with a strong negative prior (the simple shape is closed
+  twice: `deriv-positioning` b1, funding arm B). Build only if the four extra
+  filters (≥ 2-venue funding extreme, OI +5 %/24 h at a 7-day high, ≥ 2
+  failed highs, spot CVD not confirming) demonstrably rescue it; a kill closes
+  the squeeze family.
+- **P4 spot-lead label** → arm (b) of the "Spot–perp basis" entry above,
+  `research/spot-lead/ARCHITECT-NOTE.md`.
+Ungated, built and run in `SHADOW` on collected data: **P3 post-cascade
+reversal** (liquidation feeds have no history, so history-first is impossible;
+the first admissible read is ≥ 4 weeks of live shadow plus a replay over the
+collected months). **P5** is veto-only. P6–P10 are stage 2–3 and get their
+own research routing when reached (P6 token unlocks needs a pass; P7, P8, P9
+are context/info; P10 is a veto).
+
+**Idea:** a Telegram bot that fires only when a pre-described mechanism forces
+part of the market to act, and sends a concrete plan (direction, trigger,
+stop, targets, size, invalidation) with the playbook's own track record;
+deterministic core, AI at the edges, every signal scored automatically,
+auto-`SHADOW` on negative expectancy over the last 20. Data collection starts
+before any logic because liquidations, predicted funding and Bybit/OKX
+equivalents are unrecoverable.
+
+**Framing / constraints carried from the brief:** collect the top-30 USD-M
+perps, trade BTC/ETH/SOL first; 15m and 4h closes; 1–5 day holds allowed
+(scope ruling 2026-09-16); no standalone regime classifier — context enters
+only as a global calendar veto or one declared, twin-arm-tested gate per
+playbook (design §8.3); Anthropic-only AI, budget 0.7 USD/day; hosting EC2
+Tokyo; `cmc-bot-main` untouched.
+
+**Open questions (for the passes, not the build):** does the multi-venue
+funding count add anything beyond Binance alone (ablation row registered);
+does a 4 h CVD window carry information beyond the move itself (shadow
+registered); what liquidation-feed undercount looks like once measured
+against the collected tape (a descriptive job after stage 0, not a
+hypothesis yet).
