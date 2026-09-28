@@ -10,6 +10,7 @@ COPY libs/contracts/package.json libs/contracts/package.json
 COPY libs/indicators/package.json libs/indicators/package.json
 COPY libs/replay-core/package.json libs/replay-core/package.json
 COPY libs/binance-client/package.json libs/binance-client/package.json
+COPY libs/calendar-core/package.json libs/calendar-core/package.json
 COPY libs/market-data-core/package.json libs/market-data-core/package.json
 COPY apps/signal-server/package.json apps/signal-server/package.json
 RUN npm install
@@ -19,6 +20,7 @@ COPY libs/contracts libs/contracts
 COPY libs/indicators libs/indicators
 COPY libs/replay-core libs/replay-core
 COPY libs/binance-client libs/binance-client
+COPY libs/calendar-core libs/calendar-core
 COPY libs/market-data-core libs/market-data-core
 COPY apps/signal-server apps/signal-server
 
@@ -39,6 +41,7 @@ COPY libs/contracts/package.json libs/contracts/package.json
 COPY libs/indicators/package.json libs/indicators/package.json
 COPY libs/replay-core/package.json libs/replay-core/package.json
 COPY libs/binance-client/package.json libs/binance-client/package.json
+COPY libs/calendar-core/package.json libs/calendar-core/package.json
 COPY libs/market-data-core/package.json libs/market-data-core/package.json
 COPY apps/signal-server/package.json apps/signal-server/package.json
 RUN npm install --omit=dev
@@ -47,6 +50,7 @@ COPY --from=build /workspace/libs/contracts/dist libs/contracts/dist
 COPY --from=build /workspace/libs/indicators/dist libs/indicators/dist
 COPY --from=build /workspace/libs/replay-core/dist libs/replay-core/dist
 COPY --from=build /workspace/libs/binance-client/dist libs/binance-client/dist
+COPY --from=build /workspace/libs/calendar-core/dist libs/calendar-core/dist
 COPY --from=build /workspace/libs/market-data-core/dist libs/market-data-core/dist
 COPY --from=build /workspace/apps/signal-server/dist apps/signal-server/dist
 COPY apps/signal-server/config apps/signal-server/config

@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { XMLParser } from 'fast-xml-parser';
 import { FeedXmlRow } from './ff-feed.mapper';
 
@@ -35,8 +34,6 @@ export function parseXmlRows(xmlBuffer: Buffer): FeedXmlRow[] {
  * same-JSON snapshot never needs a fresh XML fetch either.
  */
 export class FfFeedClient implements FeedClient {
-  private readonly logger = new Logger(FfFeedClient.name);
-
   constructor(private readonly baseUrl: string) {}
 
   async fetch(previousEtag: { json: string | null; xml: string | null }): Promise<FeedFetchOutcome> {

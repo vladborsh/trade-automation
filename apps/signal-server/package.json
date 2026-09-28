@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@trade-automation/binance-client": "0.1.0",
+    "@trade-automation/calendar-core": "0.1.0",
     "@trade-automation/contracts": "0.1.0",
     "@trade-automation/market-data-core": "0.1.0",
     "@trade-automation/indicators": "0.1.0",

@@ -1,6 +1,6 @@
 import { EconomicEvent, EventRevision } from '@trade-automation/contracts';
-import { MappedEventDraft } from './feed/ff-feed.mapper';
-import { CalendarEventChange } from './calendar.events';
+import { MappedEventDraft } from './ff-feed.mapper';
+import { CalendarEventChange } from './calendar-change';
 
 export interface DiffOutcome {
   /** Every event that must be written to the store/cache this poll (created, updated, removed, and unchanged-but-refreshed). */

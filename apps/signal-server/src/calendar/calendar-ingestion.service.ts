@@ -2,14 +2,13 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subscription } from 'rxjs';
 import { eventWeekWindowNY } from '@trade-automation/contracts';
+import { diffSnapshot, mapFeedSnapshot } from '@trade-automation/calendar-core';
 import { AppConfigService } from '../config/config.service';
 import { MetricsService } from '../observability/metrics.service';
 import { EVENT_STORE, EventStore } from '../storage/event-store.port';
 import { BarClock } from '../market-data/bar-clock.service';
 import { CalendarCache } from './calendar-cache.service';
 import { ActualsBackfillService } from './actuals-backfill.service';
-import { diffSnapshot } from './calendar-diff.service';
-import { mapFeedSnapshot } from './feed/ff-feed.mapper';
 import { FEED_CLIENT, FeedClient } from './feed/feed-client.token';
 import { CalendarEventChangedEvent, CalendarEvents } from './calendar.events';
 

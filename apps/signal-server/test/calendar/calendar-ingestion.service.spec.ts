@@ -3,7 +3,7 @@ import { Subject } from 'rxjs';
 import { CalendarIngestionService } from '../../src/calendar/calendar-ingestion.service';
 import { CalendarCache } from '../../src/calendar/calendar-cache.service';
 import { ActualsBackfillService } from '../../src/calendar/actuals-backfill.service';
-import { FeedFetchOutcome } from '../../src/calendar/feed/ff-feed.client';
+import { FeedFetchOutcome } from '@trade-automation/calendar-core';
 
 function fakeConfig(env: Record<string, unknown> = {}) {
   const defaults: Record<string, unknown> = {

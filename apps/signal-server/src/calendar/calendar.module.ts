@@ -8,7 +8,7 @@ import { CalendarCache } from './calendar-cache.service';
 import { CalendarIngestionService } from './calendar-ingestion.service';
 import { ActualsBackfillService } from './actuals-backfill.service';
 import { NotificationSchedulerService } from './notification-scheduler.service';
-import { FfFeedClient } from './feed/ff-feed.client';
+import { FfFeedClient } from '@trade-automation/calendar-core';
 import { FixtureFeedClient } from './feed/fixture-feed.client';
 import { FEED_CLIENT } from './feed/feed-client.token';
 

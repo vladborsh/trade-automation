@@ -1,6 +1,6 @@
 import { EconomicEvent } from '@trade-automation/contracts';
-import { diffSnapshot } from '../../src/calendar/calendar-diff.service';
-import { MappedEventDraft } from '../../src/calendar/feed/ff-feed.mapper';
+import { diffSnapshot } from '../src/calendar-diff';
+import { MappedEventDraft } from '../src/ff-feed.mapper';
 
 function draft(overrides: Partial<MappedEventDraft> = {}): MappedEventDraft {
   return {

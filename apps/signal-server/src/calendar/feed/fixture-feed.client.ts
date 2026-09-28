@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { FeedClient, FeedFetchOutcome, parseXmlRows } from './ff-feed.client';
+import { FeedClient, FeedFetchOutcome, parseXmlRows } from '@trade-automation/calendar-core';
 
 /**
  * architecture/economic-calendar.md §3 — the ReplayAdapter analogue for the calendar: reads the

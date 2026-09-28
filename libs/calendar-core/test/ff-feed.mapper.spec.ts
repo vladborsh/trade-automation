@@ -1,9 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { mapFeedSnapshot, xmlInstantUtc } from '../../../src/calendar/feed/ff-feed.mapper';
-import { parseXmlRows } from '../../../src/calendar/feed/ff-feed.client';
+import { mapFeedSnapshot, xmlInstantUtc } from '../src/ff-feed.mapper';
+import { parseXmlRows } from '../src/ff-feed.client';
 
-const FIXTURE_DIR = path.join(__dirname, '..', '..', 'fixtures', 'calendar', '2026-09-16');
+const FIXTURE_DIR = path.join(__dirname, 'fixtures', 'calendar', '2026-09-16');
 
 function loadFixture() {
   const json = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, 'ff_calendar_thisweek.json'), 'utf8'));
