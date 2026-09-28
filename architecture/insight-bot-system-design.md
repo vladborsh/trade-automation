@@ -309,10 +309,18 @@ OI and L/S at 5 m (`collectors/binance-perp/oi-ls.poller.ts`), aligned to the
 `/futures/data/openInterestHist?period=5m&limit=1` and the four ratio
 endpoints `topLongShortPositionRatio`, `topLongShortAccountRatio`,
 `globalLongShortAccountRatio`, `takerlongshortRatio` — 5 calls × 30 symbols
-per 5 min = **30 weight/min**. On boot, the poller backfills the venue's
-30-day window (500 rows per page, paginating **backward** by `endTime` as the
-signal-server adapter learned the hard way) for every symbol whose last
-stored row is older than 5 minutes.
+per 5 min = **30 weight/min averaged; ≈ 150/min instantaneous** during the
+~1-minute pass (6.25 % of 2400), both figures stated in the module header
+(§16.8). Each call takes the last **3** rows, not 1: publication lag is
+per-symbol and can exceed the +20 s offset, and with `limit=1` a slot that
+was late is never fetched again; the upsert is idempotent so re-writing is
+free. On boot, the poller backfills the venue's 30-day window (500 rows per
+page, paginating **backward** by `endTime`) for every symbol whose last
+stored row is older than 5 minutes. Measured 2026-09-28: retention is
+enforced on **`endTime`** (−31 d → `-1130`), while a too-old `startTime` is
+silently clamped — so `-1130` on `endTime` is the clean end of data, and the
+retention edge is not recorded as a gap (a symbol returning nothing at all
+is).
 
 ### 4.2 Binance spot (`collectors/binance-spot`)
 
@@ -353,7 +361,7 @@ funding) simply resume; the hole is recorded in `collector_gaps` with
 
 | Loop | Weight/min |
 |---|---|
-| OI + 4 × L/S, 30 symbols per 5 min | 30 |
+| OI + 4 × L/S, 30 symbols per 5 min | 30 averaged (≈ 150 during the pass minute) |
 | funding settlement fetch, 30 per 8 h | ≈ 0.06 |
 | gap repair | 0 in steady state; 5 per repaired ≤ 1500-bar range |
 | markPrice, forceOrder, klines | 0 (WS) |
@@ -395,7 +403,11 @@ idempotent and resumable by month.
 - `GET /metrics` (prom-client): `ib_stream_last_message_age_seconds{stream}`,
   `ib_rows_written_total{table}`, `ib_gaps_detected_total{stream}`,
   `ib_gaps_unrepaired_total{stream}`, `ib_binance_weight_used_1m` (USD-M
-  futures, ceiling 2400/min), `ib_binance_spot_weight_used_1m` (spot, its own
+  futures, ceiling 2400/min; one shared `BinanceWeightTracker` for every
+  futures loop — the venue's `X-MBX-USED-WEIGHT-1M` header from `/fapi/*`
+  answers is authoritative, `/futures/data/*` sends no header and is counted
+  as a trailing-minute estimate that fills in; read live at scrape time, with
+  `isEstimate` exposed), `ib_binance_spot_weight_used_1m` (spot, its own
   6000/min ceiling — a separate gauge so each is comparable with its own
   budget; §4.2), `ib_ws_reconnects_total{stream}`.
 
@@ -978,3 +990,20 @@ still covers the hour after the print, so a released row must remain inside
 the veto's positive filter); ForexFactory's `removed` maps to `cancelled`;
 `rescheduled` is never written because the feed expresses a move as a new id
 plus a removal with nothing linking them. §3.3's comment is corrected.
+
+### 16.8 IB-007 OI/L-S poller — five measured corrections ratified (2026-09-28)
+
+`reports/dev-2-IB-007.md`. (1) `/futures/data/*` sends no weight header:
+the task's "expose the gauge from the header" is satisfied by the shared
+`BinanceWeightTracker` (header authoritative, estimate fills in) — ratified
+as the substitute, and the tracker is now the design's rule for every
+Binance futures loop, including IB-005's. (2) Retention is on `endTime`
+(`-1130`), `startTime` is clamped silently — §4.1 corrected; note for the
+backtest stream: signal-server's adapter header says the opposite, and a
+backfill that waits for a `startTime` rejection would never stop (the Tech
+Lead may file it there). (3) `limit=3` per poll, idempotent re-write —
+ratified. (4) The retention edge is not a gap — ratified. (5) 30 weight/min
+is an average, ≈ 150 instantaneous — §4.5 states both. Also ratified: the
+poller registering inside IB-005's `CollectorsModule.register()` (one switch,
+`DATABASE_URL`), and the one-line dependency change in `binance-perp.service`
+that makes both loops share the tracker.
