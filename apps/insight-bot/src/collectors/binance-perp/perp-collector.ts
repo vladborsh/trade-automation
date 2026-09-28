@@ -167,7 +167,14 @@ export class BinancePerpCollector {
         this.policy.onOpen(this.now());
         this.ports.logger.log('binance-perp socket open');
       },
-      onMessage: (stream: string, data: unknown) => void this.onMessage(stream, data),
+      // `onMessage` is async and the socket cannot await it, so a rejection has nowhere to go:
+      // `void` alone dropped it silently, which would let one bad payload disappear without a
+      // trace while the stream looked healthy. Catching it here keeps the socket running — one
+      // failed message must not take the feed down — and says which stream failed and why.
+      onMessage: (stream: string, data: unknown) =>
+        void this.onMessage(stream, data).catch((error: unknown) =>
+          this.ports.logger.warn(`binance-perp handler failed for ${stream}: ${(error as Error).message}`),
+        ),
       onClose: (code: number) => {
         this.policy.onClosed();
         this.ports.metrics?.wsReconnects.inc({ stream: STREAM_KLINE });
