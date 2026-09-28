@@ -8,7 +8,7 @@ describe('StreamRegistry', () => {
     const registry = new StreamRegistry();
     registry.register('binance-perp:kline_1m', 'binance');
     expect(registry.snapshot()).toEqual([
-      { id: 'binance-perp:kline_1m', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 0 },
+      { id: 'binance-perp:kline_1m', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 0, mode: 'ws', degradedReason: null },
     ]);
   });
 
@@ -18,6 +18,20 @@ describe('StreamRegistry', () => {
     registry.recordMessage('okx:liquidation-orders', 1_000_000);
     expect(registry.snapshot(1_000_000)[0].lastMessageAgeSec).toBe(0);
     expect(registry.snapshot(1_090_000)[0].lastMessageAgeSec).toBe(90);
+  });
+
+  it('IB-005 / §16.1: a stream reports its mode, and the reason only while degraded', () => {
+    const registry = new StreamRegistry();
+    registry.register('binance-perp:kline_1m', 'binance');
+    expect(registry.snapshot()[0]).toMatchObject({ mode: 'ws', degradedReason: null });
+
+    registry.setMode('binance-perp:kline_1m', 'degraded', 'silent-after-open');
+    expect(registry.snapshot()[0]).toMatchObject({ mode: 'degraded', degradedReason: 'silent-after-open' });
+
+    registry.setMode('binance-perp:kline_1m', 'ws');
+    expect(registry.snapshot()[0]).toMatchObject({ mode: 'ws', degradedReason: null });
+    registry.setMode('unregistered', 'degraded', 'x'); // ignored, like the other writes
+    expect(registry.snapshot()).toHaveLength(1);
   });
 
   it('counts reconnects in the trailing 24h only', () => {
@@ -62,7 +76,7 @@ describe('GET /health', () => {
 
     const health = new HealthController(streams, metrics).get();
     expect(health.streams).toEqual([
-      { id: 'binance-perp:markPrice', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 2 },
+      { id: 'binance-perp:markPrice', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 2, mode: 'ws', degradedReason: null },
     ]);
     expect(health.budget.binanceWeightUsed1m).toBe(240);
   });

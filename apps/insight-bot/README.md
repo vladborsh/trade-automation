@@ -110,11 +110,41 @@ from that table are lower bounds on Binance, and a cross-venue comparison of eve
 comparing different things. The constraint is written on the table itself (`comment on table`),
 so it travels with the schema.
 
+## The Binance USD-M perp collector (IB-005)
+
+`src/collectors/binance-perp/` — one combined-stream socket for the whole universe:
+`<sym>@kline_1m` × 30 plus `!markPrice@arr@1s` and `!forceOrder@arr` (§4.1). Closed 1m bars go
+through `GapRepair` into `candles_1m` (with IB-002's taker fields); mark price is stored **once
+per minute per symbol** (D5) plus one row at each settlement second; `forceOrder` events become
+`liquidations` rows with the side normalised to *the side liquidated*.
+
+It registers three streams — `binance-perp:kline_1m`, `:markPrice`, `:forceOrder` — and is
+enabled only when `DATABASE_URL` is set (`CollectorsModule.register()`); without one the app
+still boots and serves `/health` and `/metrics`.
+
+**REST weight** (§4.5, D15): **≈ 0.1 weight/min** in steady state — gap repair only (5 per
+repaired range) plus one `fundingRate` per symbol per 8 h settlement.
+
+### Degraded mode (§16.1)
+
+`fstream.binance.com` accepts the handshake from some networks and then sends nothing (the
+IB-013 probe found exactly that from the dev network). The collector treats that as a first-class
+state, not an error:
+
+- **no data 30 s after the socket opens**, or **90 s of silence** once it was flowing → `degraded`;
+- degraded polling: `klines?limit=2` every **3 s for the signal set**, **15 s for the rest**, and
+  one symbol-less `premiumIndex` per minute — **≈ 178 weight/min ≈ 7 % of the 2400 budget**,
+  acceptable only while degraded;
+- **`!forceOrder` has no REST equivalent**, so liquidations in that window are *lost*: each spell
+  is written to `collector_gaps` with `repaired = 0` and an explaining `error`, cut at UTC
+  midnight so every daily gap report (§6.2) sees its own row;
+- the socket is retried every 5 min; the first message returns the collector to `ws`;
+- `/health` shows `mode` and `degradedReason` **per stream**, so a degraded run never looks healthy.
+
 ## Endpoints
 
-- `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1).
-  At this stage `streams` is `[]` (no collector registers one yet) and `lagSec` is `null` until
-  the time-series tables exist (IB-004).
+- `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode`).
+  `lagSec` is still `null` (IB-004's tables exist, but nothing measures lag yet).
 - `GET /metrics` → prom-client: `ib_stream_last_message_age_seconds{stream}`,
   `ib_rows_written_total{table}`, `ib_gaps_detected_total{stream}`,
   `ib_gaps_unrepaired_total{stream}`, `ib_binance_weight_used_1m`, `ib_ws_reconnects_total{stream}`.
