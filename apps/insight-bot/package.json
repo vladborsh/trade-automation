@@ -10,7 +10,9 @@
     "migrate": "node dist/db/migrate.js",
     "test": "jest",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "report": "node dist/ops/gap-report.cli.js"
+    "report": "node dist/ops/gap-report.cli.js",
+    "backfill": "node dist/backfill/backfill.cli.js",
+    "backfill:verify": "node dist/backfill/verify.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",

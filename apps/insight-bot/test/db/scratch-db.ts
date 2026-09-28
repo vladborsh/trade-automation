@@ -15,6 +15,13 @@ export function slotOf(databaseUrl: string): string {
   return new URL(databaseUrl).pathname.replace(/^\//, '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
 }
 
+/**
+ * **`databaseUrl` must always be this run's own `DATABASE_URL`.** The prefix is the only thing
+ * confining `dropLeftovers` to one slot: it drops every database whose name starts with what
+ * this returns. Build the prefix from a hard-coded name, another slot's URL or an unvalidated
+ * argument and the helper will happily drop that slot's databases instead — a slot's data is
+ * someone else's running work, and the drop is not recoverable.
+ */
 export function scratchPrefix(kind: string, databaseUrl: string): string {
   return `${kind}_${slotOf(databaseUrl)}_`;
 }

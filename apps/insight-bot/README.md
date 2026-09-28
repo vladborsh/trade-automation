@@ -287,6 +287,53 @@ anything missed while backfilling is lost for good.
 **Rate limits are Bybit's own** — nothing here touches `ib_binance_weight_used_1m`, which is scoped
 to the Binance futures budget (§4.5). Steady state is ~0.06 REST requests/minute.
 
+## The historical backfill (IB-012)
+
+`npm run backfill -- --symbols BTCUSDT,ETHUSDT,SOLUSDT [--from 2024-01] [--force]`
+
+Fills the same tables the collectors write, tagged `source='archive'` (D8), from
+data.binance.vision plus a REST tail. Per symbol and series it walks **monthly archive files →
+daily files for the current month → REST for the hours since**. It boots config + database only,
+never the collectors.
+
+- **Idempotent and resumable by month.** Every write is the collectors' own upsert on the natural
+  key (D12), and before downloading, the runner reads which months already hold rows and skips
+  them (`--force` overrides). A run interrupted at month 40 of 60 costs 20 on retry.
+- **Partitions are created as it goes** — a 2020 month has none on a fresh database.
+- **≤ 4 parallel downloads; the REST tail is throttled to 600 weight/min** and stops outright
+  when Binance's own `X-MBX-USED-WEIGHT-1M` passes 1200 (§5, D15). Steady-state collection is
+  ~32/min, so a backfill cannot eat the live collectors' headroom.
+
+### Depth is measured, and absence is not always a gap
+
+This is the part that matters for the 8am report. The venues do not serve everything, and a
+backfill that recorded every 404 as a hole would put permanent red lines in front of the operator:
+
+| Series | Depth | Consequence |
+|---|---|---|
+| 1m candles, perp/spot | from `listed_perp` in `universe.yaml` | — |
+| funding, Binance | 2020-01 | — |
+| OI + 4× L/S, 5m | **BTCUSDT 2020-09-01, every other symbol 2021-12-01** | earlier months are `unavailable`, never requested |
+| funding, Bybit | from listing (BTC 2020-03) | paged back until it reaches stored rows |
+| funding, OKX | **≈ 97 days only** | every uncollected day is lost for good |
+| liquidations, mark, predicted funding | none | forward only, from the day the collectors start |
+
+`results/coverage.md` reports `missing` (a real hole) separately from `unavailable` (a month the
+venue never served). Only the first is a defect.
+
+### Checking the archive against the collectors
+
+```sh
+npm run backfill:verify -- --symbol BTCUSDT --day 2026-09-20 [--against archive|rest]
+```
+
+Compares the stored bars for one UTC day against the archive's own file, minute by minute, and
+**writes nothing**. It has to work that way: `candles_1m`'s conflict key is
+`(venue, market, symbol, open_time)` and does *not* include `source`, so importing a day the
+collectors already covered replaces their rows — the comparison must happen before the write, not
+after. `--against rest` compares with the REST API instead, which is the only option for a day
+that has not closed yet (a day gains its archive file only once it is over).
+
 ## The watchdog, the daily gap report and the service chat (IB-011)
 
 `src/ops/` — the operator's instruments (§6.2). This is the **stage-0 exit instrument**: fourteen
