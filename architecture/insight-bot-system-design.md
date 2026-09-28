@@ -359,8 +359,10 @@ funding) simply resume; the hole is recorded in `collector_gaps` with
 | markPrice, forceOrder, klines | 0 (WS) |
 | **total** | **≈ 32 ≈ 1.3 %** |
 
-Spot REST: repair only. Bybit/OKX REST: funding history poll once per
-settlement per symbol (≈ 0.1 calls/min each).
+Spot REST: repair only, against spot's own 6000/min budget, reported on
+`ib_binance_spot_weight_used_1m` (never added to the futures gauge). Bybit/OKX
+REST: funding history poll once per settlement per symbol (≈ 0.1 calls/min
+each).
 
 ---
 
@@ -392,8 +394,10 @@ idempotent and resumable by month.
 - `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen }], db: { lagSec }, budget: { binanceWeightUsed1m } }`.
 - `GET /metrics` (prom-client): `ib_stream_last_message_age_seconds{stream}`,
   `ib_rows_written_total{table}`, `ib_gaps_detected_total{stream}`,
-  `ib_gaps_unrepaired_total{stream}`, `ib_binance_weight_used_1m`,
-  `ib_ws_reconnects_total{stream}`.
+  `ib_gaps_unrepaired_total{stream}`, `ib_binance_weight_used_1m` (USD-M
+  futures, ceiling 2400/min), `ib_binance_spot_weight_used_1m` (spot, its own
+  6000/min ceiling — a separate gauge so each is comparable with its own
+  budget; §4.2), `ib_ws_reconnects_total{stream}`.
 
 ### 6.2 Watchdog and the daily gap report
 
