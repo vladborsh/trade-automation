@@ -27,6 +27,7 @@ import { DbModule } from '../../src/db/db.module';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { FileCandleStore } from '../../src/storage/file/file-candle-store';
 import { StorageModule } from '../../src/storage/storage.module';
+import { LOGIN_BURST_TIMEOUT_MS } from '../auth/login-burst-timeout';
 import { DB_HOOK_TIMEOUT_MS } from '../db/scratch-db';
 
 /**
@@ -378,5 +379,5 @@ maybeDescribe('backtest money path over HTTP, real Postgres (Tester e2e, cluster
     // the bootstrapped admin is a different key and unaffected
     const res = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: adminEmail, password: PASSWORD }) });
     expect(res.status).toBe(200);
-  });
+  }, LOGIN_BURST_TIMEOUT_MS); // BUG-020: 10 admitted attempts each pay for real scrypt; 5,055 ms observed at load 8-10
 });

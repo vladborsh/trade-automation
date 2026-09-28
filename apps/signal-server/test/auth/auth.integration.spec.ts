@@ -9,6 +9,7 @@ import { AdminBootstrap } from '../../src/auth/admin-bootstrap.service';
 import { AdminService } from '../../src/auth/admin.service';
 import { AuthService, INVITE_TTL_MS } from '../../src/auth/auth.service';
 import { LoginThrottle } from '../../src/auth/login-throttle';
+import { LOGIN_BURST_TIMEOUT_MS } from './login-burst-timeout';
 import { PgAuthRepositories } from '../../src/auth/pg/pg-auth-repositories';
 import { SESSION_TTL_MS, sha256Hex } from '../../src/auth/session-cookie';
 import { runMigrations } from '../../src/db/migration-runner';
@@ -211,11 +212,13 @@ maybeDescribe('auth against a real Postgres (T-007 done-when)', () => {
       // the right password is now refused too, until the window passes
       const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email('burst'), password: 'burst-password-ok' }) });
       expect(res.status).toBe(429);
-    }, 60_000);
+      // BUG-020: named, and the 60 s is derived — see login-burst-timeout.ts. Value unchanged.
+    }, LOGIN_BURST_TIMEOUT_MS);
 
     it('the same for an unknown email', async () => {
       expect(tally(await burst(email('nobody-home'), 200))).toEqual({ 401: 10, 429: 190 });
-    }, 60_000);
+      // BUG-020: an unknown email still pays one scrypt per admitted attempt (auth.service.ts).
+    }, LOGIN_BURST_TIMEOUT_MS);
   });
 
   it('AdminBootstrap upserts the admin from env: creates, then resets password/role/disabled on re-boot', async () => {
