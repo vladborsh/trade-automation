@@ -163,3 +163,116 @@ describe('BinanceAdapter.streamCandles over the combined-stream URL', () => {
     sub.unsubscribe();
   });
 });
+
+/**
+ * BUG-019: a socket that is accepted and then goes silent — with no `close` event — used to strand the
+ * feed forever: the REST fallback armed only if the socket had NEVER spoken, and the reconnect needed
+ * a `close`. That is how the coordinator's live candles went ~25 h stale.
+ */
+describe('BinanceAdapter silence watchdog (BUG-019)', () => {
+  const silent = { log: () => undefined, warn: () => undefined };
+  const timings = { silenceAfterOpenMs: 30, silenceMs: 90, muteRetryMs: 300, restPollMs: 10 };
+
+  function kmsg(openTime: number) {
+    return Buffer.from(
+      JSON.stringify({
+        stream: 'btcusdt@kline_1m',
+        data: {
+          e: 'kline',
+          E: openTime + 1,
+          s: 'BTCUSDT',
+          k: { t: openTime, T: openTime + 59_999, s: 'BTCUSDT', i: '1m', o: '100', h: '101', l: '99', c: '100.5', v: '10', x: true },
+        },
+      }),
+    );
+  }
+
+  /** Lets the REST poll's promise chain settle under fake timers. */
+  const flush = async () => {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  };
+
+  let restCalls = 0;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    restCalls = 0;
+    probe().opened.length = 0;
+    probe().sockets.length = 0;
+    global.fetch = jest.fn(async () => {
+      restCalls += 1;
+      return { ok: true, json: async () => [kline(1_700_000_000_000, 1_700_000_059_999), kline(1_700_000_060_000, 1_700_000_119_999)] } as Response;
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('mute after delivering: reconnects, serves REST meanwhile, reports degraded, then recovers on the first message back', async () => {
+    const adapter = new BinanceAdapter('https://fapi.example', 'wss://example', silent, timings);
+    const statuses: string[] = [];
+    adapter.health().subscribe((s) => statuses.push(s));
+    const seen: number[] = [];
+    const sub = adapter.streamCandles(instrument).subscribe((c) => seen.push(c.openTime));
+
+    probe().sockets[0].fire('open');
+    probe().sockets[0].fire('message', kmsg(1_700_000_000_000));
+    expect(seen).toEqual([1_700_000_000_000]);
+    expect(statuses).toEqual(['up']);
+
+    // it then goes silent, with no close event of its own
+    jest.advanceTimersByTime(timings.silenceMs);
+    await flush();
+    expect(statuses).toEqual(['up', 'degraded']); // GET /api/health shows the degraded venue
+    jest.advanceTimersByTime(timings.restPollMs * 2);
+    await flush();
+    expect(restCalls).toBeGreaterThan(0); // candles keep coming from REST while it is mute
+
+    jest.advanceTimersByTime(timings.muteRetryMs); // the socket is retried, which it never was before
+    expect(probe().opened).toHaveLength(2);
+
+    const callsBefore = restCalls;
+    probe().sockets[1].fire('open');
+    probe().sockets[1].fire('message', kmsg(1_700_000_060_000));
+    await flush();
+    expect(seen).toContain(1_700_000_060_000);
+    expect(statuses).toEqual(['up', 'degraded', 'up']); // recovery is visible
+    jest.advanceTimersByTime(timings.restPollMs * 3);
+    await flush();
+    expect(restCalls).toBe(callsBefore); // the REST poll stopped
+
+    sub.unsubscribe();
+  });
+
+  it('mute from the first byte: the same watchdog arms after the shorter open timeout', async () => {
+    const adapter = new BinanceAdapter('https://fapi.example', 'wss://example', silent, timings);
+    const statuses: string[] = [];
+    adapter.health().subscribe((s) => statuses.push(s));
+    const sub = adapter.streamCandles(instrument).subscribe();
+
+    probe().sockets[0].fire('open');
+    jest.advanceTimersByTime(timings.silenceAfterOpenMs);
+    await flush();
+    expect(statuses).toEqual(['up', 'degraded']);
+    jest.advanceTimersByTime(timings.restPollMs);
+    await flush();
+    expect(restCalls).toBeGreaterThan(0);
+
+    sub.unsubscribe();
+    expect(statuses).toEqual(['up', 'degraded', 'up']); // the subscription's teardown clears the degraded mark
+  });
+
+  it('an ordinary close still reconnects with backoff, and the watchdog does not double-schedule it', () => {
+    const adapter = new BinanceAdapter('https://fapi.example', 'wss://example', silent, timings);
+    const sub = adapter.streamCandles(instrument).subscribe();
+
+    probe().sockets[0].fire('open');
+    probe().sockets[0].fire('close');
+    expect(probe().opened).toHaveLength(1); // scheduled, not immediate
+    jest.advanceTimersByTime(1000);
+    expect(probe().opened).toHaveLength(2);
+
+    sub.unsubscribe();
+  });
+});

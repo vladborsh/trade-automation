@@ -1,4 +1,4 @@
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import WebSocket from 'ws';
 import { Candle, Instrument, TIMEFRAME_MS, Timeframe, VenueStatus } from '@trade-automation/contracts';
 import { BinanceRestKline, BinanceWsKlineMessage, mapRestKline, mapWsKline } from './binance.mapper';
@@ -11,6 +11,31 @@ export interface BinanceClientLogger {
   log(message: string): void;
   warn(message: string): void;
 }
+
+/**
+ * BUG-019: how long the live socket may stay quiet before it counts as mute. Binance's USD-M
+ * `fstream` has been observed accepting the handshake and then sending nothing — sometimes from the
+ * first byte, sometimes after hours of normal traffic — without ever emitting `close`. A socket like
+ * that used to strand the feed forever (the old fallback armed only if the socket had NEVER spoken,
+ * and a reconnect needed a `close` event), which is how the coordinator's candles went ~25 h stale.
+ */
+export interface BinanceStreamTimings {
+  /** No message this long after the socket opens → mute. */
+  silenceAfterOpenMs: number;
+  /** No message for this long once it has delivered at least one → mute. */
+  silenceMs: number;
+  /** While mute: how long to wait before trying the socket again. */
+  muteRetryMs: number;
+  /** REST poll interval while the socket is mute. */
+  restPollMs: number;
+}
+
+export const DEFAULT_STREAM_TIMINGS: BinanceStreamTimings = {
+  silenceAfterOpenMs: 30_000,
+  silenceMs: 90_000,
+  muteRetryMs: 300_000,
+  restPollMs: 3_000,
+};
 
 const CONSOLE_LOGGER: BinanceClientLogger = {
   // eslint-disable-next-line no-console
@@ -40,7 +65,16 @@ export class BinanceAdapter {
     private readonly restBaseUrl: string,
     private readonly wsBaseUrl: string,
     private readonly logger: BinanceClientLogger = CONSOLE_LOGGER,
+    private readonly timings: BinanceStreamTimings = DEFAULT_STREAM_TIMINGS,
   ) {}
+
+  /**
+   * BUG-019: 'degraded' while any stream of this adapter is mute and served from REST, 'up' once the
+   * socket delivers again. `health()` replays the current value, so signal-server's per-instrument
+   * status (and `GET /api/health`) shows the degraded mode instead of a permanent 'up'.
+   */
+  private readonly status = new BehaviorSubject<VenueStatus>('up');
+  private muteStreams = 0;
 
   /**
    * §12.5 item 3: `interval` is set to whatever `tf` is requested (Binance's kline interval
@@ -90,7 +124,7 @@ export class BinanceAdapter {
    * REQUEST_WEIGHT budget — under 2 %, leaving the backfill and gap-repair paths their room.
    */
   private streamCandlesViaRest(instrument: Instrument): Observable<Candle> {
-    const POLL_MS = 3000;
+    const POLL_MS = this.timings.restPollMs;
     const url =
       `${this.restBaseUrl}/fapi/v1/klines` +
       `?symbol=${instrument.symbol}&interval=1m&limit=2`;
@@ -148,6 +182,7 @@ export class BinanceAdapter {
    */
   streamKlines(streams: readonly string[], instrument: Instrument): Observable<Candle> {
     const url = `${this.wsBaseUrl}/stream?streams=${streams.join('/')}`;
+    const { silenceAfterOpenMs, silenceMs, muteRetryMs } = this.timings;
 
     return new Observable<Candle>((subscriber) => {
       let ws: WebSocket | null = null;
@@ -155,32 +190,66 @@ export class BinanceAdapter {
       let backoffMs = 1000;
       const MAX_BACKOFF_MS = 30_000;
 
-      // `fstream.binance.com` was observed (2026-09-17) accepting the TLS/WS handshake and then
-      // sending NOTHING — verified outside this codebase, and against @aggTrade (a
-      // many-per-second stream) as well as @kline_1m, while spot, COIN-M `dstream` and the
-      // `data-stream.binance.vision` mirror all delivered normally from the same host. That is a
-      // silent venue/region block, not a bug here, and a socket that is open but mute would
-      // otherwise strand the feed forever with no error to reconnect on. So: if the socket
-      // produces no message within SILENT_WS_TIMEOUT_MS of opening, fall back to REST polling.
-      // The fallback is one-way for the life of the subscription; a restart re-tries the WS, so
-      // the real stream comes back on its own if the block lifts or a VPN is used.
-      const SILENT_WS_TIMEOUT_MS = 30_000;
-      let sawMessage = false;
+      // BUG-019: the watchdog. Every message re-arms it; when it fires, the socket is mute — the
+      // feed falls back to REST polling (so candles keep coming) AND the socket is reconnected,
+      // retried every `muteRetryMs` while it stays mute. The first message on a reconnected socket
+      // stops the polling and logs the recovery: the fallback is no longer one-way for the life of
+      // the subscription, which is what left a silent-after-open socket stranded.
       let silenceTimer: NodeJS.Timeout | null = null;
+      let reconnectTimer: NodeJS.Timeout | null = null;
       let restSub: { unsubscribe(): void } | null = null;
+      let mute = false;
 
-      const fallBackToRest = () => {
+      const clearSilence = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = null;
+      };
+
+      const armSilence = (ms: number) => {
+        clearSilence();
+        silenceTimer = setTimeout(onSilence, ms);
+      };
+
+      const startRestFallback = () => {
         if (stopped || restSub) return;
         this.logger.warn(
-          `Binance WS for ${instrument.symbol} opened but sent nothing in ${SILENT_WS_TIMEOUT_MS}ms ` +
-            '— falling back to REST polling for this subscription (restart to re-try the stream)',
+          `Binance WS for ${instrument.symbol} is mute — polling REST every ${this.timings.restPollMs}ms ` +
+            `and retrying the socket every ${muteRetryMs}ms`,
         );
-        stopped = true;
-        ws?.close();
+        this.degrade();
         restSub = this.streamCandlesViaRest(instrument).subscribe({
           next: (c) => subscriber.next(c),
           error: (e) => subscriber.error(e),
         });
+      };
+
+      const stopRestFallback = () => {
+        if (!restSub) return;
+        restSub.unsubscribe();
+        restSub = null;
+        this.recover();
+        this.logger.log(`Binance WS for ${instrument.symbol} is delivering again — back on the stream`);
+      };
+
+      const onSilence = () => {
+        if (stopped) return;
+        silenceTimer = null;
+        mute = true;
+        startRestFallback();
+        // force the reconnect the venue never asks for: a mute socket emits no `close` of its own
+        const socket = ws;
+        ws = null;
+        socket?.removeAllListeners?.();
+        socket?.close();
+        scheduleConnect(muteRetryMs);
+      };
+
+      const scheduleConnect = (ms: number) => {
+        if (stopped || reconnectTimer) return;
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, ms);
       };
 
       const connect = () => {
@@ -189,18 +258,14 @@ export class BinanceAdapter {
 
         ws.on('open', () => {
           backoffMs = 1000;
-          if (!sawMessage && !silenceTimer) {
-            silenceTimer = setTimeout(fallBackToRest, SILENT_WS_TIMEOUT_MS);
-          }
+          armSilence(silenceAfterOpenMs);
         });
 
         ws.on('message', (data: WebSocket.RawData) => {
-          if (!sawMessage) {
-            sawMessage = true;
-            if (silenceTimer) {
-              clearTimeout(silenceTimer);
-              silenceTimer = null;
-            }
+          armSilence(silenceMs);
+          if (mute) {
+            mute = false;
+            stopRestFallback();
           }
           try {
             const raw = JSON.parse(data.toString()) as BinanceCombinedMessage | BinanceWsKlineMessage;
@@ -219,11 +284,12 @@ export class BinanceAdapter {
 
         ws.on('close', () => {
           if (stopped) return;
+          clearSilence();
           this.logger.warn(
             `Binance WS closed for ${instrument.symbol}; reconnecting in ${backoffMs}ms ` +
               '(gap, if any, will be closed by GapRepair on the next closed candle)',
           );
-          setTimeout(connect, backoffMs);
+          scheduleConnect(backoffMs);
           backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
         });
       };
@@ -232,16 +298,31 @@ export class BinanceAdapter {
 
       return () => {
         stopped = true;
-        if (silenceTimer) clearTimeout(silenceTimer);
-        restSub?.unsubscribe();
+        clearSilence();
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        if (restSub) {
+          restSub.unsubscribe();
+          restSub = null;
+          this.recover();
+        }
         ws?.close();
       };
     });
   }
 
+  /** One more stream of this adapter is mute: the venue is degraded until every one recovers. */
+  private degrade(): void {
+    this.muteStreams += 1;
+    if (this.muteStreams === 1) this.status.next('degraded');
+  }
+
+  private recover(): void {
+    this.muteStreams = Math.max(0, this.muteStreams - 1);
+    if (this.muteStreams === 0) this.status.next('up');
+  }
+
+  /** BUG-019: the live venue status — 'degraded' while a mute socket is served from REST. */
   health(): Observable<VenueStatus> {
-    return new Observable<VenueStatus>((subscriber) => {
-      subscriber.next('up');
-    });
+    return this.status.asObservable();
   }
 }
