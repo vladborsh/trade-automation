@@ -488,12 +488,28 @@ Local development stays on the existing single Postgres from
 ### 8.1 Clocks
 
 - `BarClock` ticks at every UTC minute + 5 s grace. `derive/` folds the closed
-  1m into `candles_agg` for every tf whose bar just closed.
+  1m into `candles_agg` for every tf whose bar just closed, **and a heal pass
+  on every tick re-folds every bucket still `complete = false`** (idempotent
+  upsert). A bucket is `complete` only when `bars` equals the bucket's 1m
+  count, and **it is reliably complete only after the heal pass**, never
+  after the first fold: in degraded mode (§16.1) non-signal-set symbols are
+  polled every 15 s, so their closing minute lands after the 5 s grace
+  (measured 2026-09-28: 28 of 60 buckets one minute short until healed,
+  §16.10). A single-pass derive must not be restored.
 - The **feature pass** runs at every 15m close and every 4h close (+ 15 s
-  grace for the last 1m and the 5m OI slot to land). If the closing 1m bar
-  or the OI slot is missing, the frame is computed with `complete = false`
-  and **no playbook may arm or trigger on an incomplete frame**; the next
-  complete frame re-evaluates.
+  grace for the last 1m and the 5m OI slot to land) and **reads only
+  `candles_agg` buckets with `complete = true`**. If the closing bucket, any
+  bucket inside a feature's window, or the OI slot is incomplete at the
+  grace, the pass re-checks at +30 s and +60 s (two heal ticks); if still
+  incomplete it writes the frame with `complete = false` and the reason
+  (`incomplete_reason`: which bucket/slot). **No playbook may arm or trigger
+  on an incomplete frame.** When the heal pass later completes the bucket,
+  the feature pass recomputes that frame (idempotent on `(symbol, tf,
+  close_time)`) and the runner re-evaluates it once — a late-completed
+  15m frame still counts as that bar's decision, stamped with its own
+  `close_time`, not the wall clock. This holds for every mode, not only
+  degraded: a chart may show a short bar for a minute; a frame that arms a
+  playbook may not.
 - Timeframe is per playbook (brief §5): P3 runs on 15m frames, P1/P2/P6 on
   4h frames, P4 is a feature, P5 a global veto.
 
@@ -1046,3 +1062,17 @@ the durable home is IB-012's coverage table, which the dashboard's
 move there in the same change, no separate task. Also noted: OKX pages
 funding history backward with `after`; a bare `User-Agent` request to
 `www.okx.com` is answered 403.
+
+### 16.10 IB-014 derive heal pass and the feature-pass completeness rule (2026-09-28)
+
+`reports/dev-1-IB-014-disagreement.md`. Measured: in degraded mode the
+non-signal-set symbols' closing 1m lands after the 5 s derive grace; a
+single-pass derive left 28 of 60 buckets permanently one minute short.
+Ratified: dev-1's idempotent heal pass (re-fold still-incomplete buckets every
+tick) is the design, and `complete` is reliable only after it — §8.1 amended
+so nobody restores a single-pass derive. The wider decision, mine: the
+feature pass **refuses incomplete input** rather than healing on its own —
+it reads only `complete = true` buckets, re-checks at +30 s / +60 s, then
+writes `complete = false` with a reason, and recomputes when the bucket
+heals; incomplete frames can never arm or trigger. IB-015's description is
+updated (it is unassigned).
