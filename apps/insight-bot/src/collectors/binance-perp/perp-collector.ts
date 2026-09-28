@@ -1,13 +1,14 @@
 import type { Candle, Instrument } from '@trade-automation/contracts';
-import { mapRestKline, mapWsKline, type BinanceRestKline, type BinanceWsKlineMessage } from '@trade-automation/binance-client';
-import { GapRepair, type CandleSource } from '@trade-automation/market-data-core';
+import { mapWsKline, type BinanceWsKlineMessage } from '@trade-automation/binance-client';
+import type { CandleSource } from '@trade-automation/market-data-core';
 import type { Candle1mRow, CollectorGapRow, FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
 import { DegradedGapTracker } from './degraded-gaps';
 import { fundingSettlementRow, liquidationRowFromEvent, markRowFromPremiumIndex, VENUE } from './mappers';
 import { MarkSampler, minuteBoundary } from './mark-sampler';
-import { ModePolicy, klinePollIntervalMs, type CollectorMode, type ModePolicyOptions } from '../binance-common/mode';
+import { KlineIngest } from '../binance-common/kline-ingest';
+import { ModePolicy, type CollectorMode, type ModePolicyOptions } from '../binance-common/mode';
 import { isForceOrderEvent, isMarkPriceEvent, type MarkPriceEvent } from './payloads';
-import { candleRow, expectedBars, gapRow } from '../binance-common/rows';
+import { gapRow } from '../binance-common/rows';
 import type { PerpRest } from './rest';
 import { perpStreamNames } from './streams';
 
@@ -88,10 +89,10 @@ export interface PerpCollectorPorts {
 export class BinancePerpCollector {
   private readonly policy: ModePolicy;
   private readonly sampler = new MarkSampler();
-  private readonly gapRepair = new GapRepair();
   private readonly degradedGaps = new DegradedGapTracker();
   private readonly instruments = new Map<string, Instrument>();
-  private readonly lastKlinePoll = new Map<string, number>();
+  /** IB-006: the 1m klines — shared with the spot collector (`binance-common/kline-ingest.ts`). */
+  private readonly klines: KlineIngest;
   private readonly now: () => number;
   private socket: CollectorSocket | null = null;
   private lastMinute: number | null = null;
@@ -102,6 +103,21 @@ export class BinancePerpCollector {
     this.now = ports.now ?? Date.now;
     this.policy = new ModePolicy(ports.mode);
     for (const symbol of ports.symbols) this.instruments.set(symbol, perpInstrument(symbol));
+    this.klines = new KlineIngest({
+      stream: STREAM_KLINE,
+      market: MARKET,
+      symbols: ports.symbols,
+      signalSet: ports.signalSet,
+      instrumentOf: (symbol) => this.instrumentOf(symbol),
+      writers: ports.writers,
+      candles: ports.candles,
+      restKlines: (symbol, limit) => ports.rest.klines(symbol, limit),
+      registry: ports.registry,
+      metrics: ports.metrics,
+      logger: ports.logger,
+      lastOpenTimes: ports.lastOpenTimes,
+      now: () => this.now(),
+    });
   }
 
   get mode(): CollectorMode {
@@ -111,7 +127,7 @@ export class BinancePerpCollector {
   /** Boot: register the streams, seed gap repair from storage and REST-fill before the socket opens. */
   async start(): Promise<void> {
     for (const id of [STREAM_KLINE, STREAM_MARK, STREAM_LIQUIDATION]) this.ports.registry.register(id, VENUE);
-    await this.seedFromStorage();
+    await this.klines.seedFromStorage();
     this.act({ kind: 'reconnect' });
   }
 
@@ -125,7 +141,7 @@ export class BinancePerpCollector {
       if (transition) await this.act(transition, now);
       await this.rollDegradedDays(now);
       await this.onMinuteBoundary(now);
-      if (this.policy.mode === 'degraded') await this.pollDegraded(now);
+      if (this.policy.mode === 'degraded') await this.klines.pollDegraded(now);
     } catch (error) {
       this.ports.logger.warn(`binance-perp tick failed: ${(error as Error).message}`);
     } finally {
@@ -189,31 +205,12 @@ export class BinancePerpCollector {
     this.ports.registry.recordMessage(STREAM_KLINE, now);
     if (!message.k.x) return; // the forming bar is /health's business only (§4.1)
     const symbol = message.k.s;
-    await this.writeClosed(symbol, mapWsKline(`${VENUE}:${symbol}`, message), 'ws', now);
+    await this.klines.writeClosed(symbol, mapWsKline(`${VENUE}:${symbol}`, message), 'ws', now);
   }
 
   // ---------------------------------------------------------------------------------------------
   // writing
   // ---------------------------------------------------------------------------------------------
-
-  /** A closed 1m bar: through GapRepair, then the rows and any hole it reports. */
-  private async writeClosed(symbol: string, candle: Candle, source: 'ws' | 'rest', now: number): Promise<void> {
-    const instrument = this.instrumentOf(symbol);
-    const { ordered, gap } = await this.gapRepair.onClosed1m(instrument, candle, this.ports.candles, 'up');
-    const rows = ordered.map((c) => candleRow(c, MARKET, c === candle ? source : 'rest'));
-    if (rows.length > 0) await this.ports.writers.candles1m.write(rows);
-    if (!gap) return;
-
-    const expected = expectedBars(gap.from, gap.to);
-    this.ports.metrics?.gapsDetected.inc({ stream: STREAM_KLINE });
-    if (gap.count < expected) this.ports.metrics?.gapsUnrepaired.inc({ stream: STREAM_KLINE });
-    await this.ports.writers.collectorGaps.write([
-      gapRow({
-        stream: STREAM_KLINE, market: MARKET, symbol,
-        from: gap.from, to: gap.to, expected, repaired: gap.count, error: gap.error, detectedAt: new Date(now),
-      }),
-    ]);
-  }
 
   /** Every minute: the mark sample (D5), any funding settlement, and degraded mark polling. */
   private async onMinuteBoundary(now: number): Promise<void> {
@@ -302,26 +299,6 @@ export class BinancePerpCollector {
     ]);
   }
 
-  /** Degraded kline polling: the signal set every 3 s, the rest every 15 s (§16.1). */
-  private async pollDegraded(now: number): Promise<void> {
-    for (const symbol of this.ports.symbols) {
-      const interval = klinePollIntervalMs(this.ports.signalSet.includes(symbol));
-      const last = this.lastKlinePoll.get(symbol) ?? 0;
-      if (now - last < interval) continue;
-      this.lastKlinePoll.set(symbol, now);
-      try {
-        const rows = await this.ports.rest.klines(symbol, 2);
-        // the venue answered: the stream is alive, just on REST — otherwise the watchdog (IB-011)
-        // would call a working degraded collector silent
-        this.ports.registry.recordMessage(STREAM_KLINE, now);
-        const closed = rows.find((row) => isClosedRow(row, now));
-        if (closed) await this.writeClosed(symbol, mapRestKline(`${VENUE}:${symbol}`, closed), 'rest', now);
-      } catch (error) {
-        this.ports.logger.warn(`degraded kline poll failed for ${symbol}: ${(error as Error).message}`);
-      }
-    }
-  }
-
   /** Degraded mark/funding: one symbol-less premiumIndex per minute (§16.1). */
   private async pollMark(boundary: Date): Promise<void> {
     try {
@@ -343,48 +320,6 @@ export class BinancePerpCollector {
   // boot
   // ---------------------------------------------------------------------------------------------
 
-  /** Seed `GapRepair` from the newest stored bar and REST-fill to now, before any socket (§4.1). */
-  private async seedFromStorage(): Promise<void> {
-    if (!this.ports.lastOpenTimes) return;
-    let stored: Map<string, number>;
-    try {
-      stored = await this.ports.lastOpenTimes();
-    } catch (error) {
-      this.ports.logger.warn(`boot seed read failed, starting without it: ${(error as Error).message}`);
-      return;
-    }
-    const now = this.now();
-    for (const [symbol, openTime] of stored) {
-      if (!this.instruments.has(symbol)) continue;
-      this.gapRepair.seed(`${VENUE}:${symbol}`, openTime);
-      const from = openTime + 60_000;
-      const to = minuteBoundary(now).getTime() - 60_000;
-      if (to < from) continue;
-      try {
-        const candles = await this.ports.candles.fetchCandles(this.instrumentOf(symbol), '1m', from, to);
-        if (candles.length > 0) {
-          await this.ports.writers.candles1m.write(candles.map((c) => candleRow(c, MARKET, 'rest')));
-          this.gapRepair.seed(`${VENUE}:${symbol}`, candles[candles.length - 1].openTime);
-        }
-        // Every hole a restart left is recorded, repaired or not: "the restart repaired N bars"
-        // is exactly what the daily gap report (§6.2) and the Tester's restart check read.
-        const expected = expectedBars(from, to);
-        await this.ports.writers.collectorGaps.write([
-          gapRow({
-            stream: STREAM_KLINE, market: MARKET, symbol, from, to,
-            expected, repaired: candles.length,
-            error: candles.length < expected ? 'boot backfill incomplete' : undefined,
-            detectedAt: new Date(now),
-          }),
-        ]);
-        if (candles.length < expected) this.ports.metrics?.gapsUnrepaired.inc({ stream: STREAM_KLINE });
-        this.ports.metrics?.gapsDetected.inc({ stream: STREAM_KLINE });
-      } catch (error) {
-        this.ports.logger.warn(`boot backfill failed for ${symbol}: ${(error as Error).message}`);
-      }
-    }
-  }
-
   private instrumentOf(symbol: string): Instrument {
     const known = this.instruments.get(symbol);
     if (known) return known;
@@ -392,11 +327,6 @@ export class BinancePerpCollector {
     this.instruments.set(symbol, made);
     return made;
   }
-}
-
-/** A closed REST kline row: its close time is in the past (column 6). */
-function isClosedRow(row: BinanceRestKline, now: number): boolean {
-  return typeof row?.[6] === 'number' && row[6] <= now;
 }
 
 /** The minimal `Instrument` the lifted REST paginator and GapRepair need for a perp symbol. */
