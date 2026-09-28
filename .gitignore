@@ -68,3 +68,6 @@ research/coinm-carry/data
 # OS / editor / Angular build cache
 .DS_Store
 .angular/
+
+research/spot-lead/data
+research/spot-lead/cache

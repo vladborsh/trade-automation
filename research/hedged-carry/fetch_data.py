@@ -20,6 +20,17 @@ Output (gitignored):
     data/<SYM>-perp1h.csv.gz    ts,open,high,low,close,volume
     data/<SYM>-spot1h.csv.gz    ts,open,high,low,close,volume
     results/fetch_log.csv       every month's HTTP outcome, rows, ts unit
+
+1m MODE (added 2026-09-28 for research/spot-lead, ARCHITECT-NOTE §5): with
+`--interval 1m` the same two kline paths are pulled at 1m and the
+`taker_buy_volume` column is KEPT (the 1h mode drops it, unchanged).  Output
+goes to `--data-dir` as parquet (a 1m tape is ~3.6 M rows per leg):
+    <data-dir>/<SYM>-funding.csv.gz  as above
+    <data-dir>/<SYM>-perp1m.parquet  ts,open,high,low,close,volume,taker_buy_volume
+    <data-dir>/<SYM>-spot1m.parquet  same
+    <log-dir>/fetch_log_1m.csv
+The per-file us/ms unit rule applies unchanged.  The default invocation (no
+flags) behaves exactly as before.
 """
 from __future__ import annotations
 import argparse, gzip, io, os, sys, zipfile
@@ -121,9 +132,16 @@ def _fund_ts(series):
     return pd.to_datetime(v, unit=unit, utc=True)
 
 
-def build_klines(symbol, ms, workers, base, kind):
-    """kind: 'perp' -> futures/um path, 'spot' -> spot path."""
-    urls = [(m, f"{base}/klines/{symbol}/1h/{symbol}-1h-{m}.zip") for m in ms]
+def build_klines(symbol, ms, workers, base, kind, interval="1h"):
+    """kind: 'perp' -> futures/um path, 'spot' -> spot path.
+
+    interval '1h' keeps ts,OHLCV (original behaviour); '1m' also keeps
+    taker_buy_volume."""
+    keep = ["ts", "open", "high", "low", "close", "volume"]
+    if interval != "1h":
+        keep = keep + ["taker_buy_volume"]
+    urls = [(m, f"{base}/klines/{symbol}/{interval}/{symbol}-{interval}-{m}.zip")
+            for m in ms]
     with ThreadPoolExecutor(max_workers=workers) as ex:
         res = list(ex.map(lambda mu: fetch(mu[1], KLINE_COLS), urls))
     parts, log = [], []
@@ -136,14 +154,13 @@ def build_klines(symbol, ms, workers, base, kind):
                 pd.to_numeric(df["open_time"], errors="coerce"),
                 unit=unit, utc=True)
             df["month"] = m
-            parts.append(df[["ts", "open", "high", "low", "close",
-                             "volume", "month"]])
+            parts.append(df[keep + ["month"]])
         log.append(dict(symbol=symbol, dataset=kind, month=m, status=st,
                         rows=(0 if df is None else len(df)), ts_unit=unit))
     if not parts:
         return None, log
     kl = pd.concat(parts, ignore_index=True)
-    for c in ("open", "high", "low", "close", "volume"):
+    for c in keep[1:]:
         kl[c] = pd.to_numeric(kl[c], errors="coerce")
     kl = kl.sort_values("ts").reset_index(drop=True)
     return kl, log
@@ -176,7 +193,14 @@ def main():
     ap.add_argument("--symbols", default=",".join(SYMBOLS))
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--interval", default="1h", choices=["1h", "1m"])
+    ap.add_argument("--data-dir", default=DATA)
+    ap.add_argument("--log-dir", default=OUT)
+    ap.add_argument("--start", default=PROBE_START)
+    ap.add_argument("--end", default=PROBE_END)
     a = ap.parse_args()
+    if a.interval == "1m":
+        return main_1m(a)
     ms = months(PROBE_START, PROBE_END)
     print(f"probe months: {ms[0]} .. {ms[-1]} ({len(ms)})", flush=True)
     logs = []
@@ -209,6 +233,44 @@ def main():
                                       keep="last")
         new.to_csv(f, index=False)
         print(f"wrote {f} ({len(new)} rows)", flush=True)
+
+
+def main_1m(a):
+    """1m + taker-buy pull (spot-lead).  One symbol at a time: a 1m leg is
+    ~3.6 M rows, and holding 16 of them at once is not needed."""
+    os.makedirs(a.data_dir, exist_ok=True)
+    os.makedirs(a.log_dir, exist_ok=True)
+    ms = months(a.start, a.end)
+    print(f"1m probe months: {ms[0]} .. {ms[-1]} ({len(ms)})", flush=True)
+    logf = os.path.join(a.log_dir, "fetch_log_1m.csv")
+    for s in a.symbols.split(","):
+        paths = {"funding": os.path.join(a.data_dir, f"{s}-funding.csv.gz"),
+                 "perp1m": os.path.join(a.data_dir, f"{s}-perp1m.parquet"),
+                 "spot1m": os.path.join(a.data_dir, f"{s}-spot1m.parquet")}
+        if all(os.path.exists(p) for p in paths.values()) and not a.force:
+            print(f"skip {s} (exists)", flush=True)
+            continue
+        logs = []
+        fund, lg = build_funding(s, ms, a.workers); logs += lg
+        perp, lg = build_klines(s, ms, a.workers, FUT, "perp1m", "1m"); logs += lg
+        spot, lg = build_klines(s, ms, a.workers, SPOT, "spot1m", "1m"); logs += lg
+        new = pd.DataFrame(logs)
+        if os.path.exists(logf):
+            new = pd.concat([pd.read_csv(logf), new], ignore_index=True)
+            new = new.drop_duplicates(subset=["symbol", "dataset", "month"],
+                                      keep="last")
+        new.to_csv(logf, index=False)
+        if fund is None or perp is None or spot is None:
+            print(f"{s}: NO DATA (fund={fund is not None} "
+                  f"perp={perp is not None} spot={spot is not None})", flush=True)
+            continue
+        with gzip.open(paths["funding"], "wt") as fh:
+            fund.to_csv(fh, index=False)
+        for k, df in (("perp1m", perp), ("spot1m", spot)):
+            df.drop(columns=["month"]).to_parquet(paths[k], index=False)
+        print(f"{s}: funding {len(fund):>6} | perp1m {len(perp):>8} "
+              f"{perp.ts.iloc[0]}..{perp.ts.iloc[-1]} | spot1m {len(spot):>8} "
+              f"{spot.ts.iloc[0]}..{spot.ts.iloc[-1]}", flush=True)
 
 
 if __name__ == "__main__":
