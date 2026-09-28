@@ -167,3 +167,38 @@ producers it reads. Nothing in the dashboard gates any stage.
    bound to the user, session revocable via `/admin/members/:id/disable`.
 4. **Two front doors for admin** — one service behind both; a spec asserts
    the web and the Telegram command produce the same `playbook_config` row.
+
+## 9. Memory budget on the box (t4g.micro, 1 GB RAM + 2 GB swap; `COST-PLAN.md`)
+
+Sizing rules for IB-030/IB-031, so nobody guesses:
+
+| Resident | Budget | How it is held there |
+|---|---|---|
+| OS + docker + `cloudflared` | ≈ 150 MB | `cloudflared` ≈ 30 MB; nothing else runs on the host |
+| Postgres 16 | ≈ 350 MB peak | `shared_buffers=256MB`, `max_connections=20`, `work_mem=4MB` (already in the IaC); the web readers get **their own pool of ≤ 4 connections** and `statement_timeout=5s` |
+| insight-bot (Node) | **≤ 400 MB RSS**, `--max-old-space-size=320` in the image `CMD` | collectors' batched writers (≤ 500 rows in flight per table) + web readers (below) |
+| headroom / page cache | ≈ 100 MB | swap absorbs bursts (IB-012 backfill is the known offender and runs before the collectors or on a temporary `t4g.small`) |
+
+**Angular build: never on the box.** `ng build insight-dashboard` runs in the
+GitHub Actions image build (≈ 1.5 GB during the build, on the runner); the
+box only pulls the image and serves ≈ 1–2 MB of gzipped static files from
+disk via `ServeStaticModule` with `Cache-Control: max-age=1y` on hashed
+assets — no measurable RSS.
+
+**API readers are bounded by construction, not by hope:**
+
+- every series endpoint has a hard cap of **5,000 points** per call and
+  rejects 1m ranges > 90 days (§4); a response is therefore ≤ ~1 MB of JSON
+  and ≤ ~10 MB of transient heap;
+- queries page or aggregate **in SQL** (`candles_agg`, bucketed liquidation
+  sums, downsampled `mark_funding_1m`), never load a raw range into Node and
+  reduce it there;
+- responses stream from the pg cursor to the socket for the candle endpoint
+  (`pg-query-stream`), so a slow phone does not pin a buffer;
+- concurrency: ≤ 4 web reader connections means at most 4 in-flight series
+  reads, ≈ 40 MB transient worst case; the collectors' writer pool is
+  separate so a dashboard burst cannot starve a write.
+
+If `/health` ever shows the Node RSS above 400 MB for more than a minute
+(add `ib_process_rss_bytes` to §6.1's gauges in IB-030), that is a bug in a
+reader, not a reason to size up the instance.
