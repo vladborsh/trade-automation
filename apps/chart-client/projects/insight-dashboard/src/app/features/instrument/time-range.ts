@@ -1,4 +1,5 @@
 import { WEB_MAX_1M_RANGE_DAYS, type WebTimeframe } from '@trade-automation/contracts';
+import type { StringKey } from '../../i18n/keys';
 
 /**
  * IB-031 — the instrument page's range and timeframe choices
@@ -15,25 +16,20 @@ export type RangeKey = '1d' | '3d' | '1w' | '1m' | '3m' | '1y';
 export interface RangePreset {
   key: RangeKey;
   /**
-   * Currently English, matching the shell and the other pages.
-   *
-   * The ruled policy (dashboard design §11) is that the dashboard follows the member's `lang`
-   * from `/auth/me`, ru by default, through a shared string table that **IB-030 owns and has
-   * not built yet** — so this page deliberately does not invent a second mechanism. IB-BUG-004
-   * retrofits the shell and this view together. What matters until then is that the page is
-   * consistent in one language; a half-translated screen is the outcome the ruling forbids.
+   * The i18n key, not the text (§11, IB-BUG-004). The label lives in `i18n/{ru,en}.ts`, so this
+   * module stays pure and the page renders it in the member's language.
    */
-  label: string;
+  labelKey: StringKey;
   days: number;
 }
 
 export const RANGE_PRESETS: readonly RangePreset[] = [
-  { key: '1d', label: '1 day', days: 1 },
-  { key: '3d', label: '3 days', days: 3 },
-  { key: '1w', label: '1 week', days: 7 },
-  { key: '1m', label: '1 month', days: 30 },
-  { key: '3m', label: '3 months', days: 90 },
-  { key: '1y', label: '1 year', days: 365 },
+  { key: '1d', labelKey: 'range.1d', days: 1 },
+  { key: '3d', labelKey: 'range.3d', days: 3 },
+  { key: '1w', labelKey: 'range.1w', days: 7 },
+  { key: '1m', labelKey: 'range.1m', days: 30 },
+  { key: '3m', labelKey: 'range.3m', days: 90 },
+  { key: '1y', labelKey: 'range.1y', days: 365 },
 ];
 
 export const TIMEFRAMES: readonly WebTimeframe[] = ['1m', '15m', '1h', '4h', '1d'];

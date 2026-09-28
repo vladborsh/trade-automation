@@ -60,7 +60,34 @@ export type StringKey =
   | 'coverage.col.missingMonths'
   | 'coverage.summary.none'
   | 'coverage.summary.complete'
-  | 'coverage.summary.problems';
+  | 'coverage.summary.problems'
+  // instrument view (IB-031)
+  | 'instrument.symbol'
+  | 'instrument.range'
+  | 'instrument.timeframe'
+  | 'instrument.market'
+  | 'instrument.coarsened'
+  | 'instrument.downsampled'
+  | 'instrument.loadFailed'
+  | 'instrument.topTitle'
+  | 'instrument.col.time'
+  | 'instrument.col.venue'
+  | 'instrument.col.side'
+  | 'instrument.col.price'
+  | 'instrument.col.qty'
+  | 'instrument.col.notional'
+  | 'instrument.side.long'
+  | 'instrument.side.short'
+  | 'instrument.noLiquidations'
+  | 'instrument.pane.liquidations'
+  | 'instrument.pane.liquidationsUndercounted'
+  | 'instrument.venue.all'
+  | 'range.1d'
+  | 'range.3d'
+  | 'range.1w'
+  | 'range.1m'
+  | 'range.3m'
+  | 'range.1y';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

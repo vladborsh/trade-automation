@@ -2,6 +2,7 @@ import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import {
   LIQUIDATION_COLORS, LiquidationHistogramRenderer, liquidationPaneTitle,
 } from './liquidation-histogram.renderer';
+import { I18nService } from '../../i18n/i18n.service';
 
 /**
  * IB-031 — the liquidations pane. The renderer is thin, so the spec is about the two things
@@ -90,25 +91,33 @@ describe('LiquidationHistogramRenderer', () => {
 });
 
 describe('liquidationPaneTitle', () => {
+  // a real translator over the real tables, so a missing key or a dropped placeholder fails here
+  const en = new I18nService();
+  en.setLang('en');
+  const ru = new I18nService();
+  ru.setLang('ru');
+
   it('states the Binance undercount in the title, not in a footnote nobody opens', () => {
-    const title = liquidationPaneTitle('1m', 'all', true);
+    const title = liquidationPaneTitle(en.t.bind(en), '1m', 'all', true);
     expect(title).toContain('visible only');
     expect(title).toContain('1 event/s per symbol');
   });
 
+  it('says the same thing in Russian — the warning is not an English-only courtesy', () => {
+    const title = liquidationPaneTitle(ru.t.bind(ru), '1m', 'all', true);
+    expect(title).toContain('только видимые');
+    expect(title).toContain('1 события в секунду');
+  });
+
   it('does not claim the undercount when it does not apply', () => {
-    expect(liquidationPaneTitle('1h', 'bybit', false)).toBe('Liquidations (1h, bybit)');
+    expect(liquidationPaneTitle(en.t.bind(en), '1h', 'bybit', false)).toBe('Liquidations (1h, bybit)');
   });
 
-  it('names the bucket and the venue scope', () => {
-    expect(liquidationPaneTitle('15m', 'all', false)).toBe('Liquidations (15m, all venues)');
-  });
-
-  it('keeps the venue and bucket as codes, whatever language the prose ends up in', () => {
-    // IB-BUG-004 will translate the prose per the member's `lang`; tickers, venues and bucket
-    // codes stay English by the same ruling, so they are asserted here rather than left to the
-    // retrofit to remember.
-    expect(liquidationPaneTitle('15m', 'okx', false)).toContain('okx');
-    expect(liquidationPaneTitle('15m', 'okx', false)).toContain('15m');
+  it('keeps the venue and bucket as CODES in both languages (§11)', () => {
+    for (const t of [en.t.bind(en), ru.t.bind(ru)]) {
+      const title = liquidationPaneTitle(t, '15m', 'okx', false);
+      expect(title).toContain('okx');
+      expect(title).toContain('15m');
+    }
   });
 });
