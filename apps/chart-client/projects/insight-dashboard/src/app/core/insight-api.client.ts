@@ -1,7 +1,7 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
-  WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest,
+  WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest, WebFearGreedResponse, WebMarketCapResponse,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseTopResponse,
@@ -117,6 +117,14 @@ export class InsightApiClient {
     return this.get<WebLiquidationsOverviewResponse>('/liquidations/overview', {
       symbols: 'top20', feed_min_usd: feedMinUsd, feed_limit: feedLimit,
     });
+  /** IB-037 §10: Fear & Greed for a window, plus the whole series' newest point for the gauge. */
+  async fearGreed(fromMs: number, toMs: number): Promise<WebFearGreedResponse> {
+    return this.get<WebFearGreedResponse>('/context/fear-greed', { from: fromMs, to: toMs });
+  }
+
+  /** IB-037 §10: the top-20 stacked shares, the current table and the dominance line. */
+  async marketCap(fromMs: number, toMs: number): Promise<WebMarketCapResponse> {
+    return this.get<WebMarketCapResponse>('/context/market-cap', { from: fromMs, to: toMs });
   }
 
   /**

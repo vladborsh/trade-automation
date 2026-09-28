@@ -50,6 +50,13 @@ const ALLOWED_BY_TEMPLATE: ReadonlyArray<readonly [string, readonly string[]]> =
     // language beside the table — never translating the field names themselves (ruled 2026-09-28).
     ['time', 'UTC', 'venue', 'side', 'price', 'qty', 'notional', 'long', 'short'],
   ],
+  [
+    join('features', 'market', 'market.component.html'),
+    // §11 "field names in tables of raw data" again: the current-caps table. `B` and `USD` are
+    // units; `coin`, `cap`, `price`, `share` name the columns of the venue's own figures. The
+    // prose around the table — every sentence a reader actually reads — is in the tables.
+    ['coin', 'cap', 'USD', 'price', 'share', '24h', '7d'],
+  ],
 ];
 
 /** The tokens allowed in `file`: the global set, plus any carve-out that names this template. */
@@ -82,11 +89,45 @@ export function userFacingText(html: string): string[] {
   // HTML entities are markup, not prose: `&nbsp;` between two spans is a separator, and reading it
   // as the word "nbsp" made this check fail on its own punctuation.
   const withoutEntities = withoutBlocks.replace(/&[a-z]+;|&#\d+;/gi, ' ');
-  const withoutTags = withoutEntities.replace(/<[^>]*>/g, '\n');
+  const withoutTags = stripTags(withoutEntities);
   return withoutTags
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+}
+
+/**
+ * Removes tags, respecting quoted attribute values.
+ *
+ * A naive `/<[^>]*>/` ends the tag at the first `>`, and an Angular binding may hold one inside
+ * quotes — `[class.up]="(row.change24h ?? 0) > 0"`. The tail of that attribute then leaked into
+ * the scanned text and the check reported `class.down` and `row.change24h` as untranslated prose.
+ * The tempting repair is to allow those words, which would blind the guard to real prose; the
+ * right one is to parse the tag properly.
+ */
+export function stripTags(html: string): string {
+  let out = '';
+  let inTag = false;
+  let quote: '"' | "'" | null = null;
+  for (const char of html) {
+    if (inTag) {
+      if (quote) {
+        if (char === quote) quote = null;
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if (char === '>') {
+        inTag = false;
+        out += '\n';
+      }
+      continue;
+    }
+    if (char === '<') {
+      inTag = true;
+      continue;
+    }
+    out += char;
+  }
+  return out;
 }
 
 /** A fragment is suspicious when it contains a word of two or more letters that `allowed` lacks. */
@@ -115,6 +156,17 @@ describe('§11: no hard-coded user-facing literals in the dashboard templates', 
       expect(offenders).toEqual([]);
     },
   );
+});
+
+describe('stripTags', () => {
+  it('keeps a `>` inside a quoted attribute inside the tag', () => {
+    // the binding that exposed this: its tail used to leak out and be read as prose
+    expect(stripTags('<td [class.up]="(row.change24h ?? 0) > 0">x</td>').trim()).toBe('x');
+  });
+
+  it('still removes ordinary tags and keeps their text', () => {
+    expect(stripTags('<p class="muted">hello</p>').trim()).toBe('hello');
+  });
 });
 
 describe('the English-by-rule allow-list is scoped to where it was argued', () => {

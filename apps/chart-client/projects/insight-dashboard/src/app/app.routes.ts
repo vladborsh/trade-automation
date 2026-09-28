@@ -9,11 +9,11 @@ import { Routes } from '@angular/router';
  *
  * `LANDING_ROUTE` is the single place that decides where "in" is: the default route, the unknown-path
  * fallback and the login exchange all read it, so moving the landing page is one edit rather than
- * three that can disagree. It becomes `/market` when IB-037's page lands.
+ * three that can disagree. IB-037's card page has landed, so it is `/market`.
  */
 
-/** Where a member arrives: the most useful page we have, never Health. */
-export const LANDING_ROUTE = '/instrument/BTCUSDT';
+/** Where a member arrives: the market cards, never Health. */
+export const LANDING_ROUTE = '/market';
 
 /** The same destination as a `redirectTo`, which takes no leading slash. */
 const LANDING_REDIRECT = LANDING_ROUTE.replace(/^\//, '');
@@ -35,13 +35,9 @@ export const routes: Routes = [
     path: 'instrument/:symbol',
     loadComponent: () => import('./features/instrument/instrument.component').then((m) => m.InstrumentComponent),
   },
-  // IB-038's placeholder, NOT the market page. IB-037 replaces this entry with its own page and
-  // mounts the three liquidation components under its cards; dev-1 resolves the conflict in
-  // favour of their version (reports/dev-1-IB-037-038-seam.md). Until then this is the only way
-  // to reach the liquidation surfaces by clicking, which is what their acceptance needs.
   {
     path: 'market',
-    loadComponent: () => import('./features/liquidations/liquidations-page.component').then((m) => m.LiquidationsPageComponent),
+    loadComponent: () => import('./features/market/market.component').then((m) => m.MarketComponent),
   },
   { path: '**', redirectTo: LANDING_REDIRECT },
 ];
