@@ -15,10 +15,12 @@ export type ArchiveSeries = 'klines-perp' | 'klines-spot' | 'funding' | 'metrics
 /**
  * First month/day each series is served, measured — not assumed.
  *
- * - `metrics`: **BTCUSDT from 2020-09-01, every other symbol from 2021-12-01** (404 before that,
- *   measured in `research/squeeze-full-form/`). Only the daily prefix exists at all: the monthly
- *   metrics prefix is a 404 for every symbol/month probed
- *   (`research/deriv-positioning/fetch_metrics.py`).
+ * - `metrics`: **BTCUSDT from 2020-09-01, every other symbol from 2021-12-01** — 404 before
+ *   that, measured across 8 symbols in `research/squeeze-full-form/` (2026-09-28) and confirmed
+ *   on 3 symbols by the IB-012 backfill run the same day, whose coverage report shows every
+ *   earlier month as `unavailable` and none as a hole. Only the daily prefix exists at all: the
+ *   monthly metrics prefix was a 404 for every symbol/month probed
+ *   (`research/deriv-positioning/fetch_metrics.py`, many months × 8 symbols).
  * - `funding`: 2020-01 (verified 0 missing slots on 8 symbols in `research/funding-rate-signals`).
  * - klines: from the symbol's own listing, so there is no single floor — the caller passes it.
  */

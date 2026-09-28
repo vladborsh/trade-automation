@@ -6,10 +6,17 @@
  * (a couple of bars, one funding row), while this pages a range under a weight throttle. Sharing
  * one class would give each caller the other's constraints.
  *
- * Depth facts honoured here, all measured (§5):
- * - **Bybit** funding serves from listing, so it pages until it reaches rows we already store.
- * - **OKX** funding serves only about the **last 97 days**. Reaching that wall is the expected
- *   end of the walk, not a failure, and every day OKX is not collected is lost for good.
+ * Depth facts honoured here. Both are **repeated** measurements, not single probes
+ * (AGENTS.md: a venue fact is a rule only after repetition, and must say how often and when):
+ *
+ * - **Bybit** funding serves from each contract's listing — 8 instruments in
+ *   `research/squeeze-full-form/results/venue_depth.csv` (Researcher, 2026-09-28) and 3 more on
+ *   my own IB-012 backfill run the same day, agreeing to the day (BTC 2020-03-25, ETH
+ *   2020-10-21, SOL 2021-06-29). So it pages until it reaches rows we already store.
+ * - **OKX** funding serves only about the **last 97 days**: 97–98 days across those same 8
+ *   instruments, and 291 settlements back to 2026-06-24 (~97 days) on each of the 3 in my run.
+ *   Two occasions, 11 observations. Reaching that wall is the expected end of the walk, not a
+ *   failure, and every day OKX is not collected is lost for good.
  */
 
 import type { WeightThrottle } from '@trade-automation/binance-client';
@@ -25,7 +32,12 @@ export type FetchLike = (url: string, init?: { signal?: AbortSignal }) => Promis
 export const BINANCE_KLINE_PAGE = 1000;
 /** `/klines` with limit ≤ 1000 costs 2 weight on both the spot and the USD-M futures API. */
 export const BINANCE_KLINE_WEIGHT = 2;
-/** Measured: OKX funding history reaches back roughly 97 days and no further. */
+/**
+ * OKX funding history reaches back roughly 97 days and no further — 97–98 days on 8 instruments
+ * (venue_depth.csv, 2026-09-28) and ~97 on 3 more in the IB-012 run the same day. A boundary,
+ * not a guarantee: it is a rolling window, so treat it as "about", and re-measure before relying
+ * on the exact number.
+ */
 export const OKX_FUNDING_DAYS = 97;
 
 const MINUTE_MS = 60_000;
