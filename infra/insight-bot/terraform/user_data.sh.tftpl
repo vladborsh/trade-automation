@@ -23,6 +23,18 @@ systemctl enable --now amazon-ssm-agent
 install -d -m 0755 /opt/insight-bot
 install -d -m 0700 /opt/insight-bot/pgdata
 
+# COST-PLAN.md: the box is a 1 GB t4g.micro. A 2 GB swap file means a burst pages to disk instead
+# of the OOM killer taking Postgres or the collector down.
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >>/etc/fstab
+  sysctl -w vm.swappiness=10
+  echo 'vm.swappiness=10' >/etc/sysctl.d/99-insight-bot.conf
+fi
+
 cat >/opt/insight-bot/docker-compose.yml <<'COMPOSE_EOF'
 ${compose_file}
 COMPOSE_EOF
@@ -55,7 +67,7 @@ chmod 0755 /opt/insight-bot/*.sh
 
 # Static facts the scripts read instead of hardcoding.
 printf '%s' "${backup_bucket}" >/opt/insight-bot/backup-bucket
-printf '%s' "${image_repo_url}" >/opt/insight-bot/ecr-repo-url
+printf '%s' "${image_ref}" >/opt/insight-bot/image-ref
 printf 'AWS_REGION=%s\nSSM_PREFIX=%s\n' "${region}" "${ssm_prefix}" >/etc/profile.d/insight-bot.sh
 chmod 0644 /etc/profile.d/insight-bot.sh
 

@@ -2,7 +2,8 @@
 # database password live in SSM SecureStrings the user creates (RUNBOOK §4), never in Terraform.
 
 # S3 bucket names are globally unique — pick one with the account id or a suffix.
-backup_bucket_name = "insight-bot-backups-CHANGE-ME"
+backup_bucket_name = "vb-insight-bot-backups-apne1"   # the user's name; add a short suffix if taken
+budget_alert_email = ""                              # where the 18 USD alert goes; empty = no budget
 
 # Leave both empty to skip the CI deploy role; fill them to let GitHub Actions assume it.
 # github_oidc_provider_arn = "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"

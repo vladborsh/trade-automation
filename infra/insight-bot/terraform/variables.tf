@@ -5,15 +5,21 @@ variable "region" {
 }
 
 variable "instance_type" {
-  description = "t4g.small: 2 vCPU arm64, 2 GB (design §7). The cost ceiling assumes it."
+  description = <<-EOT
+    t4g.micro (2 vCPU arm64, 1 GB) + a 2 GB swap file: what fits the user's hard 20 USD/month cap
+    (COST-PLAN.md). t4g.small is one edit plus stop/start when the backfill of IB-012 needs it.
+  EOT
   type        = string
-  default     = "t4g.small"
+  default     = "t4g.micro"
 }
 
 variable "root_volume_gb" {
-  description = "gp3 root volume; the Postgres data directory lives on it (design §7)."
+  description = <<-EOT
+    gp3 root volume; the Postgres data directory lives on it. 20 GB ≈ one year of collection at
+    §3.3's row estimate, and gp3 grows online — 50 GB would be +2.88 USD/month (COST-PLAN.md).
+  EOT
   type        = number
-  default     = 50
+  default     = 20
 }
 
 variable "backup_bucket_name" {
@@ -27,10 +33,25 @@ variable "backup_retention_days" {
   default     = 35
 }
 
-variable "ecr_repository_name" {
-  description = "ECR repository the GitHub Actions job pushes the arm64 image to."
+variable "image_ref" {
+  description = <<-EOT
+    The container image the box pulls, on GHCR (ECR is dropped: it bills per GB and GHCR is free
+    for this use — COST-PLAN.md). The deploy step overrides the tag per release.
+  EOT
   type        = string
-  default     = "insight-bot"
+  default     = "ghcr.io/vladborsh/insight-bot:latest"
+}
+
+variable "budget_alert_usd" {
+  description = "AWS Budgets alerts the user above this monthly spend; 2 USD under the 20 cap."
+  type        = number
+  default     = 18
+}
+
+variable "budget_alert_email" {
+  description = "Where the budget alert goes. Empty disables the budget (not recommended)."
+  type        = string
+  default     = ""
 }
 
 variable "ssm_parameter_prefix" {

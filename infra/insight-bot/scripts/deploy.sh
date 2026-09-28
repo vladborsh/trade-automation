@@ -3,24 +3,34 @@
 #
 #   deploy.sh <image-tag>     # e.g. deploy.sh sha-9f2c1ab   (default: latest)
 #
-# 1. render /opt/insight-bot/.env from SSM   2. log in to ECR   3. pull   4. up -d   5. health check
+# 1. render /opt/insight-bot/.env from SSM   2. log in to GHCR   3. pull   4. up -d   5. health check
 set -euo pipefail
 
 TAG="${1:-latest}"
 REGION="${AWS_REGION:-ap-northeast-1}"
 DIR=/opt/insight-bot
-REPO_URL="$(cat "$DIR/ecr-repo-url")"
+IMAGE_REF="$(cat "$DIR/image-ref")"      # e.g. ghcr.io/<owner>/insight-bot:latest
+REGISTRY="${IMAGE_REF%%/*}"
+IMAGE_BASE="${IMAGE_REF%:*}"
 
 cd "$DIR"
 
 echo "==> rendering .env from SSM"
 AWS_REGION="$REGION" "$DIR/render-env.sh"
 
-echo "==> ECR login"
-aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${REPO_URL%%/*}"
+# GHCR needs a read-only token (a GitHub PAT with `read:packages`), kept in SSM and rendered into
+# .env by the step above. A public package needs no login, so a missing token is not fatal.
+echo "==> registry login (${REGISTRY})"
+GHCR_TOKEN="$(grep -m1 '^GHCR_TOKEN=' "$DIR/.env" | cut -d= -f2- | tr -d "'" || true)"
+GHCR_USER="$(grep -m1 '^GHCR_USER=' "$DIR/.env" | cut -d= -f2- | tr -d "'" || true)"
+if [ -n "$GHCR_TOKEN" ]; then
+  printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" --username "${GHCR_USER:-token}" --password-stdin
+else
+  echo "    no GHCR_TOKEN in .env — assuming a public package"
+fi
 
-echo "==> pulling ${REPO_URL}:${TAG}"
-IMAGE="${REPO_URL}:${TAG}"
+echo "==> pulling ${IMAGE_BASE}:${TAG}"
+IMAGE="${IMAGE_BASE}:${TAG}"
 grep -q '^IMAGE=' "$DIR/.env" && sed -i '/^IMAGE=/d' "$DIR/.env"
 printf "IMAGE='%s'\n" "$IMAGE" >>"$DIR/.env"
 docker compose pull

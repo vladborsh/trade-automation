@@ -23,22 +23,8 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
 }
 
 data "aws_iam_policy_document" "instance" {
-  statement {
-    sid       = "EcrAuth"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"] # the token call is account-wide by definition
-  }
-
-  statement {
-    sid = "EcrPullInsightBot"
-    actions = [
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer",
-    ]
-    resources = [aws_ecr_repository.insight_bot.arn]
-  }
-
+  # No ECR statements: the image comes from GHCR with a read-only token kept in SSM below
+  # (COST-PLAN.md). The box's only AWS rights are its own parameters and its own backups.
   statement {
     sid       = "ReadOwnSecrets"
     actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
@@ -112,26 +98,8 @@ data "aws_iam_policy_document" "deploy_assume" {
 data "aws_iam_policy_document" "deploy" {
   count = local.deploy_role_enabled ? 1 : 0
 
-  statement {
-    sid       = "EcrAuth"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid = "EcrPush"
-    actions = [
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:BatchGetImage",
-      "ecr:CompleteLayerUpload",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:InitiateLayerUpload",
-      "ecr:PutImage",
-      "ecr:UploadLayerPart",
-    ]
-    resources = [aws_ecr_repository.insight_bot.arn]
-  }
-
+  # The image is pushed to GHCR with GitHub's own token, so CI needs no AWS rights for the build.
+  # Its AWS role exists for one verb: run the deploy script on this one instance.
   statement {
     sid       = "RunDeployCommand"
     actions   = ["ssm:SendCommand"]

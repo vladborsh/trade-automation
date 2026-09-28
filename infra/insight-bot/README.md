@@ -13,8 +13,8 @@ SSM, a nightly `pg_dump` to S3, and a deploy path through ECR + `ssm send-comman
 ```
 probe-venues.mjs              venue connectivity probe — run FIRST on a fresh box (§7)
 RUNBOOK.md                    operations, in plain Russian (deploy, restore, rotate, /health, alerts)
-terraform/                    the stack: EC2, security group, IAM, S3 backups, ECR
-  versions.tf variables.tf main.tf iam.tf s3.tf ecr.tf outputs.tf
+terraform/                    the stack: EC2, security group, IAM, S3 backups, Budgets
+  versions.tf variables.tf main.tf iam.tf s3.tf budgets.tf outputs.tf
   user_data.sh.tftpl          first-boot script; inlines the files below so the box needs no repo
   terraform.tfvars.example    the two inputs a reviewer must set
   backend.tf.example          S3 state backend, for after the first apply
@@ -34,16 +34,20 @@ The GitHub Actions job is `.github/workflows/insight-bot-deploy.yml` (manual tri
   decrypt only via SSM, and write only the backup bucket.
 - **Backups.** Versioned bucket, 35-day expiry on current and noncurrent versions, and a restore
   drill (`restore.sh … --into-check`) that never touches the live database.
-- **Cost.** ≈ 22–24 USD/month (RUNBOOK §9): instance + 50 GB gp3 + small S3/ECR, no NAT gateway,
-  default VPC.
+- **Cost.** ≈ **13.6 USD/month** against the user's hard 20 cap (`COST-PLAN.md`): `t4g.micro`
+  + 20 GB gp3 + the public IPv4 charge the first estimate missed + a few cents of S3. No ECR, no
+  NAT gateway, default VPC, and an AWS Budgets alert at 18 USD.
 
-## When the go-ahead arrives
+## The order of the apply (agreed with the Tech Lead)
 
-1. `cd terraform && cp terraform.tfvars.example terraform.tfvars` and set `backup_bucket_name`.
-2. `terraform init && terraform plan` — review, then apply.
-3. Create the SSM parameters (RUNBOOK §4).
-4. On the box: run `probe-venues.mjs` and paste the result into RUNBOOK §8.
-5. After IB-003 merges: run the deploy workflow, then the restore drill once.
+0. The user follows `SETUP-RU.md` and tells me the profile exists (plus the e-mail for the budget).
+1. `cd terraform && cp terraform.tfvars.example terraform.tfvars` — the bucket is
+   `vb-insight-bot-backups-apne1` (a short suffix if the name is taken).
+2. `AWS_PROFILE=insight-bot terraform init && terraform plan` — **the plan goes to the Tech Lead
+   before any apply**, then apply step by step with a report after each.
+3. The user's secrets into SSM (RUNBOOK §4); I never print a value.
+4. On the box: `probe-venues.mjs` first, result into RUNBOOK §8. A mute venue escalates.
+5. Deploy the image, then the restore drill once, then the report.
 
 ## Local checks that need no AWS
 

@@ -69,7 +69,7 @@ resource "aws_instance" "insight_bot" {
     region          = var.region
     ssm_prefix      = var.ssm_parameter_prefix
     backup_bucket   = aws_s3_bucket.backups.bucket
-    image_repo_url  = aws_ecr_repository.insight_bot.repository_url
+    image_ref       = var.image_ref
     compose_file    = file("${path.module}/../compose/docker-compose.yml")
     render_env_sh   = file("${path.module}/../scripts/render-env.sh")
     deploy_sh       = file("${path.module}/../scripts/deploy.sh")

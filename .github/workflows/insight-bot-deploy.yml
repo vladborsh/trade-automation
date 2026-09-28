@@ -2,10 +2,13 @@
 # (design §7). Manual by default; the push trigger is commented out until the stack exists and the
 # user has approved deploys.
 #
-# Needs these repository variables (no secrets: auth is GitHub OIDC → the insight-bot-deploy role):
+# The image goes to GHCR (ECR is dropped — infra/insight-bot/COST-PLAN.md), pushed with GitHub's
+# own GITHUB_TOKEN, so the build needs no AWS credentials at all. AWS is used for one verb: running
+# the deploy script on the box through SSM, via OIDC.
+#
+# Repository variables (no secrets):
 #   AWS_REGION            ap-northeast-1
 #   AWS_DEPLOY_ROLE_ARN   arn:aws:iam::<account>:role/insight-bot-deploy   (Terraform output)
-#   ECR_REPOSITORY_URL    <account>.dkr.ecr.ap-northeast-1.amazonaws.com/insight-bot
 #   INSTANCE_ID           i-…                                             (Terraform output)
 name: insight-bot deploy
 
@@ -25,8 +28,9 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write # OIDC
+  id-token: write # OIDC to AWS
   contents: read
+  packages: write # push the image to GHCR
 
 jobs:
   deploy:
@@ -36,13 +40,18 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-
-      - uses: aws-actions/amazon-ecr-login@v2
 
       - uses: docker/setup-qemu-action@v3 # arm64 on an x86 runner
       - uses: docker/setup-buildx-action@v3
@@ -56,8 +65,8 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ${{ vars.ECR_REPOSITORY_URL }}:sha-${{ github.sha }}
-            ${{ vars.ECR_REPOSITORY_URL }}:latest
+            ghcr.io/${{ github.repository_owner }}/insight-bot:sha-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/insight-bot:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -9,14 +9,15 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    # Design §7: data on the EBS volume, shared_buffers 512MB, max_connections 50 (2 GB box).
+    # Tuned for the 1 GB t4g.micro of COST-PLAN.md (design §7's 512MB/50 assumed a 2 GB box).
+    # A 2 GB swap file on the EBS volume absorbs bursts; see user_data.
     command: >-
       postgres
-      -c shared_buffers=512MB
-      -c max_connections=50
-      -c effective_cache_size=1GB
-      -c work_mem=8MB
-      -c maintenance_work_mem=128MB
+      -c shared_buffers=256MB
+      -c max_connections=20
+      -c effective_cache_size=512MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
       -c wal_compression=on
     environment:
       POSTGRES_DB: insight

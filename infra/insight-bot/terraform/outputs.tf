@@ -3,9 +3,9 @@ output "instance_id" {
   value       = aws_instance.insight_bot.id
 }
 
-output "ecr_repository_url" {
-  description = "Push target of the GitHub Actions job."
-  value       = aws_ecr_repository.insight_bot.repository_url
+output "image_ref" {
+  description = "The GHCR image the box pulls (ECR is not used — COST-PLAN.md)."
+  value       = var.image_ref
 }
 
 output "backup_bucket" {
