@@ -204,8 +204,10 @@ liquidations(id bigserial, venue, symbol, ts, side CHECK IN ('long','short'),   
         PK (id, ts),                                               -- partition key must be in every unique index
         UNIQUE (venue, symbol, ts, side, price, qty))              -- D6; Binance undercount documented here
         -- write rule: INSERT … ON CONFLICT DO NOTHING (events are immutable; first writer's `source` stands)
-calendar_events(id text, revision int, source, event_time, currency, title, impact, forecast, previous,
-        actual, fetched_at, PK (id, revision))                     -- every revision kept, as in signal-server
+calendar_events(id text, revision int, source, series_id text, event_time, currency, title, impact,
+        status text NOT NULL DEFAULT 'scheduled',                  -- scheduled | cancelled | rescheduled (§16.7)
+        forecast, previous, actual, actual_source text NULL, fetched_at,
+        PK (id, revision), INDEX (impact, currency, event_time))   -- every revision kept, as in signal-server
 collector_gaps(id bigserial, stream text, venue, market NULL, symbol NULL, gap_from, gap_to,
         expected int, repaired int, error text NULL, detected_at,
         PK (id, detected_at))                                      -- feeds §6.2's report
@@ -674,8 +676,10 @@ by the squeeze pass on its own merits.
 ### 9.3 P5 — macro event veto
 
 `EVENT_RISK` from `calendar_events` with `impact = high`, `currency = USD`,
-±60 min. Members get one quiet notice at T−60 ("новых сигналов до HH:MM не
-будет"). The trading half of P5 is not built (brief §2, §5).
+`status = 'scheduled'` on the latest revision, ±60 min, read through one
+shared windowed query (`calendar/events-in-window.ts`) that the veto, the
+T−60 notice and the morning plan all use. Members get one quiet notice at
+T−60 ("новых сигналов до HH:MM не будет"). The trading half of P5 is not built (brief §2, §5).
 
 ### 9.4 P1 / P2 — long / short squeeze: **gate failed, CLOSED (2026-09-28)**
 
@@ -947,3 +951,16 @@ in every unique index; the six-column natural unique key is unchanged);
 venue events, no archive source exists for them (§5), so a duplicate can only
 be the same event seen twice and the first writer's `source` is the true
 provenance. §3.1 and §3.3 updated.
+
+### 16.7 IB-010 calendar_events — additive migration 003 ratified (2026-09-28)
+
+`reports/dev-1-IB-010-escalation.md`. The §3.3 row omitted three things the
+lifted ForexFactory logic produces and needs: `status` (a cancelled or
+rescheduled event must not fire the §9.3 veto, and a reschedule mints a new
+id, so the old row must be marked, not left live), `series_id` (the
+next-occurrence actuals rule is keyed on the series) and `actual_source`
+(guarding "never overwrite a feed/provider actual"). Ratified as dev-1's
+additive migration 003 with the `(impact, currency, event_time)` index; §3.3
+corrected. §9.3 governs the window: ±60 min and a T−60 notice; the "next
+24 h" in IB-010's done-line was a smoke query, not a spec, and the shared
+windowed query dev-1 ships is the right shape.
