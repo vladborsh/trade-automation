@@ -45,20 +45,23 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   that is not yours will collide with another agent's running instance and give you (or
   them) someone else's state.
 
-  | Slot | Signal server | Client dev server |
-  |---|---|---|
-  | Coordinator / Tech Lead checkout | `:3000` | `:4200` |
-  | dev-1 | `:3010` | `:4210` |
-  | dev-2 | `:3020` | `:4220` |
-  | dev-3 | `:3030` | `:4230` |
-  | Tester | `:3040` | `:4240` |
+  | Slot | Signal server | Client dev server | Insight bot | Insight-bot database |
+  |---|---|---|---|---|
+  | Coordinator / Tech Lead checkout | `:3000` | `:4200` | `:3005` | `insight_coord` |
+  | dev-1 | `:3010` | `:4210` | `:3015` | `insight_dev1` |
+  | dev-2 | `:3020` | `:4220` | `:3025` | `insight_dev2` |
+  | dev-3 | `:3030` | `:4230` | `:3035` | `insight_dev3` |
+  | Tester | `:3040` | `:4240` | `:3045` | `insight_tester` |
 
   The mock server (`npm run mock-server` in `apps/chart-client`) stays on its default
   `:4300`. Once the backtest app's database exists, each slot also gets **its own
   database inside the one local Postgres** (`backtest_dev1`, `backtest_dev2`,
   `backtest_dev3`, `backtest_tester`) — one server, separate databases, so migrations
-  run in one worktree never break another. If you are not one of the slots above, take the next free `:30x0`/`:42x0`
-  pair and say which one you took.
+  run in one worktree never break another. The insight bot (`apps/insight-bot`) follows
+  the same rule on the same Postgres with its own databases (`insight_<slot>`, column
+  above) and its own Telegram **test bot per slot**, token in the slot's `.env`; there is
+  one production bot. If you are not one of the slots above, take the next free
+  `:30x0`/`:30x5`/`:42x0` triple and say which one you took.
 - `apps/chart-client/public/config.json` may carry an uncommitted local change in the
   coordinator's checkout — never commit or revert a change to it you did not make.
 - Client tests: `npx ng test --watch=false` from `apps/chart-client` (no `--browsers`

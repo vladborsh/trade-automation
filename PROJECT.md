@@ -172,12 +172,18 @@ role-to-role, technical detail is the point). For user-facing material:
 
 ## Task backlog
 
-`tasks.jsonl` at the repo root is the **delivery queue**: one JSON object per
-line, one line per task. It is deliberately machine-readable rather than prose —
-the Tech Lead answers "what is unblocked", "who is busy", "what depends on this"
-many times a day, and `IDEAS-BACKLOG.md` already shows where a 100 KB prose log
-ends up. Keep it distinct from `IDEAS-BACKLOG.md`, which holds *ideas* upstream
-of any design.
+The **delivery queue** lives under `tasks/`, **one file per stream**:
+`tasks/<stream>.jsonl` — one JSON object per line, one line per task. Streams
+today: `tasks/backtest-app.jsonl` (the manual backtesting app, ids `T-`/`BUG-`,
+moved from the repo root on 2026-09-28 with its history unchanged) and
+`tasks/insight-bot.jsonl` (the crypto insight bot, ids `IB-`/`IB-BUG-`). A new
+stream gets a new file and its own id prefix; the row schema below is the same
+in every file. One Tech Lead schedules across all files with one shared
+developer pool; `P0` (red `master`) is global across streams. The queue is
+deliberately machine-readable rather than prose — the Tech Lead answers "what
+is unblocked", "who is busy", "what depends on this" many times a day, and
+`IDEAS-BACKLOG.md` already shows where a 100 KB prose log ends up. Keep it
+distinct from `IDEAS-BACKLOG.md`, which holds *ideas* upstream of any design.
 
 **Two writers, split by field — never by line.** The Architect owns `title`,
 `description`, `depends_on`. The Tech Lead owns `priority`, `assignee`,
@@ -186,7 +192,7 @@ of any design.
 
 | Field | Owner | Meaning |
 |---|---|---|
-| `id` | creator | `T-017`, or `BUG-004` for a bug task. Never reused. |
+| `id` | creator | Stream prefix + number: `T-017` / `BUG-004` (backtest app), `IB-012` / `IB-BUG-001` (insight bot). Never reused. |
 | `title` | Architect | One line, imperative. |
 | `description` | Architect | What to build and what "done" means. For a bug: reproduction steps. |
 | `depends_on` | Architect | Task ids that must be `merged` before this can start. `[]` if none. |
@@ -253,6 +259,7 @@ the prose definition, for whoever reads this next.
 | [`smart-money-ict.md`](knowledge/smart-money-ict.md) | ICT true-open levels, premium/discount, proximal-edge iFVG; the `cmc-bot` H1-bias → M1-iFVG strategy as coded |
 | [`opening-range-breakout.md`](knowledge/opening-range-breakout.md) | Opening-range breakout at the NY cash open: OR/trigger/stop/exit definitions, eligibility calendar, the imported crypto anchor; measurement conventions of the `orb-ny-open` pass |
 | [`venue-contract-specs.md`](knowledge/venue-contract-specs.md) | Binance perp and Capital.com CFD contract specs: quantity unit, multiplier, minimum/step, leverage cap per regulated entity (EU/UK retail chosen), sources, and the API request that confirms them; feeds `instruments.yaml` `contract:` blocks |
+| [`forced-flow.md`](knowledge/forced-flow.md) | Liquidation feeds (side convention, Binance 1 event/s undercount, no history), settled vs predicted funding and the multi-venue extreme count, CVD from taker-buy volume and the spot-vs-perp labels; all untested as of 2026-09-28, with pointers to the two open passes |
 
 ## Architecture
 
@@ -269,6 +276,8 @@ note per system. They are role-to-role technical material.
 | [`four-streams-2026-09-18.md`](architecture/four-streams-2026-09-18.md) | Routing for four streams: OI in USD + OI candles (`chart-layouts.md` §11.1–11.2), horizontal/collapsible panels (§11.3), calendar filter set/flags/sound (`economic-calendar.md` §11), component-file rule (`AGENTS.md`) and its migration |
 | [`backtest-app-2026-09-21.md`](architecture/backtest-app-2026-09-21.md) | **Settled brief** for the manual backtesting app (39 product decisions taken with the user, plus a repository reuse inventory). Requirements only — not a design. |
 | [`backtest-app-system-design.md`](architecture/backtest-app-system-design.md) | System design for the manual backtesting app: `libs/indicators` + `libs/replay-core`, the relational model behind repository ports (first database in the repo), the first write endpoints, replay cursor/fill engine, position-tool interaction layer, screenshots to S3, cookie auth with env admin and single-use invites; decomposed into `tasks.jsonl` |
+| [`crypto-insight-bot-2026-09-28.md`](architecture/crypto-insight-bot-2026-09-28.md) | **Settled brief** for the crypto insight bot (25 product decisions taken with the user: collectors first, EC2 Tokyo, plain Postgres, grammY, research gates for P1/P2/P4, Anthropic-only AI at the edges, per-stream task files). Requirements only — not a design. |
+| [`insight-bot-system-design.md`](architecture/insight-bot-system-design.md) | System design for `apps/insight-bot`: three lifted libs (`binance-client`, `market-data-core`, `calendar-core`), partitioned time-series schema in database `insight`, four venue collectors + archive backfill, watchdog and the stage-0 exit criterion, EC2 hosting requirements, the stage-1 feature frame / twin-arm playbook engine (how the no-standalone-regime-classifier ruling is enforced structurally) / gate / Telegram delivery / tracker; decomposed into `tasks/insight-bot.jsonl` |
 
 ## Status
 
@@ -311,5 +320,14 @@ Roles and this context document were the first deliverable. Since then:
   crypto perp universe first, the prioritised funding-rate family second,
   two fit-only probes (market intraday momentum; macro-event continuation)
   after. VWAP mean reversion and any ORB form are not proposed.
+- **Second product stream opened 2026-09-28 — the crypto insight bot**
+  (`architecture/crypto-insight-bot-2026-09-28.md` brief,
+  `architecture/insight-bot-system-design.md` design, `tasks/insight-bot.jsonl`
+  IB-001…IB-028). Collectors + EC2 hosting are the first cluster and rank above
+  any new backtest-app work because liquidations, predicted funding and
+  Bybit/OKX data are lost for every day they are not collected. Two research
+  gates dispatched in parallel: the full-form long/short squeeze (P1/P2,
+  `research/squeeze-full-form/`) and spot-lead confirmation (P4,
+  `research/spot-lead/`).
 - The trading-idea intake format is still informal (backlog entry → Architect
   grilling → research package).
