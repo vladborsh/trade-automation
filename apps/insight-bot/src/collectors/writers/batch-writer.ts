@@ -59,6 +59,9 @@ export class Writers {
   readonly liquidations: BatchWriter<t.LiquidationRow>;
   readonly calendarEvents: BatchWriter<t.CalendarEventRow>;
   readonly collectorGaps: BatchWriter<t.CollectorGapRow>;
+  readonly fearGreed: BatchWriter<t.FearGreedWriteRow>;
+  readonly marketCapGlobal: BatchWriter<t.MarketCapGlobalWriteRow>;
+  readonly marketCapCoin: BatchWriter<t.MarketCapCoinWriteRow>;
 
   constructor(
     @Inject(DB) db: Db | null,
@@ -76,5 +79,8 @@ export class Writers {
     this.liquidations = new BatchWriter(db, t.LIQUIDATIONS, t.liquidationTuple, metrics);
     this.calendarEvents = new BatchWriter(db, t.CALENDAR_EVENTS, t.calendarEventTuple, metrics);
     this.collectorGaps = new BatchWriter(db, t.COLLECTOR_GAPS, t.collectorGapTuple, metrics);
+    this.fearGreed = new BatchWriter(db, t.FEAR_GREED, t.fearGreedTuple, metrics);
+    this.marketCapGlobal = new BatchWriter(db, t.MARKET_CAP_GLOBAL, t.marketCapGlobalTuple, metrics);
+    this.marketCapCoin = new BatchWriter(db, t.MARKET_CAP_COIN, t.marketCapCoinTuple, metrics);
   }
 }

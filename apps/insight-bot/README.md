@@ -461,6 +461,49 @@ The CLI boots config + DB + sender only, never the collectors. Two honest limits
 day it counts only up to *now* (future minutes are not missing minutes), and the Binance weight
 peak reads "нет данных", because only the process that ran the day knows it.
 
+## Market context (IB-036)
+
+Three keyless series behind the same `CollectorsModule.register()` gate
+(`src/collectors/context/`, design `insight-bot-web-dashboard.md` §10):
+
+| Series | Source | Cadence | Backfill |
+|---|---|---|---|
+| `fear_greed` | `api.alternative.me/fng/` | daily 00:05 UTC | **yes** — `limit=0` returns the whole history since 2018-02-01 in one call |
+| `market_cap_global` | CoinGecko `/api/v3/global` | **every 10 min** | **none possible** |
+| `market_cap_coin` | CoinGecko `/coins/{id}/market_chart` | daily 00:10 UTC | 365 days, once per coin |
+
+**`market_cap_global` is forward-only.** CoinGecko's historical endpoint is paid (401 on the free
+tier), so **every 10-minute slot not collected is permanently missing** — there is nothing to
+backfill from later. That is why a failed poll retries after 60 s instead of waiting out its
+ten-minute slot, and why the poll starts before the one-shot backfills finish.
+
+### Request rate, against each source's published limit
+
+| Source | Our rate | Their limit |
+|---|---|---|
+| alternative.me | 1/day (+1 on first run) | none published |
+| CoinGecko `/global` | 144/day = **0.1/min** | ~5–15/min keyless |
+| CoinGecko `market_chart` | 20/day (+20 on first run) | same pool |
+
+≈**165 CoinGecko requests/day ≈ 0.11/min**, about 1 % of the keyless allowance.
+
+**The daily average was never the binding constraint — the burst was.** Twenty `market_chart`
+calls back-to-back is ~60/min instantaneously and CoinGecko answers it with `429`; that is what
+the first live run did, and it cost that run its `/global` samples. The per-coin calls are
+therefore spaced **6 s** apart (10/min), and both one-shot backfills are **skipped when the
+tables already hold them**, so a restart does not re-spend the allowance on data already stored.
+A 429 is retried after 60 s, at most 3 times. A **401 is not retried** — that is the venue saying
+the endpoint is paid, not a transient failure.
+
+**No API key is used or needed**, and none was requested. The two endpoints that require one
+(`/global/market_cap_chart`, `market_chart?days=max`) are not called.
+
+`config/universe.yaml` carries a `coingecko_id` per symbol. **Those ids were verified by price,
+not by ticker** — CoinGecko lists 12 coins with the symbol BTC and 21 with PEPE, and picking the
+largest market cap among them is wrong for ONE (it gives `cross-2`, while Binance's ONEUSDT
+tracks `harmony`). Re-run that check when the universe is revised; the method is in the file's
+header.
+
 ## Endpoints
 
 - `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason, expectedIntervalSec }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode` and IB-011's `expectedIntervalSec`).

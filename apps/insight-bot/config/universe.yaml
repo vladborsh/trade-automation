@@ -10,6 +10,16 @@
 # listed_perp is the first bar in the data.binance.vision USD-M archive, which is what the
 # backfill (§5) can actually start from; for the 2020-01 symbols the perp itself is older
 # than the archive.
+#
+# coingecko_id (IB-036, added 2026-09-28) maps each perp to the coin whose market cap the
+# dashboard charts. **Every id was verified by price, not by ticker.** Matching on symbol alone
+# is hopeless — CoinGecko lists 12 coins with the symbol BTC and 21 with PEPE — and matching on
+# the largest market cap among them is WRONG at least once: for ONE it picks `cross-2`
+# ("ONEchain", 81 M USD cap) over `harmony` (39 M), while Binance's ONEUSDT perp tracks Harmony.
+# The check that settles it is the price: each perp's mark against the coin's spot, allowing for
+# the 1000x prefix on 1000PEPEUSDT. All 30 agree within 1 % on 2026-09-28 except ONE, which
+# agrees with harmony (0.0025139 vs 0.00260048) and is off by 60x against cross-2.
+# Re-run that check when this list is revised.
 
 signal_set: [BTCUSDT, ETHUSDT, SOLUSDT]        # stage-1 playbooks evaluate only these
 
@@ -17,6 +27,7 @@ symbols:
   - id: BTCUSDT
     base: BTC
     quote: USDT
+    coingecko_id: bitcoin
     binance_perp: BTCUSDT
     binance_spot: BTCUSDT
     bybit_linear: BTCUSDT
@@ -26,6 +37,7 @@ symbols:
   - id: ETHUSDT
     base: ETH
     quote: USDT
+    coingecko_id: ethereum
     binance_perp: ETHUSDT
     binance_spot: ETHUSDT
     bybit_linear: ETHUSDT
@@ -35,6 +47,7 @@ symbols:
   - id: ZECUSDT
     base: ZEC
     quote: USDT
+    coingecko_id: zcash
     binance_perp: ZECUSDT
     binance_spot: ZECUSDT
     bybit_linear: ZECUSDT
@@ -44,6 +57,7 @@ symbols:
   - id: SOLUSDT
     base: SOL
     quote: USDT
+    coingecko_id: solana
     binance_perp: SOLUSDT
     binance_spot: SOLUSDT
     bybit_linear: SOLUSDT
@@ -53,6 +67,7 @@ symbols:
   - id: XRPUSDT
     base: XRP
     quote: USDT
+    coingecko_id: ripple
     binance_perp: XRPUSDT
     binance_spot: XRPUSDT
     bybit_linear: XRPUSDT
@@ -62,6 +77,7 @@ symbols:
   - id: HYPEUSDT
     base: HYPE
     quote: USDT
+    coingecko_id: hyperliquid
     binance_perp: HYPEUSDT
     binance_spot: HYPEUSDT
     bybit_linear: HYPEUSDT
@@ -71,6 +87,7 @@ symbols:
   - id: DOGEUSDT
     base: DOGE
     quote: USDT
+    coingecko_id: dogecoin
     binance_perp: DOGEUSDT
     binance_spot: DOGEUSDT
     bybit_linear: DOGEUSDT
@@ -80,6 +97,7 @@ symbols:
   - id: NEARUSDT
     base: NEAR
     quote: USDT
+    coingecko_id: near
     binance_perp: NEARUSDT
     binance_spot: NEARUSDT
     bybit_linear: NEARUSDT
@@ -89,6 +107,7 @@ symbols:
   - id: UNIUSDT
     base: UNI
     quote: USDT
+    coingecko_id: uniswap
     binance_perp: UNIUSDT
     binance_spot: UNIUSDT
     bybit_linear: UNIUSDT
@@ -98,6 +117,7 @@ symbols:
   - id: BNBUSDT
     base: BNB
     quote: USDT
+    coingecko_id: binancecoin
     binance_perp: BNBUSDT
     binance_spot: BNBUSDT
     bybit_linear: BNBUSDT
@@ -107,6 +127,7 @@ symbols:
   - id: SUIUSDT
     base: SUI
     quote: USDT
+    coingecko_id: sui
     binance_perp: SUIUSDT
     binance_spot: SUIUSDT
     bybit_linear: SUIUSDT
@@ -116,6 +137,7 @@ symbols:
   - id: ENAUSDT
     base: ENA
     quote: USDT
+    coingecko_id: ethena
     binance_perp: ENAUSDT
     binance_spot: ENAUSDT
     bybit_linear: ENAUSDT
@@ -125,6 +147,7 @@ symbols:
   - id: 1000PEPEUSDT
     base: PEPE
     quote: USDT
+    coingecko_id: pepe
     binance_perp: 1000PEPEUSDT
     binance_spot: PEPEUSDT
     bybit_linear: 1000PEPEUSDT
@@ -134,6 +157,7 @@ symbols:
   - id: ARBUSDT
     base: ARB
     quote: USDT
+    coingecko_id: arbitrum
     binance_perp: ARBUSDT
     binance_spot: ARBUSDT
     bybit_linear: ARBUSDT
@@ -143,6 +167,7 @@ symbols:
   - id: WLDUSDT
     base: WLD
     quote: USDT
+    coingecko_id: worldcoin-wld
     binance_perp: WLDUSDT
     binance_spot: WLDUSDT
     bybit_linear: WLDUSDT
@@ -152,6 +177,7 @@ symbols:
   - id: ADAUSDT
     base: ADA
     quote: USDT
+    coingecko_id: cardano
     binance_perp: ADAUSDT
     binance_spot: ADAUSDT
     bybit_linear: ADAUSDT
@@ -161,6 +187,7 @@ symbols:
   - id: PUMPUSDT
     base: PUMP
     quote: USDT
+    coingecko_id: pump-fun
     binance_perp: PUMPUSDT
     binance_spot: PUMPUSDT
     # bybit_linear: not listed on Bybit linear (2026-09-28)
@@ -170,6 +197,7 @@ symbols:
   - id: LINKUSDT
     base: LINK
     quote: USDT
+    coingecko_id: chainlink
     binance_perp: LINKUSDT
     binance_spot: LINKUSDT
     bybit_linear: LINKUSDT
@@ -179,6 +207,7 @@ symbols:
   - id: TAOUSDT
     base: TAO
     quote: USDT
+    coingecko_id: bittensor
     binance_perp: TAOUSDT
     binance_spot: TAOUSDT
     bybit_linear: TAOUSDT
@@ -188,6 +217,7 @@ symbols:
   - id: TRUMPUSDT
     base: TRUMP
     quote: USDT
+    coingecko_id: official-trump
     binance_perp: TRUMPUSDT
     binance_spot: TRUMPUSDT
     bybit_linear: TRUMPUSDT
@@ -197,6 +227,7 @@ symbols:
   - id: AVAXUSDT
     base: AVAX
     quote: USDT
+    coingecko_id: avalanche-2
     binance_perp: AVAXUSDT
     binance_spot: AVAXUSDT
     bybit_linear: AVAXUSDT
@@ -206,6 +237,7 @@ symbols:
   - id: MARSCOINUSDT
     base: MARSCOIN
     quote: USDT
+    coingecko_id: marscoin-4
     binance_perp: MARSCOINUSDT
     binance_spot: MARSCOINUSDT
     bybit_linear: MARSCOINUSDT
@@ -215,6 +247,7 @@ symbols:
   - id: BCHUSDT
     base: BCH
     quote: USDT
+    coingecko_id: bitcoin-cash
     binance_perp: BCHUSDT
     binance_spot: BCHUSDT
     bybit_linear: BCHUSDT
@@ -224,6 +257,7 @@ symbols:
   - id: FILUSDT
     base: FIL
     quote: USDT
+    coingecko_id: filecoin
     binance_perp: FILUSDT
     binance_spot: FILUSDT
     bybit_linear: FILUSDT
@@ -233,6 +267,7 @@ symbols:
   - id: ONDOUSDT
     base: ONDO
     quote: USDT
+    coingecko_id: ondo-finance
     binance_perp: ONDOUSDT
     binance_spot: ONDOUSDT
     bybit_linear: ONDOUSDT
@@ -242,6 +277,7 @@ symbols:
   - id: LTCUSDT
     base: LTC
     quote: USDT
+    coingecko_id: litecoin
     binance_perp: LTCUSDT
     binance_spot: LTCUSDT
     bybit_linear: LTCUSDT
@@ -251,6 +287,7 @@ symbols:
   - id: DASHUSDT
     base: DASH
     quote: USDT
+    coingecko_id: dash
     binance_perp: DASHUSDT
     binance_spot: DASHUSDT
     bybit_linear: DASHUSDT
@@ -260,6 +297,7 @@ symbols:
   - id: ONEUSDT
     base: ONE
     quote: USDT
+    coingecko_id: harmony
     binance_perp: ONEUSDT
     binance_spot: ONEUSDT
     # bybit_linear: not listed on Bybit linear (2026-09-28)
@@ -269,6 +307,7 @@ symbols:
   - id: AAVEUSDT
     base: AAVE
     quote: USDT
+    coingecko_id: aave
     binance_perp: AAVEUSDT
     binance_spot: AAVEUSDT
     bybit_linear: AAVEUSDT
@@ -278,6 +317,7 @@ symbols:
   - id: QNTUSDT
     base: QNT
     quote: USDT
+    coingecko_id: quant-network
     binance_perp: QNTUSDT
     binance_spot: QNTUSDT
     bybit_linear: QNTUSDT

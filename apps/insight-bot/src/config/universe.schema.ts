@@ -18,6 +18,9 @@ export const UniverseSymbolSchema = z
     binance_spot: z.string().min(1).optional(),
     bybit_linear: z.string().min(1).optional(),
     okx_swap: z.string().min(1).optional(),
+    // IB-036: the CoinGecko coin whose market cap the dashboard charts. Optional — a perp with no
+    // listed coin simply has no market-cap series, never a zero one (the §2.3 rule again).
+    coingecko_id: z.string().min(1).optional(),
     // A `date` in SQL (§3.2). yaml parses an unquoted 2020-01-01 to a JS Date, so accept either
     // and normalise to the ISO day — the value is a calendar day, never an instant.
     listed_perp: z.union([z.string(), z.date()]).transform(toIsoDay),

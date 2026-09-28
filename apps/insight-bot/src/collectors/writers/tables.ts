@@ -257,3 +257,63 @@ export function collectorGapTuple(row: CollectorGapRow): unknown[] {
     row.gapFrom, row.gapTo, row.expected, row.repaired ?? 0, row.error ?? null, row.detectedAt,
   ];
 }
+
+// ---------------------------------------------------------------------------------------------
+// IB-036 — market context (§10). Small, unpartitioned series; forward-only for market_cap_global.
+// ---------------------------------------------------------------------------------------------
+
+export interface FearGreedWriteRow {
+  day: string;
+  value: number;
+  classification: string;
+  fetchedAt: Date;
+}
+
+export const FEAR_GREED: TableSpec = {
+  table: 'fear_greed',
+  columns: ['day', 'value', 'classification', 'fetched_at'],
+  conflict: ['day'],
+};
+
+export function fearGreedTuple(row: FearGreedWriteRow): unknown[] {
+  return [row.day, row.value, row.classification, row.fetchedAt];
+}
+
+export interface MarketCapGlobalWriteRow {
+  ts: Date;
+  totalUsd: number;
+  btcPct?: number | null;
+  ethPct?: number | null;
+  dominance: Record<string, number>;
+  fetchedAt: Date;
+}
+
+export const MARKET_CAP_GLOBAL: TableSpec = {
+  table: 'market_cap_global',
+  columns: ['ts', 'total_usd', 'btc_pct', 'eth_pct', 'dominance', 'fetched_at'],
+  conflict: ['ts'],
+};
+
+export function marketCapGlobalTuple(row: MarketCapGlobalWriteRow): unknown[] {
+  // `dominance` is jsonb: pg takes the object through as JSON, so it is stringified here once
+  // rather than relying on the driver's object handling.
+  return [row.ts, row.totalUsd, row.btcPct ?? null, row.ethPct ?? null, JSON.stringify(row.dominance), row.fetchedAt];
+}
+
+export interface MarketCapCoinWriteRow {
+  day: string;
+  coin: string;
+  capUsd?: number | null;
+  priceUsd?: number | null;
+  fetchedAt: Date;
+}
+
+export const MARKET_CAP_COIN: TableSpec = {
+  table: 'market_cap_coin',
+  columns: ['day', 'coin', 'cap_usd', 'price_usd', 'fetched_at'],
+  conflict: ['day', 'coin'],
+};
+
+export function marketCapCoinTuple(row: MarketCapCoinWriteRow): unknown[] {
+  return [row.day, row.coin, row.capUsd ?? null, row.priceUsd ?? null, row.fetchedAt];
+}

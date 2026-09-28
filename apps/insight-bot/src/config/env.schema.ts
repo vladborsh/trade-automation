@@ -59,6 +59,11 @@ export const EnvSchema = z.object({
   // How far back the collector seeds its diff picture from calendar_events at boot.
   CALENDAR_CACHE_LOOKBACK_DAYS: z.coerce.number().int().positive().default(30),
 
+  // §10 (IB-036) — the two keyless market-context sources. No key is used or needed; the
+  // endpoints that require one (/global/market_cap_chart, market_chart?days=max) are not called.
+  FNG_BASE_URL: z.string().default('https://api.alternative.me'),
+  COINGECKO_BASE_URL: z.string().default('https://api.coingecko.com'),
+
   // §6.2 — the watchdog alerts once when a stream has been silent for this many minutes.
   WATCHDOG_SILENCE_MIN: z.coerce.number().int().positive().default(3),
   // brief §1 — the per-user daily alert budget the gate enforces (§8.5).
