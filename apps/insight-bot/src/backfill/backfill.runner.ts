@@ -28,7 +28,9 @@ import {
 } from './calendar-range';
 import { fetchFundingMonth, fetchKlineDay, fetchKlineMonth, fetchMetricsDay, BINANCE } from './archive-sources';
 import { BybitRest } from '../collectors/bybit/rest';
-import { binanceFundingRange, binanceKlineRange, okxFundingFloor, okxFundingHistory, type FetchLike } from './rest-tail';
+import { settlementRowsFromHistory } from '../collectors/okx/mappers';
+import { OkxRest } from '../collectors/okx/okx-rest';
+import { binanceFundingRange, binanceKlineRange, okxFundingFloor, OKX_REST_BASE_URL, type FetchLike } from './rest-tail';
 
 export const ARCHIVE_PARALLEL = 4;
 
@@ -232,8 +234,20 @@ export class BackfillRunner {
 
     if (this.options.fetchImpl) {
       const writer = new BatchWriter<t.FundingSettlementRow>(this.options.db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple);
-      const { rows, reachedWall } = await okxFundingHistory(this.options.fetchImpl, instId, floorMs, this.now().getTime());
-      await this.write(writer, rows, 'okx funding');
+      // IB-BUG-003: one OKX implementation. The venue's paging, its error handling and its
+      // retention edge live in `OkxRest`; this call replaces the stand-alone copy IB-012 carried
+      // while IB-009 was in flight.
+      const rest = new OkxRest({ baseUrl: OKX_REST_BASE_URL, fetchImpl: this.options.fetchImpl as never });
+      const { rows, reachedWall } = await rest.fundingHistory(instId, { stopAtMs: floorMs });
+
+      // IB-012 skipped a row whose rate would not parse rather than failing the whole backfill.
+      // That behaviour is preserved — a 97-day run across 30 instruments should not die on one
+      // malformed row — but it is no longer silent.
+      const usable = rows.filter((row) => Number.isFinite(Number(row.realizedRate ?? row.fundingRate)));
+      if (usable.length !== rows.length) {
+        this.logger.warn(`  okx ${instId}: ${rows.length - usable.length} row(s) with an unparseable rate skipped`);
+      }
+      await this.write(writer, settlementRowsFromHistory(usable), 'okx funding');
       if (reachedWall) this.logger.log(`  okx ${instId}: reached the venue's ~97-day wall, as expected`);
     }
     return this.coverage(instId, 'funding_okx', SERIES_TABLES.funding, filter, from, monthOf(this.today()), servedFrom);

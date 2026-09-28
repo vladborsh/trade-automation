@@ -59,7 +59,7 @@ describe('fundingHistory paging', () => {
     const second = page(newest - 199 * EIGHT_HOURS, 100);
     const f = fakeFetch([{ body: first }, { body: second }, { body: { code: '0', data: [] } }]);
 
-    const rows = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('BTC-USDT-SWAP');
+    const { rows } = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('BTC-USDT-SWAP');
 
     expect(f.urls[0]).toContain(`limit=${FUNDING_PAGE_LIMIT}`);
     expect(f.urls[0]).not.toContain('after=');
@@ -71,7 +71,7 @@ describe('fundingHistory paging', () => {
 
   it('stops at an empty page', async () => {
     const f = fakeFetch([{ body: { code: '0', data: [] } }]);
-    expect(await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X')).toEqual([]);
+    expect((await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X')).rows).toEqual([]);
     expect(f.calls()).toBe(1);
   });
 
@@ -89,7 +89,7 @@ describe('fundingHistory paging', () => {
       oldest -= 10 * EIGHT_HOURS;
       return { ok: true, status: 200, json: async () => page(oldest, 10), text: async () => '' };
     }) as unknown as typeof fetch;
-    const rows = await new OkxRest({ baseUrl: BASE, fetchImpl: impl }).fundingHistory('X');
+    const { rows } = await new OkxRest({ baseUrl: BASE, fetchImpl: impl }).fundingHistory('X');
     expect(rows.length).toBeLessThanOrEqual(MAX_FUNDING_PAGES * 10);
   });
 
@@ -97,7 +97,7 @@ describe('fundingHistory paging', () => {
     const newer = page(1_700_000_000_000, 10);
     const overlapping = page(1_700_000_000_000 - 5 * EIGHT_HOURS, 10);
     const f = fakeFetch([{ body: newer }, { body: overlapping }, { body: { code: '0', data: [] } }]);
-    const rows = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X');
+    const { rows } = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X');
     expect(new Set(rows.map((r) => r.fundingTime)).size).toBe(rows.length);
     expect(rows).toEqual([...rows].sort((a, b) => Number(a.fundingTime) - Number(b.fundingTime)));
   });
@@ -105,9 +105,52 @@ describe('fundingHistory paging', () => {
   it('reports each page to the caller, for pacing', async () => {
     const f = fakeFetch([{ body: page(1_700_000_000_000, 10) }, { body: { code: '0', data: [] } }]);
     const seen: number[] = [];
-    await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X', (rows) => {
-      seen.push(rows.length);
+    await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X', {
+      onPage: (rows) => {
+        seen.push(rows.length);
+      },
     });
     expect(seen).toEqual([10]);
+  });
+});
+
+describe('the folded IB-012 contract (IB-BUG-003)', () => {
+  const SLOT = 8 * 60 * 60 * 1000;
+  const now = 1_790_000_000_000;
+
+  it('drops rows older than stopAtMs and stops walking there', async () => {
+    const floor = now - 10 * SLOT;
+    const f = fakeFetch([{ body: page(now - 19 * SLOT, 20) }, { body: { code: '0', data: [] } }]);
+    const { rows, reachedWall } = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X', {
+      stopAtMs: floor,
+    });
+
+    expect(rows.every((r) => Number(r.fundingTime) >= floor)).toBe(true);
+    // Stopped at OUR floor, not the venue's wall — the distinction IB-012 logs.
+    expect(reachedWall).toBe(false);
+  });
+
+  it('reports reachedWall when the VENUE runs out before the floor', async () => {
+    const f = fakeFetch([{ body: page(now - 4 * SLOT, 5) }, { body: { code: '0', data: [] } }]);
+    const { reachedWall } = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X', {
+      stopAtMs: now - 10_000 * SLOT, // a floor far beyond anything the venue holds
+    });
+    expect(reachedWall).toBe(true);
+  });
+
+  it('reports reachedWall when a page stops advancing above the floor', async () => {
+    const same = page(now - 4 * SLOT, 5);
+    const f = fakeFetch([{ body: same }, { body: same }]);
+    const { reachedWall } = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X', {
+      stopAtMs: now - 10_000 * SLOT,
+    });
+    expect(reachedWall).toBe(true);
+  });
+
+  it('walks to the wall when no floor is given — what the collector wants', async () => {
+    const f = fakeFetch([{ body: page(now - 9 * SLOT, 10) }, { body: { code: '0', data: [] } }]);
+    const { rows, reachedWall } = await new OkxRest({ baseUrl: BASE, fetchImpl: f.impl }).fundingHistory('X');
+    expect(rows).toHaveLength(10);
+    expect(reachedWall).toBe(true);
   });
 });

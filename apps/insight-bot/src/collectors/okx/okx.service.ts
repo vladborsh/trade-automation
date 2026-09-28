@@ -150,7 +150,7 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
     let total = 0;
     const depths: string[] = [];
     for (const instId of instIds) {
-      const rows = await rest.fundingHistory(instId);
+      const { rows } = await rest.fundingHistory(instId);
       if (rows.length === 0) {
         depths.push(`${instId}: none served`);
         continue;

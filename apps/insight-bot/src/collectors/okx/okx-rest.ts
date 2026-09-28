@@ -59,31 +59,72 @@ export class OkxRest {
   }
 
   /**
-   * Settled funding, newest page first, walking back with `after` until the venue runs out —
-   * "boot backfill as far as served, depth recorded" (the task). Stops on an empty page, on a
-   * page that does not go further back (which would loop), and at `MAX_FUNDING_PAGES`.
+   * Settled funding, newest page first, walking back with `after` until the caller's floor or the
+   * venue's own wall — whichever comes first.
    *
-   * Returns rows oldest-first, de-duplicated on `fundingTime`.
+   * **IB-BUG-003 folded IB-012's `okxFundingHistory` in here**, so the venue's paging, error
+   * handling and retention edge live in one place. That copy existed because IB-012 needed this
+   * endpoint while IB-009 was still in flight; its behaviour is preserved exactly, including the
+   * two things callers depend on:
+   *
+   * - **`stopAtMs`** — rows older than the floor are dropped and the walk stops there. Without a
+   *   floor the walk runs to the venue's wall, which is what the collector wants.
+   * - **`reachedWall`** — true when the VENUE ran out of history, false when the walk stopped at
+   *   the caller's own floor. IB-012 logs the difference, and the two are not interchangeable:
+   *   a floor set inside the wall (its `OKX_FUNDING_DAYS = 97`, against a wall measured at ~98
+   *   days) means the usual outcome is `false`.
+   *
+   * `after` is **exclusive** (measured 2026-09-28: page 2 with `after=<page 1's oldest>` does not
+   * repeat that row), so neither this nor the copy it replaces could double-count. The de-dup on
+   * `fundingTime` below is belt-and-braces.
+   *
+   * Rows come back oldest-first.
    */
-  async fundingHistory(instId: string, onPage?: (rows: OkxFundingHistoryRow[]) => void | Promise<void>): Promise<OkxFundingHistoryRow[]> {
+  async fundingHistory(
+    instId: string,
+    options: {
+      /** Drop rows older than this and stop walking; omitted = walk to the venue's wall. */
+      stopAtMs?: number;
+      onPage?: (rows: OkxFundingHistoryRow[]) => void | Promise<void>;
+    } = {},
+  ): Promise<{ rows: OkxFundingHistoryRow[]; reachedWall: boolean }> {
+    const stopAtMs = options.stopAtMs ?? Number.NEGATIVE_INFINITY;
     const byTime = new Map<number, OkxFundingHistoryRow>();
     let after: string | undefined;
     let previousOldest = Number.POSITIVE_INFINITY;
+    let reachedWall = false;
 
     for (let page = 0; page < MAX_FUNDING_PAGES; page += 1) {
       const params: Record<string, string> = { instId, limit: String(FUNDING_PAGE_LIMIT) };
       if (after !== undefined) params.after = after;
       const rows = await this.get<OkxFundingHistoryRow>('/api/v5/public/funding-rate-history', params);
-      if (rows.length === 0) break;
-      await onPage?.(rows);
+      if (rows.length === 0) {
+        reachedWall = true; // the venue served nothing more
+        break;
+      }
+      await options.onPage?.(rows);
 
-      for (const row of rows) byTime.set(Number(row.fundingTime), row);
+      for (const row of rows) {
+        const ms = Number(row.fundingTime);
+        if (Number.isFinite(ms) && ms >= stopAtMs) byTime.set(ms, row);
+      }
+
       const oldest = Math.min(...rows.map((row) => Number(row.fundingTime)));
-      if (!Number.isFinite(oldest) || oldest >= previousOldest) break;
+      if (!Number.isFinite(oldest)) break;
+      if (oldest <= stopAtMs || oldest >= previousOldest) {
+        // Past the floor, or the page stopped advancing. The second case is the venue declining
+        // to go further back, which IS the wall — but only if we had not already reached our own
+        // floor, hence the comparison rather than a bare `true`.
+        reachedWall = oldest > stopAtMs;
+        break;
+      }
       previousOldest = oldest;
       after = String(oldest);
     }
 
-    return [...byTime.values()].sort((a, b) => Number(a.fundingTime) - Number(b.fundingTime));
+    return {
+      rows: [...byTime.values()].sort((a, b) => Number(a.fundingTime) - Number(b.fundingTime)),
+      reachedWall,
+    };
   }
 }

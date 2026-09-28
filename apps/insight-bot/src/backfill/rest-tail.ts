@@ -124,42 +124,12 @@ export async function binanceFundingRange(
 }
 
 /**
- * OKX settled funding, paged backwards from now. Stops at the venue's wall (an empty page) or
- * when it reaches `stopAtMs`; the wall is expected at ~97 days and is not an error.
+ * IB-BUG-003 — the stand-alone `okxFundingHistory` that lived here is gone: the backfill now
+ * calls `OkxRest.fundingHistory` (IB-009), so the venue's paging, error handling and retention
+ * edge have one implementation. This file keeps only the floor, which is the backfill's own
+ * policy rather than the venue's behaviour.
  */
-export async function okxFundingHistory(
-  fetchImpl: FetchLike,
-  instId: string,
-  stopAtMs: number,
-  now = Date.now(),
-): Promise<{ rows: FundingSettlementRow[]; reachedWall: boolean }> {
-  const symbol = instId;
-  const rows: FundingSettlementRow[] = [];
-  let before = now;
-  let reachedWall = false;
-
-  for (let page = 0; page < 40; page++) {
-    const url = `https://www.okx.com/api/v5/public/funding-rate-history?instId=${instId}&before=0&after=${before}&limit=100`;
-    const response = await fetchImpl(url, { signal: AbortSignal.timeout(20_000) });
-    if (!response.ok) throw new Error(`okx funding HTTP ${response.status} for ${instId}`);
-    const body = (await response.json()) as { data?: Array<{ fundingTime: string; realizedRate?: string; fundingRate?: string }> };
-    const data = body.data ?? [];
-    if (data.length === 0) { reachedWall = true; break; }
-
-    let oldest = before;
-    for (const row of data) {
-      const ms = Number(row.fundingTime);
-      const rate = Number(row.realizedRate ?? row.fundingRate);
-      if (!Number.isFinite(ms) || !Number.isFinite(rate)) continue;
-      oldest = Math.min(oldest, ms);
-      if (ms < stopAtMs) continue;
-      rows.push({ venue: 'okx', symbol, fundingTime: new Date(ms), rate, markPrice: null, source: 'rest' });
-    }
-    if (oldest <= stopAtMs || oldest >= before) { reachedWall = oldest > stopAtMs; break; }
-    before = oldest;
-  }
-  return { rows, reachedWall };
-}
+export const OKX_REST_BASE_URL = 'https://www.okx.com';
 
 /** The earliest settlement OKX can still serve, as a timestamp. */
 export function okxFundingFloor(now = Date.now()): number {
