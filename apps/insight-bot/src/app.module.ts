@@ -7,6 +7,7 @@ import { DeliveryModule } from './delivery/delivery.module';
 import { CollectorsModule } from './collectors/collectors.module';
 import { OpsModule } from './ops/ops.module';
 import { CalendarModule } from './collectors/calendar/calendar.module';
+import { DeriveModule } from './derive/derive.module';
 
 /**
  * architecture/insight-bot-system-design.md §2.1. IB-003 wires the three modules the rest hang
@@ -16,10 +17,10 @@ import { CalendarModule } from './collectors/calendar/calendar.module';
  * /health and /metrics without a database, which is IB-003's rule (IB-BUG-001 fixed the calendar
  * side, which had imported `WritersModule` statically). `CALENDAR_ENABLED=false` is a separate
  * switch that leaves the module wired and stops the polling. The remaining `collectors/`,
- * `derive/`, `features/`, `regime/`, `playbooks/`, `gate/`, `delivery/`, `tracker/` and `users/`
+ * `features/`, `regime/`, `playbooks/`, `gate/`, `delivery/`, `tracker/` and `users/`
  * arrive with their own tasks.
  */
 @Module({
-  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeliveryModule.register(), WebModule.register(), DashboardStaticModule.register()],
+  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeriveModule.register(), DeliveryModule.register(), WebModule.register(), DashboardStaticModule.register()],
 })
 export class AppModule {}

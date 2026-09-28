@@ -12,7 +12,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "report": "node dist/ops/gap-report.cli.js",
     "backfill": "node dist/backfill/backfill.cli.js",
-    "backfill:verify": "node dist/backfill/verify.cli.js"
+    "backfill:verify": "node dist/backfill/verify.cli.js",
+    "derive": "node dist/derive/derive.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",
