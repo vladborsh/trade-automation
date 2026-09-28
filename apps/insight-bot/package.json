@@ -27,6 +27,7 @@
     "@trade-automation/binance-client": "0.1.0",
     "@trade-automation/contracts": "0.1.0",
     "@trade-automation/market-data-core": "0.1.0",
+    "fast-xml-parser": "^4.5.0",
     "grammy": "^1.46.0",
     "js-yaml": "^4.1.0",
     "nestjs-pino": "^4.1.0",
