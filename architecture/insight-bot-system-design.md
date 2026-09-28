@@ -205,7 +205,7 @@ liquidations(id bigserial, venue, symbol, ts, side CHECK IN ('long','short'),   
         UNIQUE (venue, symbol, ts, side, price, qty))              -- D6; Binance undercount documented here
         -- write rule: INSERT … ON CONFLICT DO NOTHING (events are immutable; first writer's `source` stands)
 calendar_events(id text, revision int, source, series_id text, event_time, currency, title, impact,
-        status text NOT NULL DEFAULT 'scheduled',                  -- scheduled | cancelled | rescheduled (§16.7)
+        status text NOT NULL DEFAULT 'scheduled',                  -- scheduled | cancelled (§16.7)
         forecast, previous, actual, actual_source text NULL, fetched_at,
         PK (id, revision), INDEX (impact, currency, event_time))   -- every revision kept, as in signal-server
 collector_gaps(id bigserial, stream text, venue, market NULL, symbol NULL, gap_from, gap_to,
@@ -964,3 +964,13 @@ additive migration 003 with the `(impact, currency, event_time)` index; §3.3
 corrected. §9.3 governs the window: ±60 min and a T−60 notice; the "next
 24 h" in IB-010's done-line was a smoke query, not a spec, and the shared
 windowed query dev-1 ships is the right shape.
+
+Two further calls from `reports/dev-1-IB-010.md`, ratified so they are not
+re-litigated: (a) **hot poll cadence is ±20 min** around a high-impact event,
+as signal-server and `economic-calendar.md` §3.2 have it — IB-010's "within
+2 h" was my transcription error; (b) **`status` values are `scheduled` and
+`cancelled` only.** A released event stays `scheduled` (the ±60 min window
+still covers the hour after the print, so a released row must remain inside
+the veto's positive filter); ForexFactory's `removed` maps to `cancelled`;
+`rescheduled` is never written because the feed expresses a move as a new id
+plus a removal with nothing linking them. §3.3's comment is corrected.
