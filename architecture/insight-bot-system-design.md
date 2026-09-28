@@ -1085,8 +1085,14 @@ updated (it is unassigned).
 
 ### 16.11 Standing rule — a measured venue claim needs repetition before it becomes design text (2026-09-28)
 
-From BUG-022: a venue fact enters a mapper header, a task description or
-this design only with **how many times it was observed and when** (≥ 5
-repetitions at each boundary, on at least two occasions minutes apart when
-the fact is a limit or an edge); one probe is a note, not a rule. Written
-into `AGENTS.md` so it binds every agent, not only this stream.
+From BUG-022: a venue **number** (limit, edge, retention window, lag, rate)
+enters a mapper header, a task description or this design only with **how
+many times it was observed and when** (≥ 5 repetitions at each boundary, on
+two occasions minutes apart); one probe is a note, not a rule. It does
+**not** bind payload shapes or field names: those are pinned by a committed
+fixture a spec parses (fails the build the day the venue changes) plus a
+runtime assertion where the shape carries an invariant (`forceOrder`,
+`posSide`). A number drifts and a fixture cannot see it; a shape does not
+drift and a fixture catches it immediately. Written into `AGENTS.md` so it
+binds every agent, not only this stream (wording: dev-2 via the Tech Lead,
+2026-09-28).

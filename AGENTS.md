@@ -74,9 +74,16 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   pointed at that slot's insight bot on `:30x5`.
 - Binance REST budget is 2400 weight/min and we use ~1 %. Any design that adds a polling
   loop against a venue must state its weight per minute.
-- **A measured venue fact is a rule only after repetition.** Before a limit, edge, retention
-  window or payload convention goes into a code comment, a task or an architecture note, say
-  how many times you observed it and when (≥ 5 repetitions per boundary, on two occasions
-  minutes apart for anything that can drift). One probe is a note marked as such. Established
-  2026-09-28 after a single-probe retention claim was ratified into design text and was wrong
-  (`reports/dev-2-BUG-022.md`).
+- **A measured venue fact is a rule only after repetition.** Before a **number** — a limit, an
+  edge, a retention window, a lag, a rate — goes into a code comment, a task or an architecture
+  note, say how many times you observed it and when (≥ 5 repetitions per boundary, on two
+  occasions minutes apart: these drift, which is how a single-probe retention claim got into
+  design text on 2026-09-28 and was wrong, `reports/dev-2-BUG-022.md`). One probe is a note
+  marked as such.
+  **This does not bind payload shapes or field names.** Pin those with a committed fixture that
+  a spec parses: that fails the build the day the venue changes, rather than the next time
+  someone thinks to look. Where a shape carries a behavioural invariant (Binance's `forceOrder`
+  and OKX's `posSide` both encode *which side was liquidated*), assert it at runtime so a venue
+  that changes its convention throws instead of silently inverting your data. In one sentence:
+  a number drifts and a fixture cannot see it; a shape does not drift and a fixture catches it
+  immediately.
