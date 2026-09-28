@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subscription } from 'rxjs';
-import { Candle, Instrument, Timeframe, Venue } from '@trade-automation/contracts';
+import { Candle, Instrument, InstrumentId, TIMEFRAME_MS, Timeframe, Venue } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { CANDLE_STORE, CandleStore } from '../storage/candle-store.port';
 import { WriteBuffer } from '../storage/write-buffer.service';
@@ -237,18 +237,62 @@ export class IngestionService implements OnApplicationBootstrap, OnModuleDestroy
       const existing = this.cache.query(instrument.id, candle.timeframe, candle.openTime, candle.openTime)[0];
       const isOverlapPair =
         existing && existing.source !== candle.source && (existing.source === 'venue-native' || candle.source === 'venue-native');
-      if (isOverlapPair && this.candlesDisagree(existing, candle)) {
-        this.metrics.venueNativeMismatchCount.inc({ instrument: instrument.id, timeframe: candle.timeframe });
-        this.logger.warn(
-          `venue-native/resampled mismatch for ${instrument.id} ${candle.timeframe}@${new Date(candle.openTime).toISOString()}`,
-        );
+      if (isOverlapPair) {
+        // BUG-023: compare only a COMPLETE resampled bucket. Warm-up backfills about ten 1m bars
+        // and then resamples an hour, so the old check pitted a partial bucket against a complete
+        // native bar — a guaranteed "mismatch" that said nothing, and fired for BTC and ETH on
+        // 1h/4h/1d every run. A standing false alarm is worse than no alarm: it teaches the
+        // reader to skip the log, taking the real warnings with it.
+        const resampled = existing.source === 'resampled' ? existing : candle;
+        const present = this.oneMinuteBarsIn(instrument.id, resampled.openTime, resampled.timeframe);
+        const expected = TIMEFRAME_MS[resampled.timeframe] / TIMEFRAME_MS['1m'];
+
+        if (present < expected) {
+          this.logger.debug(
+            `venue-native/resampled comparison skipped for ${instrument.id} ${candle.timeframe}` +
+              `@${new Date(candle.openTime).toISOString()}: bucket holds ${present} of ${expected} 1m bars`,
+          );
+        } else if (this.candlesDisagree(existing, candle)) {
+          this.metrics.venueNativeMismatchCount.inc({ instrument: instrument.id, timeframe: candle.timeframe });
+          this.logger.warn(
+            `venue-native/resampled mismatch for ${instrument.id} ${candle.timeframe}@${new Date(candle.openTime).toISOString()} ` +
+              `(complete bucket, ${present} 1m bars)`,
+          );
+        }
       }
     }
     this.cache.upsert(candle);
   }
 
+  /** How many 1m bars the cache holds for a coarse bucket — its completeness (BUG-023). */
+  private oneMinuteBarsIn(instrument: InstrumentId, bucketStart: number, tf: Timeframe): number {
+    const end = bucketStart + TIMEFRAME_MS[tf] - TIMEFRAME_MS['1m'];
+    return this.cache.query(instrument, '1m', bucketStart, end).length;
+  }
+
+  /**
+   * BUG-023 — the bound is what was measured, not a round number.
+   *
+   * dev-1's IB-014 compared 186 venue-native 4h bars against the same hours resampled from stored
+   * 1m data (`reports/dev-1-IB-014-disagreement.md`): **OHLC agreed bit-for-bit on every bar.**
+   * The only residual anywhere was in *volume*, from float summation — worst 2.15e-16 relative,
+   * one ULP — and this check does not compare volume at all.
+   *
+   * So for the four fields below, measured reality is exact agreement, and float representation
+   * noise is ~1e-16. A semantic disagreement — a mis-bucketed bar, a mid-vs-last-trade price —
+   * is at least basis points, 1e-4. 1e-9 sits seven orders above the noise and five below the
+   * smallest difference that could mean anything, so it catches everything real and nothing else.
+   *
+   * **The old bound was 0.1 %, which would have hidden a real 0.05 % error** — five hundred
+   * thousand times the measured disagreement. A tolerance that wide is not a tolerance, it is a
+   * blindfold.
+   *
+   * The measurement is **Binance-only**. If this ever fires for Capital.com, that is new
+   * information about how that venue aggregates, not a reason to widen the bound: measure it and
+   * record what you find, the way IB-014 did here.
+   */
   private candlesDisagree(a: Candle, b: Candle): boolean {
-    const TOLERANCE = 0.001; // 0.1% relative — a venue's own coarse aggregation vs. our 1m resample can differ slightly (rounding, mid-vs-last-trade) without being "wrong"
+    const TOLERANCE = 1e-9;
     const rel = (x: number, y: number) => Math.abs(x - y) / Math.max(Math.abs(x), Math.abs(y), 1e-9);
     return rel(a.open, b.open) > TOLERANCE || rel(a.high, b.high) > TOLERANCE || rel(a.low, b.low) > TOLERANCE || rel(a.close, b.close) > TOLERANCE;
   }

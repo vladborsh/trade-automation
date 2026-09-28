@@ -96,7 +96,30 @@ function buildService(adapter: VenueAdapter) {
 }
 
 describe('IngestionService (architecture/live-signal-server.md §12.3, §12.5)', () => {
+  /**
+   * BUG-023 — a 1h bucket is only compared when all 60 of its 1m bars are present. Seeding them
+   * is what makes a spec about *disagreement* rather than about *incompleteness*.
+   */
+  const seedComplete1h = (cache: CandleCache, openTime: number, price = 100): void => {
+    for (let i = 0; i < 60; i += 1) {
+      cache.upsert({
+        instrument: instrument.id,
+        timeframe: '1m',
+        openTime: openTime + i * 60_000,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume: 1,
+        closed: true,
+        source: 'venue-native',
+      });
+    }
+  };
+
   describe('§12.3 Phase 2 — deepenHistoryAsync backward extension', () => {
+
+
     it('flips backfillStatus from deepening to complete and grows 1m coverage backward', async () => {
       const { service, cache, status } = buildService(denseAdapter());
       const now = Date.UTC(2026, 2, 10, 0, 0, 0);
@@ -187,8 +210,10 @@ describe('IngestionService (architecture/live-signal-server.md §12.3, §12.5)',
       };
       const { service, cache, metrics } = buildService(adapter);
 
-      // Seed the cache with an already-resampled 1h bar at the same slot (as if 1m backfill had
-      // already resampled through it).
+      // BUG-023: seed the 60 1m bars too. Without them the bucket is incomplete and the
+      // comparison is skipped by design — this spec is about a genuine disagreement on a
+      // COMPLETE bucket, which is the only case that should ever warn.
+      seedComplete1h(cache, openTime);
       cache.upsert({
         instrument: instrument.id,
         timeframe: '1h',
@@ -216,7 +241,7 @@ describe('IngestionService (architecture/live-signal-server.md §12.3, §12.5)',
       expect(cache.query(instrument.id, '1h', openTime, openTime)[0]).toMatchObject({ source: 'resampled', close: 100 });
     });
 
-    it('does not fire the metric when a venue-native bar and the resampled bar agree within tolerance', async () => {
+    it('does not fire the metric when a complete bucket agrees with the venue-native bar', async () => {
       const openTime = Date.UTC(2026, 0, 1, 0, 0, 0);
       const adapter: VenueAdapter = {
         venue: 'capitalcom',
@@ -227,10 +252,14 @@ describe('IngestionService (architecture/live-signal-server.md §12.3, §12.5)',
                 instrument: instrument.id,
                 timeframe: '1h',
                 openTime,
-                open: 100.02,
-                high: 100.02,
-                low: 100.02,
-                close: 100.02, // within the 0.1% tolerance of 100
+                // BUG-023: this spec used 100.02 — a 0.02 % difference — and called it "within
+                // tolerance". Against the measured reality (OHLC agree bit-for-bit, IB-014) that
+                // is a real disagreement, and the tightened 1e-9 bound now reports it. Agreement
+                // means agreement.
+                open: 100,
+                high: 100,
+                low: 100,
+                close: 100,
                 volume: 1,
                 closed: true,
                 source: 'venue-native',
@@ -243,6 +272,7 @@ describe('IngestionService (architecture/live-signal-server.md §12.3, §12.5)',
         health: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }) as never,
       };
       const { service, cache, metrics } = buildService(adapter);
+      seedComplete1h(cache, openTime);
       cache.upsert({
         instrument: instrument.id,
         timeframe: '1h',
@@ -261,6 +291,58 @@ describe('IngestionService (architecture/live-signal-server.md §12.3, §12.5)',
       ](instrument, adapter);
 
       expect((metrics as { venueNativeMismatchCount: { inc: jest.Mock } }).venueNativeMismatchCount.inc).not.toHaveBeenCalled();
+    });
+
+    it('BUG-023: says nothing about an INCOMPLETE bucket, however far apart the numbers look', async () => {
+      // The standing false alarm: warm-up backfills ~10 1m bars, resamples an hour, and the old
+      // check compared that partial bucket against a complete native bar. It fired for BTC and
+      // ETH on 1h/4h/1d every single run and meant nothing.
+      const openTime = Date.UTC(2026, 0, 1, 0, 0, 0);
+      const adapter: VenueAdapter = {
+        venue: 'capitalcom',
+        fetchCandles: jest.fn(async (_i: Instrument, tf: Timeframe): Promise<Candle[]> =>
+          tf === '1h'
+            ? [{ instrument: instrument.id, timeframe: '1h', openTime, open: 200, high: 200, low: 200, close: 200, volume: 1, closed: true, source: 'venue-native' }]
+            : [],
+        ),
+        streamCandles: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }) as never,
+        health: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }) as never,
+      };
+      const { service, cache, metrics } = buildService(adapter);
+
+      // Ten of sixty 1m bars — exactly the warm-up shape.
+      for (let i = 0; i < 10; i += 1) cache.upsert(bar1m(openTime + i * 60_000, 100));
+      cache.upsert({ instrument: instrument.id, timeframe: '1h', openTime, open: 100, high: 100, low: 100, close: 100, volume: 1, closed: true, source: 'resampled' });
+
+      await (service as unknown as { warmUpNativeCoarse: (i: Instrument, a: VenueAdapter) => Promise<void> })['warmUpNativeCoarse'](instrument, adapter);
+
+      // 100 vs 200 is a 100 % difference and STILL must not warn: the bucket is not comparable.
+      expect((metrics as { venueNativeMismatchCount: { inc: jest.Mock } }).venueNativeMismatchCount.inc).not.toHaveBeenCalled();
+    });
+
+    it('BUG-023: the tightened bound catches the 0.05 % error the old 0.1 % tolerance hid', async () => {
+      // IB-014 measured OHLC agreeing bit-for-bit, so 0.1 % was five hundred thousand times the
+      // real disagreement — wide enough to swallow a genuine 0.05 % error in silence.
+      const openTime = Date.UTC(2026, 0, 1, 0, 0, 0);
+      const adapter: VenueAdapter = {
+        venue: 'capitalcom',
+        fetchCandles: jest.fn(async (_i: Instrument, tf: Timeframe): Promise<Candle[]> =>
+          tf === '1h'
+            ? [{ instrument: instrument.id, timeframe: '1h', openTime, open: 100.05, high: 100.05, low: 100.05, close: 100.05, volume: 1, closed: true, source: 'venue-native' }]
+            : [],
+        ),
+        streamCandles: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }) as never,
+        health: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }) as never,
+      };
+      const { service, cache, metrics } = buildService(adapter);
+      seedComplete1h(cache, openTime);
+      cache.upsert({ instrument: instrument.id, timeframe: '1h', openTime, open: 100, high: 100, low: 100, close: 100, volume: 1, closed: true, source: 'resampled' });
+
+      await (service as unknown as { warmUpNativeCoarse: (i: Instrument, a: VenueAdapter) => Promise<void> })['warmUpNativeCoarse'](instrument, adapter);
+
+      expect((metrics as { venueNativeMismatchCount: { inc: jest.Mock } }).venueNativeMismatchCount.inc).toHaveBeenCalledWith(
+        { instrument: instrument.id, timeframe: '1h' },
+      );
     });
   });
 });
