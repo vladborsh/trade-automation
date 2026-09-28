@@ -27,10 +27,9 @@ export const UniverseSymbolSchema = z
     // IB-031: the dashboard's "top 20" picker. Optional because the file is ALREADY ordered by
     // 30-day quote volume by construction (see its header), so the rank is the position unless
     // a revision wants to state it explicitly.
+    // (coingecko_id is declared above by IB-036, which landed first and needs it for the same
+    // reason — one declaration, not two.)
     volume_rank: z.number().int().positive().optional(),
-    // IB-037: CoinGecko's id for the base asset, for market-cap and dominance joins. Never
-    // guessed from the ticker — absent means we have no mapping.
-    coingecko_id: z.string().min(1).optional(),
   })
   .strict();
 export type UniverseSymbol = z.infer<typeof UniverseSymbolSchema>;
