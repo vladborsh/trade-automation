@@ -3,13 +3,17 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
+    "start": "ng serve chart-client",
+    "build": "ng build chart-client",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "ng test chart-client --watch=false && ng test insight-dashboard --watch=false",
     "mock-server": "tsx watch mock-server/server.ts",
     "mock-server:once": "tsx mock-server/server.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "test:chart-client": "ng test chart-client --watch=false",
+    "test:insight-dashboard": "ng test insight-dashboard --watch=false",
+    "build:insight-dashboard": "ng build insight-dashboard",
+    "start:insight-dashboard": "ng serve insight-dashboard"
   },
   "private": true,
   "packageManager": "npm@11.13.0",

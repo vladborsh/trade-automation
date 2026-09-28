@@ -1,0 +1,22 @@
+.head { display: flex; align-items: baseline; gap: 12px; }
+h1 { font-size: 15px; margin: 0 0 12px; }
+
+button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 2px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+button:disabled { color: var(--muted); cursor: default; }
+
+table { border-collapse: collapse; margin-top: 8px; }
+th, td { padding: 2px 12px 2px 0; text-align: left; font-weight: normal; }
+th { color: var(--muted); }
+
+.muted { color: var(--muted); }
+.error { color: var(--down); }
+tr.empty td { color: var(--down); }
+tr.holes td { color: #d29922; }

@@ -76,7 +76,12 @@ export class LayoutFeedService {
       this.connection.setVenueStatus(frame.instrument, frame.venueStatus, frame.lastClosedCandleTime),
     );
     this.socket.reconnected.subscribe(() => void this.healAllAfterReconnect());
-    this.socket.connect(this.config.get().wsUrl);
+    const { wsUrl } = this.config.get();
+    // IB-030 made `wsUrl` optional for the dashboard, which has no socket. The backtest SPA does,
+    // so a config without it is a misconfigured deployment and must fail loudly here rather than
+    // connect to `undefined`.
+    if (!wsUrl) throw new Error('config.json has no wsUrl: the backtest client needs one to stream');
+    this.socket.connect(wsUrl);
   }
 
   private async rebuild(layout: Layout, tf: Timeframe): Promise<void> {

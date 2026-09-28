@@ -1,14 +1,19 @@
 import { BacktestErrorCodeSchema, type BacktestErrorCode } from '@trade-automation/contracts';
 
 /**
- * A non-2xx REST response. `code` is the contract error code from the `{ error: { code,
- * message } }` envelope (backtest-app-system-design.md §7) when the body carries one, else null
- * — e.g. the auth guard's plain 401 or a validation 400.
+ * A non-2xx REST response. `code` is the contract error code the body carried, else null — e.g.
+ * the auth guard's plain 401 or a validation 400.
+ *
+ * Generic in its code set, defaulting to the backtest app's: `ApiError` on its own still means
+ * exactly what it did (IB-030 changed no backtest call site). The insight dashboard, whose
+ * `/api/web` envelope is a different shape with a different enum, uses `ApiError<WebErrorCode>`
+ * via its own `toWebApiError` — one error class for both apps, neither pretending to be the
+ * other's (insight-bot-web-dashboard.md §3: generalise in place, never fork).
  */
-export class ApiError extends Error {
+export class ApiError<C extends string = BacktestErrorCode> extends Error {
   constructor(
     readonly status: number,
-    readonly code: BacktestErrorCode | null,
+    readonly code: C | null,
     message: string,
   ) {
     super(message);
@@ -16,7 +21,7 @@ export class ApiError extends Error {
   }
 }
 
-/** Builds an ApiError from a response status and its (possibly non-JSON) parsed body. */
+/** Builds an ApiError from a backtest `{ error: { code, message } }` body (§7). */
 export function toApiError(method: string, path: string, status: number, body: unknown): ApiError {
   const envelope = (body as { error?: { code?: unknown; message?: unknown } } | null)?.error;
   const parsed = BacktestErrorCodeSchema.safeParse(envelope?.code);

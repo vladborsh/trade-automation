@@ -1,0 +1,87 @@
+<header class="head">
+  <h1>Health</h1>
+  <button type="button" (click)="load()" [disabled]="loading()">refresh</button>
+</header>
+
+@if (error(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+} @else if (loading()) {
+  <p class="muted">loading…</p>
+} @else {
+  <section>
+    <h2>Streams</h2>
+    @if (degraded().length > 0) {
+      <p class="warn">{{ degraded().length }} stream(s) degraded — serving over REST</p>
+    }
+    <table>
+      <thead>
+        <tr><th>stream</th><th>venue</th><th>mode</th><th>last msg</th><th>reconnects 24h</th><th>open gaps</th></tr>
+      </thead>
+      <tbody>
+        @for (s of streams()?.streams ?? []; track s.id) {
+          <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.venue }}</td>
+            <td [class.degraded]="s.mode === 'degraded'">{{ s.mode }}@if (s.reason) { <span class="muted"> ({{ s.reason }})</span> }</td>
+            <td>{{ age(s.lastMessageAgeSec) }}</td>
+            <td>{{ s.reconnects24h }}</td>
+            <td [class.warn]="s.gapsOpen > 0">{{ s.gapsOpen }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <p class="muted">open gaps total: {{ openGaps() }}</p>
+  </section>
+
+  <section>
+    <h2>Binance REST weight</h2>
+    <!-- Two budgets, metered separately by the venue: futures 2400/min, spot 6000/min (§4.5). -->
+    @for (w of streams()?.weights ?? []; track w.market) {
+      <p>
+        {{ w.market }}: {{ w.used1m }} / {{ w.budget1m }} per min
+        <span class="muted">({{ (w.used1m / w.budget1m * 100).toFixed(1) }}%)</span>
+      </p>
+    } @empty {
+      <p class="muted">no weight reported yet</p>
+    }
+  </section>
+
+  <section>
+    <h2>Daily gap reports</h2>
+    @if (worst().length > 0) {
+      <p class="warn">worst: @for (c of worst(); track c.symbol + c.day) {<span>{{ c.symbol }} {{ c.day }} ({{ c.missing }})</span> }</p>
+    } @else {
+      <p class="muted">nothing missing in the window</p>
+    }
+    <!-- no reports in the window means no grid: a lone `symbol` header over nothing reads as a
+         rendering fault, and the sentence above already says what is true. -->
+    @if ((grid()?.rows ?? []).length > 0) {
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>symbol</th>
+          @for (day of grid()?.days ?? []; track day) { <th class="day">{{ day.slice(5) }}</th> }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of grid()?.rows ?? []; track row.symbol) {
+          <tr>
+            <td>{{ row.symbol }}</td>
+            @for (cell of row.cells; track cell.day) {
+              <td class="cell" [class]="severity(cell)" [title]="cell.missing + ' missing of ' + cell.expected">{{ label(cell) }}</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+    }
+  </section>
+
+  <section>
+    <h2>Database</h2>
+    @if (db(); as d) {
+      <p>size: {{ gigabytes(d.sizeBytes) }}</p>
+      <p>partitions: {{ d.partitionCount }}, prepared through {{ d.partitionHorizon ?? 'none' }}</p>
+    }
+  </section>
+}

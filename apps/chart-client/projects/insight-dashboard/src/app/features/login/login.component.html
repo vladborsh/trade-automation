@@ -1,0 +1,13 @@
+<section class="login">
+  <h1>Insight dashboard</h1>
+  @switch (state()) {
+    @case ('exchanging') { <p class="muted">signing in…</p> }
+    @case ('failed') { <p class="error" role="alert">{{ message() }}</p> }
+    @default {
+      <p class="muted">Open the link the bot sent you with <code>/web</code>.</p>
+      @if (t()) {
+        <button type="button" (click)="exchange()">try again</button>
+      }
+    }
+  }
+</section>

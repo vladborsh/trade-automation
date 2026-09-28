@@ -12,6 +12,15 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
+    /*
+     * IB-030 (design §3, risk §8.1) — the insight-dashboard project imports the backtest SPA's
+     * shared core through this alias instead of copying or forking it. Kept to the pieces that are
+     * genuinely app-agnostic (`ApiError`, `AppConfigService`); anything backtest-specific is
+     * generalised in place with its own spec rather than aliased into the dashboard.
+     */
+    "paths": {
+      "@backtest-core/*": ["./src/app/core/*"]
+    },
     "module": "preserve"
   },
   "angularCompilerOptions": {

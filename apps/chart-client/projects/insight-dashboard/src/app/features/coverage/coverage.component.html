@@ -1,0 +1,28 @@
+<header class="head">
+  <h1>Coverage</h1>
+  <button type="button" (click)="load()" [disabled]="loading()">refresh</button>
+</header>
+
+@if (error(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+} @else if (loading()) {
+  <p class="muted">loading…</p>
+} @else {
+  <p class="muted">{{ summary() }}</p>
+  <table>
+    <thead>
+      <tr><th>symbol</th><th>series</th><th>first</th><th>last</th><th>missing months</th></tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track row.symbol + row.series) {
+        <tr [class]="row.state">
+          <td>{{ row.symbol }}</td>
+          <td>{{ row.series }}</td>
+          <td>{{ row.firstLabel }}</td>
+          <td>{{ row.lastLabel }}</td>
+          <td>{{ row.missingMonths.length ? row.missingMonths.join(', ') : '·' }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

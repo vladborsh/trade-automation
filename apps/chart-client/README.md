@@ -109,3 +109,30 @@ ergonomic per-item/per-frame alias is useful (`InstrumentWithStatus`,
 `core/contracts/derived.ts` as pure type-level projections
 (`InstrumentsResponse[number]`, `Extract<WsServerMessage, {...}>`), not
 duplicated shapes. `mock-server/*.ts` imports the same package.
+
+## The `insight-dashboard` project, and the `@backtest-core/*` alias (IB-030)
+
+`apps/chart-client` holds **two** Angular projects (`angular.json`): `chart-client`, the backtest
+SPA, and `insight-dashboard`, the insight bot's web dashboard (design
+`architecture/insight-bot-web-dashboard.md` §3). They are separate applications with separate
+bundles, `public/config.json` and dev servers — `ng serve insight-dashboard --port 42x5` for your
+slot — that happen to share one workspace so they can share code instead of forking it.
+
+**The dashboard imports the backtest SPA's shared core through a path alias**, never by copying:
+
+```ts
+import { ApiError } from '@backtest-core/api/api-error';
+import { AppConfigService } from '@backtest-core/config/app-config.service';
+```
+
+`@backtest-core/*` maps to `./src/app/core/*` (`tsconfig.json`). The rule that keeps this honest
+(risk §8.1): **alias only what is genuinely app-agnostic.** If a piece turns out to carry backtest
+assumptions, generalise it in place, with its own spec, and let both apps use the generalised
+version — do not fork it into the dashboard, and do not bend the dashboard around it. Two of the
+three pieces IB-030 needed were already agnostic; `AppConfigService` needed one generalisation
+(its config file path is now injectable), which is why it has a spec covering both apps' shapes.
+
+**After pulling any `libs/contracts` change, run `npm install && npm run build` at the repository
+root before you trust a type error.** Both projects compile against `libs/contracts/dist`, so a
+stale `dist` produces errors quoting a union or export list that disagrees with the source — and
+they point at innocent files. This cost one reviewer an afternoon on IB-006.

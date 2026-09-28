@@ -74,6 +74,79 @@
           "builder": "@angular/build:unit-test"
         }
       }
+    },
+    "insight-dashboard": {
+      "projectType": "application",
+      "root": "projects/insight-dashboard",
+      "sourceRoot": "projects/insight-dashboard/src",
+      "prefix": "app",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss",
+          "type": "component",
+          "changeDetection": "OnPush"
+        }
+      },
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "projects/insight-dashboard/src/main.ts",
+            "index": "projects/insight-dashboard/src/index.html",
+            "tsConfig": "projects/insight-dashboard/tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "projects/insight-dashboard/public"
+              }
+            ],
+            "styles": [
+              "projects/insight-dashboard/src/styles.css"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "insight-dashboard:build:production"
+            },
+            "development": {
+              "buildTarget": "insight-dashboard:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/insight-dashboard/tsconfig.spec.json"
+          }
+        }
+      }
     }
   }
 }
