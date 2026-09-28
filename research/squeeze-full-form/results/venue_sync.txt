@@ -1,0 +1,8 @@
+BTCUSDT corr 0.7 P(bybit_hi|binance_hi) 0.53
+ETHUSDT corr 0.83 P(bybit_hi|binance_hi) 0.73
+SOLUSDT corr 0.91 P(bybit_hi|binance_hi) 0.67
+BNBUSDT corr 0.841 P(bybit_hi|binance_hi) 0.55
+XRPUSDT corr 0.724 P(bybit_hi|binance_hi) 0.72
+DOGEUSDT corr 0.69 P(bybit_hi|binance_hi) 0.65
+ADAUSDT corr 0.771 P(bybit_hi|binance_hi) 0.71
+LINKUSDT corr 0.793 P(bybit_hi|binance_hi) 0.73

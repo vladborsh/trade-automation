@@ -1599,6 +1599,13 @@ any new backtest-app work). Two research gates dispatched the same day:
   filters (≥ 2-venue funding extreme, OI +5 %/24 h at a 7-day high, ≥ 2
   failed highs, spot CVD not confirming) demonstrably rescue it; a kill closes
   the squeeze family.
+  **Result 2026-09-28: UNDERPOWERED on all four arms** (fit `n` 0 / 0 / 0 / 6,
+  holdout not read, Запись 37): the full form almost never fires — "OI at a
+  7-day high" coincides with a two-venue funding extreme 15 times in 943; no
+  ablation rung is distinguishable from zero; P1-M shadow −0.188R (CI < 0).
+  Researcher recommends **no P1/P2 build and the squeeze family closed**;
+  the Architect rules. OKX REST keeps only ≈ 97 days of funding (collect
+  live from day one); Binance OI archive starts 2021-12 for all but BTC.
 - **P4 spot-lead label** → arm (b) of the "Spot–perp basis" entry above,
   `research/spot-lead/ARCHITECT-NOTE.md`. **Result 2026-09-28: kill** (all
   four arms fit-period NO EDGE, Запись 36) → `label.p4` displayed only,
