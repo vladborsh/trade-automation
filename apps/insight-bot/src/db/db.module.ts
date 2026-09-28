@@ -3,6 +3,7 @@ import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
 import { Db, DB } from './db.port';
 import { runMigrations } from './migration-runner';
+import { MONTHS_AHEAD, PartitionMaintenanceService } from './partitions.service';
 import { PgDatabase } from './pg/pg-database';
 import { syncUniverse } from './universe-sync';
 
@@ -41,8 +42,9 @@ export function createDb(config: DbEnvSource): Db | null {
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => createDb(config),
     },
+    PartitionMaintenanceService,
   ],
-  exports: [DB],
+  exports: [DB, PartitionMaintenanceService],
 })
 export class DbModule implements OnModuleInit {
   private readonly logger = new Logger(DbModule.name);
@@ -50,6 +52,7 @@ export class DbModule implements OnModuleInit {
   constructor(
     private readonly config: AppConfigService,
     @Inject(DB) private readonly db: Db | null,
+    private readonly partitions: PartitionMaintenanceService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -76,5 +79,12 @@ export class DbModule implements OnModuleInit {
     const sync = await syncUniverse(this.db, this.config.universe);
     const deactivated = sync.deactivated.length > 0 ? `, deactivated ${sync.deactivated.join(', ')}` : '';
     this.logger.log(`Universe: ${sync.upserted} symbols loaded from ${this.config.env.get('UNIVERSE_FILE')}${deactivated}`);
+
+    // §3.1, D7 — "the maintenance job runs before collectors start", because there is no DEFAULT
+    // partition and a write into an unprepared month fails. Here is the only place that ordering
+    // is guaranteed: migrations, then the universe, then partitions, all before AppModule is up.
+    const created = await this.partitions.ensureAhead();
+    this.partitions.startDailyMaintenance();
+    this.logger.log(`Partitions: ${created} checked for the current month + ${MONTHS_AHEAD} ahead (daily maintenance on).`);
   }
 }

@@ -76,6 +76,40 @@ not a warning. The keys that matter here:
 is loaded into the `symbols` table on every boot. A symbol dropped from the file is set
 `active = false`, never deleted — its collected history still references it.
 
+## The time-series schema (migration 002)
+
+The §3.3 tables are **partitioned monthly by native RANGE** (D7, no TimescaleDB) — all of them
+except `funding_settlements` (~100k rows/year) and `calendar_events` (a few thousand), which are
+plain tables.
+
+**There is no DEFAULT partition, deliberately.** A write into a month nobody prepared fails with
+`no partition of relation "…" found for row` instead of landing in a catch-all nobody queries.
+`src/db/partitions.ts` is what keeps that from happening: `DbModule` creates the current month
+plus three ahead at boot — after the migrations, before anything writes — and re-runs daily; the
+archive backfill calls `ensureRange()` for every month it is about to touch.
+
+Row-count estimate per year, at the 30-symbol universe (§3.3):
+
+| Table | Rows/year | Note |
+|---|---|---|
+| `candles_1m` | ~31.5 M | perp + spot |
+| `candles_agg` | ~3.4 M | 15m/1h/4h/1d, derived (D4) |
+| `mark_funding_1m` | ~15.8 M | Binance; Bybit/OKX per-minute **only for the signal set**, the rest settlement-only |
+| `open_interest_5m` | ~3.2 M | |
+| `long_short_5m` | ~12.6 M | four `kind`s |
+| `liquidations` | 1–5 M | event rows (D6) |
+| `funding_settlements` | ~0.1 M | unpartitioned |
+| **Total** | **≈ 70 M rows/yr** | **≈ 8–10 GB/yr with indexes**, in line with the brief's 50–70 M |
+
+That is what the 50 GB gp3 volume of §7 is sized against: roughly five years of collection
+before the disk is the binding constraint.
+
+**`liquidations` undercounts on Binance.** Its `!forceOrder` stream publishes at most one event
+per second per symbol, so a cascade arrives as a sample rather than a census; counts and sums
+from that table are lower bounds on Binance, and a cross-venue comparison of event counts is
+comparing different things. The constraint is written on the table itself (`comment on table`),
+so it travels with the schema.
+
 ## Endpoints
 
 - `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1).
