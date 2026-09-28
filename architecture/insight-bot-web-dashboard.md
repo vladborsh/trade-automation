@@ -240,3 +240,32 @@ instrument-agnostic; `core/state/metric-points.store.ts` and
 `features/panel-grid/chart-panel.component.ts` give the aligned multi-pane
 layout. The instrument view imports these through the path alias; the only
 new renderer is a two-colour histogram for liquidations per side.
+
+## 11. Language of the dashboard (ruling 2026-09-28)
+
+**The dashboard follows the bot, not the backtest app.** The same member
+reads both surfaces, and brief Q23 already fixes their language: message
+text in plain Russian, `ru` by default, `en` as the per-user alternative;
+commands, playbook codes (`P3`), tickers, venue names and every log/DB
+field name in English. So:
+
+- Every UI string comes from a typed string table
+  `projects/insight-dashboard/src/app/i18n/{ru,en}.ts` (one bundle, runtime
+  selection — not Angular's build-time i18n), keyed by the member's `lang`
+  from `GET /api/web/auth/me`; changing `/lang` in the bot changes the
+  dashboard on next load; the login page (no user yet) is `ru` with an `en`
+  switch that only affects that page.
+- **No mixed screens.** A page is either fully `ru` or fully `en` apart from
+  the English-by-rule tokens above (tickers, codes, field names in tables of
+  raw data, units). A hard-coded literal in a template is a review reject.
+- Numbers, dates and times: the member's `lang` locale, UTC shown
+  explicitly where a time is venue time (the whole system is UTC).
+- The backtest app's English-everywhere ruling (T-058) stands for the
+  backtest app; it is a different audience and does not transfer.
+
+Consequence for IB-031 (shipped with English labels and one Russian
+empty-state): the labels move into the string table before merge, or as an
+`IB-BUG-` if already merged — the Tech Lead's call inside the component.
+IB-030's shell gains the `i18n/` table and the `lang` plumbing as the shared
+mechanism if it is not there yet; IB-033/034/035/037 use it and decide
+nothing on their own.
