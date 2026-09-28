@@ -12,3 +12,5 @@ export * from './coverage';
 // IB-031 — the instrument view.
 export * from './series';
 export * from './universe';
+// IB-037 — the market-context page (Fear & Greed, dominance, top-20 caps).
+export * from './context';

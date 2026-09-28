@@ -79,7 +79,31 @@ export type StringKey =
   | 'range.1w'
   | 'range.1m'
   | 'range.3m'
-  | 'range.1y';
+  | 'range.1y'
+  // IB-037 — the market-context page (§10)
+  | 'market.title'
+  | 'market.range'
+  | 'market.range.days'
+  | 'market.downsampled'
+  | 'market.fg.title'
+  | 'market.fg.aria'
+  | 'market.fg.asOf'
+  | 'market.fg.history'
+  | 'market.fg.none'
+  | 'market.fg.extremeFear'
+  | 'market.fg.fear'
+  | 'market.fg.neutral'
+  | 'market.fg.greed'
+  | 'market.fg.extremeGreed'
+  | 'market.dominance.title'
+  | 'market.dominance.since'
+  | 'market.dominance.none'
+  | 'market.shares.title'
+  | 'market.shares.btcLine'
+  | 'market.shares.counted'
+  | 'market.shares.none'
+  | 'market.table.title'
+  | 'market.table.none';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

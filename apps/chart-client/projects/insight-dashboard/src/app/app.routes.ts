@@ -23,6 +23,9 @@ export const routes: Routes = [
     path: 'instrument/:symbol',
     loadComponent: () => import('./features/instrument/instrument.component').then((m) => m.InstrumentComponent),
   },
-  { path: 'market', redirectTo: 'health' }, // IB-037
+  {
+    path: 'market',
+    loadComponent: () => import('./features/market/market.component').then((m) => m.MarketComponent),
+  },
   { path: '**', redirectTo: 'health' },
 ];
