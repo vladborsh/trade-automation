@@ -147,6 +147,19 @@ export function userList(rows: ReadonlyArray<{ tgUserId: number; role: string; d
   };
 }
 
+export function webLink(url: string, minutes: number): Texts {
+  return {
+    ru: `Вход в панель (ссылка одноразовая, действует ${minutes} мин):\n${url}`,
+    en: `Dashboard sign-in (single-use link, valid for ${minutes} min):\n${url}`,
+  };
+}
+
+/** The dashboard is not deployed for this instance — §4: /web refuses rather than guessing. */
+export const WEB_NOT_CONFIGURED: Texts = {
+  ru: 'Веб-панель для этого бота не настроена.',
+  en: 'The dashboard is not configured for this bot.',
+};
+
 /** An unrecognised command from a KNOWN member — different from an unknown user's one line. */
 export const UNKNOWN_COMMAND: Texts = {
   ru: 'Не знаю такой команды. /settings — ваши настройки.',

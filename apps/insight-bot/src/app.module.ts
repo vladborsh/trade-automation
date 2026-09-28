@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
+import { WebModule } from './web/web.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { CollectorsModule } from './collectors/collectors.module';
 import { OpsModule } from './ops/ops.module';
@@ -18,6 +19,6 @@ import { CalendarModule } from './collectors/calendar/calendar.module';
  * arrive with their own tasks.
  */
 @Module({
-  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeliveryModule.register()],
+  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeliveryModule.register(), WebModule.register()],
 })
 export class AppModule {}

@@ -70,6 +70,13 @@ export const EnvSchema = z.object({
   TELEGRAM_BOT_USERNAME: z.string().default('insight_bot'),
   // The one account bootstrapped as admin on boot (§3.5). 0 means "no admin configured".
   ADMIN_TG_USER_ID: z.coerce.number().int().nonnegative().default(0),
+
+  // IB-029, web dashboard §1 W3, §4 — where the dashboard is served. Empty means the dashboard
+  // is not deployed: /web refuses rather than sending a link to nowhere.
+  WEB_BASE_URL: z.string().default(''),
+  // `Secure` on the ib_session cookie. Off only for local http development; IB-032 serves the
+  // dashboard through a Cloudflare Tunnel (HTTPS), where this must be on.
+  WEB_COOKIE_SECURE: booleanFlag(false),
 });
 export type Env = z.infer<typeof EnvSchema>;
 

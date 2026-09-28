@@ -331,6 +331,55 @@ misread when a link is retyped (`0`/`O`, `1`/`l`/`I`). Consumption is one transa
 conditional `UPDATE`, so **two people opening the same link race safely**: exactly one becomes a
 member and the other sees the ordinary refusal. There is an integration spec for precisely that.
 
+## The dashboard's auth (IB-029)
+
+`src/web/auth/`, design `architecture/insight-bot-web-dashboard.md` §1 W3 and §4. Migration
+**006** adds `web_login_tokens` and `web_sessions`.
+
+The flow: a member sends **`/web`** to the bot → the bot replies with a single-use link
+(`WEB_BASE_URL/login?t=…`, ten minutes) → the browser POSTs the token to
+`/api/web/auth/exchange` → it comes back with the `ib_session` cookie.
+
+| Route | Auth | Result |
+|---|---|---|
+| `POST /api/web/auth/exchange` | public | `{token}` → `{user}` + `Set-Cookie`; 401 `TOKEN_INVALID`, 410 `TOKEN_USED` / `TOKEN_EXPIRED` |
+| `GET /api/web/auth/me` | cookie | `{user}` |
+| `POST /api/web/auth/logout` | public | 204, clears the cookie |
+
+**Only hashes are stored.** Both the login token and the session cookie exist in the database
+only as `sha256(token)`, so a dump of either table cannot be replayed into a session. The
+plaintext lives in exactly two places: the Telegram message, and the browser.
+
+**The login token is single-use and cannot be replayed.** It is claimed with one conditional
+`UPDATE ... where used_at is null and expires_at > now`, so a link that is opened twice, or
+forwarded to someone else, is already dead — the second attempt gets 410 `TOKEN_USED`. Expiry is
+ten minutes because the link travels through a chat message.
+
+**The guard is module-wide**, registered as an `APP_GUARD` in `web.module.ts` and enforcing on
+the `/api/web` prefix: every controller added to `WebModule` later is authenticated by default,
+with no decorator to forget. `@Public()` opts a route out (only the exchange and logout),
+`@AdminOnly()` adds the role check, `@CurrentUser()` gives the member. The unauthenticated ops
+`GET /health` and `/metrics` are outside the prefix and untouched — and
+`test/web/web-auth.guard.spec.ts` holds the list of fields that must never appear on the ops
+payload, so the two cannot quietly converge.
+
+### Cookie attributes, and why each one
+
+- **HttpOnly** — the dashboard never reads the cookie from JavaScript, so an XSS bug in a chart
+  page cannot walk away with the session.
+- **SameSite=Lax** — the dashboard makes no cross-site POSTs, so Lax costs nothing and blocks a
+  form on another site acting as the member. *Not* `Strict`: the login link is followed from
+  Telegram, and a `Strict` cookie is withheld on that first cross-site navigation, which would
+  land the person logged out on the one flow this feature exists for.
+- **Secure** — `WEB_COOKIE_SECURE`, on by deployment. IB-032 serves the dashboard through a
+  Cloudflare Tunnel (HTTPS), where this must be on or the cookie can go out in clear on a
+  downgrade. It is a flag only so local `http://localhost` development works.
+- Sliding **30 days**, renewed by the guard when the session is over an hour stale — one write
+  per hour per active session, not one per request.
+
+A disabled member's session is deleted the moment it is next presented, so revoking access ends
+the dashboard session too rather than leaving a 30-day cookie live.
+
 ## The historical backfill (IB-012)
 
 `npm run backfill -- --symbols BTCUSDT,ETHUSDT,SOLUSDT [--from 2024-01] [--force]`

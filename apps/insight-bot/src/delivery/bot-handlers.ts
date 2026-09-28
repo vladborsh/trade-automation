@@ -30,8 +30,19 @@ export interface UsersPort {
   setChatId(userId: number, chatId: number): Promise<void>;
 }
 
+/**
+ * IB-029 — issuing a dashboard login link. Optional so the bot still works with no web
+ * surface configured, and so IB-021's specs need not know about the dashboard.
+ */
+export interface WebAuthPort {
+  /** The full login URL, or null when WEB_BASE_URL is unset. */
+  createLoginLink(userId: number): Promise<string | null>;
+  loginTokenTtlMs: number;
+}
+
 export interface HandlerDeps {
   users: UsersPort;
+  web?: WebAuthPort;
   botUsername: string;
   now?: () => Date;
   inviteTtlMs?: number;
@@ -162,6 +173,13 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         const expiresAt = new Date(now().getTime() + ttl);
         await deps.users.createInvite(code, user.id, expiresAt);
         await reply(ctx, T.inviteCreated(inviteLink(deps.botUsername, code), expiresAt), lang);
+        return;
+      }
+      case 'web': {
+        // §4: refuse rather than send a link to nowhere
+        const link = deps.web ? await deps.web.createLoginLink(user.id) : null;
+        if (!link) { await reply(ctx, T.WEB_NOT_CONFIGURED, lang); return; }
+        await reply(ctx, T.webLink(link, Math.round((deps.web as WebAuthPort).loginTokenTtlMs / 60_000)), lang);
         return;
       }
       case 'users': {

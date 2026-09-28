@@ -4,6 +4,7 @@ import { DbModule } from '../db/db.module';
 import { UsersService } from '../users/users.service';
 import { TelegramSender } from './telegram-sender';
 import { TelegramBotService } from './telegram-bot.service';
+import { WebModule } from '../web/web.module';
 
 /**
  * IB-021 — the Telegram surface: the member bot (§8.6) and IB-011's service-chat sender, which
@@ -23,7 +24,7 @@ export class DeliveryModule {
     }
     return {
       module: DeliveryModule,
-      imports: [AppConfigModule, DbModule],
+      imports: [AppConfigModule, DbModule, WebModule.register()],
       providers: [UsersService, TelegramSender, TelegramBotService],
       exports: [UsersService, TelegramSender],
     };

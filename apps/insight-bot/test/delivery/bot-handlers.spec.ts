@@ -45,14 +45,18 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
     ...over,
   };
 
+  let web: { createLoginLink: (userId: number) => Promise<string | null>; loginTokenTtlMs: number } | undefined;
   const bot = new Bot('123:FAKE', { botInfo: BOT_INFO });
   bot.api.config.use(async (_prev, method, payload) => {
     calls.push({ method, payload: payload as Record<string, unknown> });
     if (method === 'sendMessage') sent.push(String((payload as { text: string }).text));
     return { ok: true, result: { message_id: calls.length } } as never;
   });
-  registerHandlers(bot, { users: port, botUsername: 'insight_test_bot', now: () => new Date('2026-09-28T12:00:00Z') });
-  return { bot, sent, calls, patches, invites };
+  registerHandlers(bot, {
+    users: port, botUsername: 'insight_test_bot', now: () => new Date('2026-09-28T12:00:00Z'),
+    web: { createLoginLink: (id) => (web ? web.createLoginLink(id) : Promise.resolve(null)), get loginTokenTtlMs() { return web?.loginTokenTtlMs ?? 0; } },
+  });
+  return { bot, sent, calls, patches, invites, setWeb: (w: typeof web) => { web = w; } };
 }
 
 let updateId = 0;
@@ -171,6 +175,30 @@ describe('member settings', () => {
     const h = harness({}, { 222: member });
     await h.bot.handleUpdate(text(222, '/nonsense') as never);
     expect(h.sent).toEqual([T.UNKNOWN_COMMAND.ru]);
+  });
+});
+
+describe('/web — the dashboard login link (IB-029)', () => {
+  it('sends a single-use link and says how long it lasts', async () => {
+    const h = harness({}, { 222: member });
+    h.setWeb({ createLoginLink: async () => 'https://dash.example.com/login?t=abc', loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/web') as never);
+    expect(h.sent[0]).toContain('https://dash.example.com/login?t=abc');
+    expect(h.sent[0]).toContain('10');
+  });
+
+  it('refuses when the dashboard is not configured, rather than sending a link to nowhere', async () => {
+    const h = harness({}, { 222: member });
+    h.setWeb({ createLoginLink: async () => null, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/web') as never);
+    expect(h.sent).toEqual([T.WEB_NOT_CONFIGURED.ru]);
+  });
+
+  it('is unavailable to a stranger, like everything else', async () => {
+    const h = harness();
+    h.setWeb({ createLoginLink: async () => 'https://x/login?t=y', loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(999, '/web') as never);
+    expect(h.sent).toEqual([T.UNKNOWN_USER.ru]);
   });
 });
 

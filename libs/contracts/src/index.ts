@@ -9,3 +9,4 @@ export * from './calendar';
 export * from './wire';
 export * from './auth';
 export * from './backtest';
+export * from './insight';

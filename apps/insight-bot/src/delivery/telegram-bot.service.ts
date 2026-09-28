@@ -2,6 +2,8 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { Bot } from 'grammy';
 import { AppConfigService } from '../config/config.service';
 import { UsersService } from '../users/users.service';
+import { WebAuthService } from '../web/auth/web-auth.service';
+import { LOGIN_TOKEN_TTL_MS } from '../web/auth/session-cookie';
 import { registerHandlers } from './bot-handlers';
 
 /**
@@ -21,6 +23,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
   constructor(
     private readonly config: AppConfigService,
     private readonly users: UsersService,
+    private readonly webAuth: WebAuthService,
   ) {}
 
   get enabled(): boolean {
@@ -37,6 +40,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     const bot = new Bot(token);
     registerHandlers(bot, {
       users: this.users,
+      web: { createLoginLink: (userId) => this.webAuth.createLoginLink(userId), loginTokenTtlMs: LOGIN_TOKEN_TTL_MS },
       botUsername: this.config.env.get('TELEGRAM_BOT_USERNAME'),
       logger: { warn: (m) => this.logger.warn(m) },
     });
