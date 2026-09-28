@@ -1,21 +1,15 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { ApiError } from '@backtest-core/api/api-error';
-import { InsightApiClient } from '../../core/insight-api.client';
+import { I18nService } from '../../i18n/i18n.service';
+import type { StringKey } from '../../i18n/keys';
 
 /**
  * architecture/insight-bot-web-dashboard.md §4 W3 — the bot's `/web` command sends a single-use
  * link; this page exchanges its `?t=` for the `ib_session` cookie and goes to /health.
  *
- * **IB-029 owns the endpoint and its contracts** (`POST /api/web/auth/exchange`), and they are on
- * master, so the call goes through `InsightApiClient` against `WebExchangeResponse` — no local
- * transcription of someone else's shape.
- *
- * The failure is read from the server's `{ code }`, never from the status alone: `TOKEN_USED` and
- * `TOKEN_EXPIRED` share HTTP 410 and are different things to a member — one forwarded their link,
- * the other let it go stale — so each gets its own sentence.
+ * §11: there is no user here yet, so the page starts in the stored language (`ru` by default) and
+ * carries its own switch. Once the exchange succeeds, `/auth/me` decides the language everywhere.
  */
-
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -25,60 +19,60 @@ import { InsightApiClient } from '../../core/insight-api.client';
 })
 export class LoginComponent {
   private readonly router = inject(Router);
-  private readonly api = inject(InsightApiClient);
-
-  constructor() {
-    // The link IS the sign-in: arriving with a token exchanges it straight away. Waiting for a
-    // click would ask a member to confirm something they already did by opening the bot's link,
-    // and the token is one-use and ten minutes old, so the click is only a way to waste it.
-    effect(() => {
-      const token = this.t();
-      if (token) untracked(() => void this.exchange());
-    });
-  }
+  private readonly i18n = inject(I18nService);
+  readonly t = this.i18n.t.bind(this.i18n);
 
   /** Bound from the query string by `withComponentInputBinding()`. */
-  readonly t = input<string | undefined>(undefined);
+  readonly t_ = input<string | undefined>(undefined, { alias: 't' });
 
   readonly state = signal<'idle' | 'exchanging' | 'failed'>('idle');
   readonly message = signal<string | null>(null);
 
+  toggleLang(): void {
+    this.i18n.setLang(this.i18n.lang() === 'ru' ? 'en' : 'ru');
+  }
+
   async exchange(): Promise<void> {
-    const token = this.t();
+    const token = this.t_();
     if (!token) {
-      this.state.set('failed');
-      this.message.set('This link carries no token. Ask the bot for a new one with /web.');
+      this.fail('login.noToken');
       return;
     }
     this.state.set('exchanging');
     try {
-      await this.api.exchange(token);
+      const response = await fetch('/api/web/auth/exchange', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      if (!response.ok) {
+        const { key, params } = loginFailure(response.status);
+        this.fail(key, params);
+        return;
+      }
+      // the member exists now, so their own language decides every screen from here
+      const body = (await response.json()) as { user?: { lang?: unknown } };
+      this.i18n.setLangFromUser(body.user?.lang);
       await this.router.navigateByUrl('/health');
-    } catch (error) {
-      this.state.set('failed');
-      this.message.set(
-        error instanceof ApiError
-          ? loginFailureMessage(error.code, error.status)
-          : 'Could not reach the server. Try again in a moment.',
-      );
+    } catch {
+      this.fail('login.unreachable');
     }
+  }
+
+  private fail(key: StringKey, params?: Record<string, string | number>): void {
+    this.state.set('failed');
+    this.message.set(this.t(key, params));
   }
 }
 
 /**
- * Pure: the sentence a member sees for each failure IB-029 defines. Branches on the server's
- * `code` (the one thing a client should branch on, per the `/api/web` error contract); the status
- * is only a fallback for a proxy or a body that never reached us.
+ * Pure: which string a failure gets. IB-029 defines the codes, and each is reachable by an ordinary
+ * mistake — forwarding the link, opening it twice, letting it sit for ten minutes — so each gets its
+ * own sentence with the way out in it rather than a shared "failed".
  */
-export function loginFailureMessage(code: string | null | undefined, status: number): string {
-  switch (code) {
-    case 'TOKEN_INVALID':
-      return 'This link is not valid. Ask the bot for a new one with /web.';
-    case 'TOKEN_USED':
-      return 'This link has already been used. Ask the bot for a new one with /web.';
-    case 'TOKEN_EXPIRED':
-      return 'This link has expired. Ask the bot for a new one with /web.';
-    default:
-      return `Sign-in failed (HTTP ${status}).`;
-  }
+export function loginFailure(status: number): { key: StringKey; params?: Record<string, string | number> } {
+  if (status === 401) return { key: 'login.invalid' };
+  if (status === 410) return { key: 'login.used' };
+  return { key: 'login.failed', params: { status } };
 }

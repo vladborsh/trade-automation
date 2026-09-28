@@ -1,13 +1,13 @@
 <section class="login">
-  <h1>Insight dashboard</h1>
+  <h1>{{ t('login.title') }}</h1>
   @switch (state()) {
-    @case ('exchanging') { <p class="muted">signing in…</p> }
+    @case ('exchanging') { <p class="muted">{{ t('login.signingIn') }}</p> }
     @case ('failed') { <p class="error" role="alert">{{ message() }}</p> }
     @default {
-      <p class="muted">Open the link the bot sent you with <code>/web</code>.</p>
-      @if (t()) {
-        <button type="button" (click)="exchange()">try again</button>
-      }
+      <p class="muted">{{ t('login.hint') }}</p>
+      <button type="button" (click)="exchange()">{{ t('login.continue') }}</button>
     }
   }
+  <!-- §11: the login page has no user yet, so it carries its own switch; it affects this page only. -->
+  <button type="button" class="lang" (click)="toggleLang()">{{ t('login.switchLang') }}</button>
 </section>

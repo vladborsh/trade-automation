@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { WebDbHealthResponse, WebStreamsResponse } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
+import { I18nService } from '../../i18n/i18n.service';
 import { cellLabel, cellSeverity, toGapGrid, worstCells, type GapGrid } from './gap-grid.mapper';
 
 /**
@@ -19,6 +20,8 @@ import { cellLabel, cellSeverity, toGapGrid, worstCells, type GapGrid } from './
 })
 export class HealthComponent {
   private readonly api = inject(InsightApiClient);
+  private readonly i18n = inject(I18nService);
+  readonly t = this.i18n.t.bind(this.i18n);
 
   readonly streams = signal<WebStreamsResponse | null>(null);
   readonly db = signal<WebDbHealthResponse | null>(null);
@@ -60,7 +63,7 @@ export class HealthComponent {
   }
 
   age(seconds: number | null): string {
-    if (seconds === null) return 'never';
+    if (seconds === null) return this.t('state.never');
     if (seconds < 120) return `${seconds}s`;
     return seconds < 7200 ? `${Math.round(seconds / 60)}m` : `${Math.round(seconds / 3600)}h`;
   }

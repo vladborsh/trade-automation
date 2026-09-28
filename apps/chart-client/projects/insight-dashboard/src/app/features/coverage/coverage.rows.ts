@@ -34,11 +34,14 @@ function rank(state: CoverageView['state']): number {
   return state === 'empty' ? 0 : state === 'holes' ? 1 : 2;
 }
 
-/** The one-line summary above the table. */
-export function coverageSummary(views: readonly CoverageView[]): string {
-  const empty = views.filter((v) => v.state === 'empty').length;
-  const holes = views.filter((v) => v.state === 'holes').length;
-  if (views.length === 0) return 'no series reported';
-  if (empty === 0 && holes === 0) return `${views.length} series, all complete`;
-  return `${views.length} series: ${empty} empty, ${holes} with missing months`;
+/**
+ * The counts behind the summary line. Pure numbers rather than a sentence: §11 puts every sentence
+ * in the string table, and a helper that returned prose would be a literal in disguise.
+ */
+export function coverageCounts(views: readonly CoverageView[]): { total: number; empty: number; holes: number } {
+  return {
+    total: views.length,
+    empty: views.filter((v) => v.state === 'empty').length,
+    holes: views.filter((v) => v.state === 'holes').length,
+  };
 }

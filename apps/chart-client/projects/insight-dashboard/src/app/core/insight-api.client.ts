@@ -40,6 +40,14 @@ export class InsightApiClient {
     return this.get<WebDbHealthResponse>('/health/db');
   }
 
+  /**
+   * The signed-in member. IB-029 owns the contract; the dashboard needs it for two things: whether
+   * there is a session at all, and the member's `lang` (§11 — the dashboard follows the bot).
+   */
+  async me(): Promise<{ user?: { lang?: unknown } }> {
+    return this.get<{ user?: { lang?: unknown } }>('/auth/me');
+  }
+
   async coverage(): Promise<WebCoverageResponse> {
     return this.get<WebCoverageResponse>('/coverage');
   }

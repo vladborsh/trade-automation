@@ -1,0 +1,60 @@
+import type { Strings } from './keys';
+
+/**
+ * §11 — plain Russian, the same register the bot speaks. Tickers, venue names, playbook codes,
+ * timeframes and raw field names stay English on purpose: a member reading `BTCUSDT` in a table
+ * needs it to match the venue and the logs.
+ *
+ * `{n}`-style placeholders are filled by `I18nService.t`.
+ */
+export const ru: Strings = {
+  'nav.brand': 'инсайт',
+  'nav.health': 'состояние',
+  'nav.coverage': 'покрытие',
+
+  'action.refresh': 'обновить',
+  'state.loading': 'загрузка…',
+  'state.never': 'ни разу',
+
+  'login.title': 'Панель инсайт-бота',
+  'login.hint': 'Откройте ссылку, которую прислал бот, и продолжите.',
+  'login.continue': 'продолжить',
+  'login.signingIn': 'входим…',
+  'login.noToken': 'В этой ссылке нет ключа. Запросите новую командой /web у бота.',
+  'login.invalid': 'Ссылка недействительна. Запросите новую командой /web у бота.',
+  'login.used': 'Ссылка уже использована или истекла. Запросите новую командой /web.',
+  'login.failed': 'Не удалось войти (HTTP {status}).',
+  'login.unreachable': 'Сервер не отвечает. Попробуйте ещё раз через минуту.',
+  'login.switchLang': 'English',
+
+  'health.title': 'Состояние',
+  'health.streams': 'Потоки',
+  'health.streamsDegraded': 'потоков в деградированном режиме: {count} — данные идут через REST',
+  'health.col.stream': 'поток',
+  'health.col.venue': 'биржа',
+  'health.col.mode': 'режим',
+  'health.col.lastMessage': 'последнее сообщение',
+  'health.col.reconnects': 'переподключений за 24 ч',
+  'health.col.openGaps': 'открытых пропусков',
+  'health.openGapsTotal': 'всего открытых пропусков: {count}',
+  'health.weight': 'Вес запросов к Binance',
+  'health.weightNone': 'вес ещё не измерен',
+  'health.weightPerMinute': 'в минуту',
+  'health.gapReports': 'Ежедневные отчёты о пропусках',
+  'health.gapReportsWorst': 'худшее:',
+  'health.gapReportsClean': 'за этот период ничего не потеряно',
+  'health.col.symbol': 'символ',
+  'health.database': 'База данных',
+  'health.dbSize': 'размер: {size}',
+  'health.dbPartitions': 'партиций: {count}, подготовлены до {horizon}',
+
+  'coverage.title': 'Покрытие',
+  'coverage.col.symbol': 'символ',
+  'coverage.col.series': 'серия',
+  'coverage.col.first': 'первая запись',
+  'coverage.col.last': 'последняя запись',
+  'coverage.col.missingMonths': 'пропущенные месяцы',
+  'coverage.summary.none': 'нет данных ни по одной серии',
+  'coverage.summary.complete': 'серий: {total}, все полные',
+  'coverage.summary.problems': 'серий: {total}: пустых {empty}, с пропущенными месяцами {holes}',
+};
