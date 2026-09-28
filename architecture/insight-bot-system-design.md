@@ -159,7 +159,11 @@ zero.
   is a boot-time bug, so the maintenance job runs before collectors start.
   Backfill creates partitions for every month it touches.
 - Every write is an `INSERT … ON CONFLICT (natural key) DO UPDATE` unless
-  stated. Batched (≤ 500 rows per statement) by the writers module.
+  stated; `liquidations` is `DO NOTHING` (§16.6). Batched (≤ 500 rows per
+  statement) by the writers module.
+- On a partitioned table every unique index, the primary key included, must
+  contain the partition column, so surrogate-keyed tables use a composite
+  primary key `(id, <time col>)` beside their natural unique key.
 - `source` columns take `'ws' | 'rest' | 'archive'`.
 
 ### 3.2 Reference and configuration
@@ -197,11 +201,14 @@ long_short_5m(venue, symbol, ts, kind CHECK IN ('global_account','top_account','
         long_ratio, short_ratio, ratio, source, PK (venue, symbol, ts, kind))
 liquidations(id bigserial, venue, symbol, ts, side CHECK IN ('long','short'),   -- the side liquidated
         price, qty, notional, order_status text NULL, source,
+        PK (id, ts),                                               -- partition key must be in every unique index
         UNIQUE (venue, symbol, ts, side, price, qty))              -- D6; Binance undercount documented here
+        -- write rule: INSERT … ON CONFLICT DO NOTHING (events are immutable; first writer's `source` stands)
 calendar_events(id text, revision int, source, event_time, currency, title, impact, forecast, previous,
         actual, fetched_at, PK (id, revision))                     -- every revision kept, as in signal-server
 collector_gaps(id bigserial, stream text, venue, market NULL, symbol NULL, gap_from, gap_to,
-        expected int, repaired int, error text NULL, detected_at)   -- feeds §6.2's report
+        expected int, repaired int, error text NULL, detected_at,
+        PK (id, detected_at))                                      -- feeds §6.2's report
 ```
 
 `liquidations.side` is normalised at the mapper: Binance `forceOrder` with
@@ -930,3 +937,13 @@ in sign") cannot be met by P3's history until months of liquidation data
 exist. The gate stands as the user set it; the timeline behind it just got
 longer, and P6 (unlocks, stage 2) becomes the next candidate with testable
 history.
+
+### 16.6 IB-004 schema — composite primary keys and the liquidations write rule (2026-09-28)
+
+`reports/dev-2-IB-004.md`. Ratified: `liquidations` PK `(id, ts)` and
+`collector_gaps` PK `(id, detected_at)` (Postgres requires the partition key
+in every unique index; the six-column natural unique key is unchanged);
+`liquidations` written with `ON CONFLICT DO NOTHING` — the rows are immutable
+venue events, no archive source exists for them (§5), so a duplicate can only
+be the same event seen twice and the first writer's `source` is the true
+provenance. §3.1 and §3.3 updated.
