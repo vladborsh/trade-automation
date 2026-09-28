@@ -1,0 +1,273 @@
+import { BinanceWeightTracker } from '../src/collectors/binance-perp/binance-weight.tracker';
+import { FuturesDataClient } from '../src/collectors/binance-perp/futures-data.client';
+import { OiLsPoller, POLL_LIMIT, STREAM_ID } from '../src/collectors/binance-perp/oi-ls.poller';
+import { BatchWriter } from '../src/collectors/writers/batch-writer';
+import * as t from '../src/collectors/writers/tables';
+import { MetricsService } from '../src/ops/metrics.service';
+import { StreamRegistry } from '../src/ops/stream-registry';
+import { Db, DbHandle } from '../src/db/db.port';
+import { PartitionMaintenanceService } from '../src/db/partitions.service';
+
+const SLOT = 300_000;
+const SLOT_TS = Date.UTC(2026, 8, 28, 12, 5);
+
+/** A db that answers the poller's two queries from what the test seeds. */
+class FakeDb implements Db {
+  constructor(
+    private readonly lastBySymbol: Record<string, Date | null> = {},
+    private readonly stored: Date[] = [],
+  ) {}
+  async query<T>(sql: string, _params: readonly unknown[] = []): Promise<T[]> {
+    if (sql.includes('max(o.ts)')) {
+      return Object.entries(this.lastBySymbol).map(([symbol, last]) => ({ symbol, last })) as T[];
+    }
+    if (sql.includes('select ts from open_interest_5m')) return this.stored.map((ts) => ({ ts })) as T[];
+    return [] as T[];
+  }
+  async transaction<T>(fn: (tx: DbHandle) => Promise<T>): Promise<T> {
+    return fn(this);
+  }
+}
+
+/** Captures what each writer was handed, without a database. */
+function fakeWriters() {
+  const written: Record<string, unknown[]> = { oi: [], ls: [], gaps: [] };
+  const writer = (key: string) =>
+    ({ write: async (rows: unknown[]) => { written[key].push(...rows); return rows.length; } }) as unknown as BatchWriter<never>;
+  return {
+    written,
+    writers: { openInterest: writer('oi'), longShort: writer('ls'), collectorGaps: writer('gaps') } as never,
+  };
+}
+
+function fakeConfig(symbols: string[]) {
+  return {
+    symbols: symbols.map((id) => ({ binance_perp: id })),
+    env: { get: (key: string) => (key === 'BINANCE_FUTURES_REST_BASE_URL' ? 'https://fapi.binance.com' : undefined) },
+  } as never;
+}
+
+/** A client whose five endpoints answer from canned rows, and which records what was asked. */
+function fakeClient(rowsFor: (endpoint: string, symbol: string) => unknown[] | Error) {
+  const asked: Array<{ endpoint: string; symbol: string; limit?: number }> = [];
+  return {
+    asked,
+    client: {
+      async fetchPage({ endpoint, symbol, limit }: { endpoint: string; symbol: string; limit?: number }) {
+        asked.push({ endpoint, symbol, limit });
+        const result = rowsFor(endpoint, symbol);
+        if (result instanceof Error) throw result;
+        return result;
+      },
+      async fetchBackward({ endpoint, symbol }: { endpoint: string; symbol: string }) {
+        asked.push({ endpoint, symbol });
+        const result = rowsFor(endpoint, symbol);
+        if (result instanceof Error) throw result;
+        return result;
+      },
+    } as unknown as FuturesDataClient,
+  };
+}
+
+const oiRow = (ts: number) => ({ symbol: 'BTCUSDT', sumOpenInterest: '100', sumOpenInterestValue: '1000', timestamp: ts });
+const lsRow = (ts: number) => ({ symbol: 'BTCUSDT', longAccount: '0.6', shortAccount: '0.4', longShortRatio: '1.5', timestamp: ts });
+const takerRow = (ts: number) => ({ buySellRatio: '1.1', buyVol: '110', sellVol: '100', timestamp: ts });
+
+function build(opts: {
+  symbols?: string[];
+  rowsFor?: (endpoint: string, symbol: string) => unknown[] | Error;
+  db?: Db;
+}) {
+  const { written, writers } = fakeWriters();
+  const streams = new StreamRegistry();
+  const metrics = new MetricsService(streams);
+  const weight = new BinanceWeightTracker();
+  const rowsFor =
+    opts.rowsFor ??
+    ((endpoint: string) => (endpoint === 'takerlongshortRatio' ? [takerRow(SLOT_TS)] : endpoint === 'openInterestHist' ? [oiRow(SLOT_TS)] : [lsRow(SLOT_TS)]));
+  const { client, asked } = fakeClient(rowsFor);
+  const db = opts.db ?? new FakeDb();
+  // A real PartitionMaintenanceService over the fake db: its DDL is a no-op query here, which is
+  // enough to assert the backfill asks for its window's partitions before writing.
+  const partitions = new PartitionMaintenanceService(db);
+  const poller = new OiLsPoller(
+    fakeConfig(opts.symbols ?? ['BTCUSDT']),
+    db,
+    partitions,
+    writers,
+    weight,
+    metrics,
+    streams,
+    client,
+  );
+  return { poller, written, asked, streams, metrics, weight, db };
+}
+
+describe('OiLsPoller.pollOnce', () => {
+  it('asks all five series per symbol, for the last POLL_LIMIT rows', async () => {
+    const { poller, asked } = build({ symbols: ['BTCUSDT', 'ETHUSDT'] });
+    await poller.pollOnce(SLOT_TS + 20_000);
+
+    expect(asked).toHaveLength(10); // 5 endpoints x 2 symbols — §4.5's weight line
+    expect(new Set(asked.map((a) => a.endpoint))).toEqual(
+      new Set(['openInterestHist', 'topLongShortPositionRatio', 'topLongShortAccountRatio', 'globalLongShortAccountRatio', 'takerlongshortRatio']),
+    );
+    expect(asked.every((a) => a.limit === POLL_LIMIT)).toBe(true);
+  });
+
+  it('writes one OI row and four long/short rows per symbol, all four kinds', async () => {
+    const { poller, written } = build({ symbols: ['BTCUSDT'] });
+    const result = await poller.pollOnce(SLOT_TS + 20_000);
+
+    expect(result).toMatchObject({ oi: 1, longShort: 4, failed: [] });
+    expect(written.oi).toHaveLength(1);
+    expect((written.ls as t.LongShortRow[]).map((r) => r.kind).sort()).toEqual([
+      'global_account', 'taker', 'top_account', 'top_position',
+    ]);
+  });
+
+  it('writes every returned slot, so a lagging symbol cannot lose one', async () => {
+    // Measured 2026-09-28: the venue's publication lag is per-symbol and can exceed the +20 s
+    // offset. With limit=1, a poll returning 13:50 followed by one returning 14:00 would drop
+    // 13:55 for good. Asking for the last few rows and upserting them all closes that.
+    const slots = [SLOT_TS - 2 * SLOT, SLOT_TS - SLOT, SLOT_TS];
+    const { poller, written } = build({
+      symbols: ['LAGGYUSDT'],
+      rowsFor: (endpoint) =>
+        endpoint === 'takerlongshortRatio'
+          ? slots.map(takerRow)
+          : endpoint === 'openInterestHist' ? slots.map(oiRow) : slots.map(lsRow),
+    });
+
+    const result = await poller.pollOnce(SLOT_TS + 20_000);
+    expect(result.oi).toBe(3);
+    expect((written.oi as t.OpenInterestRow[]).map((r) => r.ts.getTime()).sort()).toEqual(slots);
+  });
+
+  it('records the poll on the stream registry, so /health sees it', async () => {
+    const { poller, streams } = build({});
+    await poller.pollOnce(SLOT_TS + 20_000);
+    expect(streams.snapshot(SLOT_TS + 20_000)[0]).toMatchObject({ id: STREAM_ID, venue: 'binance', lastMessageAgeSec: 0 });
+  });
+
+  it('keeps going when one symbol fails, and logs that symbol as a gap', async () => {
+    const { poller, written } = build({
+      symbols: ['BTCUSDT', 'BROKENUSDT', 'ETHUSDT'],
+      rowsFor: (endpoint, symbol) =>
+        symbol === 'BROKENUSDT'
+          ? new Error('HTTP 500')
+          : endpoint === 'takerlongshortRatio' ? [takerRow(SLOT_TS)] : endpoint === 'openInterestHist' ? [oiRow(SLOT_TS)] : [lsRow(SLOT_TS)],
+    });
+
+    const result = await poller.pollOnce(SLOT_TS + 20_000);
+    expect(result.failed).toEqual(['BROKENUSDT']);
+    expect(result.oi).toBe(2); // the other two still wrote
+    const gaps = written.gaps as t.CollectorGapRow[];
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toMatchObject({ stream: STREAM_ID, symbol: 'BROKENUSDT', expected: 1, repaired: 0 });
+  });
+
+  it('publishes the tracker\'s reading onto the metric at the poll instant', async () => {
+    // The counting itself lives in FuturesDataClient (its own spec); what the poller owes is to
+    // push the trailing-minute figure onto ib_binance_weight_used_1m on every pass.
+    const { poller, metrics, weight } = build({ symbols: ['BTCUSDT', 'ETHUSDT'] });
+    const at = SLOT_TS + 20_000;
+    for (let i = 0; i < 10; i += 1) weight.recordCall(1, at - 1_000); // 5 endpoints x 2 symbols
+    await poller.pollOnce(at);
+    expect(metrics.getBinanceWeightUsed1m()).toBe(10);
+  });
+});
+
+describe('OiLsPoller.backfill', () => {
+  const now = SLOT_TS + 20_000;
+
+  it('backfills only the symbols whose newest stored slot is stale', async () => {
+    const db = new FakeDb({ FRESHUSDT: new Date(now - 60_000), STALEUSDT: new Date(now - 3 * SLOT), NEWUSDT: null });
+    const { poller, asked } = build({ symbols: ['FRESHUSDT', 'STALEUSDT', 'NEWUSDT'], db });
+
+    const result = await poller.backfill(now);
+    expect(result.symbols).toBe(2);
+    const symbols = new Set(asked.map((a) => a.symbol));
+    expect(symbols).toEqual(new Set(['STALEUSDT', 'NEWUSDT']));
+    expect(symbols.has('FRESHUSDT')).toBe(false);
+  });
+
+  it('creates the partitions for the window before writing into it', async () => {
+    // Caught live on the first real run: boot maintenance only prepares the current month + 3,
+    // so a 30-day backfill reaching into last month had nowhere to land and died on
+    // `no partition of relation "open_interest_5m" found for row` (IB-004: no DEFAULT partition).
+    const statements: string[] = [];
+    class RecordingDb extends FakeDb {
+      async query<T>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
+        statements.push(sql);
+        return super.query<T>(sql, params);
+      }
+    }
+    const { poller } = build({ symbols: ['STALEUSDT'], db: new RecordingDb({ STALEUSDT: null }) });
+    await poller.backfill(now);
+
+    const created = statements.filter((sql) => sql.startsWith('create table if not exists open_interest_5m_'));
+    expect(created.length).toBeGreaterThanOrEqual(2); // this month and the one 30 days back
+    const firstWrite = statements.findIndex((sql) => sql.startsWith('insert into open_interest_5m'));
+    const lastCreate = statements.map((s) => s.startsWith('create table if not exists')).lastIndexOf(true);
+    expect(lastCreate).toBeLessThan(firstWrite === -1 ? Number.MAX_SAFE_INTEGER : firstWrite);
+  });
+
+  it('pages all five series per stale symbol', async () => {
+    const db = new FakeDb({ STALEUSDT: null });
+    const { poller, asked } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+    expect(asked).toHaveLength(5);
+  });
+
+  it('records a hole inside what the venue served', async () => {
+    // Stored: ...:00, :05, [:10 missing], :15 — a real hole, inside the served range.
+    const stored = [
+      new Date(SLOT_TS - 3 * SLOT), new Date(SLOT_TS - 2 * SLOT), new Date(SLOT_TS),
+    ];
+    const db = new FakeDb({ STALEUSDT: null }, stored);
+    const { poller, written } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+
+    const gaps = written.gaps as t.CollectorGapRow[];
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]).toMatchObject({
+      stream: STREAM_ID, symbol: 'STALEUSDT', venue: 'binance', market: 'perp', expected: 1, repaired: 0,
+    });
+    expect(gaps[0].gapFrom.getTime()).toBe(SLOT_TS - SLOT);
+  });
+
+  it('does NOT record the retention edge as a gap', async () => {
+    // The window asks from now-30d, but the venue's oldest row is far newer — the edge drifts
+    // between asking and answering. Observed on the first live run as exactly one phantom gap
+    // per symbol, which would have put 30 false gaps a day into the §6.2 report.
+    const stored = [new Date(SLOT_TS - SLOT), new Date(SLOT_TS)];
+    const db = new FakeDb({ STALEUSDT: null }, stored);
+    const { poller, written } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+    expect(written.gaps).toHaveLength(0);
+  });
+
+  it('records the whole window when the venue returned nothing for a symbol', async () => {
+    // No edge to anchor to, and a symbol with no data at all is a real failure: stay visible.
+    const db = new FakeDb({ STALEUSDT: null }, []);
+    const { poller, written } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+
+    const gaps = written.gaps as t.CollectorGapRow[];
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].error).toMatch(/returned no rows/);
+    expect(gaps[0].expected).toBeGreaterThan(8000); // ~30 days of 5-minute slots
+  });
+
+  it('reports no gap when the stored grid is complete', async () => {
+    const stored: Date[] = [];
+    // A full 30-day grid would be 8640 slots; the poller asks from now-30d+1slot, so build that.
+    for (let ts = now - 30 * 24 * 60 * 60_000 + SLOT; ts <= now; ts += SLOT) stored.push(new Date(Math.floor(ts / SLOT) * SLOT));
+    const db = new FakeDb({ STALEUSDT: null }, stored);
+    const { poller, written } = build({ symbols: ['STALEUSDT'], db });
+
+    await poller.backfill(now);
+    expect(written.gaps).toHaveLength(0);
+  });
+});

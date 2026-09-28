@@ -141,6 +141,32 @@ state, not an error:
 - the socket is retried every 5 min; the first message returns the collector to `ws`;
 - `/health` shows `mode` and `degradedReason` **per stream**, so a degraded run never looks healthy.
 
+## Binance USD-M OI and long/short, 5 m (IB-007)
+
+Registered by the same `CollectorsModule.register()` as the collector above, so it too is live
+only when `DATABASE_URL` is set.
+
+**Binance USD-M OI + long/short, 5 m** (`collectors/binance-perp/oi-ls.poller.ts`, §4.1): polls
+each 5-minute boundary **+ 20 s** (the venue publishes on the boundary with a lag), five series
+per symbol — `openInterestHist` → `open_interest_5m`, and `topLongShortPositionRatio`,
+`topLongShortAccountRatio`, `globalLongShortAccountRatio`, `takerlongshortRatio` →
+`long_short_5m` under the four `kind`s.
+
+**Weight: 5 calls × 30 symbols per 5 min = 30 weight/min = 1.25 % of the 2400/min budget**
+(§4.5, D15). On boot it backfills the venue's 30-day window for every symbol whose newest stored
+slot is stale, paging **backward** by `endTime`, paced so it does not burst.
+
+Two things about these endpoints, **measured 2026-09-28**, that differ from what the older
+signal-server adapter recorded:
+
+- **`/futures/data/*` sends no `X-MBX-USED-WEIGHT-1M` header** (`/fapi/*` does). So
+  `ib_binance_weight_used_1m` is this app's own trailing-minute count while only this poller is
+  running; it switches to the venue's figure as soon as any `/fapi/*` call reports one.
+  `BinanceWeightTracker.isEstimate()` says which is in use.
+- **The ~30-day retention is enforced on `endTime`, not `startTime`**, and it is a `-1130`
+  rejection, which the pager treats as "no more history" rather than an error. A `startTime`
+  older than 30 days is now silently accepted and clamped, so it is useless as a stop signal.
+
 ## Endpoints
 
 - `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode`).

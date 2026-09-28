@@ -3,10 +3,12 @@ import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { OpsModule } from '../ops/ops.module';
 import { BinancePerpService } from './binance-perp/binance-perp.service';
+import { BinanceWeightTracker } from './binance-perp/binance-weight.tracker';
+import { OiLsPoller } from './binance-perp/oi-ls.poller';
 import { WritersModule } from './writers/writers.module';
 
 /**
- * IB-005 — the collectors, registered only when there is a database to write into.
+ * IB-005 / IB-007 — the collectors, registered only when there is a database to write into.
  *
  * `Writers` throws without `DATABASE_URL` (IB-004), and the app must still boot without one
  * (IB-003, §2.1): so this is a dynamic module that provides nothing in that case and says why,
@@ -23,7 +25,7 @@ export class CollectorsModule {
     return {
       module: CollectorsModule,
       imports: [AppConfigModule, DbModule, OpsModule, WritersModule],
-      providers: [BinancePerpService],
+      providers: [BinancePerpService, BinanceWeightTracker, OiLsPoller],
     };
   }
 }
