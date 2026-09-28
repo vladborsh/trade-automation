@@ -19,7 +19,18 @@
      * generalised in place with its own spec rather than aliased into the dashboard.
      */
     "paths": {
-      "@backtest-core/*": ["./src/app/core/*"]
+      "@backtest-core/*": ["./src/app/core/*"],
+      /*
+       * IB-031 adds a second alias for the same reason the first exists. The instrument view
+       * draws open interest with the backtest SPA's `MetricSeriesRenderer` **unchanged** — that
+       * is why the server serves OI in the `MetricPoint` wire shape — and a renderer is a
+       * `features/` file, not a `core/` one. The alternative was a five-level relative path out
+       * of `projects/`, which breaks the moment either tree moves.
+       *
+       * The same rule applies as to `@backtest-core/*`: alias what is genuinely reusable as is,
+       * generalise in place when it is not, never fork.
+       */
+      "@backtest-features/*": ["./src/app/features/*"]
     },
     "module": "preserve"
   },

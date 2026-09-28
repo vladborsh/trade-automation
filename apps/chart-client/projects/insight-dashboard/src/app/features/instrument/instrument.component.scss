@@ -1,0 +1,133 @@
+/* The dark-terminal palette (AGENTS.md): #0d1117 background, #30363d borders, #c9d1d9 text,
+   #8b949e muted, #26a69a / #ef5350 up/down. Reused, never approximated. */
+.instrument {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  color: #c9d1d9;
+  background: #0d1117;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    color: #8b949e;
+    font-size: 12px;
+  }
+
+  input {
+    min-width: 180px;
+    padding: 4px 6px;
+    color: #c9d1d9;
+    background: #0d1117;
+    border: 1px solid #30363d;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  /* twenty symbols is a lot of chrome; cap the strip and let it scroll rather than pushing the
+     chart below the fold on a 1280px screen */
+  max-height: 56px;
+  overflow-y: auto;
+}
+
+.chip,
+.group button,
+.market {
+  padding: 3px 8px;
+  color: #c9d1d9;
+  background: transparent;
+  border: 1px solid #30363d;
+  cursor: pointer;
+  font-size: 12px;
+
+  &.active {
+    border-color: #26a69a;
+    color: #26a69a;
+  }
+
+  &:hover {
+    border-color: #8b949e;
+  }
+}
+
+.switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.group {
+  display: flex;
+  gap: 2px;
+}
+
+.note {
+  margin: 0;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  color: #ef5350;
+  font-size: 13px;
+}
+
+.table-title {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+
+.top {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    padding: 3px 6px;
+    text-align: left;
+    border-bottom: 1px solid #30363d;
+  }
+
+  th {
+    color: #8b949e;
+    font-weight: 500;
+  }
+
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .long {
+    color: #ef5350; /* a long liquidated means price fell */
+  }
+
+  .short {
+    color: #26a69a;
+  }
+
+  .muted {
+    color: #8b949e;
+  }
+}

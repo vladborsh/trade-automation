@@ -1,6 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import type {
-  WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest, WebExchangeResponse, WebGapReportsResponse, WebStreamsResponse,
+  WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest,
+  WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
+  WebLongShortResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation,
+  WebUniverseTopResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -39,6 +42,42 @@ export class InsightApiClient {
 
   async coverage(): Promise<WebCoverageResponse> {
     return this.get<WebCoverageResponse>('/coverage');
+  }
+
+  // ------------------------------------------------------ IB-031, the instrument view
+
+  async universeTop(n = 20): Promise<WebUniverseTopResponse> {
+    return this.get<WebUniverseTopResponse>('/universe/top', { n });
+  }
+
+  /**
+   * Every series call takes the same `from`/`to` in epoch **milliseconds**. The server refuses a
+   * 1m range over 90 days with `RANGE_TOO_WIDE` rather than trimming it, so a caller that wants
+   * a wider window must coarsen the timeframe — `toWebApiError` keeps `maxDays` on the message
+   * so the page can say which.
+   */
+  async candles(symbol: string, fromMs: number, toMs: number, tf: WebTimeframe, market = 'perp'): Promise<WebCandlesResponse> {
+    return this.get<WebCandlesResponse>('/series/candles', { symbol, from: fromMs, to: toMs, tf, market });
+  }
+
+  async funding(symbol: string, fromMs: number, toMs: number): Promise<WebFundingResponse> {
+    return this.get<WebFundingResponse>('/series/funding', { symbol, from: fromMs, to: toMs });
+  }
+
+  async openInterest(symbol: string, fromMs: number, toMs: number): Promise<{ symbol: string; venue: string; points: Array<{ time: number; value: number; notional: number | null }>; downsampled: boolean }> {
+    return this.get('/series/oi', { symbol, from: fromMs, to: toMs });
+  }
+
+  async longShort(symbol: string, fromMs: number, toMs: number, kind: string): Promise<WebLongShortResponse> {
+    return this.get<WebLongShortResponse>('/series/ls', { symbol, from: fromMs, to: toMs, kind });
+  }
+
+  async liquidations(symbol: string, fromMs: number, toMs: number, bucket: string, venue = 'all'): Promise<WebLiquidationsResponse> {
+    return this.get<WebLiquidationsResponse>('/series/liquidations', { symbol, from: fromMs, to: toMs, bucket, venue });
+  }
+
+  async topLiquidations(symbol: string, fromMs: number, toMs: number, n = 50): Promise<{ symbol: string; rows: WebTopLiquidation[] }> {
+    return this.get('/series/liquidations/top', { symbol, from: fromMs, to: toMs, n });
   }
 
   /**

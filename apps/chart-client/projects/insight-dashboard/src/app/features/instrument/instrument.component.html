@@ -1,0 +1,81 @@
+<section class="instrument">
+  <header class="controls">
+    <div class="picker">
+      <label for="symbol-input">Инструмент</label>
+      <input
+        id="symbol-input"
+        type="text"
+        [value]="typed()"
+        (input)="typed.set($any($event.target).value)"
+        (keyup.enter)="select(typed())"
+        placeholder="{{ symbol() }}"
+        list="top-symbols"
+        autocomplete="off"
+      />
+      <datalist id="top-symbols">
+        @for (s of universe(); track s.id) {
+          <option [value]="s.id">{{ s.volumeRank }} · {{ s.base }}</option>
+        }
+      </datalist>
+      <div class="chips">
+        @for (s of universe(); track s.id) {
+          <button type="button" class="chip" [class.active]="s.id === symbol()" (click)="select(s.id)">{{ s.id }}</button>
+        }
+      </div>
+    </div>
+
+    <div class="switches">
+      <div class="group" role="group" aria-label="Период">
+        @for (p of presets; track p.key) {
+          <button type="button" [class.active]="p.key === preset().key" (click)="choosePreset(p)">{{ p.label }}</button>
+        }
+      </div>
+      <div class="group" role="group" aria-label="Таймфрейм">
+        @for (tf of timeframes(); track tf) {
+          <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ tf }}</button>
+        }
+      </div>
+      <button type="button" class="market" (click)="toggleMarket()">{{ market() === 'perp' ? 'перп' : 'спот' }}</button>
+    </div>
+  </header>
+
+  @if (coarsenedTo(); as tf) {
+    <p class="note">Для выбранного периода минутные свечи не отдаются — показан таймфрейм {{ tf }}.</p>
+  }
+  @if (downsampled()) {
+    <p class="note">Точек больше лимита — часть прорежена для отображения.</p>
+  }
+  @if (error(); as message) {
+    <p class="error">Не удалось загрузить данные: {{ message }}</p>
+  }
+  @if (loading()) {
+    <p class="note">Загрузка…</p>
+  }
+
+  @if (panes(); as data) {
+    <app-instrument-chart [data]="data" />
+
+    <h2 class="table-title">50 крупнейших ликвидаций за период</h2>
+    <table class="top">
+      <thead>
+        <tr><th>Время (UTC)</th><th>Биржа</th><th>Сторона</th><th class="num">Цена</th><th class="num">Объём</th><th class="num">Сумма</th></tr>
+      </thead>
+      <tbody>
+        @for (row of top(); track row.time + row.venue + row.notional) {
+          <tr>
+            <td>{{ row.time * 1000 | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}</td>
+            <td>{{ row.venue }}</td>
+            <td [class.long]="row.side === 'long'" [class.short]="row.side === 'short'">
+              {{ row.side === 'long' ? 'лонг' : 'шорт' }}
+            </td>
+            <td class="num">{{ row.price }}</td>
+            <td class="num">{{ row.qty }}</td>
+            <td class="num">{{ row.notional | number: '1.0-0' }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="muted">За период ликвидаций не было.</td></tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

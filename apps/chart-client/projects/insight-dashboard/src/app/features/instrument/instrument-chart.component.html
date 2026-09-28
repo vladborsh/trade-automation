@@ -1,0 +1,6 @@
+<div class="chart-stack">
+  <div #chartHost class="chart-host"></div>
+  @if (data(); as d) {
+    <p class="pane-note">{{ paneTitle(d.bucket, d.liquidations.venue, d.liquidations.undercounted) }}</p>
+  }
+</div>

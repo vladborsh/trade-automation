@@ -1,0 +1,21 @@
+/* The dark-terminal palette (AGENTS.md), not a near-duplicate of it. */
+.chart-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.chart-host {
+  /* the six panes need room; below this the time scale and the pane titles collide */
+  min-height: 720px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+}
+
+.pane-note {
+  margin: 0;
+  padding: 2px 4px;
+  color: #8b949e;
+  font-size: 12px;
+}

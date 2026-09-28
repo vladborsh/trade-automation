@@ -19,13 +19,22 @@ const PRICE_FORMAT = { type: 'custom' as const, formatter: formatCompact, minMov
 export class MetricSeriesRenderer {
   private chart: IChartApi | null = null;
   private drawn: Drawn | null = null;
+  /**
+   * Which chart pane the series lives in. Defaults to 0, which is what every backtest call site
+   * has always got — the backtest panel gives each metric its own chart, so pane 0 is the only
+   * pane there. IB-031 draws price and open interest on ONE chart, where OI must have its own
+   * pane or its notional (10^9) flattens the candles (10^4) into a line. Generalised in place
+   * rather than forked, the same way IB-030 generalised `ApiError`.
+   */
+  private pane = 0;
 
   get series(): MetricSeriesApi | null {
     return this.drawn?.series ?? null;
   }
 
-  attach(chart: IChartApi, tf: Timeframe): MetricSeriesApi {
+  attach(chart: IChartApi, tf: Timeframe, pane = 0): MetricSeriesApi {
     this.chart = chart;
+    this.pane = pane;
     this.drawn = this.create(chart, metricSeriesStyle(tf));
     return this.drawn.series;
   }
@@ -66,7 +75,7 @@ export class MetricSeriesRenderer {
           lineWidth: 2,
           lastValueVisible: true,
           priceFormat: PRICE_FORMAT,
-        }),
+        }, this.pane),
       };
     }
     return {
@@ -78,7 +87,7 @@ export class MetricSeriesRenderer {
         wickUpColor: METRIC_UP_COLOR,
         wickDownColor: METRIC_DOWN_COLOR,
         priceFormat: PRICE_FORMAT,
-      }),
+      }, this.pane),
     };
   }
 }

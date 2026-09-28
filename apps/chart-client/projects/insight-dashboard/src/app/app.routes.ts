@@ -19,7 +19,10 @@ export const routes: Routes = [
     path: 'coverage',
     loadComponent: () => import('./features/coverage/coverage.component').then((m) => m.CoverageComponent),
   },
-  { path: 'instrument/:symbol', redirectTo: 'health' }, // IB-031
+  {
+    path: 'instrument/:symbol',
+    loadComponent: () => import('./features/instrument/instrument.component').then((m) => m.InstrumentComponent),
+  },
   { path: 'market', redirectTo: 'health' }, // IB-037
   { path: '**', redirectTo: 'health' },
 ];
