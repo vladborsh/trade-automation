@@ -3,7 +3,7 @@ import type { AggTimeframe, CandleAggRow } from '../collectors/writers/tables';
 import type { Db } from '../db/db.port';
 import { Writers } from '../collectors/writers/batch-writer';
 import { AGG_TIMEFRAMES, bucketStart, foldAll, foldBucket, justClosedBucket, MINUTE_MS, TF_MINUTES } from './bucket';
-import { candles1mBetween, seriesWithRows } from './derive.reads';
+import { candles1mBetween, incompleteBuckets, seriesWithRows } from './derive.reads';
 
 /**
  * IB-014 — folds 1m rows into `candles_agg` (design §8.1, D4).
@@ -53,6 +53,36 @@ export class DeriveService {
       }
     }
     return written;
+  }
+
+  /**
+   * Looks again at buckets still marked incomplete, and re-folds any whose missing minutes have
+   * since arrived. Called every tick; bounded by `lookbackMs`, and idempotent because the upsert is
+   * keyed on the bucket.
+   *
+   * This is what keeps a late 1m row from leaving a wrong bar on a chart for good: degraded-mode
+   * REST polling (§16.1) can deliver the closing minute ~15 s after close, past §8.1's 5 s grace,
+   * and GapRepair can fill a hole minutes later. Both are normal; a permanently short coarse bar is
+   * not.
+   */
+  async healIncomplete(now: number, lookbackMs = 2 * 3_600_000): Promise<number> {
+    const stale = await incompleteBuckets(this.db, now, lookbackMs);
+    let healed = 0;
+    for (const bucket of stale) {
+      const tf = bucket.tf as AggTimeframe;
+      const span = TF_MINUTES[tf] * MINUTE_MS;
+      const start = bucket.openTime.getTime();
+      if (start + span > now) continue; // still open: not late, just not finished
+      const minutes = await candles1mBetween(this.db, bucket.venue, bucket.market, bucket.symbol, start, start + span);
+      const bar = foldBucket(minutes, tf, start);
+      if (!bar || bar.bars === 0) continue;
+      await this.writers.candlesAgg.write([bar]);
+      if (bar.complete) {
+        healed++;
+        this.logger.log(`${bucket.market} ${bucket.symbol} ${tf}@${bucket.openTime.toISOString()} is complete now (${bar.bars} bars)`);
+      }
+    }
+    return healed;
   }
 
   /**

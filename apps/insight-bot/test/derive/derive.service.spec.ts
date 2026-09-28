@@ -102,3 +102,57 @@ describe('DeriveService.deriveRange', () => {
     expect(bars[0]).toMatchObject({ openTime: new Date(T0), bars: 60, complete: true });
   });
 });
+
+describe('DeriveService.healIncomplete (the late-minute case, measured on a live run)', () => {
+  function healBuild(rows: Candle1mRow[], incomplete: Array<{ tf: string; openTime: Date }>) {
+    const written: CandleAggRow[][] = [];
+    const db = {
+      query: async (sql: string, params?: readonly unknown[]) => {
+        if (sql.includes('complete = false')) {
+          return incomplete.map((i) => ({ venue: 'binance', market: 'perp', symbol: 'BTCUSDT', tf: i.tf, openTime: i.openTime }));
+        }
+        if (sql.includes('select distinct venue')) return [{ venue: 'binance', market: 'perp', symbol: 'BTCUSDT' }];
+        const from = (params?.[3] ?? params?.[0]) as Date;
+        const to = (params?.[4] ?? params?.[1]) as Date;
+        return rows
+          .filter((r) => r.openTime >= from && r.openTime < to)
+          .map((r) => ({
+            venue: r.venue, market: r.market, symbol: r.symbol, open_time: r.openTime,
+            open: String(r.open), high: String(r.high), low: String(r.low), close: String(r.close),
+            volume: String(r.volume), quote_volume: String(r.quoteVolume), trades: r.trades,
+            taker_buy_volume: String(r.takerBuyVolume), taker_buy_quote_volume: String(r.takerBuyQuoteVolume),
+            source: r.source,
+          }));
+      },
+    };
+    const writers = { candlesAgg: { write: async (batch: readonly CandleAggRow[]) => (written.push([...batch]), batch.length) } };
+    return { service: new DeriveService(db as never, writers as never), written };
+  }
+
+  it('re-folds a bucket whose missing minute has since arrived, and reports it complete', async () => {
+    // the live case: 14 of 15 at derive time, all 15 present a few seconds later
+    const { service, written } = healBuild(minutes(15), [{ tf: '15m', openTime: new Date(T0) }]);
+    const healed = await service.healIncomplete(T0 + 20 * M);
+    expect(healed).toBe(1);
+    expect(written.flat()[0]).toMatchObject({ bars: 15, complete: true });
+  });
+
+  it('rewrites the bar but does not count it healed while it is still short', async () => {
+    const { service, written } = healBuild(minutes(14), [{ tf: '15m', openTime: new Date(T0) }]);
+    expect(await service.healIncomplete(T0 + 20 * M)).toBe(0);
+    expect(written.flat()[0]).toMatchObject({ bars: 14, complete: false });
+  });
+
+  it('leaves a bucket that has not closed yet alone — it is unfinished, not late', async () => {
+    const { service, written } = healBuild(minutes(15), [{ tf: '1h', openTime: new Date(T0) }]);
+    expect(await service.healIncomplete(T0 + 30 * M)).toBe(0);
+    expect(written).toEqual([]);
+  });
+
+  it('is idempotent — healing twice writes the same bar', async () => {
+    const { service, written } = healBuild(minutes(15), [{ tf: '15m', openTime: new Date(T0) }]);
+    await service.healIncomplete(T0 + 20 * M);
+    await service.healIncomplete(T0 + 20 * M);
+    expect(written[0]).toEqual(written[1]);
+  });
+});

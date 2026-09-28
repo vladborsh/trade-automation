@@ -58,3 +58,29 @@ export async function seriesWithRows(
     [new Date(fromMs), new Date(toMsExclusive)],
   );
 }
+
+/**
+ * IB-014 — buckets still marked incomplete whose window has closed, newest first.
+ *
+ * Why this exists: the §8.1 grace is 5 s, which is right for the WS path, but §16.1's degraded REST
+ * mode polls non-signal-set symbols every **15 s**, so their last 1m row lands after the grace and
+ * the coarse bar is written one minute short. GapRepair filling a hole minutes later does the same.
+ * Measured on a live run: 28 of 60 15m buckets were written at 14/15 bars, and all 15 rows were in
+ * the table moments later. Re-folding is idempotent, so the fix is to look again rather than to
+ * widen the grace and hope.
+ */
+export async function incompleteBuckets(
+  db: Db,
+  nowMs: number,
+  lookbackMs: number,
+): Promise<Array<{ venue: string; market: string; symbol: string; tf: string; openTime: Date }>> {
+  return db.query(
+    `select venue, market, symbol, tf, open_time as "openTime"
+       from candles_agg
+      where complete = false
+        and open_time >= $1
+        and open_time < $2
+      order by open_time desc`,
+    [new Date(nowMs - lookbackMs), new Date(nowMs)],
+  );
+}

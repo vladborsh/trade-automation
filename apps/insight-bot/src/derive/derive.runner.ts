@@ -46,7 +46,11 @@ export class DeriveRunner implements OnApplicationBootstrap, OnModuleDestroy {
   private async tick(): Promise<void> {
     try {
       // the grace is subtracted so a bucket that closed at HH:MM:00 is recognised at HH:MM:05
-      await this.service.deriveClosedBuckets(Date.now() - GRACE_MS);
+      const now = Date.now();
+      await this.service.deriveClosedBuckets(now - GRACE_MS);
+      // and look again at anything still short: a degraded-mode poll or a gap repair can deliver a
+      // minute after the grace, and re-folding is idempotent (IB-014)
+      await this.service.healIncomplete(now);
     } catch (error) {
       this.logger.warn(`derive tick failed: ${(error as Error).message}`);
     } finally {
