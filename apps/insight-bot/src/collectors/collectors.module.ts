@@ -3,6 +3,7 @@ import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { OpsModule } from '../ops/ops.module';
 import { BinancePerpService } from './binance-perp/binance-perp.service';
+import { BinanceSpotService } from './binance-spot/binance-spot.service';
 import { BinanceWeightTracker } from './binance-perp/binance-weight.tracker';
 import { OiLsPoller } from './binance-perp/oi-ls.poller';
 import { BybitService } from './bybit/bybit.service';
@@ -31,7 +32,7 @@ export class CollectorsModule {
       module: CollectorsModule,
       imports: [AppConfigModule, DbModule, OpsModule, WritersModule],
       providers: [
-        BinancePerpService, BinanceWeightTracker, OiLsPoller, BybitService,
+        BinancePerpService, BinanceSpotService, BinanceWeightTracker, OiLsPoller, BybitService,
         // IB-011: the operator's instruments. They live behind the same switch because the report
         // reads the collectors' tables and the watchdog watches their streams.
         TelegramSender, WatchdogService, GapReportService,

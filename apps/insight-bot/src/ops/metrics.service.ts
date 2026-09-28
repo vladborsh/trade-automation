@@ -23,6 +23,8 @@ export class MetricsService {
    */
   private weightSource: (() => number) | null = null;
   private binanceWeightUsed1m = 0;
+  /** IB-006: spot's own trailing-minute weight, against its own 6000/min ceiling (§4.5). */
+  private binanceSpotWeightUsed1m = 0;
 
   readonly rowsWritten = new client.Counter({
     name: 'ib_rows_written_total',
@@ -77,6 +79,17 @@ export class MetricsService {
         this.set(self.getBinanceWeightUsed1m());
       },
     });
+
+    // A separate series, never added to the futures gauge: the venue meters `api.binance.com` and
+    // `fapi.binance.com` apart, so each number is only meaningful against its own ceiling (§6.1).
+    new client.Gauge({
+      name: 'ib_binance_spot_weight_used_1m',
+      help: 'Binance SPOT REST weight used in the trailing minute (budget 6000/min, §4.2)',
+      registers: [this.registry],
+      collect() {
+        this.set(self.getBinanceSpotWeightUsed1m());
+      },
+    });
   }
 
   /** Registers the live reader. The collector calls this once, at boot. */
@@ -91,5 +104,14 @@ export class MetricsService {
 
   getBinanceWeightUsed1m(): number {
     return this.weightSource !== null ? this.weightSource() : this.binanceWeightUsed1m;
+  }
+
+  /** IB-006: the spot collector reports its `x-mbx-used-weight-1m` here, and nowhere else. */
+  setBinanceSpotWeightUsed1m(weight: number): void {
+    this.binanceSpotWeightUsed1m = weight;
+  }
+
+  getBinanceSpotWeightUsed1m(): number {
+    return this.binanceSpotWeightUsed1m;
   }
 }

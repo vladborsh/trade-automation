@@ -14,7 +14,9 @@ export const InstrumentIdSchema = z
     return VenueSchema.safeParse(venue).success && rest.join(':').length > 0;
   }, { message: 'InstrumentId must be "<venue>:<symbol>"' }) as z.ZodType<InstrumentId>;
 
-export const AssetClassSchema = z.enum(['crypto-perp', 'index-cfd', 'forex-cfd', 'equity']);
+// IB-006: `crypto-spot` joined the set when the Binance spot collector landed — a spot market is
+// not a perp (no funding, no mark price), and the insight bot keys its spot bars on it.
+export const AssetClassSchema = z.enum(['crypto-perp', 'crypto-spot', 'index-cfd', 'forex-cfd', 'equity']);
 export type AssetClass = z.infer<typeof AssetClassSchema>;
 
 /**

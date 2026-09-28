@@ -1,3 +1,4 @@
+import type { AppConfigService } from '../src/config/config.service';
 import { HealthController } from '../src/ops/health.controller';
 import { MetricsController } from '../src/ops/metrics.controller';
 import { MetricsService } from '../src/ops/metrics.service';
@@ -60,11 +61,34 @@ describe('StreamRegistry', () => {
   });
 });
 
+/** Only `symbols` is read by /health (IB-006's `noSpot`). */
+const config = (symbols: { id: string; binance_spot?: string }[] = []) => ({ symbols }) as unknown as AppConfigService;
+
 describe('GET /health', () => {
   it('answers the §6.1 shape, with no streams and no measurable db lag at this stage', () => {
     const streams = new StreamRegistry();
-    const controller = new HealthController(streams, new MetricsService(streams));
-    expect(controller.get()).toEqual({ streams: [], db: { lagSec: null }, budget: { binanceWeightUsed1m: 0 } });
+    const controller = new HealthController(streams, new MetricsService(streams), config());
+    expect(controller.get()).toEqual({
+      streams: [],
+      db: { lagSec: null },
+      budget: { binanceWeightUsed1m: 0, binanceSpotWeightUsed1m: 0 },
+      noSpot: [],
+    });
+  });
+
+  it('IB-006: a universe symbol with no binance_spot mapping is listed under noSpot, and spot weight is its own figure', () => {
+    const streams = new StreamRegistry();
+    const metrics = new MetricsService(streams);
+    metrics.setBinanceWeightUsed1m(240);
+    metrics.setBinanceSpotWeightUsed1m(12);
+    const health = new HealthController(
+      streams,
+      metrics,
+      config([{ id: 'BTCUSDT', binance_spot: 'BTCUSDT' }, { id: 'FOOUSDT' }]),
+    ).get();
+    expect(health.noSpot).toEqual(['FOOUSDT']);
+    // the two budgets are metered apart by the venue and never summed (§4.5, §6.1)
+    expect(health.budget).toEqual({ binanceWeightUsed1m: 240, binanceSpotWeightUsed1m: 12 });
   });
 
   it('reports each registered stream and the current Binance weight', () => {
@@ -74,7 +98,7 @@ describe('GET /health', () => {
     streams.setGapsOpen('binance-perp:markPrice', 2);
     metrics.setBinanceWeightUsed1m(240);
 
-    const health = new HealthController(streams, metrics).get();
+    const health = new HealthController(streams, metrics, config()).get();
     expect(health.streams).toEqual([
       { id: 'binance-perp:markPrice', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 2, mode: 'ws', degradedReason: null, expectedIntervalSec: null },
     ]);
@@ -83,7 +107,7 @@ describe('GET /health', () => {
 });
 
 describe('GET /metrics', () => {
-  it('exposes the six §6.1 metric names', async () => {
+  it('exposes the §6.1 metric names, spot weight as its own series', async () => {
     const streams = new StreamRegistry();
     const metrics = new MetricsService(streams);
     streams.register('binance-perp:kline_1m', 'binance');
@@ -100,6 +124,7 @@ describe('GET /metrics', () => {
       'ib_gaps_detected_total',
       'ib_gaps_unrepaired_total',
       'ib_binance_weight_used_1m',
+      'ib_binance_spot_weight_used_1m',
       'ib_ws_reconnects_total',
     ]) {
       expect(body).toContain(name);
