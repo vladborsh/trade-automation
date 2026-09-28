@@ -28,6 +28,10 @@ const ALLOWED = new Set([
   '1m', '5m', '15m', '1h', '4h', '1d', 'ws', 'degraded', 'perp', 'spot',
   // venue and series names, as the venue and the schema spell them
   'binance', 'bybit', 'okx', 'futures', 'candles_1m', 'candles_agg', 'open_interest_5m', 'long_short_5m',
+  // §11 keeps "field names in tables of raw data" English in BOTH languages: these are the
+  // columns and side values of the liquidations table, which a reader matches against the
+  // venue's own data and our logs. Prose around them is translated; these are not prose.
+  'time', 'UTC', 'venue', 'side', 'price', 'qty', 'notional', 'long', 'short',
 ]);
 
 function templateFiles(dir: string): string[] {

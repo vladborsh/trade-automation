@@ -58,7 +58,9 @@
     <h2 class="table-title">{{ t('instrument.topTitle') }}</h2>
     <table class="top">
       <thead>
-        <tr><th>{{ t('instrument.col.time') }}</th><th>{{ t('instrument.col.venue') }}</th><th>{{ t('instrument.col.side') }}</th><th class="num">{{ t('instrument.col.price') }}</th><th class="num">{{ t('instrument.col.qty') }}</th><th class="num">{{ t('instrument.col.notional') }}</th></tr>
+        <!-- §11 English-by-rule: field names in a table of raw data, which a reader matches
+             against the venue's own data and our logs. Allow-listed in no-literals.spec.ts. -->
+        <tr><th>time (UTC)</th><th>venue</th><th>side</th><th class="num">price</th><th class="num">qty</th><th class="num">notional</th></tr>
       </thead>
       <tbody>
         @for (row of top(); track row.time + row.venue + row.notional) {
@@ -66,7 +68,7 @@
             <td>{{ row.time * 1000 | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}</td>
             <td>{{ row.venue }}</td>
             <td [class.long]="row.side === 'long'" [class.short]="row.side === 'short'">
-              {{ t(row.side === 'long' ? 'instrument.side.long' : 'instrument.side.short') }}
+              {{ row.side }}
             </td>
             <td class="num">{{ row.price }}</td>
             <td class="num">{{ row.qty }}</td>
