@@ -2,11 +2,11 @@
 
 Canonical definitions for the observables the crypto insight bot collects and
 the playbooks it evaluates (`architecture/insight-bot-system-design.md`).
-Reference, not a log. Status of each concept as evidence: **nothing here has
-been tested yet** — the squeeze family is closed in its simple forms
-(`derivatives-positioning.md` §4, `research/funding-rate-signals/REPORT.md`);
-the full-form squeeze and the spot-lead label are under pre-registered passes
-(`research/squeeze-full-form/`, `research/spot-lead/`); liquidation-feed
+Reference, not a log. Status of each concept as evidence: the squeeze family
+is closed in its simple forms (`derivatives-positioning.md` §4,
+`research/funding-rate-signals/REPORT.md`); the full-form squeeze is under a
+pre-registered pass (`research/squeeze-full-form/`); **the spot-vs-perp label
+was tested and killed 2026-09-28** (§3, `research/spot-lead/REPORT.md`); liquidation-feed
 signals have never been researched because the data did not exist before
 2026-09-28.
 
@@ -75,6 +75,17 @@ length changes the answer (fixed at 4 h; not tuned), and market-makers'
 maker/taker switching adds noise. Whether the label predicts anything is the
 `research/spot-lead/` question; until it answers, the label is context and
 score decoration only.
+
+**Tested 2026-09-28 — no information beyond price** (`research/spot-lead/`,
+Запись 36; 8 Binance perps, 2020-01 .. 2025-07, 1m spot and perp taker
+volume). `SPOT_LED` is the ordinary advance (69 % of all 4 h advances), lasts
+one bar (mean run 1.3), and its 1–5 day follow-through equals `PERP_LED`'s
+(5-day drift +0.650 vs +0.648 ATR). As a +1R/5-day long the two differ by
++0.005R [−0.041, +0.051]; as a filter on "buy every advance" it changes the
+mean by +0.0001R; the absorption long (−0.060R) is beaten by its price shadow.
+Consequence: the bot shows the label, gives it **weight 0**, and gates nothing
+on it. A future spot/perp flow idea needs a different observable (size, other
+venues, Coinbase premium) — the sign of Binance spot CVD over 4 h is spent.
 
 ## 4. Open interest and long/short ratios (pointer)
 

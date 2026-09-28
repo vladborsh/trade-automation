@@ -1132,7 +1132,12 @@ plausible daily sd (SE ≈ 1–2 % p.a. on two years); the level bar is.
 
 ## Spot–perp basis and spot-lead signals (Binance spot vs USD-M perp)
 
-**Status:** **arm (b) spot-lead confirmation DISPATCHED 2026-09-28** to the
+**Status:** **arm (b) spot-lead confirmation CLOSED 2026-09-28 — NO EDGE,
+fit-period kill on all four arms** (`research/spot-lead/REPORT.md`,
+`RESEARCH-LOG.md` Запись 36): spot-led vs perp-led advance contrast +0.005R
+[−0.041, +0.051]; as a filter Δ +0.0001R at 84 % kept; holdout never read.
+P4 stays a displayed context with score weight 0. Arm (a) basis-extreme
+convergence stays parked. Dispatch record: **arm (b) dispatched 2026-09-28** to the
 Researcher as the research gate for the insight bot's P4 label —
 pre-registration `research/spot-lead/ARCHITECT-NOTE.md` (four arms, α = 0.0125,
 price shadow gating). Arm (a) basis-extreme convergence stays parked.
@@ -1595,7 +1600,10 @@ any new backtest-app work). Two research gates dispatched the same day:
   failed highs, spot CVD not confirming) demonstrably rescue it; a kill closes
   the squeeze family.
 - **P4 spot-lead label** → arm (b) of the "Spot–perp basis" entry above,
-  `research/spot-lead/ARCHITECT-NOTE.md`.
+  `research/spot-lead/ARCHITECT-NOTE.md`. **Result 2026-09-28: kill** (all
+  four arms fit-period NO EDGE, Запись 36) → `label.p4` displayed only,
+  score weight 0, no `context_gate` (design §8.5's `10·confirmations(P4)`
+  term to be zeroed by the Architect).
 Ungated, built and run in `SHADOW` on collected data: **P3 post-cascade
 reversal** (liquidation feeds have no history, so history-first is impossible;
 the first admissible read is ≥ 4 weeks of live shadow plus a replay over the

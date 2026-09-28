@@ -261,7 +261,7 @@ the prose definition, for whoever reads this next.
 | [`smart-money-ict.md`](knowledge/smart-money-ict.md) | ICT true-open levels, premium/discount, proximal-edge iFVG; the `cmc-bot` H1-bias → M1-iFVG strategy as coded |
 | [`opening-range-breakout.md`](knowledge/opening-range-breakout.md) | Opening-range breakout at the NY cash open: OR/trigger/stop/exit definitions, eligibility calendar, the imported crypto anchor; measurement conventions of the `orb-ny-open` pass |
 | [`venue-contract-specs.md`](knowledge/venue-contract-specs.md) | Binance perp and Capital.com CFD contract specs: quantity unit, multiplier, minimum/step, leverage cap per regulated entity (EU/UK retail chosen), sources, and the API request that confirms them; feeds `instruments.yaml` `contract:` blocks |
-| [`forced-flow.md`](knowledge/forced-flow.md) | Liquidation feeds (side convention, Binance 1 event/s undercount, no history), settled vs predicted funding and the multi-venue extreme count, CVD from taker-buy volume and the spot-vs-perp labels; all untested as of 2026-09-28, with pointers to the two open passes |
+| [`forced-flow.md`](knowledge/forced-flow.md) | Liquidation feeds (side convention, Binance 1 event/s undercount, no history), settled vs predicted funding and the multi-venue extreme count, CVD from taker-buy volume and the spot-vs-perp labels; the spot-vs-perp label tested and killed 2026-09-28 (`research/spot-lead/`), the rest untested, with a pointer to the open squeeze pass |
 
 ## Architecture
 
