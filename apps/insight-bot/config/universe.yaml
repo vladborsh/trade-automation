@@ -1,0 +1,286 @@
+# Top-30 Binance USD-M perps by 30-day quote volume, revised by hand monthly
+# (architecture/insight-bot-system-design.md §2.3, brief §3). Static on purpose.
+#
+# Measured 2026-09-28 (IB-003): fapi/v1/klines 1d, the 30 closed UTC days before that
+# date, summed on quote volume. Tokenised equity and commodity perps (XAUUSDT, CLUSDT,
+# SOXLUSDT, MSTRUSDT, NVDAUSDT, ...) rank inside the raw top 30 but are excluded: they have
+# no Binance spot market, so no spot CVD and none of the crypto regime this bot reads.
+# The filter is exactly that — a perp qualifies only if its base has a Binance spot USDT pair.
+#
+# listed_perp is the first bar in the data.binance.vision USD-M archive, which is what the
+# backfill (§5) can actually start from; for the 2020-01 symbols the perp itself is older
+# than the archive.
+
+signal_set: [BTCUSDT, ETHUSDT, SOLUSDT]        # stage-1 playbooks evaluate only these
+
+symbols:
+  - id: BTCUSDT
+    base: BTC
+    quote: USDT
+    binance_perp: BTCUSDT
+    binance_spot: BTCUSDT
+    bybit_linear: BTCUSDT
+    okx_swap: BTC-USDT-SWAP
+    listed_perp: 2020-01-01
+    # 30d quote volume 326.2bn USD
+  - id: ETHUSDT
+    base: ETH
+    quote: USDT
+    binance_perp: ETHUSDT
+    binance_spot: ETHUSDT
+    bybit_linear: ETHUSDT
+    okx_swap: ETH-USDT-SWAP
+    listed_perp: 2020-01-01
+    # 30d quote volume 260.4bn USD
+  - id: ZECUSDT
+    base: ZEC
+    quote: USDT
+    binance_perp: ZECUSDT
+    binance_spot: ZECUSDT
+    bybit_linear: ZECUSDT
+    okx_swap: ZEC-USDT-SWAP
+    listed_perp: 2020-02-05
+    # 30d quote volume 68.5bn USD
+  - id: SOLUSDT
+    base: SOL
+    quote: USDT
+    binance_perp: SOLUSDT
+    binance_spot: SOLUSDT
+    bybit_linear: SOLUSDT
+    okx_swap: SOL-USDT-SWAP
+    listed_perp: 2020-09-14
+    # 30d quote volume 60.8bn USD
+  - id: XRPUSDT
+    base: XRP
+    quote: USDT
+    binance_perp: XRPUSDT
+    binance_spot: XRPUSDT
+    bybit_linear: XRPUSDT
+    okx_swap: XRP-USDT-SWAP
+    listed_perp: 2020-01-06
+    # 30d quote volume 36.5bn USD
+  - id: HYPEUSDT
+    base: HYPE
+    quote: USDT
+    binance_perp: HYPEUSDT
+    binance_spot: HYPEUSDT
+    bybit_linear: HYPEUSDT
+    okx_swap: HYPE-USDT-SWAP
+    listed_perp: 2025-05-30
+    # 30d quote volume 20.5bn USD
+  - id: DOGEUSDT
+    base: DOGE
+    quote: USDT
+    binance_perp: DOGEUSDT
+    binance_spot: DOGEUSDT
+    bybit_linear: DOGEUSDT
+    okx_swap: DOGE-USDT-SWAP
+    listed_perp: 2020-07-10
+    # 30d quote volume 16.1bn USD
+  - id: NEARUSDT
+    base: NEAR
+    quote: USDT
+    binance_perp: NEARUSDT
+    binance_spot: NEARUSDT
+    bybit_linear: NEARUSDT
+    okx_swap: NEAR-USDT-SWAP
+    listed_perp: 2020-10-15
+    # 30d quote volume 14.8bn USD
+  - id: UNIUSDT
+    base: UNI
+    quote: USDT
+    binance_perp: UNIUSDT
+    binance_spot: UNIUSDT
+    bybit_linear: UNIUSDT
+    okx_swap: UNI-USDT-SWAP
+    listed_perp: 2020-09-18
+    # 30d quote volume 12.9bn USD
+  - id: BNBUSDT
+    base: BNB
+    quote: USDT
+    binance_perp: BNBUSDT
+    binance_spot: BNBUSDT
+    bybit_linear: BNBUSDT
+    okx_swap: BNB-USDT-SWAP
+    listed_perp: 2020-02-10
+    # 30d quote volume 11.9bn USD
+  - id: SUIUSDT
+    base: SUI
+    quote: USDT
+    binance_perp: SUIUSDT
+    binance_spot: SUIUSDT
+    bybit_linear: SUIUSDT
+    okx_swap: SUI-USDT-SWAP
+    listed_perp: 2023-05-03
+    # 30d quote volume 11.0bn USD
+  - id: ENAUSDT
+    base: ENA
+    quote: USDT
+    binance_perp: ENAUSDT
+    binance_spot: ENAUSDT
+    bybit_linear: ENAUSDT
+    okx_swap: ENA-USDT-SWAP
+    listed_perp: 2024-04-02
+    # 30d quote volume 9.3bn USD
+  - id: 1000PEPEUSDT
+    base: PEPE
+    quote: USDT
+    binance_perp: 1000PEPEUSDT
+    binance_spot: PEPEUSDT
+    bybit_linear: 1000PEPEUSDT
+    okx_swap: PEPE-USDT-SWAP
+    listed_perp: 2023-05-05
+    # 30d quote volume 8.8bn USD
+  - id: ARBUSDT
+    base: ARB
+    quote: USDT
+    binance_perp: ARBUSDT
+    binance_spot: ARBUSDT
+    bybit_linear: ARBUSDT
+    okx_swap: ARB-USDT-SWAP
+    listed_perp: 2023-03-23
+    # 30d quote volume 7.5bn USD
+  - id: WLDUSDT
+    base: WLD
+    quote: USDT
+    binance_perp: WLDUSDT
+    binance_spot: WLDUSDT
+    bybit_linear: WLDUSDT
+    okx_swap: WLD-USDT-SWAP
+    listed_perp: 2023-07-24
+    # 30d quote volume 6.2bn USD
+  - id: ADAUSDT
+    base: ADA
+    quote: USDT
+    binance_perp: ADAUSDT
+    binance_spot: ADAUSDT
+    bybit_linear: ADAUSDT
+    okx_swap: ADA-USDT-SWAP
+    listed_perp: 2020-01-31
+    # 30d quote volume 6.1bn USD
+  - id: PUMPUSDT
+    base: PUMP
+    quote: USDT
+    binance_perp: PUMPUSDT
+    binance_spot: PUMPUSDT
+    # bybit_linear: not listed on Bybit linear (2026-09-28)
+    okx_swap: PUMP-USDT-SWAP
+    listed_perp: 2025-04-12
+    # 30d quote volume 5.6bn USD
+  - id: LINKUSDT
+    base: LINK
+    quote: USDT
+    binance_perp: LINKUSDT
+    binance_spot: LINKUSDT
+    bybit_linear: LINKUSDT
+    okx_swap: LINK-USDT-SWAP
+    listed_perp: 2020-01-17
+    # 30d quote volume 5.5bn USD
+  - id: TAOUSDT
+    base: TAO
+    quote: USDT
+    binance_perp: TAOUSDT
+    binance_spot: TAOUSDT
+    bybit_linear: TAOUSDT
+    okx_swap: TAO-USDT-SWAP
+    listed_perp: 2024-04-11
+    # 30d quote volume 5.5bn USD
+  - id: TRUMPUSDT
+    base: TRUMP
+    quote: USDT
+    binance_perp: TRUMPUSDT
+    binance_spot: TRUMPUSDT
+    bybit_linear: TRUMPUSDT
+    okx_swap: TRUMP-USDT-SWAP
+    listed_perp: 2025-01-18
+    # 30d quote volume 5.5bn USD
+  - id: AVAXUSDT
+    base: AVAX
+    quote: USDT
+    binance_perp: AVAXUSDT
+    binance_spot: AVAXUSDT
+    bybit_linear: AVAXUSDT
+    okx_swap: AVAX-USDT-SWAP
+    listed_perp: 2020-09-23
+    # 30d quote volume 5.0bn USD
+  - id: MARSCOINUSDT
+    base: MARSCOIN
+    quote: USDT
+    binance_perp: MARSCOINUSDT
+    binance_spot: MARSCOINUSDT
+    bybit_linear: MARSCOINUSDT
+    # okx_swap: not listed on OKX SWAP (2026-09-28)
+    listed_perp: 2026-09-01
+    # 30d quote volume 4.8bn USD over 27 days — listed mid-window
+  - id: BCHUSDT
+    base: BCH
+    quote: USDT
+    binance_perp: BCHUSDT
+    binance_spot: BCHUSDT
+    bybit_linear: BCHUSDT
+    okx_swap: BCH-USDT-SWAP
+    listed_perp: 2020-01-01
+    # 30d quote volume 4.8bn USD
+  - id: FILUSDT
+    base: FIL
+    quote: USDT
+    binance_perp: FILUSDT
+    binance_spot: FILUSDT
+    bybit_linear: FILUSDT
+    okx_swap: FIL-USDT-SWAP
+    listed_perp: 2020-10-16
+    # 30d quote volume 4.4bn USD
+  - id: ONDOUSDT
+    base: ONDO
+    quote: USDT
+    binance_perp: ONDOUSDT
+    binance_spot: ONDOUSDT
+    bybit_linear: ONDOUSDT
+    okx_swap: ONDO-USDT-SWAP
+    listed_perp: 2024-01-20
+    # 30d quote volume 4.3bn USD
+  - id: LTCUSDT
+    base: LTC
+    quote: USDT
+    binance_perp: LTCUSDT
+    binance_spot: LTCUSDT
+    bybit_linear: LTCUSDT
+    okx_swap: LTC-USDT-SWAP
+    listed_perp: 2020-01-09
+    # 30d quote volume 3.9bn USD
+  - id: DASHUSDT
+    base: DASH
+    quote: USDT
+    binance_perp: DASHUSDT
+    binance_spot: DASHUSDT
+    bybit_linear: DASHUSDT
+    okx_swap: DASH-USDT-SWAP
+    listed_perp: 2020-02-04
+    # 30d quote volume 3.8bn USD
+  - id: ONEUSDT
+    base: ONE
+    quote: USDT
+    binance_perp: ONEUSDT
+    binance_spot: ONEUSDT
+    # bybit_linear: not listed on Bybit linear (2026-09-28)
+    okx_swap: ONE-USDT-SWAP
+    listed_perp: 2021-03-18
+    # 30d quote volume 3.6bn USD
+  - id: AAVEUSDT
+    base: AAVE
+    quote: USDT
+    binance_perp: AAVEUSDT
+    binance_spot: AAVEUSDT
+    bybit_linear: AAVEUSDT
+    okx_swap: AAVE-USDT-SWAP
+    listed_perp: 2020-10-16
+    # 30d quote volume 3.3bn USD
+  - id: QNTUSDT
+    base: QNT
+    quote: USDT
+    binance_perp: QNTUSDT
+    binance_spot: QNTUSDT
+    bybit_linear: QNTUSDT
+    okx_swap: QNT-USDT-SWAP
+    listed_perp: 2022-10-20
+    # 30d quote volume 3.0bn USD

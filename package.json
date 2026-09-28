@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build -w libs/contracts -w libs/indicators -w libs/replay-core -w libs/binance-client -w libs/market-data-core -w apps/signal-server -w apps/chart-client",
+    "build": "npm run build -w libs/contracts -w libs/indicators -w libs/replay-core -w libs/binance-client -w libs/market-data-core -w apps/signal-server -w apps/insight-bot -w apps/chart-client",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"
   }

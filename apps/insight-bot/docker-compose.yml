@@ -1,0 +1,38 @@
+# Local development only (architecture/insight-bot-system-design.md §7).
+#
+# There is **no postgres service here on purpose**: local dev uses the one Postgres this repo
+# already runs, from `apps/signal-server/docker-compose.yml`, with one database per slot
+# (`insight_coord`, `insight_dev1..3`, `insight_tester` — AGENTS.md). Start it there, create
+# your slot's database once, then bring this up:
+#
+#   docker compose -f apps/signal-server/docker-compose.yml up -d postgres
+#   docker compose -f apps/signal-server/docker-compose.yml exec postgres \
+#     psql -U backtest -c 'create database insight_dev2'
+#   INSIGHT_PORT=3025 INSIGHT_DB=insight_dev2 docker compose -f apps/insight-bot/docker-compose.yml up
+#
+# The production compose file (postgres + insight-bot on the EC2 box) is IB-013's, under
+# infra/insight-bot/. podman-compose compatible (plain keys only, no Docker-only extensions).
+services:
+  insight-bot:
+    build:
+      context: ../..
+      dockerfile: apps/insight-bot/Dockerfile
+    # Both default to the coordinator's slot; every dev slot must pass its own (AGENTS.md).
+    ports:
+      - "${INSIGHT_PORT:-3005}:${INSIGHT_PORT:-3005}"
+    environment:
+      NODE_ENV: development
+      PORT: "${INSIGHT_PORT:-3005}"
+      LOG_LEVEL: info
+      UNIVERSE_FILE: config/universe.yaml
+      # host.docker.internal reaches the signal-server compose project's Postgres, which
+      # publishes :5432 on the host — one server, one database per slot, never shared.
+      DATABASE_URL: postgresql://backtest:backtest@host.docker.internal:5432/${INSIGHT_DB:-insight_coord}
+      DB_MIGRATE_ON_BOOT: "true"
+      # Telegram tokens are the user's and are never committed: set them in the slot's .env
+      # (gitignored) and uncomment the two lines below to pass them through.
+      # TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      # TELEGRAM_SERVICE_CHAT_ID: ${TELEGRAM_SERVICE_CHAT_ID}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
