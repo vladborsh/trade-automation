@@ -2,6 +2,7 @@ import { WEB_MAX_1M_RANGE_DAYS } from '@trade-automation/contracts';
 import {
   allowedTimeframes, bucketFor, effectiveTimeframe, findPreset, isRefused, RANGE_PRESETS, rangeOf,
 } from './time-range';
+import { I18nService } from '../../i18n/i18n.service';
 
 /**
  * IB-031 — the page must never offer a range/timeframe pair the server refuses.
@@ -64,14 +65,17 @@ describe('bucketFor', () => {
   });
 });
 
-describe('the labels are all in ONE language', () => {
-  it('no label mixes scripts with its neighbours', () => {
-    // The dashboard will follow the member's `lang` once IB-030's string mechanism exists
-    // (dashboard design §11; IB-BUG-004 retrofits this page). Until then these labels are
-    // English, and what this guards is that they stay CONSISTENT — a half-translated screen is
-    // the one outcome the ruling singles out, and it is the easy mistake during the retrofit.
-    const cyrillic = RANGE_PRESETS.filter((p) => /[А-Яа-я]/.test(p.label));
-    expect(cyrillic.length === 0 || cyrillic.length === RANGE_PRESETS.length).toBe(true);
+describe('the presets carry keys, not text (§11)', () => {
+  it('every preset resolves in BOTH tables — a missing one would render as a raw key', () => {
+    const en = new I18nService();
+    en.setLang('en');
+    const ru = new I18nService();
+    ru.setLang('ru');
+    for (const p of RANGE_PRESETS) {
+      expect(en.t(p.labelKey)).not.toBe(p.labelKey);
+      expect(ru.t(p.labelKey)).not.toBe(p.labelKey);
+      expect(ru.t(p.labelKey)).not.toBe(en.t(p.labelKey)); // actually translated, not copied
+    }
   });
 });
 

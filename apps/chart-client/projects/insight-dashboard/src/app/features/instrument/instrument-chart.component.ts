@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, ElementRef, effect, input, viewChild, type OnDestroy,
+  ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, viewChild, type OnDestroy,
 } from '@angular/core';
 import {
   CandlestickSeries, LineSeries, createChart, type IChartApi, type Time,
@@ -12,6 +12,7 @@ import {
   toCandleData, toCvdSegments, toFundingSteps, toLongShortLine, toOpenInterestPoints,
   toPredictedFunding, toTakerDelta,
 } from './series.adapter';
+import { I18nService } from '../../i18n/i18n.service';
 import { LiquidationHistogramRenderer, liquidationPaneTitle } from './liquidation-histogram.renderer';
 
 export interface PaneData {
@@ -54,7 +55,10 @@ export class InstrumentChartComponent implements OnDestroy {
   private readonly oi = new MetricSeriesRenderer();
   private readonly liquidations = new LiquidationHistogramRenderer();
 
-  readonly paneTitle = liquidationPaneTitle;
+  private readonly i18n = inject(I18nService);
+  readonly t = this.i18n.t.bind(this.i18n);
+  readonly paneTitle = (bucket: string, venue: string, undercounted: boolean): string =>
+    liquidationPaneTitle(this.t, bucket, venue, undercounted);
 
   constructor() {
     effect(() => {

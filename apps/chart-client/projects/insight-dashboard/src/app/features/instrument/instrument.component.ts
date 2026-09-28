@@ -7,6 +7,7 @@ import type {
   WebTimeframe, WebTopLiquidation, WebUniverseSymbol,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
+import { I18nService } from '../../i18n/i18n.service';
 import { InstrumentChartComponent, type PaneData } from './instrument-chart.component';
 import {
   allowedTimeframes, bucketFor, effectiveTimeframe, findPreset, isRefused, RANGE_PRESETS,
@@ -32,6 +33,8 @@ import {
 })
 export class InstrumentComponent {
   private readonly api = inject(InsightApiClient);
+  private readonly i18n = inject(I18nService);
+  readonly t = this.i18n.t.bind(this.i18n);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 

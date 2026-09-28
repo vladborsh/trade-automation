@@ -1,6 +1,7 @@
 import { HistogramSeries, type IChartApi, type ISeriesApi } from 'lightweight-charts';
 import type { WebLiquidationBar } from '@trade-automation/contracts';
 import { toLiquidationHistogram } from './series.adapter';
+import type { StringKey } from '../../i18n/keys';
 
 /**
  * IB-031 — the liquidations pane (architecture/insight-bot-web-dashboard.md §2).
@@ -66,13 +67,26 @@ export class LiquidationHistogramRenderer {
 }
 
 /**
- * The pane's title. It states the undercount rather than leaving it to documentation: Binance
- * emits at most one `forceOrder` event per second per symbol (§12.2), so these are *visible*
- * liquidations. A reader comparing the pane to a venue's own dashboard must know that, and a
- * footnote nobody opens is not knowing.
+ * The pane's title, in the member's language (§11). It states the undercount rather than leaving
+ * it to documentation: Binance emits at most one `forceOrder` event per second per symbol
+ * (§12.2), so these are *visible* liquidations. A reader comparing the pane to a venue's own
+ * dashboard must know that, and a footnote nobody opens is not knowing.
+ *
+ * Takes the translator rather than importing it: this file is otherwise pure, and a renderer
+ * that reaches into Angular's injector cannot be tested without one.
  */
-export function liquidationPaneTitle(bucket: string, venue: string, undercounted: boolean): string {
-  const scope = venue === 'all' ? 'all venues' : venue;
-  const base = `Liquidations (${bucket}, ${scope})`;
-  return undercounted ? `${base} — visible only: Binance sends at most 1 event/s per symbol` : base;
+export type Translate = (key: StringKey, params?: Record<string, string | number>) => string;
+
+export function liquidationPaneTitle(
+  t: Translate,
+  bucket: string,
+  venue: string,
+  undercounted: boolean,
+): string {
+  // the venue and the bucket are codes: English in both languages, per §11
+  const scope = venue === 'all' ? t('instrument.venue.all') : venue;
+  const key: StringKey = undercounted
+    ? 'instrument.pane.liquidationsUndercounted'
+    : 'instrument.pane.liquidations';
+  return t(key, { bucket, venue: scope });
 }
