@@ -6,10 +6,14 @@ import { BinancePerpService } from './binance-perp/binance-perp.service';
 import { BinanceWeightTracker } from './binance-perp/binance-weight.tracker';
 import { OiLsPoller } from './binance-perp/oi-ls.poller';
 import { BybitService } from './bybit/bybit.service';
+import { GapReportService } from '../ops/gap-report.service';
+import { TelegramSender } from '../ops/telegram-sender';
+import { WatchdogService } from '../ops/watchdog.service';
 import { WritersModule } from './writers/writers.module';
 
 /**
- * IB-005 / IB-007 / IB-008 — the collectors, registered only when there is a database to write into.
+ * IB-005 / IB-007 / IB-008 — the collectors, and IB-011's watchdog and daily gap report,
+ * registered only when there is a database to write into.
  *
  * `Writers` throws without `DATABASE_URL` (IB-004), and the app must still boot without one
  * (IB-003, §2.1): so this is a dynamic module that provides nothing in that case and says why,
@@ -26,7 +30,12 @@ export class CollectorsModule {
     return {
       module: CollectorsModule,
       imports: [AppConfigModule, DbModule, OpsModule, WritersModule],
-      providers: [BinancePerpService, BinanceWeightTracker, OiLsPoller, BybitService],
+      providers: [
+        BinancePerpService, BinanceWeightTracker, OiLsPoller, BybitService,
+        // IB-011: the operator's instruments. They live behind the same switch because the report
+        // reads the collectors' tables and the watchdog watches their streams.
+        TelegramSender, WatchdogService, GapReportService,
+      ],
     };
   }
 }

@@ -86,7 +86,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
         baseUrl: this.config.env.get('BINANCE_FUTURES_REST_BASE_URL'),
         weight: this.weight,
       });
-    this.streams.register(STREAM_ID, VENUE);
+    this.streams.register(STREAM_ID, VENUE, SLOT_MS / 1000); // a 5-minute poller, not a socket
     // Read live at scrape time, so the gauge decays with the trailing minute instead of holding
     // the last poll's figure for five minutes.
     this.metrics.setBinanceWeightSource(() => this.weight.used1m());

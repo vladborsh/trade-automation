@@ -57,7 +57,7 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
       this.logger.log('CALENDAR_ENABLED=false — calendar collector disabled');
       return;
     }
-    this.streams.register(CALENDAR_STREAM_ID, 'forexfactory');
+    this.streams.register(CALENDAR_STREAM_ID, 'forexfactory', Math.round(this.cadence.intervalMs / 1000));
 
     await this.seedCache();
     await this.poll(); // §3.4: boot polls immediately, before the loop starts

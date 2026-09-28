@@ -9,7 +9,8 @@
     "start:dev": "nest start --watch",
     "migrate": "node dist/db/migrate.js",
     "test": "jest",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "report": "node dist/ops/gap-report.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",
@@ -19,6 +20,7 @@
     "@trade-automation/binance-client": "0.1.0",
     "@trade-automation/contracts": "0.1.0",
     "@trade-automation/market-data-core": "0.1.0",
+    "grammy": "^1.46.0",
     "js-yaml": "^4.1.0",
     "nestjs-pino": "^4.1.0",
     "pg": "^8.13.0",

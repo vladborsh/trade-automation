@@ -11,6 +11,12 @@ export interface StreamHealth {
   mode: CollectorStreamMode;
   /** Why it is degraded, for the operator; null on a healthy stream. */
   degradedReason: string | null;
+  /**
+   * How often this stream is EXPECTED to speak, when that is known (a poller's period). A
+   * socket that streams ticks leaves it null. The watchdog judges a stream against its own
+   * cadence: a 5-minute poller is not late at 3 minutes (IB-011).
+   */
+  expectedIntervalSec: number | null;
 }
 
 /** A stream is either on its websocket or on the REST fallback of §16.1. */
@@ -23,6 +29,7 @@ interface StreamState {
   gapsOpen: number;
   mode: CollectorStreamMode;
   degradedReason: string | null;
+  expectedIntervalSec: number | null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -40,10 +47,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export class StreamRegistry {
   private readonly streams = new Map<string, StreamState>();
 
-  /** Called by a collector when it starts a stream, before any message arrives. */
-  register(id: string, venue: string): void {
+  /**
+   * Called by a collector when it starts a stream, before any message arrives.
+   *
+   * `expectedIntervalSec` is for streams that speak on a known period — a poller, not a socket.
+   * Passing it is what stops the watchdog reporting a healthy 5- or 10-minute poller as silent
+   * every cycle (IB-011, found on a live run).
+   */
+  register(id: string, venue: string, expectedIntervalSec: number | null = null): void {
     if (!this.streams.has(id)) {
-      this.streams.set(id, { venue, lastMessageAt: null, reconnects: [], gapsOpen: 0, mode: 'ws', degradedReason: null });
+      this.streams.set(id, { venue, lastMessageAt: null, reconnects: [], gapsOpen: 0, mode: 'ws', degradedReason: null, expectedIntervalSec });
     }
   }
 
@@ -89,6 +102,7 @@ export class StreamRegistry {
         gapsOpen: state.gapsOpen,
         mode: state.mode,
         degradedReason: state.degradedReason,
+        expectedIntervalSec: state.expectedIntervalSec,
       });
     }
     return out;

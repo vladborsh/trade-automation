@@ -8,7 +8,7 @@ describe('StreamRegistry', () => {
     const registry = new StreamRegistry();
     registry.register('binance-perp:kline_1m', 'binance');
     expect(registry.snapshot()).toEqual([
-      { id: 'binance-perp:kline_1m', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 0, mode: 'ws', degradedReason: null },
+      { id: 'binance-perp:kline_1m', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 0, mode: 'ws', degradedReason: null, expectedIntervalSec: null },
     ]);
   });
 
@@ -76,7 +76,7 @@ describe('GET /health', () => {
 
     const health = new HealthController(streams, metrics).get();
     expect(health.streams).toEqual([
-      { id: 'binance-perp:markPrice', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 2, mode: 'ws', degradedReason: null },
+      { id: 'binance-perp:markPrice', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 2, mode: 'ws', degradedReason: null, expectedIntervalSec: null },
     ]);
     expect(health.budget.binanceWeightUsed1m).toBe(240);
   });

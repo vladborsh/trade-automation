@@ -224,10 +224,44 @@ anything missed while backfilling is lost for good.
 **Rate limits are Bybit's own** — nothing here touches `ib_binance_weight_used_1m`, which is scoped
 to the Binance futures budget (§4.5). Steady state is ~0.06 REST requests/minute.
 
+## The watchdog, the daily gap report and the service chat (IB-011)
+
+`src/ops/` — the operator's instruments (§6.2). This is the **stage-0 exit instrument**: fourteen
+consecutive clean reports are the acceptance criterion, so everything here is built around one
+rule — *a report that cries wolf is worse than no report*. What it refuses to alert on is as
+load-bearing as what it does:
+
+- **A degraded stream is not a silent stream.** IB-005 records a message on every answered REST
+  poll for exactly this reason; `/health` and the stream's `collector_gaps` row already say it.
+- **A poller is judged against its own period, not the flat threshold.** `binance-perp:oi-ls-5m`
+  speaks every 5 minutes and the calendar every 10; against the default 3-minute threshold both
+  alerted forever on a healthy box (found on the live run, not in a spec). Streams now declare
+  `expectedIntervalSec` to `StreamRegistry.register`, and a poller is late only after missing two
+  of its own cycles.
+- **A stream that has never spoken** gets its window from registration, not from the epoch.
+- **A recovery message only follows an alert that was actually sent.**
+- **The retention edge and a mid-day start are not gaps** (§16.8, IB-007): `expected` is counted
+  from the series' first stored row.
+
+The report is **stored in `gap_reports` before it is sent** — the row is the Tester's evidence and
+a Telegram outage must not cost a day of it. Without `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_SERVICE_CHAT_ID` the sender is *disabled, not broken*: it logs each message at warn
+level, so a dev slot runs the whole path with no bot. Tokens are the user's to issue.
+
+Re-run a day by hand (it overwrites that day's row):
+
+```sh
+npm run report -- --day 2026-09-27
+```
+
+The CLI boots config + DB + sender only, never the collectors. Two honest limits: for the current
+day it counts only up to *now* (future minutes are not missing minutes), and the Binance weight
+peak reads "нет данных", because only the process that ran the day knows it.
+
 ## Endpoints
 
-- `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode`).
-  Streams registered today: `binance-perp:{kline_1m,markPrice,forceOrder}`, `bybit:{tickers,allLiquidation}`.
+- `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason, expectedIntervalSec }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode` and IB-011's `expectedIntervalSec`).
+  Streams registered today: `binance-perp:{kline_1m,markPrice,forceOrder,oi-ls-5m}`, `bybit:{tickers,allLiquidation}`.
   `lagSec` is still `null` (IB-004's tables exist, but nothing measures lag yet).
 - `GET /metrics` → prom-client: `ib_stream_last_message_age_seconds{stream}`,
   `ib_rows_written_total{table}`, `ib_gaps_detected_total{stream}`,
