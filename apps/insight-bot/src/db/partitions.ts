@@ -110,8 +110,13 @@ export function buildCreatePartition(partition: Partition, tables = PARTITIONED_
   if (partition.name !== partitionName(partition.table, partition.month)) {
     throw new Error(`Partition name '${partition.name}' does not match ${partition.table} / ${partition.month}`);
   }
+  // The bounds carry an EXPLICIT +00. Every partition key here is `timestamptz`, and Postgres
+  // resolves a bare literal like '2026-08-01' in the SESSION's timezone — so on a box whose
+  // Postgres session is not UTC the whole partition slides (measured: US/Pacific shifted every
+  // month by 7 hours, leaving 00:00–07:00Z on the 1st of each month with no partition at all).
+  // The app's own TZ=UTC does not help: this is the database session's zone, not the process's.
   return (
     `create table if not exists ${partition.name} partition of ${partition.table} ` +
-    `for values from ('${partition.from}') to ('${partition.to}')`
+    `for values from ('${partition.from} 00:00:00+00') to ('${partition.to} 00:00:00+00')`
   );
 }

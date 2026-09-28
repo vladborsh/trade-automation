@@ -81,12 +81,23 @@ describe('partitionsFor', () => {
   });
 });
 
+describe('buildCreatePartition — the bounds are explicitly UTC', () => {
+  it('pins both bounds to +00, because the partition key is timestamptz', () => {
+    // A bare '2026-09-01' is resolved in the DATABASE SESSION's timezone, not the app's. Found
+    // by IB-012: on a US/Pacific session every partition slid 7 hours, so the first 7 hours of
+    // each month had no partition and the insert failed with "no partition of relation found".
+    const sql = buildCreatePartition({ table: 'candles_1m', month: '2026-09', name: 'candles_1m_2026_09', from: '2026-09-01', to: '2026-10-01' });
+    expect(sql).toContain("from ('2026-09-01 00:00:00+00')");
+    expect(sql).toContain("to ('2026-10-01 00:00:00+00')");
+  });
+});
+
 describe('buildCreatePartition', () => {
   const partition = partitionsFor(['2026-09'], [{ table: 'candles_1m', column: 'open_time' }])[0];
 
   it('builds an IF NOT EXISTS statement, so re-running maintenance is a no-op', () => {
     expect(buildCreatePartition(partition)).toBe(
-      "create table if not exists candles_1m_2026_09 partition of candles_1m for values from ('2026-09-01') to ('2026-10-01')",
+      "create table if not exists candles_1m_2026_09 partition of candles_1m for values from ('2026-09-01 00:00:00+00') to ('2026-10-01 00:00:00+00')",
     );
   });
 

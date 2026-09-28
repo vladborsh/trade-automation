@@ -30,6 +30,40 @@ docker compose -f apps/signal-server/docker-compose.yml up -d postgres
 docker compose -f apps/signal-server/docker-compose.yml exec postgres psql -U backtest -c 'create database insight_dev2'
 ```
 
+### One-off repair: partitions created before IB-BUG-002 (do this once)
+
+**Every database created before the IB-BUG-002 fix has partitions that are shifted by the
+database session's UTC offset**, because the bounds were written as bare date literals and the
+partition keys are `timestamptz`. On a US/Pacific session each monthly partition covers
+`01-<month> 07:00Z .. 01-<next> 07:00Z`, so **the first 7 hours of every UTC month have no
+partition** and any write there fails with:
+
+```
+no partition of relation "candles_1m" found for row
+```
+
+Nothing breaks until a write lands in that window — the 1st of a month, 00:00–07:00 UTC — so a
+database can look healthy right up to the boundary. Check yours:
+
+```sh
+psql -U backtest -d insight_dev2 -c \
+  "select relname, pg_get_expr(relpartbound, oid) from pg_class where relname like 'candles_1m_2026%'"
+```
+
+A bound ending in `-07` (or any offset other than `+00`) is skewed. The code fix only applies to
+partitions created **after** it, so existing ones must be rebuilt. On a dev slot, whose data is
+reproducible, drop and recreate the database — the fastest and safest repair:
+
+```sh
+psql -U backtest -d postgres -c 'drop database if exists insight_dev2'
+psql -U backtest -d postgres -c 'create database insight_dev2'
+# migrations and correct partitions are recreated on the next boot
+```
+
+For a database whose contents matter, rebuild the partitions instead of dropping: create the
+correctly bounded partition, move the rows, then swap — do not simply `alter` the bounds, since
+Postgres will not let a partition's range change while it holds rows.
+
 ## Running it
 
 ```sh
