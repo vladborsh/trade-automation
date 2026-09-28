@@ -560,7 +560,9 @@ trigger; `TRIGGERED` → `CLOSED` when the tracker records an outcome; a new
 
 Score (draft §9.2, kept as a **display and ordering** number, never a
 threshold): `40·conditions_passed_share + 30·norm(expectancy last 50) +
-20·context_match + 10·confirmations(P4)`; `n < 20` prints "мало данных".
+20·context_match + 0·confirmations(P4)`; `n < 20` prints "мало данных". The
+P4 term is **0** since the spot-lead kill (§16.3); the slot stays so a future
+confirmation observable can be registered into it.
 
 ### 8.6 Delivery (`delivery/`, grammY)
 
@@ -615,7 +617,10 @@ ARMED when all of: `liq.long.z60m ≥ 3` (or `liq.short.z60m` for the mirror);
 `oi.d4h_pct ≤ −8` (BTC; `≤ −12` for ETH/SOL); `funding.predicted.binance ≤
 0.0001`; `px.drawdown_from_24h_high ≥ 2.5 × atr.1h.14 / price`. Trigger
 (long): 15m close above the cascade bar's midpoint, or close ≥ cascade low +
-0.5·ATR(1h) with `cvd.spot.slope_4h > 0`. Stop: cascade low − 0.1·ATR(1h).
+0.5·ATR(1h). (The draft's extra clause `cvd.spot.slope_4h > 0` was dropped on
+2026-09-28, §16.3: its prior is gone and P3 is rare enough that a filter with
+no prior only costs sample; the value is still in the snapshot for a later
+read.) Stop: cascade low − 0.1·ATR(1h).
 T1 50 % of the cascade range (half off), T2 the cascade's origin. Invalidation:
 new low after trigger; `oi.d4h_pct` rising while price falls. `armed_ttl_bars
 = 8` (2 h). Until 14 days of liquidation history exist `liq.*.z60m` is null
@@ -634,11 +639,15 @@ else `→`), spot CVD sign from `cvd.spot.4h`, perp from `cvd.perp.4h`:
 | → | ↓ | ↑ | `DISTRIBUTION` |
 | otherwise | | | `NONE` |
 
-Consumers: P3 trigger (spot slope), P1/P2 conditions once built, the morning
-plan line, the score's confirmation term. The label's predictive value is
-what the Researcher's spot-lead pass (arm (b) of the backlog entry) measures;
-until then it is displayed and logged, and no playbook may be gated on it
-except through §8.3's twin-arm mechanism.
+**Tested and killed 2026-09-28** (`research/spot-lead/REPORT.md`, Запись
+36; §16.3): the label carries no information beyond the advance itself.
+Consumers now: the morning plan line and the message context **only**. It is
+still computed and logged in every feature snapshot (cheap, and the record is
+what would justify any future registration), but its score weight is 0, it
+may not be a `context_gate`, and P3's trigger no longer references it. P1/P2's
+"spot CVD not confirming" condition is a *different* observable (the raw spot
+CVD sign over 4 h inside a funding/OI-conditioned setup) and is being tested
+by the squeeze pass on its own merits.
 
 ### 9.3 P5 — macro event veto
 
@@ -845,3 +854,20 @@ Tech Lead files it as `BUG-` in the backtest stream: "REST fallback / reconnect
 on N seconds of silence after open, not only before the first message".
 `libs/binance-client` (IB-001) must lift the code **as is**; the fix lands in
 the lib afterwards as its own task so both apps get it.
+
+### 16.3 P4 spot-lead research gate — KILL ratified (2026-09-28)
+
+`research/spot-lead/` (Researcher, Запись 36): all four registered arms fail
+the fit screen; holdout unread. The hypothesis contrast — spot-led vs
+perp-led advances over 1–5 days — is +0.005R [−0.041, +0.051] on 9,265 vs
+3,318 trades; as a filter the label changes the mean by +0.0001R while
+keeping 84 % of advances; `SPOT_LED` is 69 % of all advances and lasts one
+bar. The package is admissible: DESIGN before any R, screen committed before
+the holdout, 40/40 wiring checks, price-shadow control, decomposition on every
+row. **Ratified as a kill.** Consequences applied in this design: §8.5 score
+term → 0; §9.2 label is context only, never a `context_gate`; §9.1 P3 loses
+the spot-slope trigger clause; IB-018 and IB-019 descriptions updated. The
+Researcher's process flag stands for future registrations: a matched-time
+placebo must draw through the same one-position rule as the arm (it was
+~+0.03R anti-conservative here; it decided nothing). Arm (a) of the backlog
+entry (basis-extreme convergence) stays parked.
