@@ -126,8 +126,23 @@ symbols:
     ...
 ```
 
-A symbol with no `binance_spot` (none expected in the top 30) simply has no
-spot CVD; features that need it are `null` for it, never silently zero.
+**Universe rule (ratified 2026-09-28, §16.4):** rank USD-M perps by 30-day
+quote volume over the last 30 closed UTC days; a perp **qualifies only if its
+base asset has a Binance spot USDT market**. This excludes Binance's tokenised
+equity and commodity perps (`XAUUSDT`, `CLUSDT`, `MSTRUSDT`, `NVDAUSDT`, …),
+which now sit inside the raw top 30: they follow US-session hours and their
+own underlying's regime, carry none of the crypto mechanics the playbooks
+read, and have no spot CVD. A newly listed perp with a short history **stays
+in** if it ranks (its backfill starts at listing and its 30-day percentile
+features are `null` until the window exists); it is flagged in the yaml. A
+venue mapping the venue does not list is `null`, never a guessed symbol.
+`listed_perp` is the **first bar in the `data.binance.vision` USD-M archive**
+(the backfill start, §5), which for the oldest perps is 2020-01-01 — the
+`2019-09-08` in the example above is the listing date and is superseded by
+this rule. A symbol that leaves the list is set `active = false`, never
+deleted: its history references it. Otherwise a symbol with no `binance_spot`
+simply has no spot CVD; features that need it are `null`, never silently
+zero.
 
 ---
 
@@ -871,3 +886,14 @@ Researcher's process flag stands for future registrations: a matched-time
 placebo must draw through the same one-position rule as the arm (it was
 ~+0.03R anti-conservative here; it decided nothing). Arm (a) of the backlog
 entry (basis-extreme convergence) stays parked.
+
+### 16.4 Universe composition — dev-2's IB-003 calls ratified (2026-09-28)
+
+`reports/dev-2-IB-003.md`. (1) Tokenised equity/commodity perps are excluded
+by the objective spot-USDT-pair rule — ratified, and written into §2.3; this
+is a product ruling in the brief's spirit ("crypto derivatives"), not an
+engineering convenience, so it stands until the user says otherwise. (2)
+`MARSCOINUSDT` stays on 27 days of history: the brief says top-30 by volume,
+the universe is meant to be measured, and the feature layer already treats
+missing history as `null`. (3) `null` venue mappings and `listed_perp` = first
+archive bar — ratified. The monthly hand-revision keeps the same rule.
