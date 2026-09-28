@@ -13,13 +13,21 @@ export const PAGE_LIMIT = 500;
  * | now − 30 d | 288 rows, oldest 2026-08-28 13:40 |
  * | now − 31 d | **HTTP 400 `{"code":-1130,"msg":"parameter 'endTime' is invalid."}`** |
  *
- * Two corrections to what `apps/signal-server/.../binance-metrics.adapter.ts` recorded in
- * 2026-09 and what IB-007's task text repeats:
- * 1. The rejection is on **`endTime`**, not `startTime`. A `startTime` 31 days back is now
- *    accepted and silently clamped — it came back with the newest page, no error. A backfill
- *    that expects `-1130` from `startTime` would therefore never stop.
- * 2. `-1130` is the **retention edge, not a failure**: it is how this endpoint says "there is
- *    no more history", so the pager treats it as a clean end of data.
+ * **CORRECTED 2026-09-28 by BUG-022's re-measurement — my IB-007 note above was half wrong.**
+ * I wrote that the rejection is on `endTime` "not `startTime`", and that a too-old `startTime` is
+ * "silently clamped". It is not. **Both parameters are validated**, each naming itself in the
+ * `-1130` message, and the earlier signal-server comment I was contradicting was right about
+ * `startTime` — it was merely incomplete, as mine then was about `endTime`.
+ *
+ * What misled me: the boundary **drifts**. Re-measuring, `startTime = now-31d` was rejected at
+ * 21:01 UTC and accepted five times out of five at 21:04, with the edge sitting between 31 and 32
+ * days. My single IB-007 probe straddled that moving edge and I generalised a venue rule from it.
+ *
+ * What survives unchanged, and is what this pager actually relies on:
+ * 1. `-1130` is the **retention edge, not a failure** — how this endpoint says "no more history",
+ *    so the walk ends cleanly on it.
+ * 2. Past the data but still inside the valid window the venue returns an **empty array**, so the
+ *    walk ends on that too. A pager that stops only on one of the two either spins or crashes.
  *
  * Unchanged and re-confirmed: the endpoint returns the **newest** `limit` rows inside the
  * window, so history is paged **backward** by shrinking `endTime`.

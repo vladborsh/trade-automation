@@ -116,6 +116,58 @@ describe(
       expect(observations[observations.length - 1].time).toBe(seriesEnd);
     });
 
+    it('BUG-022: treats -1130 as the retention wall and keeps what it already fetched', async () => {
+      // Re-measured 2026-09-28: BOTH startTime and endTime are validated against a window that
+      // DRIFTS (now-31d was rejected at 21:01 and accepted at 21:04). So a page that was inside
+      // the window when the clamp was computed can be outside it by the time it is requested.
+      // Before this fix any non-2xx threw, losing an entire backfill to a moving boundary.
+      const now = 1_800_000_000_000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+      const seriesEnd = now - PERIOD_MS;
+      const seriesStart = seriesEnd - 600 * PERIOD_MS;
+
+      let call = 0;
+      global.fetch = jest.fn(async (url: URL) => {
+        call += 1;
+        if (call === 1) {
+          const endTime = Number(url.searchParams.get('endTime'));
+          const times: number[] = [];
+          for (let t = Math.max(seriesStart, endTime - 499 * PERIOD_MS); t <= Math.min(seriesEnd, endTime); t += PERIOD_MS) times.push(t);
+          return { ok: true, json: async () => times.map(row) } as Response;
+        }
+        // The second page falls off the drifting edge.
+        return {
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          text: async () => '{"msg":"parameter \'endTime\' is invalid.","code":-1130}',
+        } as Response;
+      }) as never;
+
+      const adapter = new BinanceMetricsAdapter('https://fapi.binance.com');
+      const out = await adapter.fetchObservations(instrument, 'openInterest', seriesStart, seriesEnd);
+
+      // It kept page one rather than throwing it away.
+      expect(out.length).toBeGreaterThan(0);
+      expect(out).toEqual([...out].sort((a, b) => a.time - b.time));
+    });
+
+    it('BUG-022: a non-retention failure still throws — only -1130 is an ending', async () => {
+      const now = 1_800_000_000_000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+      global.fetch = jest.fn(async () => ({
+        ok: false,
+        status: 418,
+        statusText: "I'm a teapot",
+        text: async () => '{"msg":"banned","code":-1003}',
+      })) as never;
+
+      const adapter = new BinanceMetricsAdapter('https://fapi.binance.com');
+      await expect(
+        adapter.fetchObservations(instrument, 'openInterest', now - 3 * PERIOD_MS, now - PERIOD_MS),
+      ).rejects.toThrow(/failed: 418/);
+    });
+
     it(
       'a forward-paginating implementation would have failed this: single-page result covers ' +
         'only the newest slice of a wide window',

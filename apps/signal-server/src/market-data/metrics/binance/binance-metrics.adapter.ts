@@ -20,23 +20,40 @@ const HIST_PERIOD = '5m';
 const HIST_PAGE_LIMIT = 500;
 
 /**
- * openInterestHist retention — CONFIRMED LIVE against fapi.binance.com on 2026-09-12 (SE-4
- * build time), superseding the architecture note's "~30 days, unconfirmed": a request with
- * `startTime` more than 30 days in the past is rejected outright by the endpoint
- * (`{"msg":"parameter 'startTime' is invalid.","code":-1130}`), while `startTime` up to and
- * including 30 days back succeeds and returns data. So the venue's retention window is
- * **exactly ~30 days**, enforced as a parameter-validation error rather than an empty result.
- * `fetchObservations` clamps `from` to this window and logs when it does, per the note's D-
- * escalation pre-answer (b): if the venue's history is short, backfill what exists — this
- * constant does not need to be exact to the minute, only close enough that the clamp rarely
- * fires (the ingestion boot order already re-derives the real tail from `MetricStore`).
+ * openInterestHist retention — **RE-MEASURED 2026-09-28 (BUG-022)**, correcting two earlier
+ * comments that were each half right.
+ *
+ * What this endpoint actually does, from `fapi.binance.com`, BTCUSDT, `period=5m`:
+ *
+ * | request | result |
+ * |---|---|
+ * | `startTime = now-30d` / `now-31d` | 200, rows |
+ * | `startTime = now-32d` | **400 `{"msg":"parameter 'startTime' is invalid.","code":-1130}`** |
+ * | `endTime = now-30d` | 200, 288 rows — the oldest data |
+ * | `endTime = now-31d` | **200 with an EMPTY array** — valid request, no data left |
+ * | `endTime = now-32d` | **400 `{"msg":"parameter 'endTime' is invalid.","code":-1130}`** |
+ *
+ * Three facts follow, and all three matter to the code below:
+ *
+ * 1. **BOTH parameters are validated**, each naming itself in the `-1130` message. The 2026-09-12
+ *    comment here said `startTime`; IB-007 said `endTime`; neither was wrong, both were partial.
+ * 2. **The boundary is not a crisp 30 days and it drifts.** Measured at 21:01 UTC, `now-31d` was
+ *    rejected; at 21:04 the same request succeeded five times out of five and the edge sat
+ *    between 31 and 32 days. So `HIST_RETENTION_MS` is a conservative clamp, not a truth: it must
+ *    never be the only thing standing between this code and a `-1130`.
+ * 3. **Past the data but inside the valid window the venue returns an empty array, not an error.**
+ *    A pager that stops only on `-1130` spins on empty pages; one that stops only on empty
+ *    crashes at the wall. This one stops on both.
+ *
+ * `-1130` is therefore treated as a **clean end of data**, the way IB-007's insight-bot client
+ * does, rather than as a failed request — which is what it used to be, since any non-2xx threw
+ * and would have aborted an entire backfill at the edge.
  *
  * architecture/panel-sync-and-oi-depth-diagnosis.md, Bug 2, defect 1 — CONFIRMED LIVE on
- * 2026-09-17 that this endpoint returns the **newest** `limit` rows inside `[startTime,
- * endTime]`, not the oldest: a request with `startTime = now-29d` came back spanning only the
- * last ~41h40m of that window. `fetchObservations` therefore paginates *backward* by shrinking
- * `endTime`, not forward by advancing `startTime` — walking forward silently returns only the
- * newest page every time, however wide `[from, to]` is.
+ * 2026-09-17 and unchanged: this endpoint returns the **newest** `limit` rows inside `[startTime,
+ * endTime]`, not the oldest (a request with `startTime = now-29d` came back spanning only the
+ * last ~41h40m). `fetchObservations` therefore paginates *backward* by shrinking `endTime`;
+ * walking forward silently returns only the newest page every time, however wide the window.
  */
 const HIST_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
@@ -112,6 +129,18 @@ export class BinanceMetricsAdapter implements MetricAdapter {
 
       const res = await fetch(url);
       if (!res.ok) {
+        const body = await res.text();
+        if (body.includes('"code":-1130')) {
+          // BUG-022: the retention wall, not a failure. The window drifts, so a page that was
+          // inside it when the clamp was computed can be outside it by the time it is requested.
+          // Ending the walk here returns what was collected; throwing would lose the whole
+          // backfill to a boundary that moves on its own.
+          this.logger.warn(
+            `openInterestHist reached the venue's retention wall for ${instrument.id} ` +
+              `(${body.slice(0, 120)}); keeping the ${out.length} observation(s) already fetched`,
+          );
+          break;
+        }
         throw new Error(`Binance openInterestHist request failed: ${res.status} ${res.statusText}`);
       }
       const rows = (await res.json()) as BinanceOpenInterestHistRow[];
