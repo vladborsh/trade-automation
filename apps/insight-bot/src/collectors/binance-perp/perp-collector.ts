@@ -5,11 +5,11 @@ import type { Candle1mRow, CollectorGapRow, FundingSettlementRow, LiquidationRow
 import { DegradedGapTracker } from './degraded-gaps';
 import { fundingSettlementRow, liquidationRowFromEvent, markRowFromPremiumIndex, VENUE } from './mappers';
 import { MarkSampler, minuteBoundary } from './mark-sampler';
-import { ModePolicy, klinePollIntervalMs, type CollectorMode, type ModePolicyOptions } from './mode';
+import { ModePolicy, klinePollIntervalMs, type CollectorMode, type ModePolicyOptions } from '../binance-common/mode';
 import { isForceOrderEvent, isMarkPriceEvent, type MarkPriceEvent } from './payloads';
-import { candleRow, expectedBars, gapRow } from './rows';
+import { candleRow, expectedBars, gapRow } from '../binance-common/rows';
 import type { PerpRest } from './rest';
-import { perpStreamNames } from './perp-socket';
+import { perpStreamNames } from './streams';
 
 /**
  * IB-005 — the Binance USD-M perp collector (design §4.1, §16.1).

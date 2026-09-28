@@ -98,7 +98,7 @@ export class ModePolicy {
   }
 
   /**
-   * The socket closed. `PerpSocket` reconnects itself with backoff, so the policy does NOT ask for
+   * The socket closed. `BinanceSocket` reconnects itself with backoff, so the policy does NOT ask for
    * another socket here — it only starts counting: if no data arrives within `silentAfterOpenMs`
    * we degrade. (Found by the first live run: asking again on every tick opened a socket per
    * second while the handshake was still in flight — "closed before the connection was

@@ -1,4 +1,4 @@
-import { DEFAULT_MODE_POLICY, ModePolicy, degradedWeightPerMinute, klinePollIntervalMs } from '../../../src/collectors/binance-perp/mode';
+import { DEFAULT_MODE_POLICY, ModePolicy, degradedWeightPerMinute, klinePollIntervalMs } from '../../../src/collectors/binance-common/mode';
 
 /**
  * IB-005 / design §16.1 — the WS → degraded → WS transitions. Time is an argument, so every edge

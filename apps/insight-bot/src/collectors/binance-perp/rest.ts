@@ -15,34 +15,12 @@ import type { FundingRateRow, PremiumIndexRow } from './payloads';
  * collector forwards to `MetricsService.setBinanceWeightUsed1m` (§6.1's `ib_binance_weight_used_1m`).
  */
 
-export type FetchLike = (url: string, init?: { signal?: AbortSignal }) => Promise<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: { get(name: string): string | null };
-  json(): Promise<unknown>;
-}>;
+import { BinanceRest, type BinanceRestOptions } from '../binance-common/rest';
 
-export interface PerpRestOptions {
-  baseUrl: string;
-  fetchImpl?: FetchLike;
-  /** Called with the venue's used-weight header value after every answered request. */
-  onWeight?: (usedWeight1m: number) => void;
-  /** Request timeout; a hung REST call must not stall the degraded poller. */
-  timeoutMs?: number;
-}
+/** IB-006: the shared mechanics moved to `binance-common/rest.ts`; these three paths are perp's. */
+export type PerpRestOptions = BinanceRestOptions;
 
-export const DEFAULT_REST_TIMEOUT_MS = 10_000;
-
-export class PerpRest {
-  private readonly fetchImpl: FetchLike;
-  private readonly timeoutMs: number;
-
-  constructor(private readonly options: PerpRestOptions) {
-    this.fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as ReturnType<FetchLike>);
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_REST_TIMEOUT_MS;
-  }
-
+export class PerpRest extends BinanceRest {
   /** The last `limit` 1m klines of one symbol — degraded mode's replacement for the kline stream. */
   async klines(symbol: string, limit = 2): Promise<BinanceRestKline[]> {
     return this.get<BinanceRestKline[]>(`/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=${limit}`);
@@ -57,19 +35,5 @@ export class PerpRest {
   /** The settled funding rate of one symbol, newest first (§4.1: fetched when `nextFundingTime` rolls). */
   async fundingRate(symbol: string, limit = 1): Promise<FundingRateRow[]> {
     return this.get<FundingRateRow[]>(`/fapi/v1/fundingRate?symbol=${symbol}&limit=${limit}`);
-  }
-
-  private async get<T>(path: string): Promise<T> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const response = await this.fetchImpl(`${this.options.baseUrl}${path}`, { signal: controller.signal });
-      const used = Number(response.headers.get('x-mbx-used-weight-1m'));
-      if (Number.isFinite(used) && used > 0) this.options.onWeight?.(used);
-      if (!response.ok) throw new Error(`Binance REST ${path} failed: ${response.status} ${response.statusText}`);
-      return (await response.json()) as T;
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

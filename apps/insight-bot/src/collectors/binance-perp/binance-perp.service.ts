@@ -8,7 +8,7 @@ import { StreamRegistry } from '../../ops/stream-registry';
 import { Writers } from '../writers/batch-writer';
 import { BinanceWeightTracker } from './binance-weight.tracker';
 import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collector';
-import { PerpSocket } from './perp-socket';
+import { BinanceSocket } from '../binance-common/socket';
 import { PerpRest } from './rest';
 
 /** One tick per second drives the mode policy, the minute boundary and the degraded pollers. */
@@ -61,7 +61,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
       metrics: this.metrics,
       rest,
       candles: adapter,
-      socketFactory: (handlers, streams) => new PerpSocket({ wsBaseUrl, streams, handlers }),
+      socketFactory: (handlers, streams) => new BinanceSocket({ wsBaseUrl, streams, handlers }),
       lastOpenTimes: this.db ? () => lastCandleOpenTimes(this.db as Db, 'binance', MARKET) : undefined,
       logger: { log: (m) => this.logger.log(m), warn: (m) => this.logger.warn(m) },
     });

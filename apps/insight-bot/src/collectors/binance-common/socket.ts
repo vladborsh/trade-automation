@@ -1,7 +1,9 @@
 import WebSocket from 'ws';
 
 /**
- * IB-005 — one combined-stream socket carrying the whole universe (design §4.1).
+ * IB-005, moved to `binance-common` by IB-006 — one combined-stream socket carrying a whole
+ * universe (design §4.1 for perp, §4.2 for spot; the two differ only in the base URL and the
+ * stream list its caller supplies).
  *
  * Why this is not `BinanceAdapter.streamKlines`: that helper opens a socket per instrument, drops
  * everything whose `e` is not `kline`, and tags every candle with the single instrument it was
@@ -14,7 +16,7 @@ import WebSocket from 'ws';
  * (1 s doubling to 30 s) is here because it is socket mechanics, not policy.
  */
 
-export interface PerpSocketHandlers {
+export interface BinanceSocketHandlers {
   /** The socket completed its handshake. */
   onOpen(): void;
   /** One demultiplexed payload: `stream` is e.g. `btcusdt@kline_1m`, `data` the event object. */
@@ -23,11 +25,11 @@ export interface PerpSocketHandlers {
   onError(message: string): void;
 }
 
-export interface PerpSocketOptions {
+export interface BinanceSocketOptions {
   /** e.g. `wss://fstream.binance.com` */
   wsBaseUrl: string;
   streams: readonly string[];
-  handlers: PerpSocketHandlers;
+  handlers: BinanceSocketHandlers;
   /** Injected in specs; defaults to the real `ws` client. */
   factory?: (url: string) => WebSocketLike;
   now?: () => number;
@@ -68,14 +70,14 @@ export function demultiplex(raw: unknown): { stream: string; data: unknown } | n
   return null;
 }
 
-export class PerpSocket {
+export class BinanceSocket {
   private socket: WebSocketLike | null = null;
   private backoffMs = INITIAL_BACKOFF_MS;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private readonly factory: (url: string) => WebSocketLike;
 
-  constructor(private readonly options: PerpSocketOptions) {
+  constructor(private readonly options: BinanceSocketOptions) {
     this.factory = options.factory ?? ((url) => new WebSocket(url) as unknown as WebSocketLike);
   }
 
@@ -148,9 +150,4 @@ export class PerpSocket {
       socket.terminate?.();
     }
   }
-}
-
-/** The stream names for one universe: a kline per symbol plus the two array streams (§4.1). */
-export function perpStreamNames(symbols: readonly string[]): string[] {
-  return [...symbols.map((s) => `${s.toLowerCase()}@kline_1m`), '!markPrice@arr@1s', '!forceOrder@arr'];
 }

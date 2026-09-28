@@ -1,7 +1,7 @@
 import {
-  INITIAL_BACKOFF_MS, MAX_BACKOFF_MS, MAX_STREAMS_PER_SOCKET, PerpSocket,
-  combinedStreamUrl, demultiplex, perpStreamNames, type WebSocketLike,
-} from '../../../src/collectors/binance-perp/perp-socket';
+  INITIAL_BACKOFF_MS, MAX_BACKOFF_MS, MAX_STREAMS_PER_SOCKET, BinanceSocket,
+  combinedStreamUrl, demultiplex, type WebSocketLike,
+} from '../../../src/collectors/binance-common/socket';
 
 /** IB-005 — the combined-stream socket: URL, demultiplexing, and reconnect backoff. No network. */
 
@@ -20,13 +20,7 @@ function fakeSocket() {
   return { socket, state, emit: (event: string, arg?: unknown) => listeners.get(event)?.(arg) };
 }
 
-describe('combinedStreamUrl / perpStreamNames (§4.1)', () => {
-  it('one socket carries a kline per symbol plus the two array streams, lower-cased', () => {
-    expect(perpStreamNames(['BTCUSDT', 'ETHUSDT'])).toEqual([
-      'btcusdt@kline_1m', 'ethusdt@kline_1m', '!markPrice@arr@1s', '!forceOrder@arr',
-    ]);
-  });
-
+describe('combinedStreamUrl (§4.1, §4.2)', () => {
   it('builds the combined form even for a single stream', () => {
     expect(combinedStreamUrl('wss://fstream.binance.com', ['btcusdt@kline_1m'])).toBe(
       'wss://fstream.binance.com/stream?streams=btcusdt@kline_1m',
@@ -38,10 +32,6 @@ describe('combinedStreamUrl / perpStreamNames (§4.1)', () => {
     expect(() => combinedStreamUrl('wss://x', [])).toThrow(RangeError);
     const tooMany = Array.from({ length: MAX_STREAMS_PER_SOCKET + 1 }, (_, i) => `s${i}`);
     expect(() => combinedStreamUrl('wss://x', tooMany)).toThrow(/1024/);
-  });
-
-  it('a 30-symbol universe fits comfortably', () => {
-    expect(perpStreamNames(Array.from({ length: 30 }, (_, i) => `SYM${i}USDT`))).toHaveLength(32);
   });
 });
 
@@ -60,12 +50,12 @@ describe('demultiplex', () => {
   });
 });
 
-describe('PerpSocket', () => {
+describe('BinanceSocket', () => {
   it('forwards demultiplexed messages and reports open/close/error', () => {
     const fake = fakeSocket();
     const seen: Array<[string, unknown]> = [];
     const events: string[] = [];
-    const socket = new PerpSocket({
+    const socket = new BinanceSocket({
       wsBaseUrl: 'wss://fstream.binance.com',
       streams: ['btcusdt@kline_1m'],
       factory: () => fake.socket,
@@ -92,7 +82,7 @@ describe('PerpSocket', () => {
     jest.useFakeTimers();
     try {
       const made: ReturnType<typeof fakeSocket>[] = [];
-      const socket = new PerpSocket({
+      const socket = new BinanceSocket({
         wsBaseUrl: 'wss://fstream.binance.com',
         streams: ['btcusdt@kline_1m'],
         factory: () => {
@@ -133,7 +123,7 @@ describe('PerpSocket', () => {
 
   it('opening again closes the socket it replaces (the degraded retry)', () => {
     const made: ReturnType<typeof fakeSocket>[] = [];
-    const socket = new PerpSocket({
+    const socket = new BinanceSocket({
       wsBaseUrl: 'wss://x',
       streams: ['a'],
       factory: () => {

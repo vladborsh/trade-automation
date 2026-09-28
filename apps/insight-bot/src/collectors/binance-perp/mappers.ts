@@ -1,12 +1,15 @@
 import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
 import type { ForceOrderEvent, FundingRateRow, MarkPriceEvent, PremiumIndexRow } from './payloads';
+import { VENUE } from '../binance-common/venue';
 
 /**
  * IB-005 — pure payload → row mappers for the Binance USD-M perp collector (design §4.1, §3.3).
  * No clock, no I/O: every timestamp comes from the payload, as §1's cmc-bot-main bug demands.
  */
 
-export const VENUE = 'binance';
+// IB-006: the constant moved to `binance-common/venue.ts` (spot writes the same venue); imported
+// and re-exported here so every existing `from './mappers'` import is unchanged.
+export { VENUE };
 
 /** A number the venue sent as a string; `null` for absent or unparseable, never 0. */
 function num(value: string | undefined): number | null {

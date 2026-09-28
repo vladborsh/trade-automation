@@ -1,6 +1,6 @@
 import type { Candle } from '@trade-automation/contracts';
 import type { Candle1mRow, CollectorGapRow, Market, Source } from '../writers/tables';
-import { VENUE } from './mappers';
+import { VENUE } from './venue';
 
 /**
  * IB-005 — the last pure step before the writers: a `Candle` from the lifted Binance mappers (with

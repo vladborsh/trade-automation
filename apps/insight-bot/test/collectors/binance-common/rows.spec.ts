@@ -1,5 +1,5 @@
 import type { Candle } from '@trade-automation/contracts';
-import { candleRow, expectedBars, gapRow, symbolOf } from '../../../src/collectors/binance-perp/rows';
+import { candleRow, expectedBars, gapRow, symbolOf } from '../../../src/collectors/binance-common/rows';
 
 /** IB-005 — Candle → candles_1m row, and a GapRepair hole → collector_gaps row. */
 
