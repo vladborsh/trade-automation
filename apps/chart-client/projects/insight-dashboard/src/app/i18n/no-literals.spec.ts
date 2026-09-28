@@ -20,25 +20,43 @@ import type { StringKey } from './keys';
 // Built from cwd rather than `__dirname`, which does not exist in the ESM the runner loads.
 const APP_DIR = join(process.cwd(), 'projects', 'insight-dashboard', 'src', 'app');
 
-/** Tokens §11 keeps English in both languages, plus structural noise. */
-const ALLOWED = new Set([
+/** Tokens §11 keeps English in **every** template: units, codes, and names the venue owns. */
+const ALLOWED_EVERYWHERE = new Set([
   // units and separators that read the same either way
   'GB', 'ms', 's', 'm', 'h', 'd', '%', '·', '?', '—', '/', ':', ',', '(', ')', '|', '+',
   // timeframes and modes come from the API as codes
   '1m', '5m', '15m', '1h', '4h', '1d', 'ws', 'degraded', 'perp', 'spot',
   // venue and series names, as the venue and the schema spell them
   'binance', 'bybit', 'okx', 'futures', 'candles_1m', 'candles_agg', 'open_interest_5m', 'long_short_5m',
-  // §11 keeps "field names in tables of raw data" English in BOTH languages: these are the
-  // columns and side values of the liquidations table, which a reader matches against the
-  // venue's own data and our logs. Prose around them is translated; these are not prose.
-  // `long`/`short` are the stored enum values the API sends, not words chosen for a reader.
-  //
-  // **The escape hatch, ruled 2026-09-28:** if a member ever reports that these columns read as
-  // opaque, the answer is a legend or a tooltip IN THEIR LANGUAGE next to the table — not
-  // translating the field names. Translating them would break the one thing they are for: matching
-  // a row against the venue's own UI and our logs.
-  'time', 'UTC', 'venue', 'side', 'price', 'qty', 'notional', 'long', 'short',
 ]);
+
+/**
+ * Tokens allowed in ONE template, because that is where the argument for them was made.
+ *
+ * dev-3's observation on IB-BUG-004: a global allow-list hides its words everywhere, and `long`,
+ * `short`, `time`, `price` and `side` are ordinary English. Allowed globally, a future single-word
+ * heading or cell of prose would pass unchallenged in any page — the guard would be quietly weaker
+ * than the rule it enforces. Scoped, the carve-out stays where it was argued: the liquidations
+ * table, whose columns a reader matches against the venue's own UI and our logs.
+ *
+ * Adding a page does not inherit anything here; a new carve-out is a new entry, with its reason.
+ */
+const ALLOWED_BY_TEMPLATE: ReadonlyArray<readonly [string, readonly string[]]> = [
+  [
+    join('features', 'instrument', 'instrument.component.html'),
+    // §11 "field names in tables of raw data": the liquidations table's columns and the stored
+    // enum values the API sends as a row's side. Prose around them is translated; these are not
+    // prose. If a member ever reports them as opaque, the answer is a legend or tooltip in their
+    // language beside the table — never translating the field names themselves (ruled 2026-09-28).
+    ['time', 'UTC', 'venue', 'side', 'price', 'qty', 'notional', 'long', 'short'],
+  ],
+];
+
+/** The tokens allowed in `file`: the global set, plus any carve-out that names this template. */
+export function allowedFor(file: string): ReadonlySet<string> {
+  const scoped = ALLOWED_BY_TEMPLATE.filter(([suffix]) => file.endsWith(suffix)).flatMap(([, words]) => words);
+  return new Set([...ALLOWED_EVERYWHERE, ...scoped]);
+}
 
 function templateFiles(dir: string): string[] {
   const out: string[] = [];
@@ -71,13 +89,13 @@ export function userFacingText(html: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-/** A fragment is suspicious when it contains a word of two or more letters that is not allowed. */
-export function suspiciousWords(fragment: string): string[] {
+/** A fragment is suspicious when it contains a word of two or more letters that `allowed` lacks. */
+export function suspiciousWords(fragment: string, allowed: ReadonlySet<string> = ALLOWED_EVERYWHERE): string[] {
   return fragment
     .split(/[\s|,:()/]+/)
     .map((word) => word.replace(/^[^\p{L}\p{N}_%·?—]+|[^\p{L}\p{N}_%·?—]+$/gu, ''))
     .filter((word) => word.length > 0)
-    .filter((word) => !ALLOWED.has(word))
+    .filter((word) => !allowed.has(word))
     .filter((word) => /\p{L}{2,}/u.test(word));
 }
 
@@ -92,10 +110,44 @@ describe('§11: no hard-coded user-facing literals in the dashboard templates', 
   it.each(files.map((f) => [f.slice(f.indexOf('insight-dashboard')), f] as const))(
     '%s has no untranslated prose',
     (_label, file) => {
-      const offenders = userFacingText(readFileSync(file, 'utf8')).flatMap(suspiciousWords);
+      const allowed = allowedFor(file);
+      const offenders = userFacingText(readFileSync(file, 'utf8')).flatMap((fragment) => suspiciousWords(fragment, allowed));
       expect(offenders).toEqual([]);
     },
   );
+});
+
+describe('the English-by-rule allow-list is scoped to where it was argued', () => {
+  const instrument = join(APP_DIR, 'features', 'instrument', 'instrument.component.html');
+  const health = join(APP_DIR, 'features', 'health', 'health.component.html');
+
+  it("the liquidations table's field names pass in ITS template", () => {
+    for (const word of ['time', 'venue', 'side', 'price', 'qty', 'notional', 'long', 'short']) {
+      expect(suspiciousWords(word, allowedFor(instrument))).toEqual([]);
+    }
+  });
+
+  it('the same words are caught in any other template — the carve-out does not leak', () => {
+    for (const word of ['side', 'price', 'long', 'short']) {
+      expect(suspiciousWords(word, allowedFor(health))).toEqual([word]);
+    }
+  });
+
+  it('units and venue names stay allowed everywhere, in both', () => {
+    for (const file of [instrument, health]) {
+      expect(suspiciousWords('binance perp 1m ws', allowedFor(file))).toEqual([]);
+    }
+  });
+
+  it('a new template inherits no carve-out', () => {
+    const future = join(APP_DIR, 'features', 'market', 'market.component.html');
+    expect(suspiciousWords('side', allowedFor(future))).toEqual(['side']);
+  });
+
+  it('prose is still caught in the template that owns the carve-out', () => {
+    // the carve-out is a list of identifiers, not a licence for sentences in that file
+    expect(suspiciousWords('Recent liquidations by venue', allowedFor(instrument))).toEqual(['Recent', 'liquidations', 'by']);
+  });
 });
 
 describe('the string tables', () => {
