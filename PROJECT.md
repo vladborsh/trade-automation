@@ -172,13 +172,15 @@ role-to-role, technical detail is the point). For user-facing material:
 
 ## Task backlog
 
-The **delivery queue** lives under `tasks/`, **one file per stream**:
-`tasks/<stream>.jsonl` — one JSON object per line, one line per task. Streams
-today: `tasks/backtest-app.jsonl` (the manual backtesting app, ids `T-`/`BUG-`,
-moved from the repo root on 2026-09-28 with its history unchanged) and
-`tasks/insight-bot.jsonl` (the crypto insight bot, ids `IB-`/`IB-BUG-`). A new
-stream gets a new file and its own id prefix; the row schema below is the same
-in every file. One Tech Lead schedules across all files with one shared
+The **delivery queue** is **one `.jsonl` file per stream** — one JSON object
+per line, one line per task. Streams today: the manual backtesting app (ids
+`T-`/`BUG-`) in **`tasks.jsonl` at the repo root** — its move to
+`tasks/backtest-app.jsonl` is decided (brief
+`architecture/crypto-insight-bot-2026-09-28.md` §8) and **pending** as one
+mechanical commit; until it lands the root file is the backtest stream's
+queue — and the crypto insight bot (ids `IB-`/`IB-BUG-`) in
+**`tasks/insight-bot.jsonl`**. A new stream gets a new file under `tasks/` and
+its own id prefix; the row schema below is the same in every file. One Tech Lead schedules across all files with one shared
 developer pool; `P0` (red `master`) is global across streams. The queue is
 deliberately machine-readable rather than prose — the Tech Lead answers "what
 is unblocked", "who is busy", "what depends on this" many times a day, and
