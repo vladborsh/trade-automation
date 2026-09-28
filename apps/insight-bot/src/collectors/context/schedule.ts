@@ -20,13 +20,27 @@ export const GLOBAL_RETRY_MS = 60_000;
 /**
  * Spacing between the per-coin `market_chart` calls.
  *
- * **Measured 2026-09-28:** twenty calls back-to-back drew
- * `429 "You've exceeded the Rate Limit"` from CoinGecko, even though the collector's *daily*
- * average is ~0.11 requests/min. The average was never the constraint — the burst was, at roughly
- * 60/min instantaneous. At 6 s spacing the backfill runs at 10/min, inside the ~5-15/min keyless
- * allowance, and takes about two minutes for twenty coins, which nothing is waiting on.
+ * **A venue's published rate is a claim; the rate measured under sustained load is the fact.**
+ * The design's ~5-15/min for keyless CoinGecko came from a one-off probe, not from a sustained
+ * run, which is why the numbers below disagree with it.
+ *
+ * Measured 2026-09-28, in two steps:
+ *
+ * 1. Twenty `market_chart` calls back-to-back drew `429 "You've exceeded the Rate Limit"`. The
+ *    collector's *daily average* is ~0.11 requests/min — the average was never the constraint,
+ *    the burst was, at roughly 60/min instantaneously.
+ * 2. Spacing them 6 s apart (10/min) was **still too fast**. Eight probe calls at that spacing,
+ *    immediately after a backfill, returned `429, 429, 429, 429, 429, 429, 200, 200` — the
+ *    allowance only cleared about 65 s after the last backfill request. The backfill itself ran
+ *    at **27 s/coin** (540 s for 20 coins) because the 60 s back-off was absorbing the excess:
+ *    it completed correctly, but spent most of its wall time waiting rather than working.
+ *
+ * So the sustainable keyless rate here is **~2-3 requests/min**, not 10. At 30 s spacing the
+ * twenty coins take ten minutes — free, for a once-a-day job nothing waits on — and the job runs
+ * at its stated pace instead of living in back-off. When a 429 does occur it is now logged
+ * (`onRetry`), because a silent retry hides exactly this.
  */
-export const COIN_REQUEST_SPACING_MS = 6_000;
+export const COIN_REQUEST_SPACING_MS = 30_000;
 export const FNG_DAILY_UTC = { hour: 0, minute: 5 };
 export const COINS_DAILY_UTC = { hour: 0, minute: 10 };
 

@@ -487,13 +487,23 @@ ten-minute slot, and why the poll starts before the one-shot backfills finish.
 
 ≈**165 CoinGecko requests/day ≈ 0.11/min**, about 1 % of the keyless allowance.
 
-**The daily average was never the binding constraint — the burst was.** Twenty `market_chart`
-calls back-to-back is ~60/min instantaneously and CoinGecko answers it with `429`; that is what
-the first live run did, and it cost that run its `/global` samples. The per-coin calls are
-therefore spaced **6 s** apart (10/min), and both one-shot backfills are **skipped when the
-tables already hold them**, so a restart does not re-spend the allowance on data already stored.
-A 429 is retried after 60 s, at most 3 times. A **401 is not retried** — that is the venue saying
-the endpoint is paid, not a transient failure.
+**A venue's published rate is a claim; the rate measured under sustained load is the fact.** The
+~5–15/min above is CoinGecko's published keyless figure, from a one-off probe. Measured here:
+
+- twenty `market_chart` calls back-to-back drew `429` — the daily average was never the
+  constraint, the burst was, at ~60/min instantaneously;
+- spacing them **6 s** apart (10/min) was *still* too fast: eight probe calls at that spacing
+  returned `429, 429, 429, 429, 429, 429, 200, 200`, and a backfill crawled at **27 s/coin**
+  because its own 60 s back-off was absorbing the excess.
+
+So the sustainable keyless rate is **~2–3 requests/min**. The per-coin calls are spaced **30 s**
+apart: twenty coins take ten minutes, which is free for a once-a-day job, and the job runs at its
+stated pace instead of living in back-off. Both one-shot backfills are **skipped when the tables
+already hold them**, so a restart does not re-spend the allowance on stored data.
+
+A 429 is retried after 60 s, at most 3 times, and **every retry is logged** — a silent retry is
+how a collector reports "normal" while running at a fraction of its pace. A **401 is not
+retried**: that is the venue saying the endpoint is paid, not a transient failure.
 
 **No API key is used or needed**, and none was requested. The two endpoints that require one
 (`/global/market_cap_chart`, `market_chart?days=max`) are not called.

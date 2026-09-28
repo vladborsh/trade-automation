@@ -12,6 +12,13 @@ export interface ContextClientOptions {
   fetchImpl?: typeof fetch;
   /** Injected so the specs do not really wait 60 s. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Called on every 429 before backing off. **Not optional in spirit**: a silent retry is how a
+   * collector reports "normal" while running at a fraction of its configured pace — measured
+   * 2026-09-28, a backfill spent roughly three quarters of its wall time in back-off and logged
+   * nothing at all.
+   */
+  onRetry?: (info: { url: string; attempt: number; of: number; waitMs: number }) => void;
 }
 
 /**
@@ -37,6 +44,7 @@ export class ContextClient {
       if (response.ok) return (await response.json()) as T;
 
       if (response.status === 429 && attempt < MAX_RETRIES) {
+        this.options.onRetry?.({ url, attempt: attempt + 1, of: MAX_RETRIES, waitMs: RETRY_AFTER_MS });
         await this.sleep(RETRY_AFTER_MS);
         continue;
       }

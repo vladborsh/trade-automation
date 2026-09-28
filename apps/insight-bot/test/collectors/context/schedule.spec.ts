@@ -28,10 +28,17 @@ describe('the /global cadence', () => {
     expect(GLOBAL_RETRY_MS).toBeLessThan(GLOBAL_POLL_MS);
   });
 
-  it('paces the per-coin calls inside the keyless allowance', () => {
-    // 20 coins at this spacing is 10 requests/min, against CoinGecko's ~5-15/min.
-    expect(COIN_REQUEST_SPACING_MS).toBe(6_000);
-    expect(60_000 / COIN_REQUEST_SPACING_MS).toBeLessThanOrEqual(15);
+  it('paces the per-coin calls at the MEASURED rate, not the published one', () => {
+    // The design's ~5-15/min came from a one-off probe. Under sustained use, 6 s spacing (10/min)
+    // still drew 429,429,429,429,429,429,200,200 and the backfill crawled at 27 s/coin inside its
+    // own back-off. The sustainable rate is ~2-3/min.
+    expect(COIN_REQUEST_SPACING_MS).toBe(30_000);
+    expect(60_000 / COIN_REQUEST_SPACING_MS).toBeLessThanOrEqual(3);
+  });
+
+  it('still finishes the daily job well inside its day', () => {
+    // 20 coins x 30 s = 10 minutes, for a once-a-day job nothing waits on.
+    expect((20 * COIN_REQUEST_SPACING_MS) / 60_000).toBeLessThanOrEqual(15);
   });
 });
 

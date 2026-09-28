@@ -20,6 +20,7 @@ function fakeFetch(responses: Array<{ status?: number; body: unknown }>) {
 
 function build(responses: Parameters<typeof fakeFetch>[0]) {
   const slept: number[] = [];
+  const retries: Array<{ url: string; attempt: number; of: number; waitMs: number }> = [];
   const f = fakeFetch(responses);
   const client = new ContextClient({
     fngBaseUrl: 'https://fng.test',
@@ -28,8 +29,9 @@ function build(responses: Parameters<typeof fakeFetch>[0]) {
     sleep: async (ms) => {
       slept.push(ms);
     },
+    onRetry: (info) => retries.push(info),
   });
-  return { client, slept, ...f };
+  return { client, slept, retries, ...f };
 }
 
 describe('URLs', () => {
@@ -82,5 +84,30 @@ describe('back-off', () => {
     const { client, calls } = build([{ status: 500, body: 'boom' }]);
     await expect(client.global()).rejects.toThrow(/HTTP 500/);
     expect(calls()).toBe(1);
+  });
+});
+
+describe('a 429 retry is never silent', () => {
+  it('reports every back-off with its endpoint and attempt number', async () => {
+    // Measured 2026-09-28: a backfill spent ~3/4 of its wall time in back-off and logged nothing,
+    // so it looked healthy while running at a fraction of its pace.
+    const { client, retries } = build([{ status: 429, body: 'slow down' }]);
+    await expect(client.global()).rejects.toThrow(/HTTP 429/);
+
+    expect(retries).toHaveLength(MAX_RETRIES);
+    expect(retries[0]).toEqual({ url: 'https://cg.test/api/v3/global', attempt: 1, of: MAX_RETRIES, waitMs: RETRY_AFTER_MS });
+    expect(retries.map((r) => r.attempt)).toEqual([1, 2, 3]);
+  });
+
+  it('reports the retry that then succeeds, so a recovered throttle is still visible', async () => {
+    const { client, retries } = build([{ status: 429, body: 'slow' }, { body: { data: {} } }]);
+    await client.global();
+    expect(retries).toHaveLength(1);
+  });
+
+  it('says nothing when nothing was throttled', async () => {
+    const { client, retries } = build([{ body: { data: {} } }]);
+    await client.global();
+    expect(retries).toEqual([]);
   });
 });

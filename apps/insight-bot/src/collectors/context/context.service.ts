@@ -53,6 +53,10 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
       new ContextClient({
         fngBaseUrl: this.config.env.get('FNG_BASE_URL'),
         coingeckoBaseUrl: this.config.env.get('COINGECKO_BASE_URL'),
+        onRetry: ({ url, attempt, of, waitMs }) =>
+          this.logger.warn(
+            `rate limited (429) by ${new URL(url).host}${new URL(url).pathname} — retry ${attempt}/${of} in ${waitMs / 1000} s`,
+          ),
       });
   }
 
@@ -134,13 +138,19 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
       try {
         const rows = marketCapCoinRows(await this.client.coinMarketChart(coin, days), coin, now);
         written += await this.writers.marketCapCoin.write(rows);
+        // Per coin, NOT per pass: the 365-day backfill takes ten minutes at the measured rate,
+        // and a pass-level record would leave this stream reading silent throughout. The
+        // watchdog's threshold is 3 minutes, so a first boot on a fresh box would raise a false
+        // alert on its very first run — the cry-wolf case, at exactly the moment trust in the
+        // alerts is being established.
+        this.registry.recordMessage(STREAM_COINS, Date.now());
       } catch (err) {
         // One coin failing must not cost the other nineteen their day.
         this.logger.warn(`market cap for ${coin}: ${(err as Error).message}`);
         this.metrics.gapsDetected.inc({ stream: STREAM_COINS });
       }
     }
-    this.registry.recordMessage(STREAM_COINS, now.getTime());
+    this.registry.recordMessage(STREAM_COINS, Date.now());
     return written;
   }
 
