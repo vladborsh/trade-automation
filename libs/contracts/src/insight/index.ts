@@ -4,4 +4,5 @@
  *
  * Owned by dev-3 for IB-029; other dashboard tasks append their own modules here.
  */
+export * from './common';
 export * from './auth';
