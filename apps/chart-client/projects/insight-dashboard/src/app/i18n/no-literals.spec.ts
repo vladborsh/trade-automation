@@ -31,6 +31,12 @@ const ALLOWED = new Set([
   // §11 keeps "field names in tables of raw data" English in BOTH languages: these are the
   // columns and side values of the liquidations table, which a reader matches against the
   // venue's own data and our logs. Prose around them is translated; these are not prose.
+  // `long`/`short` are the stored enum values the API sends, not words chosen for a reader.
+  //
+  // **The escape hatch, ruled 2026-09-28:** if a member ever reports that these columns read as
+  // opaque, the answer is a legend or a tooltip IN THEIR LANGUAGE next to the table — not
+  // translating the field names. Translating them would break the one thing they are for: matching
+  // a row against the venue's own UI and our logs.
   'time', 'UTC', 'venue', 'side', 'price', 'qty', 'notional', 'long', 'short',
 ]);
 
