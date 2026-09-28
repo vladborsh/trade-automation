@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { AppConfigService } from '../config/config.service';
 import { StreamRegistry } from './stream-registry';
-import { TelegramSender } from './telegram-sender';
+import { TelegramSender } from '../delivery/telegram-sender';
 import { Watchdog, renderAlert } from './watchdog';
 
 /** §6.2: "the watchdog (every 30 s)". */

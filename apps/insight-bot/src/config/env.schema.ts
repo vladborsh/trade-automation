@@ -63,6 +63,13 @@ export const EnvSchema = z.object({
   WATCHDOG_SILENCE_MIN: z.coerce.number().int().positive().default(3),
   // brief §1 — the per-user daily alert budget the gate enforces (§8.5).
   ALERTS_PER_DAY: z.coerce.number().int().positive().default(3),
+
+  // IB-021, §8.6 — the member bot. Without a token the bot does not start at all (the app still
+  // collects and serves /health); tokens are the user's to issue, never an agent's.
+  // TELEGRAM_BOT_USERNAME only shapes the t.me/<bot>?start=<code> link text.
+  TELEGRAM_BOT_USERNAME: z.string().default('insight_bot'),
+  // The one account bootstrapped as admin on boot (§3.5). 0 means "no admin configured".
+  ADMIN_TG_USER_ID: z.coerce.number().int().nonnegative().default(0),
 });
 export type Env = z.infer<typeof EnvSchema>;
 

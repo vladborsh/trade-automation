@@ -9,7 +9,7 @@ import { OiLsPoller } from './binance-perp/oi-ls.poller';
 import { OkxService } from './okx/okx.service';
 import { BybitService } from './bybit/bybit.service';
 import { GapReportService } from '../ops/gap-report.service';
-import { TelegramSender } from '../ops/telegram-sender';
+import { TelegramSender } from '../delivery/telegram-sender';
 import { WatchdogService } from '../ops/watchdog.service';
 import { WritersModule } from './writers/writers.module';
 

@@ -4,7 +4,7 @@ import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.
 import { DB, type Db } from '../db/db.port';
 import { candleCoverage, gapsForDay, saveGapReport, slotCoverage } from '../db/pg/collector-reads';
 import { buildGapReport, renderGapReport, type GapReport } from './gap-report';
-import { TelegramSender } from './telegram-sender';
+import { TelegramSender } from '../delivery/telegram-sender';
 
 const DAY_MS = 86_400_000;
 /** §6.2: "at 00:10 UTC" — ten minutes of slack so the last minute's writes have landed. */

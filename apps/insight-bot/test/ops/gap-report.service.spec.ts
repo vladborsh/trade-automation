@@ -1,7 +1,7 @@
 import { BinanceWeightTracker } from '../../src/collectors/binance-perp/binance-weight.tracker';
 import type { Db } from '../../src/db/db.port';
 import { GapReportService } from '../../src/ops/gap-report.service';
-import type { TelegramSender } from '../../src/ops/telegram-sender';
+import type { TelegramSender } from '../../src/delivery/telegram-sender';
 
 /**
  * IB-011 — the job around the pure builder: when it fires, and the ordering that makes the

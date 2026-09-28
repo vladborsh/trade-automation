@@ -15,7 +15,7 @@ import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { GapReportService } from './gap-report.service';
 import { renderGapReport } from './gap-report';
-import { TelegramSender } from './telegram-sender';
+import { TelegramSender } from '../delivery/telegram-sender';
 
 /**
  * Deliberately NOT `AppModule`: booting that here would open every venue socket and start a

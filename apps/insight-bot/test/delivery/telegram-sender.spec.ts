@@ -1,4 +1,4 @@
-import { TelegramSender } from '../../src/ops/telegram-sender';
+import { TelegramSender } from '../../src/delivery/telegram-sender';
 
 /** IB-011 — the service sender. Tokens are the user's: without one this is disabled, not broken. */
 

@@ -287,6 +287,50 @@ anything missed while backfilling is lost for good.
 **Rate limits are Bybit's own** — nothing here touches `ib_binance_weight_used_1m`, which is scoped
 to the Binance futures budget (§4.5). Steady state is ~0.06 REST requests/minute.
 
+## The Telegram bot and members (IB-021)
+
+`src/delivery/` (the bot) and `src/users/` (members and invites), design §8.6 and §3.5.
+Migration **005** adds `users` and `invites` — 004 was IB-011's `gap_reports`, and migration
+numbers here are first-come.
+
+**The bot needs a token that only the user can issue, and it is disabled without one.** No token
+means the app still collects, still serves `/health`, and the bot simply does not start; the same
+rule IB-011's sender follows. An agent never registers a bot. Set, per slot, in that slot's
+`.env`:
+
+| Variable | Meaning |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | the slot's **test** bot (there is one production bot) |
+| `TELEGRAM_BOT_USERNAME` | shapes the `t.me/<bot>?start=<code>` link |
+| `ADMIN_TG_USER_ID` | bootstrapped as admin on every boot, idempotently |
+| `TELEGRAM_SERVICE_CHAT_ID` | IB-011's operator chat (watchdog, gap report) |
+
+Long polling (D11), so the instance opens no inbound port.
+
+### Commands
+
+Member: `/start <code>`, `/settings`, `/deposit <n>`, `/risk <pct>`, `/limit <pct>`,
+`/lang ru|en`, `/dex on|off`. Admin: `/invite`, `/users`.
+
+Three behaviours that are deliberate rather than incidental:
+
+- **An unknown user gets one line and nothing else** (§8.6) — no command list, no mention that
+  invites exist. A stranger who finds the bot learns nothing about it.
+- **A wrong, used and expired invite give the same refusal.** Someone trying codes must not be
+  able to tell them apart.
+- **`/lang en` is confirmed in English.** The reply is the first proof the change took effect.
+
+Texts are pure functions in `delivery/templates/texts.ts`, `ru` and `en` for every message, with
+commands, codes and tickers left in English so both languages type the same thing.
+
+### Invites
+
+Single-use `t.me/<bot>?start=<code>` deep links, 7-day expiry (§3.5). Codes are 16 characters of
+a 31-symbol alphabet from `crypto.randomBytes` — 80 bits, and the alphabet omits the characters
+misread when a link is retyped (`0`/`O`, `1`/`l`/`I`). Consumption is one transaction with a
+conditional `UPDATE`, so **two people opening the same link race safely**: exactly one becomes a
+member and the other sees the ordinary refusal. There is an integration spec for precisely that.
+
 ## The historical backfill (IB-012)
 
 `npm run backfill -- --symbols BTCUSDT,ETHUSDT,SOLUSDT [--from 2024-01] [--force]`
