@@ -1,16 +1,20 @@
 /* The dark-terminal palette (AGENTS.md), not a near-duplicate of it. */
-.chart-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-}
 
-.chart-host {
-  /* the six panes need room; below this the time scale and the pane titles collide */
-  min-height: 720px;
-  border: 1px solid #30363d;
-  background: #0d1117;
+/*
+ * The row. `overflow-x: auto` here is what the user asked for in so many words: on a narrow
+ * screen THE ROW scrolls sideways and the page does not. The page's own horizontal overflow is
+ * shut off in instrument.component.scss, so the scrollbar can only ever appear on this element.
+ */
+.panel-row {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  /* Tall enough to read six narrow charts, and tied to the viewport so the row — not the page —
+     is what fills the screen. The header and the note above it are the rest of the 100dvh. */
+  height: calc(100dvh - 190px);
+  min-height: 420px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .pane-note {

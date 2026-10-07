@@ -7,6 +7,13 @@
   padding: 12px;
   color: #c9d1d9;
   background: #0d1117;
+  /*
+   * IB-BUG-009: the user asked that on a narrow screen the ROW scrolls sideways and the page
+   * does not. Shutting horizontal overflow off here is what guarantees that — the only element
+   * that may ever show a horizontal scrollbar is `.panel-row`. Vertical scrolling is left alone
+   * so the «50 крупнейших ликвидаций» table below the row is still reachable.
+   */
+  overflow-x: hidden;
 }
 
 .controls {

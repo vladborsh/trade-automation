@@ -1,0 +1,75 @@
+/* The dark-terminal palette (AGENTS.md), not a near-duplicate of it. */
+
+/*
+ * The HOST is the row's flex child, not `.panel` inside it. An Angular component's host element
+ * is `display: inline` by default, so without this the flex sizing lands on an inline box, the
+ * panel never stretches, and all six charts collapse to about 60 px — which is exactly what the
+ * first real run showed while every unit test passed.
+ *
+ * `min-width` is what makes the ROW scroll horizontally instead of the panels squeezing to
+ * nothing on a narrow screen.
+ */
+:host {
+  flex: 1 1 0;
+  min-width: 260px;
+  display: flex;
+  min-height: 0;
+}
+
+.panel {
+  /* Fills the host, which fills the row's height. */
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #30363d;
+  background: #0d1117;
+}
+
+.panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #30363d;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9d1d9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.panel-host {
+  /* The chart takes the rest of the column; `min-height: 0` lets flex shrink it. */
+  flex: 1 1 auto;
+  min-height: 0;
+}

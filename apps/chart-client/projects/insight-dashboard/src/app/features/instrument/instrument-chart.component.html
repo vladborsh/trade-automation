@@ -1,6 +1,9 @@
-<div class="chart-stack">
-  <div #chartHost class="chart-host"></div>
-  @if (data(); as d) {
-    <p class="pane-note">{{ paneTitle(d.bucket, d.liquidations.venue, d.liquidations.undercounted) }}</p>
+<div class="panel-row">
+  @for (panel of panels; track panel.key) {
+    <app-instrument-panel [panel]="panel" [data]="data()" />
   }
 </div>
+
+@if (data(); as d) {
+  <p class="pane-note">{{ paneTitle(d.bucket, d.liquidations.venue, d.liquidations.undercounted) }}</p>
+}

@@ -1,134 +1,56 @@
-import {
-  ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, viewChild, type OnDestroy,
-} from '@angular/core';
-import {
-  CandlestickSeries, LineSeries, createChart, type IChartApi, type Time,
-} from 'lightweight-charts';
-import type {
-  WebCandlesResponse, WebFundingResponse, WebLiquidationsResponse, WebLongShortResponse,
-} from '@trade-automation/contracts';
-import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
-import {
-  toCandleData, toCvdSegments, toFundingSteps, toLongShortLine, toOpenInterestPoints,
-  toPredictedFunding, toTakerDelta,
-} from './series.adapter';
+import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { I18nService } from '../../i18n/i18n.service';
-import { LiquidationHistogramRenderer, liquidationPaneTitle } from './liquidation-histogram.renderer';
+import { InstrumentPanelComponent } from './instrument-panel.component';
+import { liquidationPaneTitle } from './liquidation-histogram.renderer';
+import type { PaneData } from './pane-data';
+import { PANELS } from './panels.model';
 
-export interface PaneData {
-  instrument: string;
-  timeframe: string;
-  bucket: string;
-  candles: WebCandlesResponse;
-  openInterest: Array<{ time: number; value: number; notional: number | null }>;
-  funding: WebFundingResponse;
-  longShort: WebLongShortResponse;
-  liquidations: WebLiquidationsResponse;
-}
+export type { PaneData } from './pane-data';
 
 /**
- * IB-031 — the instrument page's chart stack (architecture/insight-bot-web-dashboard.md §2).
+ * IB-BUG-009 — the instrument row: **six panels side by side**, Price | OI | Liquidations |
+ * CVD/delta | Funding | L/S, each its own chart with its own time axis, title and autoscale
+ * (user feedback 2026-10-07, `reports/zinc-raven-instrument-layout.md`).
  *
- * **One chart with panes, not several charts.** Every pane shares the chart's time scale, which
- * is what "time-aligned" means: a cascade in the liquidation pane sits under the exact candle
- * it happened in, and scrolling moves all of them together. Separate charts would drift apart
- * the moment anyone panned one.
+ * **What this replaced, and what it cost.** IB-031 drew one chart of six stacked panes and
+ * argued for it in this file: *"Every pane shares the chart's time scale, which is what
+ * time-aligned means… Separate charts would drift apart the moment anyone panned one."* That was
+ * right, and the user has chosen the row anyway. So six charts mean six time scales, and the
+ * drift is real.
  *
- * Reused as is through the `@backtest-features` alias: **`MetricSeriesRenderer`** draws the open
- * interest pane unchanged, which is why the server serves OI in the `MetricPoint` wire shape.
- * Not reused: the backtest SPA's `ChartPanelComponent` and its panel/feed model, which are
- * built around that app's layout feed and would have to be bent around a second, differently
- * driven page — the same judgement dev-1 applied to `RestClient` in IB-030.
+ * **Cross-panel pan/zoom sync is NOT implemented, and that is a decision, not an omission.**
+ * The brief calls it a bonus and says to drop it rather than bend the layout around it, which is
+ * what two attempts earned:
+ *
+ * 1. On the *logical* range (bar indices). The panels hold wildly different counts for the same
+ *    window — 1m candles ≈ 1440, 5m open interest ≈ 288, funding a handful of settlements — so
+ *    bar 100 is a different moment in each panel. Mirroring the index pulled the row apart.
+ * 2. On the *time* range, which is comparable by construction. That failed for a subtler reason:
+ *    lightweight-charts fires `subscribeVisibleTimeRangeChange` asynchronously, so a flag set
+ *    around `setVisibleRange` is already cleared by the time the callback runs and cannot
+ *    suppress the echo. Each panel then re-broadcast the range it had actually *achieved* after
+ *    clamping to its own data, and the thinnest series won: the funding panel, with 15 points,
+ *    dragged all six down to a five-minute window. The acceptance screenshot showed it.
+ *
+ * What replaces it: every panel opens on the SAME wall-clock window (`windowBounds`), so the row
+ * reads as one window on arrival — which is what the layout is for. Panning one panel moves only
+ * that panel. That cost is stated here and in the report rather than hidden.
  */
 @Component({
   selector: 'app-instrument-chart',
   standalone: true,
+  imports: [InstrumentPanelComponent],
   templateUrl: './instrument-chart.component.html',
   styleUrl: './instrument-chart.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class InstrumentChartComponent implements OnDestroy {
+export class InstrumentChartComponent {
   readonly data = input<PaneData | null>(null);
 
-  private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('chartHost');
-  private chart: IChartApi | null = null;
-  private readonly oi = new MetricSeriesRenderer();
-  private readonly liquidations = new LiquidationHistogramRenderer();
+  readonly panels = PANELS;
 
   private readonly i18n = inject(I18nService);
   readonly t = this.i18n.t.bind(this.i18n);
   readonly paneTitle = (bucket: string, venue: string, undercounted: boolean): string =>
     liquidationPaneTitle(this.t, bucket, venue, undercounted);
-
-  constructor() {
-    effect(() => {
-      const data = this.data();
-      if (!data) return;
-      this.ensureChart();
-      this.draw(data);
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.chart?.remove();
-    this.chart = null;
-  }
-
-  private ensureChart(): void {
-    if (this.chart) return;
-    this.chart = createChart(this.host().nativeElement, {
-      layout: { background: { color: '#0d1117' }, textColor: '#c9d1d9', panes: { separatorColor: '#30363d' } },
-      grid: { vertLines: { color: '#30363d' }, horzLines: { color: '#30363d' } },
-      rightPriceScale: { borderColor: '#30363d' },
-      timeScale: { borderColor: '#30363d', timeVisible: true, secondsVisible: false },
-      autoSize: true,
-    });
-    // price dominates; the five reading panes share the rest. Without this every pane is equal
-    // and the candles — the thing every other pane is read against — are a sixth of the screen.
-    this.chart.panes()[0]?.setStretchFactor(3);
-  }
-
-  /**
-   * Redraws every pane from scratch. The page fetches a whole window at a time, so there is no
-   * incremental path to get wrong — and `setData` on an existing series keeps the user's zoom.
-   */
-  private draw(data: PaneData): void {
-    const chart = this.chart;
-    if (!chart) return;
-
-    const price = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
-      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
-    }, 0);
-    price.setData(toCandleData(data.candles.candles) as never);
-
-    // pane 1: OI notional is ~10^9 against price's ~10^4, so sharing pane 0 flattens the
-    // candles into a line. Found on the acceptance run, fixed by giving the shared renderer an
-    // optional pane rather than forking it.
-    if (!this.oi.series) this.oi.attach(chart, data.timeframe as never, 1);
-    this.oi.setData(toOpenInterestPoints(data.openInterest, data.instrument, data.timeframe));
-
-    // pane 2 for the same reason as OI: the bars sit at zero and would pull the price scale
-    // down to 0, squashing the candles into a band at the top
-    if (!this.liquidations.attached) this.liquidations.attach(chart, 2);
-    this.liquidations.setData(data.liquidations.bars);
-
-    // CVD is drawn as segments so an outage stays a hole rather than a straight line
-    for (const segment of toCvdSegments(data.candles.candles)) {
-      chart.addSeries(LineSeries, { color: '#8b949e', lineWidth: 1, lastValueVisible: false }, 3)
-        .setData(segment as unknown as Array<{ time: Time; value: number }>);
-    }
-    chart.addSeries(LineSeries, { color: '#c9d1d9', lineWidth: 1, lastValueVisible: false }, 3)
-      .setData(toTakerDelta(data.candles.candles) as unknown as Array<{ time: Time; value: number }>);
-
-    for (const venue of data.funding.settled) {
-      chart.addSeries(LineSeries, { color: '#26a69a', lineWidth: 1, lastValueVisible: false }, 4)
-        .setData(toFundingSteps(venue.points) as unknown as Array<{ time: Time; value: number }>);
-    }
-    chart.addSeries(LineSeries, { color: '#8b949e', lineWidth: 1, lineStyle: 2, lastValueVisible: false }, 4)
-      .setData(toPredictedFunding(data.funding) as unknown as Array<{ time: Time; value: number }>);
-
-    chart.addSeries(LineSeries, { color: '#c9d1d9', lineWidth: 1, lastValueVisible: false }, 5)
-      .setData(toLongShortLine(data.longShort) as unknown as Array<{ time: Time; value: number }>);
-  }
 }

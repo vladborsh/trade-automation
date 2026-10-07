@@ -177,7 +177,19 @@ describe('the string tables', () => {
     // page it reads "English" and on an English page "Русский", because a member looking for the
     // switch is looking for the language they want, not the one they are reading.
     const SWITCH: StringKey = 'login.switchLang';
-    const keys = (Object.keys(ru) as StringKey[]).filter((key) => key !== SWITCH);
+    /**
+     * IB-BUG-009: the L/S panel's title. The brief's six titles are «Цена, Открытый интерес,
+     * Ликвидации лонг/шорт, Дельта/CVD, Фандинг, **Long/Short**» — the last written in English
+     * on purpose, as the name of the ratio rather than a sentence about it. Named here, like the
+     * switch, rather than widened into a pattern: one key, one reason, visible in the diff.
+     *
+     * Note the brief writes «лонг/шорт» in Cyrillic for the liquidations title, so this is a
+     * judgement about one term of art, not a general carve-out for English titles. If the user
+     * would rather read «Лонг/шорт», that is a one-word change in `ru.ts` and this line goes.
+     */
+    const TERMS_OF_ART: readonly StringKey[] = ['instrument.panel.longShort'];
+    const exempt = new Set<StringKey>([SWITCH, ...TERMS_OF_ART]);
+    const keys = (Object.keys(ru) as StringKey[]).filter((key) => !exempt.has(key));
 
     const untranslated = keys.filter((key) => !cyrillic.test(ru[key]) && /\p{L}{4,}/u.test(ru[key]) && ru[key] === en[key]);
     expect(untranslated).toEqual([]);
