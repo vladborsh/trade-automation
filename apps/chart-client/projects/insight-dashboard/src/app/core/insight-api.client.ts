@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
   WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest,
@@ -29,6 +29,7 @@ import { toWebApiError } from './web-api-error';
 export class InsightApiClient {
   private readonly config = inject(AppConfigService);
   private readonly router = inject(Router);
+  private readonly document = inject(DOCUMENT);
 
   async streams(): Promise<WebStreamsResponse> {
     return this.get<WebStreamsResponse>('/health/streams');
@@ -120,7 +121,20 @@ export class InsightApiClient {
       // on. One redirect here covers every guarded call rather than each page remembering to
       // check — and the login screen says how to get a link. The error is still thrown so the
       // caller's own state machine settles.
-      if (error.code === 'UNAUTHENTICATED') void this.router.navigateByUrl('/login');
+      //
+      // **Never from /login itself.** The shell calls /auth/me on every load, including on the
+      // login page, where a 401 is the NORMAL state — there is no session yet, that is the point
+      // of being there. Redirecting then navigates /login?t=<token> to /login and destroys the
+      // token in the URL, so the link the bot just sent becomes "this link carries no token".
+      // Found on a real run: it would have broken the exact flow this task exists to fix.
+      //
+      // The current page comes from `location`, NOT from `router.url`: /auth/me is fired by the
+      // shell during bootstrap, before the first navigation has settled, and until it does
+      // `router.url` is still '/'. Measured on a live run — the guard written against the router
+      // let the redirect through and the token was destroyed anyway. `location.pathname` is
+      // correct from the first byte.
+      const onLogin = this.document.location.pathname === '/login';
+      if (error.code === 'UNAUTHENTICATED' && !onLogin) void this.router.navigateByUrl('/login');
       throw error;
     }
     return (await response.json()) as T;

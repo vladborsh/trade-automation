@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { InsightApiClient } from './insight-api.client';
@@ -12,12 +13,17 @@ import { AppConfigService } from '@backtest-core/config/app-config.service';
  * on other failures, which would hide real errors behind a login screen.
  */
 
-function setup(status: number, body: unknown) {
+/**
+ * `pathname` is the page the BROWSER is on and `routerUrl` is what the router thinks; they differ
+ * during bootstrap, which is the whole point of the last test here.
+ */
+function setup(status: number, body: unknown, pathname = '/health', routerUrl = pathname) {
   const navigated: string[] = [];
   TestBed.configureTestingModule({
     providers: [
       InsightApiClient,
-      { provide: Router, useValue: { navigateByUrl: (url: string) => { navigated.push(url); return Promise.resolve(true); } } },
+      { provide: DOCUMENT, useValue: { location: { pathname } } },
+      { provide: Router, useValue: { url: routerUrl, navigateByUrl: (url: string) => { navigated.push(url); return Promise.resolve(true); } } },
       { provide: AppConfigService, useValue: { get: () => ({ apiBaseUrl: '/api/web' }) } },
     ],
   });
@@ -58,6 +64,25 @@ describe('an unauthenticated call sends the member to the login screen', () => {
   it('does not redirect on success', async () => {
     const { api, navigated } = setup(200, { streams: [] });
     await api.streams();
+    expect(navigated).toEqual([]);
+  });
+});
+
+describe('the login page is never redirected away from', () => {
+  it('does NOT redirect when the 401 came from /login — that would destroy the ?t= token', async () => {
+    // the shell calls /auth/me on every load; on /login a 401 is the normal state, there is no
+    // session yet. Navigating to /login then drops the query string and the bot's link dies.
+    const { api, navigated } = setup(401, { code: 'UNAUTHENTICATED' }, '/login');
+    await expect(api.me()).rejects.toThrow();
+    expect(navigated).toEqual([]);
+  });
+
+  it('reads the page from location, not the router, so a 401 DURING bootstrap is still safe', async () => {
+    // measured on a live run: /auth/me resolves before the first navigation settles, and until it
+    // does `router.url` is '/'. A guard written against the router let the redirect through and
+    // the token was destroyed anyway. This is that exact state.
+    const { api, navigated } = setup(401, { code: 'UNAUTHENTICATED' }, '/login', '/');
+    await expect(api.me()).rejects.toThrow();
     expect(navigated).toEqual([]);
   });
 });

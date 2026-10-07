@@ -22,6 +22,14 @@ import { createHash, randomBytes } from 'crypto';
  *   where `Secure` must be on or the cookie can be sent in clear on any downgrade. It is a flag
  *   rather than a constant only so local `http://localhost` development works at all; the
  *   deployed default is on, and `WEB_COOKIE_SECURE` is what IB-032 sets.
+ *
+ *   **Measured 2026-10-07 (one observation, not yet a rule):** a `Secure` `ib_session` set over
+ *   plain `http://127.0.0.1:3005` **is stored and sent back** — the user followed the bot's link
+ *   and landed signed in. Browsers treat `127.0.0.1` as a trusted/secure origin, so `Secure` does
+ *   not need relaxing for the W4 SSM-port-forwarding path. So `WEB_COOKIE_SECURE` stays `true`
+ *   there; do not set it to `false` to "make local work". If this is ever re-tested, note that
+ *   `localhost` and `127.0.0.1` are not interchangeable elsewhere in this flow — Telegram rejects
+ *   `localhost` in an inline button (IB-BUG-008, `infra/insight-bot/verify-telegram-link.mjs`).
  * - **Path=/** — the SPA and `/api/web` share an origin.
  *
  * Pure: no Nest, no I/O, so the guard, the controller and the specs all use the same functions.
