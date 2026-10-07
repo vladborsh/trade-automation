@@ -179,7 +179,27 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         // §4: refuse rather than send a link to nowhere
         const link = deps.web ? await deps.web.createLoginLink(user.id) : null;
         if (!link) { await reply(ctx, T.WEB_NOT_CONFIGURED, lang); return; }
-        await reply(ctx, T.webLink(link, Math.round((deps.web as WebAuthPort).loginTokenTtlMs / 60_000)), lang);
+
+        // IB-BUG-008: sent as HTML with an inline button, because Telegram does not auto-link a
+        // URL with no TLD (`http://localhost:3005/...`) and the user could not tap it. Three
+        // routes to the same ONE token — button, anchor, bare URL — so a client that renders
+        // none of the first two still works, and single use is unaffected.
+        const minutes = Math.round((deps.web as WebAuthPort).loginTokenTtlMs / 60_000);
+        const text = T.pick(T.webLink(link, minutes), lang);
+        try {
+          await ctx.reply(text, {
+            parse_mode: 'HTML',
+            link_preview_options: { is_disabled: true },
+            reply_markup: { inline_keyboard: [[{ text: T.pick(T.WEB_BUTTON, lang), url: link }]] },
+          });
+        } catch (error) {
+          // Telegram rejects some URLs in buttons (BUTTON_URL_INVALID) and may refuse a
+          // host it does not consider a URL at all. Falling back to the plain text keeps the
+          // person able to copy the link rather than getting nothing; the failure is logged
+          // because it is the kind of thing that should be fixed, not silently absorbed.
+          deps.logger?.warn(`/web: Telegram refused the rich message, falling back to plain text: ${(error as Error).message}`);
+          await reply(ctx, T.webLinkPlain(link, minutes), lang);
+        }
         return;
       }
       case 'users': {

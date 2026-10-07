@@ -1,6 +1,9 @@
 import { Body, Controller, Get, HttpCode, HttpException, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { WebExchangeRequestSchema, type WebExchangeResponse, type WebMeResponse, type WebUser } from '@trade-automation/contracts';
+import {
+  WebExchangeRequestSchema, type WebAuthContext, type WebExchangeResponse, type WebMeResponse,
+  type WebUser,
+} from '@trade-automation/contracts';
 import type { User } from '../../users/user.model';
 import { WebAuthService } from './web-auth.service';
 import { CurrentUser, Public } from './web-auth.guard';
@@ -29,6 +32,17 @@ export class WebAuthController {
 
     res.setHeader('Set-Cookie', serializeSessionCookie(result.token, result.expiresAtMs, { secure: this.auth.cookieSecure }));
     return { user: toWebUser(result.user) };
+  }
+
+  /**
+   * IB-BUG-008 — the login screen tells the visitor which bot to message, and the username is
+   * configuration (`TELEGRAM_BOT_USERNAME`), never hard-coded. Public, because the whole point
+   * is that it is readable by someone who has no session yet; it carries nothing else.
+   */
+  @Public()
+  @Get('context')
+  context(): WebAuthContext {
+    return { botUsername: this.auth.botUsername };
   }
 
   @Get('me')

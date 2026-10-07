@@ -28,6 +28,30 @@ export class LoginComponent {
   readonly state = signal<'idle' | 'exchanging' | 'failed'>('idle');
   readonly message = signal<string | null>(null);
 
+  /**
+   * IB-BUG-008 — which bot to message, from `TELEGRAM_BOT_USERNAME` on the server. Null until it
+   * arrives (or if the call fails), and the template hides the hint rather than printing
+   * "@null": a wrong handle is worse than no handle, because someone will message it.
+   */
+  readonly botUsername = signal<string | null>(null);
+
+  constructor() {
+    void this.loadContext();
+  }
+
+  private async loadContext(): Promise<void> {
+    try {
+      const response = await fetch('/api/web/auth/context', { credentials: 'include' });
+      if (!response.ok) return;
+      const body = (await response.json()) as { botUsername?: unknown };
+      if (typeof body.botUsername === 'string' && body.botUsername.length > 0) {
+        this.botUsername.set(body.botUsername);
+      }
+    } catch {
+      // the hint is help, not a requirement: the page still works without it
+    }
+  }
+
   toggleLang(): void {
     this.i18n.setLang(this.i18n.lang() === 'ru' ? 'en' : 'ru');
   }

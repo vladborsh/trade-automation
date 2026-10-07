@@ -1,0 +1,11 @@
+
+# IB-013: a real terraform.tfvars carries the user's budget-alert e-mail address and their
+# chosen bucket name. The .example is the committed one; the filled copy stays local, so a
+# personal address is never published in the repository.
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/backend.tf
