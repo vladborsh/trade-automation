@@ -184,8 +184,11 @@ describe('the string tables', () => {
      * switch, rather than widened into a pattern: one key, one reason, visible in the diff.
      *
      * Note the brief writes «лонг/шорт» in Cyrillic for the liquidations title, so this is a
-     * judgement about one term of art, not a general carve-out for English titles. If the user
-     * would rather read «Лонг/шорт», that is a one-word change in `ru.ts` and this line goes.
+     * judgement about one term of art, not a general carve-out for English titles.
+     *
+     * Ruled by the Tech Lead on 2026-10-07 reviewing IB-BUG-009: exempt it, because it is **the
+     * venues' own term** and the brief's literal title. So this entry is settled, not pending —
+     * if it ever changes it changes in `ru.ts`, and this line goes with it.
      */
     const TERMS_OF_ART: readonly StringKey[] = ['instrument.panel.longShort'];
     const exempt = new Set<StringKey>([SWITCH, ...TERMS_OF_ART]);

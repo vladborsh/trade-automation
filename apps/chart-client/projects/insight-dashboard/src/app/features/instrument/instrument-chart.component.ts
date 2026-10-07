@@ -35,6 +35,13 @@ export type { PaneData } from './pane-data';
  * What replaces it: every panel opens on the SAME wall-clock window (`windowBounds`), so the row
  * reads as one window on arrival — which is what the layout is for. Panning one panel moves only
  * that panel. That cost is stated here and in the report rather than hidden.
+ *
+ * **If you come back to add the sync, start from (2), not from scratch.** The obstacle is not the
+ * range type, it is that the callback is asynchronous, so a boolean set around `setVisibleRange`
+ * cannot suppress the echo; a working version needs the receiving panel to *ignore a range it is
+ * already showing* (idempotence), and still has to decide what to do when a panel cannot honour
+ * the range because its own data is thinner. Decided on the Tech Lead's approval of 7a35f30
+ * (2026-10-07): not worth that complexity for a bonus.
  */
 @Component({
   selector: 'app-instrument-chart',

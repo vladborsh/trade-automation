@@ -18,6 +18,12 @@ import {
  * IB-031 built the page around — see `panels.model.ts`, where that trade-off is written down.
  * What it buys, besides the layout the user asked for: each panel's price scale is its own, so
  * the zero-anchored liquidation bars can no longer drag the candles flat.
+ *
+ * **`:host { display: flex; flex: 1 1 0 }` in the stylesheet is load-bearing — do not drop it as
+ * redundant.** An Angular component's host element is `display: inline` by default, so without
+ * it the row's flex sizing lands on an inline box: the panel never stretches and **all six charts
+ * collapse to about 60 px tall while every unit test passes.** That is how the first acceptance
+ * run looked. With it they measure 260 × 710.
  */
 @Component({
   selector: 'app-instrument-panel',
