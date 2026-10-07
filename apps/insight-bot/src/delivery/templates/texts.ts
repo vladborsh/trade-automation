@@ -154,6 +154,18 @@ export function userList(rows: ReadonlyArray<{ tgUserId: number; role: string; d
  * `http://localhost:3005/...` has no TLD, so the user got plain text they could not tap. An
  * explicit `<a href>` works regardless of auto-linking.
  *
+ * **Measured against the real API on 2026-10-07** (one probe per variant, so a note rather than
+ * a rule — AGENTS.md's repetition bar is five, and this was four messages total):
+ *
+ * | variant | `localhost` | `127.0.0.1` |
+ * |---|---|---|
+ * | HTML anchor | accepted | accepted |
+ * | inline button | **rejected**, "Wrong HTTP URL" | accepted |
+ *
+ * Hence `WEB_BASE_URL=http://127.0.0.1:3005`: it is the only host of the two that gets a real
+ * tap target rather than a fallback. Both the try/catch and the plain-URL line stay anyway —
+ * they cost nothing, and the next client or the next Telegram change is not ours to predict.
+ *
  * The bare URL stays underneath on its own line: a client that renders neither the anchor nor
  * the button still leaves something copyable, and the whole point is that the person gets in.
  *
