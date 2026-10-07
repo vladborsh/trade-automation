@@ -1,0 +1,13 @@
+<section class="panel">
+  <header>
+    <h3>{{ t(panel().titleKey) }}</h3>
+    @if (panel().legend.length > 0) {
+      <ul class="legend">
+        @for (item of panel().legend; track item.labelKey) {
+          <li><span class="swatch" [style.background]="item.color"></span>{{ t(item.labelKey) }}</li>
+        }
+      </ul>
+    }
+  </header>
+  <div #chartHost class="chart-host"></div>
+</section>

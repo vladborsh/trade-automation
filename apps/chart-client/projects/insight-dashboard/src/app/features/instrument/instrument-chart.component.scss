@@ -1,21 +1,24 @@
-/* The dark-terminal palette (AGENTS.md), not a near-duplicate of it. */
-.chart-stack {
+/*
+ * The row fills the viewport height and scrolls HORIZONTALLY when the panels no longer fit.
+ * The page itself must not scroll vertically here: the panels exist to be read against one
+ * another, and a vertical scroll takes them off-screen one at a time.
+ */
+.panel-row {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 4px;
-  min-height: 0;
-}
+  align-items: stretch;
 
-.chart-host {
-  /* the six panes need room; below this the time scale and the pane titles collide */
-  min-height: 720px;
-  border: 1px solid #30363d;
-  background: #0d1117;
-}
+  /* the viewport minus the page's controls and the table heading above it */
+  height: calc(100vh - 230px);
+  min-height: 420px;
 
-.pane-note {
-  margin: 0;
-  padding: 2px 4px;
-  color: #8b949e;
-  font-size: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  /* a panel keeps its width instead of being squeezed to nothing as siblings are added */
+  > * {
+    flex: 1 0 320px;
+    min-width: 320px;
+  }
 }

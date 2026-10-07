@@ -71,4 +71,17 @@ export const en: Strings = {
   'range.1m': '1 month',
   'range.3m': '3 months',
   'range.1y': '1 year',
+  // IB-BUG-009 — panel titles carry the unit; tickers, venues and codes stay as they are (§11)
+  'panel.price': 'Price, USDT',
+  'panel.oi': 'Open interest, USD',
+  'panel.liquidations': 'Liquidations long/short, USD',
+  'panel.cvd': 'Delta / CVD, base',
+  'panel.funding': 'Funding, %',
+  'panel.longShort': 'Long/Short, ratio',
+  'legend.longs': 'longs',
+  'legend.shorts': 'shorts',
+  'legend.cvd': 'CVD',
+  'legend.delta': 'delta',
+  'legend.settled': 'settled',
+  'legend.predicted': 'predicted',
 };

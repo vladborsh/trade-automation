@@ -1,6 +1,6 @@
-<div class="chart-stack">
-  <div #chartHost class="chart-host"></div>
-  @if (data(); as d) {
-    <p class="pane-note">{{ paneTitle(d.bucket, d.liquidations.venue, d.liquidations.undercounted) }}</p>
+<!-- One row: the ROW scrolls sideways, never the page (IB-BUG-009). -->
+<div class="panel-row">
+  @for (panel of panels(); track panel.id) {
+    <app-instrument-panel [panel]="panel" />
   }
 </div>

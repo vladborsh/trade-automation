@@ -80,7 +80,19 @@ export type StringKey =
   | 'range.1w'
   | 'range.1m'
   | 'range.3m'
-  | 'range.1y';
+  | 'range.1y'
+  | 'panel.price'
+  | 'panel.oi'
+  | 'panel.liquidations'
+  | 'panel.cvd'
+  | 'panel.funding'
+  | 'panel.longShort'
+  | 'legend.longs'
+  | 'legend.shorts'
+  | 'legend.cvd'
+  | 'legend.delta'
+  | 'legend.settled'
+  | 'legend.predicted';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

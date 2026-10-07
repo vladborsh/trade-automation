@@ -77,4 +77,17 @@ export const ru: Strings = {
   'range.1m': 'месяц',
   'range.3m': '3 месяца',
   'range.1y': 'год',
+  // IB-BUG-009 — заголовки панелей с единицей измерения; тикеры и коды остаются как есть (§11)
+  'panel.price': 'Цена, USDT',
+  'panel.oi': 'Открытый интерес, USD',
+  'panel.liquidations': 'Ликвидации лонг/шорт, USD',
+  'panel.cvd': 'Дельта / CVD, базовая',
+  'panel.funding': 'Фандинг, %',
+  'panel.longShort': 'Long/Short, отношение',
+  'legend.longs': 'лонги',
+  'legend.shorts': 'шорты',
+  'legend.cvd': 'CVD',
+  'legend.delta': 'дельта',
+  'legend.settled': 'расчётный',
+  'legend.predicted': 'прогноз',
 };

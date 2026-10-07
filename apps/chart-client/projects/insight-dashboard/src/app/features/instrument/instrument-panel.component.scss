@@ -1,0 +1,55 @@
+/* The dark-terminal palette (AGENTS.md). */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 320px; /* narrower than this and a time axis is unreadable */
+  flex: 1 1 0;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  min-height: 0;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #21262d;
+}
+
+h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9d1d9;
+  white-space: nowrap;
+}
+
+.legend {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: #8b949e;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+}
+
+.chart-host {
+  flex: 1 1 auto;
+  min-height: 0;
+}
