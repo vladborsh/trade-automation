@@ -1,7 +1,6 @@
 import type { WebMarketCapDay } from '@trade-automation/contracts';
 import {
-  BTC_COLOUR, btcShareLine, dominanceLine, fearGreedBand, fearGreedLine, gaugeAngle, gaugePoint, linePoints, polyline, shareLegend, stackedBands,
-} from './market.adapter';
+  BTC_COLOUR, btcShareLine, dominanceLine, fearGreedBand, fearGreedLine, gaugeAngle, gaugePoint, linePoints, polyline, shareLegend, stackedBands, coinPrice } from './market.adapter';
 
 const day = (d: string, shares: Record<string, number | null>): WebMarketCapDay => ({
   day: d,
@@ -101,5 +100,31 @@ describe('the stacked shares', () => {
 
   it('the BTC share line is of Σ top-20 — the field the server derived, not /global dominance', () => {
     expect(btcShareLine(days, 100, 40)).toBe('0,40 100,0'); // 0.5 -> 0.6 over its own min/max
+  });
+});
+
+describe('coinPrice (IB-037: the venue sends full float precision)', () => {
+  it('rounds a four-figure coin to whole units — 83289.68745869919 is not a price anyone reads', () => {
+    expect(coinPrice(83289.68745869919)).toBe('83,290');
+  });
+
+  it('keeps two decimals in the single-digit-to-hundreds range', () => {
+    expect(coinPrice(769.8578155209467)).toBe('769.86');
+    expect(coinPrice(1.420171426483137)).toBe('1.42');
+  });
+
+  it('keeps enough digits for a sub-cent coin to stay distinguishable', () => {
+    expect(coinPrice(0.08828949927571071)).toBe('0.0883');
+    expect(coinPrice(0.0000123456)).toBe('0.000012');
+  });
+
+  it('returns null for an absent or non-finite price rather than printing NaN', () => {
+    expect(coinPrice(null)).toBeNull();
+    expect(coinPrice(undefined)).toBeNull();
+    expect(coinPrice(Number.NaN)).toBeNull();
+  });
+
+  it('handles zero without pretending it is unknown', () => {
+    expect(coinPrice(0)).toBe('0.000000');
   });
 });

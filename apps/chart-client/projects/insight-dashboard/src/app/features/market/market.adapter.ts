@@ -155,3 +155,18 @@ export function shareLegend(days: readonly WebMarketCapDay[]): Array<WebCoinShar
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * A coin price as a reader needs it, not as the venue sent it.
+ *
+ * CoinGecko returns full float precision — `83289.68745869919`, `0.08828949927571071` — and printing
+ * that raw made the table unreadable and implied a precision nobody has. The significant digits move
+ * with the magnitude: a four-figure coin needs none after the point, a sub-cent coin needs six, and
+ * a fixed number of decimals would wreck one end or the other.
+ */
+export function coinPrice(value: number | null | undefined): string | null {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const abs = Math.abs(value);
+  const decimals = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
+  return value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}

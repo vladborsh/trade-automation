@@ -91,7 +91,7 @@
           <tr>
             <td>{{ row.coin }}</td>
             <td class="num">{{ billions(row.capUsd) ?? '—' }}</td>
-            <td class="num">{{ row.priceUsd ?? '—' }}</td>
+            <td class="num">{{ price(row.priceUsd) ?? '—' }}</td>
             <td class="num">{{ share(row.share) ?? '—' }}</td>
             <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ percent(row.change24h) ?? '—' }}</td>
             <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ percent(row.change7d) ?? '—' }}</td>

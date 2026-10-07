@@ -3,6 +3,7 @@ import type { Strings } from './keys';
 /** §11 — the per-user alternative. Same rules: tickers, codes, field names and units untouched. */
 export const en: Strings = {
   'nav.brand': 'insight',
+  'nav.market': 'market',
   'nav.instrument': 'instrument',
   'nav.health': 'health',
   'nav.coverage': 'coverage',

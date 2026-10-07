@@ -1,7 +1,8 @@
 <nav class="nav">
   <span class="brand">{{ t('nav.brand') }}</span>
-  <!-- The instrument view first: it is what a member comes for. Health and Coverage are the
-       operator's pages and stay, but after it. Market joins the front when IB-037 lands. -->
+  <!-- Market is the landing page and comes first; the instrument view next; the operator's two
+       pages stay, but last (see app.routes.ts). -->
+  <a routerLink="/market" routerLinkActive="active">{{ t('nav.market') }}</a>
   <a routerLink="/instrument/BTCUSDT" routerLinkActive="active">{{ t('nav.instrument') }}</a>
   <!-- IB-038's placeholder link. IB-037 owns the real Market entry and its label; this one goes
        when their page lands, so there is one entry and not two. -->

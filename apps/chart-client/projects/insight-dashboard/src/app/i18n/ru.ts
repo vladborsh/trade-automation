@@ -9,6 +9,7 @@ import type { Strings } from './keys';
  */
 export const ru: Strings = {
   'nav.brand': 'инсайт',
+  'nav.market': 'рынок',
   'nav.instrument': 'инструмент',
   'nav.health': 'состояние',
   'nav.coverage': 'покрытие',
