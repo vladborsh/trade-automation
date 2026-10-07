@@ -38,7 +38,7 @@ stage-1 producers.
 | W1 | **Second project in the `apps/chart-client` Angular workspace**, not a second repo app and not routes inside the backtest SPA. | Reuses the stack (user's standing preference) — `core/api`, `core/config`, chart wrappers, palette, `AGENTS.md` component rules — without coupling two products' auth boots and route guards into one bundle. Angular CLI supports multiple projects per workspace natively. |
 | W2 | **Served by insight-bot** (`ServeStaticModule`, path `/`, API under `/api/web/*`), same origin. | One deployable on the box; cookies same-site; no CORS; the image already exists. |
 | W3 | **Auth = one-time login link issued by the bot.** `/web` in Telegram → `https://<host>/login?t=<token>` (10 min, single use) → `POST /api/web/auth/exchange` → `ib_session` cookie (HttpOnly, Secure, SameSite=Lax, 30-day sliding), row in `web_sessions`. `/logout`, `/auth/me`. | Proves Telegram identity by construction; the bot's `users` is the only user base (no second, disconnected one); needs no BotFather domain binding (Telegram Login Widget) and no passwords. The backtest app's email/password base is a different contour and stays separate. |
-| W4 | **Reach: Cloudflare Tunnel** (`cloudflared` container, outbound only) → `https://insight.<domain>`; TLS at Cloudflare's edge; box keeps zero inbound ports. Needs a domain on Cloudflare (**user decision**, §6). | Cheapest way to a TLS hostname without opening 443 or paying for an ALB; ~30 MB RAM; free tier. Tailscale/VPN rejected (members would install software); opening 443 + Caddy rejected (inbound surface, same domain need). |
+| W4 | **Reach, revised 2026-10-07 (user: no domain, "I can reach it by IP"): SSM port forwarding, admin-only, temporary.** The user runs `aws ssm start-session … AWS-StartPortForwardingSession portNumber=3005,localPortNumber=3005` (already in `RUNBOOK.md`) and opens `http://localhost:3005`. Zero inbound ports (D11 intact), zero cost, and the `Secure` cookie of IB-029 works because browsers treat `localhost` as a secure context. `WEB_BASE_URL=http://localhost:3005`, so the bot's `/web` link opens exactly what the admin will reach. **Companions cannot use this mode; no member-facing web feature may assume reach until it is revisited.** When a companion needs the web, the step is a Cloudflare *quick* tunnel (`cloudflared tunnel --url`, no domain, random `*.trycloudflare.com` hostname, TLS included) or a domain — the user's call then. A direct public IP over plain HTTP is **rejected**: it would send the one-time login exchange in clear and the `Secure` cookie would not be set; TLS on a bare IP has no free certificate path. | The original Cloudflare Tunnel + domain design stays in §5 as the member-facing option for later. |
 | W5 | **Read-mostly.** Trade actions (`[Взял]/[Пропустил]`) stay in Telegram where the alert arrives, so there is one record path; the web adds reading, charts, stats, and **admin** actions (invites, users, playbook status/version) that are cramped as commands. | Keeps the Telegram bot the product; the web is the place to *look*. |
 | W6 | **Slice 1 = stage-0 health + data browser**, dispatched after the collectors merge; **slice 2 = signals/stats/admin**, each page depends on its stage-1 producer task. | The health page is the exit-criterion instrument (design §6.2) made readable; the data browser is how the user (and the Researcher) eyeball the collected tape before any playbook exists. |
 | W7 | Wire contracts as zod schemas in `libs/contracts/src/insight/*`, shared by server and dashboard. | The reason `libs/contracts` exists. |
@@ -140,13 +140,13 @@ at 1m (400 `RANGE_TOO_WIDE`), so a page cannot pull a year of 1m rows on a
 - `WEB_BASE_URL=https://insight.<domain>` in the box `.env`; the bot refuses
   to issue login links when it is unset.
 
-## 6. The user's decision (plain Russian in the reply)
+## 6. The user's decision — taken 2026-10-07: no domain
 
-A hostname needs a domain on Cloudflare: either one the user already owns
-(add it to Cloudflare, free) or a new one (≈ 10 USD/year). Recommendation: a
-cheap new domain bought at Cloudflare Registrar, subdomain `insight.`; the
-tunnel, TLS and DNS then cost nothing. Until it exists, slice 1 runs locally
-on each slot (`:42x5`) and is fully testable; only IB-032 waits.
+The user declined a domain. Reach is therefore W4's SSM port-forward mode
+(admin only) until a companion needs the web; then the quick tunnel (no
+domain) or a domain, at the user's choice. §5's tunnel-with-domain design is
+kept as that later option; IB-032 is re-pointed at the port-forward mode
+(runbook, `WEB_BASE_URL`, a smoke check), which needs no new infrastructure.
 
 ## 7. Ordering
 
