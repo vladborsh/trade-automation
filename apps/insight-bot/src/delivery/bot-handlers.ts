@@ -181,9 +181,13 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         if (!link) { await reply(ctx, T.WEB_NOT_CONFIGURED, lang); return; }
 
         // IB-BUG-008: sent as HTML with an inline button, because Telegram does not auto-link a
-        // URL with no TLD (`http://localhost:3005/...`) and the user could not tap it. Three
-        // routes to the same ONE token — button, anchor, bare URL — so a client that renders
-        // none of the first two still works, and single use is unaffected.
+        // URL with no TLD and the user could not tap it. Three routes to the same ONE token —
+        // button, anchor, bare URL — so a client that renders none of the first two still
+        // works, and single use is unaffected.
+        //
+        // Measured 2026-10-07: Telegram REJECTS `localhost` in a button ("Wrong HTTP URL") and
+        // accepts `127.0.0.1` in both forms, which is why WEB_BASE_URL uses the latter. One
+        // probe per variant — a note, not a rule.
         const minutes = Math.round((deps.web as WebAuthPort).loginTokenTtlMs / 60_000);
         const text = T.pick(T.webLink(link, minutes), lang);
         try {

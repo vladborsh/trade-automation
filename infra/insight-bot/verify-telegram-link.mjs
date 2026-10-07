@@ -23,7 +23,16 @@ if (!token || !chatId) {
   process.exit(2);
 }
 
-const URLS = ['http://localhost:3005/login?t=VERIFY', 'http://127.0.0.1:3005/login?t=VERIFY'];
+/**
+ * Result of the first run, 2026-10-07 (one probe per variant — a note, not a rule):
+ *
+ *   HTML anchor    localhost    ACCEPTED        inline button  localhost    REJECTED "Wrong HTTP URL"
+ *   HTML anchor    127.0.0.1    ACCEPTED        inline button  127.0.0.1    ACCEPTED
+ *
+ * So `WEB_BASE_URL` uses `127.0.0.1`. Re-run this if Telegram's behaviour is ever in doubt;
+ * that is what it is for.
+ */
+const URLS = ['http://127.0.0.1:3005/login?t=VERIFY', 'http://localhost:3005/login?t=VERIFY'];
 
 async function call(method, payload) {
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
