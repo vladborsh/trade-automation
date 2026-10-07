@@ -269,3 +269,76 @@ empty-state): the labels move into the string table before merge, or as an
 IB-030's shell gains the `i18n/` table and the `lang` plumbing as the shared
 mechanism if it is not there yet; IB-033/034/035/037 use it and decide
 nothing on their own.
+
+## 12. Cards, not charts — Market page and liquidations (user, 2026-10-07)
+
+User: Fear & Greed and BTC dominance must not be charts; liquidations must
+not be a chart either. Replaces the chart scope of IB-037 and the
+liquidations column of IB-031/IB-BUG-009. Tasks: IB-037 (amended), IB-038,
+IB-039. Everything below reads in the member's language through the string
+tables; the up/down colours are the palette's `#26a69a` / `#ef5350`.
+
+### 12.1 Landing page = a row of cards (first screen after `/web`)
+
+| Card | Content | Source |
+|---|---|---|
+| **Страх и жадность** | today's value 0–100 and its zone (Крайний страх / Страх / Нейтрально / Жадность / Крайняя жадность: 0–24 / 25–44 / 45–55 / 56–75 / 76–100, the alternative.me bands), colour by zone; Δ vs yesterday and vs 7 days ago (arrow + number); one plain sentence per zone from the string table — context only, never "buy/sell" wording | `fear_greed` |
+| **Доминация BTC** | BTC share of total market cap (%); Δ 24 h and Δ 7 d — shown only when forward collection covers the window, else «данных пока за N дней»; one plain sentence (share rising → money leaving alts into BTC, falling → the reverse, flat → no rotation) | `market_cap_global` |
+| **BTC против топ-20** | BTC cap / Σ top-20 (%), Δ 7 d and Δ 30 d; a compact ranked **list** of the top-20 shares (coin, %, Δ 7 d) — a list, not a chart | `market_cap_coin` |
+| **Рынок** (the optional card, taken) | total market cap in USD with Δ 24 h, and ETH dominance with Δ 24 h | `market_cap_global` |
+| **Ликвидации сейчас** | for 1 h / 4 h / 24 h: total USD liquidated, split long vs short as one horizontal bar (longs `#ef5350` on the left, shorts `#26a69a` on the right) with both amounts; **«× от нормы»** per window (12.2), colour-escalated (< 1.5 muted, 1.5–3 amber, ≥ 3 red); one plain line: «сейчас выносят лонги» / «выносят шорты» / «спокойно»; the honesty line (12.4) | `liquidations` |
+
+### 12.2 «× от нормы» — the one new definition
+
+For a window length W ∈ {1 h, 4 h, 24 h} and a scope (market-wide, or one
+coin), `ratio_W = Σ USD liquidated in the trailing W / median over the
+trailing 30 days of Σ USD in consecutive, non-overlapping, boundary-aligned
+W-windows`, computed per side and in total, over the **venues present in
+the window** (12.4). `null` until 7 days of liquidation history exist for
+that scope. This is the P3 notion (the asset's own trailing norm, design
+§8.2 `liq.*.z60m`) made readable; the z-score stays the playbook's
+observable, the ratio is the display. Computed server-side, in SQL, by one
+endpoint (12.3); specs on a synthetic 30-day tape.
+
+### 12.3 Liquidations below the cards
+
+- **Table «Где ликвидируют»**: rows = top-20 coins, columns 1 h / 4 h /
+  24 h; a cell shows the USD amount, its background intensity scales with
+  `ratio_W` (four steps), its colour follows the dominant side; sorted by
+  the 1 h ratio descending so a cascade floats to the top; a row links to
+  `/instrument/:symbol`.
+- **Feed «Крупные ликвидации»**: newest N (default 30) events above a
+  threshold (default 100 k USD, a picker: 50 k / 100 k / 500 k / 1 M):
+  time, coin, side, USD, price, venue. Polled with the page (30 s).
+- One endpoint feeds all three: `GET /api/web/liquidations/overview?symbols=top20&feed_min_usd=100000`
+  → `{ windows: {1h,4h,24h} × {long, short, total, ratio} market-wide,
+  perCoin: [...same per coin...], feed: [...], venues: { present: [...],
+  missing: [...] }, asOf }`. One SQL pass per window; ≤ 50 ms on a day of
+  data is the budget; cached 15 s server-side so several members polling do
+  not multiply the query.
+
+### 12.4 Honesty line
+
+While a venue's liquidations are not being collected (today: Binance from
+the local run, which is REST-degraded and has no `forceOrder`), the
+response's `venues.missing` is non-empty and every card, table and the
+instrument summary shows «Binance: нет данных до запуска сервера» (string
+table key, venue interpolated). Bybit + OKX are never presented as the
+whole market silently; the ratio's 30-day norm is computed over the same
+venue set as its numerator, so a venue joining later does not fake a spike.
+
+### 12.5 Instrument page: markers on the price chart, not a panel
+
+The liquidations column of IB-BUG-009's one-row layout is removed. Instead
+`/instrument/:symbol` draws **liquidation markers on the price chart**: one
+marker per event at (time, price), radius by USD (sqrt scale, 3–14 px,
+clamped), colour by side, via a lightweight-charts series-markers / overlay
+primitive (`liquidation-markers.primitive.ts`, pure data mapping in
+`liquidation-markers.adapter.ts` with specs); events are bucketed to the
+chart's bar when more than one falls in a bar (sum USD, dominant side) so
+a cascade reads as one big bubble, not a smear; hover shows time, side,
+USD, price, venue. Under the chart: a small 1 h / 4 h / 24 h long/short
+summary with the ratio and the honesty line (same component as the landing
+card, narrow variant). Endpoint: `GET /api/web/series/liquidations/events?symbol&from&to&min_usd`
+(≤ 2,000 events per call, else 400 `RANGE_TOO_WIDE`, the bucketing is
+client-side at the chart's tf).
