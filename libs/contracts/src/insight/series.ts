@@ -110,6 +110,16 @@ export const WebLiquidationsResponseSchema = z.object({
   symbol: z.string(),
   bucket: WebLiquidationBucketSchema,
   venue: WebVenueFilterSchema,
+  /**
+   * IB-BUG-011 — the venues that actually contributed rows to `bars`.
+   *
+   * `venue` above is the FILTER the caller asked for; this is what the data delivered. They used
+   * to be assumed equal, and were not: the query matched the caller's symbol string, so OKX rows
+   * (stored as `BTC-USDT-SWAP`) never matched `BTCUSDT` and the response still said
+   * `venue: 'all'`. A reader saw «все биржи» over 10 % of the money. Now the claim and the data
+   * are separate fields, so the next time they disagree it is visible instead of implied.
+   */
+  venuesPresent: z.array(z.string()),
   bars: z.array(WebLiquidationBarSchema),
   /**
    * §12.2: Binance emits at most one forceOrder event per second per symbol, so these are

@@ -146,11 +146,15 @@ export class SeriesController {
       symbol, fromMs, toMs, venue: parsedVenue.data === 'all' ? null : parsedVenue.data,
     });
     const bars = bucketLiquidations(rows, parsedBucket.data, fromMs, toMs);
+    // IB-BUG-011: what the data delivered, beside what the caller asked for. Derived from the
+    // rows, never from the filter — a list built from the request would re-assert the bug.
+    const venuesPresent = [...new Set(rows.map((r) => r.venue))].sort();
     const { rows: thinned, downsampled } = thin(bars, WEB_MAX_POINTS);
     return {
       symbol,
       bucket: parsedBucket.data,
       venue: parsedVenue.data,
+      venuesPresent,
       bars: thinned,
       // §12.2: Binance sends at most one forceOrder per second per symbol
       undercounted: parsedVenue.data === 'all' || parsedVenue.data === 'binance',

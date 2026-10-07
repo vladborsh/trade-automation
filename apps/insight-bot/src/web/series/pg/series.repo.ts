@@ -71,16 +71,61 @@ export async function candles(
   }));
 }
 
+/**
+ * IB-BUG-011 — the venue spellings of one canonical symbol.
+ *
+ * **Every multi-venue table stores each venue's OWN symbol string**, because that is what the
+ * venue sends and rewriting it on ingest would make the row unverifiable against the source.
+ * `BTCUSDT` on Binance and Bybit is `BTC-USDT-SWAP` on OKX; Bybit's `1000PEPEUSDT` is OKX's
+ * `PEPE-USDT-SWAP`. The dashboard, correctly, asks for the canonical `symbols.id`.
+ *
+ * Matching the caller's string directly — which is what `liquidations` and `settledFunding` did
+ * until now — therefore returns whichever venues happen to spell the symbol that way and drops
+ * the rest, **while the response still says `venue: 'all'`**. Measured on the local tape when
+ * this was found: BTC's last 24 h held 27 250 USD of Bybit liquidations and 236 565 USD of OKX
+ * ones, and the instrument page showed the first and labelled it «все биржи» — 10 % of the money
+ * under a label claiming all of it. Nothing threw, nothing was blank; the number was simply
+ * wrong and confident. Funding had the same hole: 318 OKX BTC settlements never reached the
+ * panel.
+ *
+ * Returns the spellings to match. Empty when the symbol is unknown — the caller returns no rows
+ * rather than falling back to the raw string, because a silent fallback is how this bug reads as
+ * a quiet market.
+ */
+export async function venueSpellings(db: Db, symbolId: string, venue?: string | null): Promise<string[]> {
+  const rows = await db.query<{ binance_perp: string | null; bybit_linear: string | null; okx_swap: string | null }>(
+    `select binance_perp, bybit_linear, okx_swap from symbols where id = $1`,
+    [symbolId],
+  );
+  const row = rows[0];
+  if (!row) return [];
+  const byVenue: Record<string, string | null> = {
+    binance: row.binance_perp,
+    bybit: row.bybit_linear,
+    okx: row.okx_swap,
+  };
+  const wanted = venue ? [byVenue[venue] ?? null] : Object.values(byVenue);
+  // de-duplicated: Binance and Bybit usually spell it the same, and `= any([x, x])` is wasteful
+  return [...new Set(wanted.filter((s): s is string => s !== null && s.length > 0))];
+}
+
 export interface FundingPointRow { venue: string; time: number; rate: number }
 
-/** Settled funding per venue — steps, so every row matters and there is no thinning. */
+/**
+ * Settled funding per venue — steps, so every row matters and there is no thinning.
+ *
+ * IB-BUG-011: matched on the canonical symbol's venue spellings, so OKX's settlements stop being
+ * invisible on a page that lists its venues.
+ */
 export async function settledFunding(db: Db, q: Omit<RangeQuery, 'stride'>): Promise<FundingPointRow[]> {
+  const spellings = await venueSpellings(db, q.symbol);
+  if (spellings.length === 0) return [];
   const rows = await db.query<{ venue: string; funding_time: Date; rate: string }>(
     `select venue, funding_time, rate
        from funding_settlements
-      where symbol = $1 and funding_time >= $2 and funding_time < $3
+      where symbol = any($1::text[]) and funding_time >= $2 and funding_time < $3
       order by funding_time`,
-    [q.symbol, asDate(q.fromMs), asDate(q.toMs)],
+    [spellings, asDate(q.fromMs), asDate(q.toMs)],
   );
   return rows.map((r) => ({ venue: r.venue, time: sec(r.funding_time), rate: Number(r.rate) }));
 }
@@ -144,12 +189,18 @@ export interface LiquidationRowDb { ts: number; side: 'long' | 'short'; notional
 /**
  * Raw liquidations for the window. Not thinned: they are bucketed afterwards, and thinning
  * before bucketing would drop events out of the histogram's counts.
+ *
+ * IB-BUG-011: matched on the canonical symbol's **venue spellings**, not on the string the caller
+ * typed — see `venueSpellings`.
  */
 export async function liquidations(
   db: Db,
   q: Omit<RangeQuery, 'stride'> & { venue: string | null },
 ): Promise<LiquidationRowDb[]> {
-  const params: unknown[] = [q.symbol, asDate(q.fromMs), asDate(q.toMs)];
+  const spellings = await venueSpellings(db, q.symbol, q.venue);
+  if (spellings.length === 0) return [];
+
+  const params: unknown[] = [spellings, asDate(q.fromMs), asDate(q.toMs)];
   let venueFilter = '';
   if (q.venue) {
     params.push(q.venue);
@@ -158,7 +209,7 @@ export async function liquidations(
   const rows = await db.query<{ ts: Date; side: 'long' | 'short'; price: string; qty: string; notional: string | null; venue: string }>(
     `select ts, side, price, qty, notional, venue
        from liquidations
-      where symbol = $1 and ts >= $2 and ts < $3 ${venueFilter}
+      where symbol = any($1::text[]) and ts >= $2 and ts < $3 ${venueFilter}
       order by ts`,
     params,
   );
