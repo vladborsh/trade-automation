@@ -17,8 +17,10 @@ COPY apps/insight-bot apps/insight-bot
 RUN npm run build --workspace=@trade-automation/insight-bot
 
 # IB-030 (design §3 "Angular build: never on the box") — the dashboard is built HERE, on the
-# runner, because `ng build` peaks around 1.5 GB and the production box is a t4g.small. The image
-# carries only the ~1-2 MB of hashed static files it produces.
+# runner, because `ng build` peaks around 1.5 GB and the production box is a **t4g.micro with
+# 1 GB** (the cost plan chose the micro over D14's t4g.small to stay inside the user's 20 USD
+# cap). The build would not merely be slow there, it would not fit. The image carries only the
+# ~1-2 MB of hashed static files it produces, and the box only ever pulls from GHCR.
 FROM node:22-slim AS dashboard
 WORKDIR /workspace
 

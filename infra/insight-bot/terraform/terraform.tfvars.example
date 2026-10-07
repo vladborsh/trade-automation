@@ -9,7 +9,11 @@ budget_alert_email = ""                              # where the 18 USD alert go
 # github_oidc_provider_arn = "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
 # deploy_role_github_sub   = "repo:<owner>/<repo>:ref:refs/heads/master"
 
+# These are the defaults in variables.tf; uncomment only to override them. The shape below is
+# the COST PLAN's (t4g.micro, 20 GB), which superseded design D14's t4g.small to stay inside the
+# user's hard 20 USD/month cap — a measured run showed node at ~207 MB steady, so the micro fits
+# once node is capped (see the compose file).
 # region                = "ap-northeast-1"
-# instance_type         = "t4g.small"
-# root_volume_gb        = 50
+# instance_type         = "t4g.micro"
+# root_volume_gb        = 20
 # backup_retention_days = 35

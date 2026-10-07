@@ -46,8 +46,17 @@ services:
         condition: service_healthy
     env_file:
       - /opt/insight-bot/.env
+    # Measured 2026-09-28 on a full local run (five collectors, watchdog, derive tick, SPA
+    # served): node sat at ~207 MB steady and peaked at 260 MB, flat over 11 minutes, with the
+    # gap report adding ~72 MB. The cap is set above that peak, not at it.
+    #
+    # The point is not node's size, it is that an UNBOUNDED node on a 1 GB box makes the kernel
+    # choose a victim under pressure, and it may choose Postgres — turning a memory problem into
+    # a data-layer outage. Capped, the bot dies alone and restarts.
+    mem_limit: 420m
     environment:
       NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=320
       PORT: '3005'
       DATABASE_URL: postgres://insight:${POSTGRES_PASSWORD}@postgres:5432/insight
     expose:
