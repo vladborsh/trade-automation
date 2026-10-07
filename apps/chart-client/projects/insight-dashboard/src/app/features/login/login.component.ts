@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angu
 import { Router } from '@angular/router';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
+import { LANDING_ROUTE } from '../../app.routes';
 
 /**
  * architecture/insight-bot-web-dashboard.md §4 W3 — the bot's `/web` command sends a single-use
@@ -78,7 +79,9 @@ export class LoginComponent {
       // the member exists now, so their own language decides every screen from here
       const body = (await response.json()) as { user?: { lang?: unknown } };
       this.i18n.setLangFromUser(body.user?.lang);
-      await this.router.navigateByUrl('/health');
+      // the same destination as the default route, from the one place that decides it: a member who
+      // taps the bot's link must arrive where a member who types the bare host arrives
+      await this.router.navigateByUrl(LANDING_ROUTE);
     } catch {
       this.fail('login.unreachable');
     }

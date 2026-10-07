@@ -13,6 +13,7 @@
 export type StringKey =
   // shell
   | 'nav.brand'
+  | 'nav.instrument'
   | 'nav.health'
   | 'nav.coverage'
   // shared controls
