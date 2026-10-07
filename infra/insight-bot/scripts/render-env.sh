@@ -22,12 +22,19 @@ echo "# rendered from SSM ${PREFIX} at $(date -u +%FT%TZ) — do not edit by han
 #
 # WEB_BASE_URL is here rather than in SSM because it is not a secret and it is not a choice: the
 # Architect's W4 ruling (design, 2026-10-07) is that the dashboard is reached by an **SSM port
-# forward**, admin-only — no domain, no tunnel, no public exposure. The admin therefore opens
-# `http://localhost:3005`, and the bot's `/web` link has to say exactly that or it hands them a
-# URL that resolves to their own laptop's nothing. Making the user create an SSM parameter for a
-# fixed string would be a step they could forget, and forgetting it means a broken login link.
+# forward**, admin-only — no domain, no tunnel, no public exposure. The admin opens the forwarded
+# port locally, and the bot's `/web` link has to say exactly that or it hands them a URL that
+# resolves to nothing. Making the user create an SSM parameter for a fixed string would be a step
+# they could forget, and forgetting it means a broken login link.
+#
+# **127.0.0.1 rather than localhost, and that is measured, not stylistic.** Telegram REJECTS
+# `localhost` in an inline keyboard button ("Wrong HTTP URL") and accepts `127.0.0.1` in both a
+# button and an HTML anchor (IB-BUG-008, probed against the real API 2026-10-07; one probe per
+# variant, so a note rather than a rule). With `localhost` the member gets a plain-text fallback
+# instead of a tap target. Both are the same loopback address, so the port forward is unaffected,
+# and both are trusted origins in Chrome, so the `Secure` session cookie still sticks.
 cat >>"$tmp" <<'DEFAULTS'
-WEB_BASE_URL='http://localhost:3005'
+WEB_BASE_URL='http://127.0.0.1:3005'
 WEB_COOKIE_SECURE='true'
 DEFAULTS
 
