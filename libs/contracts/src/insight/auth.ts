@@ -35,6 +35,14 @@ export type WebMeResponse = z.infer<typeof WebMeResponseSchema>;
  * outsider can usefully enumerate — it is 256 bits and lives for ten minutes — so telling its
  * holder "you already used this" is help, not a leak.
  */
+/**
+ * IB-BUG-008 — what the login page needs before anyone is signed in: which bot to talk to.
+ * Public by nature (a member has to be able to find the bot) and deliberately nothing else —
+ * no token, no URL, no account detail on a screen an unauthenticated visitor can reach.
+ */
+export const WebAuthContextSchema = z.object({ botUsername: z.string() });
+export type WebAuthContext = z.infer<typeof WebAuthContextSchema>;
+
 export const WEB_AUTH_ERROR_CODES = ['TOKEN_INVALID', 'TOKEN_USED', 'TOKEN_EXPIRED', 'UNAUTHENTICATED', 'FORBIDDEN'] as const;
 export type WebAuthErrorCode = (typeof WEB_AUTH_ERROR_CODES)[number];
 

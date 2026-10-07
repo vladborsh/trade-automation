@@ -8,6 +8,12 @@
       <button type="button" (click)="exchange()">{{ t('login.continue') }}</button>
     }
   }
+  <!-- IB-BUG-008: how to get a link at all. Shown in every state except mid-exchange, because
+       someone who lands here without a token needs it most, and someone whose link failed needs
+       it too. Hidden entirely when the username is unknown: a wrong handle is worse than none. -->
+  @if (state() !== 'exchanging' && botUsername(); as bot) {
+    <p class="muted use-bot">{{ t('login.useBot', { bot }) }}</p>
+  }
   <!-- §11: the login page has no user yet, so it carries its own switch; it affects this page only. -->
   <button type="button" class="lang" (click)="toggleLang()">{{ t('login.switchLang') }}</button>
 </section>

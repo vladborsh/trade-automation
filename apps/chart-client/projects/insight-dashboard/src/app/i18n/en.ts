@@ -15,6 +15,7 @@ export const en: Strings = {
   'login.hint': 'Open the link the bot sent you, then continue.',
   'login.continue': 'continue',
   'login.signingIn': 'signing in…',
+  'login.useBot': 'Sign in through the bot: send /web to @{bot}',
   'login.noToken': 'This link carries no token. Ask the bot for a new one with /web.',
   'login.invalid': 'This link is not valid. Ask the bot for a new one with /web.',
   'login.used': 'This link has already been used or has expired. Ask for a new one with /web.',

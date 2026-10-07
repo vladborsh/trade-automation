@@ -39,6 +39,11 @@ export class WebAuthService {
     return typeof url === 'string' && url.length > 0 ? url : null;
   }
 
+  /** `TELEGRAM_BOT_USERNAME` — public, and the login screen needs it (IB-BUG-008). */
+  get botUsername(): string {
+    return this.config.env.get('TELEGRAM_BOT_USERNAME');
+  }
+
   get cookieSecure(): boolean {
     return this.config.env.get('WEB_COOKIE_SECURE') === true;
   }

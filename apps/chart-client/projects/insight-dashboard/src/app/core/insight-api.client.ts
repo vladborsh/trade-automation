@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import type {
   WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
@@ -27,6 +28,7 @@ import { toWebApiError } from './web-api-error';
 @Injectable({ providedIn: 'root' })
 export class InsightApiClient {
   private readonly config = inject(AppConfigService);
+  private readonly router = inject(Router);
 
   async streams(): Promise<WebStreamsResponse> {
     return this.get<WebStreamsResponse>('/health/streams');
@@ -112,7 +114,14 @@ export class InsightApiClient {
     const url = buildUrl(this.config.get().apiBaseUrl, path, window.location.origin, params);
     const response = await fetch(url, { credentials: 'include' });
     if (!response.ok) {
-      throw toWebApiError('GET', path, response.status, await this.safeJson(response));
+      const error = toWebApiError('GET', path, response.status, await this.safeJson(response));
+      // IB-BUG-008: with no session every page used to render the raw
+      // `GET /health/streams failed: UNAUTHENTICATED`, which tells a member nothing they can act
+      // on. One redirect here covers every guarded call rather than each page remembering to
+      // check — and the login screen says how to get a link. The error is still thrown so the
+      // caller's own state machine settles.
+      if (error.code === 'UNAUTHENTICATED') void this.router.navigateByUrl('/login');
+      throw error;
     }
     return (await response.json()) as T;
   }

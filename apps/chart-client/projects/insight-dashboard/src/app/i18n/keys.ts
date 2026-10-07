@@ -26,6 +26,7 @@ export type StringKey =
   | 'login.continue'
   | 'login.signingIn'
   | 'login.noToken'
+  | 'login.useBot'
   | 'login.invalid'
   | 'login.used'
   | 'login.failed'

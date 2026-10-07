@@ -147,11 +147,52 @@ export function userList(rows: ReadonlyArray<{ tgUserId: number; role: string; d
   };
 }
 
+/**
+ * IB-BUG-008 — the sign-in message, as **HTML** so the link is tappable.
+ *
+ * Telegram auto-links bare URLs only when they look like URLs to it, and
+ * `http://localhost:3005/...` has no TLD, so the user got plain text they could not tap. An
+ * explicit `<a href>` works regardless of auto-linking.
+ *
+ * The bare URL stays underneath on its own line: a client that renders neither the anchor nor
+ * the button still leaves something copyable, and the whole point is that the person gets in.
+ *
+ * **The token appears twice** (anchor and fallback, plus the button the caller attaches) and
+ * that is safe: it is ONE token, so the single-use rule is untouched — whichever copy is opened
+ * spends the same row, and the second attempt gets `TOKEN_USED`.
+ */
 export function webLink(url: string, minutes: number): Texts {
+  const a = `<a href="${escapeHtml(url)}">`;
+  return {
+    ru: `Вход в панель (ссылка одноразовая, действует ${minutes} мин):\n${a}Открыть панель</a>\n\n${escapeHtml(url)}`,
+    en: `Dashboard sign-in (single-use link, valid for ${minutes} min):\n${a}Open the dashboard</a>\n\n${escapeHtml(url)}`,
+  };
+}
+
+/**
+ * The same message with no markup at all, for the fallback path: if Telegram refuses the HTML
+ * or the button, the person must still end up with something they can copy.
+ */
+export function webLinkPlain(url: string, minutes: number): Texts {
   return {
     ru: `Вход в панель (ссылка одноразовая, действует ${minutes} мин):\n${url}`,
     en: `Dashboard sign-in (single-use link, valid for ${minutes} min):\n${url}`,
   };
+}
+
+/** The label on the inline button, in the member's language. */
+export const WEB_BUTTON: Texts = {
+  ru: 'Открыть панель',
+  en: 'Open the dashboard',
+};
+
+/**
+ * Telegram's HTML parse mode needs these three escaped, and only these three. Our URLs are
+ * base64url plus a path so they contain none of them today — escaping anyway because a URL that
+ * is built differently tomorrow must not be able to break the markup or inject a tag.
+ */
+export function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** The dashboard is not deployed for this instance — §4: /web refuses rather than guessing. */

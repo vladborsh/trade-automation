@@ -46,8 +46,14 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
   };
 
   let web: { createLoginLink: (userId: number) => Promise<string | null>; loginTokenTtlMs: number } | undefined;
+  let failNext: string | null = null;
   const bot = new Bot('123:FAKE', { botInfo: BOT_INFO });
   bot.api.config.use(async (_prev, method, payload) => {
+    if (method === 'sendMessage' && failNext !== null) {
+      const message = failNext;
+      failNext = null; // only the rich attempt fails; the fallback must get through
+      throw new Error(message);
+    }
     calls.push({ method, payload: payload as Record<string, unknown> });
     if (method === 'sendMessage') sent.push(String((payload as { text: string }).text));
     return { ok: true, result: { message_id: calls.length } } as never;
@@ -56,7 +62,11 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
     users: port, botUsername: 'insight_test_bot', now: () => new Date('2026-09-28T12:00:00Z'),
     web: { createLoginLink: (id) => (web ? web.createLoginLink(id) : Promise.resolve(null)), get loginTokenTtlMs() { return web?.loginTokenTtlMs ?? 0; } },
   });
-  return { bot, sent, calls, patches, invites, setWeb: (w: typeof web) => { web = w; } };
+  return {
+    bot, sent, calls, patches, invites,
+    setWeb: (w: typeof web) => { web = w; },
+    failNextSendWith: (message: string) => { failNext = message; },
+  };
 }
 
 let updateId = 0;
@@ -185,6 +195,41 @@ describe('/web — the dashboard login link (IB-029)', () => {
     await h.bot.handleUpdate(text(222, '/web') as never);
     expect(h.sent[0]).toContain('https://dash.example.com/login?t=abc');
     expect(h.sent[0]).toContain('10');
+  });
+
+  it('IB-BUG-008: sends HTML with a tappable anchor AND an inline button, same token', async () => {
+    const h = harness({}, { 222: member });
+    const url = 'http://localhost:3005/login?t=abc';
+    h.setWeb({ createLoginLink: async () => url, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/web') as never);
+
+    const call = h.calls.find((c) => c.method === 'sendMessage');
+    expect(call?.payload['parse_mode']).toBe('HTML');
+    expect(String(call?.payload['text'])).toContain(`<a href="${url}">`);
+
+    const markup = call?.payload['reply_markup'] as { inline_keyboard: Array<Array<{ url: string }>> };
+    expect(markup.inline_keyboard[0][0].url).toBe(url);
+    expect(String(call?.payload['text'])).toContain(url); // bare URL still underneath
+
+    // ONE token across button, anchor and fallback: single use is untouched
+    const tokens = String(call?.payload['text']).match(/t=([A-Za-z0-9_-]+)/g) ?? [];
+    expect(new Set(tokens).size).toBe(1);
+  });
+
+  it('IB-BUG-008: falls back to plain text when Telegram refuses the rich message', async () => {
+    const h = harness({}, { 222: member });
+    h.setWeb({ createLoginLink: async () => 'http://localhost:3005/login?t=abc', loginTokenTtlMs: 600_000 });
+    h.failNextSendWith('Bad Request: BUTTON_URL_INVALID');
+
+    await h.bot.handleUpdate(text(222, '/web') as never);
+
+    const last = h.sent[h.sent.length - 1];
+    expect(last).toContain('http://localhost:3005/login?t=abc');
+    expect(last).not.toContain('<a href');
+  });
+
+  it('escapes HTML so a URL can never break the markup', () => {
+    expect(T.escapeHtml('a&b<c>')).toBe('a&amp;b&lt;c&gt;');
   });
 
   it('refuses when the dashboard is not configured, rather than sending a link to nowhere', async () => {
