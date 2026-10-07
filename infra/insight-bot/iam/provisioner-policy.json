@@ -141,6 +141,10 @@
         "iam:RemoveRoleFromInstanceProfile",
         "iam:TagRole",
         "iam:TagInstanceProfile",
+        "iam:UntagRole",
+        "iam:UntagInstanceProfile",
+        "iam:ListRoleTags",
+        "iam:ListInstanceProfileTags",
         "iam:UpdateAssumeRolePolicy"
       ],
       "Resource": [
@@ -175,7 +179,10 @@
       "Effect": "Allow",
       "Action": [
         "budgets:ViewBudget",
-        "budgets:ModifyBudget"
+        "budgets:ModifyBudget",
+        "budgets:TagResource",
+        "budgets:UntagResource",
+        "budgets:ListTagsForResource"
       ],
       "Resource": "arn:aws:budgets::*:budget/insight-bot-monthly"
     }
