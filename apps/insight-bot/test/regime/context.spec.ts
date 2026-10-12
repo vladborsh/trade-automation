@@ -1,6 +1,6 @@
 import { assertComparableContexts, regimeContext, type RegimeContextInput } from '../../src/regime/context';
 import type { PercentileRank } from '../../src/regime/axes';
-import type { FrameFeatureValue } from '../../src/regime/feature-value';
+import type { WebFeatureValue } from '@trade-automation/contracts';
 import { REGIME_VERSION, regimeSpecFingerprint } from '../../src/regime/regime-spec';
 
 const percentileRank: PercentileRank = (sample, value, minPeriods) => {
@@ -10,7 +10,7 @@ const percentileRank: PercentileRank = (sample, value, minPeriods) => {
   return atOrBelow / sample.length;
 };
 
-const value = (n: number): FrameFeatureValue => ({ ok: true, value: n });
+const value = (n: number): WebFeatureValue => ({ ok: true, value: n });
 const ramp = (n: number): number[] => Array.from({ length: n }, (_, i) => i + 1);
 
 function input(overrides: Partial<RegimeContextInput> = {}): RegimeContextInput {
@@ -20,6 +20,7 @@ function input(overrides: Partial<RegimeContextInput> = {}): RegimeContextInput 
     tf: '4h',
     frameVersion: 1,
     frameRevision: 1,
+    computedMode: 'live',
     emaFastNow: value(106),
     emaFastThen: value(100),
     emaSlow: value(90),
@@ -45,14 +46,16 @@ describe('regimeContext', () => {
     expect(row.eventWindow).toEqual({ ok: true, value: 'CLEAR' });
   });
 
-  it('records what produced it: the frame’s version and revision, and its own', () => {
+  it('records what produced it: the frame’s version, revision and MODE, and its own', () => {
     const row = regimeContext(input({ frameVersion: 1, frameRevision: 3 }), percentileRank);
     expect(row).toMatchObject({
       frameVersion: 1,
       frameRevision: 3,
+      computedMode: 'live',
       regimeVersion: REGIME_VERSION,
       specFingerprint: regimeSpecFingerprint(),
     });
+    expect(regimeContext(input({ computedMode: 'backfill' }), percentileRank).computedMode).toBe('backfill');
   });
 
   it('is stamped by the bar, never by wall clock', () => {
@@ -86,6 +89,14 @@ describe('assertComparableContexts', () => {
   it('accepts rows from the same definitions, and an empty list', () => {
     expect(() => assertComparableContexts([base, regimeContext(input({ frameRevision: 2 }), percentileRank)])).not.toThrow();
     expect(() => assertComparableContexts([])).not.toThrow();
+  });
+
+  it('throws on a set that mixes live and backfilled frames — that is lookahead', () => {
+    // derive heals buckets after the fact, so a backfilled frame is systematically better
+    // informed than the live frame for the same close: an axis can read HIGH where the live frame
+    // could only have refused. Learning across the two is learning from what was not knowable.
+    const backfilled = regimeContext(input({ computedMode: 'backfill' }), percentileRank);
+    expect(() => assertComparableContexts([base, backfilled])).toThrow(/live and backfilled/);
   });
 
   it('throws when the frame version differs — two meanings, one comparison', () => {

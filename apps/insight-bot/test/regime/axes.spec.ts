@@ -1,7 +1,7 @@
 import {
   crowdedSideAxis, eventWindowAxis, leverageAxis, trendAxis, volAxis, type PercentileRank,
 } from '../../src/regime/axes';
-import type { FrameFeatureValue, FrameRefusalReason } from '../../src/regime/feature-value';
+import type { WebFeatureUnavailable, WebFeatureValue } from '@trade-automation/contracts';
 import { REGIME_SPEC } from '../../src/regime/regime-spec';
 
 /**
@@ -23,8 +23,8 @@ const percentileRank: PercentileRank = (sample, value, minPeriods) => {
   return atOrBelow / sample.length;
 };
 
-const value = (n: number): FrameFeatureValue => ({ ok: true, value: n });
-const refused = (why: FrameRefusalReason): FrameFeatureValue => ({ ok: false, why });
+const value = (n: number): WebFeatureValue => ({ ok: true, value: n });
+const refused = (why: WebFeatureUnavailable): WebFeatureValue => ({ ok: false, why });
 
 /** `n` ascending values, so a percentile is easy to check by hand. */
 const ramp = (n: number): number[] => Array.from({ length: n }, (_, i) => i + 1);

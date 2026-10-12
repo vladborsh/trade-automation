@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { REGIME_SPEC, REGIME_VERSION, regimeParamNumber, regimeSpecFingerprint } from '../../src/regime/regime-spec';
-import { FRAME_REFUSAL_REASONS, assertMatchesContract } from '../../src/regime/feature-value';
+import { WEB_FEATURE_UNAVAILABLE } from '@trade-automation/contracts';
 
 /**
  * IB-016 — the guards around the axes: the meaning fingerprint, the vocabulary copy that has to
@@ -49,12 +49,13 @@ describe('the regime spec fingerprint', () => {
   });
 });
 
-describe('the borrowed refusal vocabulary', () => {
-  it('still matches IB-015’s list, which is what makes it safe to delete later', () => {
-    // the contract is not on master yet; when it is, this call takes WEB_FEATURE_UNAVAILABLE and
-    // this file is how we find out the copy has drifted
-    expect(() => assertMatchesContract([...FRAME_REFUSAL_REASONS])).not.toThrow();
-    expect(() => assertMatchesContract(['no_data'])).toThrow(/drifted/);
+describe('the refusal vocabulary', () => {
+  it('is the contract’s, now that IB-015 is on master — there is no second copy to drift', () => {
+    // this file used to assert that a local copy of WEB_FEATURE_UNAVAILABLE had not drifted from
+    // the contract, because the contract lived on an unmerged branch. The copy is deleted; the
+    // axes import the real union, so a reason that does not exist no longer compiles.
+    expect(WEB_FEATURE_UNAVAILABLE).toContain('insufficient_history');
+    expect(WEB_FEATURE_UNAVAILABLE).toContain('incomplete_input');
   });
 });
 

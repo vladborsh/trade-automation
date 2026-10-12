@@ -1,4 +1,4 @@
-import type { FrameFeatureValue } from './feature-value';
+import type { WebFeatureFrame, WebFeatureValue } from '@trade-automation/contracts';
 import {
   crowdedSideAxis, eventWindowAxis, leverageAxis, trendAxis, volAxis,
   type PercentileRank, type RegimeAxisValue, type RegimeCalendarEvent, type RegimeCrowdedSide,
@@ -37,6 +37,19 @@ export interface RegimeContext {
   frameVersion: number;
   /** Which revision of that frame these axes read (frames amend; revisions are append-only). */
   frameRevision: number;
+  /**
+   * Whether the frame these axes read was computed **live** at its close or **backfilled** later
+   * (IB-015, 2026-10-12).
+   *
+   * It is on the row for the same reason the frame carries it: derive heals buckets after the
+   * fact, so a backfilled frame is systematically better informed than the live frame for the
+   * same close. A regime context inherits that difference completely — an axis computed from a
+   * healed frame can say `HIGH` where the live frame could only have said
+   * `insufficient_history` — so a context row that did not record its mode would let IB-017's
+   * arming reconstruction and IB-023's outcome tracking learn from information that did not exist
+   * at the close. That is lookahead, and it is invisible: the numbers all look reasonable.
+   */
+  computedMode: WebFeatureFrame['computedMode'];
   /** The axes' own definition version, and a fingerprint of their constants. */
   regimeVersion: number;
   specFingerprint: string;
@@ -49,14 +62,15 @@ export interface RegimeContextInput {
   tf: string;
   frameVersion: number;
   frameRevision: number;
+  computedMode: WebFeatureFrame['computedMode'];
 
   /** `ema.4h.50` now, and as it stood `slopeBars` frames back (null when that frame is missing). */
-  emaFastNow: FrameFeatureValue;
-  emaFastThen: FrameFeatureValue | null;
+  emaFastNow: WebFeatureValue;
+  emaFastThen: WebFeatureValue | null;
   /** `ema.1d.200` now. */
-  emaSlow: FrameFeatureValue;
+  emaSlow: WebFeatureValue;
   /** The frame's close. */
-  price: FrameFeatureValue;
+  price: WebFeatureValue;
 
   /**
    * `atr.4h.14` now, and its trailing values over the lookback.
@@ -71,11 +85,11 @@ export interface RegimeContextInput {
    * mode (`--from --to`, as IB-014's derive has), so past closes are backfilled into frames and
    * these histories exist immediately *and* consistently. That is dev-2's, on IB-015.
    */
-  atr: FrameFeatureValue;
+  atr: WebFeatureValue;
   atrHistory: readonly number[];
 
   /** `oi.binance.now` now, and its trailing values over the lookback — stored frames, as above. */
-  oi: FrameFeatureValue;
+  oi: WebFeatureValue;
   oiHistory: readonly number[];
 
   /** Settled funding rates inside the window, across the venues that reported. */
@@ -114,22 +128,37 @@ export function regimeContext(input: RegimeContextInput, percentileRank: Percent
 
     frameVersion: input.frameVersion,
     frameRevision: input.frameRevision,
+    computedMode: input.computedMode,
     regimeVersion: REGIME_VERSION,
     specFingerprint: regimeSpecFingerprint(),
   };
 }
 
 /**
- * Two context rows may only be compared when they were produced by the same definitions.
+ * Two context rows may only be compared when they were produced by the same definitions **and in
+ * the same computed mode**.
  *
  * Throws rather than returning a flag, for IB-015's reason: a caller that wanted to know would
  * have checked first, and a flag is something a caller can ignore while still getting a plausible
  * answer out the other side.
+ *
+ * The mode check mirrors `assertSingleComputedMode` one layer up, and it is not redundant with it:
+ * a caller can take a correctly single-mode set of frames and still assemble context rows from two
+ * different runs. Mixing them is lookahead in the same way, by the same mechanism, and it is worth
+ * refusing at both levels because this is the level a playbook's gate reads.
  */
 export function assertComparableContexts(rows: readonly RegimeContext[]): void {
   if (rows.length === 0) return;
   const [first] = rows;
   for (const row of rows) {
+    if (row.computedMode !== first.computedMode) {
+      throw new Error(
+        'regime contexts mix live and backfilled frames: a backfilled frame is systematically ' +
+          'better informed than the live frame for the same close, because derive healed its ' +
+          'buckets in between. Build the set from liveRevisions() for anything reconstructing ' +
+          'what was knowable at a close, or work with backfilled context deliberately and alone.',
+      );
+    }
     if (
       row.frameVersion !== first.frameVersion ||
       row.regimeVersion !== first.regimeVersion ||

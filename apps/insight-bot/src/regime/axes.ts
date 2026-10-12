@@ -1,4 +1,4 @@
-import type { FrameFeatureValue, FrameRefusalReason } from './feature-value';
+import type { WebFeatureUnavailable, WebFeatureValue } from '@trade-automation/contracts';
 import { REGIME_SPEC } from './regime-spec';
 
 /**
@@ -10,10 +10,10 @@ import { REGIME_SPEC } from './regime-spec';
  * to the middle band. `RANGE`, `NORMAL` and `NEUTRAL` are measurements — "I looked, and the market
  * is between the bands" — and using one of them for "I could not look" puts a shrug and a finding
  * behind the same word. Everything downstream then treats an unmeasured market as an ordinary one.
- * IB-015's `FrameFeatureValue` makes that unrepresentable one level down; this keeps it
+ * IB-015's `WebFeatureValue` makes that unrepresentable one level down; this keeps it
  * unrepresentable one level up.
  *
- * The vocabulary is IB-015's `FrameRefusalReason` rather than a regime-specific set: a reader
+ * The vocabulary is IB-015's `WebFeatureUnavailable` rather than a regime-specific set: a reader
  * who has learned what `insufficient_history` means on a key should not have to learn a second
  * word for the same fact on an axis.
  *
@@ -28,11 +28,11 @@ export type RegimeLeverage = 'LEVERED' | 'NEUTRAL' | 'DELEVERED';
 export type RegimeCrowdedSide = 'LONGS' | 'SHORTS' | 'BALANCED';
 export type RegimeEventWindow = 'CLEAR' | 'EVENT_RISK';
 
-/** A measurement or a stated refusal — the same discriminated shape as `FrameFeatureValue`. */
-export type RegimeAxisValue<T> = { ok: true; value: T } | { ok: false; why: FrameRefusalReason };
+/** A measurement or a stated refusal — the same discriminated shape as `WebFeatureValue`. */
+export type RegimeAxisValue<T> = { ok: true; value: T } | { ok: false; why: WebFeatureUnavailable };
 
 const ok = <T>(value: T): RegimeAxisValue<T> => ({ ok: true, value });
-const refuse = <T>(why: FrameRefusalReason): RegimeAxisValue<T> => ({ ok: false, why });
+const refuse = <T>(why: WebFeatureUnavailable): RegimeAxisValue<T> => ({ ok: false, why });
 
 /**
  * The percentile definition is **injected, not restated**.
@@ -45,7 +45,7 @@ const refuse = <T>(why: FrameRefusalReason): RegimeAxisValue<T> => ({ ok: false,
 export type PercentileRank = (sample: readonly number[], value: number, minPeriods: number) => number | null;
 
 /** A refusal passes straight through; a value is handed on as a number. */
-function numberOf(value: FrameFeatureValue): { ok: true; n: number } | { ok: false; why: FrameRefusalReason } {
+function numberOf(value: WebFeatureValue): { ok: true; n: number } | { ok: false; why: WebFeatureUnavailable } {
   if (!value.ok) return { ok: false, why: value.why };
   if (typeof value.value !== 'number') {
     // A key declared `number` in the registry arriving as something else is a contract violation,
@@ -67,13 +67,13 @@ function numberOf(value: FrameFeatureValue): { ok: true; n: number } | { ok: fal
  */
 export function trendAxis(input: {
   /** `ema.4h.50` at this frame. */
-  fastNow: FrameFeatureValue;
+  fastNow: WebFeatureValue;
   /** `ema.4h.50` as it was `slopeBars` frames ago, from the stored frame of that bar. */
-  fastThen: FrameFeatureValue | null;
+  fastThen: WebFeatureValue | null;
   /** `ema.1d.200` at this frame. */
-  slow: FrameFeatureValue;
+  slow: WebFeatureValue;
   /** The frame's close. */
-  price: FrameFeatureValue;
+  price: WebFeatureValue;
 }): RegimeAxisValue<RegimeTrend> {
   const { slopeMinimum } = REGIME_SPEC.trend.params;
   // A frame that far back may simply not exist yet — which is short history, not a broken input.
@@ -104,7 +104,7 @@ export function trendAxis(input: {
  * volatility is not NORMAL, it is unknown.
  */
 export function volAxis(
-  atr: FrameFeatureValue,
+  atr: WebFeatureValue,
   history: readonly number[],
   percentileRank: PercentileRank,
 ): RegimeAxisValue<RegimeVol> {
@@ -130,7 +130,7 @@ export function volAxis(
  * combination is how «все биржи» and `0 из 0` happened.
  */
 export function leverageAxis(
-  oi: FrameFeatureValue,
+  oi: WebFeatureValue,
   oiHistory: readonly number[],
   percentileRank: PercentileRank,
 ): RegimeAxisValue<RegimeLeverage> {
