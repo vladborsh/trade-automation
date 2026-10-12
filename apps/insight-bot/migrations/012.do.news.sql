@@ -186,11 +186,61 @@ create table news_assets (
  * yet or not available" and never zero: a return of 0 % is a real measurement and must not be
  * confusable with a missing bar (§2.3's rule).
  */
+/*
+ * IB-027 — the measured move after a story, per tagged symbol (§10). Feeds the AI-1 calibration,
+ * which is why every column below is provenance rather than convenience: this table is where an
+ * attribution error becomes a correlation, and a correlation becomes a feature.
+ *
+ * **1. Which instant the window started from, and how far the two disagree.** `published_at` is the
+ * publisher's own claim: self-reported, sometimes wrong, often earlier than anything we could have
+ * seen. A window anchored on it can contain price action from before the news was knowable, so the
+ * "reaction" may be measuring what CAUSED the publication rather than what it caused — lookahead
+ * wearing a respectable timestamp. So `anchor` names which instant was used, `anchor_at` is that
+ * instant, and `anchor_skew_sec` is how far `published_at` and our first-seen instant are apart. A
+ * reaction whose anchors are hours apart is suspect, not merely late, and a consumer can see that
+ * without re-deriving it.
+ *
+ * **2. Which venue and spelling the price came from.** The tag is a canonical symbol; the price
+ * tables store each venue's own spelling. `venue`, `market` and `symbol_spelling` record what was
+ * actually queried, resolved through the venue-spelling map rather than by matching the canonical
+ * string — IB-BUG-011 twice over was exactly this. A move on one venue presented as "the asset's
+ * reaction" is «все биржи» over one venue.
+ *
+ * **3. A reaction over a window that cannot be shown covered REFUSES.** `return_pct` is null and
+ * `refused` says why. A collection gap inside the window produces a confidently wrong magnitude and
+ * is invisible in the output unless the output carries its basis — so there is no row that computed
+ * anyway. Null-with-a-reason and a real zero are different things and must not look alike.
+ *
+ * **4. How many OTHER tagged stories fell in the same window.** If three tagged stories land inside
+ * one window the move belongs to none of them in particular. `others_in_window` and `of_window_items`
+ * are the {count, of} pair, so a consumer discards confounded reactions instead of averaging them
+ * into noise. `others_in_window = 0` and `= 7` are different kinds of evidence.
+ */
 create table news_reactions (
   news_id    text not null references raw_news (id) on delete cascade,
   symbol     text not null,
   horizon    text not null check (horizon in ('15m','1h','4h')),
+
+  -- 1. the anchor, stated rather than assumed
+  anchor          text not null check (anchor in ('published','first_seen')),
+  anchor_at       timestamptz not null,
+  anchor_skew_sec integer not null,
+
+  -- 2. where the price actually came from
+  venue           text not null,
+  market          text not null check (market in ('perp','spot')),
+  symbol_spelling text not null,
+
+  -- 3. the measurement, or the reason there is none. Never both, never neither.
   return_pct double precision,
+  refused    text check (refused in ('window_not_covered','no_price_at_anchor','no_price_at_horizon','no_venue_spelling')),
+  constraint news_reactions_measured_or_refused
+    check ((return_pct is not null and refused is null) or (return_pct is null and refused is not null)),
+
+  -- 4. confounders, as {count, of}
+  others_in_window int not null default 0,
+  of_window_items  int not null default 1,
+
   computed_at timestamptz not null default now(),
   primary key (news_id, symbol, horizon)
 );
