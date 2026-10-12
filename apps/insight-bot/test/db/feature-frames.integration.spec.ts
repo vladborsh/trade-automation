@@ -7,6 +7,8 @@ import { PgDatabase } from '../../src/db/pg/pg-database';
 import {
   FrameVersionMismatchError, assertFrameVersionFingerprint,
 } from '../../src/features/frame-version-guard';
+import * as inputs from '../../src/features/pg/feature-inputs.repo';
+import * as frames from '../../src/features/pg/frames.repo';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
@@ -145,6 +147,170 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
         `select frame_version from feature_frame_versions order by frame_version`,
       );
       expect(rows.map((r) => r.frame_version)).toEqual([WEB_FRAME_VERSION, WEB_FRAME_VERSION + 1]);
+    });
+  });
+
+  /**
+   * The repo's own SQL, against the real schema.
+   *
+   * A query that typechecks can still be wrong in every way that matters — a column that does
+   * not exist, a `$4` Postgres cannot type, a `distinct on` whose `order by` disagrees with it.
+   * None of that is visible until it runs.
+   */
+  describe('frames.repo', () => {
+    const SYM = 'ETHUSDT';
+    const frameAt = (closeMs: number, over: Partial<Parameters<typeof frames.insertFrame>[1]> = {}) => ({
+      symbol: SYM,
+      tf: '15m' as const,
+      closeTime: Math.floor(closeMs / 1000),
+      frameVersion: WEB_FRAME_VERSION,
+      keys: { 'oi.d24h_pct': { ok: true as const, value: 1.5 } },
+      basis: { venues: ['bybit'], coverage: 'not_recorded' as const, coveredHours: null },
+      complete: true,
+      incompleteReason: [] as string[],
+      revision: 1,
+      amendedAt: null as number | null,
+      amendedKeys: [] as string[],
+      ...over,
+    });
+
+    it('round-trips a frame through insert and read', async () => {
+      const at = CLOSE + 10 * 900_000;
+      expect(await frames.insertFrame(db, frameAt(at))).toBe(true);
+      const read = await frames.publishedFrame(db, SYM, '15m', at);
+      expect(read?.closeTime).toBe(Math.floor(at / 1000));
+      expect(read?.keys['oi.d24h_pct']).toEqual({ ok: true, value: 1.5 });
+      expect(read?.revision).toBe(1);
+    });
+
+    it('reads the LATEST revision, not the first — the amendment path depends on it', async () => {
+      const at = CLOSE + 11 * 900_000;
+      await frames.insertFrame(db, frameAt(at, { complete: false, incompleteReason: ['short'] }));
+      await frames.insertFrame(db, frameAt(at, {
+        revision: 2, amendedAt: Math.floor(at / 1000), amendedKeys: ['oi.d24h_pct'],
+      }));
+      const read = await frames.publishedFrame(db, SYM, '15m', at);
+      expect(read?.revision).toBe(2);
+      expect(read?.amendedKeys).toEqual(['oi.d24h_pct']);
+      expect(read?.complete).toBe(true);
+    });
+
+    it('is idempotent on a re-run: the second insert of a revision writes nothing', async () => {
+      // The CLI re-runs ranges. The one thing it must never do is rewrite a row something may
+      // already have armed on, so a repeat reports false rather than throwing or overwriting.
+      const at = CLOSE + 12 * 900_000;
+      expect(await frames.insertFrame(db, frameAt(at))).toBe(true);
+      expect(await frames.insertFrame(db, frameAt(at, { complete: false }))).toBe(false);
+      const read = await frames.publishedFrame(db, SYM, '15m', at);
+      expect(read?.complete).toBe(true); // the first write stands
+    });
+
+    it('returns null for a close nothing was written for', async () => {
+      expect(await frames.publishedFrame(db, SYM, '15m', CLOSE + 500 * 900_000)).toBeNull();
+    });
+
+    it('records conflicts against the published revision', async () => {
+      const at = CLOSE + 13 * 900_000;
+      await frames.insertFrame(db, frameAt(at));
+      await frames.recordConflicts(db, { symbol: SYM, tf: '15m', closeTimeMs: at, revision: 1 }, [
+        { key: 'oi.d24h_pct', published: { ok: true, value: 1.5 }, recomputed: { ok: true, value: 9 } },
+      ]);
+      const [row] = await db.query<{ n: string }>(
+        `select count(*) as n from feature_value_conflicts where symbol = $1`, [SYM],
+      );
+      expect(Number(row?.n)).toBe(1);
+    });
+  });
+
+  /**
+   * `frameCounts` is where the three-way distinction has to survive contact with SQL: a frame
+   * is chaseable, permanently refused, or fine, and only the first is anybody's problem.
+   */
+  describe('frameCounts', () => {
+    const SYM = 'SOLUSDT';
+    const BASE = Date.UTC(2026, 9, 5, 0, 0, 0);
+    const HEAL_DEADLINE = BASE + 10 * 900_000;
+
+    const write = (i: number, keys: Record<string, unknown>, complete: boolean) =>
+      frames.insertFrame(db, {
+        symbol: SYM, tf: '4h', closeTime: Math.floor((BASE + i * 900_000) / 1000),
+        frameVersion: WEB_FRAME_VERSION,
+        keys: keys as never,
+        basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
+        complete, incompleteReason: complete ? [] : ['x'],
+        revision: 1, amendedAt: null, amendedKeys: [],
+      });
+
+    beforeAll(async () => {
+      await write(0, { a: { ok: true, value: 1 } }, true);
+      // chaseable, and old enough that no heal pass will reach it again
+      await write(1, { a: { ok: false, why: 'incomplete_input' } }, false);
+      // chaseable but still young — incomplete, NOT unhealed
+      await write(20, { a: { ok: false, why: 'incomplete_input' } }, false);
+      // permanently refused: complete = false for ever, and nobody's problem
+      await write(2, { a: { ok: false, why: 'explained_absence' } }, false);
+      await write(3, { a: { ok: false, why: 'insufficient_history' } }, false);
+    }, DB_HOOK_TIMEOUT_MS);
+
+    const counts = async () => {
+      const rows = await frames.frameCounts(db, BASE - 900_000, BASE + 100 * 900_000, HEAL_DEADLINE);
+      return rows.find((r) => r.tf === '4h');
+    };
+
+    it('counts only incomplete_input as chaseable, whatever `complete` says', async () => {
+      const row = await counts();
+      expect(row?.written).toBe(5);
+      expect(row?.incomplete).toBe(2);
+    });
+
+    it('counts permanent refusals SEPARATELY, so they never light an alarm', async () => {
+      // Both of these are `complete = false`. A counter keyed on that column would report 4
+      // problems where there are 2, and two of them could never be cleared by anyone.
+      const row = await counts();
+      expect(row?.explainedOnly).toBe(2);
+    });
+
+    it('calls only the ones past the heal deadline unhealed — a young frame is not a fault', async () => {
+      const row = await counts();
+      expect(row?.unhealed).toBe(1);
+      expect(row?.oldestUnhealedMs).toBe(BASE + 1 * 900_000);
+    });
+  });
+
+  /**
+   * The input queries, against the real schema but no data. This proves only that each one
+   * parses, types its parameters and names columns that exist — which is exactly the class of
+   * error a unit test with a fake database cannot reach, and the class that broke the backfill
+   * runner spec when its fake matched on SQL text.
+   */
+  describe('feature-inputs.repo SQL', () => {
+    const NOW = CLOSE;
+    const syms = ['BTCUSDT'];
+
+    it('every input query runs against the real schema', async () => {
+      await expect(Promise.all([
+        inputs.aggBars(db, { venue: 'binance', market: 'perp', symbols: syms, tf: '15m', fromMs: NOW - 86_400_000, toMsExclusive: NOW }),
+        inputs.minuteBars(db, { venue: 'binance', market: 'perp', symbols: syms, fromMs: NOW - 86_400_000, toMsExclusive: NOW }),
+        inputs.minuteCount(db, { venue: 'binance', market: 'perp', symbols: syms, fromMs: NOW - 86_400_000, toMsExclusive: NOW }),
+        inputs.oiSlots(db, { venue: 'binance', symbols: syms, fromMs: NOW - 86_400_000, toMsExclusive: NOW }),
+        inputs.recentSettlements(db, { symbols: syms, beforeMs: NOW, limitPerVenue: 90 }),
+        inputs.predictedFundingAt(db, { venue: 'binance', symbols: syms, atMs: NOW, withinMs: 600_000 }),
+        inputs.longShortSeries(db, { venue: 'binance', symbols: syms, fromMs: NOW - 86_400_000, toMsExclusive: NOW }),
+        inputs.liquidationBuckets(db, { symbols: syms, fromMs: NOW - 86_400_000, toMsExclusive: NOW, widthSec: 3600 }),
+        inputs.liquidationHistoryStartMs(db),
+        inputs.recordedGapMinutes(db, { stream: 'binance:kline_1m', symbols: syms, fromMs: NOW - 86_400_000, toMsExclusive: NOW }),
+        inputs.listedPerpMs(db, 'BTCUSDT'),
+        inputs.signalSetSymbols(db),
+      ])).resolves.toBeDefined();
+    });
+
+    it('returns an empty result for no symbols rather than matching everything', async () => {
+      // `symbol = any('{}')` matches nothing, but the guard matters for the readers that would
+      // otherwise send an unparameterised query: an empty spelling list is IB-BUG-011's signal
+      // that the symbol is unknown, and the answer is no rows, never all rows.
+      expect(await inputs.aggBars(db, { venue: 'binance', market: 'perp', symbols: [], tf: '15m', fromMs: 0, toMsExclusive: NOW })).toEqual([]);
+      expect(await inputs.minuteCount(db, { venue: 'binance', market: 'perp', symbols: [], fromMs: 0, toMsExclusive: NOW })).toBe(0);
+      expect(await inputs.liquidationBuckets(db, { symbols: [], fromMs: 0, toMsExclusive: NOW, widthSec: 3600 })).toEqual([]);
     });
   });
 });

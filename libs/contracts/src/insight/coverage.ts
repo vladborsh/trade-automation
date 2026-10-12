@@ -61,6 +61,49 @@ export const WebUnmappedLiquidationSchema = z.object({
 });
 export type WebUnmappedLiquidation = z.infer<typeof WebUnmappedLiquidationSchema>;
 
+/**
+ * IB-015 — where the unhealed-gap counter is READ, which until this block existed was nowhere.
+ *
+ * Its own block with its own fields, deliberately NOT folded into `collectors` above. The two
+ * measure different things and merging them would make a frame problem look like a collector
+ * problem: a stream can be up for every hour of the window while every frame in it refuses,
+ * because collector liveness says a socket was connected and says nothing about whether the
+ * buckets it fed ever healed.
+ *
+ * Four counts, and the distinctions between them are the point:
+ *
+ * - **`expected` vs `written`** — a frame that was never written is invisible in any count of
+ *   frames, which is IB-BUG-010 one layer up: "the pass was not running" and "nothing was wrong"
+ *   must not look alike. `expected` is computed from the window and the timeframe, not from the
+ *   rows.
+ * - **`incomplete` is not `complete = false`.** A frame refusing only `explained_absence` keys
+ *   is `complete = false` for ever and there is nothing to chase: the venue did not produce
+ *   those minutes and never will. Counting it here would be an alarm that cannot be cleared,
+ *   and an alarm that cannot be cleared stops being read. `incomplete` counts frames holding at
+ *   least one `incomplete_input` key; `explainedOnly` counts the permanent ones separately so
+ *   they are visible without being actionable.
+ * - **`unhealed` is the only number anyone should act on**: frames still holding an
+ *   `incomplete_input` key after the heal window closed, so no further heal pass will reach
+ *   back for them. Before that deadline an incomplete frame is simply young.
+ */
+export const WebFrameCoverageSchema = z.object({
+  /** `15m` or `4h`. An identifier — not translated. */
+  tf: z.string(),
+  /** Frames the window should hold, computed from the window and the timeframe. */
+  expected: z.number().int(),
+  /** Frames actually stored. Below `expected` means the pass did not run, not that data is fine. */
+  written: z.number().int(),
+  /** Frames holding at least one `incomplete_input` key — chaseable, whatever their age. */
+  incomplete: z.number().int(),
+  /** Frames whose only refusals are permanent. Visible, never actionable, never an alarm. */
+  explainedOnly: z.number().int(),
+  /** Still `incomplete_input` past the heal window. The actionable figure, and normally zero. */
+  unhealed: z.number().int(),
+  /** ms UTC of the oldest unhealed frame's close, or null when there is none. */
+  oldestUnhealed: z.number().int().nullable(),
+});
+export type WebFrameCoverage = z.infer<typeof WebFrameCoverageSchema>;
+
 export const WebCoverageResponseSchema = z.object({
   rows: z.array(WebCoverageRowSchema),
   /** Defaulted, so a client built against the earlier shape keeps parsing. */
@@ -68,6 +111,12 @@ export const WebCoverageResponseSchema = z.object({
   unmapped: z
     .object({ total: z.number().int(), rows: z.array(WebUnmappedLiquidationSchema) })
     .default({ total: 0, rows: [] }),
+  /**
+   * IB-015's frame block, one row per timeframe. Its own field rather than a member of
+   * `collectors`: a collector count and a frame count answer different questions and a reader
+   * who sees them in one table will treat one as evidence about the other.
+   */
+  frames: z.array(WebFrameCoverageSchema).default([]),
   /** The window `collectors` was computed over, so the page can state its basis. */
   windowDays: z.number().int().default(30),
 });
