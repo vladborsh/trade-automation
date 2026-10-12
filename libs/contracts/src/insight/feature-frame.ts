@@ -327,6 +327,11 @@ export const WEB_FEATURE_SPEC = {
   // was 83634.9 — **$362 out on one bar**. Against ATR(1h) on BTCUSDT over the preceding seven
   // days, measured independently on two slots: mean **$327–359**, median **$269–290**.
   //
+  // The range is two slots, not noise in the estimator: `insight_dev1` gave $327 and
+  // `insight_dev2` $359 over nominally the same window, because they hold different sets of
+  // COMPLETE bars. The ATR of Bitcoin does not depend on which database you ask — every figure
+  // we can produce does, so neither number is "the" ATR and the pair is quoted deliberately.
+  //
   // So the error is roughly ONE ATR(1h) — and P3's stop is `cascade low − 0.1·ATR`, a buffer of
   // about $27–36. The simplification would therefore move the stop by **an order of magnitude
   // more than the buffer the design puts there on purpose**, and a `px.low` that is too high
