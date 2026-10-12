@@ -1,8 +1,12 @@
 -- IB-027 — stage-2 news ingest (architecture/insight-bot-system-design.md §10).
 --
--- Migration 009: 006-008 were taken when this was written (`ls migrations` first — two migrations
--- sharing a version makes postgrator refuse to run AT ALL, failing every DB suite rather than
--- just the clashing pair; it cost 6 suites / 52 tests during IB-036).
+-- Migration 011. It was written as 009 and renumbered on 2026-10-12: while this branch sat idle,
+-- 009 was taken by `symbols-coingecko-id` and 010 by `collector-heartbeats`. **Git did not
+-- complain** — two new files with different names merge cleanly — so the rebase was silent and
+-- only `ls migrations` showed two 009s. Two migrations sharing a version makes postgrator refuse
+-- to run AT ALL, failing every DB suite rather than just the clashing pair; it cost 6 suites /
+-- 52 tests during IB-036, and this is the same trap one branch later. Check every ref, not just
+-- the obvious branches, before taking a number.
 --
 -- **Collection window.** Unlike `market_cap_global`, which has no history endpoint at all, the
 -- news feeds are a ROLLING window: measured 2026-09-28, the crypto sources carry roughly three
