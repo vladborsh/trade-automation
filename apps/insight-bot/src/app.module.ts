@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
+import { NewsModule } from './news/news.module';
 import { WebModule } from './web/web.module';
 import { DashboardStaticModule } from './web/static.module';
 import { DeliveryModule } from './delivery/delivery.module';
@@ -22,6 +23,6 @@ import { FeaturesModule } from './features/features.module';
  * arrive with their own tasks.
  */
 @Module({
-  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeriveModule.register(), FeaturesModule.register(), DeliveryModule.register(), WebModule.register(), DashboardStaticModule.register()],
+  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeriveModule.register(), FeaturesModule.register(), DeliveryModule.register(), NewsModule.register(), WebModule.register(), DashboardStaticModule.register()],
 })
 export class AppModule {}
