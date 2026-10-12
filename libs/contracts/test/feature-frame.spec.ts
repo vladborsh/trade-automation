@@ -14,7 +14,7 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('27e2e004');
+    expect(featureSpecFingerprint()).toBe('7560290d');
     expect(WEB_FRAME_VERSION).toBe(1);
   });
 
@@ -40,6 +40,16 @@ describe('the key set is pinned', () => {
     expect(featureSpecFingerprint(clone3)).not.toBe(base);
   });
 
+  it('INCLUDES `def`, so a change of meaning in prose still moves the hash', () => {
+    // Deliberate, with its cost accepted: a wording-only improvement forces a version bump and a
+    // one-line note saying the meaning did not change. The alternative is worse — a calculator
+    // going from "percentile of the last rate" to "percentile of the mean of the last three"
+    // with params untouched would otherwise pass silently.
+    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, { def: string }>;
+    clone['funding.binance.rate'].def = 'something else entirely';
+    expect(featureSpecFingerprint(clone as never)).not.toBe(featureSpecFingerprint());
+  });
+
   it('is not moved by the ORDER params happen to be written in', () => {
     // Otherwise a harmless reformat would demand a version bump and the rule would be ignored.
     const reordered = Object.fromEntries(Object.entries(
@@ -53,7 +63,11 @@ describe('the key set is pinned', () => {
 
   it('every meaning-defining constant lives in params, so none can change silently', () => {
     // Spot-check the ones a calculator would otherwise be tempted to hard-code.
-    expect(WEB_FEATURE_SPEC['funding.binance.pct30d'].params).toMatchObject({ settlements: 90, minPeriods: 45 });
+    expect(WEB_FEATURE_SPEC['funding.binance.pct30d'].params).toMatchObject({
+      settlements: 90, minPeriods: 45,
+      // the convention the key NAME depends on: 90 settlements is 30 days only at 8-hourly
+      settlementHours: 8, intervalTolerance: 0.25,
+    });
     expect(WEB_FEATURE_SPEC['atr.1h.14'].params).toMatchObject({ period: 14, smoothing: 'wilder' });
     expect(WEB_FEATURE_SPEC['liq.long.z60m'].params).toMatchObject({ lookbackDays: 30, minHistoryDays: 14, transform: 'log1p' });
     expect(WEB_FEATURE_SPEC['structure.failed_highs_24h'].params).toMatchObject({ atrMultiple: 0.5, atrTf: '1h' });

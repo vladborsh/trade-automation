@@ -1,7 +1,12 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { WEB_FRAME_VERSION, featureSpecFingerprint } from '@trade-automation/contracts';
-import { fundingFeatures, type FundingInput } from '../../src/features/calculators/funding';
+import { fundingFeatures, type FundingInput, type Settlement } from '../../src/features/calculators/funding';
+
+/** 8-hourly settlements ending at a fixed UTC instant — the convention the keys assume. */
+const T_END = Date.UTC(2026, 9, 12, 0, 0, 0) / 1000;
+const every = (rates: readonly number[], hours = 8): Settlement[] =>
+  rates.map((rate, i) => ({ timeSec: T_END - (rates.length - 1 - i) * hours * 3600, rate }));
 
 /**
  * IB-015 — the GOLDEN FRAME: one fixture, one expected output, asserted whole.
@@ -24,10 +29,10 @@ const goldenPath = join(__dirname, 'golden', `frame-v${WEB_FRAME_VERSION}.json`)
 
 /** Fixed, hand-built inputs. No clock, no database, no randomness. */
 function buildGolden(): Record<string, unknown> {
-  const settlements = (last: number, others: number): number[] => [
+  const settlements = (last: number, others: number): Settlement[] => every([
     ...Array.from({ length: 89 }, () => others),
     last,
-  ];
+  ]);
 
   /**
    * A history whose last rate sits EXACTLY on §8.2's hi threshold: 81 of 90 settlements at or
@@ -39,16 +44,16 @@ function buildGolden(): Record<string, unknown> {
    * golden whose fixture avoids the boundary tests nothing at the boundary, which is the same
    * mistake as IB-043's mid-month fixtures missing a month-boundary bug.
    */
-  const exactlyOnHiThreshold = (): number[] => [
+  const exactlyOnHiThreshold = (): Settlement[] => every([
     ...Array.from({ length: 80 }, () => -0.001), // below
     ...Array.from({ length: 9 }, () => 0.001),   // above
     0.0003,                                      // the value: 81 of 90 are <= it -> pct 0.90
-  ];
+  ]);
 
   const funding: FundingInput = {
     settled: {
       binance: settlements(0.0012, -0.0001), // comfortably extreme-high
-      bybit: [0.002, 0.002, 0.002],          // a rate, but too little history for a percentile
+      bybit: every([0.002, 0.002, 0.002]),   // a rate, but too little history for a percentile
       okx: exactlyOnHiThreshold(),           // ON the boundary, both halves of the condition
     },
     predictedBinance: -0.000018,

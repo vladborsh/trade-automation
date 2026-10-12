@@ -30,24 +30,66 @@ export const FUNDING_EXTREME = {
   loRate: featureParamNumber('funding.extreme_lo_venues', 'rate'),
   window: featureParamNumber('funding.binance.pct30d', 'settlements'),
   minPeriods: featureParamNumber('funding.binance.pct30d', 'minPeriods'),
+  /** The convention the key's NAME depends on, asserted below rather than assumed. */
+  settlementHours: featureParamNumber('funding.binance.pct30d', 'settlementHours'),
+  intervalTolerance: featureParamNumber('funding.binance.pct30d', 'intervalTolerance'),
 } as const;
 
 export const FUNDING_VENUES = ['binance', 'bybit', 'okx'] as const;
 export type FundingVenue = (typeof FUNDING_VENUES)[number];
 
+/** One settlement: the instant matters as much as the rate — see `settlementIntervalHours`. */
+export interface Settlement {
+  /** Epoch seconds, UTC. */
+  timeSec: number;
+  rate: number;
+}
+
 export interface FundingInput {
   /**
-   * Settled rates per venue, **ascending by settlement time**. The caller owns the ordering and
+   * Settlements per venue, **ascending by settlement time**. The caller owns the ordering and
    * the window; at most the last `FUNDING_EXTREME.window` are used.
+   *
+   * Times are carried, not just rates, because `pct30d`'s name is only true at an 8-hourly
+   * settlement interval and the interval has to be measured to know.
    */
-  settled: Partial<Record<FundingVenue, readonly number[]>>;
+  settled: Partial<Record<FundingVenue, readonly Settlement[]>>;
   /** Binance's last `predicted_funding_rate`, or null when none is stored. */
   predictedBinance: number | null;
 }
 
+/**
+ * The venue's typical settlement interval in hours, from the MEDIAN gap in the window.
+ *
+ * Median rather than mean: a single missed settlement doubles one gap, and a mean would call an
+ * 8-hourly venue 9-hourly on one outage. `null` when there are not two settlements to measure.
+ */
+export function settlementIntervalHours(settlements: readonly Settlement[]): number | null {
+  if (settlements.length < 2) return null;
+  const gaps: number[] = [];
+  for (let i = 1; i < settlements.length; i += 1) {
+    gaps.push((settlements[i] as Settlement).timeSec - (settlements[i - 1] as Settlement).timeSec);
+  }
+  gaps.sort((a, b) => a - b);
+  const mid = gaps.length >> 1;
+  const medianSec = gaps.length % 2 === 1
+    ? (gaps[mid] as number)
+    : ((gaps[mid - 1] as number) + (gaps[mid] as number)) / 2;
+  return medianSec / 3600;
+}
+
+/** Does the window still settle at the interval the key's name assumes? */
+export function matchesSettlementConvention(settlements: readonly Settlement[]): boolean {
+  const hours = settlementIntervalHours(settlements);
+  if (hours === null) return true; // nothing measurable: the sample refusal already covers it
+  const expected = FUNDING_EXTREME.settlementHours;
+  return Math.abs(hours - expected) / expected <= FUNDING_EXTREME.intervalTolerance;
+}
+
 const ok = (value: number | boolean | { count: number; of: number }): WebFeatureValue =>
   ({ ok: true, value });
-const no = (why: 'no_data' | 'insufficient_history'): WebFeatureValue => ({ ok: false, why });
+const no = (why: 'no_data' | 'insufficient_history' | 'convention_changed'): WebFeatureValue =>
+  ({ ok: false, why });
 
 /**
  * One venue's rate and percentile.
@@ -57,12 +99,23 @@ const no = (why: 'no_data' | 'insufficient_history'): WebFeatureValue => ({ ok: 
  * percentile (`insufficient_history`). Collapsing them would lose the only information that
  * tells an operator whether to wait or to go looking for a collector.
  */
-function venueKeys(rates: readonly number[] | undefined): { rate: WebFeatureValue; pct: WebFeatureValue } {
-  if (!rates || rates.length === 0) return { rate: no('no_data'), pct: no('no_data') };
-  const last = rates[rates.length - 1] as number;
-  const window = rates.slice(-FUNDING_EXTREME.window);
-  const pct = percentileOf(window, last, FUNDING_EXTREME.minPeriods);
-  return { rate: ok(last), pct: pct === null ? no('insufficient_history') : ok(pct) };
+function venueKeys(settlements: readonly Settlement[] | undefined): { rate: WebFeatureValue; pct: WebFeatureValue } {
+  if (!settlements || settlements.length === 0) return { rate: no('no_data'), pct: no('no_data') };
+  const window = settlements.slice(-FUNDING_EXTREME.window);
+  const last = window[window.length - 1] as Settlement;
+
+  // The rate is always reportable: it is the last settled rate and nothing about the interval
+  // changes what it is.
+  if (!matchesSettlementConvention(window)) {
+    // The percentile is not. At 4-hourly, 90 settlements is 15 days and `pct30d` would be
+    // measuring half the window its name claims — and `extreme_*_venues` would then compare a
+    // 15-day percentile against its neighbours' 30-day ones. Refusing drops the venue from the
+    // `of` denominator too, which keeps the cross-venue count honest rather than mixed.
+    return { rate: ok(last.rate), pct: no('convention_changed') };
+  }
+
+  const pct = percentileOf(window.map((s) => s.rate), last.rate, FUNDING_EXTREME.minPeriods);
+  return { rate: ok(last.rate), pct: pct === null ? no('insufficient_history') : ok(pct) };
 }
 
 export function fundingFeatures(input: FundingInput): Partial<Record<WebFeatureKey, WebFeatureValue>> {

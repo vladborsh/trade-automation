@@ -37,6 +37,17 @@ export const WEB_FEATURE_UNAVAILABLE = [
   'incomplete_input',
   /** The key cannot exist for this symbol — a perp with no spot market has no `cvd.spot.*`. */
   'not_applicable',
+  /**
+   * A venue convention the key's definition depends on no longer holds, so the number would be
+   * measuring something other than what its name says.
+   *
+   * The case this exists for: `funding.*.pct30d` is thirty days **because** a settlement is eight
+   * hours on these venues. That is a venue convention, not an invariant — at 4-hourly, ninety
+   * settlements is fifteen days, the name becomes a lie and the number stays plausible. AGENTS.md
+   * requires a behavioural invariant carried by a venue's shape to be asserted at runtime rather
+   * than trusted, so the interval is measured and the key refuses when it has moved.
+   */
+  'convention_changed',
 ] as const;
 export const WebFeatureUnavailableSchema = z.enum(WEB_FEATURE_UNAVAILABLE);
 export type WebFeatureUnavailable = z.infer<typeof WebFeatureUnavailableSchema>;
@@ -131,6 +142,17 @@ export type WebFeatureFrame = z.infer<typeof WebFeatureFrameSchema>;
  */
 export const WEB_FRAME_VERSION = 1;
 
+/**
+ * **The version freezes at the first persisted frame.** Until migration 011 exists nothing has
+ * ever been written, so there are no stored frames for a consumer to be version-aware about, and
+ * a fingerprint change updates the committed literal without a bump. The moment the table exists
+ * that exemption ends and every fingerprint change is a bump.
+ *
+ * Stated rather than done quietly, because "we skipped the bump this once" is exactly the habit
+ * the rule exists to prevent — the exemption has a boundary and the boundary is in the code.
+ */
+export const WEB_FRAME_VERSION_FROZEN_FROM_FIRST_WRITE = true;
+
 
 /**
  * ============================= THE KEY SET (design §8.2) =============================
@@ -148,9 +170,12 @@ export const WEB_FEATURE_SPEC = {
   'funding.binance.rate': { type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on binance' },
   'funding.bybit.rate': { type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on bybit' },
   'funding.okx.rate': { type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on okx' },
-  'funding.binance.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45 }, def: 'percentile of the last settled rate among the venue last N settlements' },
-  'funding.bybit.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45 }, def: 'percentile of the last settled rate among the venue last N settlements' },
-  'funding.okx.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45 }, def: 'percentile of the last settled rate among the venue last N settlements' },
+  // The name says 30d; the window is 90 SETTLEMENTS (§8.2). Those are the same thing only while a
+  // settlement is 8 hours, which is a venue convention and not an invariant — so the interval is
+  // measured and the key refuses with convention_changed when it has moved. See `settlementHours`.
+  'funding.binance.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
+  'funding.bybit.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
+  'funding.okx.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
   'funding.extreme_hi_venues': { type: 'count', window: 'per venue', params: { percentile: 0.9, rate: 0.0003, denominator: 'venues_assessable' }, def: 'venues at or above the percentile AND at or above the rate, of the venues that could be assessed' },
   'funding.extreme_lo_venues': { type: 'count', window: 'per venue', params: { percentile: 0.1, rate: -0.0003, denominator: 'venues_assessable' }, def: 'venues at or below the percentile AND at or below the rate, of the venues that could be assessed' },
   'funding.predicted.binance': { type: 'number', window: 'latest', params: {}, def: 'last predicted_funding_rate on binance' },
