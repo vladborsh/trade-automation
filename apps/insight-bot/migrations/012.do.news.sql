@@ -1,12 +1,18 @@
 -- IB-027 — stage-2 news ingest (architecture/insight-bot-system-design.md §10).
 --
--- Migration 011. It was written as 009 and renumbered on 2026-10-12: while this branch sat idle,
--- 009 was taken by `symbols-coingecko-id` and 010 by `collector-heartbeats`. **Git did not
--- complain** — two new files with different names merge cleanly — so the rebase was silent and
--- only `ls migrations` showed two 009s. Two migrations sharing a version makes postgrator refuse
--- to run AT ALL, failing every DB suite rather than just the clashing pair; it cost 6 suites /
--- 52 tests during IB-036, and this is the same trap one branch later. Check every ref, not just
--- the obvious branches, before taking a number.
+-- Migration 012, and this number has moved twice in one day. Written as 009; renumbered to 011 on
+-- 2026-10-12 when 009 (`symbols-coingecko-id`) and 010 (`collector-heartbeats`) were found taken;
+-- renumbered again to 012 hours later because dev-2's unmerged `ib-feature-frame` already holds
+-- 011. Master's highest was 010, so two branches independently read 011 as free.
+--
+-- **Git will never show you this.** Two new files with different names merge without a conflict, so
+-- the working tree is the only place a duplicate version is visible — and only once both branches
+-- are in it. Postgrator then refuses to run AT ALL, failing every database suite rather than the
+-- clashing pair; that cost 6 suites / 52 tests in IB-036.
+--
+-- So picking a number with `ls migrations` is not enough: it shows one branch. Check every ref,
+-- including unmerged ones. `test/db/migration-versions.spec.ts` now fails the build on a duplicate,
+-- which turns the next occurrence into a red test at merge time instead of a silent refusal at boot.
 --
 -- **Collection window.** Unlike `market_cap_global`, which has no history endpoint at all, the
 -- news feeds are a ROLLING window: measured 2026-09-28, the crypto sources carry roughly three
