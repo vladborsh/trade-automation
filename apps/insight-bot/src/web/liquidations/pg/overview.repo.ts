@@ -1,0 +1,204 @@
+import type { Db } from '../../../db/db.port';
+
+/**
+ * IB-038 — the liquidations overview's reads (SQL under a `pg/` directory, IB-004's rule).
+ *
+ * **The venue→coin map is a CTE, not a chain of ORs.** `liquidations` stores each venue's own
+ * symbol (`BTCUSDT` on Bybit, `BTC-USDT-SWAP` on OKX — IB-BUG-011), so every query here has to
+ * canonicalise. Unpivoting `symbols` into one `(venue, venue_symbol) → (id, base)` row set turns
+ * that into a plain equi-join the planner understands, and — the reason it is a `left` join —
+ * makes an unmapped row **visible as a null** instead of silently absent. A venue listing
+ * something before `symbols` knows about it must show up as a number, not as a quieter market.
+ */
+
+/** `(venue, venue_symbol) → (canonical id, base)`, built from the three per-venue columns. */
+const SYMBOL_MAP = `
+  map as (
+    select id, base, 'binance'::text as venue, binance_perp as sym from symbols where binance_perp is not null
+    union all
+    select id, base, 'bybit'::text,            bybit_linear       from symbols where bybit_linear is not null
+    union all
+    select id, base, 'okx'::text,              okx_swap           from symbols where okx_swap is not null
+  )`;
+
+const asDate = (ms: number) => new Date(ms);
+
+export interface BucketRow {
+  /** Canonical symbol, or null when the venue's symbol is in no `symbols` row. */
+  symbolId: string | null;
+  side: 'long' | 'short';
+  /** Start of the boundary-aligned window, epoch ms. */
+  bucketMs: number;
+  usd: number;
+}
+
+/**
+ * Σ USD per (coin, side, boundary-aligned window) over the norm period — **one pass per window
+ * size**, which is the budget §12.3 sets.
+ *
+ * Alignment is `floor(epoch / W) * W`, i.e. anchored to the Unix epoch, which for 1 h, 4 h and
+ * 24 h means UTC hour, UTC 4-hour and UTC midnight boundaries. The same expression is used for
+ * every window size so the three cannot drift apart.
+ *
+ * Empty windows are NOT returned — there is no row to return. The caller fills the grid with
+ * zeros, because a quiet window is a real zero and belongs in the median (`norm.ts`).
+ */
+export async function alignedBuckets(
+  db: Db,
+  q: { windowSec: number; fromMs: number; toMs: number },
+): Promise<BucketRow[]> {
+  const rows = await db.query<{ symbol_id: string | null; side: 'long' | 'short'; bucket: string; usd: string }>(
+    `with ${SYMBOL_MAP}
+     select m.id as symbol_id,
+            l.side,
+            floor(extract(epoch from l.ts) / $1) * $1 as bucket,
+            sum(l.notional) as usd
+       from liquidations l
+       left join map m on m.venue = l.venue and m.sym = l.symbol
+      where l.ts >= $2 and l.ts < $3
+      group by 1, 2, 3`,
+    [q.windowSec, asDate(q.fromMs), asDate(q.toMs)],
+  );
+  return rows.map((r) => ({
+    symbolId: r.symbol_id,
+    side: r.side,
+    bucketMs: Number(r.bucket) * 1000,
+    usd: Number(r.usd),
+  }));
+}
+
+export interface TrailingRow {
+  symbolId: string | null;
+  side: 'long' | 'short';
+  /** USD in each trailing window, keyed by the window's length in seconds. */
+  usdByWindow: Record<number, number>;
+  eventsByWindow: Record<number, number>;
+}
+
+/**
+ * Σ USD and event counts for every trailing window in one pass.
+ *
+ * The trailing window is `(now - W, now]` and is deliberately **not** boundary-aligned: the card
+ * answers "what is happening now", and an aligned window would answer "what happened since the
+ * last hour mark", which at 12:01 is one minute of data presented as an hour.
+ */
+export async function trailingSums(
+  db: Db,
+  q: { nowMs: number; windowsSec: readonly number[] },
+): Promise<TrailingRow[]> {
+  const widest = Math.max(...q.windowsSec);
+  const params: unknown[] = [asDate(q.nowMs - widest * 1000), asDate(q.nowMs)];
+  const sums = q.windowsSec.map((sec) => {
+    params.push(asDate(q.nowMs - sec * 1000));
+    const p = `$${params.length}`;
+    return `coalesce(sum(l.notional) filter (where l.ts >= ${p}), 0) as usd_${sec},
+            count(*) filter (where l.ts >= ${p}) as events_${sec}`;
+  });
+
+  const rows = await db.query<Record<string, string | null>>(
+    `with ${SYMBOL_MAP}
+     select m.id as symbol_id, l.side, ${sums.join(', ')}
+       from liquidations l
+       left join map m on m.venue = l.venue and m.sym = l.symbol
+      where l.ts >= $1 and l.ts < $2
+      group by 1, 2`,
+    params,
+  );
+
+  return rows.map((r) => {
+    const usdByWindow: Record<number, number> = {};
+    const eventsByWindow: Record<number, number> = {};
+    for (const sec of q.windowsSec) {
+      usdByWindow[sec] = Number(r[`usd_${sec}`] ?? 0);
+      eventsByWindow[sec] = Number(r[`events_${sec}`] ?? 0);
+    }
+    return { symbolId: (r.symbol_id as string | null) ?? null, side: r.side as 'long' | 'short', usdByWindow, eventsByWindow };
+  });
+}
+
+/**
+ * When each venue was first seen, per scope, within the norm period.
+ *
+ * Bounded to the period on purpose: a venue whose first row predates it is capped there anyway
+ * (`normPeriodStart`), so scanning all history to learn that would be work with no answer in it.
+ * `symbolId: null` carries the market-wide first-seen, which is the min over every venue row.
+ */
+export async function venueFirstSeen(
+  db: Db,
+  q: { fromMs: number; toMs: number },
+): Promise<Array<{ symbolId: string | null; venue: string; firstSeenMs: number }>> {
+  const rows = await db.query<{ symbol_id: string | null; venue: string; first_seen: Date }>(
+    `with ${SYMBOL_MAP}
+     select m.id as symbol_id, l.venue, min(l.ts) as first_seen
+       from liquidations l
+       left join map m on m.venue = l.venue and m.sym = l.symbol
+      where l.ts >= $1 and l.ts < $2
+      group by 1, 2`,
+    [asDate(q.fromMs), asDate(q.toMs)],
+  );
+  return rows.map((r) => ({
+    symbolId: r.symbol_id,
+    venue: r.venue,
+    firstSeenMs: new Date(r.first_seen).getTime(),
+  }));
+}
+
+export interface FeedRow {
+  timeSec: number;
+  symbolId: string | null;
+  /** The venue's own symbol, kept so an unmapped event is still nameable in the feed. */
+  venueSymbol: string;
+  base: string | null;
+  side: 'long' | 'short';
+  usd: number;
+  price: number;
+  venue: string;
+}
+
+/** The newest events above the threshold, biggest-first order being the feed's job, not SQL's. */
+export async function feed(
+  db: Db,
+  q: { fromMs: number; toMs: number; minUsd: number; limit: number },
+): Promise<FeedRow[]> {
+  const rows = await db.query<{
+    ts: Date; symbol_id: string | null; venue_symbol: string; base: string | null;
+    side: 'long' | 'short'; notional: string; price: string; venue: string;
+  }>(
+    `with ${SYMBOL_MAP}
+     select l.ts, m.id as symbol_id, l.symbol as venue_symbol, m.base, l.side, l.notional, l.price, l.venue
+       from liquidations l
+       left join map m on m.venue = l.venue and m.sym = l.symbol
+      where l.ts >= $1 and l.ts < $2 and l.notional >= $3
+      order by l.ts desc
+      limit $4`,
+    [asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.limit],
+  );
+  return rows.map((r) => ({
+    timeSec: Math.floor(new Date(r.ts).getTime() / 1000),
+    symbolId: r.symbol_id,
+    venueSymbol: r.venue_symbol,
+    base: r.base,
+    side: r.side,
+    usd: Number(r.notional),
+    price: Number(r.price),
+    venue: r.venue,
+  }));
+}
+
+/** The venues that wrote anything in the window. Evidence, not configuration. */
+export async function venuesWithRows(db: Db, q: { fromMs: number; toMs: number }): Promise<string[]> {
+  const rows = await db.query<{ venue: string }>(
+    `select distinct venue from liquidations where ts >= $1 and ts < $2 order by venue`,
+    [asDate(q.fromMs), asDate(q.toMs)],
+  );
+  return rows.map((r) => r.venue);
+}
+
+/** Top-N canonical symbols by volume rank — the rows of «Где ликвидируют». */
+export async function rankedSymbols(db: Db, n: number): Promise<Array<{ id: string; base: string }>> {
+  const rows = await db.query<{ id: string; base: string }>(
+    `select id, base from symbols where active order by volume_rank nulls last, id limit $1`,
+    [n],
+  );
+  return rows.map((r) => ({ id: r.id, base: r.base }));
+}

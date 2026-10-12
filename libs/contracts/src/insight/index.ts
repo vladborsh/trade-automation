@@ -12,3 +12,5 @@ export * from './coverage';
 // IB-031 — the instrument view.
 export * from './series';
 export * from './universe';
+// IB-038 — the liquidations overview behind the landing page's card, table and feed.
+export * from './liquidations-overview';

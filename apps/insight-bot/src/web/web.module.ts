@@ -9,6 +9,8 @@ import { WebAuthService } from './auth/web-auth.service';
 import { WebCoverageController } from './coverage.controller';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
+import { LiquidationsController } from './liquidations/liquidations.controller';
+import { LiquidationsOverviewService } from './liquidations/overview.service';
 import { UniverseController } from './universe.controller';
 
 /**
@@ -43,9 +45,13 @@ export class WebModule {
       // which is the whole point of it being module-wide.
       controllers: [
         WebAuthController, WebHealthController, WebCoverageController,
-        SeriesController, UniverseController,
+        SeriesController, UniverseController, LiquidationsController,
       ],
-      providers: [WebAuthService, { provide: APP_GUARD, useClass: WebAuthGuard }],
+      providers: [
+        WebAuthService,
+        LiquidationsOverviewService,
+        { provide: APP_GUARD, useClass: WebAuthGuard },
+      ],
       exports: [WebAuthService],
     };
   }

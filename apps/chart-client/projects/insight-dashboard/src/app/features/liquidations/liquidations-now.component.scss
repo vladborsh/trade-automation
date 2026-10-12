@@ -1,0 +1,102 @@
+/* Dark-terminal palette (AGENTS.md): #0d1117 bg, #30363d border, #c9d1d9 text, #8b949e muted,
+ * #26a69a / #ef5350 up/down. Card chrome matches dev-1's IB-037 cards so this sits in their grid
+ * as a sibling rather than a guest: 1px border, 12px gap, muted uppercase title. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #c9d1d9;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.window {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.label {
+  min-width: 34px;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.total {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* §12.1's escalation. `none` is deliberately the MUTED style and not the calm one: the card must
+   not let "we have no norm" look like "nothing is happening". */
+.ratio {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+
+  &[data-level='none'] { color: #8b949e; font-style: italic; }
+  &[data-level='calm'] { color: #8b949e; }
+  &[data-level='elevated'] { color: #d29922; }
+  &[data-level='extreme'] { color: #ef5350; font-weight: 600; }
+}
+
+/* One bar, longs left and shorts right, in the palette's down/up colours: a long being
+   liquidated is price falling, so the colour follows what the market did, not the noun. */
+.bar {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  background: #161b22;
+}
+
+.seg {
+  display: block;
+  height: 100%;
+
+  &.long { background: #ef5350; }
+  &.short { background: #26a69a; }
+}
+
+.amounts {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+
+  .long { color: #ef5350; }
+  .short { color: #26a69a; }
+}
+
+.leaning {
+  margin: 0;
+  font-size: 13px;
+}
+
+.basis,
+.note {
+  margin: 0;
+  color: #8b949e;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.note.warn {
+  color: #d29922;
+}

@@ -35,8 +35,13 @@ export const routes: Routes = [
     path: 'instrument/:symbol',
     loadComponent: () => import('./features/instrument/instrument.component').then((m) => m.InstrumentComponent),
   },
-  // IB-037's page is not on master yet. Until it is, a /market link lands where everything else
-  // does — it used to go to Health, which is how a shared market link opened diagnostics.
-  { path: 'market', redirectTo: LANDING_REDIRECT },
+  // IB-038's placeholder, NOT the market page. IB-037 replaces this entry with its own page and
+  // mounts the three liquidation components under its cards; dev-1 resolves the conflict in
+  // favour of their version (reports/dev-1-IB-037-038-seam.md). Until then this is the only way
+  // to reach the liquidation surfaces by clicking, which is what their acceptance needs.
+  {
+    path: 'market',
+    loadComponent: () => import('./features/liquidations/liquidations-page.component').then((m) => m.LiquidationsPageComponent),
+  },
   { path: '**', redirectTo: LANDING_REDIRECT },
 ];

@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import type {
   WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
-  WebLongShortResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation,
-  WebUniverseTopResponse,
+  WebLiquidationsOverviewResponse, WebLongShortResponse, WebStreamsResponse, WebTimeframe,
+  WebTopLiquidation, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -89,6 +89,21 @@ export class InsightApiClient {
 
   async topLiquidations(symbol: string, fromMs: number, toMs: number, n = 50): Promise<{ symbol: string; rows: WebTopLiquidation[] }> {
     return this.get('/series/liquidations/top', { symbol, from: fromMs, to: toMs, n });
+  }
+
+  // ------------------------------------------------------ IB-038, the liquidation surfaces
+
+  /**
+   * One call behind the card, the table and the feed (§12.3).
+   *
+   * No `from`/`to`: the windows are 1 h / 4 h / 24 h ending now, by definition, and letting a
+   * caller choose them would invite a card labelled «сейчас» showing last Tuesday. The server
+   * caches for 15 s, so the page may poll without multiplying the query.
+   */
+  async liquidationsOverview(feedMinUsd = 100_000, feedLimit = 30): Promise<WebLiquidationsOverviewResponse> {
+    return this.get<WebLiquidationsOverviewResponse>('/liquidations/overview', {
+      symbols: 'top20', feed_min_usd: feedMinUsd, feed_limit: feedLimit,
+    });
   }
 
   /**

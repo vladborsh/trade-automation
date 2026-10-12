@@ -1,0 +1,23 @@
+<p class="placeholder">{{ t('liq.placeholder') }}</p>
+
+@if (error(); as e) {
+  <p class="error">{{ e }}</p>
+}
+
+@if (data(); as d) {
+  <!-- The card sits in a grid because IB-037's four cards join it here; one column for now. -->
+  <div class="cards">
+    <app-liquidations-now [windows]="d.windows" [venues]="d.venues" [unmappedRows]="d.unmappedRows" />
+  </div>
+
+  <app-liquidations-where [coins]="d.perCoin" [venues]="d.venues" />
+
+  <app-liquidations-feed
+    [events]="d.feed"
+    [minUsd]="d.feedMinUsd"
+    [venues]="d.venues"
+    (minUsdChange)="onMinUsdChange($event)"
+  />
+} @else if (loading()) {
+  <p class="placeholder">{{ t('state.loading') }}</p>
+}

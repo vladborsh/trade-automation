@@ -1,0 +1,30 @@
+/* Dark-terminal palette (AGENTS.md). Deliberately thin: this page is a placeholder IB-037
+ * replaces, so anything elaborate here is work thrown away. The card grid matches dev-1's
+ * (12px gap, auto-fit columns) so the card looks the same once it moves. */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.placeholder {
+  margin: 0;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #ef5350;
+  color: #ef5350;
+  font-size: 13px;
+}

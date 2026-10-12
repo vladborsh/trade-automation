@@ -1,0 +1,41 @@
+<section class="card">
+  <h2 class="card-title">{{ t('liq.now.title') }}</h2>
+
+  @for (w of windows(); track w.window) {
+    <div class="window" [attr.data-window]="w.window">
+      <div class="head">
+        <span class="label">{{ windowLabel(w) }}</span>
+        <span class="total">{{ usd(w.total.usd) }}</span>
+        @if (ratio(w.total.ratio); as r) {
+          <span class="ratio" [attr.data-level]="escalation(w.total.ratio)">{{ r }} {{ t('liq.norm.label') }}</span>
+        } @else {
+          <!-- never a dash: an absent norm must not read as a calm one -->
+          <span class="ratio" data-level="none">{{ t('liq.norm.absent') }}</span>
+        }
+      </div>
+
+      <div class="bar" role="img" [attr.aria-label]="usd(w.long.usd) + ' / ' + usd(w.short.usd)">
+        <span class="seg long" [style.width.%]="share(w).long"></span>
+        <span class="seg short" [style.width.%]="share(w).short"></span>
+      </div>
+
+      <div class="amounts">
+        <span class="long">{{ t('liq.side.longs') }} {{ usd(w.long.usd) }}</span>
+        <span class="short">{{ t('liq.side.shorts') }} {{ usd(w.short.usd) }}</span>
+      </div>
+
+      <p class="leaning">{{ leaningLine(w) }}</p>
+      <p class="basis">{{ basis(w) }}</p>
+    </div>
+  }
+
+  @if (sources(); as s) {
+    <p class="note">{{ s }}</p>
+  }
+  @if (missing(); as m) {
+    <p class="note warn">{{ m }}</p>
+  }
+  @if (unmappedRows() > 0) {
+    <p class="note warn">{{ t('liq.unmapped', { count: unmappedRows() }) }}</p>
+  }
+</section>
