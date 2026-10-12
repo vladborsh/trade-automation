@@ -116,6 +116,58 @@ describe('the duplicate check itself', () => {
  * here; opening a new gap grows it and also fails, which is the conversation worth forcing
  * before a number is skipped on purpose.
  */
+/** Gaps below the highest present version. */
+export function gapsIn(present: readonly number[]): number[] {
+  if (present.length === 0) return [];
+  const highest = Math.max(...present);
+  const gaps: number[] = [];
+  for (let v = 1; v <= highest; v += 1) if (!present.includes(v)) gaps.push(v);
+  return gaps;
+}
+
+/**
+ * The failure message, and the reason this is a function rather than a bare `toEqual`.
+ *
+ * dev-3 found it while comparing guards: an UNREBASED branch is missing the migrations that
+ * landed on master since it forked, so those numbers read as gaps. The check fires correctly —
+ * the tree really does have a hole — but `expected [13,14,15] to equal [13,14]` sends the reader
+ * looking for a missing file when the answer is "rebase". A guard that fires for the right
+ * reason with a misleading message costs the next person twenty minutes in the wrong place, and
+ * that cost is what eventually gets guards deleted.
+ *
+ * Returns '' when the gap set is exactly the burned one.
+ */
+export function gapReport(present: readonly number[], burned: readonly number[]): string {
+  const gaps = gapsIn(present);
+  const unexpected = gaps.filter((g) => !burned.includes(g));
+  const filled = burned.filter((b) => present.includes(b));
+  if (unexpected.length === 0 && filled.length === 0) return '';
+
+  const lines: string[] = [];
+  if (filled.length > 0) {
+    lines.push(
+      `migration version(s) ${filled.join(', ')} are BURNED and must never be used: postgrator ` +
+      'applies only versions greater than the database\'s current one, so filling one is ' +
+      'silently skipped on every existing database and applied on every fresh one.',
+    );
+  }
+  if (unexpected.length > 0) {
+    const highest = Math.max(...present);
+    // The tell for an unrebased branch: the unexpected gaps run up against the top of the tree,
+    // i.e. they are the numbers that landed on master after this branch forked.
+    const contiguousWithTop = unexpected.includes(highest - 1) || unexpected.some((g) => g > Math.max(...burned));
+    lines.push(`unexpected gap(s) in the migrations directory: ${unexpected.join(', ')}`);
+    if (contiguousWithTop) {
+      lines.push(
+        'Gaps just below the highest version usually mean THIS BRANCH IS BEHIND MASTER rather ' +
+        'than that a file is missing — rebase and re-run before looking for one.',
+      );
+    }
+    lines.push('If a number was skipped deliberately, add it to BURNED with the reason.');
+  }
+  return lines.join('\n');
+}
+
 describe('burned version numbers', () => {
   const BURNED = [13, 14];
 
@@ -125,11 +177,7 @@ describe('burned version numbers', () => {
   )].sort((a, b) => a - b);
 
   it('has exactly the gaps we know about, and no others', () => {
-    const present = versions();
-    const highest = present[present.length - 1] as number;
-    const gaps: number[] = [];
-    for (let v = 1; v <= highest; v += 1) if (!present.includes(v)) gaps.push(v);
-    expect(gaps).toEqual(BURNED);
+    expect(gapReport(versions(), BURNED)).toBe('');
   });
 
   it('refuses a migration that fills a burned number', () => {
@@ -140,12 +188,45 @@ describe('burned version numbers', () => {
     }
   });
 
-  it('would catch a gap being filled', () => {
-    // The real check reads the directory; this proves the arithmetic flags it.
-    const pretend = [1, 2, 13, 15];
-    const highest = 15;
-    const gaps: number[] = [];
-    for (let v = 1; v <= highest; v += 1) if (!pretend.includes(v)) gaps.push(v);
-    expect(gaps).not.toEqual(BURNED); // 13 present, 14 still missing — no longer the known set
+  it('would catch a gap being filled, and SAYS it is burned', () => {
+    const report = gapReport([1, 2, 13, 15], BURNED);
+    expect(report).toContain('13');
+    expect(report).toContain('BURNED');
+    // The reason, not just the fact: skipped on existing databases, applied on fresh ones.
+    expect(report).toContain('silently skipped');
+  });
+
+  /**
+   * dev-3's finding, fixed here: the check reads the TREE, so a branch that has not rebased is
+   * missing whatever landed on master since it forked, and those numbers read as gaps.
+   */
+  it('tells an UNREBASED branch to rebase, instead of sending it to look for a file', () => {
+    // A branch forked before 015 landed, carrying its own 016: 15 reads as a gap.
+    const report = gapReport([...Array.from({ length: 12 }, (_, i) => i + 1), 16], BURNED);
+    expect(report).toContain('BEHIND MASTER');
+    expect(report).toContain('rebase');
+  });
+
+  it('does NOT blame a rebase when the gap is nowhere near the top', () => {
+    // A hole in the middle of a tree whose top is current is a genuinely missing file, and
+    // saying "rebase" there would be the same wrong-direction advice pointing the other way.
+    const present = [...Array.from({ length: 12 }, (_, i) => i + 1), 15, 16, 17];
+    const report = gapReport(present.filter((v) => v !== 5), BURNED);
+    expect(report).toContain('5');
+    expect(report).not.toContain('BEHIND MASTER');
+  });
+
+  it('names the deliberate-skip escape hatch, so the fix is not "delete the test"', () => {
+    expect(gapReport([1, 3], BURNED)).toContain('add it to BURNED');
+  });
+
+  it('is silent on a healthy tree', () => {
+    const healthy = [...Array.from({ length: 12 }, (_, i) => i + 1), 15];
+    expect(gapReport(healthy, BURNED)).toBe('');
+  });
+
+  it('is silent on an empty directory rather than inventing a gap', () => {
+    // Vacuous, but the anti-vacuity check above already proves the directory is found.
+    expect(gapReport([], BURNED)).toBe('');
   });
 });
