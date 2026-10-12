@@ -28,7 +28,13 @@ const fakeDb = (monthsPresent: string[] = []) => {
   const written: unknown[][] = [];
   const db: Db = {
     query: async (sql: string, params?: readonly unknown[]) => {
-      if (sql.includes("to_char(date_trunc('month'")) return monthsPresent.map((month) => ({ month })) as never;
+      // IB-042: matched on the OUTPUT format, `'YYYY-MM'`, not on the query's internals. The
+      // previous matcher looked for `to_char(date_trunc('month'`, which is the shape of the
+      // implementation rather than of the answer — so when `monthsWithRows` was rewritten this
+      // stub silently started returning "no months stored" and the runner re-downloaded a month
+      // it already had. The behaviour was unchanged; only the stub's recognition broke, and it
+      // broke in the direction that looks like a real regression. Match the contract, not the SQL.
+      if (sql.includes("'YYYY-MM'")) return monthsPresent.map((month) => ({ month })) as never;
       if (sql.includes('count(*)')) return [{ n: '0', first_row: null, last_row: null }] as never;
       if (sql.trim().toLowerCase().startsWith('insert')) written.push(params as unknown[]);
       return [] as never;

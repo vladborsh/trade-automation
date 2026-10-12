@@ -2,7 +2,7 @@ import { Controller, Get, Inject, Query } from '@nestjs/common';
 import type { WebCoverageResponse, WebCoverageRow } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
-import { monthsWithRows, seriesExtent, SERIES_TABLES } from '../db/pg/backfill-reads';
+import { monthsWithRows, seriesBounds, SERIES_TABLES } from '../db/pg/backfill-reads';
 import { gapsOverlapping, heartbeats, unmappedLiquidations } from '../db/pg/coverage-reads';
 import { collectorCoverage } from './collector-coverage';
 
@@ -40,7 +40,9 @@ export class WebCoverageController {
     for (const symbol of this.config.symbols) {
       for (const [series, table] of Object.entries(SERIES_TABLES)) {
         const filter = { venue: 'binance', symbol: symbol.binance_perp, market: table.table === 'candles_1m' ? 'perp' : undefined };
-        const extent = await seriesExtent(db, table, filter);
+        // IB-042: bounds, not the full extent — this page never read the row count, and
+        // counting is what forced a scan per series.
+        const extent = await seriesBounds(db, table, filter);
         const firstMs = extent.firstRow === null ? null : Date.parse(extent.firstRow);
         const lastMs = extent.lastRow === null ? null : Date.parse(extent.lastRow);
         rows.push({
