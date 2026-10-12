@@ -228,3 +228,85 @@ describe('a chaseable refusal becoming a permanent one', () => {
     expect(applyAmendment(published, decision, 1_760_000_100, [], 'live').complete).toBe(false);
   });
 });
+
+/**
+ * IB-048 — a value that came back from `jsonb` with its keys reordered is the SAME value.
+ *
+ * dev-1 measured the old `JSON.stringify` comparison at 954 false conflicts in one audit window,
+ * ~17,000 a day. Every fixture below reorders deliberately: one that round-trips through
+ * `JSON.stringify` identically is structurally blind to a bug about ordering, which is exactly
+ * why the existing five-iteration idempotency loop could not see this.
+ */
+describe('comparing a value that has been through jsonb', () => {
+  const frameWithComposite = (value: unknown) => ({
+    symbol: 'BTCUSDT', tf: '15m' as const, closeTime: 1_760_000_000, frameVersion: 1,
+    keys: { 'funding.extreme_hi_venues': { ok: true as const, value: value as never } },
+    basis: { venues: [], coverage: 'not_recorded' as const, coveredHours: null },
+    complete: true, incompleteReason: [] as string[], revision: 1,
+    amendedAt: null as number | null, amendedKeys: [] as string[],
+    computedMode: 'live' as const, computedAt: 1_760_000_015,
+  });
+
+  it('writes NOTHING when only the key ORDER differs — the 17,000-a-day bug', () => {
+    // Stored as {of, count} (how jsonb hands it back), recomputed as {count, of}.
+    const published = frameWithComposite({ of: 3, count: 2 });
+    const decision = decideAmendment(published, {
+      'funding.extreme_hi_venues': { ok: true, value: { count: 2, of: 3 } as never },
+    });
+    expect(decision.action).toBe('none');
+    expect(decision.conflicts).toEqual([]);
+  });
+
+  it('proves the fixture can actually disagree — stringify would have differed', () => {
+    // Without this the test above could pass for the wrong reason, i.e. because the two objects
+    // happened to serialise alike after all.
+    expect(JSON.stringify({ of: 3, count: 2 })).not.toBe(JSON.stringify({ count: 2, of: 3 }));
+  });
+
+  it('still reports a REAL change in a composite value', () => {
+    // The fix must not make the comparison blind: a different count is a genuine data defect.
+    const decision = decideAmendment(frameWithComposite({ of: 3, count: 2 }), {
+      'funding.extreme_hi_venues': { ok: true, value: { count: 1, of: 3 } as never },
+    });
+    expect(decision.conflicts).toHaveLength(1);
+  });
+
+  it('notices a missing or extra key rather than ignoring it', () => {
+    expect(decideAmendment(frameWithComposite({ of: 3, count: 2 }), {
+      'funding.extreme_hi_venues': { ok: true, value: { count: 2 } as never },
+    }).conflicts).toHaveLength(1);
+    expect(decideAmendment(frameWithComposite({ count: 2 }), {
+      'funding.extreme_hi_venues': { ok: true, value: { count: 2, of: 3 } as never },
+    }).conflicts).toHaveLength(1);
+  });
+
+  it('keeps ARRAYS order-sensitive, because jsonb preserves array order', () => {
+    // [1,2] and [2,1] are different measurements. Only object keys reorder in jsonb, so being
+    // insensitive here would hide a real change rather than reveal a false one.
+    expect(decideAmendment(frameWithComposite([1, 2]), {
+      'funding.extreme_hi_venues': { ok: true, value: [2, 1] as never },
+    }).conflicts).toHaveLength(1);
+  });
+
+  it('compares nested objects by value, not by their serialisation', () => {
+    expect(decideAmendment(frameWithComposite({ a: { x: 1, y: 2 }, b: 3 }), {
+      'funding.extreme_hi_venues': { ok: true, value: { b: 3, a: { y: 2, x: 1 } } as never },
+    }).action).toBe('none');
+  });
+
+  it('leaves plain numbers and strings behaving exactly as before', () => {
+    expect(decideAmendment(frameWithComposite(1.5), {
+      'funding.extreme_hi_venues': { ok: true, value: 1.5 as never },
+    }).action).toBe('none');
+    expect(decideAmendment(frameWithComposite(1.5), {
+      'funding.extreme_hi_venues': { ok: true, value: 1.6 as never },
+    }).conflicts).toHaveLength(1);
+  });
+
+  it('does not mint a conflict when both sides are NaN', () => {
+    // `===` says NaN !== NaN, which would make every re-check of a non-answer a fresh defect.
+    expect(decideAmendment(frameWithComposite(Number.NaN), {
+      'funding.extreme_hi_venues': { ok: true, value: Number.NaN as never },
+    }).action).toBe('none');
+  });
+});

@@ -3,7 +3,6 @@ import type { Db } from '../db/db.port';
 import { computeAll } from './compute';
 import { applyAmendment, decideAmendment } from './frame-amendment';
 import { assembleFrame } from './frame-assembly';
-import { assertFrameVersionFingerprint } from './frame-version-guard';
 import { gather, loadPassContext, type PassContext } from './gather';
 import { lookbackMs } from './required-windows';
 
@@ -56,6 +55,7 @@ export interface PassSummary {
 
 export class FeaturePassService {
   constructor(private readonly db: Db) {}
+
 
   /**
    * One symbol, one close.
@@ -151,9 +151,9 @@ export class FeaturePassService {
      */
     only: 'all' | 'awaiting-heal' = 'all',
   ): Promise<PassSummary> {
-    // Checked once per pass rather than per symbol: the fingerprint cannot change mid-pass, and
-    // thirty identical round trips to say so is thirty round trips.
-    await assertFrameVersionFingerprint(this.db);
+    // The version claim is NOT here. It lives inside `insertFrame`, the write primitive, so no
+    // caller can reach the table without it — IB-049. Asserting at this level is what let
+    // `features.cli --symbol` bypass it entirely.
 
     const symbols = only === 'all'
       ? await inputs.signalSetSymbols(this.db)

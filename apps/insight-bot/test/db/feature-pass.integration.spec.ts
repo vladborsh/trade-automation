@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { WEB_FRAME_VERSION, featureSpecFingerprint } from '@trade-automation/contracts';
 import { Client } from 'pg';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
@@ -294,6 +295,68 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
         `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, computed_mode)
          values ($1,'15m',$2,1,'{}','{}',true,'guessed')`, [SYMBOL, new Date(CLOSE + 51 * 900_000)],
       )).rejects.toThrow(/computed_mode|check constraint/i);
+    });
+  });
+
+  /**
+   * IB-049 — the version claim cannot be bypassed.
+   *
+   * The defect these exist for: `assertFrameVersionFingerprint` lived in `runPass`, and
+   * `features.cli --symbol` calls `runClose` directly, so the bulk-backfill path wrote frames
+   * and claimed nothing. `insight_dev1` reached 905 frames with an empty
+   * `feature_frame_versions` — and with no claim row the guard is silent by construction,
+   * because `checkFingerprint` returns early when there is nothing to compare against.
+   *
+   * **Every spec for the guard passed throughout**, because they all called the guarded path.
+   * These call the one that skipped it.
+   */
+  describe('the version claim is in the write primitive', () => {
+    it('runClose alone — the --symbol path — claims the version', async () => {
+      await db.query(`delete from feature_frame_versions`);
+      await seedAgg(96);
+      await service.runClose(SYMBOL, '15m', CLOSE, CLOSE + 15_000, 'live');
+
+      const rows = await db.query<{ frame_version: number; spec_fingerprint: string }>(
+        `select frame_version, spec_fingerprint from feature_frame_versions`);
+      expect(rows).toEqual([{ frame_version: WEB_FRAME_VERSION, spec_fingerprint: featureSpecFingerprint() }]);
+    });
+
+    it('a frame can never exist without a claim describing it', async () => {
+      // The property the bypass broke, asserted directly rather than via the caller that
+      // happens to be guarded today.
+      await db.query(`delete from feature_frame_versions`);
+      await seedAgg(96);
+      await service.runClose(SYMBOL, '15m', CLOSE + 30 * MIN, CLOSE + 30 * MIN + 15_000, 'live');
+
+      const [frames] = await db.query<{ n: string }>(`select count(*) as n from feature_frames`);
+      const [claims] = await db.query<{ n: string }>(`select count(*) as n from feature_frame_versions`);
+      expect(Number(frames?.n)).toBeGreaterThan(0);
+      expect(Number(claims?.n)).toBe(1);
+    });
+
+    it('REFUSES the write when a claim exists under a different fingerprint', async () => {
+      // The case the guard was built for, now reachable from the write rather than only from
+      // the pass: a later build changed the key set without bumping the version.
+      await db.query(`delete from feature_frame_versions`);
+      await db.query(
+        `insert into feature_frame_versions (frame_version, spec_fingerprint) values ($1, 'deadbeef')`,
+        [WEB_FRAME_VERSION]);
+      await seedAgg(96);
+      await expect(service.runClose(SYMBOL, '15m', CLOSE + 60 * MIN, CLOSE + 60 * MIN + 15_000, 'live'))
+        .rejects.toThrow(/spec changed under frame_version/);
+    });
+
+    it('and writes NO frame when it refuses', async () => {
+      // A refusal that still wrote the row would be the worst of both.
+      await db.query(`delete from feature_frame_versions`);
+      await db.query(`delete from feature_frames`);
+      await db.query(
+        `insert into feature_frame_versions (frame_version, spec_fingerprint) values ($1, 'deadbeef')`,
+        [WEB_FRAME_VERSION]);
+      await seedAgg(96);
+      await service.runClose(SYMBOL, '15m', CLOSE, CLOSE + 15_000, 'live').catch(() => undefined);
+      const [row] = await db.query<{ n: string }>(`select count(*) as n from feature_frames`);
+      expect(Number(row?.n)).toBe(0);
     });
   });
 });

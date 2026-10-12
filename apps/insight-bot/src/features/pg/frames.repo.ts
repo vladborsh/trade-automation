@@ -1,6 +1,7 @@
 import type { WebFeatureFrame, WebFrameBasis, WebFrameTimeframe } from '@trade-automation/contracts';
 import type { DbHandle } from '../../db/db.port';
 import type { ValueConflict } from '../frame-amendment';
+import { assertFrameVersionFingerprint } from '../frame-version-guard';
 
 /**
  * IB-015 — the `feature_frames` rows themselves: reading the published frame, appending a
@@ -126,14 +127,30 @@ export async function publishedFramesBetween(
 }
 
 /**
- * Appends a revision.
+ * Appends a revision, **claiming and verifying the frame version first**.
  *
  * `on conflict do nothing` on the full key, not `do update`: the table is append-only and a
  * revision that already exists is a re-run of the same work, not a correction. Re-running the
  * pass over a range must be safe — that is the whole point of the CLI — and the one thing it
  * must never do is rewrite a row something may already have armed on.
+ *
+ * **The version claim lives HERE, in the write primitive, so a caller cannot skip it** —
+ * IB-049. It used to sit in `FeaturePassService.runPass`, and `features.cli --symbol` calls
+ * `runClose` directly, so the bulk-backfill path wrote frames and claimed nothing:
+ * `insight_dev1` reached 905 frames with an empty `feature_frame_versions`.
+ *
+ * That is worse than having no guard. With no claim row `checkFingerprint` returns early, so
+ * the guard was silent by construction — and the first write through the claiming path would
+ * have inserted the CURRENT fingerprint and retroactively legitimised 905 frames computed
+ * under a different key set. An absent guard leaves you uncertain; one asserting something
+ * false leaves you confident and wrong.
+ *
+ * Moving the call up a level would have been the same mistake one layer out: "remember to
+ * claim before writing" is a rule, and today produced eight cases of rules losing to
+ * mechanisms. Inside the primitive, the only way to write a frame is through the check.
  */
 export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise<boolean> {
+  await assertFrameVersionFingerprint(db, frame.frameVersion);
   const rows = await db.query<{ revision: number }>(
     `insert into feature_frames
        (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason,

@@ -27,11 +27,60 @@ export type AmendmentDecision =
   /** At least one refusal became a value. Write revision n+1 naming the keys that moved. */
   | { action: 'amend'; revision: number; amendedKeys: WebFeatureKey[]; keys: Record<string, WebFeatureValue>; conflicts: ValueConflict[] };
 
-/** Two values are the same measurement, compared structurally rather than by reference. */
+/**
+ * Are these the same measurement? Compared SEMANTICALLY, not by serialisation.
+ *
+ * **It used to be `JSON.stringify(a) === JSON.stringify(b)` and that was a P1** (IB-048, found
+ * by dev-1). Postgres `jsonb` does not preserve key order, so a stored `{count, of}` comes back
+ * as `{of, count}` and stringifies differently from the freshly computed object while being the
+ * same value. Measured: **954 false conflicts in one audit window, ~17,000 a day extrapolated.**
+ *
+ * It broke both properties this module exists to provide, at once:
+ *
+ * 1. **Idempotency** — "a re-check producing identical values writes NOTHING" is the rule that
+ *    keeps append-only from becoming grows-for-ever. A false conflict is a written revision.
+ * 2. **The data-defect signal** — a changed published value is meant to be a rare, countable
+ *    finding about the collectors. 17,000 false ones a day buries every real one, which is the
+ *    same failure as a guard that cries wolf: people stop reading it.
+ *
+ * The five-iteration idempotency loop could not see it because its fixtures round-trip through
+ * `JSON.stringify` identically — a fixture that cannot reorder is structurally blind to a bug
+ * about ordering.
+ */
 function sameValue(a: WebFeatureValue, b: WebFeatureValue): boolean {
   if (a.ok !== b.ok) return false;
   if (!a.ok || !b.ok) return !a.ok && !b.ok && a.why === b.why;
-  return JSON.stringify(a.value) === JSON.stringify(b.value);
+  return deepEqual(a.value, b.value);
+}
+
+/**
+ * Order-insensitive structural equality, for values that have been through `jsonb`.
+ *
+ * Deliberately NOT "canonicalise then stringify": that would still compare two strings, and the
+ * next value shape that serialises ambiguously would reintroduce the bug somewhere else. This
+ * compares the values.
+ *
+ * Arrays stay ORDER-SENSITIVE — `[1,2]` and `[2,1]` are different measurements, and jsonb
+ * preserves array order, so there is nothing to be insensitive to. Only object keys reorder.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  // NaN is not a measurement anyone should publish, but if two of them meet they are the same
+  // non-answer; `===` says otherwise and would mint a conflict on every re-check.
+  if (typeof a === 'number' && typeof b === 'number') return Number.isNaN(a) && Number.isNaN(b);
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, i) => deepEqual(item, b[i]));
+  }
+
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  return leftKeys.every((key) =>
+    Object.prototype.hasOwnProperty.call(right, key) && deepEqual(left[key], right[key]));
 }
 
 /**

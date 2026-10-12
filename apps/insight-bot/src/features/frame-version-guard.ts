@@ -1,5 +1,5 @@
 import { WEB_FRAME_VERSION, featureSpecFingerprint } from '@trade-automation/contracts';
-import type { Db } from '../db/db.port';
+import type { DbHandle } from '../db/db.port';
 
 /**
  * IB-015 — the frame's definition cannot change without its version changing, enforced.
@@ -63,7 +63,7 @@ export function checkFingerprint(
  * winner's row and is checked against it, which is the correct outcome either way.
  */
 export async function assertFrameVersionFingerprint(
-  db: Db,
+  db: DbHandle,
   frameVersion: number = WEB_FRAME_VERSION,
   live: string = featureSpecFingerprint(),
 ): Promise<void> {
