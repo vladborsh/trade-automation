@@ -65,9 +65,16 @@ describe('the refusal vocabulary', () => {
  * `regime/` has bypassed both, and the whole point of the two-arm design — that a gate's own
  * expectancy is measurable — is gone with it.
  *
- * It passes vacuously today because `playbooks/` does not exist yet. That is deliberate: the
- * guard must be in place **before** the directory it guards, or it arrives after the first
- * import it was meant to stop.
+ * Written **before** `src/playbooks/` existed, when it passed vacuously, because a guard that
+ * arrives after the directory it guards arrives after the first import it was meant to stop.
+ * IB-017 has since landed and it now scans real files — so it also asserts that it **found** some,
+ * because a guard that silently scans an empty directory (a rename, a moved tree) proves nothing
+ * while still showing green.
+ *
+ * **Verified by planting the violation** (2026-10-12), the way dev-3 verified the migration-version
+ * guard: adding `import { evaluateRegimeGate } from '../regime/gate';` to `src/playbooks/gate.ts`
+ * failed this spec and named that file; the import was then removed. A guard nobody has watched
+ * fail is a guard nobody knows the shape of.
  */
 describe('playbooks/ must never import regime/', () => {
   const srcDir = join(process.cwd(), 'src');
@@ -87,17 +94,35 @@ describe('playbooks/ must never import regime/', () => {
     });
   };
 
-  it('holds for every file in playbooks/, including the ones not written yet', () => {
-    const offenders = filesUnder(playbooksDir).filter((file) => {
+  /** Static `from '…'`, `require('…')` and dynamic `import('…')` — all three reach the same code. */
+  const IMPORTS_REGIME = [
+    /from\s+['"][^'"]*regime[^'"]*['"]/,
+    /require\(\s*['"][^'"]*regime[^'"]*['"]/,
+    /import\(\s*['"][^'"]*regime[^'"]*['"]/,
+  ];
+
+  it('holds for every file in playbooks/, and says how many it read', () => {
+    const files = filesUnder(playbooksDir);
+    // the guard asserts it SCANNED something: a renamed or moved tree would otherwise leave this
+    // green for ever while guarding nothing, which is the failure mode of every vacuous check
+    expect(files.length).toBeGreaterThan(0);
+
+    const offenders = files.filter((file) => {
       const source = readFileSync(file, 'utf8');
-      return /from\s+['"][^'"]*regime[^'"]*['"]/.test(source) || /require\(['"][^'"]*regime/.test(source);
+      return IMPORTS_REGIME.some((pattern) => pattern.test(source));
     });
     expect(offenders).toEqual([]);
   });
 
-  it('would catch an import if one appeared — the check is not vacuous by construction', () => {
-    // proves the detector, not the tree: the same regex against a line that does import regime/
-    const line = "import { volAxis } from '../regime/axes';";
-    expect(/from\s+['"][^'"]*regime[^'"]*['"]/.test(line)).toBe(true);
+  it('catches every import form, not just the static one', () => {
+    const forms = [
+      "import { volAxis } from '../regime/axes';",
+      "const { volAxis } = require('../regime/axes');",
+      "const m = await import('../regime/axes');",
+    ];
+    for (const line of forms) {
+      expect(IMPORTS_REGIME.some((pattern) => pattern.test(line))).toBe(true);
+    }
+    expect(IMPORTS_REGIME.some((pattern) => pattern.test("import { x } from './config';"))).toBe(false);
   });
 });
