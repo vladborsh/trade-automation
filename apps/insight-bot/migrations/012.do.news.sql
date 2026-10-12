@@ -93,13 +93,18 @@ create index raw_news_title_trgm_idx on raw_news using gin (title gin_trgm_ops);
  *
  * 1. **Re-derivation becomes impossible.** Once an article is gone, no batch can rebuild the
  *    cluster it belonged to. The ability named above quietly stops existing.
- * 2. **Existing clusters are destroyed on the spot.** `news_clusters.first_news_id` references
- *    `raw_news (id)` **on delete cascade**, so deleting a cluster's REPRESENTATIVE deletes the
- *    cluster row — which cascades again to `news_cluster_members`. A cluster whose first telling is
- *    old but whose other members are recent loses its identity and its `confirmations`, and those
- *    surviving members are left orphaned: still in `raw_news`, in no cluster, and never re-clustered
- *    because they are not new. `news_assets` and `news_reactions` cascade away with their article
- *    too, taking the AI-1 calibration evidence with them.
+ * 2. **Deleting a representative is REFUSED, by the schema.** `news_clusters.first_news_id` is
+ *    `on delete restrict`. It was `cascade`, which meant deleting a cluster's representative
+ *    deleted the cluster row and cascaded again to `news_cluster_members` — a cluster whose first
+ *    telling is old but whose other members are recent lost its identity and its `confirmations`,
+ *    and the survivors were stranded: still in `raw_news`, in no cluster, and never re-clustered
+ *    because they are not new. A comment asking people not to do that is prose they may not read;
+ *    RESTRICT fails the delete at the moment it is attempted and forces the choice. If it blocks a
+ *    single-article delete you actually want, that is correct — re-point or drop the cluster first.
+ *
+ *    Note that `news_assets` and `news_reactions` still cascade with their article, deliberately:
+ *    they are *about* that article and mean nothing without it, unlike a cluster, which is about a
+ *    story and outlives any one telling of it.
  *
  * None of these tables is partitioned (unlike `candles_1m` and friends), so retention here would be
  * a `DELETE`, not a partition drop — there is no cheap "drop the old month" and no version of it
@@ -118,7 +123,12 @@ create index raw_news_title_trgm_idx on raw_news using gin (title gin_trgm_ops);
  */
 create table news_clusters (
   id            bigserial primary key,
-  first_news_id text not null references raw_news (id) on delete cascade,
+  -- RESTRICT, not CASCADE: see the retention warning above. Deleting a cluster's representative
+  -- would delete the cluster and its memberships, stranding articles that still exist. This turns
+  -- that into a loud failure at the moment it is attempted, so whoever wrote the delete must pick
+  -- a non-destructive option instead of discovering the loss later. A legitimate single-article
+  -- delete is still possible — re-point or remove the cluster first, deliberately.
+  first_news_id text not null references raw_news (id) on delete restrict,
   confirmations int not null default 1,     -- distinct sources carrying this story
   of_sources    int not null default 0,     -- sources being polled when it was last updated
   created_at    timestamptz not null default now(),

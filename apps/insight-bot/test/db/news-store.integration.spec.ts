@@ -200,11 +200,11 @@ maybeDescribe('IB-027 news store against a real database', () => {
     expect(Number(n)).toBe(2);
   });
 
-  it('deleting a representative DESTROYS its cluster and orphans the survivors (retention warning)', async () => {
-    // Not a feature — evidence for the warning in migration 012. A retention policy that deletes
-    // old raw_news rows does not merely prevent re-deriving clusters: first_news_id cascades, so
-    // the cluster row goes with its representative and takes every membership with it, leaving
-    // recent articles stranded in no cluster and never re-clustered because they are not new.
+  it('REFUSES to delete a representative, rather than destroying the cluster (IB-027 retention)', async () => {
+    // first_news_id is ON DELETE RESTRICT. It used to be CASCADE, which meant a retention DELETE of
+    // old articles silently took the cluster row and every membership with it, stranding recent
+    // articles in no cluster that would never be re-clustered because they are not new. A comment
+    // asking people not to do that is prose; this fails at the attempt.
     const rep = item('sec', 'https://sec.gov/rep', 'Commission adopts new disclosure rule', T0 + 900_000);
     const member = item('coindesk', 'https://coindesk.com/rep-follow', 'Commission adopts new disclosure rules', T0 + 960_000);
     await ingest([rep]);
@@ -216,22 +216,20 @@ maybeDescribe('IB-027 news store against a real database', () => {
     );
     expect(Number(before.confirmations)).toBe(2);
 
-    await db.query(`delete from raw_news where id = $1`, [rep.id]);
+    await expect(db.query(`delete from raw_news where id = $1`, [rep.id])).rejects.toThrow(/foreign key|violates/i);
 
-    // the cluster is gone, not merely re-pointed
-    const clusters = await db.query<{ n: string }>(
-      `select count(*) n from news_clusters where first_news_id = $1`, [rep.id],
-    );
-    expect(Number(clusters[0].n)).toBe(0);
+    // nothing moved: the article, the cluster and both memberships are all still there
+    expect(Number((await db.query<{ n: string }>(`select count(*) n from raw_news where id = $1`, [rep.id]))[0].n)).toBe(1);
+    expect(Number((await db.query<{ n: string }>(`select count(*) n from news_clusters where first_news_id = $1`, [rep.id]))[0].n)).toBe(1);
+    expect(Number((await db.query<{ n: string }>(`select count(*) n from news_cluster_members where news_id = $1`, [member.id]))[0].n)).toBe(1);
+  });
 
-    // and the surviving member still exists but belongs to nothing
-    const [survivor] = await db.query<{ n: string }>(
-      `select count(*) n from raw_news where id = $1`, [member.id],
-    );
-    expect(Number(survivor.n)).toBe(1);
-    const [membership] = await db.query<{ n: string }>(
-      `select count(*) n from news_cluster_members where news_id = $1`, [member.id],
-    );
-    expect(Number(membership.n)).toBe(0);
+  it('a deliberate single-article delete is still possible once the cluster is dealt with', async () => {
+    // RESTRICT must not make cleanup impossible, only deliberate: drop the cluster first, then the
+    // article. If this stopped working, the guard would have become an obstruction.
+    const rep = newsId('sec', 'https://sec.gov/rep');
+    await db.query(`delete from news_clusters where first_news_id = $1`, [rep]);
+    await db.query(`delete from raw_news where id = $1`, [rep]);
+    expect(Number((await db.query<{ n: string }>(`select count(*) n from raw_news where id = $1`, [rep]))[0].n)).toBe(0);
   });
 });
