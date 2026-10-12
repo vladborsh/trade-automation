@@ -83,6 +83,33 @@ create index raw_news_title_trgm_idx on raw_news using gin (title gin_trgm_ops);
  * from `raw_news` in `published_at` order as a batch, not to tighten the live path — that is a
  * deliberate decision not taken here, because live polling has no ordering to preserve.
  *
+ * ---
+ *
+ * **READ THIS BEFORE WRITING ANY RETENTION POLICY FOR `raw_news`.**
+ *
+ * The line above makes `raw_news` the system of record for clustering: clusters are derived data
+ * and the articles are the only thing they can be derived FROM. Deleting old articles to save
+ * space therefore costs more than the rows deleted, in two ways, and the second is immediate:
+ *
+ * 1. **Re-derivation becomes impossible.** Once an article is gone, no batch can rebuild the
+ *    cluster it belonged to. The ability named above quietly stops existing.
+ * 2. **Existing clusters are destroyed on the spot.** `news_clusters.first_news_id` references
+ *    `raw_news (id)` **on delete cascade**, so deleting a cluster's REPRESENTATIVE deletes the
+ *    cluster row — which cascades again to `news_cluster_members`. A cluster whose first telling is
+ *    old but whose other members are recent loses its identity and its `confirmations`, and those
+ *    surviving members are left orphaned: still in `raw_news`, in no cluster, and never re-clustered
+ *    because they are not new. `news_assets` and `news_reactions` cascade away with their article
+ *    too, taking the AI-1 calibration evidence with them.
+ *
+ * None of these tables is partitioned (unlike `candles_1m` and friends), so retention here would be
+ * a `DELETE`, not a partition drop — there is no cheap "drop the old month" and no version of it
+ * that avoids the cascades above.
+ *
+ * If space genuinely becomes the problem, the options that do not destroy the record are: drop
+ * `body` while keeping the row, or archive whole articles out to S3 before deleting. Deleting
+ * `raw_news` rows in place is not a space optimisation, it is a decision to lose the news history
+ * and every cluster that touches it. Bring it to the Tech Lead.
+ *
  * **`confirmations` counts DISTINCT SOURCES, not member rows**, and `of_sources` carries what it is
  * counted out of. One chatty outlet publishing an RSS copy and an API copy is two members and one
  * confirmation; counting rows would make it look like corroboration, which is a venue count without

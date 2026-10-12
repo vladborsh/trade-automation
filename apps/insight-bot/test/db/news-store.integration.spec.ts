@@ -199,4 +199,39 @@ maybeDescribe('IB-027 news store against a real database', () => {
     // a and b are one story; c is another. Chaining through b would make this 1.
     expect(Number(n)).toBe(2);
   });
+
+  it('deleting a representative DESTROYS its cluster and orphans the survivors (retention warning)', async () => {
+    // Not a feature — evidence for the warning in migration 012. A retention policy that deletes
+    // old raw_news rows does not merely prevent re-deriving clusters: first_news_id cascades, so
+    // the cluster row goes with its representative and takes every membership with it, leaving
+    // recent articles stranded in no cluster and never re-clustered because they are not new.
+    const rep = item('sec', 'https://sec.gov/rep', 'Commission adopts new disclosure rule', T0 + 900_000);
+    const member = item('coindesk', 'https://coindesk.com/rep-follow', 'Commission adopts new disclosure rules', T0 + 960_000);
+    await ingest([rep]);
+    await ingest([member]);
+
+    const [before] = await db.query<{ confirmations: number }>(
+      `select c.confirmations from news_clusters c join news_cluster_members m on m.cluster_id = c.id
+        where m.news_id = $1`, [member.id],
+    );
+    expect(Number(before.confirmations)).toBe(2);
+
+    await db.query(`delete from raw_news where id = $1`, [rep.id]);
+
+    // the cluster is gone, not merely re-pointed
+    const clusters = await db.query<{ n: string }>(
+      `select count(*) n from news_clusters where first_news_id = $1`, [rep.id],
+    );
+    expect(Number(clusters[0].n)).toBe(0);
+
+    // and the surviving member still exists but belongs to nothing
+    const [survivor] = await db.query<{ n: string }>(
+      `select count(*) n from raw_news where id = $1`, [member.id],
+    );
+    expect(Number(survivor.n)).toBe(1);
+    const [membership] = await db.query<{ n: string }>(
+      `select count(*) n from news_cluster_members where news_id = $1`, [member.id],
+    );
+    expect(Number(membership.n)).toBe(0);
+  });
 });
