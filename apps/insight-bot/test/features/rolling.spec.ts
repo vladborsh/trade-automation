@@ -1,4 +1,4 @@
-import { log1pZScore, meanAndSd, percentileOf } from '../../src/features/math/rolling';
+import { isMeaningfulSpread, log1pZScore, meanAndSd, percentileOf } from '../../src/features/math/rolling';
 
 /**
  * IB-015 §8.2 — the two rolling statistics. The cases that matter are the refusals: a percentile
@@ -60,6 +60,31 @@ describe('log1pZScore', () => {
     // mistake as IB-038's median-of-zero: a missing measurement is not an average one.
     expect(log1pZScore([5, 5, 5, 5], 5, 1)).toBeNull();
     expect(log1pZScore([0, 0, 0, 0], 100, 1)).toBeNull();
+  });
+
+  it('REFUSES A LONG FLAT SAMPLE, where the sd is floating-point residue rather than spread', () => {
+    // The case that broke the first implementation, which tested `sd === 0`. 400 identical
+    // values of log1p(100) give a mean differing from each of them in the last bits and an sd of
+    // 2.8e-14 — residue, not spread — so the exact-equality guard let it through and the z-score
+    // came out at 1.4e14. A confidently absurd number is worse than a refusal.
+    const flat = Array.from({ length: 400 }, () => 100);
+    expect(log1pZScore(flat, 5000, 10)).toBeNull();
+  });
+
+  it('still measures a genuinely small but real spread', () => {
+    // The guard must not swallow a quiet market: these differ in the sixth significant figure
+    // and that is a real, if small, distribution.
+    const nearlyFlat = Array.from({ length: 400 }, (_, i) => 100 + i * 1e-3);
+    expect(log1pZScore(nearlyFlat, 5000, 10)).not.toBeNull();
+  });
+});
+
+describe('isMeaningfulSpread', () => {
+  it('rejects residue and accepts real spread, scaled to the data', () => {
+    expect(isMeaningfulSpread(2.8e-14, 4.6)).toBe(false);
+    expect(isMeaningfulSpread(0, 4.6)).toBe(false);
+    expect(isMeaningfulSpread(Number.NaN, 4.6)).toBe(false);
+    expect(isMeaningfulSpread(0.001, 4.6)).toBe(true);
   });
 
   it('a genuinely average window scores 0, and that IS a measurement', () => {

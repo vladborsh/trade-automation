@@ -31,6 +31,19 @@ export function percentileOf(
   return atOrBelow / sample.length;
 }
 
+/**
+ * Is this standard deviation real spread, or floating-point residue?
+ *
+ * Scaled to the magnitude of the data rather than an absolute epsilon, because the sample here
+ * is `log1p` of USD sums and its scale varies with the symbol. `1e-9` of the mean is far below
+ * any spread a real tape produces and far above the ~1e-14 residue a flat sample leaves.
+ */
+export function isMeaningfulSpread(sd: number, mean: number): boolean {
+  if (!Number.isFinite(sd) || sd <= 0) return false;
+  const scale = Math.max(Math.abs(mean), 1);
+  return sd > scale * 1e-9;
+}
+
 /** Population mean and standard deviation, the convention already used in `bollinger.ts`. */
 export function meanAndSd(sample: readonly number[]): { mean: number; sd: number } {
   const n = sample.length;
@@ -55,9 +68,17 @@ export function meanAndSd(sample: readonly number[]): { mean: number; sd: number
  *
  * - **under `minSamples`** — §8.2 says `null` until 14 days of liquidation history exist, and
  *   the caller converts that to a sample count;
- * - **`sd === 0`** — every window in the sample held the same amount, so "how unusual is this"
- *   has no denominator. Reporting 0 would say "exactly normal" about a measurement that does not
- *   exist, which is the same mistake as IB-038's median-of-zero.
+ * - **a standard deviation that is not meaningfully positive** — every window in the sample held
+ *   the same amount, so "how unusual is this" has no denominator. Reporting 0 would say "exactly
+ *   normal" about a measurement that does not exist, which is the same mistake as IB-038's
+ *   median-of-zero.
+ *
+ *   **Not `sd === 0`.** That was the first implementation and it is exact equality on a float,
+ *   which a computed sd almost never satisfies: 400 identical values of `log1p(100)` give a
+ *   mean that differs from each of them in the last bits, and an sd of **2.8e-14** — residue,
+ *   not spread. Dividing by it produced a z-score of **1.4e14** for a perfectly flat history,
+ *   which is exactly the confidently-absurd number this module exists to refuse. Caught by the
+ *   spec below, which uses a flat sample on purpose.
  */
 export function log1pZScore(
   sample: readonly number[],
@@ -67,6 +88,6 @@ export function log1pZScore(
   if (sample.length < minSamples) return null;
   const transformed = sample.map((x) => Math.log1p(x));
   const { mean, sd } = meanAndSd(transformed);
-  if (sd === 0) return null;
+  if (!isMeaningfulSpread(sd, mean)) return null;
   return (Math.log1p(value) - mean) / sd;
 }
