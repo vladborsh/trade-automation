@@ -43,6 +43,23 @@ export const WEB_LIQUIDATION_NORM_DAYS = 30;
 export const WEB_LIQUIDATION_MIN_HISTORY_DAYS = 7;
 
 /**
+ * A median below this is dust, not a norm, and the ratio refuses.
+ *
+ * IB-015 swept for guards that compare a float to an exact value after one was found producing a
+ * z-score of 1.4e14. This one — `median === 0` — is **not** that bug: a median of exact zeros is
+ * exactly zero, so the guard holds. It is exposed to the neighbouring one, a legitimately TINY
+ * median: measured on `insight_dev2` on 2026-10-12, the smallest non-zero hourly liquidation sum
+ * is **$0.18**, and a $500k hour against a $0.18 norm renders as «×2 700 000 от нормы» on the
+ * card a member reads.
+ *
+ * Not currently reachable — every coin's hourly median on that tape is exactly 0, measured, so
+ * the existing guard catches all of them — but it costs one comparison to close, and the card is
+ * user-facing. A judgement rather than a measurement: $1 sits above the $0.18 floor and well
+ * below the $5.44 first percentile of non-zero hours.
+ */
+export const WEB_LIQUIDATION_MIN_NORM_USD = 1;
+
+/**
  * What a «× от нормы» was measured against. Sent with every ratio, including a null one.
  *
  * **`windowsObserved` is the honest denominator, not `periodDays`.** A ws collector that was down

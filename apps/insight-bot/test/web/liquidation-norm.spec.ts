@@ -1,3 +1,4 @@
+import { WEB_LIQUIDATION_MIN_NORM_USD } from '@trade-automation/contracts';
 import { median, normBasis, normPeriodStart, sideStats, unavailableReason } from '../../src/web/liquidations/norm';
 
 /**
@@ -69,6 +70,49 @@ describe('sideStats', () => {
     expect(stats.ratio).toBeNull();
     expect(stats.median).toBe(0);
     expect(Number.isFinite(stats.usd)).toBe(true);
+  });
+
+  /**
+   * IB-046 — the floor is a JUDGEMENT, and these specs pin it to the reasoning that produced it
+   * rather than to its current value.
+   *
+   * The two numbers below are not illustrative. They are the measurement that justified the
+   * constant, taken on `insight_dev2` on 2026-10-12 over every non-zero hourly liquidation sum:
+   * $0.1848 is the smallest one in the table, and $5.44 is the first percentile. The floor was
+   * chosen to sit between them — above the dust, below anything a real tape routinely produces.
+   *
+   * So the bracket is asserted directly. Tune the constant below $0.18 and the dust case starts
+   * dividing again; tune it above $5.44 and genuinely quiet coins lose a ratio they should have.
+   * Either way a spec fails and names what the number was FOR, which a bare constant cannot do.
+   */
+  describe('the dust floor, pinned to the measurement that justified it', () => {
+    const SMALLEST_NON_ZERO_HOUR_USD = 0.1848; // measured, insight_dev2, 2026-10-12
+    const FIRST_PERCENTILE_HOUR_USD = 5.44; //    measured, same query
+
+    it('sits between the measured floor and the measured first percentile', () => {
+      expect(WEB_LIQUIDATION_MIN_NORM_USD).toBeGreaterThan(SMALLEST_NON_ZERO_HOUR_USD);
+      expect(WEB_LIQUIDATION_MIN_NORM_USD).toBeLessThan(FIRST_PERCENTILE_HOUR_USD);
+    });
+
+    it('REFUSES a median at the measured dust floor', () => {
+      // $500k against $0.18 would render as «×2 700 000 от нормы» on the card a member reads.
+      const dust = Array.from({ length: 10 }, () => SMALLEST_NON_ZERO_HOUR_USD);
+      const stats = sideStats({ trailing: 500_000, alignedSums: dust, periodDays: 30 });
+      expect(stats.ratio).toBeNull();
+      expect(stats.median).toBeCloseTo(SMALLEST_NON_ZERO_HOUR_USD, 10); // still reported
+    });
+
+    it('still DIVIDES by a median at the measured first percentile', () => {
+      const quiet = Array.from({ length: 10 }, () => FIRST_PERCENTILE_HOUR_USD);
+      const stats = sideStats({ trailing: FIRST_PERCENTILE_HOUR_USD * 3, alignedSums: quiet, periodDays: 30 });
+      expect(stats.ratio).toBeCloseTo(3, 10);
+    });
+
+    it('a median of exactly zero still refuses, which is the case the OLD guard covered', () => {
+      // Kept explicitly: the fix must not regress what `median === 0` already got right.
+      const stats = sideStats({ trailing: 500_000, alignedSums: [0, 0, 0, 0], periodDays: 30 });
+      expect(stats.ratio).toBeNull();
+    });
   });
 
   it('a quiet trailing window against a real norm is 0, which IS a measurement', () => {

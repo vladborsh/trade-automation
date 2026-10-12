@@ -1,5 +1,5 @@
 import {
-  WEB_LIQUIDATION_MIN_HISTORY_DAYS, WEB_LIQUIDATION_NORM_DAYS,
+  WEB_LIQUIDATION_MIN_HISTORY_DAYS, WEB_LIQUIDATION_MIN_NORM_USD, WEB_LIQUIDATION_NORM_DAYS,
   type WebLiquidationNormBasis, type WebLiquidationSideStats,
 } from '@trade-automation/contracts';
 
@@ -84,7 +84,12 @@ export function sideStats(input: NormInput): WebLiquidationSideStats {
     return { usd: trailing, median: null, ratio: null };
   }
   const m = median(alignedSums);
-  if (m === null || m === 0) return { usd: trailing, median: m ?? 0, ratio: null };
+  // Below a dollar the median is dust rather than a norm, and dividing by it produces a multiple
+  // in the millions on a card a member reads. `< MIN_NORM_USD` rather than `=== 0`: an exact
+  // comparison catches the all-zero case and nothing near it (IB-015's sweep).
+  if (m === null || m < WEB_LIQUIDATION_MIN_NORM_USD) {
+    return { usd: trailing, median: m ?? 0, ratio: null };
+  }
   return { usd: trailing, median: m, ratio: trailing / m };
 }
 
