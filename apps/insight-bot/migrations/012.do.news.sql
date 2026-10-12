@@ -62,6 +62,27 @@ create index raw_news_title_trgm_idx on raw_news using gin (title gin_trgm_ops);
  * within the threshold of one fixed title — at the cost of occasionally splitting a story whose
  * wording drifted, which is the failure that stays visible.
  *
+ * **Consequence: cluster identity depends on ARRIVAL order, and a replay is NOT expected to
+ * reproduce it.** Because the representative is whichever telling was ingested first, the property
+ * is precisely:
+ *
+ *   - *within one pass* — deterministic: items are ordered by `published_at` before planning, so
+ *     the earliest telling founds the cluster (ties keep input order, which is source order);
+ *   - *across passes* — the representative is the first INGESTED, not the earliest PUBLISHED. A
+ *     story whose earliest telling arrives in a later poll joins the existing cluster instead of
+ *     founding one, and cannot retroactively become the representative.
+ *
+ * So a backfill that reads the same sources in one pass will systematically differ from what live
+ * polling built: same `raw_news`, different cluster composition. The divergence is systematic, not
+ * random, which makes it easy to mistake for a change in the news rather than in the order.
+ *
+ * **What is reproducible:** `raw_news` — `id` is `<source>:<url_hash>` over a normalised URL, so
+ * the same inputs always produce the same rows. **What is not:** `news_clusters` and
+ * `news_cluster_members`. Do not compare cluster composition between two runs and read a
+ * difference as signal. If reproducible clusters are ever needed, the answer is to re-derive them
+ * from `raw_news` in `published_at` order as a batch, not to tighten the live path — that is a
+ * deliberate decision not taken here, because live polling has no ordering to preserve.
+ *
  * **`confirmations` counts DISTINCT SOURCES, not member rows**, and `of_sources` carries what it is
  * counted out of. One chatty outlet publishing an RSS copy and an API copy is two members and one
  * confirmation; counting rows would make it look like corroboration, which is a venue count without

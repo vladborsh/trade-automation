@@ -180,3 +180,43 @@ describe('a bridging item must not chain two unrelated stories (IB-027 Q1)', () 
     expect(plan.inserts[1].similarity).toBeCloseTo(titleSimilarity(A, B), 5);
   });
 });
+
+describe('cluster identity depends on ARRIVAL order — known, not assumed away', () => {
+  const EARLY = 'Exchange suspends withdrawals after security incident';
+  const LATE = 'Exchange suspends withdrawals following security incident';
+
+  it('within one pass it is deterministic: the earliest PUBLISHED founds the cluster', () => {
+    const early = item('theblock', 'https://theblock.co/e', EARLY, T0);
+    const late = item('decrypt', 'https://decrypt.co/l', LATE, T0 + 300_000);
+
+    // fed both ways round; the plan is identical because the pass sorts by published_at
+    const forwards = planIngest({ items: [early, late], known: nothingKnown, recent: [] });
+    const backwards = planIngest({ items: [late, early], known: nothingKnown, recent: [] });
+
+    expect(forwards.inserts.map((i) => i.item.id)).toEqual([early.id, late.id]);
+    expect(backwards.inserts.map((i) => i.item.id)).toEqual([early.id, late.id]);
+    expect(forwards.inserts[0].joins).toBeNull();
+    expect(backwards.inserts[0].joins).toBeNull();
+  });
+
+  it('across passes it is NOT: the first INGESTED represents, even if published later', () => {
+    // live polling order. The later-published telling arrives first and founds the cluster; the
+    // earlier-published one then JOINS and can never retroactively become the representative.
+    const early = item('theblock', 'https://theblock.co/e', EARLY, T0);
+    const late = item('decrypt', 'https://decrypt.co/l', LATE, T0 + 300_000);
+
+    const pass1 = planIngest({ items: [late], known: nothingKnown, recent: [] });
+    expect(pass1.inserts[0].joins).toBeNull(); // `late` is the representative
+
+    const representatives = [{ id: late.id, title: late.title, publishedAt: late.publishedAt }];
+    const pass2 = planIngest({ items: [early], known: nothingKnown, recent: representatives });
+    expect(pass2.inserts[0].joins?.id).toBe(late.id);
+
+    // ...whereas a one-pass replay of the same two items makes `early` the representative. Same
+    // inputs, different cluster composition — systematically, not randomly. This is why a replay
+    // is documented as NOT reproducing clusters.
+    const replay = planIngest({ items: [early, late], known: nothingKnown, recent: [] });
+    expect(replay.inserts[0].item.id).toBe(early.id);
+    expect(replay.inserts[0].joins).toBeNull();
+  });
+});
