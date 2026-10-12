@@ -16,7 +16,7 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('7a4a2a87');
+    expect(featureSpecFingerprint()).toBe('14f15ddd');
     // Still 1, and that is a decision with an expiry date rather than an oversight. IB-016 added
     // px.close, ema.4h.50 and ema.1d.200 on 2026-10-12, when NOTHING had ever been persisted
     // under version 1 — so no stored frame means something different from a new one and there is
@@ -99,7 +99,7 @@ describe('the key set is pinned', () => {
   });
 
   it('carries every §8.2 group', () => {
-    expect(WEB_FEATURE_KEYS).toHaveLength(45);
+    expect(WEB_FEATURE_KEYS).toHaveLength(47);
     for (const prefix of ['funding.', 'oi.', 'ls.', 'cvd.', 'atr.', 'structure.', 'liq.', 'px.', 'ema.', 'label.']) {
       expect(WEB_FEATURE_KEYS.some((k) => k.startsWith(prefix))).toBe(true);
     }
@@ -221,6 +221,46 @@ describe('the frame row', () => {
  * IB-016 — the three keys dev-1 specified for `regime`'s trend axis, asserted here because the
  * registry is the contract between us: dev-1 reads these and does not own them.
  */
+/**
+ * IB-018 — the frame bar's high and low. The assertions are almost entirely about the `def`,
+ * because the implementation is a two-line reduction and the DERIVATION is the thing that gets
+ * lost.
+ */
+describe('px.high and px.low', () => {
+  it('reads the same input group as px.close but declares a different aggregation', () => {
+    // Same group, different derivation. That is exactly the pair someone collapses.
+    expect(WEB_FEATURE_SPEC['px.high'].inputs).toEqual(['agg:15m']);
+    expect(WEB_FEATURE_SPEC['px.high'].params).toEqual({ source: 'high', barTf: '15m', aggregation: 'max' });
+    expect(WEB_FEATURE_SPEC['px.low'].params).toEqual({ source: 'low', barTf: '15m', aggregation: 'min' });
+    expect(WEB_FEATURE_SPEC['px.close'].params).not.toHaveProperty('aggregation');
+  });
+
+  it('does NOT reuse px.close\'s wording, which would be wrong on a 4h frame', () => {
+    // px.close can say "the 15m bar whose close coincides with the 4h close" because a 4h close
+    // IS that bar's close. A 4h high is the max over sixteen bars. Borrow the phrasing and the
+    // next reader simplifies it to the final bar's high, and P3's stop quietly moves.
+    expect(WEB_FEATURE_SPEC['px.high'].def).toContain('MAXIMUM');
+    expect(WEB_FEATURE_SPEC['px.low'].def).toContain('MINIMUM');
+    expect(WEB_FEATURE_SPEC['px.high'].def).toContain('sixteen');
+    expect(WEB_FEATURE_SPEC['px.high'].def).not.toContain('coincides with the 4h close');
+  });
+
+  it('warns in the def against the simplification itself', () => {
+    // Not only what it IS, but what it is not: the def names the wrong answer so a reader who
+    // arrives with it already in mind is contradicted rather than merely uninformed.
+    expect(WEB_FEATURE_SPEC['px.high'].def).toContain('not the final 15m bar high');
+  });
+
+  it('puts the aggregation inside the fingerprint', () => {
+    const before = featureSpecFingerprint();
+    const swapped = {
+      ...WEB_FEATURE_SPEC,
+      'px.high': { ...WEB_FEATURE_SPEC['px.high'], params: { source: 'high', barTf: '15m', aggregation: 'last' } },
+    };
+    expect(featureSpecFingerprint(swapped)).not.toBe(before);
+  });
+});
+
 describe('the IB-016 trend keys', () => {
   it('carries the EMA length, bar timeframe and SEED as parameters', () => {
     // `seed` is meaning, not implementation. An EMA seeded with the first close and one seeded
@@ -349,6 +389,6 @@ describe('computedMode', () => {
     // The fingerprint is over the key registry. Adding a field that describes how a frame was
     // produced says nothing about what any key MEANS, so stored frames stay comparable and the
     // version does not bump.
-    expect(featureSpecFingerprint()).toBe('7a4a2a87');
+    expect(featureSpecFingerprint()).toBe('14f15ddd');
   });
 });

@@ -313,6 +313,16 @@ export const WEB_FEATURE_SPEC = {
   // ema.4h.50, which refuses on short agg:4h buckets; a key reading px.close ALONE on a 4h
   // frame would not have that protection.
   'px.close': { inputs: ['agg:15m'], type: 'number', window: 'frame bar', params: { source: 'close', barTf: '15m' }, def: 'close of the bar the frame is stamped by: for a 15m frame its own 15m bar, for a 4h frame the 15m bar whose close coincides with the 4h close (the one opening 3h45m into it)' },
+  // IB-018: the frame bar's high and low, for P3's stop, both trigger forms and T1.
+  //
+  // **The `def` deliberately does NOT reuse px.close's wording, and the difference is not
+  // pedantry.** px.close can honestly say "the 15m bar whose close coincides with the 4h close"
+  // because a 4h close IS its last 15m close — one bar, same number. A 4h HIGH is the maximum
+  // over the sixteen 15m bars of that window, which is a different derivation from the same
+  // input group. Borrow the close's phrasing and the next reader simplifies it to the final
+  // bar's high; P3's stop is `cascade low − 0.1·ATR`, so the stop then quietly moves.
+  'px.high': { inputs: ['agg:15m'], type: 'number', window: 'frame bar', params: { source: 'high', barTf: '15m', aggregation: 'max' }, def: 'high of the bar the frame is stamped by: for a 15m frame its own bar high, and for a 4h frame the MAXIMUM high across the sixteen 15m bars of that 4h window — not the final 15m bar high, which coincides with the 4h value only for the close' },
+  'px.low': { inputs: ['agg:15m'], type: 'number', window: 'frame bar', params: { source: 'low', barTf: '15m', aggregation: 'min' }, def: 'low of the bar the frame is stamped by: for a 15m frame its own bar low, and for a 4h frame the MINIMUM low across the sixteen 15m bars of that 4h window — not the final 15m bar low, which coincides with the 4h value only for the close' },
   // ---- trend (IB-016). `seed` is in params because it is MEANING: an EMA seeded with the first
   // close and one seeded with the SMA of the first `length` closes disagree for roughly `length`
   // bars and then converge, so two readers of "EMA200" get different numbers for 200 days and

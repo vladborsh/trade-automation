@@ -20,6 +20,16 @@ export interface PriceInput {
   close4hAgo: number | null;
   /** Highest high over the trailing 24 h, or null when nothing is stored. */
   high24h: number | null;
+  /**
+   * The FRAME BAR's own high and low — IB-018, for P3's stop, both trigger forms and T1.
+   *
+   * Not the last 15m bar's high and low on a 4h frame. A 4h close coincides with its final 15m
+   * close, so `close` can be read off one bar; a 4h high is the maximum across the sixteen 15m
+   * bars of the window and a 4h low the minimum. The caller does that reduction, because it is
+   * the caller that knows which bars compose the frame.
+   */
+  barHigh: number | null;
+  barLow: number | null;
 }
 
 function ret(now: number, before: number | null): WebFeatureValue {
@@ -36,6 +46,11 @@ export function priceFeatures(input: PriceInput): Partial<Record<WebFeatureKey, 
   // history — if the frame bar has no close, the bar is not there at all.
   out['px.close'] = input.close === null ? { ok: false, why: 'no_data' } : { ok: true, value: input.close };
   const close = input.close;
+
+  // IB-018. `no_data` for the same reason as px.close: if the frame bar has no high, the bar is
+  // not there at all — this is never a question about history.
+  out['px.high'] = input.barHigh === null ? no('no_data') : ok(input.barHigh);
+  out['px.low'] = input.barLow === null ? no('no_data') : ok(input.barLow);
 
   out['px.ret_24h'] = close === null ? no('no_data') : ret(close, input.close24hAgo);
   out['px.ret_4h'] = close === null ? no('no_data') : ret(close, input.close4hAgo);

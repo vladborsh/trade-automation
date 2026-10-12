@@ -66,6 +66,31 @@ export interface Gathered {
   basis: WebFrameBasis;
 }
 
+/**
+ * The frame bar's high and low, reduced over the 15m bars that compose it.
+ *
+ * A 4h frame's bar is the sixteen 15m bars of `[close - 4h, close)`; a 15m frame's is the single
+ * bar closing at `close`. Returns nulls when none of those bars is stored, rather than reaching
+ * for the nearest one — an extreme taken from an arbitrary neighbouring bar is a stop in the
+ * wrong place, which is worse than no stop at all.
+ */
+export function frameBarExtremes(
+  bars15m: ReadonlyArray<{ openTimeSec: number; high: number; low: number }>,
+  tf: WebFrameTimeframe,
+  closeMs: number,
+): { barHigh: number | null; barLow: number | null } {
+  const spanMs = tf === '4h' ? 4 * HOUR : 15 * MINUTE;
+  const inBar = bars15m.filter((b) => {
+    const openMs = b.openTimeSec * 1000;
+    return openMs >= closeMs - spanMs && openMs < closeMs;
+  });
+  if (inBar.length === 0) return { barHigh: null, barLow: null };
+  return {
+    barHigh: Math.max(...inBar.map((b) => b.high)),
+    barLow: Math.min(...inBar.map((b) => b.low)),
+  };
+}
+
 /** A 15m agg row as the pivot maths wants it — the open carried through so a swing has a time. */
 const toPivotBar = (b: { openTimeSec: number; high: number; low: number }) =>
   ({ time: b.openTimeSec * 1000, high: b.high, low: b.low });
@@ -313,6 +338,13 @@ export async function gather(
     closeMs,
     price: {
       close: lastClose,
+      // IB-018: the FRAME BAR's extremes, reduced over the bars that compose it.
+      //
+      // For a 15m frame that is one bar; for a 4h frame it is the max/min across the sixteen
+      // 15m bars of the window, which is a different derivation from the same input group than
+      // the close. Taking the last bar's high on a 4h frame would understate the cascade and
+      // move P3's stop, which is `cascade low - 0.1 x ATR`.
+      ...frameBarExtremes(bars15m, tf, closeMs),
       close24hAgo: closeOf(closeMs - 24 * HOUR),
       close4hAgo: closeOf(closeMs - 4 * HOUR),
       high24h: highs24h.length > 0 ? Math.max(...highs24h) : null,
