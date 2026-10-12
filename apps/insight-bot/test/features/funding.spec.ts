@@ -78,6 +78,40 @@ describe('the extreme-venue counts carry their denominator', () => {
     expect(val(f['funding.extreme_hi_venues']) as WebFeatureCount).toEqual({ count: 1, of: 2 });
   });
 
+  it('§8.2 thresholds are INCLUSIVE: exactly on the boundary counts', () => {
+    // 81 of 90 settlements at or below the last one is a percentile of exactly 0.90, and the
+    // rate is exactly +0.0003 — both halves of the condition sit on their boundary. §8.2 says
+    // ">= 0.90" and ">= +0.0003", so this venue counts. A `>` would silently drop it and no
+    // parameter or definition would reveal the change; this and the golden are what catch it.
+    const onBoundary = [
+      ...Array.from({ length: 80 }, () => -0.001),
+      ...Array.from({ length: 9 }, () => 0.001),
+      FUNDING_EXTREME.hiRate,
+    ];
+    const f = fundingFeatures(input({ settled: { binance: onBoundary } }));
+    expect(val(f['funding.binance.pct30d'])).toBeCloseTo(FUNDING_EXTREME.hiPercentile, 10);
+    expect(val(f['funding.extreme_hi_venues']) as WebFeatureCount).toEqual({ count: 1, of: 1 });
+  });
+
+  it('the lo threshold is inclusive too, at exactly -0.0003 and percentile 0.10', () => {
+    const onBoundary = [
+      ...Array.from({ length: 81 }, () => 0.001),  // above
+      ...Array.from({ length: 8 }, () => -0.002),  // below
+      FUNDING_EXTREME.loRate,                      // 9 of 90 are <= it -> pct 0.10
+    ];
+    const f = fundingFeatures(input({ settled: { okx: onBoundary } }));
+    expect(val(f['funding.okx.pct30d'])).toBeCloseTo(FUNDING_EXTREME.loPercentile, 10);
+    expect(val(f['funding.extreme_lo_venues']) as WebFeatureCount).toEqual({ count: 1, of: 1 });
+  });
+
+  it('reads its constants from the contract registry, not from its own literals', () => {
+    // One copy of each meaning-defining number, and it is the copy inside the fingerprint.
+    expect(FUNDING_EXTREME.window).toBe(90);
+    expect(FUNDING_EXTREME.minPeriods).toBe(45);
+    expect(FUNDING_EXTREME.hiPercentile).toBe(0.9);
+    expect(FUNDING_EXTREME.hiRate).toBe(0.0003);
+  });
+
   it('REFUSES rather than reporting "0 of 0" when nothing could be assessed', () => {
     // A ratio with an empty denominator reads as calm and measures nothing — the same defect as
     // the 0-of-0 basis line on the coverage page.

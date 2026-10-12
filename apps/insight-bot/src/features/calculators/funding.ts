@@ -1,4 +1,4 @@
-import type { WebFeatureKey, WebFeatureValue } from '@trade-automation/contracts';
+import { featureParamNumber, type WebFeatureKey, type WebFeatureValue } from '@trade-automation/contracts';
 import { percentileOf } from '../math/rolling';
 
 /**
@@ -13,15 +13,23 @@ import { percentileOf } from '../math/rolling';
  * `no_data`, never a rate of zero.
  */
 
-/** §8.2's funding-family thresholds. Fixed here with the key set; a change is a new version. */
+/**
+ * §8.2's funding-family constants, **read from the contract registry rather than restated here**.
+ *
+ * They used to be literals in this file while the registry carried the same numbers as prose.
+ * That is two declarations of one fact, and the fingerprint watched neither: changing the window
+ * from 90 settlements to 60 would have moved the number a reader acts on while the registry,
+ * `featureSpecFingerprint()` and every spec stayed green (Tech Lead, 2026-10-12). Now the
+ * registry is the only copy, it is inside the fingerprint, and this module cannot disagree with
+ * the contract because it has nothing of its own to disagree with.
+ */
 export const FUNDING_EXTREME = {
-  hiPercentile: 0.9,
-  hiRate: 0.0003,
-  loPercentile: 0.1,
-  loRate: -0.0003,
-  /** §8.2: the venue's last 90 settlements, `min_periods` 45. */
-  window: 90,
-  minPeriods: 45,
+  hiPercentile: featureParamNumber('funding.extreme_hi_venues', 'percentile'),
+  hiRate: featureParamNumber('funding.extreme_hi_venues', 'rate'),
+  loPercentile: featureParamNumber('funding.extreme_lo_venues', 'percentile'),
+  loRate: featureParamNumber('funding.extreme_lo_venues', 'rate'),
+  window: featureParamNumber('funding.binance.pct30d', 'settlements'),
+  minPeriods: featureParamNumber('funding.binance.pct30d', 'minPeriods'),
 } as const;
 
 export const FUNDING_VENUES = ['binance', 'bybit', 'okx'] as const;

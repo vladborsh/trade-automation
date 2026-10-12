@@ -1,0 +1,48 @@
+{
+  "frameVersion": 1,
+  "specFingerprint": "27e2e004",
+  "keys": {
+    "funding.binance.rate": {
+      "ok": true,
+      "value": 0.0012
+    },
+    "funding.binance.pct30d": {
+      "ok": true,
+      "value": 1
+    },
+    "funding.bybit.rate": {
+      "ok": true,
+      "value": 0.002
+    },
+    "funding.bybit.pct30d": {
+      "ok": false,
+      "why": "insufficient_history"
+    },
+    "funding.okx.rate": {
+      "ok": true,
+      "value": 0.0003
+    },
+    "funding.okx.pct30d": {
+      "ok": true,
+      "value": 0.9
+    },
+    "funding.extreme_hi_venues": {
+      "ok": true,
+      "value": {
+        "count": 2,
+        "of": 2
+      }
+    },
+    "funding.extreme_lo_venues": {
+      "ok": true,
+      "value": {
+        "count": 0,
+        "of": 2
+      }
+    },
+    "funding.predicted.binance": {
+      "ok": true,
+      "value": -0.000018
+    }
+  }
+}

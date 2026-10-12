@@ -14,8 +14,49 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('3efcf553');
+    expect(featureSpecFingerprint()).toBe('27e2e004');
     expect(WEB_FRAME_VERSION).toBe(1);
+  });
+
+  it('CHANGING A WINDOW MOVES THE FINGERPRINT, not just a comment', () => {
+    // The gap this closes: a fingerprint over names and types stays green while a percentile
+    // window goes 90 -> 60 or an ATR period 14 -> 20. Asserted by actually perturbing a param
+    // rather than trusting that it is included.
+    const base = featureSpecFingerprint();
+    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, {
+      type: string; window: string; params: Record<string, string | number>; def: string;
+    }>;
+
+    clone['funding.binance.pct30d'].params.settlements = 60;
+    expect(featureSpecFingerprint(clone)).not.toBe(base);
+
+    const clone2 = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as typeof clone;
+    clone2['atr.4h.14'].params.period = 20;
+    expect(featureSpecFingerprint(clone2)).not.toBe(base);
+
+    // and the venue-set rule behind `of`, which is a rule rather than a number
+    const clone3 = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as typeof clone;
+    clone3['funding.extreme_hi_venues'].params.denominator = 'venues_configured';
+    expect(featureSpecFingerprint(clone3)).not.toBe(base);
+  });
+
+  it('is not moved by the ORDER params happen to be written in', () => {
+    // Otherwise a harmless reformat would demand a version bump and the rule would be ignored.
+    const reordered = Object.fromEntries(Object.entries(
+      JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, { params: Record<string, unknown> }>,
+    ).map(([key, entry]) => [key, {
+      ...entry,
+      params: Object.fromEntries(Object.entries(entry.params).reverse()),
+    }])) as never;
+    expect(featureSpecFingerprint(reordered)).toBe(featureSpecFingerprint());
+  });
+
+  it('every meaning-defining constant lives in params, so none can change silently', () => {
+    // Spot-check the ones a calculator would otherwise be tempted to hard-code.
+    expect(WEB_FEATURE_SPEC['funding.binance.pct30d'].params).toMatchObject({ settlements: 90, minPeriods: 45 });
+    expect(WEB_FEATURE_SPEC['atr.1h.14'].params).toMatchObject({ period: 14, smoothing: 'wilder' });
+    expect(WEB_FEATURE_SPEC['liq.long.z60m'].params).toMatchObject({ lookbackDays: 30, minHistoryDays: 14, transform: 'log1p' });
+    expect(WEB_FEATURE_SPEC['structure.failed_highs_24h'].params).toMatchObject({ atrMultiple: 0.5, atrTf: '1h' });
   });
 
   it('carries every §8.2 group', () => {
@@ -35,9 +76,11 @@ describe('the key set is pinned', () => {
     }
   });
 
-  it('says WILDER in the ATR definitions, because the obvious reuse is the wrong statistic', () => {
+  it('says wilder in the ATR params, because the obvious reuse is the wrong statistic', () => {
+    // In params rather than prose: libs/indicators' computeAtr is the arithmetic mean of true
+    // range, and switching to it would otherwise change three keys without moving the hash.
     for (const key of ['atr.1h.14', 'atr.4h.14', 'atr.1d.14'] as const) {
-      expect(WEB_FEATURE_SPEC[key].def).toContain('WILDER');
+      expect(WEB_FEATURE_SPEC[key].params.smoothing).toBe('wilder');
     }
   });
 });
