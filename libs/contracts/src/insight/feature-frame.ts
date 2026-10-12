@@ -170,59 +170,59 @@ export const WEB_FRAME_VERSION = 1;
  */
 export const WEB_FEATURE_SPEC = {
   // ---- funding
-  'funding.binance.rate': { type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on binance' },
-  'funding.bybit.rate': { type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on bybit' },
-  'funding.okx.rate': { type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on okx' },
+  'funding.binance.rate': { inputs: ['funding'], type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on binance' },
+  'funding.bybit.rate': { inputs: ['funding'], type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on bybit' },
+  'funding.okx.rate': { inputs: ['funding'], type: 'number', window: 'last settlement', params: {}, def: 'last settled funding rate on okx' },
   // The name says 30d; the window is 90 SETTLEMENTS (§8.2). Those are the same thing only while a
   // settlement is 8 hours, which is a venue convention and not an invariant — so the interval is
   // measured and the key refuses with convention_changed when it has moved. See `settlementHours`.
-  'funding.binance.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
-  'funding.bybit.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
-  'funding.okx.pct30d': { type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
-  'funding.extreme_hi_venues': { type: 'count', window: 'per venue', params: { percentile: 0.9, rate: 0.0003, denominator: 'venues_assessable' }, def: 'venues at or above the percentile AND at or above the rate, of the venues that could be assessed' },
-  'funding.extreme_lo_venues': { type: 'count', window: 'per venue', params: { percentile: 0.1, rate: -0.0003, denominator: 'venues_assessable' }, def: 'venues at or below the percentile AND at or below the rate, of the venues that could be assessed' },
-  'funding.predicted.binance': { type: 'number', window: 'latest', params: {}, def: 'last predicted_funding_rate on binance' },
+  'funding.binance.pct30d': { inputs: ['funding'], type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
+  'funding.bybit.pct30d': { inputs: ['funding'], type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
+  'funding.okx.pct30d': { inputs: ['funding'], type: 'number', window: 'last N settlements', params: { settlements: 90, minPeriods: 45, settlementHours: 8, intervalTolerance: 0.25 }, def: 'percentile of the last settled rate among the venue last N settlements; the 30d in the key name is an equivalence that holds only at the stated settlement interval, which is asserted' },
+  'funding.extreme_hi_venues': { inputs: ['funding'], type: 'count', window: 'per venue', params: { percentile: 0.9, rate: 0.0003, denominator: 'venues_assessable' }, def: 'venues at or above the percentile AND at or above the rate, of the venues that could be assessed' },
+  'funding.extreme_lo_venues': { inputs: ['funding'], type: 'count', window: 'per venue', params: { percentile: 0.1, rate: -0.0003, denominator: 'venues_assessable' }, def: 'venues at or below the percentile AND at or below the rate, of the venues that could be assessed' },
+  'funding.predicted.binance': { inputs: ['funding'], type: 'number', window: 'latest', params: {}, def: 'last predicted_funding_rate on binance' },
   // ---- open interest
-  'oi.binance.now': { type: 'number', window: 'at frame close', params: {}, def: 'binance open interest, base units, at the frame close' },
-  'oi.d24h_pct': { type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'percent change of open interest over the window' },
-  'oi.d4h_pct': { type: 'number', window: 'rolling hours', params: { hours: 4 }, def: 'percent change of open interest over the window' },
-  'oi.at_7d_high': { type: 'boolean', window: 'rolling days', params: { days: 7 }, def: 'open interest now is at or above its maximum over the window' },
+  'oi.binance.now': { inputs: ['oi'], type: 'number', window: 'at frame close', params: {}, def: 'binance open interest, base units, at the frame close' },
+  'oi.d24h_pct': { inputs: ['oi'], type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'percent change of open interest over the window' },
+  'oi.d4h_pct': { inputs: ['oi'], type: 'number', window: 'rolling hours', params: { hours: 4 }, def: 'percent change of open interest over the window' },
+  'oi.at_7d_high': { inputs: ['oi'], type: 'boolean', window: 'rolling days', params: { days: 7 }, def: 'open interest now is at or above its maximum over the window' },
   // ---- long/short
-  'ls.top_position': { type: 'number', window: 'latest 5m', params: {}, def: 'latest top-position long/short ratio' },
-  'ls.global_account': { type: 'number', window: 'latest 5m', params: {}, def: 'latest global-account long/short ratio' },
-  'ls.taker': { type: 'number', window: 'latest 5m', params: {}, def: 'latest taker long/short ratio' },
-  'ls.top_position.pct30d': { type: 'number', window: 'rolling days', params: { days: 30, minPeriods: 45 }, def: 'percentile of the latest top-position ratio over the window' },
-  'ls.global_account.pct30d': { type: 'number', window: 'rolling days', params: { days: 30, minPeriods: 45 }, def: 'percentile of the latest global-account ratio over the window' },
-  'ls.taker.pct30d': { type: 'number', window: 'rolling days', params: { days: 30, minPeriods: 45 }, def: 'percentile of the latest taker ratio over the window' },
+  'ls.top_position': { inputs: ['ls'], type: 'number', window: 'latest 5m', params: {}, def: 'latest top-position long/short ratio' },
+  'ls.global_account': { inputs: ['ls'], type: 'number', window: 'latest 5m', params: {}, def: 'latest global-account long/short ratio' },
+  'ls.taker': { inputs: ['ls'], type: 'number', window: 'latest 5m', params: {}, def: 'latest taker long/short ratio' },
+  'ls.top_position.pct30d': { inputs: ['ls'], type: 'number', window: 'rolling days', params: { days: 30, minPeriods: 45 }, def: 'percentile of the latest top-position ratio over the window' },
+  'ls.global_account.pct30d': { inputs: ['ls'], type: 'number', window: 'rolling days', params: { days: 30, minPeriods: 45 }, def: 'percentile of the latest global-account ratio over the window' },
+  'ls.taker.pct30d': { inputs: ['ls'], type: 'number', window: 'rolling days', params: { days: 30, minPeriods: 45 }, def: 'percentile of the latest taker ratio over the window' },
   // ---- CVD
-  'cvd.spot.4h': { type: 'number', window: 'rolling hours', params: { hours: 4, market: 'spot' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
-  'cvd.spot.24h': { type: 'number', window: 'rolling hours', params: { hours: 24, market: 'spot' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
-  'cvd.perp.4h': { type: 'number', window: 'rolling hours', params: { hours: 4, market: 'perp' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
-  'cvd.perp.24h': { type: 'number', window: 'rolling hours', params: { hours: 24, market: 'perp' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
-  'cvd.spot.slope_4h': { type: 'number', window: 'window vs previous window', params: { hours: 4, previousHours: 4, market: 'spot' }, def: 'sign of the change in window CVD against the previous window' },
-  'cvd.perp.slope_4h': { type: 'number', window: 'window vs previous window', params: { hours: 4, previousHours: 4, market: 'perp' }, def: 'sign of the change in window CVD against the previous window' },
+  'cvd.spot.4h': { inputs: ['candles1m:spot'], type: 'number', window: 'rolling hours', params: { hours: 4, market: 'spot' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
+  'cvd.spot.24h': { inputs: ['candles1m:spot'], type: 'number', window: 'rolling hours', params: { hours: 24, market: 'spot' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
+  'cvd.perp.4h': { inputs: ['candles1m:perp'], type: 'number', window: 'rolling hours', params: { hours: 4, market: 'perp' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
+  'cvd.perp.24h': { inputs: ['candles1m:perp'], type: 'number', window: 'rolling hours', params: { hours: 24, market: 'perp' }, def: 'sum of (2*takerBuyVolume - volume) over the window of 1m bars, base units' },
+  'cvd.spot.slope_4h': { inputs: ['candles1m:spot'], type: 'number', window: 'window vs previous window', params: { hours: 4, previousHours: 4, market: 'spot' }, def: 'sign of the change in window CVD against the previous window' },
+  'cvd.perp.slope_4h': { inputs: ['candles1m:perp'], type: 'number', window: 'window vs previous window', params: { hours: 4, previousHours: 4, market: 'perp' }, def: 'sign of the change in window CVD against the previous window' },
   // ---- volatility
-  'atr.1h.14': { type: 'number', window: 'N bars', params: { period: 14, barTf: '1h', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
-  'atr.4h.14': { type: 'number', window: 'N bars', params: { period: 14, barTf: '4h', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
-  'atr.1d.14': { type: 'number', window: 'N bars', params: { period: 14, barTf: '1d', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
+  'atr.1h.14': { inputs: ['agg:1h'], type: 'number', window: 'N bars', params: { period: 14, barTf: '1h', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
+  'atr.4h.14': { inputs: ['agg:4h'], type: 'number', window: 'N bars', params: { period: 14, barTf: '4h', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
+  'atr.1d.14': { inputs: ['agg:1d'], type: 'number', window: 'N bars', params: { period: 14, barTf: '1d', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
   // ---- structure
-  'structure.swing_high_12h': { type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'highest pivot high over the window' },
-  'structure.swing_low_12h': { type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'lowest pivot low over the window' },
-  'structure.failed_highs_24h': { type: 'number', window: 'rolling hours', params: { hours: 24, atrMultiple: 0.5, atrTf: '1h', pivotBars: 3 }, def: 'pivots within the ATR multiple below the window high that did not close above it' },
-  'structure.impulse_low_15m': { type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'low of the last impulse leg: the last swing low before the current high' },
+  'structure.swing_high_12h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'highest pivot high over the window' },
+  'structure.swing_low_12h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'lowest pivot low over the window' },
+  'structure.failed_highs_24h': { inputs: ['agg:15m', 'agg:1h'], type: 'number', window: 'rolling hours', params: { hours: 24, atrMultiple: 0.5, atrTf: '1h', pivotBars: 3 }, def: 'pivots within the ATR multiple below the window high that did not close above it' },
+  'structure.impulse_low_15m': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'low of the last impulse leg: the last swing low before the current high' },
   // ---- liquidations
-  'liq.long.15m': { type: 'number', window: 'rolling minutes', params: { minutes: 15, side: 'long' }, def: 'sum of notional liquidated on the side over the window' },
-  'liq.long.60m': { type: 'number', window: 'rolling minutes', params: { minutes: 60, side: 'long' }, def: 'sum of notional liquidated on the side over the window' },
-  'liq.short.15m': { type: 'number', window: 'rolling minutes', params: { minutes: 15, side: 'short' }, def: 'sum of notional liquidated on the side over the window' },
-  'liq.short.60m': { type: 'number', window: 'rolling minutes', params: { minutes: 60, side: 'short' }, def: 'sum of notional liquidated on the side over the window' },
-  'liq.long.z60m': { type: 'number', window: 'window sums over a lookback', params: { windowMinutes: 60, lookbackDays: 30, minHistoryDays: 14, transform: 'log1p', side: 'long' }, def: 'z-score of the window sum against the symbol own trailing window sums, transformed as the transform parameter states' },
-  'liq.short.z60m': { type: 'number', window: 'window sums over a lookback', params: { windowMinutes: 60, lookbackDays: 30, minHistoryDays: 14, transform: 'log1p', side: 'short' }, def: 'z-score of the window sum against the symbol own trailing window sums, transformed as the transform parameter states' },
+  'liq.long.15m': { inputs: ['liq'], type: 'number', window: 'rolling minutes', params: { minutes: 15, side: 'long' }, def: 'sum of notional liquidated on the side over the window' },
+  'liq.long.60m': { inputs: ['liq'], type: 'number', window: 'rolling minutes', params: { minutes: 60, side: 'long' }, def: 'sum of notional liquidated on the side over the window' },
+  'liq.short.15m': { inputs: ['liq'], type: 'number', window: 'rolling minutes', params: { minutes: 15, side: 'short' }, def: 'sum of notional liquidated on the side over the window' },
+  'liq.short.60m': { inputs: ['liq'], type: 'number', window: 'rolling minutes', params: { minutes: 60, side: 'short' }, def: 'sum of notional liquidated on the side over the window' },
+  'liq.long.z60m': { inputs: ['liq'], type: 'number', window: 'window sums over a lookback', params: { windowMinutes: 60, lookbackDays: 30, minHistoryDays: 14, transform: 'log1p', side: 'long' }, def: 'z-score of the window sum against the symbol own trailing window sums, transformed as the transform parameter states' },
+  'liq.short.z60m': { inputs: ['liq'], type: 'number', window: 'window sums over a lookback', params: { windowMinutes: 60, lookbackDays: 30, minHistoryDays: 14, transform: 'log1p', side: 'short' }, def: 'z-score of the window sum against the symbol own trailing window sums, transformed as the transform parameter states' },
   // ---- price context
-  'px.ret_24h': { type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'return over the window' },
-  'px.ret_4h': { type: 'number', window: 'rolling hours', params: { hours: 4 }, def: 'return over the window' },
-  'px.drawdown_from_24h_high': { type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'drawdown from the window high' },
+  'px.ret_24h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'return over the window' },
+  'px.ret_4h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours', params: { hours: 4 }, def: 'return over the window' },
+  'px.drawdown_from_24h_high': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'drawdown from the window high' },
   // ---- label
-  'label.p4': { type: 'enum', window: 'frame', params: { source: 'design 9.2' }, values: ['SPOT_LED', 'PERP_LED', 'ABSORPTION', 'DISTRIBUTION', 'NONE'], def: 'P4 label from the design section named in params' },
+  'label.p4': { inputs: ['agg:15m', 'candles1m:perp', 'candles1m:spot'], type: 'enum', window: 'frame', params: { source: 'design 9.2' }, values: ['SPOT_LED', 'PERP_LED', 'ABSORPTION', 'DISTRIBUTION', 'NONE'], def: 'P4 label from the design section named in params' },
 } as const;
 
 export type WebFeatureKey = keyof typeof WEB_FEATURE_SPEC;
@@ -230,6 +230,16 @@ export const WEB_FEATURE_KEYS = Object.keys(WEB_FEATURE_SPEC) as WebFeatureKey[]
 
 /** The shape of one registry entry. `params` is where MEANING lives, in numbers. */
 export interface WebFeatureSpecEntry {
+  /**
+   * The input groups this key is computed from. **This is what the refusal path reads**: when a
+   * `candles_agg` bucket inside a window is not `complete = true`, every key naming that group
+   * refuses with `incomplete_input` and the rest of the frame is still written.
+   *
+   * It is in the fingerprint because it is meaning: a key that quietly starts reading 1h bars
+   * instead of 15m ones is a different key, and it would also start surviving a different set of
+   * incomplete buckets.
+   */
+  inputs: readonly string[];
   type: string;
   window: string;
   /**
@@ -267,7 +277,10 @@ export function featureSpecFingerprint(
       .sort()
       .map((name) => `${name}=${String(entry.params[name])}`)
       .join(',');
-    return [key, entry.type, entry.window, params, entry.def, (entry.values ?? []).join('|')].join('\u0000');
+    return [
+      key, entry.inputs.join('+'), entry.type, entry.window, params, entry.def,
+      (entry.values ?? []).join('|'),
+    ].join('\u0000');
   }).join('\n');
   // FNV-1a, 32-bit: no crypto dependency in a contracts package, and collisions are not a
   // security property here — the spec compares this to a committed literal.

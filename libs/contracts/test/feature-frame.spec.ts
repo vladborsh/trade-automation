@@ -1,6 +1,7 @@
 import {
   WEB_FEATURE_KEYS, WEB_FEATURE_SPEC, WEB_FRAME_VERSION, WebFeatureFrameSchema,
   WebFeatureValueSchema, canArm, featureOr, featureSpecFingerprint, requireFeature,
+  type WebFeatureSpecEntry,
 } from '../src/insight/feature-frame';
 
 /**
@@ -14,7 +15,7 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('7560290d');
+    expect(featureSpecFingerprint()).toBe('18fc2286');
     expect(WEB_FRAME_VERSION).toBe(1);
   });
 
@@ -23,21 +24,34 @@ describe('the key set is pinned', () => {
     // window goes 90 -> 60 or an ATR period 14 -> 20. Asserted by actually perturbing a param
     // rather than trusting that it is included.
     const base = featureSpecFingerprint();
-    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, {
-      type: string; window: string; params: Record<string, string | number>; def: string;
-    }>;
+    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, WebFeatureSpecEntry>;
 
-    clone['funding.binance.pct30d'].params.settlements = 60;
-    expect(featureSpecFingerprint(clone)).not.toBe(base);
+    /** A clone with one param replaced — the registry is deeply readonly, as it should be. */
+    const withParam = (key: string, name: string, value: string | number) => {
+      const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, WebFeatureSpecEntry>;
+      clone[key] = { ...clone[key], params: { ...clone[key].params, [name]: value } };
+      return clone;
+    };
 
-    const clone2 = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as typeof clone;
-    clone2['atr.4h.14'].params.period = 20;
-    expect(featureSpecFingerprint(clone2)).not.toBe(base);
+    expect(featureSpecFingerprint(withParam('funding.binance.pct30d', 'settlements', 60))).not.toBe(base);
+    expect(featureSpecFingerprint(withParam('atr.4h.14', 'period', 20))).not.toBe(base);
+    // and the venue-set rule behind the denominator, which is a rule rather than a number
+    expect(featureSpecFingerprint(withParam('funding.extreme_hi_venues', 'denominator', 'venues_configured'))).not.toBe(base);
+  });
 
-    // and the venue-set rule behind `of`, which is a rule rather than a number
-    const clone3 = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as typeof clone;
-    clone3['funding.extreme_hi_venues'].params.denominator = 'venues_configured';
-    expect(featureSpecFingerprint(clone3)).not.toBe(base);
+  it('INCLUDES `inputs`, because which bars a key reads is what it means', () => {
+    // And it decides which incomplete bucket poisons the key, so a silent change here would
+    // change both the number and which shortfalls it survives.
+    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, WebFeatureSpecEntry>;
+    clone['atr.4h.14'] = { ...clone['atr.4h.14'], inputs: ['agg:1h'] };
+    expect(featureSpecFingerprint(clone)).not.toBe(featureSpecFingerprint());
+  });
+
+  it('declares an input group for every key, so none is silently unblockable', () => {
+    // A key with no inputs could never be refused for incompleteness, whatever was short.
+    for (const key of WEB_FEATURE_KEYS) {
+      expect(WEB_FEATURE_SPEC[key].inputs.length).toBeGreaterThan(0);
+    }
   });
 
   it('INCLUDES `def`, so a change of meaning in prose still moves the hash', () => {
@@ -45,9 +59,9 @@ describe('the key set is pinned', () => {
     // one-line note saying the meaning did not change. The alternative is worse — a calculator
     // going from "percentile of the last rate" to "percentile of the mean of the last three"
     // with params untouched would otherwise pass silently.
-    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, { def: string }>;
-    clone['funding.binance.rate'].def = 'something else entirely';
-    expect(featureSpecFingerprint(clone as never)).not.toBe(featureSpecFingerprint());
+    const clone = JSON.parse(JSON.stringify(WEB_FEATURE_SPEC)) as Record<string, WebFeatureSpecEntry>;
+    clone['funding.binance.rate'] = { ...clone['funding.binance.rate'], def: 'something else entirely' };
+    expect(featureSpecFingerprint(clone)).not.toBe(featureSpecFingerprint());
   });
 
   it('is not moved by the ORDER params happen to be written in', () => {
