@@ -35,10 +35,22 @@ export async function knownNews(
   return out;
 }
 
-/** Recent items, any source, that a new one may cluster with. */
+/**
+ * Cluster **representatives** in the window — each cluster's founding item, never every stored
+ * item.
+ *
+ * Returning every item would make a cluster the transitive closure of pairwise similarity: A~B,
+ * B~C, and A and C unrelated merges two stories, and once merged the evidence that they were
+ * separate is exactly what got absorbed. Representatives bound the cluster by construction —
+ * every member is within the threshold of one fixed title.
+ */
 export async function recentForClustering(db: Db, since: Date): Promise<ClusterCandidate[]> {
   const rows = await db.query<{ id: string; title: string; published_at: Date }>(
-    `select id, title, published_at from raw_news where published_at >= $1 order by published_at`,
+    `select n.id, n.title, n.published_at
+       from news_clusters c
+       join raw_news n on n.id = c.first_news_id
+      where n.published_at >= $1
+      order by n.published_at`,
     [since],
   );
   return rows.map((r) => ({ id: r.id, title: r.title, publishedAt: new Date(r.published_at) }));
@@ -61,7 +73,7 @@ export interface PersistResult {
  * processes polling the same source concurrently would otherwise race, and the unique index on
  * `(source, url_hash)` would abort the transaction and lose the whole pass rather than one row.
  */
-export async function persistPlan(db: Db, plan: IngestPlan): Promise<PersistResult> {
+export async function persistPlan(db: Db, plan: IngestPlan, ofSources: number): Promise<PersistResult> {
   const result: PersistResult = { inserted: 0, clustersCreated: 0, clustersJoined: 0 };
   if (plan.inserts.length === 0) return result;
 
@@ -88,6 +100,7 @@ export async function persistPlan(db: Db, plan: IngestPlan): Promise<PersistResu
            on conflict do nothing`,
           [cluster.id, item.id],
         );
+        await recount(tx, cluster.id, ofSources);
         result.clustersCreated += 1;
         continue;
       }
@@ -110,13 +123,14 @@ export async function persistPlan(db: Db, plan: IngestPlan): Promise<PersistResu
            on conflict do nothing`,
           [cluster.id, planned.joins.id],
         );
+        await recount(tx, cluster.id, ofSources);
         result.clustersCreated += 1;
-        await joinCluster(tx, cluster.id, item.id, planned.similarity);
+        await joinCluster(tx, cluster.id, item.id, planned.similarity, ofSources);
         result.clustersJoined += 1;
         continue;
       }
 
-      await joinCluster(tx, member.cluster_id, item.id, planned.similarity);
+      await joinCluster(tx, member.cluster_id, item.id, planned.similarity, ofSources);
       result.clustersJoined += 1;
     }
   });
@@ -129,19 +143,40 @@ async function joinCluster(
   clusterId: string,
   newsId: string,
   similarity: number,
+  ofSources: number,
 ): Promise<void> {
   await tx.query(
     `insert into news_cluster_members (cluster_id, news_id, similarity) values ($1, $2, $3)
      on conflict do nothing`,
     [clusterId, newsId, similarity],
   );
-  // confirmations counts members, so it is recomputed rather than incremented: an increment drifts
-  // the moment a membership insert is skipped by the conflict clause above.
+  await recount(tx, clusterId, ofSources);
+}
+
+/**
+ * Recomputes `confirmations` as **distinct sources**, and records what it is counted out of.
+ *
+ * Counting member ROWS would let one chatty outlet publishing an RSS copy and an API copy of the
+ * same announcement look like two independent confirmations — corroboration manufactured out of a
+ * single voice, which is a venue count without its denominator. Exchange announcement feeds are
+ * the obvious trap: the same text reaches us through an official RSS and an API, and those are one
+ * source.
+ *
+ * Recomputed, never incremented: the membership insert above carries `on conflict do nothing` for
+ * concurrent writers, and an increment drifts from the rows the moment that clause skips one. A
+ * recomputed count is definitionally equal to the thing it counts.
+ */
+async function recount(tx: { query: Db['query'] }, clusterId: string, ofSources: number): Promise<void> {
   await tx.query(
     `update news_clusters
-        set confirmations = (select count(*) from news_cluster_members m where m.cluster_id = $1),
+        set confirmations = (
+              select count(distinct n.source)
+                from news_cluster_members m
+                join raw_news n on n.id = m.news_id
+               where m.cluster_id = $1),
+            of_sources = $2,
             updated_at = now()
       where id = $1`,
-    [clusterId],
+    [clusterId, ofSources],
   );
 }

@@ -54,11 +54,25 @@ create index raw_news_title_trgm_idx on raw_news using gin (title gin_trgm_ops);
 /*
  * Near-duplicate clustering: the same story from several outlets inside 24 h. `confirmations` is
  * how many sources carried it, which is the signal — one outlet is a report, five is an event.
+ *
+ * **A member must match the cluster's REPRESENTATIVE** (`first_news_id`'s title), not merely some
+ * existing member. Matching any member makes a cluster the transitive closure of pairwise
+ * similarity: A~B, B~C, and A and C unrelated collapses two stories into one blob, and once merged
+ * nothing records that it was wrong. The representative rule bounds the cluster — every member is
+ * within the threshold of one fixed title — at the cost of occasionally splitting a story whose
+ * wording drifted, which is the failure that stays visible.
+ *
+ * **`confirmations` counts DISTINCT SOURCES, not member rows**, and `of_sources` carries what it is
+ * counted out of. One chatty outlet publishing an RSS copy and an API copy is two members and one
+ * confirmation; counting rows would make it look like corroboration, which is a venue count without
+ * its denominator. Both are recomputed from the rows on every write, never incremented: an
+ * incremented counter drifts from the thing it counts the moment a write is skipped.
  */
 create table news_clusters (
   id            bigserial primary key,
   first_news_id text not null references raw_news (id) on delete cascade,
-  confirmations int not null default 1,
+  confirmations int not null default 1,     -- distinct sources carrying this story
+  of_sources    int not null default 0,     -- sources being polled when it was last updated
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );

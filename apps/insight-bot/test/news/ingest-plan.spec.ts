@@ -1,3 +1,4 @@
+import { titleSimilarity } from '../../src/news/cluster';
 import { planIngest, type KnownNews } from '../../src/news/ingest-plan';
 import { newsId, titleHash, urlHash } from '../../src/news/normalise';
 import type { NewsItem } from '../../src/news/parse';
@@ -130,5 +131,52 @@ describe('clustering against what is already stored', () => {
 describe('an empty pass', () => {
   it('plans nothing and claims nothing', () => {
     expect(planIngest({ items: [], known: nothingKnown, recent: [] })).toEqual({ inserts: [], skipped: [] });
+  });
+});
+
+describe('a bridging item must not chain two unrelated stories (IB-027 Q1)', () => {
+  // The hazard: resolving a join through "whichever member I matched" makes a cluster the
+  // transitive closure of pairwise similarity. A~B and B~C merges A and C even when they share
+  // nothing — and once merged, the evidence that they were separate is exactly what got absorbed,
+  // so nothing downstream can tell the cluster is wrong.
+  //
+  // Jaccard distance is a metric, so the chain is BOUNDED but real: with a 0.6 threshold,
+  // J(A,C) >= 0.6 + 0.6 - 1 = 0.2, which still leaves A and C about different subjects. These
+  // three are a shared framing plus two distinct tails, with B the roundup that straddles them —
+  // measured A~B 0.67, B~C 0.73, A~C 0.43.
+  const SHARED = 'Federal regulator announces decision on';
+  const A = `${SHARED} spot Ether ETF applications`;
+  const B = `${SHARED} spot Ether ETF applications and on derivatives firm misconduct charges`;
+  const C = `${SHARED} derivatives firm misconduct charges`;
+
+  it('the chain is real — B matches both ends while the ends do not match each other', () => {
+    // asserted explicitly, so this test cannot quietly stop testing anything if the measure changes
+    expect(titleSimilarity(A, B)).toBeGreaterThanOrEqual(0.6);
+    expect(titleSimilarity(B, C)).toBeGreaterThanOrEqual(0.6);
+    expect(titleSimilarity(A, C)).toBeLessThan(0.6);
+  });
+
+  it('keeps the two stories apart: C founds its own cluster rather than joining A through B', () => {
+    const a = item('coindesk', 'https://coindesk.com/a', A, T0);
+    const b = item('theblock', 'https://theblock.co/b', B, T0 + 60_000);
+    const c = item('decrypt', 'https://decrypt.co/c', C, T0 + 120_000);
+
+    const plan = planIngest({ items: [a, b, c], known: nothingKnown, recent: [] });
+
+    expect(plan.inserts).toHaveLength(3);
+    // a founds; b joins a (it genuinely is the same story plus an extra clause)
+    expect(plan.inserts[0].joins).toBeNull();
+    expect(plan.inserts[1].joins?.id).toBe(a.id);
+    // c must NOT reach a's cluster through b — b is a member, never a representative
+    expect(plan.inserts[2].joins).toBeNull();
+  });
+
+  it('every joiner matched the REPRESENTATIVE, so similarity is to one fixed title', () => {
+    const a = item('coindesk', 'https://coindesk.com/a', A, T0);
+    const b = item('theblock', 'https://theblock.co/b', B, T0 + 60_000);
+    const plan = planIngest({ items: [a, b], known: nothingKnown, recent: [] });
+    // the schema documents news_cluster_members.similarity as "to the cluster's first title";
+    // this is what makes that true rather than aspirational
+    expect(plan.inserts[1].similarity).toBeCloseTo(titleSimilarity(A, B), 5);
   });
 });

@@ -25,6 +25,8 @@ const maybeDescribe = DATABASE_URL ? describe : describe.skip;
 
 const T0 = Date.UTC(2026, 9, 12, 12, 0, 0);
 const SINCE = new Date(T0 - 7 * 86_400_000);
+/** What `confirmations` is counted out of — the number of sources being polled. */
+const SOURCE_COUNT = 10;
 
 function item(source: string, url: string, title: string, atMs = T0): NewsItem {
   return {
@@ -63,7 +65,7 @@ maybeDescribe('IB-027 news store against a real database', () => {
       known: await knownNews(db, sources, SINCE),
       recent: await recentForClustering(db, SINCE),
     });
-    return { plan, result: await persistPlan(db, plan) };
+    return { plan, result: await persistPlan(db, plan, SOURCE_COUNT) };
   }
 
   it('stores a first article and founds a cluster of one', async () => {
@@ -148,11 +150,53 @@ maybeDescribe('IB-027 news store against a real database', () => {
     const before = await db.query<{ n: string }>(`select count(*) n from raw_news`, []);
 
     const plan = planIngest({ items: [good, poisoned], known: new Map(), recent: [] });
-    await expect(persistPlan(db, plan)).rejects.toThrow();
+    await expect(persistPlan(db, plan, SOURCE_COUNT)).rejects.toThrow();
 
     const after = await db.query<{ n: string }>(`select count(*) n from raw_news`, []);
     // the good row rolled back with the bad one: a half-written pass would leave raw_news rows
     // with no cluster, and the next pass would not re-offer them because they are not new
     expect(after[0].n).toBe(before[0].n);
+  });
+
+  it('counts DISTINCT SOURCES, so one chatty outlet cannot corroborate itself', async () => {
+    // the trap: binance publishes the same announcement through an official RSS and an API. Two
+    // members, two different URLs and titles — but ONE voice. Counting member rows would read as
+    // independent corroboration.
+    const rss = item('binance-announcements', 'https://binance.com/en/support/announcement/x', 'Binance will list NEWCOIN perpetual contract', T0 + 600_000);
+    const api = item('binance-announcements', 'https://binance.com/bapi/composite/v1/x', 'Binance will list NEWCOIN perpetual', T0 + 660_000);
+
+    await ingest([rss]);
+    await ingest([api]);
+
+    const [row] = await db.query<{ confirmations: number; of_sources: number; members: number }>(
+      `select c.confirmations, c.of_sources,
+              (select count(*) from news_cluster_members m where m.cluster_id = c.id) members
+         from news_clusters c
+         join news_cluster_members mm on mm.cluster_id = c.id
+        where mm.news_id = $1`, [api.id],
+    );
+    expect(Number(row.members)).toBe(2);        // two articles
+    expect(Number(row.confirmations)).toBe(1);  // one source
+    expect(Number(row.of_sources)).toBe(SOURCE_COUNT); // and the figure carries its denominator
+  });
+
+  it('a bridging item cannot chain two unrelated stories through the database either', async () => {
+    // the pure planner has its own version of this; here it is end to end, because the bound only
+    // holds if recentForClustering returns REPRESENTATIVES and not every stored item
+    const SHARED = 'Agency publishes long awaited guidance on';
+    const a = item('coindesk', 'https://coindesk.com/ch-a', `${SHARED} stablecoin reserve attestations`, T0 + 700_000);
+    const b = item('theblock', 'https://theblock.co/ch-b', `${SHARED} stablecoin reserve attestations and on custody bankruptcy rules`, T0 + 760_000);
+    const c = item('decrypt', 'https://decrypt.co/ch-c', `${SHARED} custody bankruptcy rules`, T0 + 820_000);
+
+    await ingest([a]);
+    await ingest([b]);
+    await ingest([c]);
+
+    const [{ n }] = await db.query<{ n: string }>(
+      `select count(distinct cluster_id) n from news_cluster_members where news_id in ($1, $2, $3)`,
+      [a.id, b.id, c.id],
+    );
+    // a and b are one story; c is another. Chaining through b would make this 1.
+    expect(Number(n)).toBe(2);
   });
 });

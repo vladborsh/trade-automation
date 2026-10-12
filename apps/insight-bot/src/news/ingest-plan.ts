@@ -21,7 +21,21 @@ import type { NewsItem } from './parse';
  * signal than one outlet carrying it, and collapsing them would erase exactly that. So a
  * cross-source match is inserted and joined to the cluster, never skipped.
  *
- * ## 2. Items inside one pass must be able to cluster with each other
+ * ## 2. A member must match the cluster's REPRESENTATIVE, not merely some member
+ *
+ * Joining by "whatever existing item I matched" makes a cluster the transitive closure of pairwise
+ * similarity: A~B, B~C, and A and C unrelated collapses two stories into one blob. With trigram
+ * similarity a single bridging headline straddling two stories is enough, and **once merged nothing
+ * records that it was wrong** — the evidence that they were separate is exactly what got absorbed.
+ *
+ * So `recent` carries cluster **representatives** (each cluster's founding title), never every
+ * stored item, and an accepted item becomes a candidate only when it founds a cluster of its own.
+ * Every member is then within the threshold of one fixed title, which bounds the cluster by
+ * construction rather than by a size cap. The cost is the opposite failure — a story whose wording
+ * drifts far enough from the first telling starts a second cluster — and that one stays visible,
+ * where a wrong merge does not.
+ *
+ * ## 3. Items inside one pass must be able to cluster with each other
  *
  * A single pass regularly brings in two outlets' versions of the same story at once. Clustering
  * only against what was already stored would put them in two clusters that no later pass ever
@@ -29,7 +43,7 @@ import type { NewsItem } from './parse';
  * set as the plan is built — the trap here is that it looks correct in a test that feeds one item
  * at a time.
  *
- * ## 3. Nothing is invented
+ * ## 4. Nothing is invented
  *
  * Items the parser refused are already gone before this point (`parse.ts` drops anything without a
  * URL, a title or a usable date rather than stamping it with our clock). Nothing here fills a gap.
@@ -46,7 +60,10 @@ export interface IngestPlanInput {
   items: readonly NewsItem[];
   /** What the database already holds for the sources in this pass, keyed by source id. */
   known: ReadonlyMap<string, KnownNews>;
-  /** Recent items (any source) the new ones may cluster with — the caller's queried window. */
+  /**
+   * Cluster REPRESENTATIVES in the window — one per cluster, its founding item. Not every recent
+   * item: see the transitive-closure note above.
+   */
   recent: readonly ClusterCandidate[];
   windowMs?: number;
   threshold?: number;
@@ -72,9 +89,10 @@ export function planIngest(input: IngestPlanInput): IngestPlan {
   const inserts: PlannedInsert[] = [];
   const skipped: IngestPlan['skipped'] = [];
 
-  // Candidates grow as the pass proceeds, so two outlets' versions of one story arriving together
-  // land in the same cluster instead of two that never merge.
-  const candidates: ClusterCandidate[] = [...input.recent];
+  // Representatives grow as the pass proceeds, so two outlets' versions of one story arriving
+  // together land in the same cluster instead of two that never merge — but ONLY founders are
+  // added, so a chain cannot form through a joining member.
+  const representatives: ClusterCandidate[] = [...input.recent];
   // what this pass has already accepted, per source, so a feed repeating an item inside one
   // response does not produce two rows
   const acceptedUrl = new Map<string, Set<string>>();
@@ -104,10 +122,11 @@ export function planIngest(input: IngestPlanInput): IngestPlan {
     }
 
     const incoming: ClusterCandidate = { id: item.id, title: item.title, publishedAt: item.publishedAt };
-    const decision = chooseCluster(incoming, candidates, windowMs, threshold);
+    const decision = chooseCluster(incoming, representatives, windowMs, threshold);
     inserts.push({ item, joins: decision.joins, similarity: decision.similarity });
 
-    candidates.push(incoming);
+    // only a founder becomes a representative; a joining member must never bridge two stories
+    if (decision.joins === null) representatives.push(incoming);
     seenUrl.add(item.urlHash);
     seenTitle.add(item.titleHash);
     acceptedUrl.set(item.source, seenUrl);
