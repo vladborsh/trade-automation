@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { AppConfigService } from '../../config/config.service';
 import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
+import { UptimeRecorder } from '../uptime/uptime.recorder';
 import { Writers } from '../writers/batch-writer';
 import { CollectorGapRow } from '../writers/tables';
 import { contractSpecs } from './contract-size';
@@ -32,6 +33,7 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly writers: Writers,
     private readonly registry: StreamRegistry,
     private readonly metrics: MetricsService,
+    private readonly uptime: UptimeRecorder,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -65,6 +67,9 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
     }
 
     this.openSocket(instIds);
+    // IB-BUG-010: writes a collector_gaps row for however long we were NOT running, then starts
+    // the heartbeat that makes the next such window measurable.
+    await this.uptime.begin([{ stream: STREAM_LIQUIDATION, venue: VENUE, market: 'perp' }]);
     this.startClock();
 
     void this.backfillFunding(rest, instIds).catch((err) =>
@@ -184,9 +189,11 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
     await this.writers.collectorGaps.write([gap]);
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
     this.socket?.close();
+    // a last heartbeat, so the outage is dated from when we stopped
+    await this.uptime.end();
   }
 }

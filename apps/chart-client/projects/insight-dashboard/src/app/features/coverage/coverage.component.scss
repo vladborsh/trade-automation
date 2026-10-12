@@ -20,3 +20,21 @@ th { color: var(--muted); }
 .error { color: var(--down); }
 tr.empty td { color: var(--down); }
 tr.holes td { color: #d29922; }
+
+/* IB-BUG-010 — the collector-uptime block above the per-series table. */
+.collectors {
+  margin-bottom: 1.5rem;
+}
+
+.collectors h2 {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+
+/* A number that is short of its basis is the thing worth noticing, so it carries the down colour
+   rather than a new one — the palette is fixed (AGENTS.md). */
+.warn {
+  color: #ef5350;
+}

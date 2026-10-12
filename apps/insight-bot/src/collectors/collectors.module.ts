@@ -9,6 +9,7 @@ import { OiLsPoller } from './binance-perp/oi-ls.poller';
 import { ContextService } from './context/context.service';
 import { OkxService } from './okx/okx.service';
 import { BybitService } from './bybit/bybit.service';
+import { UptimeRecorder } from './uptime/uptime.recorder';
 import { GapReportService } from '../ops/gap-report.service';
 import { TelegramSender } from '../delivery/telegram-sender';
 import { WatchdogService } from '../ops/watchdog.service';
@@ -35,6 +36,9 @@ export class CollectorsModule {
       imports: [AppConfigModule, DbModule, OpsModule, WritersModule],
       providers: [
         BinancePerpService, BinanceSpotService, BinanceWeightTracker, OiLsPoller, BybitService, OkxService, ContextService,
+        // IB-BUG-010: one recorder shared by the ws liquidation collectors, so the heartbeat is a
+        // single timer rather than one per venue.
+        UptimeRecorder,
         // IB-011: the operator's instruments. They live behind the same switch because the report
         // reads the collectors' tables and the watchdog watches their streams.
         TelegramSender, WatchdogService, GapReportService,

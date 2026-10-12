@@ -3,8 +3,9 @@ import { AppConfigService } from '../../config/config.service';
 import { DB, type Db } from '../../db/db.port';
 import { earliestFundingTimes } from '../../db/pg/collector-reads';
 import { StreamRegistry } from '../../ops/stream-registry';
+import { UptimeRecorder } from '../uptime/uptime.recorder';
 import { Writers } from '../writers/batch-writer';
-import { BybitCollector } from './bybit-collector';
+import { BybitCollector, STREAM_LIQUIDATION } from './bybit-collector';
 import { BybitSocket } from './bybit-socket';
 import { VENUE } from './mappers';
 import { BybitRest } from './rest';
@@ -26,6 +27,7 @@ export class BybitService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly config: AppConfigService,
     private readonly writers: Writers,
     private readonly registry: StreamRegistry,
+    private readonly uptime: UptimeRecorder,
     @Inject(DB) private readonly db: Db | null,
   ) {}
 
@@ -51,15 +53,21 @@ export class BybitService implements OnApplicationBootstrap, OnModuleDestroy {
     });
 
     await this.collector.start();
+    // IB-BUG-010: this writes a collector_gaps row for however long we were NOT running, then
+    // starts the heartbeat. After start(), so the window closes when the socket is actually up.
+    await this.uptime.begin([{ stream: STREAM_LIQUIDATION, venue: VENUE, market: 'perp' }]);
     this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
     this.timer.unref?.();
     this.logger.log(`bybit collector started for ${symbols.length} symbols`);
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.collector?.stop();
     this.collector = null;
+    // a last heartbeat, so the outage is dated from when we stopped rather than up to one
+    // heartbeat interval earlier
+    await this.uptime.end();
   }
 }
