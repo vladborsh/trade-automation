@@ -46,6 +46,19 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
   private timer: ReturnType<typeof setInterval> | null = null;
   private globalDueAt = 0;
   private lastDailyDay = '';
+  /**
+   * One `/global` poll at a time, and one daily pass at a time.
+   *
+   * **Measured on the failure-path run of this fix (2026-10-12, 20:15–20:18Z).** A 429 keeps a
+   * poll alive for minutes — three internal retries, 60 s apart — while the clock goes on firing
+   * every 30 seconds. `globalDueAt` is only advanced when the poll *settles*, so every tick in
+   * between started ANOTHER poll: three concurrent attempts, each logging «retry 1/3», each
+   * taking a gate slot ahead of the backfill, which collected **zero coins in two minutes**.
+   * That is the original starvation with the victims swapped — exactly what this task exists to
+   * remove, so it is guarded rather than left for the next person to measure again.
+   */
+  private globalInFlight = false;
+  private dailyInFlight = false;
 
   constructor(
     private readonly config: AppConfigService,
@@ -128,14 +141,39 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
    * priority from here on, so one attempt is enough to put the forward-only series first.
    */
   private async primeThenBackfill(now = new Date()): Promise<void> {
+    await this.pollGlobalGuarded();
+
+    // **On a fresh database the backfills ARE today's collection**, so the daily passes must not
+    // run alongside them. Measured on the first run of this fix: the 30-second clock fired half a
+    // minute into a 24-minute backfill, found both daily tasks due (`lastRunDay` is empty on a new
+    // process) and started a SECOND coin loop — twenty extra requests for two days of data whose
+    // 365 were already in flight, interleaved with the backfill through the one queue, which is
+    // why the backfill ran at a coin a minute instead of a coin every thirty seconds.
+    //
+    // Marked BEFORE the backfill rather than after it: the clock fires during the backfill, so a
+    // flag set at the end would be set long after the duplicate pass had already run. If the
+    // backfill then fails outright the mark is lifted, because a day that was not collected must
+    // not look collected.
+    const fresh = await this.isFreshDatabase();
+    const today = now.toISOString().slice(0, 10);
+    if (fresh) this.lastDailyDay = today;
     try {
-      await this.pollGlobal(now);
-      this.globalDueAt = globalDueAfter(now.getTime(), 'ok');
+      await this.backfill(now);
     } catch (err) {
-      this.globalDueAt = globalDueAfter(now.getTime(), 'failed');
-      this.logger.warn(`first /global sample failed (${(err as Error).message}) — backfilling anyway`);
+      if (fresh) this.lastDailyDay = '';
+      throw err;
     }
-    await this.backfill(now);
+  }
+
+  /**
+   * A database with neither series in it — the Tokyo box's first boot, and every rehearsal of it.
+   *
+   * Deliberately strict: when only *some* coins are missing, the daily pass still has work to do
+   * for the others, so only the all-or-nothing case suppresses it.
+   */
+  private async isFreshDatabase(): Promise<boolean> {
+    const [needsFng, missing] = await Promise.all([this.needsFearGreedBackfill(), this.coinsNeedingBackfill()]);
+    return needsFng && missing.length > 0 && missing.length === this.coins().length;
   }
 
   private startClock(): void {
@@ -147,41 +185,70 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Drives both cadences off one cheap timer; every decision is in `schedule.ts` and spec'd. */
   async tick(now = new Date()): Promise<void> {
-    if (now.getTime() >= this.globalDueAt) {
-      try {
-        await this.pollGlobal(now);
-        this.globalDueAt = globalDueAfter(now.getTime(), 'ok');
-      } catch (err) {
-        // The slot is retried soon, not skipped: this series is forward-only, so a lost 10-minute
-        // slot is lost for good. Advancing the clock before the poll succeeded (which is what this
-        // code used to do) turned one 429 into a permanently missing sample.
-        this.globalDueAt = globalDueAfter(now.getTime(), 'failed');
-        throw err;
-      }
+    if (now.getTime() >= this.globalDueAt && !this.globalInFlight) {
+      await this.pollGlobalGuarded();
     }
     const due = dueDailyTasks(now, this.lastDailyDay);
-    if (due.length > 0) {
+    if (due.length > 0 && !this.dailyInFlight) {
       this.lastDailyDay = now.toISOString().slice(0, 10);
-      if (due.includes('fear-greed')) await this.pollFearGreed(now, 2);
-      if (due.includes('coins')) await this.pollCoins(now, 2);
+      this.dailyInFlight = true;
+      try {
+        if (due.includes('fear-greed')) await this.pollFearGreed(2);
+        if (due.includes('coins')) await this.pollCoins(2);
+      } finally {
+        this.dailyInFlight = false;
+      }
     }
   }
 
-  async pollGlobal(now = new Date()): Promise<number> {
-    const row = marketCapGlobalRow(await this.client.global(), now);
-    const written = await this.writers.marketCapGlobal.write([row]);
-    this.registry.recordMessage(STREAM_GLOBAL, now.getTime());
+  /**
+   * One `/global` poll, with the due-time rule and the in-flight guard in one place.
+   *
+   * The slot is retried soon, not skipped: this series is forward-only, so a lost 10-minute slot
+   * is lost for good, and advancing the clock before the poll succeeded (which this code used to
+   * do) turned one 429 into a permanently missing sample.
+   */
+  private async pollGlobalGuarded(): Promise<void> {
+    this.globalInFlight = true;
+    try {
+      await this.pollGlobal();
+      this.globalDueAt = globalDueAfter(Date.now(), 'ok');
+    } catch (err) {
+      this.globalDueAt = globalDueAfter(Date.now(), 'failed');
+      this.logger.warn(`/global poll failed: ${(err as Error).message}`);
+    } finally {
+      this.globalInFlight = false;
+    }
+  }
+
+  /**
+   * `fetched_at` is the instant the venue ANSWERED, not the instant the poll was scheduled.
+   *
+   * Measured on the failure-path run (2026-10-12): a poll that began at 20:20:09 and survived
+   * three 60-second back-offs wrote `fetched_at = 20:20:09` against a payload CoinGecko stamped
+   * `20:22:12` — a row that claims to have been fetched before the data it contains existed. The
+   * column is also what the cadence evidence for this very task is measured from, so a column
+   * that means "when we decided to ask" instead of "when we were told" quietly misdates both the
+   * data and the proof.
+   */
+  async pollGlobal(): Promise<number> {
+    const payload = await this.client.global();
+    const arrivedAt = new Date();
+    const written = await this.writers.marketCapGlobal.write([marketCapGlobalRow(payload, arrivedAt)]);
+    this.registry.recordMessage(STREAM_GLOBAL, arrivedAt.getTime());
     return written;
   }
 
-  async pollFearGreed(now = new Date(), limit = 2): Promise<number> {
-    const rows = fearGreedRows(await this.client.fearGreed(limit), now);
-    const written = await this.writers.fearGreed.write(rows);
-    this.registry.recordMessage(STREAM_FNG, now.getTime());
+  async pollFearGreed(limit = 2): Promise<number> {
+    const payload = await this.client.fearGreed(limit);
+    // same rule as pollGlobal: the answer's arrival, not the question's departure
+    const arrivedAt = new Date();
+    const written = await this.writers.fearGreed.write(fearGreedRows(payload, arrivedAt));
+    this.registry.recordMessage(STREAM_FNG, arrivedAt.getTime());
     return written;
   }
 
-  async pollCoins(now = new Date(), days = 2, coins = this.coins()): Promise<number> {
+  async pollCoins(days = 2, coins = this.coins()): Promise<number> {
     let written = 0;
     for (const coin of coins) {
       // The pacing moved into the gate (IB-BUG-006). It used to be this loop's own sleep, which
@@ -189,8 +256,10 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
       // The interval is unchanged — 30 s between any two CoinGecko requests, measured — but it is
       // now one queue, and `/global` can take a slot in the middle of a backfill.
       try {
-        const rows = marketCapCoinRows(await this.client.coinMarketChart(coin, days), coin, now);
-        written += await this.writers.marketCapCoin.write(rows);
+        const payload = await this.client.coinMarketChart(coin, days);
+        // per coin, because a 20-coin backfill spans ten minutes: one `now` for the whole pass
+        // would stamp the twentieth coin with the first coin's clock
+        written += await this.writers.marketCapCoin.write(marketCapCoinRows(payload, coin, new Date()));
         // Per coin, NOT per pass: the 365-day backfill takes ten minutes at the measured rate,
         // and a pass-level record would leave this stream reading silent throughout. The
         // watchdog's threshold is 3 minutes, so a first boot on a fresh box would raise a false
@@ -217,7 +286,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
     // restart re-fetches 20 x 365-day charts and spends the keyless allowance on data it already
     // has — which is exactly how the first live run ran into 429.
     if (await this.needsFearGreedBackfill()) {
-      const fng = await this.pollFearGreed(now, 0);
+      const fng = await this.pollFearGreed(0);
       this.logger.log(`Fear & Greed: ${fng} day(s) loaded (full history since 2018).`);
     } else {
       this.logger.log('Fear & Greed history already stored — skipping the one-shot backfill.');
@@ -228,7 +297,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.log(`Market caps: all ${this.coins().length} coin(s) already have their ${COIN_CHART_DAYS} days.`);
       return;
     }
-    const written = await this.pollCoins(now, COIN_CHART_DAYS, missing);
+    const written = await this.pollCoins(COIN_CHART_DAYS, missing);
     this.logger.log(
       `Market caps: ${written} row(s) across ${missing.length} coin(s), ${COIN_CHART_DAYS} days each ` +
         '(365 is the free limit; days=max is paid).',
