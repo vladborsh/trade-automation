@@ -9,6 +9,8 @@ export * from './auth';
 // IB-030 — the dashboard's health and coverage surfaces.
 export * from './health';
 export * from './coverage';
+// IB-017 — the playbook port, setup state machine and twin-arm contract.
+export * from './playbook';
 // IB-031 — the instrument view.
 export * from './series';
 export * from './universe';
