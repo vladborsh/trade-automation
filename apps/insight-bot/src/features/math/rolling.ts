@@ -35,13 +35,17 @@ export function percentileOf(
  * Is this standard deviation real spread, or floating-point residue?
  *
  * Scaled to the magnitude of the data rather than an absolute epsilon, because the sample here
- * is `log1p` of USD sums and its scale varies with the symbol. `1e-9` of the mean is far below
- * any spread a real tape produces and far above the ~1e-14 residue a flat sample leaves.
+ * is `log1p` of USD sums and its scale varies with the symbol. The factor is far below any
+ * spread a real tape produces and far above the ~1e-14 residue a flat sample leaves.
+ *
+ * **`relativeEpsilon` is a parameter, not a literal here.** It decides whether a key is a number
+ * or a refusal, which makes it meaning-defining, which by our own rule puts it in the registry
+ * and inside the fingerprint — otherwise someone tunes it next year and no version bumps.
  */
-export function isMeaningfulSpread(sd: number, mean: number): boolean {
+export function isMeaningfulSpread(sd: number, mean: number, relativeEpsilon: number): boolean {
   if (!Number.isFinite(sd) || sd <= 0) return false;
   const scale = Math.max(Math.abs(mean), 1);
-  return sd > scale * 1e-9;
+  return sd > scale * relativeEpsilon;
 }
 
 /** Population mean and standard deviation, the convention already used in `bollinger.ts`. */
@@ -84,10 +88,11 @@ export function log1pZScore(
   sample: readonly number[],
   value: number,
   minSamples: number,
+  relativeEpsilon: number,
 ): number | null {
   if (sample.length < minSamples) return null;
   const transformed = sample.map((x) => Math.log1p(x));
   const { mean, sd } = meanAndSd(transformed);
-  if (!isMeaningfulSpread(sd, mean)) return null;
+  if (!isMeaningfulSpread(sd, mean, relativeEpsilon)) return null;
   return (Math.log1p(value) - mean) / sd;
 }

@@ -47,7 +47,10 @@ export function liquidationFeatures(input: LiqInput): Partial<Record<WebFeatureK
     out[`liq.${side}.15m` as WebFeatureKey] = input.hasAnyHistory ? ok(sums.m15) : no('no_data');
     out[`liq.${side}.60m` as WebFeatureKey] = input.hasAnyHistory ? ok(sums.m60) : no('no_data');
 
-    const z = log1pZScore(input.history[side], sums.m60, minSamples);
+    const z = log1pZScore(
+      input.history[side], sums.m60, minSamples,
+      featureParamNumber(`liq.${side}.z60m` as 'liq.long.z60m', 'spreadEpsilonRelative'),
+    );
     out[`liq.${side}.z60m` as WebFeatureKey] = z === null ? no('insufficient_history') : ok(z);
   }
   return out;

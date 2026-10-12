@@ -15,7 +15,7 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('18fc2286');
+    expect(featureSpecFingerprint()).toBe('5fbbcf4c');
     expect(WEB_FRAME_VERSION).toBe(1);
   });
 
@@ -83,7 +83,11 @@ describe('the key set is pinned', () => {
       settlementHours: 8, intervalTolerance: 0.25,
     });
     expect(WEB_FEATURE_SPEC['atr.1h.14'].params).toMatchObject({ period: 14, smoothing: 'wilder' });
-    expect(WEB_FEATURE_SPEC['liq.long.z60m'].params).toMatchObject({ lookbackDays: 30, minHistoryDays: 14, transform: 'log1p' });
+    expect(WEB_FEATURE_SPEC['liq.long.z60m'].params).toMatchObject({
+      lookbackDays: 30, minHistoryDays: 14, transform: 'log1p',
+      // decides value-or-refusal, so it is meaning-defining and must be fingerprinted
+      spreadEpsilonRelative: 1e-9,
+    });
     expect(WEB_FEATURE_SPEC['structure.failed_highs_24h'].params).toMatchObject({ atrMultiple: 0.5, atrTf: '1h' });
   });
 

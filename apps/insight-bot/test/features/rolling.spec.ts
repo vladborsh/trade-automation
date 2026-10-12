@@ -46,20 +46,20 @@ describe('log1pZScore', () => {
     //   mean = 0.25; deviations -0.25, -0.25, -0.25, +0.75
     //   sq   = 3(0.0625) + 0.5625 = 0.75 ; population sd = sqrt(0.75 / 4) = 0.4330127
     // value e-1 -> log1p = 1       -> z = (1 - 0.25) / 0.4330127 = 1.7320508
-    const z = log1pZScore([0, 0, 0, Math.E - 1], Math.E - 1, 1);
+    const z = log1pZScore([0, 0, 0, Math.E - 1], Math.E - 1, 1, 1e-9);
     expect(z).toBeCloseTo(1.7320508, 6);
   });
 
   it('REFUSES when the sample is shorter than the definition allows', () => {
     // §8.2: null until 14 days of liquidation history exist.
-    expect(log1pZScore([1, 2, 3], 2, 336)).toBeNull();
+    expect(log1pZScore([1, 2, 3], 2, 336, 1e-9)).toBeNull();
   });
 
   it('REFUSES a flat sample rather than reporting 0, which would mean "exactly normal"', () => {
     // Every window held the same amount, so "how unusual is this" has no denominator. Same
     // mistake as IB-038's median-of-zero: a missing measurement is not an average one.
-    expect(log1pZScore([5, 5, 5, 5], 5, 1)).toBeNull();
-    expect(log1pZScore([0, 0, 0, 0], 100, 1)).toBeNull();
+    expect(log1pZScore([5, 5, 5, 5], 5, 1, 1e-9)).toBeNull();
+    expect(log1pZScore([0, 0, 0, 0], 100, 1, 1e-9)).toBeNull();
   });
 
   it('REFUSES A LONG FLAT SAMPLE, where the sd is floating-point residue rather than spread', () => {
@@ -68,28 +68,35 @@ describe('log1pZScore', () => {
     // 2.8e-14 — residue, not spread — so the exact-equality guard let it through and the z-score
     // came out at 1.4e14. A confidently absurd number is worse than a refusal.
     const flat = Array.from({ length: 400 }, () => 100);
-    expect(log1pZScore(flat, 5000, 10)).toBeNull();
+    expect(log1pZScore(flat, 5000, 10, 1e-9)).toBeNull();
   });
 
   it('still measures a genuinely small but real spread', () => {
     // The guard must not swallow a quiet market: these differ in the sixth significant figure
     // and that is a real, if small, distribution.
     const nearlyFlat = Array.from({ length: 400 }, (_, i) => 100 + i * 1e-3);
-    expect(log1pZScore(nearlyFlat, 5000, 10)).not.toBeNull();
+    expect(log1pZScore(nearlyFlat, 5000, 10, 1e-9)).not.toBeNull();
   });
 });
 
 describe('isMeaningfulSpread', () => {
+  it('takes the epsilon as a PARAMETER, because it decides value-or-refusal', () => {
+    // A constant that decides whether a key is a number is meaning-defining, so it lives in the
+    // registry and inside the fingerprint rather than in this file.
+    expect(isMeaningfulSpread(1e-5, 1, 1e-9)).toBe(true);
+    expect(isMeaningfulSpread(1e-5, 1, 1e-3)).toBe(false); // a stricter caller refuses the same sd
+  });
+
   it('rejects residue and accepts real spread, scaled to the data', () => {
-    expect(isMeaningfulSpread(2.8e-14, 4.6)).toBe(false);
-    expect(isMeaningfulSpread(0, 4.6)).toBe(false);
-    expect(isMeaningfulSpread(Number.NaN, 4.6)).toBe(false);
-    expect(isMeaningfulSpread(0.001, 4.6)).toBe(true);
+    expect(isMeaningfulSpread(2.8e-14, 4.6, 1e-9)).toBe(false);
+    expect(isMeaningfulSpread(0, 4.6, 1e-9)).toBe(false);
+    expect(isMeaningfulSpread(Number.NaN, 4.6, 1e-9)).toBe(false);
+    expect(isMeaningfulSpread(0.001, 4.6, 1e-9)).toBe(true);
   });
 
   it('a genuinely average window scores 0, and that IS a measurement', () => {
     const sample = [0, Math.E - 1];
     const mid = Math.expm1(0.5); // log1p(mid) = 0.5, exactly the mean of [0, 1]
-    expect(log1pZScore(sample, mid, 1)).toBeCloseTo(0, 10);
+    expect(log1pZScore(sample, mid, 1, 1e-9)).toBeCloseTo(0, 10);
   });
 });
