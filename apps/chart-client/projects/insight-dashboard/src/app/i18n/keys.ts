@@ -158,6 +158,8 @@ export type StringKey =
   | 'market.asOf'
   | 'market.source'
   | 'market.unknown'
+  | 'market.points'
+  | 'market.percent'
   | 'market.fg.title'
   | 'market.fg.none'
   | 'market.fg.wasYesterday'
@@ -172,6 +174,7 @@ export type StringKey =
   | 'market.dominance.day'
   | 'market.dominance.week'
   | 'market.dominance.coverage'
+  | 'market.dominance.gap'
   | 'market.dominance.eth'
   | 'market.dominance.total'
   | 'market.btcVsTop.title'
@@ -180,7 +183,8 @@ export type StringKey =
   | 'market.btcVsTop.week'
   | 'market.btcVsTop.month'
   | 'market.table.title'
-  | 'market.table.none';
+  | 'market.table.none'
+  | 'market.table.missing';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

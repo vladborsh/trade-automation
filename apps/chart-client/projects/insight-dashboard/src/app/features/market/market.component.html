@@ -36,20 +36,26 @@
   <section class="card">
     <h2>{{ t('market.dominance.title') }}</h2>
     @if (dominance(); as dom) {
-      <p class="value">{{ percent(dom.btcPct) }}%</p>
+      <p class="value">{{ percent(dom.btcPct) }}</p>
       <p class="muted">{{ t('market.asOf', { when: asOf(dom.atMs) ?? t('market.unknown') }) }}</p>
-      <p>{{ t('market.dominance.day', { change: signed(dom.changePct24h) ?? t('market.unknown') }) }}</p>
-      <p>{{ t('market.dominance.week', { change: signed(dom.changePct7d) ?? t('market.unknown') }) }}</p>
+      <p>{{ t('market.dominance.day', { change: points(dom.changePct24h) }) }}</p>
+      <p>{{ t('market.dominance.week', { change: points(dom.changePct7d) }) }}</p>
       @if (dom.changePct7d === null) {
-        <!-- §10: this series is collected forward and cannot be backfilled, so a young database
-             says how long it has been collecting instead of implying nothing happened. -->
-        <p class="muted">{{ t('market.dominance.coverage', { days: dom.coverageDays }) }}</p>
+        <!-- §10: this series is collected forward and cannot be backfilled. Two different reasons
+             for a missing 7-day move, and the card must not give the wrong one: under a week of
+             collection is youth, a week or more of it with no comparable sample is a gap in the
+             collection (which is what a pause leaves behind). -->
+        @if (dom.coverageDays < 7) {
+          <p class="muted">{{ t('market.dominance.coverage', { days: dom.coverageDays }) }}</p>
+        } @else {
+          <p class="muted">{{ t('market.dominance.gap', { days: dom.coverageDays }) }}</p>
+        }
       }
-      @if (percent(dom.ethPct); as eth) {
-        <p>{{ t('market.dominance.eth', { value: eth }) }}</p>
+      @if (dom.ethPct !== null) {
+        <p>{{ t('market.dominance.eth', { value: percent(dom.ethPct) }) }}</p>
       }
       @if (cap(dom.totalUsd); as total) {
-        <p>{{ t('market.dominance.total', { value: total, change: signed(dom.totalChangePct24h) ?? t('market.unknown') }) }}</p>
+        <p>{{ t('market.dominance.total', { value: total, change: percent(dom.totalChangePct24h, { sign: true }) }) }}</p>
       }
       <p class="muted source">{{ t('market.source', { source: dom.source }) }}</p>
     } @else {
@@ -62,10 +68,10 @@
   <section class="card">
     <h2>{{ t('market.btcVsTop.title') }}</h2>
     @if (btcVsTop(); as top) {
-      <p class="value">{{ percent(top.sharePct) }}%</p>
+      <p class="value">{{ percent(top.sharePct) }}</p>
       <p class="muted">{{ t('market.btcVsTop.counted', { counted: top.coinsCounted, expected: top.coinsExpected, day: top.day }) }}</p>
-      <p>{{ t('market.btcVsTop.week', { change: signed(top.changePct7d) ?? t('market.unknown') }) }}</p>
-      <p>{{ t('market.btcVsTop.month', { change: signed(top.changePct30d) ?? t('market.unknown') }) }}</p>
+      <p>{{ t('market.btcVsTop.week', { change: points(top.changePct7d) }) }}</p>
+      <p>{{ t('market.btcVsTop.month', { change: points(top.changePct30d) }) }}</p>
       <p class="muted source">{{ t('market.source', { source: top.source }) }}</p>
     } @else {
       <p class="muted">{{ t('market.btcVsTop.none') }}</p>
@@ -102,20 +108,25 @@
       <tr><th>coin</th><th class="num">cap</th><th class="num">price</th><th class="num">share</th><th class="num">24h</th><th class="num">7d</th></tr>
     </thead>
     <tbody>
-      @for (row of caps(); track row.coin) {
+      @for (row of heldCaps(); track row.coin) {
         <tr>
           <td>{{ row.coin }}</td>
           <td class="num">{{ cap(row.capUsd) ?? t('market.unknown') }}</td>
           <td class="num">{{ price(row.priceUsd) ?? t('market.unknown') }}</td>
-          <td class="num">{{ share(row.share) ?? t('market.unknown') }}</td>
-          <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ change(row.change24h) ?? t('market.unknown') }}</td>
-          <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ change(row.change7d) ?? t('market.unknown') }}</td>
+          <td class="num">{{ fraction(row.share) }}</td>
+          <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ fraction(row.change24h, { sign: true }) }}</td>
+          <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ fraction(row.change7d, { sign: true }) }}</td>
         </tr>
       } @empty {
         <tr><td colspan="6" class="muted">{{ t('market.table.none') }}</td></tr>
       }
     </tbody>
   </table>
+  @if (missingCaps() > 0) {
+    <!-- the coins the collector has not reached today are counted, not listed: twenty rows of
+         «нет данных» is not information, and the count is the fact a reader needs -->
+    <p class="muted">{{ t('market.table.missing', { count: missingCaps() }) }}</p>
+  }
   @if (cards(); as payload) {
     <p class="muted source">{{ t('market.source', { source: payload.capsSource }) }}</p>
   }

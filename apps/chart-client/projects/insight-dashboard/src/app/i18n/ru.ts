@@ -152,6 +152,8 @@ export const ru: Strings = {
   'market.asOf': 'на {when} UTC',
   'market.source': 'источник: {source}',
   'market.unknown': 'нет данных',
+  'market.points': '{value} п.п.',
+  'market.percent': '{value}%',
 
   'market.fg.title': 'Страх и жадность',
   'market.fg.none': 'Индекс пока не собран.',
@@ -165,18 +167,20 @@ export const ru: Strings = {
 
   'market.dominance.title': 'Доля BTC во всём рынке',
   'market.dominance.none': 'Доля рынка пока не собрана.',
-  'market.dominance.day': 'За сутки {change} п.п.',
-  'market.dominance.week': 'За неделю {change} п.п.',
+  'market.dominance.day': 'За сутки {change}',
+  'market.dominance.week': 'За неделю {change}',
   'market.dominance.coverage': 'Данных пока за {days} дн. — ряд собирается только вперёд.',
-  'market.dominance.eth': 'Доля ETH — {value}%.',
-  'market.dominance.total': 'Капитализация всего рынка — {value}, за сутки {change}%.',
+  'market.dominance.gap': 'Сравнить за неделю не с чем: в ряду пропуск сбора, хотя данные идут уже {days} дн.',
+  'market.dominance.eth': 'Доля ETH — {value}.',
+  'market.dominance.total': 'Капитализация всего рынка — {value}, за сутки {change}.',
 
   'market.btcVsTop.title': 'BTC против топ-20',
   'market.btcVsTop.none': 'Капитализации по монетам пока не собраны.',
   'market.btcVsTop.counted': 'Считано {counted} монет из {expected} за {day}.',
-  'market.btcVsTop.week': 'За неделю {change} п.п.',
-  'market.btcVsTop.month': 'За месяц {change} п.п.',
+  'market.btcVsTop.week': 'За неделю {change}',
+  'market.btcVsTop.month': 'За месяц {change}',
 
   'market.table.title': 'Капитализация монет',
   'market.table.none': 'Пока нет данных по монетам.',
+  'market.table.missing': 'Ещё {count} монет из топ-20 за этот день не собраны.',
 };

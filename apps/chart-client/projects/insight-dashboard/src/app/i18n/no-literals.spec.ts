@@ -246,7 +246,13 @@ describe('the string tables', () => {
     const exempt = new Set<StringKey>([SWITCH, ...TERMS_OF_ART]);
     const keys = (Object.keys(ru) as StringKey[]).filter((key) => !exempt.has(key));
 
-    const untranslated = keys.filter((key) => !cyrillic.test(ru[key]) && /\p{L}{4,}/u.test(ru[key]) && ru[key] === en[key]);
+    // A `{placeholder}` is a parameter name, not words a member reads: `'{value}%'` is the same
+    // string in both tables because it is pure formatting, and reading `value` as untranslated
+    // prose would make this guard reject every format-only entry. Stripped before the test.
+    const prose = (text: string): string => text.replace(/\{\w+\}/g, '');
+    const untranslated = keys.filter(
+      (key) => !cyrillic.test(ru[key]) && /\p{L}{4,}/u.test(prose(ru[key])) && ru[key] === en[key],
+    );
     expect(untranslated).toEqual([]);
     expect(keys.filter((key) => cyrillic.test(en[key]))).toEqual([]);
   });

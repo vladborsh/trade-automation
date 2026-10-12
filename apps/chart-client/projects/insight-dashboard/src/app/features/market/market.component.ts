@@ -56,6 +56,16 @@ export class MarketComponent implements OnDestroy {
   readonly caps = computed(() => this.cards()?.caps ?? []);
   readonly capsDay = computed(() => this.cards()?.capsDay ?? null);
 
+  /**
+   * Only the coins that actually have a cap for the day, and a count of the ones that do not.
+   *
+   * Fifteen rows of «нет данных» is the same mistake IB-038 avoided with its empty coins: it fills
+   * the screen with the absence of information instead of stating it once. The count is the fact —
+   * and the share card above already says what the denominator was.
+   */
+  readonly heldCaps = computed(() => this.caps().filter((row) => row.capUsd !== null));
+  readonly missingCaps = computed(() => this.caps().length - this.heldCaps().length);
+
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -104,10 +114,31 @@ export class MarketComponent implements OnDestroy {
   /** The band's label key and colour, from the same value the venue's own wording describes. */
   readonly band = fearGreedBand;
   readonly asOf = asOfUtc;
-  readonly signed = signed;
-  readonly percent = percent;
   readonly cap = capUsd;
-  readonly share = fractionPercent;
-  readonly change = fractionSigned;
   readonly price = coinPrice;
+
+  /**
+   * A figure **with its unit**, or «нет данных» — one method, because the unit and the absence have
+   * to be decided together.
+   *
+   * The first render put the unit in the sentence («За неделю {change} п.п.») and produced «За
+   * неделю нет данных п.п.», a unit hanging off a phrase that has no number. So the sentence takes
+   * one finished clause and these three build it: a known value carries `п.п.` / `%`, an unknown
+   * one carries nothing but the words saying so.
+   */
+  points(value: number | null): string {
+    const body = signed(value);
+    return body === null ? this.t('market.unknown') : this.t('market.points', { value: body });
+  }
+
+  percent(value: number | null, { sign = false } = {}): string {
+    const body = sign ? signed(value) : percent(value);
+    return body === null ? this.t('market.unknown') : this.t('market.percent', { value: body });
+  }
+
+  /** The caps table stores shares and changes as 0..1 fractions; same rule, one conversion earlier. */
+  fraction(value: number | null, { sign = false } = {}): string {
+    const body = sign ? fractionSigned(value) : fractionPercent(value);
+    return body === null ? this.t('market.unknown') : this.t('market.percent', { value: body });
+  }
 }

@@ -146,6 +146,8 @@ export const en: Strings = {
   'market.asOf': 'as of {when} UTC',
   'market.source': 'source: {source}',
   'market.unknown': 'no data',
+  'market.points': '{value} pp',
+  'market.percent': '{value}%',
 
   'market.fg.title': 'Fear and greed',
   'market.fg.none': 'The index has not been collected yet.',
@@ -159,18 +161,20 @@ export const en: Strings = {
 
   'market.dominance.title': 'BTC share of the whole market',
   'market.dominance.none': 'Market share has not been collected yet.',
-  'market.dominance.day': 'Over 24 h {change} pp.',
-  'market.dominance.week': 'Over a week {change} pp.',
+  'market.dominance.day': 'Over 24 h {change}',
+  'market.dominance.week': 'Over a week {change}',
   'market.dominance.coverage': 'Only {days} days collected so far — this series is forward-only.',
-  'market.dominance.eth': 'ETH share — {value}%.',
-  'market.dominance.total': 'Whole-market cap — {value}, {change}% over 24 h.',
+  'market.dominance.gap': 'Nothing to compare a week against: the series has a collection gap, though it has been running {days} days.',
+  'market.dominance.eth': 'ETH share — {value}.',
+  'market.dominance.total': 'Whole-market cap — {value}, {change} over 24 h.',
 
   'market.btcVsTop.title': 'BTC against the top 20',
   'market.btcVsTop.none': 'Per-coin caps have not been collected yet.',
   'market.btcVsTop.counted': 'Counted {counted} coins of {expected} for {day}.',
-  'market.btcVsTop.week': 'Over a week {change} pp.',
-  'market.btcVsTop.month': 'Over a month {change} pp.',
+  'market.btcVsTop.week': 'Over a week {change}',
+  'market.btcVsTop.month': 'Over a month {change}',
 
   'market.table.title': 'Coin market caps',
   'market.table.none': 'No coin data yet.',
+  'market.table.missing': 'Another {count} of the top 20 are not collected for this day.',
 };
