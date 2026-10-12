@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
-import type { WebFeatureFrame } from '@trade-automation/contracts';
+import { featureSpecFingerprint, type WebFeatureFrame } from '@trade-automation/contracts';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
@@ -32,6 +32,7 @@ const frameAt = (closeMs: number, close: number): WebFeatureFrame => ({
   basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
   complete: false, incompleteReason: [], revision: 1, amendedAt: null, amendedKeys: [],
   computedMode: 'live', computedAt: Math.floor(closeMs / 1000),
+  specFingerprint: featureSpecFingerprint(),
 });
 
 /** A frame whose only key refuses — the "cannot see" case. */
@@ -350,11 +351,11 @@ maybeDescribe('IB-017 the runner', () => {
   describe('frame revision pinning', () => {
     const storeFrame = async (closeMs: number, revision: number, close: number) => db.query(
       `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete,
-                                   revision, computed_mode, computed_at)
-       values ($1,'15m',$2,1,$3::jsonb,'{}'::jsonb,false,$4,'live',$5)
+                                   revision, computed_mode, computed_at, spec_fingerprint)
+       values ($1,'15m',$2,1,$3::jsonb,'{}'::jsonb,false,$4,'live',$5,$6)
        on conflict do nothing`,
       [SYMBOL, new Date(closeMs), JSON.stringify({ 'px.close': { ok: true, value: close } }),
-        revision, new Date(closeMs)],
+        revision, new Date(closeMs), featureSpecFingerprint()],
     );
 
     const frameRev = (closeMs: number, revision: number, close: number): WebFeatureFrame =>

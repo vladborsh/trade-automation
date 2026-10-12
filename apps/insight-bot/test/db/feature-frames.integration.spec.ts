@@ -51,8 +51,8 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
 
   const insertFrame = async (closeMs: number, complete = true, reason: string[] = [], revision = 1) =>
     db.query(
-      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, revision, computed_mode)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'live')`,
+      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, revision, computed_mode, spec_fingerprint)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'live','test')`,
       ['BTCUSDT', '15m', new Date(closeMs), WEB_FRAME_VERSION,
         JSON.stringify({ 'oi.d24h_pct': { ok: true, value: 1.5 } }),
         JSON.stringify({ venues: ['bybit'], coverage: 'not_recorded', coveredHours: null }),
@@ -69,8 +69,8 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
   it('REJECTS a tf outside 15m and 4h rather than storing an unknown frame', async () => {
     // Its own bar: these tests share a database and a collision would look like a schema fault.
     await expect(db.query(
-      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, computed_mode)
-       values ('BTCUSDT','1h',$1,1,'{}','{}',true,'live')`, [new Date(CLOSE - 3_600_000)],
+      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, computed_mode, spec_fingerprint)
+       values ('BTCUSDT','1h',$1,1,'{}','{}',true,'live','test')`, [new Date(CLOSE - 3_600_000)],
     )).rejects.toThrow(/tf_check|check constraint/i);
   });
 
@@ -173,6 +173,7 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
       amendedKeys: [] as string[],
       computedMode: 'live' as const,
       computedAt: Math.floor(closeMs / 1000),
+      specFingerprint: featureSpecFingerprint(),
       ...over,
     });
 
@@ -242,6 +243,7 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
         complete, incompleteReason: complete ? [] : ['x'],
         revision: 1, amendedAt: null, amendedKeys: [],
         computedMode: 'live', computedAt: Math.floor((BASE + i * 900_000) / 1000),
+        specFingerprint: featureSpecFingerprint(),
       });
 
     beforeAll(async () => {
@@ -314,6 +316,77 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
       expect(await inputs.aggBars(db, { venue: 'binance', market: 'perp', symbols: [], tf: '15m', fromMs: 0, toMsExclusive: NOW })).toEqual([]);
       expect(await inputs.minuteCount(db, { venue: 'binance', market: 'perp', symbols: [], fromMs: 0, toMsExclusive: NOW })).toBe(0);
       expect(await inputs.liquidationBuckets(db, { symbols: [], fromMs: 0, toMsExclusive: NOW, widthSec: 3600 })).toEqual([]);
+    });
+  });
+
+  /**
+   * IB-049 — every frame records the spec fingerprint it was computed under.
+   *
+   * `frame_version` is the WEAK identifier: a number a human assigns and can forget to bump.
+   * This is derived from the key set, so it cannot be forgotten. Had the column existed, the
+   * episode that produced it would have diagnosed itself — dev-1's 905 frames would have shown
+   * two fingerprints on inspection instead of being inferred by counting keys per row.
+   */
+  describe('spec_fingerprint per frame', () => {
+    const aFrame = (closeMs: number, symbol = 'FPUSDT') => ({
+      symbol, tf: '15m' as const, closeTime: Math.floor(closeMs / 1000),
+      frameVersion: WEB_FRAME_VERSION,
+      keys: { 'px.close': { ok: true as const, value: 1 } },
+      basis: { venues: [], coverage: 'not_recorded' as const, coveredHours: null },
+      complete: true, incompleteReason: [] as string[], revision: 1,
+      amendedAt: null as number | null, amendedKeys: [] as string[],
+      computedMode: 'live' as const, computedAt: Math.floor(closeMs / 1000),
+      specFingerprint: featureSpecFingerprint(),
+    });
+
+    it('is written from the LIVE registry, not from the caller', async () => {
+      const at = CLOSE + 20 * 900_000;
+      await frames.insertFrame(db, aFrame(at));
+      const [row] = await db.query<{ spec_fingerprint: string }>(
+        `select spec_fingerprint from feature_frames where close_time = $1`, [new Date(at)]);
+      expect(row?.spec_fingerprint).toBe(featureSpecFingerprint());
+    });
+
+    it('REFUSES a frame with no fingerprint rather than defaulting it', async () => {
+      // No DEFAULT, as with computed_mode and frame_revision: a writer that omits it must fail
+      // loudly rather than claim a spec the frame may not have run under — which is the exact
+      // defect the column exists to make impossible.
+      await expect(db.query(
+        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis,
+                                     complete, computed_mode)
+         values ('ZZZUSDT','15m',$1,1,'{}','{}',true,'live')`, [new Date(CLOSE + 21 * 900_000)],
+      )).rejects.toThrow(/spec_fingerprint/i);
+    });
+
+    it('makes a MIXTURE a select rather than an inference', async () => {
+      // The query nobody could run during IB-049. dev-1's slot held 903 frames at one key set
+      // and 2 at another, and the only way to see it was to count keys per row.
+      const at = CLOSE + 22 * 900_000;
+      await db.query(
+        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete,
+                                     revision, computed_mode, spec_fingerprint)
+         values ('MIXUSDT','15m',$1,1,'{}','{}',true,1,'live','7a4a2a87')`, [new Date(at)]);
+      await frames.insertFrame(db, aFrame(at + 900_000, 'MIXUSDT'));
+
+      const rows = await db.query<{ spec_fingerprint: string; n: string }>(
+        `select spec_fingerprint, count(*)::text as n from feature_frames
+          where symbol = 'MIXUSDT' group by 1 order by 1`);
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.spec_fingerprint)).toContain('7a4a2a87');
+      expect(rows.map((r) => r.spec_fingerprint)).toContain(featureSpecFingerprint());
+    });
+
+    it('contradicts a retroactive claim instead of being silently legitimised by it', async () => {
+      // The specific thing ruled against: a single write through the claiming path would have
+      // certified the current fingerprint over 903 frames computed under another. With the
+      // column, the claim and the rows disagree in a query anyone can run.
+      const claimed = await db.query<{ spec_fingerprint: string }>(
+        `select spec_fingerprint from feature_frame_versions where frame_version = $1`,
+        [WEB_FRAME_VERSION]);
+      const disagreeing = await db.query<{ n: string }>(
+        `select count(*)::text as n from feature_frames
+          where spec_fingerprint <> $1`, [claimed[0]?.spec_fingerprint ?? '']);
+      expect(Number(disagreeing[0]?.n)).toBeGreaterThan(0); // the MIXUSDT row seeded above
     });
   });
 });

@@ -160,7 +160,7 @@ describe('canArm — the rule that replaces the flag', () => {
       keys, basis: { venues: ['bybit'], coverage: 'not_recorded', coveredHours: null },
       complete: Object.values(keys).every((v) => v.ok), incompleteReason: [],
       revision: 1, amendedAt: null, amendedKeys: [],
-      computedMode: 'live', computedAt: 1_760_000_015,
+      computedMode: 'live', computedAt: 1_760_000_015, specFingerprint: '14f15ddd',
     });
 
   it('arms when every REQUIRED key computed, even on an incomplete frame', () => {
@@ -187,7 +187,7 @@ describe('the frame row', () => {
       symbol: 'BTCUSDT', tf: '15m', closeTime: 1_791_000_000, frameVersion: 1,
       keys: {}, basis: { venues: [], coverage: 'no_events', coveredHours: null }, incompleteReason: [],
       revision: 1, amendedAt: null, amendedKeys: [],
-      computedMode: 'live', computedAt: 1_760_000_015,
+      computedMode: 'live', computedAt: 1_760_000_015, specFingerprint: '14f15ddd',
     };
     expect(WebFeatureFrameSchema.safeParse({ ...base, complete: null }).success).toBe(false);
     expect(WebFeatureFrameSchema.safeParse({ ...base, complete: false }).success).toBe(true);
@@ -199,7 +199,7 @@ describe('the frame row', () => {
       symbol: 'BTCUSDT', tf: '15m' as const, closeTime: 1, frameVersion: 1, keys: {},
       basis: { venues: [], coverage: 'no_events' as const, coveredHours: null },
       complete: true, incompleteReason: [], amendedAt: null, amendedKeys: [],
-      computedMode: 'live', computedAt: 1_760_000_015,
+      computedMode: 'live', computedAt: 1_760_000_015, specFingerprint: '14f15ddd',
     };
     expect(WebFeatureFrameSchema.safeParse(base).success).toBe(false);
     expect(WebFeatureFrameSchema.safeParse({ ...base, revision: 0 }).success).toBe(false);
@@ -211,7 +211,7 @@ describe('the frame row', () => {
       symbol: 'BTCUSDT', tf: '4h', closeTime: 1, frameVersion: 1, keys: {}, complete: true,
       incompleteReason: [], basis: { venues: ['okx'], coverage: 'not_recorded', coveredHours: null },
       revision: 1, amendedAt: null, amendedKeys: [],
-      computedMode: 'live', computedAt: 1_760_000_015,
+      computedMode: 'live', computedAt: 1_760_000_015, specFingerprint: '14f15ddd',
     });
     expect(ok.success).toBe(true);
   });
@@ -326,6 +326,7 @@ describe('computedMode', () => {
     basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
     complete: true, incompleteReason: [], revision: 1, amendedAt: null, amendedKeys: [],
     computedMode: 'live', computedAt: 1_760_000_015,
+    specFingerprint: featureSpecFingerprint(),
     ...over,
   });
 
@@ -389,6 +390,51 @@ describe('computedMode', () => {
     // The fingerprint is over the key registry. Adding a field that describes how a frame was
     // produced says nothing about what any key MEANS, so stored frames stay comparable and the
     // version does not bump.
+    expect(featureSpecFingerprint()).toBe('14f15ddd');
+  });
+});
+
+/**
+ * IB-049 — the frame carries the fingerprint of the spec that produced it.
+ *
+ * `frameVersion` is the weak identifier: a number a human assigns and can forget to bump while
+ * the key set changes under it. This one is derived from the key set, so it cannot be forgotten
+ * — and that difference is the whole reason the field exists.
+ */
+describe('specFingerprint', () => {
+  const frame = (over: Partial<WebFeatureFrame> = {}): WebFeatureFrame => ({
+    symbol: 'BTCUSDT', tf: '15m', closeTime: 1_760_000_000, frameVersion: WEB_FRAME_VERSION,
+    keys: { 'px.close': { ok: true, value: 1 } },
+    basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
+    complete: true, incompleteReason: [], revision: 1, amendedAt: null, amendedKeys: [],
+    computedMode: 'live', computedAt: 1_760_000_015, specFingerprint: '14f15ddd',
+    ...over,
+  });
+
+  it('is REQUIRED — a frame cannot be parsed without saying which spec produced it', () => {
+    const { specFingerprint: _omitted, ...without } = frame();
+    expect(() => WebFeatureFrameSchema.parse(without)).toThrow();
+  });
+
+  it('rejects an empty string, which would be a fingerprint that identifies nothing', () => {
+    expect(() => WebFeatureFrameSchema.parse(frame({ specFingerprint: '' }))).toThrow();
+  });
+
+  it('can disagree with the frameVersion, which is the case it exists to expose', () => {
+    // Two frames both calling themselves version 1 while carrying different key sets is exactly
+    // what happened: 903 frames at 45 keys and 2 at 47, all version 1, distinguishable only by
+    // counting keys per row. The type must be able to represent the disagreement, or nobody can
+    // detect it.
+    const old = frame({ specFingerprint: '7a4a2a87' });
+    const current = frame({ specFingerprint: '14f15ddd' });
+    expect(old.frameVersion).toBe(current.frameVersion);
+    expect(old.specFingerprint).not.toBe(current.specFingerprint);
+    expect(() => WebFeatureFrameSchema.parse(old)).not.toThrow();
+  });
+
+  it('does not move the spec fingerprint — the frame SHAPE is not the key registry', () => {
+    // Adding a field describing how a frame was produced says nothing about what any key means,
+    // so stored frames stay comparable and the version does not bump.
     expect(featureSpecFingerprint()).toBe('14f15ddd');
   });
 });

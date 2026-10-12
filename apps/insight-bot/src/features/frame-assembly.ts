@@ -1,5 +1,5 @@
 import {
-  WEB_FEATURE_KEYS, WEB_FEATURE_SPEC, WEB_FRAME_VERSION,
+  WEB_FEATURE_KEYS, WEB_FEATURE_SPEC, WEB_FRAME_VERSION, featureSpecFingerprint,
   type WebFeatureFrame, type WebFeatureKey, type WebFeatureValue, type WebFrameBasis,
   type WebFrameTimeframe,
 } from '@trade-automation/contracts';
@@ -132,6 +132,9 @@ export function assembleFrame(input: AssembleInput): WebFeatureFrame {
     amendedKeys: [],
     computedMode: input.computedMode,
     computedAt: input.computedAtSec,
+    // The live registry's hash, read here rather than passed in: a caller cannot hand the
+    // frame a spec it was not computed under (IB-049).
+    specFingerprint: featureSpecFingerprint(),
   };
 }
 

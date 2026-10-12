@@ -1,6 +1,7 @@
 import type { WebFeatureFrame, WebFrameBasis, WebFrameTimeframe } from '@trade-automation/contracts';
 import type { DbHandle } from '../../db/db.port';
 import type { ValueConflict } from '../frame-amendment';
+import { featureSpecFingerprint } from '@trade-automation/contracts';
 import { assertFrameVersionFingerprint } from '../frame-version-guard';
 
 /**
@@ -33,6 +34,7 @@ interface FrameRow {
   amended_keys: string[];
   computed_mode: 'live' | 'backfill';
   computed_at: Date;
+  spec_fingerprint: string;
 }
 
 function toFrame(row: FrameRow): WebFeatureFrame {
@@ -50,12 +52,13 @@ function toFrame(row: FrameRow): WebFeatureFrame {
     amendedKeys: row.amended_keys,
     computedMode: row.computed_mode,
     computedAt: sec(row.computed_at),
+    specFingerprint: row.spec_fingerprint,
   };
 }
 
 const FRAME_COLUMNS =
   'symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, ' +
-  'revision, amended_at, amended_keys, computed_mode, computed_at';
+  'revision, amended_at, amended_keys, computed_mode, computed_at, spec_fingerprint';
 
 /**
  * The frame as currently published for a close, or null when nothing has been written for it.
@@ -154,8 +157,8 @@ export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise
   const rows = await db.query<{ revision: number }>(
     `insert into feature_frames
        (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason,
-        revision, amended_at, amended_keys, computed_mode, computed_at)
-     values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8::text[], $9, $10, $11::text[], $12, $13)
+        revision, amended_at, amended_keys, computed_mode, computed_at, spec_fingerprint)
+     values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8::text[], $9, $10, $11::text[], $12, $13, $14)
      on conflict (symbol, tf, close_time, revision) do nothing
      returning revision`,
     [
@@ -172,6 +175,9 @@ export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise
       frame.amendedKeys,
       frame.computedMode,
       asDate(frame.computedAt * 1000),
+      // Taken from the live registry at the moment of the write, never from the caller: a
+      // frame must not be able to claim a spec it was not computed under.
+      featureSpecFingerprint(),
     ],
   );
   return rows.length > 0;

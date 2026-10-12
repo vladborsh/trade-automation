@@ -285,15 +285,15 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
       // No DEFAULT on the column, deliberately: a new writer that forgets must fail loudly,
       // not silently inherit the mode that claims less information.
       await expect(db.query(
-        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete)
-         values ($1,'15m',$2,1,'{}','{}',true)`, [SYMBOL, new Date(CLOSE + 50 * 900_000)],
+        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, spec_fingerprint)
+         values ($1,'15m',$2,1,'{}','{}',true,'test')`, [SYMBOL, new Date(CLOSE + 50 * 900_000)],
       )).rejects.toThrow(/computed_mode/i);
     });
 
     it('REFUSES a mode outside live and backfill', async () => {
       await expect(db.query(
-        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, computed_mode)
-         values ($1,'15m',$2,1,'{}','{}',true,'guessed')`, [SYMBOL, new Date(CLOSE + 51 * 900_000)],
+        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, computed_mode, spec_fingerprint)
+         values ($1,'15m',$2,1,'{}','{}',true,'guessed','test')`, [SYMBOL, new Date(CLOSE + 51 * 900_000)],
       )).rejects.toThrow(/computed_mode|check constraint/i);
     });
   });

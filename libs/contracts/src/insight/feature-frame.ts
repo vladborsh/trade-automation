@@ -197,6 +197,25 @@ export const WebFeatureFrameSchema = z.object({
    * the distance between the two is how much healing it could have benefited from.
    */
   computedAt: TimeSec,
+  /**
+   * The spec fingerprint the key registry hashed to when this frame was computed — IB-049.
+   *
+   * `frameVersion` is the WEAK identifier: a number a human assigns, and therefore one that can
+   * be forgotten exactly when it matters. This is derived from the key set itself, so it cannot
+   * be.
+   *
+   * Without it a frame records only the number somebody chose, and `feature_frame_versions` is
+   * the sole witness to what produced it. dev-1's slot reached 905 frames whose key sets had to
+   * be INFERRED by counting them (903 at 45 keys, 2 at 47) because nothing on the row said —
+   * and a single write through the claiming path would have certified the current fingerprint
+   * over all of them. With this field the mixture is a `select`, the claim table becomes a
+   * cross-check rather than the only record, and a retroactive claim is contradicted by the
+   * rows themselves.
+   *
+   * Same principle as `venuesPresent`, the liquidation ratio's basis, `computedMode` and
+   * `frameRevision`: a derived row carries what it was derived from.
+   */
+  specFingerprint: z.string().min(1),
 });
 export type WebFeatureFrame = z.infer<typeof WebFeatureFrameSchema>;
 
