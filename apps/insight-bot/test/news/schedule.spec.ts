@@ -11,7 +11,7 @@ import type { NewsSource } from '../../src/news/sources';
 
 const FIVE_MIN = 5 * 60_000;
 const source = (id: string, pollMs = FIVE_MIN): NewsSource => ({
-  id, url: `https://example.test/${id}`, kind: 'rss', pollMs, followRedirects: true,
+  id, url: `https://example.test/${id}`, kind: 'rss', shape: 'window', pollMs, followRedirects: true,
 });
 
 const NOW = Date.UTC(2026, 9, 12, 12, 0, 0);

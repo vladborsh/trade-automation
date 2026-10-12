@@ -17,6 +17,13 @@ import type { NewsSource } from './sources';
  *
  * **A failure is returned, never thrown.** One source being down must not abort a pass that has
  * nine healthy feeds in it, so the result carries the reason and the caller decides.
+ *
+ * **What an empty 200 means is the SOURCE's property, not this client's.** A `window` feed serves
+ * "the last N items" regardless of recency, so empty means broken and must not read as "nothing
+ * published". A `time-filtered` source answers "items since T", where empty is the correct answer
+ * on a quiet weekend — failing it there would back a legitimately quiet source off and lose it for
+ * being quiet, which is the same bug pointing the other way. Both directions are silent, so the
+ * rule is declared beside the source rather than assumed here.
  */
 
 export const DEFAULT_TIMEOUT_MS = 20_000;
@@ -59,10 +66,8 @@ export class NewsClient {
         return { ok: false, status: response.status, reason: `HTTP ${response.status}` };
       }
       const body = await response.text();
-      if (body.trim().length === 0) {
-        // a 200 with nothing in it is a failure that would otherwise parse to zero items and read
-        // as "this source published nothing today"
-        return { ok: false, status: response.status, reason: 'empty body' };
+      if (body.trim().length === 0 && source.shape === 'window') {
+        return { ok: false, status: response.status, reason: 'empty body from a window feed' };
       }
       return { ok: true, body, status: response.status };
     } catch (error) {

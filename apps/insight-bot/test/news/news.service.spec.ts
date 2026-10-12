@@ -18,11 +18,11 @@ import type { NewsSource } from '../../src/news/sources';
 const FIXTURE = readFileSync(join(__dirname, '..', 'fixtures', 'news', 'cointelegraph.rss.xml'), 'utf8');
 
 const source = (id: string, over: Partial<NewsSource> = {}): NewsSource => ({
-  id, url: `https://example.test/${id}`, kind: 'rss', pollMs: 5 * 60_000, followRedirects: true, ...over,
+  id, url: `https://example.test/${id}`, kind: 'rss', shape: 'window', pollMs: 5 * 60_000, followRedirects: true, ...over,
 });
 
 /** Records which sources were asked for, and answers however the test says. */
-function fakeClient(answers: Record<string, 'ok' | 'fail' | 'garbage'>) {
+function fakeClient(answers: Record<string, 'ok' | 'fail' | 'garbage' | 'empty'>) {
   const asked: string[] = [];
   const client = {
     async fetchSource(s: NewsSource) {
@@ -30,6 +30,7 @@ function fakeClient(answers: Record<string, 'ok' | 'fail' | 'garbage'>) {
       const answer = answers[s.id] ?? 'ok';
       if (answer === 'fail') return { ok: false as const, status: 503, reason: 'HTTP 503' };
       if (answer === 'garbage') return { ok: true as const, status: 200, body: 'this is not a feed' };
+      if (answer === 'empty') return { ok: true as const, status: 200, body: '' };
       return { ok: true as const, status: 200, body: FIXTURE };
     },
   } as unknown as NewsClient;
@@ -140,5 +141,35 @@ describe('without a database', () => {
     service.onApplicationBootstrap();
     expect(asked).toEqual([]);
     service.onModuleDestroy();
+  });
+});
+
+describe('an empty response means different things to different sources', () => {
+  it('a quiet TIME-FILTERED source stays healthy and keeps its cadence', async () => {
+    // CFTC and SEC go genuinely silent on a weekend. If "no items" counted as a failure, a quiet
+    // source would back ITSELF off and we would lose it for being quiet — the mirror of treating
+    // silence as "published nothing", and just as undetectable from either side.
+    const { client, asked } = fakeClient({ quiet: 'empty' });
+    const { db } = fakeDb();
+    const service = new NewsService(db, client, [source('quiet', { shape: 'time-filtered' })]);
+
+    await service.tick(NOW);
+    asked.length = 0;
+
+    // six minutes on it is due again at its normal cadence, not backed off
+    await service.tick(NOW + 6 * 60_000);
+    expect(asked).toEqual(['quiet']);
+  });
+
+  it('an empty WINDOW feed is broken, and backs off', async () => {
+    // a feed that serves "the last N items" cannot legitimately be empty
+    const { client, asked } = fakeClient({ windowed: 'fail' });
+    const { db } = fakeDb();
+    const service = new NewsService(db, client, [source('windowed')]);
+
+    await service.tick(NOW);
+    asked.length = 0;
+    await service.tick(NOW + 6 * 60_000);
+    expect(asked).toEqual([]); // backed off to ten minutes
   });
 });

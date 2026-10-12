@@ -33,11 +33,29 @@
 
 export type NewsSourceKind = 'rss' | 'json';
 
+/**
+ * How a source answers, which decides what an EMPTY response means.
+ *
+ * - `window` — the response is "the last N items", served regardless of recency. An empty body is
+ *   therefore broken: the feed cannot legitimately have nothing in it, and treating it as "nothing
+ *   published" would record a confident zero.
+ * - `time-filtered` — the response is "items since T". Empty is the CORRECT answer on a quiet
+ *   weekend, and treating it as a failure would back a legitimately quiet source off and lose it
+ *   for being quiet — the mirror of the first bug, and just as silent.
+ *
+ * All ten sources today are `window` (fixed URLs, no time parameter), so one rule would currently
+ * be right — by coincidence of the source list, not by design. Declared per source so the first
+ * time-filtered one cannot inherit the wrong rule without someone choosing it.
+ */
+export type NewsSourceShape = 'window' | 'time-filtered';
+
 export interface NewsSource {
   /** Stable key stored in `raw_news.source`; changing one orphans that source's dedupe history. */
   id: string;
   url: string;
   kind: NewsSourceKind;
+  /** What an empty response means. See `NewsSourceShape`. */
+  shape: NewsSourceShape;
   pollMs: number;
   /**
    * CoinDesk and Blockworks answer **308** unless redirects are followed (measured 2026-09-28).
@@ -51,26 +69,28 @@ const FAST_POLL_MS = 5 * 60_000;
 const SLOW_POLL_MS = 15 * 60_000;
 
 export const NEWS_SOURCES: readonly NewsSource[] = [
-  { id: 'coindesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', kind: 'rss', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'cointelegraph', url: 'https://cointelegraph.com/rss', kind: 'rss', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'decrypt', url: 'https://decrypt.co/feed', kind: 'rss', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'theblock', url: 'https://www.theblock.co/rss.xml', kind: 'rss', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'blockworks', url: 'https://blockworks.co/feed', kind: 'rss', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'sec', url: 'https://www.sec.gov/news/pressreleases.rss', kind: 'rss', pollMs: SLOW_POLL_MS, followRedirects: true },
-  { id: 'cftc', url: 'https://www.cftc.gov/RSS/RSSGP/rssgp.xml', kind: 'rss', pollMs: SLOW_POLL_MS, followRedirects: true },
+  { id: 'coindesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'cointelegraph', url: 'https://cointelegraph.com/rss', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'decrypt', url: 'https://decrypt.co/feed', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'theblock', url: 'https://www.theblock.co/rss.xml', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'blockworks', url: 'https://blockworks.co/feed', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'sec', url: 'https://www.sec.gov/news/pressreleases.rss', kind: 'rss', shape: 'window', pollMs: SLOW_POLL_MS, followRedirects: true },
+  { id: 'cftc', url: 'https://www.cftc.gov/RSS/RSSGP/rssgp.xml', kind: 'rss', shape: 'window', pollMs: SLOW_POLL_MS, followRedirects: true },
   // Exchange announcements — listings and delistings, which move a single asset hard.
   {
     id: 'binance-announcements',
     url: 'https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&pageNo=1&pageSize=20',
     kind: 'json',
+    shape: 'window',
     pollMs: FAST_POLL_MS,
     followRedirects: true,
   },
-  { id: 'okx-announcements', url: 'https://www.okx.com/api/v5/support/announcements', kind: 'json', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'okx-announcements', url: 'https://www.okx.com/api/v5/support/announcements', kind: 'json', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
   {
     id: 'bybit-announcements',
     url: 'https://api.bybit.com/v5/announcements/index?locale=en-US&limit=20',
     kind: 'json',
+    shape: 'window',
     pollMs: FAST_POLL_MS,
     followRedirects: true,
   },

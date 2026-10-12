@@ -107,7 +107,10 @@ export class NewsService implements OnApplicationBootstrap, OnModuleDestroy {
 
     let items: NewsItem[];
     try {
-      items = this.parse(source, outcome.body);
+      // A time-filtered source legitimately answers with nothing on a quiet day; the client has
+      // already refused an empty body from a window feed, so reaching here with one means the
+      // source is allowed to be quiet. Parsing '' would throw and be counted a failure.
+      items = outcome.body.trim().length === 0 ? [] : this.parse(source, outcome.body);
     } catch (error) {
       // a feed that changed shape is a failure of this source, not of the pass
       this.state.set(source.id, afterAttempt(this.state.get(source.id), now, false));
