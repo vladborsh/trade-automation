@@ -5,6 +5,10 @@ import { applyAmendment, decideAmendment } from './frame-amendment';
 import { assembleFrame } from './frame-assembly';
 import { assertFrameVersionFingerprint } from './frame-version-guard';
 import { gather, loadPassContext, type PassContext } from './gather';
+import { lookbackMs } from './required-windows';
+
+/** The widest window the pass's coverage question has to cover: the z-score's own lookback. */
+const LIQ_LOOKBACK_MS = lookbackMs('liq');
 import { assessWindows } from './input-completeness';
 import * as inputs from './pg/feature-inputs.repo';
 import * as frames from './pg/frames.repo';
@@ -59,7 +63,9 @@ export class FeaturePassService {
     /** Pass-wide facts. Loaded here when a caller runs a single close on its own. */
     context?: PassContext,
   ): Promise<CloseOutcome> {
-    const ctx = context ?? await loadPassContext(this.db);
+    // The coverage window must span the z-score's lookback, not just this close: the sample is
+    // built from the covered hours of the last 30 days.
+    const ctx = context ?? await loadPassContext(this.db, closeMs - LIQ_LOOKBACK_MS, closeMs);
     const gathered = await gather(this.db, symbol, tf, closeMs, ctx);
     const computed = computeAll(gathered);
     const { incompleteGroups, explainedGroups, reasons } =
@@ -137,7 +143,7 @@ export class FeaturePassService {
       ? await inputs.signalSetSymbols(this.db)
       : await frames.symbolsAwaitingHeal(this.db, tf, closeMs);
     // Read once for the whole pass, not once per symbol — see `loadPassContext`.
-    const context = await loadPassContext(this.db);
+    const context = await loadPassContext(this.db, closeMs - LIQ_LOOKBACK_MS, closeMs);
     const summary: PassSummary = {
       tf, closeMs, written: 0, amended: 0, unchanged: 0, conflicts: 0, failed: [], outcomes: [],
     };

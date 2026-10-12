@@ -38,3 +38,11 @@ tr.holes td { color: #d29922; }
 .warn {
   color: #ef5350;
 }
+
+/* IB-015 — the frame block's row states, reusing the palette the page already has rather than
+   inventing near-duplicates (AGENTS.md). Missing frames take the same colour as an empty series
+   because they are the same finding: nothing was recorded. Unhealed takes the amber that already
+   means "holes". An explained refusal is muted — visible, never an alarm. `ok` needs no rule. */
+tr.missing td { color: var(--down); }
+tr.unhealed td { color: #d29922; }
+tr.explained td { color: #8b949e; }

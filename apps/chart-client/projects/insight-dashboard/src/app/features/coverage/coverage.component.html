@@ -36,6 +36,34 @@
       </table>
     }
 
+    <h2>{{ t('coverage.frames.title') }}</h2>
+    <p class="muted">{{ frameBasis() }}</p>
+    @if (frames().length) {
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('coverage.col.tf') }}</th>
+            <th>{{ t('coverage.col.framesWritten') }}</th>
+            <th>{{ t('coverage.col.unhealed') }}</th>
+            <th>{{ t('coverage.col.explained') }}</th>
+            <th>{{ t('coverage.col.oldestUnhealed') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of frames(); track row.tf) {
+            <tr [class]="row.state">
+              <td>{{ row.tf }}</td>
+              <td>{{ row.writtenLabel }}</td>
+              <td>{{ row.unhealed }}</td>
+              <td>{{ row.explainedOnly }}</td>
+              <td>{{ row.oldestUnhealedLabel }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <p class="muted">{{ t('coverage.frames.why') }}</p>
+    }
+
     <h2>{{ t('coverage.unmapped.title') }}</h2>
     <p [class]="unmappedTotal() ? 'warn' : 'muted'">{{ unmappedSummary() }}</p>
     @if (unmappedTotal()) {

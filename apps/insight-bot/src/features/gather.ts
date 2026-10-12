@@ -11,6 +11,9 @@ import type { EmaInput } from './calculators/ema';
 import type { AtrInput } from './calculators/volatility';
 import type { AtrBar } from './math/wilder-atr';
 import { type AbsenceEvidence, type WindowShortfall, expectedMinutes } from './input-completeness';
+import {
+  LIQUIDATION_STREAMS, coveredHourStarts, liquidationCoverage, type LiquidationCoverage,
+} from './liquidation-coverage';
 import * as inputs from './pg/feature-inputs.repo';
 import { lookbackMs } from './required-windows';
 
@@ -99,10 +102,23 @@ function slotAt(slots: readonly OiPoint[], atMs: number, toleranceMs: number): O
  */
 export interface PassContext {
   liquidationHistoryStartMs: number | null;
+  /**
+   * Which hours of the liquidation tape we were listening to. Collector-wide, not per symbol,
+   * so it is read once per pass like the history floor above.
+   */
+  liquidationCoverage: LiquidationCoverage;
 }
 
-export async function loadPassContext(db: DbHandle): Promise<PassContext> {
-  return { liquidationHistoryStartMs: await inputs.liquidationHistoryStartMs(db) };
+export async function loadPassContext(db: DbHandle, windowFromMs: number, windowToMs: number): Promise<PassContext> {
+  const [historyStart, beats, gaps] = await Promise.all([
+    inputs.liquidationHistoryStartMs(db),
+    inputs.liquidationHeartbeats(db),
+    inputs.liquidationGaps(db, windowFromMs, windowToMs),
+  ]);
+  return {
+    liquidationHistoryStartMs: historyStart,
+    liquidationCoverage: liquidationCoverage(beats, gaps),
+  };
 }
 
 export async function gather(
@@ -261,24 +277,20 @@ export async function gather(
 
   const sideSum = (rows: readonly { side: string; usd: number }[], side: string) =>
     rows.filter((r) => r.side === side).reduce((total, r) => total + r.usd, 0);
+  // Only the hours every liquidation stream was live for. Inside one of them a missing bucket
+  // is a genuine zero — we were listening and nothing was liquidated — and must stay in, or the
+  // sample becomes a sample of busy hours only. Outside them there is no hour to describe, and
+  // a zero would be a calm market nobody observed.
+  //
+  // Clipped to the first stored liquidation as well, because a heartbeat written later than the
+  // data it describes would otherwise claim coverage of hours we have no rows for.
+  const sampleFrom = historyStart === null ? closeMs : Math.max(liqFrom, historyStart);
+  const sampleHours = coveredHourStarts(context.liquidationCoverage, sampleFrom, closeMs - HOUR);
+
   const hourlyHistory = (side: string): number[] => {
-    // One entry per COLLECTED hour of the lookback, including the quiet ones.
-    //
-    // Two different absences, and conflating them is IB-BUG-010's vocabulary error applied to a
-    // z-score. Inside the collected span a missing bucket is a real zero — no liquidation
-    // happened — and dropping it would leave a sample of busy hours only, against which every
-    // busy hour looks normal. BEFORE collection started there is no hour to describe, and
-    // padding it with zero is inventing a calm market that nobody observed.
-    //
-    // The padding version produced `liq.long.z60m = 3.9` on a frame whose `liq.long.60m` said
-    // `no_data`: ~340 fabricated zeros dragged the mean to nearly nothing, so any real hour
-    // scored several sigma. A confident number manufactured entirely out of absence.
-    const from = historyStart === null ? closeMs : Math.max(liqFrom, historyStart);
     const byBucket = new Map<number, number>();
     for (const row of hourly) if (row.side === side) byBucket.set(row.bucketSec, row.usd);
-    const out: number[] = [];
-    for (let at = from; at < closeMs - HOUR; at += HOUR) out.push(byBucket.get(Math.floor(at / 1000)) ?? 0);
-    return out;
+    return sampleHours.map((at) => byBucket.get(Math.floor(at / 1000)) ?? 0);
   };
 
   const last15 = minute15.filter((r) => r.bucketSec * 1000 >= closeMs - 15 * MINUTE);
@@ -334,9 +346,10 @@ export async function gather(
         short: { m15: sideSum(last15, 'short'), m60: sideSum(last60, 'short') },
       },
       history: { long: hourlyHistory('long'), short: hourlyHistory('short') },
-      // 14 days of collection, measured from when the table starts rather than from this
-      // symbol's own rows: a coin that simply did not liquidate has history, not a shortage.
-      hasAnyHistory: historyStart !== null && closeMs - historyStart >= 14 * 24 * HOUR,
+      // The state of the window being SCORED, which is a different question from the sample's.
+      // A cross-venue sum over an hour with one venue dark is understated, and understated is
+      // worse than missing because it still looks like data.
+      coverage: context.liquidationCoverage.stateFor(closeMs - HOUR, closeMs),
     },
     // Sorted because the reads above run concurrently and finish in whatever order the
     // database returns them. `assembleFrame` sorts the reason strings too, but a Gathered that

@@ -3,6 +3,7 @@ import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { basisState, collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
 import { coverageCounts, toCoverageViews, type CoverageView } from './coverage.rows';
+import { frameTotals, toFrameViews, type FrameView } from './frame-rows';
 
 /** architecture/insight-bot-web-dashboard.md §2 — `GET /api/web/coverage`, per symbol × series. */
 @Component({
@@ -21,6 +22,8 @@ export class CoverageComponent {
   /** IB-BUG-010 — collector uptime, and the liquidation rows that map to no known symbol. */
   readonly collectors = signal<CollectorView[]>([]);
   readonly unmappedTotal = signal(0);
+  /** IB-015 — feature-frame coverage. Its own block: see `frame-rows.ts`. */
+  readonly frames = signal<FrameView[]>([]);
   readonly windowDays = signal(30);
   readonly error = signal<string | null>(null);
   readonly loading = signal(true);
@@ -54,6 +57,23 @@ export class CoverageComponent {
     });
   });
 
+  /**
+   * The frame block's basis line. Like the collector one it states what it has rather than
+   * reassuring: a reader who sees "0 of 96 written" knows the pass did not run, which no count
+   * of the frames that DO exist could have told them.
+   */
+  readonly frameBasis = computed(() => {
+    const totals = frameTotals(this.frames());
+    if (totals.timeframes === 0) return this.t('coverage.frames.none');
+    return this.t('coverage.frames.basis', {
+      days: this.windowDays(),
+      written: totals.written,
+      expected: totals.expected,
+      unhealed: totals.unhealed,
+      missing: totals.missing,
+    });
+  });
+
   readonly unmappedSummary = computed(() =>
     this.unmappedTotal() === 0
       ? this.t('coverage.unmapped.none')
@@ -71,6 +91,7 @@ export class CoverageComponent {
       this.rows.set(toCoverageViews(response.rows));
       this.collectors.set(toCollectorViews(response.collectors ?? []));
       this.unmappedTotal.set(response.unmapped?.total ?? 0);
+      this.frames.set(toFrameViews(response.frames ?? []));
       this.windowDays.set(response.windowDays ?? 30);
     } catch (err) {
       this.error.set((err as Error).message);

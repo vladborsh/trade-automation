@@ -1,4 +1,6 @@
 import type { DbHandle } from '../../db/db.port';
+import type { Heartbeat } from '../../collectors/uptime/uptime-gap';
+import { LIQUIDATION_STREAMS, type GapInterval } from '../liquidation-coverage';
 
 /**
  * IB-015 — everything the §8.2 calculators read, and nothing else.
@@ -399,6 +401,49 @@ export async function spotSpelling(db: DbHandle, symbolId: string): Promise<stri
   );
   const spot = rows[0]?.binance_spot;
   return spot === undefined || spot === null || spot.length === 0 ? null : spot;
+}
+
+/**
+ * Liveness for the liquidation streams only.
+ *
+ * A stream missing from this result is **not instrumented**, which is not the same as "covered
+ * zero hours" — IB-BUG-010's distinction, and the caller refuses rather than assuming either way.
+ */
+export async function liquidationHeartbeats(db: DbHandle): Promise<Heartbeat[]> {
+  const rows = await db.query<{
+    stream: string; venue: string; market: string | null; first_seen_at: Date; last_seen_at: Date;
+  }>(
+    `select stream, venue, market, first_seen_at, last_seen_at
+       from collector_heartbeats where stream = any($1::text[])`,
+    [LIQUIDATION_STREAMS],
+  );
+  return rows.map((r) => ({
+    stream: r.stream,
+    venue: r.venue,
+    market: r.market as Heartbeat['market'],
+    firstSeenAt: new Date(r.first_seen_at),
+    lastSeenAt: new Date(r.last_seen_at),
+  }));
+}
+
+/** Recorded outages of the liquidation streams overlapping a window. */
+export async function liquidationGaps(
+  db: DbHandle,
+  fromMs: number,
+  toMsExclusive: number,
+): Promise<GapInterval[]> {
+  const rows = await db.query<{ stream: string; gap_from: Date; gap_to: Date }>(
+    `select stream, gap_from, gap_to
+       from collector_gaps
+      where stream = any($1::text[]) and gap_from < $3 and gap_to > $2
+      order by gap_from`,
+    [LIQUIDATION_STREAMS, asDate(fromMs), asDate(toMsExclusive)],
+  );
+  return rows.map((r) => ({
+    stream: r.stream,
+    gapFrom: new Date(r.gap_from),
+    gapTo: new Date(r.gap_to),
+  }));
 }
 
 /** The signal set, in rank order — the symbols the pass runs for. */
