@@ -31,6 +31,10 @@ function ret(now: number, before: number | null): WebFeatureValue {
 
 export function priceFeatures(input: PriceInput): Partial<Record<WebFeatureKey, WebFeatureValue>> {
   const out: Partial<Record<WebFeatureKey, WebFeatureValue>> = {};
+
+  // IB-016: the close as a key in its own right. `no_data` rather than a refusal reason about
+  // history — if the frame bar has no close, the bar is not there at all.
+  out['px.close'] = input.close === null ? { ok: false, why: 'no_data' } : { ok: true, value: input.close };
   const close = input.close;
 
   out['px.ret_24h'] = close === null ? no('no_data') : ret(close, input.close24hAgo);

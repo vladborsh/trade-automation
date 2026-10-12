@@ -15,7 +15,13 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('5fbbcf4c');
+    expect(featureSpecFingerprint()).toBe('7a4a2a87');
+    // Still 1, and that is a decision with an expiry date rather than an oversight. IB-016 added
+    // px.close, ema.4h.50 and ema.1d.200 on 2026-10-12, when NOTHING had ever been persisted
+    // under version 1 — so no stored frame means something different from a new one and there is
+    // nothing to be incomparable with. The moment real frames exist, the next change to this
+    // registry bumps the version and dual-reads. `feature_frame_versions` enforces it from the
+    // database rather than from this comment.
     expect(WEB_FRAME_VERSION).toBe(1);
   });
 
@@ -92,8 +98,8 @@ describe('the key set is pinned', () => {
   });
 
   it('carries every §8.2 group', () => {
-    expect(WEB_FEATURE_KEYS).toHaveLength(42);
-    for (const prefix of ['funding.', 'oi.', 'ls.', 'cvd.', 'atr.', 'structure.', 'liq.', 'px.', 'label.']) {
+    expect(WEB_FEATURE_KEYS).toHaveLength(45);
+    for (const prefix of ['funding.', 'oi.', 'ls.', 'cvd.', 'atr.', 'structure.', 'liq.', 'px.', 'ema.', 'label.']) {
       expect(WEB_FEATURE_KEYS.some((k) => k.startsWith(prefix))).toBe(true);
     }
   });
@@ -203,5 +209,59 @@ describe('the frame row', () => {
       revision: 1, amendedAt: null, amendedKeys: [],
     });
     expect(ok.success).toBe(true);
+  });
+});
+
+/**
+ * IB-016 — the three keys dev-1 specified for `regime`'s trend axis, asserted here because the
+ * registry is the contract between us: dev-1 reads these and does not own them.
+ */
+describe('the IB-016 trend keys', () => {
+  it('carries the EMA length, bar timeframe and SEED as parameters', () => {
+    // `seed` is meaning, not implementation. An EMA seeded with the first close and one seeded
+    // with the SMA of the first `length` closes disagree for roughly `length` bars and then
+    // converge — two readers of "EMA200" getting different numbers for 200 days and identical
+    // ones after is the hardest kind of disagreement to notice, so it is fingerprinted.
+    expect(WEB_FEATURE_SPEC['ema.4h.50'].params).toEqual({ length: 50, barTf: '4h', source: 'close', seed: 'sma' });
+    expect(WEB_FEATURE_SPEC['ema.1d.200'].params).toEqual({ length: 200, barTf: '1d', source: 'close', seed: 'sma' });
+  });
+
+  it('reads each EMA from the aggregate of its OWN bar timeframe', () => {
+    expect(WEB_FEATURE_SPEC['ema.4h.50'].inputs).toEqual(['agg:4h']);
+    expect(WEB_FEATURE_SPEC['ema.1d.200'].inputs).toEqual(['agg:1d']);
+  });
+
+  it('makes px.close a key, so the trend input carries a refusal reason like everything else', () => {
+    // The alternative — passing the close alongside the frame — would leave one input outside
+    // the completeness rule exactly where a trend decision is made.
+    expect(WEB_FEATURE_KEYS).toContain('px.close');
+    expect(WEB_FEATURE_SPEC['px.close'].type).toBe('number');
+    expect(WEB_FEATURE_SPEC['px.close'].inputs).toEqual(['agg:15m']);
+  });
+
+  it('says in px.close’s def WHICH bar’s close it is on a 4h frame', () => {
+    // The thing to prevent: a later reader seeing `agg:15m` on a 4h frame and concluding the
+    // frame carries a 15-minute close. It carries the frame bar's close, which for a 4h frame
+    // is the close of its final 15m constituent — measured identical on 1235 of 1235 pairs.
+    expect(WEB_FEATURE_SPEC['px.close'].def).toContain('4h frame');
+    expect(WEB_FEATURE_SPEC['px.close'].def).toContain('3h45m');
+  });
+
+  it('puts the EMA lengths inside the fingerprint, so retuning one cannot be silent', () => {
+    const before = featureSpecFingerprint();
+    const retuned = {
+      ...WEB_FEATURE_SPEC,
+      'ema.1d.200': { ...WEB_FEATURE_SPEC['ema.1d.200'], params: { length: 100, barTf: '1d', source: 'close', seed: 'sma' } },
+    };
+    expect(featureSpecFingerprint(retuned)).not.toBe(before);
+  });
+
+  it('puts the SEED inside the fingerprint too, which is the subtle one', () => {
+    const before = featureSpecFingerprint();
+    const reseeded = {
+      ...WEB_FEATURE_SPEC,
+      'ema.4h.50': { ...WEB_FEATURE_SPEC['ema.4h.50'], params: { length: 50, barTf: '4h', source: 'close', seed: 'first' } },
+    };
+    expect(featureSpecFingerprint(reseeded)).not.toBe(before);
   });
 });

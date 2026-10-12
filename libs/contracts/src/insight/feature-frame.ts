@@ -270,6 +270,30 @@ export const WEB_FEATURE_SPEC = {
   'px.ret_24h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'return over the window' },
   'px.ret_4h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours', params: { hours: 4 }, def: 'return over the window' },
   'px.drawdown_from_24h_high': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours', params: { hours: 24 }, def: 'drawdown from the window high' },
+  // The close as a KEY, not as a value carried beside the frame (IB-016, dev-1's option 1,
+  // ruled by the Tech Lead 2026-10-12). Every other price key is derived FROM a close that was
+  // never itself a key, which left the one input a trend decision rests on outside the
+  // completeness rule. As a key it inherits the refusal rules for free, and a stored frame can
+  // answer "what was the price when this armed" without joining back to the candles.
+  //
+  // Sourced from agg:15m on BOTH timeframes, which dev-1 measured rather than assumed: a 4h bar
+  // closes at the same instant as the 15m bar opening +3h45m into it, and on this tape all 1235
+  // complete pairs were identical to the cent (joined on venue, market AND symbol — the first
+  // run omitted venue and market and compared a perp 4h close against a spot 15m close).
+  //
+  // The caveat, recorded because a future key could trip on it: this makes px.close's refusal
+  // track the 15m bucket's completeness, not the 4h one's. A 4h frame whose EARLIER 15m buckets
+  // were short still has a true px.close — that is genuinely the bar's close — but px.close is
+  // then not evidence that the 4h bar is whole. `trend` is safe because it also reads
+  // ema.4h.50, which refuses on short agg:4h buckets; a key reading px.close ALONE on a 4h
+  // frame would not have that protection.
+  'px.close': { inputs: ['agg:15m'], type: 'number', window: 'frame bar', params: { source: 'close', barTf: '15m' }, def: 'close of the bar the frame is stamped by: for a 15m frame its own 15m bar, for a 4h frame the 15m bar whose close coincides with the 4h close (the one opening 3h45m into it)' },
+  // ---- trend (IB-016). `seed` is in params because it is MEANING: an EMA seeded with the first
+  // close and one seeded with the SMA of the first `length` closes disagree for roughly `length`
+  // bars and then converge, so two readers of "EMA200" get different numbers for 200 days and
+  // identical ones afterwards — the hardest kind of disagreement to notice.
+  'ema.4h.50': { inputs: ['agg:4h'], type: 'number', window: 'N bars', params: { length: 50, barTf: '4h', source: 'close', seed: 'sma' }, def: 'exponential moving average of the close over the last N bars of candles_agg, alpha = 2/(length+1), seeded with the SMA of the first N closes' },
+  'ema.1d.200': { inputs: ['agg:1d'], type: 'number', window: 'N bars', params: { length: 200, barTf: '1d', source: 'close', seed: 'sma' }, def: 'exponential moving average of the close over the last N bars of candles_agg, alpha = 2/(length+1), seeded with the SMA of the first N closes' },
   // ---- label
   'label.p4': { inputs: ['agg:15m', 'candles1m:perp', 'candles1m:spot'], type: 'enum', window: 'frame', params: { source: 'design 9.2' }, values: ['SPOT_LED', 'PERP_LED', 'ABSORPTION', 'DISTRIBUTION', 'NONE'], def: 'P4 label from the design section named in params' },
 } as const;
