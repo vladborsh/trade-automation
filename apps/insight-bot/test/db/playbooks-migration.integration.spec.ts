@@ -131,12 +131,12 @@ maybeDescribe('IB-017 migration 015', () => {
     const evaluation = (over: Record<string, unknown> = {}) => db.query(
       `insert into playbook_evaluations
          (playbook, version, symbol, arm, source_mode, close_time, outcome, refusal,
-          gate_status, gate_refusal, exclude_from_comparison)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          gate_status, gate_refusal, exclude_from_comparison, frame_revision)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [over.playbook ?? 'P3', over.version ?? 1, over.symbol ?? 'BTCUSDT', over.arm ?? 'gated',
         over.source_mode ?? 'live', over.close_time ?? new Date(CLOSE), over.outcome ?? 'declined',
         over.refusal ?? null, over.gate_status ?? null, over.gate_refusal ?? null,
-        over.exclude_from_comparison ?? false],
+        over.exclude_from_comparison ?? false, over.frame_revision ?? 1],
     );
 
     it('records one row per playbook x symbol x arm x close x mode', async () => {
@@ -189,6 +189,25 @@ maybeDescribe('IB-017 migration 015', () => {
     it('REFUSES a close with no partition, rather than parking it somewhere wrong', async () => {
       await expect(evaluation({ symbol: 'DOTUSDT', close_time: new Date(Date.UTC(2031, 0, 1)) }))
         .rejects.toThrow(/no partition/i);
+    });
+
+    it('REQUIRES the frame revision — the two arms of a close must be comparable', async () => {
+      // Not nullable: without it nobody can tell afterwards whether the arms of one close read
+      // the same information, and the case where they did not is invisible in every other
+      // column. A default would let a writer omit it and reintroduce exactly that blindness.
+      await expect(db.query(
+        `insert into playbook_evaluations
+           (playbook, version, symbol, arm, source_mode, close_time, outcome)
+         values ('P3',1,'LTCUSDT','gated','live',$1,'declined')`, [new Date(CLOSE)],
+      )).rejects.toThrow(/frame_revision/i);
+    });
+
+    it('accepts frame_revision_unavailable as a refusal', async () => {
+      // The pin could not be satisfied. Refused loudly rather than silently substituting the
+      // newest revision, which is the defect itself.
+      await expect(evaluation({
+        symbol: 'ATOMUSDT', outcome: 'refused', refusal: 'frame_revision_unavailable',
+      })).resolves.toBeDefined();
     });
 
     it('is partitioned on close_time', async () => {

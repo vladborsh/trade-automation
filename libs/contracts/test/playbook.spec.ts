@@ -108,7 +108,15 @@ describe('ArmRefusal — refusing to decide is not deciding not to arm', () => {
   it('names the ways the engine does not produce a signal, each counted apart', () => {
     expect(ArmRefusalSchema.options).toEqual([
       'insufficient_features', 'blind_while_armed', 'window_not_contiguous', 'late_detection',
+      'frame_revision_unavailable',
     ]);
+  });
+
+  it('keeps frame_revision_unavailable distinct from a missing input', () => {
+    // The frame exists; a SIBLING ARM pinned a different revision of it and that one cannot be
+    // read. Refusing loudly beats substituting the newest, which is the lookahead the pin
+    // exists to prevent — the two arms of a close must be compared on the same information.
+    expect(ArmRefusalSchema.options).toContain('frame_revision_unavailable');
   });
 
   it('keeps late_detection distinct, because it is NOT a gap in the data', () => {

@@ -104,6 +104,17 @@ export const ArmRefusalSchema = z.enum([
    * is running late, which is an operational fact about us and not about the market.
    */
   'late_detection',
+  /**
+   * A sibling arm pinned this close to a frame revision that can no longer be read.
+   *
+   * The two arms of one close must be evaluated on the same information, so the first arm to
+   * touch a close pins its frame revision and any arm evaluated later reads THAT revision —
+   * never whatever is newest, which after a heal pass is better informed. Frames are
+   * append-only, so the pin is satisfiable whenever it was real; a failure here is a genuine
+   * finding about the frames table rather than an expected miss, which is why it refuses
+   * loudly instead of substituting the newest revision.
+   */
+  'frame_revision_unavailable',
 ]);
 export type ArmRefusal = z.infer<typeof ArmRefusalSchema>;
 

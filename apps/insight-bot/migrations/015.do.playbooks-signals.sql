@@ -126,6 +126,16 @@ create table playbook_evaluations (
   arm          text not null check (arm in ('gated','unconditional')),
   source_mode  playbook_source_mode not null,
   close_time   timestamptz not null,
+  -- The frame revision this arm actually read, PINNED across arms for a close.
+  --
+  -- Frames are append-only by revision and derive's heal pass produces new ones after the fact,
+  -- so without a pin the two arms of one close can be evaluated against different information:
+  -- the unconditional arm commits on revision 1, the gated arm fails and is retried after a
+  -- heal, and reads revision 2. That is lookahead inside LIVE mode — not live-versus-backfill,
+  -- which `computed_mode` covers, but revision-versus-revision — and it breaks the subset
+  -- property D9's whole comparison rests on. Recorded because it is otherwise invisible in
+  -- every other column afterwards.
+  frame_revision int not null,
   -- What happened, as a closed vocabulary rather than free text.
   outcome      text not null check (outcome in
                  ('armed','triggered','invalidated','expired','expired_unevaluable',
@@ -137,7 +147,7 @@ create table playbook_evaluations (
   -- count of it means the pass is running late, which is a fact about us, not the market.
   refusal      text check (refusal in
                  ('insufficient_features','blind_while_armed','window_not_contiguous',
-                  'late_detection')),
+                  'late_detection','frame_revision_unavailable')),
   -- The context gate's three-state answer, for the gated arm. Null when no gate is declared.
   gate_status  text check (gate_status in ('pass','blocked','unavailable')),
   gate_refusal text check (gate_refusal in

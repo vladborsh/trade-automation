@@ -80,6 +80,34 @@ export async function publishedFrame(
   return row ? toFrame(row) : null;
 }
 
+/**
+ * One SPECIFIC revision of a frame, or null when that revision was never written.
+ *
+ * The playbook engine pins the revision it first evaluated a close against and comes back for
+ * exactly that one (IB-017). Reading "the latest" there would let a sibling arm retried after a
+ * heal see a better-informed frame than the arm it is being compared with — lookahead inside
+ * live mode, through a door `computed_mode` does not cover.
+ *
+ * Revisions are append-only, so this is satisfiable whenever the pin was real; a null is a
+ * genuine finding rather than an expected miss.
+ */
+export async function frameAtRevision(
+  db: DbHandle,
+  symbol: string,
+  tf: WebFrameTimeframe,
+  closeTimeMs: number,
+  revision: number,
+): Promise<WebFeatureFrame | null> {
+  const rows = await db.query<FrameRow>(
+    `select ${FRAME_COLUMNS}
+       from feature_frames
+      where symbol = $1 and tf = $2 and close_time = $3 and revision = $4`,
+    [symbol, tf, asDate(closeTimeMs), revision],
+  );
+  const row = rows[0];
+  return row ? toFrame(row) : null;
+}
+
 /** Every published frame in a window, latest revision each, oldest first. */
 export async function publishedFramesBetween(
   db: DbHandle,

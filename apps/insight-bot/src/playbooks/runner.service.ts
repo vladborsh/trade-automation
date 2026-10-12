@@ -4,6 +4,7 @@ import {
   type Arm, type GateVerdict, type SetupTransition, type WebFeatureFrame,
 } from '@trade-automation/contracts';
 import type { Db, DbHandle } from '../db/db.port';
+import { frameAtRevision } from '../features/pg/frames.repo';
 import { activeConfig, isRunnable, statusForArm, type PlaybookConfigRow } from './config';
 import { NO_REGIME_AXES, evaluateContextGate, type ReadRegimeAxis } from './gate';
 import type { Playbook, PlaybookRegistry } from './playbook.port';
@@ -36,6 +37,17 @@ import { expectedCloses, isWindowContiguous } from './window';
  * together. A crash between them would leave a signal with no record of the evaluation that
  * produced it, or — worse — an idempotency row claiming a close was handled when its signal was
  * never written.
+ *
+ * **4. Both arms of a close read the SAME frame revision.** The first arm to touch a close pins
+ * its revision; any arm evaluated later reads that one rather than whatever is newest.
+ *
+ * Properties 2 and 3 open this hole between them, which is why it belongs with them: an arm can
+ * fail and be retried alone, and derive's heal pass produces better-informed revisions in the
+ * meantime. The unconditional arm commits on revision 1, the gated arm is retried after a heal
+ * and reads revision 2, and the twin-arm comparison is then between an arm and a
+ * better-informed arm. That is the lookahead `computed_mode` exists to kill, arriving through a
+ * different door — revision-versus-revision inside live mode rather than live-versus-backfill —
+ * and it is undetectable afterwards unless the revision each arm read is written down.
  */
 
 export type SourceMode = repo.SourceMode;
@@ -47,6 +59,13 @@ export interface RunnerDeps {
   readRegimeAxis?: ReadRegimeAxis;
   /** The regime row to snapshot onto a signal, if any. */
   regimeSnapshot?: (symbol: string, closeMs: number) => unknown;
+  /**
+   * Reads one specific frame revision, for honouring a pin. Injectable so a backtest can serve
+   * frames from wherever it holds them; defaults to the frames table.
+   */
+  readFrameRevision?: (
+    db: DbHandle, symbol: string, tf: string, closeMs: number, revision: number,
+  ) => Promise<WebFeatureFrame | null>;
 }
 
 export interface ArmOutcome {
@@ -169,12 +188,24 @@ export class PlaybookRunner {
     prev: repo.StoredState | null;
     cooldownActive: boolean;
   }): Promise<ArmOutcome | null> {
-    const { playbook, config, symbol, arm, frame, closeMs, nowMs, sourceMode } = ctx;
+    const { playbook, config, symbol, arm, closeMs, nowMs, sourceMode } = ctx;
     const key = { playbook: playbook.id, symbol, arm, sourceMode, closeTimeMs: closeMs };
 
     // Asked FIRST, before anything is read or decided: a re-run must be a no-op, and the
     // machine being stateful means "evaluate then notice" would already have moved the state.
     if (await repo.alreadyEvaluated(this.deps.db, key)) return null;
+
+    // Property 4: the sibling arm may already have pinned this close to a revision. Resolved
+    // BEFORE the playbook is asked anything, because the pinned frame is the input to all of it.
+    const frame = await this.frameForClose(ctx);
+    if (frame === null) {
+      await this.recordRefusalOnly(ctx, 'frame_revision_unavailable', config.version);
+      return {
+        playbook: playbook.id, symbol, arm, outcome: 'refused',
+        refusal: 'frame_revision_unavailable', excluded: false,
+        signalWritten: false, lateDetection: false,
+      };
+    }
 
     const prevState = ctx.prev?.state ?? 'IDLE';
     const armKeysAvailable = canArm(frame, playbook.keys.armKeys);
@@ -242,6 +273,7 @@ export class PlaybookRunner {
         gateStatus: gate?.status ?? null,
         gateRefusal: gate !== null && gate.status === 'unavailable' ? gate.refusal : null,
         excludeFromComparison: result.excludeFromComparison,
+        frameRevision: frame.revision,
       });
 
       await repo.writeState(tx, {
@@ -295,6 +327,50 @@ export class PlaybookRunner {
   }
 
   /**
+   * The frame this arm must evaluate against: the pinned revision, or the handed one when this
+   * arm is the first to touch the close.
+   *
+   * Returns null only when a pin exists and that revision cannot be read. Frames are
+   * append-only, so that is a real finding about the frames table rather than an expected miss
+   * — and substituting the newest revision instead is exactly the defect being prevented.
+   */
+  private async frameForClose(ctx: {
+    playbook: Playbook; symbol: string; sourceMode: SourceMode; closeMs: number; frame: WebFeatureFrame;
+  }): Promise<WebFeatureFrame | null> {
+    const pinned = await repo.pinnedFrameRevision(this.deps.db, {
+      playbook: ctx.playbook.id, symbol: ctx.symbol, sourceMode: ctx.sourceMode,
+      closeTimeMs: ctx.closeMs,
+    });
+    if (pinned === null || pinned === ctx.frame.revision) return ctx.frame;
+    const read = this.deps.readFrameRevision ?? defaultReadFrameRevision;
+    return read(this.deps.db, ctx.symbol, ctx.playbook.tf, ctx.closeMs, pinned);
+  }
+
+  /** Records a refusal that happened before the machine could be run at all. */
+  private async recordRefusalOnly(
+    ctx: { playbook: Playbook; symbol: string; arm: Arm; sourceMode: SourceMode; closeMs: number; prev: repo.StoredState | null; frame: WebFeatureFrame },
+    refusal: string,
+    version: number,
+  ): Promise<void> {
+    await repo.recordEvaluation(this.deps.db, {
+      playbook: ctx.playbook.id,
+      version: ctx.prev?.version ?? version,
+      symbol: ctx.symbol,
+      arm: ctx.arm,
+      sourceMode: ctx.sourceMode,
+      closeTimeMs: ctx.closeMs,
+      outcome: 'refused',
+      refusal,
+      gateStatus: null,
+      gateRefusal: null,
+      excludeFromComparison: false,
+      // What we were handed and could not use — the pin it failed to satisfy is in the sibling
+      // arm's row, which is the only place it was ever true.
+      frameRevision: ctx.frame.revision,
+    });
+  }
+
+  /**
    * Was every close since arming evaluated by THIS arm, in THIS mode?
    *
    * Only asked of an ARMED setup — an IDLE arm has no window to be whole. Read from the
@@ -315,6 +391,11 @@ export class PlaybookRunner {
     return isWindowContiguous(expected, seen);
   }
 }
+
+const defaultReadFrameRevision = (
+  db: DbHandle, symbol: string, tf: string, closeMs: number, revision: number,
+): Promise<WebFeatureFrame | null> =>
+  frameAtRevision(db, symbol, tf as WebFeatureFrame['tf'], closeMs, revision);
 
 /** `armed_ttl_bars` from the config, defaulting to §9.1's 8 when a playbook does not say. */
 function ttlBars(config: PlaybookConfigRow): number {

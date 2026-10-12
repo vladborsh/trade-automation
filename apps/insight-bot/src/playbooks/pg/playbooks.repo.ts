@@ -102,6 +102,14 @@ export interface EvaluationRow {
   gateStatus: 'pass' | 'blocked' | 'unavailable' | null;
   gateRefusal: string | null;
   excludeFromComparison: boolean;
+  /**
+   * The frame revision this arm actually read.
+   *
+   * On the row because without it nobody can tell afterwards whether the two arms of a close
+   * were compared on the same information — and the case where they are not is invisible in
+   * every other column.
+   */
+  frameRevision: number;
 }
 
 /**
@@ -118,14 +126,39 @@ export async function recordEvaluation(db: DbHandle, row: EvaluationRow): Promis
   const rows = await db.query<{ playbook: string }>(
     `insert into playbook_evaluations
        (playbook, version, symbol, arm, source_mode, close_time, outcome, refusal,
-        gate_status, gate_refusal, exclude_from_comparison)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        gate_status, gate_refusal, exclude_from_comparison, frame_revision)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
      on conflict (playbook, symbol, arm, close_time, source_mode) do nothing
      returning playbook`,
     [row.playbook, row.version, row.symbol, row.arm, row.sourceMode, asDate(row.closeTimeMs),
-      row.outcome, row.refusal, row.gateStatus, row.gateRefusal, row.excludeFromComparison],
+      row.outcome, row.refusal, row.gateStatus, row.gateRefusal, row.excludeFromComparison,
+      row.frameRevision],
   );
   return rows.length > 0;
+}
+
+/**
+ * The frame revision already pinned for this close, by whichever arm touched it first.
+ *
+ * Across ARMS deliberately — the pin is a property of `(playbook, symbol, close_time)`, not of
+ * one arm. That is the whole point: the two arms of a close must be compared on the same
+ * information, and the hazard is precisely that one of them is evaluated later, after a heal
+ * pass has produced a better-informed revision.
+ *
+ * Null when nothing has touched this close yet, in which case the caller's frame sets the pin.
+ */
+export async function pinnedFrameRevision(
+  db: DbHandle,
+  q: { playbook: string; symbol: string; sourceMode: SourceMode; closeTimeMs: number },
+): Promise<number | null> {
+  const rows = await db.query<{ frame_revision: number }>(
+    `select frame_revision from playbook_evaluations
+      where playbook = $1 and symbol = $2 and source_mode = $3 and close_time = $4
+      order by frame_revision
+      limit 1`,
+    [q.playbook, q.symbol, q.sourceMode, asDate(q.closeTimeMs)],
+  );
+  return rows[0]?.frame_revision ?? null;
 }
 
 /** Has this close already been evaluated for this arm? The idempotency question, asked first. */

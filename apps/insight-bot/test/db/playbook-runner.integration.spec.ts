@@ -84,6 +84,10 @@ maybeDescribe('IB-017 the runner', () => {
     runner.runClose('15m', closeMs, nowMs, [SYMBOL], new Map([[SYMBOL, frameAt(closeMs, price)]]), 'live');
 
   const reset = async () => {
+    // feature_frames too: the pinning tests seed revisions here, and a row surviving into the
+    // next test makes an unsatisfiable pin satisfiable. Caught by this suite failing in a full
+    // run while passing alone — the ordering dependency was in the fixture, not the code.
+    await db.query(`delete from feature_frames`);
     await db.query(`delete from playbook_evaluations`);
     await db.query(`delete from signals`);
     await db.query(`delete from playbook_state`);
@@ -330,6 +334,102 @@ maybeDescribe('IB-017 the runner', () => {
       const back = await db.query<{ state: string }>(
         `select state from playbook_state where source_mode = 'backtest' order by arm`);
       expect(back.every((s) => s.state === 'ARMED')).toBe(true);
+    });
+  });
+
+  /**
+   * The frame revision is pinned per close, across arms.
+   *
+   * The hole this closes, found in review: properties 2 and 3 open it between them. An arm can
+   * fail and be retried alone (property 2), the retry is skipped for the arm that already
+   * committed (property 3's ledger), and derive's heal pass produces a better-informed revision
+   * in between. The twin-arm comparison then compares revision 1 against revision 2 — lookahead
+   * inside LIVE mode, through a different door from the one `computed_mode` closes, and
+   * invisible afterwards unless the revision each arm read is written down.
+   */
+  describe('frame revision pinning', () => {
+    const storeFrame = async (closeMs: number, revision: number, close: number) => db.query(
+      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete,
+                                   revision, computed_mode, computed_at)
+       values ($1,'15m',$2,1,$3::jsonb,'{}'::jsonb,false,$4,'live',$5)
+       on conflict do nothing`,
+      [SYMBOL, new Date(closeMs), JSON.stringify({ 'px.close': { ok: true, value: close } }),
+        revision, new Date(closeMs)],
+    );
+
+    const frameRev = (closeMs: number, revision: number, close: number): WebFeatureFrame =>
+      ({ ...frameAt(closeMs, close), revision });
+
+    it('records the revision each arm read', async () => {
+      await run(T0, 105);
+      const rows = await db.query<{ arm: string; frame_revision: number }>(
+        `select arm, frame_revision from playbook_evaluations order by arm`);
+      expect(rows).toEqual([
+        { arm: 'gated', frame_revision: 1 },
+        { arm: 'unconditional', frame_revision: 1 },
+      ]);
+    });
+
+    it('a sibling arm retried after a HEAL reads the PINNED revision, not the newest', async () => {
+      // Step 1-2: the unconditional arm commits on revision 1; the gated arm "failed", which is
+      // reproduced by removing its audit row and state so only it is outstanding.
+      await storeFrame(T0, 1, 105);
+      await run(T0, 105);
+      await db.query(`delete from playbook_evaluations where arm = 'gated'`);
+      await db.query(`delete from playbook_state where arm = 'gated'`);
+
+      // Step 3: the heal pass produces revision 2, and it says something different — a price
+      // that would NOT have armed. If the gated arm reads it, the two arms disagree for a
+      // reason that has nothing to do with the gate.
+      await storeFrame(T0, 2, 50);
+
+      // Step 4: the retry is handed the newest frame, as a live caller would be.
+      await runner.runClose('15m', T0, T0 + 15_000, [SYMBOL],
+        new Map([[SYMBOL, frameRev(T0, 2, 50)]]), 'live');
+
+      const rows = await db.query<{ arm: string; frame_revision: number; outcome: string }>(
+        `select arm, frame_revision, outcome from playbook_evaluations order by arm`);
+      expect(rows).toEqual([
+        // read the pinned revision 1 and therefore armed, exactly like its sibling
+        { arm: 'gated', frame_revision: 1, outcome: 'armed' },
+        { arm: 'unconditional', frame_revision: 1, outcome: 'armed' },
+      ]);
+    });
+
+    it('REFUSES rather than substituting the newest when the pinned revision cannot be read', async () => {
+      // Frames are append-only, so this is a real finding about the frames table rather than an
+      // expected miss — and silently using the newer revision is the defect itself.
+      await run(T0, 105);                                    // pins revision 1
+      await db.query(`delete from playbook_evaluations where arm = 'gated'`);
+      await db.query(`delete from playbook_state where arm = 'gated'`);
+      // No feature_frames row exists for revision 1 in this test, so the pin is unsatisfiable.
+      await runner.runClose('15m', T0, T0 + 15_000, [SYMBOL],
+        new Map([[SYMBOL, frameRev(T0, 2, 105)]]), 'live');
+
+      const [row] = await db.query<{ outcome: string; refusal: string }>(
+        `select outcome, refusal from playbook_evaluations where arm = 'gated'`);
+      expect(row).toEqual({ outcome: 'refused', refusal: 'frame_revision_unavailable' });
+      // And it did NOT arm on the newer frame.
+      expect((await states()).find((s) => s.arm === 'gated')).toBeUndefined();
+    });
+
+    it('does not consult a pin when this arm is the FIRST to touch the close', async () => {
+      // The common path must not pay for the rare one: with no sibling row, the handed frame
+      // sets the pin and is used as-is whatever its revision number happens to be.
+      await runner.runClose('15m', T0, T0 + 15_000, [SYMBOL],
+        new Map([[SYMBOL, frameRev(T0, 7, 105)]]), 'live');
+      const rows = await db.query<{ frame_revision: number }>(
+        `select frame_revision from playbook_evaluations`);
+      expect(rows.every((r) => r.frame_revision === 7)).toBe(true);
+    });
+
+    it('pins per close, so a later close is free to use a later revision', async () => {
+      await run(T0, 105);
+      await runner.runClose('15m', T0 + M15, T0 + M15 + 15_000, [SYMBOL],
+        new Map([[SYMBOL, frameRev(T0 + M15, 3, 115)]]), 'live');
+      const rows = await db.query<{ close_time: Date; frame_revision: number }>(
+        `select distinct close_time, frame_revision from playbook_evaluations order by close_time`);
+      expect(rows.map((r) => r.frame_revision)).toEqual([1, 3]);
     });
   });
 });
