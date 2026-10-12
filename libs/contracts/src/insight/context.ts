@@ -104,3 +104,85 @@ export const WebMarketCapResponseSchema = z.object({
   downsampled: z.boolean(),
 });
 export type WebMarketCapResponse = z.infer<typeof WebMarketCapResponseSchema>;
+
+// ---------------------------------------------------------------------------------------------
+// The market CARDS (§12.1, ruling 2026-10-07: information cards, not charts)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * One endpoint whose payload **is** what the cards show. The client renders it and derives nothing:
+ * every figure arrives with its unit, the instant it was measured and the venue it came from,
+ * because a number on a card with no stated basis is a confident claim that may be wrong
+ * (the IB-BUG-011 lesson in its general form).
+ *
+ * Deltas are nullable on purpose and are *not* zero when unknown. `market_cap_global` is collected
+ * forward only, so a young database genuinely cannot say what dominance did over 7 days — the card
+ * says how long it has been collecting instead of inventing a move.
+ */
+export const WebCardSourceSchema = z.enum(['alternative.me', 'coingecko']);
+export type WebCardSource = z.infer<typeof WebCardSourceSchema>;
+
+export const WebFearGreedReadingSchema = z.object({
+  day: Day,
+  value: z.number().int().min(0).max(100),
+  /** The venue's own wording, verbatim. */
+  classification: z.string().min(1),
+});
+export type WebFearGreedReading = z.infer<typeof WebFearGreedReadingSchema>;
+
+export const WebFearGreedCardSchema = z.object({
+  now: WebFearGreedReadingSchema,
+  /** The previous published day, for the card's sentence. Null when only one day is held. */
+  previous: WebFearGreedReadingSchema.nullable().default(null),
+  /** Seven published days back, when held. */
+  weekAgo: WebFearGreedReadingSchema.nullable().default(null),
+  source: WebCardSourceSchema,
+});
+export type WebFearGreedCard = z.infer<typeof WebFearGreedCardSchema>;
+
+export const WebDominanceCardSchema = z.object({
+  /** Percent of total market cap, as the venue reports it. */
+  btcPct: z.number(),
+  ethPct: z.number().nullable().default(null),
+  /** Total market cap in USD at the same sample. */
+  totalUsd: z.number().nullable().default(null),
+  /** ms UTC of the sample these figures come from — never "now". */
+  atMs: z.number().int(),
+  changePct24h: z.number().nullable().default(null),
+  changePct7d: z.number().nullable().default(null),
+  totalChangePct24h: z.number().nullable().default(null),
+  /**
+   * Whole days of collection behind this series. The card says «данных пока за N дней» instead of a
+   * delta it cannot compute: this series is forward-only and cannot be backfilled (§10).
+   */
+  coverageDays: z.number().int().nonnegative(),
+  source: WebCardSourceSchema,
+});
+export type WebDominanceCard = z.infer<typeof WebDominanceCardSchema>;
+
+export const WebBtcVsTopCardSchema = z.object({
+  /** BTC's share of the top-20 caps actually held for `day` — not of the whole market. */
+  sharePct: z.number(),
+  day: Day,
+  /**
+   * The denominator, stated: how many of the top 20 had a cap that day. A share of three coins is
+   * not a share of twenty, and a card that prints the percentage without this is wrong.
+   */
+  coinsCounted: z.number().int().nonnegative(),
+  coinsExpected: z.number().int().nonnegative(),
+  changePct7d: z.number().nullable().default(null),
+  changePct30d: z.number().nullable().default(null),
+  source: WebCardSourceSchema,
+});
+export type WebBtcVsTopCard = z.infer<typeof WebBtcVsTopCardSchema>;
+
+export const WebMarketCardsResponseSchema = z.object({
+  fearGreed: WebFearGreedCardSchema.nullable().default(null),
+  dominance: WebDominanceCardSchema.nullable().default(null),
+  btcVsTop: WebBtcVsTopCardSchema.nullable().default(null),
+  /** The newest caps, largest first — the card's small table, not a series. */
+  caps: z.array(WebMarketCapCurrentSchema).default([]),
+  /** The day `caps` describes, so the table can say when it was measured. */
+  capsDay: Day.nullable().default(null),
+});
+export type WebMarketCardsResponse = z.infer<typeof WebMarketCardsResponseSchema>;
