@@ -5,4 +5,5 @@
 -- the one that frame was armed under. That is exactly why `feature_frame_versions` exists, and
 -- exactly why dropping these is a real loss of the audit trail rather than a tidy-up.
 drop table if exists feature_frames;
+drop table if exists feature_value_conflicts;
 drop table if exists feature_frame_versions;

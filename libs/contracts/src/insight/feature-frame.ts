@@ -48,6 +48,20 @@ export const WEB_FEATURE_UNAVAILABLE = [
    * than trusted, so the interval is measured and the key refuses when it has moved.
    */
   'convention_changed',
+  /**
+   * The input is short and **the absence is evidenced**, so it will never heal.
+   *
+   * Two sub-cases, deliberately under one reason because both are permanent and neither is a
+   * fresh defect: a `collector_gaps` row already records that we were not collecting (the data
+   * is gone and is counted once, there), or the venue never produced the minute at all — a halt,
+   * a maintenance window, or a timestamp before the symbol's listing date.
+   *
+   * It exists because `hours * 60` cannot tell "nobody has collected it yet" from "it never
+   * existed", and conflating them leaves a key refusing for ever behind an unhealed-gap counter
+   * that never drains. That is the stale-apology shape: an alarm that cannot be cleared stops
+   * being read. **Permanent and expected — explicitly NOT counted as an unhealed gap.**
+   */
+  'explained_absence',
 ] as const;
 export const WebFeatureUnavailableSchema = z.enum(WEB_FEATURE_UNAVAILABLE);
 export type WebFeatureUnavailable = z.infer<typeof WebFeatureUnavailableSchema>;
@@ -107,6 +121,24 @@ export type WebFrameBasis = z.infer<typeof WebFrameBasisSchema>;
 export const WebFrameTimeframeSchema = z.enum(['15m', '4h']);
 export type WebFrameTimeframe = z.infer<typeof WebFrameTimeframeSchema>;
 
+/**
+ * Reasons that will never resolve, however long the heal pass runs.
+ *
+ * The split matters because the alarm must only ring for something somebody can fix: a frame
+ * still carrying `incomplete_input` after the heal window has closed is an **unhealed gap** and
+ * is counted; one carrying any of these is working as intended and is not.
+ */
+export const WEB_FEATURE_PERMANENT_REASONS: readonly WebFeatureUnavailable[] = [
+  'insufficient_history',
+  'not_applicable',
+  'convention_changed',
+  'explained_absence',
+];
+
+export function isPermanentRefusal(value: WebFeatureValue): boolean {
+  return !value.ok && WEB_FEATURE_PERMANENT_REASONS.includes(value.why);
+}
+
 export const WebFeatureFrameSchema = z.object({
   symbol: z.string(),
   tf: WebFrameTimeframeSchema,
@@ -123,6 +155,23 @@ export const WebFeatureFrameSchema = z.object({
   complete: z.boolean(),
   /** Which bucket or slot was short, when something was. Empty when `complete`. */
   incompleteReason: z.array(z.string()),
+  /**
+   * 1 for the frame as first written, incremented by each AMENDMENT.
+   *
+   * Frames are **append-only**: `(symbol, tf, close_time, revision)` is the key, and an earlier
+   * revision is never rewritten. §8.1's idempotency is preserved in substance — a re-check that
+   * produces identical values writes NOTHING — while the question "what did this frame actually
+   * say when something armed on it?" stays answerable for ever. A signal references the
+   * revision, not just the bar.
+   */
+  revision: z.number().int().positive(),
+  /** When this revision was written, if it amended an earlier one. Null on revision 1. */
+  amendedAt: TimeSec.nullable(),
+  /**
+   * Which keys moved from a refusal to a value in THIS revision. An amendment states itself
+   * rather than being inferred by diffing two rows.
+   */
+  amendedKeys: z.array(z.string()),
 });
 export type WebFeatureFrame = z.infer<typeof WebFeatureFrameSchema>;
 
@@ -318,6 +367,51 @@ export function requireFeature(value: WebFeatureValue, key: string): WebFeatureS
 /** An explicit fallback, so substituting a value is a visible decision at the call site. */
 export function featureOr<T extends WebFeatureScalar>(value: WebFeatureValue, fallback: T): T {
   return value.ok ? (value.value as T) : fallback;
+}
+
+/**
+ * The latest revision of each `close_time` — the default read.
+ *
+ * Reads take the latest revision; a consumer may ask for a specific one, and an audit read that
+ * wants the history asks for it by name. The easy path is the correct one, because a reader that
+ * forgets gets several rows for one bar.
+ */
+export function latestRevisions(frames: readonly WebFeatureFrame[]): WebFeatureFrame[] {
+  const best = new Map<string, WebFeatureFrame>();
+  for (const frame of frames) {
+    const key = `${frame.symbol}\u0000${frame.tf}\u0000${frame.closeTime}`;
+    const held = best.get(key);
+    if (!held || frame.revision > held.revision) best.set(key, frame);
+  }
+  return [...best.values()].sort((a, b) => a.closeTime - b.closeTime || a.symbol.localeCompare(b.symbol));
+}
+
+/**
+ * A comparison across frames must not mix revisions of one bar, exactly as it must not mix
+ * versions — the two are the same mistake at different scales. Throws rather than returning a
+ * flag, because a caller that wanted to know would have called `latestRevisions` first.
+ */
+export function assertSingleRevisionPerClose(frames: readonly WebFeatureFrame[]): void {
+  const seen = new Map<string, number>();
+  for (const frame of frames) {
+    const key = `${frame.symbol} ${frame.tf} ${frame.closeTime}`;
+    const held = seen.get(key);
+    if (held !== undefined && held !== frame.revision) {
+      throw new Error(
+        `mixed frame revisions for ${key}: ${held} and ${frame.revision}. ` +
+        'Take latestRevisions() first, or compare one revision deliberately — a comparison across ' +
+        'revisions compares two different answers to the same bar.',
+      );
+    }
+    seen.set(key, frame.revision);
+  }
+  const versions = new Set(frames.map((f) => f.frameVersion));
+  if (versions.size > 1) {
+    throw new Error(
+      `mixed frame_versions in one comparison: ${[...versions].join(', ')}. ` +
+      'Frames written under different versions mean different things and must not be compared.',
+    );
+  }
 }
 
 /** Every key a playbook requires must be computable, or it does not arm (the rule, as code). */

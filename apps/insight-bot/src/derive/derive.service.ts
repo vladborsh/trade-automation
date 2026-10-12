@@ -13,6 +13,16 @@ import { candles1mBetween, incompleteBuckets, seriesWithRows } from './derive.re
  * `Writers.candlesAgg`, whose upsert is keyed on (venue, market, symbol, tf, open_time), so
  * re-running either is idempotent — a re-derived bar replaces itself rather than duplicating.
  */
+/**
+ * How far back the heal pass reaches. Beyond this, a bucket will never be re-folded.
+ *
+ * Exported because IB-015's feature pass needs the same boundary: a frame refused for an
+ * incomplete bucket can only become computable while that bucket is still within reach of this
+ * pass, so this is what closes the re-check window. Referenced rather than copied — two
+ * thresholds meaning the same thing drift, and shortening this one must move that one with it.
+ */
+export const HEAL_LOOKBACK_MS = 2 * 3_600_000;
+
 @Injectable()
 export class DeriveService {
   private readonly logger = new Logger(DeriveService.name);
@@ -65,7 +75,7 @@ export class DeriveService {
    * and GapRepair can fill a hole minutes later. Both are normal; a permanently short coarse bar is
    * not.
    */
-  async healIncomplete(now: number, lookbackMs = 2 * 3_600_000): Promise<number> {
+  async healIncomplete(now: number, lookbackMs = HEAL_LOOKBACK_MS): Promise<number> {
     const stale = await incompleteBuckets(this.db, now, lookbackMs);
     let healed = 0;
     for (const bucket of stale) {

@@ -148,6 +148,7 @@ describe('canArm — the rule that replaces the flag', () => {
       symbol: 'BTCUSDT', tf: '15m', closeTime: 1_791_000_000, frameVersion: WEB_FRAME_VERSION,
       keys, basis: { venues: ['bybit'], coverage: 'not_recorded', coveredHours: null },
       complete: Object.values(keys).every((v) => v.ok), incompleteReason: [],
+      revision: 1, amendedAt: null, amendedKeys: [],
     });
 
   it('arms when every REQUIRED key computed, even on an incomplete frame', () => {
@@ -173,15 +174,29 @@ describe('the frame row', () => {
     const base = {
       symbol: 'BTCUSDT', tf: '15m', closeTime: 1_791_000_000, frameVersion: 1,
       keys: {}, basis: { venues: [], coverage: 'no_events', coveredHours: null }, incompleteReason: [],
+      revision: 1, amendedAt: null, amendedKeys: [],
     };
     expect(WebFeatureFrameSchema.safeParse({ ...base, complete: null }).success).toBe(false);
     expect(WebFeatureFrameSchema.safeParse({ ...base, complete: false }).success).toBe(true);
+  });
+
+  it('REQUIRES a revision, so an unversioned frame cannot be stored', () => {
+    // Append-only is only meaningful if every row says which revision it is.
+    const base = {
+      symbol: 'BTCUSDT', tf: '15m' as const, closeTime: 1, frameVersion: 1, keys: {},
+      basis: { venues: [], coverage: 'no_events' as const, coveredHours: null },
+      complete: true, incompleteReason: [], amendedAt: null, amendedKeys: [],
+    };
+    expect(WebFeatureFrameSchema.safeParse(base).success).toBe(false);
+    expect(WebFeatureFrameSchema.safeParse({ ...base, revision: 0 }).success).toBe(false);
+    expect(WebFeatureFrameSchema.safeParse({ ...base, revision: 1 }).success).toBe(true);
   });
 
   it('keeps coveredHours nullable, because "not recorded" is not zero hours', () => {
     const ok = WebFeatureFrameSchema.safeParse({
       symbol: 'BTCUSDT', tf: '4h', closeTime: 1, frameVersion: 1, keys: {}, complete: true,
       incompleteReason: [], basis: { venues: ['okx'], coverage: 'not_recorded', coveredHours: null },
+      revision: 1, amendedAt: null, amendedKeys: [],
     });
     expect(ok.success).toBe(true);
   });

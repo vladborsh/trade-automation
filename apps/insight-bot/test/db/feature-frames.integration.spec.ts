@@ -47,15 +47,14 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
-  const insertFrame = async (closeMs: number, complete = true, reason: string[] = []) =>
+  const insertFrame = async (closeMs: number, complete = true, reason: string[] = [], revision = 1) =>
     db.query(
-      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason)
-       values ($1,$2,$3,$4,$5,$6,$7,$8)
-       on conflict (symbol, tf, close_time) do update set keys = excluded.keys, complete = excluded.complete`,
+      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, revision)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       ['BTCUSDT', '15m', new Date(closeMs), WEB_FRAME_VERSION,
         JSON.stringify({ 'oi.d24h_pct': { ok: true, value: 1.5 } }),
         JSON.stringify({ venues: ['bybit'], coverage: 'not_recorded', coveredHours: null }),
-        complete, reason],
+        complete, reason, revision],
     );
 
   it('creates the partitioned table the migration describes', async () => {
@@ -66,21 +65,31 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
   });
 
   it('REJECTS a tf outside 15m and 4h rather than storing an unknown frame', async () => {
-    await expect(insertFrame(CLOSE).then(() => db.query(
+    // Its own bar: these tests share a database and a collision would look like a schema fault.
+    await expect(db.query(
       `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete)
-       values ('BTCUSDT','1h',$1,1,'{}','{}',true)`, [new Date(CLOSE)],
-    ))).rejects.toThrow();
+       values ('BTCUSDT','1h',$1,1,'{}','{}',true)`, [new Date(CLOSE - 3_600_000)],
+    )).rejects.toThrow(/tf_check|check constraint/i);
   });
 
-  it('is idempotent on (symbol, tf, close_time), so a recompute replaces that bar\'s decision', async () => {
-    await insertFrame(CLOSE);
-    await insertFrame(CLOSE, false, ['candles_agg 15m@12:00 bars 14 of 15']);
-    const rows = await db.query<{ complete: boolean; incomplete_reason: string[] }>(
-      `select complete, incomplete_reason from feature_frames where symbol='BTCUSDT' and tf='15m' and close_time=$1`,
+  it('APPENDS a revision rather than overwriting, so the armed-on answer survives', async () => {
+    // "What did the frame at 12:00 actually say when something armed on it?" has to stay
+    // answerable for ever — an in-place update destroys it the moment it amends.
+    await insertFrame(CLOSE, false, ['candles_agg 15m@12:00 bars 14 of 15'], 1);
+    await insertFrame(CLOSE, true, [], 2);
+    const rows = await db.query<{ revision: number; complete: boolean }>(
+      `select revision, complete from feature_frames
+        where symbol='BTCUSDT' and tf='15m' and close_time=$1 order by revision`,
       [new Date(CLOSE)],
     );
-    expect(rows).toHaveLength(1); // one bar, one decision — not two rows
-    expect(rows[0].complete).toBe(false);
+    expect(rows.map((r) => r.revision)).toEqual([1, 2]);
+    expect(rows[0].complete).toBe(false); // revision 1 still says what it said
+    expect(rows[1].complete).toBe(true);
+  });
+
+  it('REFUSES a duplicate revision for one bar, so an amendment cannot be written twice', async () => {
+    await insertFrame(CLOSE + 1_800_000, true, [], 1);
+    await expect(insertFrame(CLOSE + 1_800_000, true, [], 1)).rejects.toThrow(/duplicate key/i);
   });
 
   it('REFUSES a row whose month has no partition, rather than parking it somewhere wrong', async () => {
@@ -88,12 +97,25 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
     await expect(insertFrame(Date.UTC(2031, 0, 1))).rejects.toThrow(/partition/i);
   });
 
-  it('defaults incomplete_reason to empty rather than null, so a reader never branches on null', async () => {
+  it('defaults incomplete_reason and amended_keys to empty rather than null', async () => {
     await insertFrame(CLOSE + 900_000);
-    const [row] = await db.query<{ incomplete_reason: string[] }>(
-      `select incomplete_reason from feature_frames where close_time = $1`, [new Date(CLOSE + 900_000)],
+    const [row] = await db.query<{ incomplete_reason: string[]; amended_keys: string[]; amended_at: Date | null }>(
+      `select incomplete_reason, amended_keys, amended_at from feature_frames where close_time = $1`,
+      [new Date(CLOSE + 900_000)],
     );
     expect(row?.incomplete_reason).toEqual([]);
+    expect(row?.amended_keys).toEqual([]);
+    expect(row?.amended_at).toBeNull(); // revision 1 amended nothing
+  });
+
+  it('records a value conflict without touching the published frame', async () => {
+    await db.query(
+      `insert into feature_value_conflicts (symbol, tf, close_time, revision, feature_key, published, recomputed)
+       values ('BTCUSDT','15m',$1,1,'cvd.perp.4h','{"ok":true,"value":100}','{"ok":true,"value":999}')`,
+      [new Date(CLOSE)],
+    );
+    const [row] = await db.query<{ n: string }>(`select count(*) as n from feature_value_conflicts`);
+    expect(Number(row?.n)).toBe(1);
   });
 
   describe('the version guard, against the real table', () => {

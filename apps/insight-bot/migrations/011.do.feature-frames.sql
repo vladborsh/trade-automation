@@ -1,9 +1,9 @@
 -- IB-015 — the feature frames of design §8.2, and the mechanism that stops their meaning
 -- drifting out from under them.
 --
--- Two tables, and the second one is the point.
+-- Three tables.
 --
--- `feature_frames` is the §3.4 shape: one row per (symbol, tf, close_time), the keys as jsonb,
+-- `feature_frames` is the §3.4 shape, APPEND-ONLY by revision: the keys as jsonb,
 -- the basis it was computed over, and `complete`. A frame is written even when a key could not be
 -- computed — a skipped frame is indistinguishable from "the feature pass was not running", which
 -- is IB-BUG-010 one layer up. `complete` is an INDEX for "does this frame hold a non-computable
@@ -35,16 +35,29 @@ create table feature_frames (
   -- which bucket or slot was short, when one was. Empty when complete.
   incomplete_reason text[]  not null default '{}',
   computed_at   timestamptz not null default now(),
-  -- the partition key is in the primary key because Postgres requires it; the key is also §8.1's
-  -- idempotency key, so a recompute after the heal pass updates the frame rather than duplicating
-  -- that bar's decision.
-  primary key (symbol, tf, close_time)
+  -- APPEND-ONLY. revision 1 is the frame as first written; each amendment appends the next.
+  revision      int         not null default 1,
+  -- when this revision was written, and which keys moved from a refusal to a value in it. An
+  -- amendment states itself rather than being inferred by diffing two rows.
+  amended_at    timestamptz,
+  amended_keys  text[]      not null default '{}',
+  -- The partition key is in the primary key because Postgres requires it. `revision` is in it
+  -- because "what did the frame at 15:00 actually say when something armed on it" must stay
+  -- answerable for ever: a signal references a revision, and a reference is only meaningful if
+  -- the thing referenced still exists.
+  --
+  -- §8.1's "idempotent on (symbol, tf, close_time)" is PRESERVED IN SUBSTANCE, not dropped: a
+  -- re-check that produces identical values writes nothing at all. A new revision exists only
+  -- when a refusal became a value. Without that rule append-only quietly becomes grows-forever.
+  primary key (symbol, tf, close_time, revision)
 ) partition by range (close_time);
 
 comment on table feature_frames is
-  'Design 8.2. One row per (symbol, tf, close_time). A frame is written even when keys are not '
-  'computable: absence would be indistinguishable from the feature pass not running. `complete` is '
-  'an index, not a gate — no consumer may arm on it; arming is decided per key.';
+  'Design 8.2, append-only by revision. Reads take the LATEST revision of a (symbol, tf, '
+  'close_time); earlier revisions are the audit trail and a signal references the one it armed '
+  'on. A frame is written even when keys are not computable: absence would be indistinguishable '
+  'from the feature pass not running. complete is an index, not a gate — no consumer may arm on '
+  'it; arming is decided per key.';
 
 comment on column feature_frames.complete is
   'True when every key computed. An INDEX for finding frames with refusals, never a safety '
@@ -52,6 +65,33 @@ comment on column feature_frames.complete is
   'cannot.';
 
 create index feature_frames_incomplete_idx on feature_frames (close_time) where not complete;
+
+-- ---------------------------------------------------------------------------------------------
+-- Rule 2: a re-check that would CHANGE an already-published value is a data defect, recorded and
+-- counted, never applied. An input that moved under us is a finding about the collectors, not a
+-- correction to a feature — and something may already have armed on the published answer.
+--
+-- Expected to be EMPTY in normal operation, which is what makes it worth counting: a counter
+-- that is routinely non-zero tells nobody anything.
+-- ---------------------------------------------------------------------------------------------
+
+create table feature_value_conflicts (
+  symbol       text        not null,
+  tf           text        not null,
+  close_time   timestamptz not null,
+  -- the revision whose value stood; the recomputed one was discarded
+  revision     int         not null,
+  feature_key  text        not null,
+  published    jsonb       not null,
+  recomputed   jsonb       not null,
+  seen_at      timestamptz not null default now(),
+  primary key (symbol, tf, close_time, revision, feature_key, seen_at)
+);
+
+comment on table feature_value_conflicts is
+  'IB-015 rule 2: a recompute that would change an already-published feature value. The published '
+  'value STANDS and the attempt is recorded here. Non-empty means an input changed under us after '
+  'publication, which is a collector finding, not a feature correction.';
 
 -- ---------------------------------------------------------------------------------------------
 -- The version guard. Tiny, not partitioned: one row per frame_version, ever.

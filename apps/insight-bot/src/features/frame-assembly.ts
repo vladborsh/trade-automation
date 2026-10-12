@@ -83,6 +83,11 @@ export function assembleFrame(input: AssembleInput): WebFeatureFrame {
     complete,
     // sorted so two runs over the same shortfalls produce byte-identical frames
     incompleteReason: complete ? [] : [...input.reasons].sort(),
+    // A frame as first written is revision 1 and has amended nothing. Amendments are decided in
+    // `frame-amendment.ts`, never here — this function only ever builds the original.
+    revision: 1,
+    amendedAt: null,
+    amendedKeys: [],
   };
 }
 
