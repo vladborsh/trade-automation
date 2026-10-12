@@ -17,7 +17,8 @@
     "audit:months": "node dist/ops/month-label-audit.cli.js",
     "features": "node dist/features/features.cli.js",
     "audit:frames": "node dist/ops/frame-audit.cli.js",
-    "measure:trend-flips": "node dist/regime/trend-flip-rate.cli.js"
+    "measure:trend-flips": "node dist/regime/trend-flip-rate.cli.js",
+    "audit:arming": "node dist/playbooks/arm-audit.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",
