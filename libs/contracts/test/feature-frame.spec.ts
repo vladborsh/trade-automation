@@ -1,7 +1,8 @@
 import {
   WEB_FEATURE_KEYS, WEB_FEATURE_SPEC, WEB_FRAME_VERSION, WebFeatureFrameSchema,
-  WebFeatureValueSchema, canArm, featureOr, featureSpecFingerprint, requireFeature,
-  type WebFeatureSpecEntry,
+  WebFeatureValueSchema, assertSingleComputedMode, canArm, featureOr, featureSpecFingerprint,
+  latestRevisions, liveRevisions, requireFeature,
+  type WebFeatureFrame, type WebFeatureSpecEntry,
 } from '../src/insight/feature-frame';
 
 /**
@@ -159,6 +160,7 @@ describe('canArm — the rule that replaces the flag', () => {
       keys, basis: { venues: ['bybit'], coverage: 'not_recorded', coveredHours: null },
       complete: Object.values(keys).every((v) => v.ok), incompleteReason: [],
       revision: 1, amendedAt: null, amendedKeys: [],
+      computedMode: 'live', computedAt: 1_760_000_015,
     });
 
   it('arms when every REQUIRED key computed, even on an incomplete frame', () => {
@@ -185,6 +187,7 @@ describe('the frame row', () => {
       symbol: 'BTCUSDT', tf: '15m', closeTime: 1_791_000_000, frameVersion: 1,
       keys: {}, basis: { venues: [], coverage: 'no_events', coveredHours: null }, incompleteReason: [],
       revision: 1, amendedAt: null, amendedKeys: [],
+      computedMode: 'live', computedAt: 1_760_000_015,
     };
     expect(WebFeatureFrameSchema.safeParse({ ...base, complete: null }).success).toBe(false);
     expect(WebFeatureFrameSchema.safeParse({ ...base, complete: false }).success).toBe(true);
@@ -196,6 +199,7 @@ describe('the frame row', () => {
       symbol: 'BTCUSDT', tf: '15m' as const, closeTime: 1, frameVersion: 1, keys: {},
       basis: { venues: [], coverage: 'no_events' as const, coveredHours: null },
       complete: true, incompleteReason: [], amendedAt: null, amendedKeys: [],
+      computedMode: 'live', computedAt: 1_760_000_015,
     };
     expect(WebFeatureFrameSchema.safeParse(base).success).toBe(false);
     expect(WebFeatureFrameSchema.safeParse({ ...base, revision: 0 }).success).toBe(false);
@@ -207,6 +211,7 @@ describe('the frame row', () => {
       symbol: 'BTCUSDT', tf: '4h', closeTime: 1, frameVersion: 1, keys: {}, complete: true,
       incompleteReason: [], basis: { venues: ['okx'], coverage: 'not_recorded', coveredHours: null },
       revision: 1, amendedAt: null, amendedKeys: [],
+      computedMode: 'live', computedAt: 1_760_000_015,
     });
     expect(ok.success).toBe(true);
   });
@@ -263,5 +268,87 @@ describe('the IB-016 trend keys', () => {
       'ema.4h.50': { ...WEB_FEATURE_SPEC['ema.4h.50'], params: { length: 50, barTf: '4h', source: 'close', seed: 'first' } },
     };
     expect(featureSpecFingerprint(reseeded)).not.toBe(before);
+  });
+});
+
+/**
+ * IB-015 — provenance, and the two helpers IB-017's arming and IB-023's outcome tracking need.
+ *
+ * The hazard is specific, not tidiness: derive's heal pass fills short buckets after the fact,
+ * so a backfilled frame is systematically better informed than the live frame for the same
+ * close. Learning or backtesting across a mixed set trains on information that did not exist at
+ * the moment it claims to model, by an amount nobody can measure.
+ */
+describe('computedMode', () => {
+  const frame = (over: Partial<WebFeatureFrame> = {}): WebFeatureFrame => ({
+    symbol: 'BTCUSDT', tf: '15m', closeTime: 1_760_000_000, frameVersion: WEB_FRAME_VERSION,
+    keys: { 'px.close': { ok: true, value: 1 } },
+    basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
+    complete: true, incompleteReason: [], revision: 1, amendedAt: null, amendedKeys: [],
+    computedMode: 'live', computedAt: 1_760_000_015,
+    ...over,
+  });
+
+  it('is REQUIRED — a frame cannot be parsed without saying which it is', () => {
+    // No default, deliberately. A default would let a new writer silently inherit `live` and
+    // reintroduce the indistinguishability the field exists to remove.
+    const { computedMode: _omitted, ...withoutMode } = frame();
+    expect(() => WebFeatureFrameSchema.parse(withoutMode)).toThrow();
+  });
+
+  it('accepts only live and backfill', () => {
+    expect(() => WebFeatureFrameSchema.parse(frame({ computedMode: 'guessed' as never }))).toThrow();
+  });
+
+  it('is per REVISION: a backfill amending a live frame is the case it exists for', () => {
+    const live = frame({ revision: 1, computedMode: 'live' });
+    const amended = frame({ revision: 2, computedMode: 'backfill', amendedKeys: ['px.close'] });
+    expect(latestRevisions([live, amended])[0]?.computedMode).toBe('backfill');
+  });
+
+  it('liveRevisions falls back to the LIVE revision rather than the latest one', () => {
+    // A bar whose revision 2 was backfilled must still answer "what was knowable at the close"
+    // with revision 1 — not disappear, and not quietly return the better-informed answer.
+    const live = frame({ revision: 1, computedMode: 'live' });
+    const amended = frame({ revision: 2, computedMode: 'backfill' });
+    const result = liveRevisions([live, amended]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.revision).toBe(1);
+  });
+
+  it('liveRevisions drops a bar that was ONLY ever backfilled', () => {
+    // Correct: nothing was knowable at that close, because no frame existed then.
+    expect(liveRevisions([frame({ computedMode: 'backfill' })])).toEqual([]);
+  });
+
+  it('assertSingleComputedMode THROWS on a mixed set, naming the lookahead', () => {
+    expect(() => assertSingleComputedMode([
+      frame({ computedMode: 'live' }),
+      frame({ closeTime: 1_760_000_900, computedMode: 'backfill' }),
+    ])).toThrow(/lookahead/);
+  });
+
+  it('accepts a set that is all one mode, in either direction', () => {
+    expect(() => assertSingleComputedMode([frame(), frame({ closeTime: 1_760_000_900 })])).not.toThrow();
+    expect(() => assertSingleComputedMode([
+      frame({ computedMode: 'backfill' }),
+      frame({ closeTime: 1_760_000_900, computedMode: 'backfill' }),
+    ])).not.toThrow();
+  });
+
+  it('accepts an empty set rather than throwing on nothing', () => {
+    expect(() => assertSingleComputedMode([])).not.toThrow();
+  });
+
+  it('carries computedAt separately from closeTime — their distance IS the healing window', () => {
+    const backfilled = frame({ closeTime: 1_760_000_000, computedAt: 1_760_086_400, computedMode: 'backfill' });
+    expect(WebFeatureFrameSchema.parse(backfilled).computedAt - backfilled.closeTime).toBe(86_400);
+  });
+
+  it('does NOT move the spec fingerprint — provenance is not key meaning', () => {
+    // The fingerprint is over the key registry. Adding a field that describes how a frame was
+    // produced says nothing about what any key MEANS, so stored frames stay comparable and the
+    // version does not bump.
+    expect(featureSpecFingerprint()).toBe('7a4a2a87');
   });
 });

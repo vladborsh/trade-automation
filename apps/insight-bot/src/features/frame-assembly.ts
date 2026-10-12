@@ -54,6 +54,14 @@ export interface AssembleInput {
   /** Human-readable, one per short bucket or slot: "candles_agg 15m@12:00 bars 14 of 15". */
   reasons: readonly string[];
   basis: WebFrameBasis;
+  /**
+   * Live pass at the close, or a backfill over history. Required rather than defaulted: a
+   * default would let a new caller silently inherit `live` and reintroduce exactly the
+   * indistinguishability this field exists to remove.
+   */
+  computedMode: 'live' | 'backfill';
+  /** When this revision was computed — the wall clock, not the bar. */
+  computedAtSec: number;
 }
 
 /** Keys poisoned by a set of incomplete input groups. */
@@ -110,6 +118,8 @@ export function assembleFrame(input: AssembleInput): WebFeatureFrame {
     revision: 1,
     amendedAt: null,
     amendedKeys: [],
+    computedMode: input.computedMode,
+    computedAt: input.computedAtSec,
   };
 }
 

@@ -172,6 +172,31 @@ export const WebFeatureFrameSchema = z.object({
    * rather than being inferred by diffing two rows.
    */
   amendedKeys: z.array(z.string()),
+  /**
+   * Whether THIS revision was computed by the live pass at the close, or by a backfill run over
+   * history (`npm run features -- --from --to`).
+   *
+   * **Not bookkeeping — it is the only thing that makes lookahead detectable.** The two are not
+   * "the same rules at different times". Derive's heal pass fills short buckets after the fact,
+   * so a live frame refuses `incomplete_input` on a bucket that a backfill run, executed later,
+   * sees healed and computes a value from. The backfilled frame is therefore systematically
+   * better informed than the frame that actually existed at that close, and better informed in
+   * a direction that correlates with the data. Anything learning from frames, or backtesting
+   * over them, would train on information that did not exist at the moment it claims to model —
+   * and without this field nothing downstream could tell.
+   *
+   * **Per revision, not per frame**, because a backfill pass amending a live frame is precisely
+   * that case: revision 1 may be `live` and revision 2 `backfill`. `latestRevisions()` can
+   * therefore hand back a backfilled answer for a bar that was armed on a live one; a consumer
+   * reconstructing what was knowable at the close must filter on this field first.
+   */
+  computedMode: z.enum(['live', 'backfill']),
+  /**
+   * When this revision was computed — the wall clock, as opposed to `closeTime`, which is the
+   * bar it describes. A backfilled frame's `computedAt` is far later than its `closeTime`, and
+   * the distance between the two is how much healing it could have benefited from.
+   */
+  computedAt: TimeSec,
 });
 export type WebFeatureFrame = z.infer<typeof WebFeatureFrameSchema>;
 
@@ -408,6 +433,39 @@ export function latestRevisions(frames: readonly WebFeatureFrame[]): WebFeatureF
     if (!held || frame.revision > held.revision) best.set(key, frame);
   }
   return [...best.values()].sort((a, b) => a.closeTime - b.closeTime || a.symbol.localeCompare(b.symbol));
+}
+
+/**
+ * Frames computed live, discarding backfilled revisions.
+ *
+ * What a consumer reconstructing "what was knowable at this close" must use. Note it filters
+ * BEFORE picking the latest revision — a bar whose revision 2 was written by a backfill falls
+ * back to its live revision 1, rather than disappearing or silently returning the better-informed
+ * answer.
+ */
+export function liveRevisions(frames: readonly WebFeatureFrame[]): WebFeatureFrame[] {
+  return latestRevisions(frames.filter((f) => f.computedMode === 'live'));
+}
+
+/**
+ * Refuses a set that mixes live and backfilled frames.
+ *
+ * IB-017's arming and IB-023's outcome tracking must not compute over a mixture: some bars would
+ * carry answers informed by healing that had not happened yet at their own close, and the
+ * resulting statistic would be better than anything achievable in real time, by an amount nobody
+ * can measure. Throwing is deliberate — a boolean would be a flag a caller can forget to read,
+ * and the whole frame design is built on typed refusals rather than flags.
+ */
+export function assertSingleComputedMode(frames: readonly WebFeatureFrame[]): void {
+  const modes = new Set(frames.map((f) => f.computedMode));
+  if (modes.size > 1) {
+    throw new Error(
+      'mixed computed modes in one frame set: live and backfill. A backfilled frame is ' +
+      'systematically better informed than the live frame for the same close, because derive ' +
+      'healed its buckets in between — comparing or learning across the two is lookahead. ' +
+      'Take liveRevisions() first, or work with backfilled frames deliberately and alone.',
+    );
+  }
 }
 
 /**

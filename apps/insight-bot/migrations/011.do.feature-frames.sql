@@ -34,7 +34,23 @@ create table feature_frames (
   complete      boolean     not null,
   -- which bucket or slot was short, when one was. Empty when complete.
   incomplete_reason text[]  not null default '{}',
+  -- When this revision was computed, as opposed to close_time, which is the bar it describes.
   computed_at   timestamptz not null default now(),
+  -- Live pass at the close, or a backfill run over history.
+  --
+  -- NOT bookkeeping. Derive's heal pass fills short buckets after the fact, so a live frame
+  -- refuses incomplete_input on a bucket that a backfill run executed later sees healed and
+  -- computes from. A backfilled frame is therefore systematically better informed than the frame
+  -- that actually existed at that close, in a direction that correlates with the data. Anything
+  -- learning from frames or backtesting over them would train on information that did not exist
+  -- at the moment it claims to model, and without this column nothing downstream could tell.
+  --
+  -- Per revision rather than per frame: a backfill pass amending a live frame is exactly that
+  -- case, so revision 1 may be 'live' and revision 2 'backfill'.
+  --
+  -- No DEFAULT, deliberately. Every writer must say which it is; a default would let a new
+  -- caller silently inherit 'live' and reintroduce the thing this column exists to make visible.
+  computed_mode text        not null check (computed_mode in ('live','backfill')),
   -- APPEND-ONLY. revision 1 is the frame as first written; each amendment appends the next.
   revision      int         not null default 1,
   -- when this revision was written, and which keys moved from a refusal to a value in it. An
@@ -59,12 +75,20 @@ comment on table feature_frames is
   'from the feature pass not running. complete is an index, not a gate — no consumer may arm on '
   'it; arming is decided per key.';
 
+comment on column feature_frames.computed_mode is
+  'live = written by the pass at the close; backfill = written by a later run over history. A '
+  'backfilled frame is better informed than the live one for the same close, because derive '
+  'healed its buckets in between — mixing the two when learning or backtesting is lookahead. '
+  'Per revision: a backfill that amends a live frame writes a backfill revision.';
+
 comment on column feature_frames.complete is
   'True when every key computed. An INDEX for finding frames with refusals, never a safety '
   'mechanism: a consumer decides per key, because a boolean can be forgotten and a typed value '
   'cannot.';
 
 create index feature_frames_incomplete_idx on feature_frames (close_time) where not complete;
+-- IB-017 and IB-023 read live frames over a window; without this they scan backfilled rows too.
+create index feature_frames_live_idx on feature_frames (close_time) where computed_mode = 'live';
 
 -- ---------------------------------------------------------------------------------------------
 -- Rule 2: a re-check that would CHANGE an already-published value is a data defect, recorded and

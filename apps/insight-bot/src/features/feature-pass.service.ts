@@ -26,6 +26,15 @@ import * as frames from './pg/frames.repo';
 
 export type PassAction = 'written' | 'amended' | 'unchanged';
 
+/**
+ * Who is writing: the pass at the close, or a run over history.
+ *
+ * Threaded explicitly from every entry point rather than inferred from the clock. Inferring it
+ * — "closeMs is old, so this must be a backfill" — would be wrong exactly when it matters, on a
+ * live pass that woke late, and would mark a genuinely live frame as better informed than it is.
+ */
+export type ComputedMode = 'live' | 'backfill';
+
 export interface CloseOutcome {
   symbol: string;
   action: PassAction;
@@ -60,6 +69,7 @@ export class FeaturePassService {
     tf: WebFrameTimeframe,
     closeMs: number,
     nowMs: number,
+    computedMode: ComputedMode,
     /** Pass-wide facts. Loaded here when a caller runs a single close on its own. */
     context?: PassContext,
   ): Promise<CloseOutcome> {
@@ -80,6 +90,8 @@ export class FeaturePassService {
       explainedGroups,
       reasons,
       basis: gathered.basis,
+      computedMode,
+      computedAtSec: Math.floor(nowMs / 1000),
     });
 
     const published = await frames.publishedFrame(this.db, symbol, tf, closeMs);
@@ -106,7 +118,10 @@ export class FeaturePassService {
       return { symbol, action: 'unchanged', frame: published, conflicts: decision.conflicts.length };
     }
 
-    const amended = applyAmendment(published, decision, Math.floor(nowMs / 1000), reasons);
+    // The amendment carries the mode of the pass writing IT, which need not match the published
+    // revision's: a backfill amending a live frame writes a backfill revision, leaving revision 1
+    // as the honest live record of what was knowable at the close.
+    const amended = applyAmendment(published, decision, Math.floor(nowMs / 1000), reasons, computedMode);
     await this.db.transaction(async (tx) => {
       await frames.insertFrame(tx, amended);
       await frames.recordConflicts(
@@ -128,6 +143,7 @@ export class FeaturePassService {
     tf: WebFrameTimeframe,
     closeMs: number,
     nowMs: number,
+    computedMode: ComputedMode,
     /**
      * A re-check (§8.1's +30 s and +60 s) visits only the frames that refused with something
      * chaseable. The grace look visits the whole signal set, because none of them have a frame
@@ -150,7 +166,7 @@ export class FeaturePassService {
 
     for (const symbol of symbols) {
       try {
-        const outcome = await this.runClose(symbol, tf, closeMs, nowMs, context);
+        const outcome = await this.runClose(symbol, tf, closeMs, nowMs, computedMode, context);
         summary.outcomes.push(outcome);
         summary.conflicts += outcome.conflicts;
         if (outcome.action === 'written') summary.written += 1;

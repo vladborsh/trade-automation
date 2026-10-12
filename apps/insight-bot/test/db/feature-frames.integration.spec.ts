@@ -51,8 +51,8 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
 
   const insertFrame = async (closeMs: number, complete = true, reason: string[] = [], revision = 1) =>
     db.query(
-      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, revision)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, revision, computed_mode)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'live')`,
       ['BTCUSDT', '15m', new Date(closeMs), WEB_FRAME_VERSION,
         JSON.stringify({ 'oi.d24h_pct': { ok: true, value: 1.5 } }),
         JSON.stringify({ venues: ['bybit'], coverage: 'not_recorded', coveredHours: null }),
@@ -69,8 +69,8 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
   it('REJECTS a tf outside 15m and 4h rather than storing an unknown frame', async () => {
     // Its own bar: these tests share a database and a collision would look like a schema fault.
     await expect(db.query(
-      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete)
-       values ('BTCUSDT','1h',$1,1,'{}','{}',true)`, [new Date(CLOSE - 3_600_000)],
+      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete, computed_mode)
+       values ('BTCUSDT','1h',$1,1,'{}','{}',true,'live')`, [new Date(CLOSE - 3_600_000)],
     )).rejects.toThrow(/tf_check|check constraint/i);
   });
 
@@ -171,6 +171,8 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
       revision: 1,
       amendedAt: null as number | null,
       amendedKeys: [] as string[],
+      computedMode: 'live' as const,
+      computedAt: Math.floor(closeMs / 1000),
       ...over,
     });
 
@@ -239,6 +241,7 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
         basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
         complete, incompleteReason: complete ? [] : ['x'],
         revision: 1, amendedAt: null, amendedKeys: [],
+        computedMode: 'live', computedAt: Math.floor((BASE + i * 900_000) / 1000),
       });
 
     beforeAll(async () => {

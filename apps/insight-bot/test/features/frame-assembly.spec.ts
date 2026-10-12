@@ -26,6 +26,8 @@ const input = (over: Partial<AssembleInput> = {}): AssembleInput => ({
   explainedGroups: new Set<string>(),
   reasons: [],
   basis: { venues: ['bybit', 'okx'], coverage: 'not_recorded', coveredHours: null },
+  computedMode: 'live',
+  computedAtSec: CLOSE + 15,
   ...over,
 });
 

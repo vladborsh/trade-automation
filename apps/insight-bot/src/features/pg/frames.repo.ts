@@ -30,6 +30,8 @@ interface FrameRow {
   revision: number;
   amended_at: Date | null;
   amended_keys: string[];
+  computed_mode: 'live' | 'backfill';
+  computed_at: Date;
 }
 
 function toFrame(row: FrameRow): WebFeatureFrame {
@@ -45,12 +47,14 @@ function toFrame(row: FrameRow): WebFeatureFrame {
     revision: row.revision,
     amendedAt: row.amended_at === null ? null : sec(row.amended_at),
     amendedKeys: row.amended_keys,
+    computedMode: row.computed_mode,
+    computedAt: sec(row.computed_at),
   };
 }
 
 const FRAME_COLUMNS =
   'symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason, ' +
-  'revision, amended_at, amended_keys';
+  'revision, amended_at, amended_keys, computed_mode, computed_at';
 
 /**
  * The frame as currently published for a close, or null when nothing has been written for it.
@@ -105,8 +109,8 @@ export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise
   const rows = await db.query<{ revision: number }>(
     `insert into feature_frames
        (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason,
-        revision, amended_at, amended_keys)
-     values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8::text[], $9, $10, $11::text[])
+        revision, amended_at, amended_keys, computed_mode, computed_at)
+     values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8::text[], $9, $10, $11::text[], $12, $13)
      on conflict (symbol, tf, close_time, revision) do nothing
      returning revision`,
     [
@@ -121,6 +125,8 @@ export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise
       frame.revision,
       frame.amendedAt === null ? null : asDate(frame.amendedAt * 1000),
       frame.amendedKeys,
+      frame.computedMode,
+      asDate(frame.computedAt * 1000),
     ],
   );
   return rows.length > 0;

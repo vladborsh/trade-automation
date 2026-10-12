@@ -16,6 +16,12 @@ import { FRAME_TIMEFRAMES, TIMEFRAME_MS, lastCloseMs } from './recheck-schedule'
  * Not `AppModule`, for the same reason `derive.cli.ts` is not: booting that opens every venue
  * socket and starts a second set of collectors against the same database.
  *
+ * **Everything it writes is marked `backfill`.** Not cosmetic: derive's heal pass fills short
+ * buckets after the fact, so a frame computed here is systematically better informed than the
+ * live frame for the same close — it sees buckets healed that the live pass refused on. Mixing
+ * the two when learning or backtesting is lookahead, and `assertSingleComputedMode` exists so a
+ * consumer refuses rather than silently averaging the two.
+ *
  * **Safe to re-run.** `insertFrame` is `on conflict do nothing` on the full key including the
  * revision, so a second run over the same range writes nothing rather than rewriting rows that
  * something may already have armed on. Re-running a range is how a backfill is finished after an
@@ -80,7 +86,7 @@ async function main(): Promise<void> {
       for (let closeMs = first; closeMs <= last; closeMs += span) {
         if (onlySymbol !== null) {
           try {
-            const outcome = await service.runClose(onlySymbol, tf, closeMs, Date.now());
+            const outcome = await service.runClose(onlySymbol, tf, closeMs, Date.now(), 'backfill');
             conflicts += outcome.conflicts;
             if (outcome.action === 'written') written += 1;
             else if (outcome.action === 'amended') amended += 1;
@@ -89,7 +95,7 @@ async function main(): Promise<void> {
             failures.push(`${onlySymbol} ${tf} ${new Date(closeMs).toISOString()}: ${(err as Error).message}`);
           }
         } else {
-          const summary = await service.runPass(tf, closeMs, Date.now());
+          const summary = await service.runPass(tf, closeMs, Date.now(), 'backfill');
           written += summary.written;
           amended += summary.amended;
           unchanged += summary.unchanged;

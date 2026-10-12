@@ -59,8 +59,11 @@ export class FeaturesRunner implements OnApplicationBootstrap, OnModuleDestroy {
         );
         return;
       }
+      // 'live' always, including a late wake: the mode records WHO wrote the frame, not how
+      // timely it was. `isAttemptStillDue` above already refuses a wake so late that the bar has
+      // been succeeded.
       const summary = await this.service.runPass(
-        attempt.tf, attempt.closeMs, now, attempt.attempt === 0 ? 'all' : 'awaiting-heal',
+        attempt.tf, attempt.closeMs, now, 'live', attempt.attempt === 0 ? 'all' : 'awaiting-heal',
       );
       if (summary.written + summary.amended + summary.failed.length > 0) {
         this.logger.log(

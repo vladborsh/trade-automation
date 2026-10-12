@@ -123,6 +123,15 @@ export function applyAmendment(
   decision: Extract<AmendmentDecision, { action: 'amend' }>,
   amendedAtSec: number,
   remainingReasons: readonly string[],
+  /**
+   * The mode of the pass writing THIS revision, which is not necessarily the published one's.
+   *
+   * A backfill run amending a live frame writes a `backfill` revision, and that is the whole
+   * point of recording the mode per revision: the amended answer is informed by healing that
+   * had not happened at the close, so revision 1 stays the live record and revision 2 is
+   * honestly marked as better informed.
+   */
+  computedMode: 'live' | 'backfill',
 ): WebFeatureFrame {
   const complete = Object.values(decision.keys).every((value) => value.ok);
   return {
@@ -133,5 +142,7 @@ export function applyAmendment(
     revision: decision.revision,
     amendedAt: amendedAtSec,
     amendedKeys: decision.amendedKeys,
+    computedMode,
+    computedAt: amendedAtSec,
   };
 }

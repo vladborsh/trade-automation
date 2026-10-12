@@ -12,7 +12,8 @@ const frame = (keys: Record<string, WebFeatureValue>, over: Partial<WebFeatureFr
   symbol: 'BTCUSDT', tf: '15m', closeTime: CLOSE, frameVersion: WEB_FRAME_VERSION,
   keys, basis: { venues: ['bybit'], coverage: 'not_recorded', coveredHours: null },
   complete: Object.values(keys).every((v) => v.ok), incompleteReason: [],
-  revision: 1, amendedAt: null, amendedKeys: [], ...over,
+  revision: 1, amendedAt: null, amendedKeys: [],
+  computedMode: 'live' as const, computedAt: CLOSE, ...over,
 });
 
 describe('decideAmendment', () => {
@@ -30,7 +31,7 @@ describe('decideAmendment', () => {
     for (let i = 0; i < 5; i += 1) {
       const decision = decideAmendment(published, { 'oi.d24h_pct': { ok: true, value: 2 } });
       expect(decision.action).toBe('none');
-      if (decision.action === 'amend') published = applyAmendment(published, decision, CLOSE, []);
+      if (decision.action === 'amend') published = applyAmendment(published, decision, CLOSE, [], 'live');
     }
     expect(published.revision).toBe(1);
   });
@@ -103,7 +104,7 @@ describe('applyAmendment', () => {
     });
     const decision = decideAmendment(published, { 'oi.d24h_pct': { ok: true, value: 2 } });
     if (decision.action !== 'amend') throw new Error('expected an amendment');
-    const amended = applyAmendment(published, decision, CLOSE + 60, []);
+    const amended = applyAmendment(published, decision, CLOSE + 60, [], 'live');
 
     expect(amended.revision).toBe(2);
     expect(amended.amendedAt).toBe(CLOSE + 60);
@@ -120,7 +121,7 @@ describe('applyAmendment', () => {
     });
     const decision = decideAmendment(published, { 'oi.d24h_pct': { ok: true, value: 2 } });
     if (decision.action !== 'amend') throw new Error('expected an amendment');
-    const amended = applyAmendment(published, decision, CLOSE + 60, ['candles_agg 4h@12:00 bars 3 of 4']);
+    const amended = applyAmendment(published, decision, CLOSE + 60, ['candles_agg 4h@12:00 bars 3 of 4'], 'live');
     expect(amended.complete).toBe(false);
     expect(amended.incompleteReason).toEqual(['candles_agg 4h@12:00 bars 3 of 4']);
   });
@@ -175,6 +176,7 @@ describe('a chaseable refusal becoming a permanent one', () => {
     basis: { venues: [], coverage: 'not_recorded' as const, coveredHours: null },
     complete: false, incompleteReason: ['x'], revision: 1,
     amendedAt: null as number | null, amendedKeys: [] as string[],
+    computedMode: 'live' as const, computedAt: 1_760_000_000,
   });
 
   it('AMENDS, so the unhealed-gap counter can drain', () => {
@@ -223,6 +225,6 @@ describe('a chaseable refusal becoming a permanent one', () => {
     const published = frameWith('incomplete_input');
     const decision = decideAmendment(published, { 'px.ret_4h': { ok: false, why: 'no_data' } });
     if (decision.action !== 'amend') throw new Error('expected an amendment');
-    expect(applyAmendment(published, decision, 1_760_000_100, []).complete).toBe(false);
+    expect(applyAmendment(published, decision, 1_760_000_100, [], 'live').complete).toBe(false);
   });
 });
