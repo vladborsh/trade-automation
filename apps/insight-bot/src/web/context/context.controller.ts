@@ -1,10 +1,11 @@
 import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common';
-import type { WebFearGreedResponse, WebMarketCapResponse } from '@trade-automation/contracts';
+import type { WebFearGreedResponse, WebMarketCapResponse, WebMarketCardsResponse } from '@trade-automation/contracts';
 import { AppConfigService } from '../../config/config.service';
 import { DB, type Db } from '../../db/db.port';
 import { coinCapsBetween, dominanceBetween, dominanceStart, fearGreedBetween, latestFearGreed } from '../../db/pg/web-context-reads';
 import { DAY_MS, thin } from '../series/range';
 import { marketCapCurrent, marketCapDays } from './market-shares';
+import { btcVsTopCard, capsCard, dominanceCard, fearGreedCard } from './market-cards';
 
 /**
  * IB-037 (design §2, §4, §10) — the market-context page's reads: Fear & Greed, BTC dominance and
@@ -23,6 +24,43 @@ export class WebContextController {
     private readonly config: AppConfigService,
     @Inject(DB) private readonly db: Db | null,
   ) {}
+
+  /**
+   * `GET …/context/cards` — everything the landing page's cards show, in one payload.
+   *
+   * §12.1 made this page cards rather than charts, so the client must not derive anything: it
+   * renders values, their instants and their sources. The windows are what each card's sentence
+   * needs — 30 days of Fear & Greed for "a week ago", 8 days of dominance for its 7-day move, 40
+   * days of caps for the 30-day one — and deliberately not a year, because nothing here draws a
+   * line any more.
+   */
+  @Get('cards')
+  async cards(): Promise<WebMarketCardsResponse> {
+    if (!this.db) {
+      return { fearGreed: null, dominance: null, btcVsTop: null, caps: [], capsDay: null, capsSource: 'coingecko' };
+    }
+    const now = Date.now();
+    // the same top-20 the chart endpoint uses, in the same order: two pages that disagree about
+    // which coins the top 20 are would print two different denominators for one market
+    const coins = this.topCoins();
+
+    const [fg, dominance, firstSample, capRows] = await Promise.all([
+      fearGreedBetween(this.db, dayOf(now - 30 * DAY_MS), dayOf(now)),
+      dominanceBetween(this.db, now - 8 * DAY_MS, now),
+      dominanceStart(this.db),
+      coinCapsBetween(this.db, coins, dayOf(now - 40 * DAY_MS), dayOf(now)),
+    ]);
+
+    const days = marketCapDays(capRows, coins);
+    return {
+      fearGreed: fearGreedCard(fg),
+      dominance: dominanceCard(dominance, firstSample, now),
+      btcVsTop: btcVsTopCard(days, coins.length),
+      caps: capsCard(marketCapCurrent(days, capRows)),
+      capsDay: days.at(-1)?.day ?? null,
+      capsSource: 'coingecko',
+    };
+  }
 
   /** `GET …/context/fear-greed?from&to` — epoch ms, `to` exclusive; defaults to the last year. */
   @Get('fear-greed')

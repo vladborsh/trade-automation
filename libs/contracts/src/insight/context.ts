@@ -184,5 +184,9 @@ export const WebMarketCardsResponseSchema = z.object({
   caps: z.array(WebMarketCapCurrentSchema).default([]),
   /** The day `caps` describes, so the table can say when it was measured. */
   capsDay: Day.nullable().default(null),
+  /** Where the caps came from. On the payload rather than in the template: the page states a
+   *  source for every figure it shows, and a source hard-coded in the client is a claim the
+   *  server never made. */
+  capsSource: WebCardSourceSchema.default('coingecko'),
 });
 export type WebMarketCardsResponse = z.infer<typeof WebMarketCardsResponseSchema>;

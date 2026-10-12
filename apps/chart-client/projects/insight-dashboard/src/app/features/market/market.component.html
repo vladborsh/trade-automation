@@ -1,105 +1,122 @@
-<section class="market">
-  <header>
-    <h1>{{ t('market.title') }}</h1>
-    <div class="group" role="group" [attr.aria-label]="t('market.range')">
-      @for (days of ranges; track days) {
-        <button type="button" [class.on]="range() === days" (click)="setRange(days)">{{ t('market.range.days', { days }) }}</button>
-      }
-    </div>
-    <button type="button" (click)="load()">{{ t('action.refresh') }}</button>
-  </header>
+<header>
+  <h1>{{ t('market.title') }}</h1>
+  <button type="button" (click)="load()">{{ t('action.refresh') }}</button>
+</header>
 
-  @if (error(); as message) {
-    <p class="error" role="alert">{{ message }}</p>
-  }
-  @if (loading()) {
-    <p class="muted">{{ t('state.loading') }}</p>
-  }
-  @if (downsampled()) {
-    <p class="muted">{{ t('market.downsampled') }}</p>
-  }
+@if (error(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+}
+@if (loading()) {
+  <p class="muted">{{ t('state.loading') }}</p>
+}
 
-  <section class="panel">
+<div class="cards">
+  <!-- Fear & Greed. The big figure is the index; the words under it are the band, and the venue's
+       own classification stays beside it verbatim (§11) so the two can never disagree. -->
+  <section class="card">
     <h2>{{ t('market.fg.title') }}</h2>
-    @if (latest(); as point) {
-      <div class="gauge">
-        <svg viewBox="0 0 100 60" role="img" [attr.aria-label]="t('market.fg.aria', { value: point.value })">
-          <path d="M 8 52 A 42 42 0 0 1 92 52" fill="none" stroke="#30363d" stroke-width="6" />
-          <line x1="50" y1="52" [attr.x2]="needle().x" [attr.y2]="needle().y" [attr.stroke]="band().colour" stroke-width="2" />
-          <circle cx="50" cy="52" r="3" [attr.fill]="band().colour" />
-        </svg>
-        <p class="value" [style.color]="band().colour">{{ point.value }}</p>
-        <!-- the venue's own wording, kept verbatim (§11: not ours to translate) -->
-        <p class="classification">{{ point.classification }}</p>
-        <p class="muted">{{ t('market.fg.asOf', { day: point.day }) }}</p>
-      </div>
-      @if (fgLine(); as line) {
-        <svg class="line" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" [attr.aria-label]="t('market.fg.history')">
-          <polyline [attr.points]="line" fill="none" [attr.stroke]="band().colour" stroke-width="0.8" />
-        </svg>
+    @if (fearGreed(); as fg) {
+      <p class="value" [style.color]="band(fg.now.value).colour">{{ fg.now.value }}</p>
+      <p class="label" [style.color]="band(fg.now.value).colour">{{ t(band(fg.now.value).key) }}</p>
+      <p class="muted">{{ t('market.asOf', { when: fg.now.day }) }} · {{ fg.now.classification }}</p>
+      @if (fg.previous; as prev) {
+        <p>{{ t('market.fg.wasYesterday', { day: prev.day, value: prev.value, band: t(band(prev.value).key) }) }}</p>
       }
+      @if (fg.weekAgo; as week) {
+        <p>{{ t('market.fg.wasWeek', { value: week.value, band: t(band(week.value).key) }) }}</p>
+      }
+      <p class="muted source">{{ t('market.source', { source: fg.source }) }}</p>
     } @else {
       <p class="muted">{{ t('market.fg.none') }}</p>
     }
   </section>
 
-  <section class="panel">
+  <!-- BTC dominance. The deltas are percentage POINTS: dominance is already a percentage, so
+       "rose 2 %" would be ambiguous where "rose 2 points" is not. -->
+  <section class="card">
     <h2>{{ t('market.dominance.title') }}</h2>
-    @if (domLine(); as line) {
-      <svg class="line" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" [attr.aria-label]="t('market.dominance.title')">
-        <polyline [attr.points]="line" fill="none" stroke="#f0b90b" stroke-width="0.8" />
-      </svg>
-      @if (dominanceStart(); as start) {
-        <!-- §10: this series is forward-only, so the page says where it really begins -->
-        <p class="muted">{{ t('market.dominance.since', { day: start }) }}</p>
+    @if (dominance(); as dom) {
+      <p class="value">{{ percent(dom.btcPct) }}%</p>
+      <p class="muted">{{ t('market.asOf', { when: asOf(dom.atMs) ?? t('market.unknown') }) }}</p>
+      <p>{{ t('market.dominance.day', { change: signed(dom.changePct24h) ?? t('market.unknown') }) }}</p>
+      <p>{{ t('market.dominance.week', { change: signed(dom.changePct7d) ?? t('market.unknown') }) }}</p>
+      @if (dom.changePct7d === null) {
+        <!-- §10: this series is collected forward and cannot be backfilled, so a young database
+             says how long it has been collecting instead of implying nothing happened. -->
+        <p class="muted">{{ t('market.dominance.coverage', { days: dom.coverageDays }) }}</p>
       }
+      @if (percent(dom.ethPct); as eth) {
+        <p>{{ t('market.dominance.eth', { value: eth }) }}</p>
+      }
+      @if (cap(dom.totalUsd); as total) {
+        <p>{{ t('market.dominance.total', { value: total, change: signed(dom.totalChangePct24h) ?? t('market.unknown') }) }}</p>
+      }
+      <p class="muted source">{{ t('market.source', { source: dom.source }) }}</p>
     } @else {
       <p class="muted">{{ t('market.dominance.none') }}</p>
     }
   </section>
 
-  <section class="panel">
-    <h2>{{ t('market.shares.title') }}</h2>
-    @if (bands().length > 0) {
-      <svg class="stack" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" [attr.aria-label]="t('market.shares.title')">
-        @for (band of bands(); track band.coin) {
-          <path [attr.d]="band.path" [attr.fill]="band.colour" opacity="0.85" />
-        }
-        <polyline [attr.points]="btcLine()" fill="none" stroke="#c9d1d9" stroke-width="0.7" stroke-dasharray="2 1.5" />
-      </svg>
-      <p class="muted">{{ t('market.shares.btcLine') }}</p>
-      <p class="muted">{{ t('market.shares.counted', { counted: coinsCounted() }) }}</p>
-      <ul class="legend">
-        @for (item of legend(); track item.coin) {
-          <li><span class="swatch" [style.background]="item.colour"></span>{{ item.coin }} @if (share(item.share); as pct) { <span class="muted">{{ pct }}%</span> }</li>
-        }
-      </ul>
+  <!-- BTC against the top 20. The denominator is on the card: a share of three coins is not a
+       share of twenty, and the deltas compare only days with the same coverage. -->
+  <section class="card">
+    <h2>{{ t('market.btcVsTop.title') }}</h2>
+    @if (btcVsTop(); as top) {
+      <p class="value">{{ percent(top.sharePct) }}%</p>
+      <p class="muted">{{ t('market.btcVsTop.counted', { counted: top.coinsCounted, expected: top.coinsExpected, day: top.day }) }}</p>
+      <p>{{ t('market.btcVsTop.week', { change: signed(top.changePct7d) ?? t('market.unknown') }) }}</p>
+      <p>{{ t('market.btcVsTop.month', { change: signed(top.changePct30d) ?? t('market.unknown') }) }}</p>
+      <p class="muted source">{{ t('market.source', { source: top.source }) }}</p>
     } @else {
-      <p class="muted">{{ t('market.shares.none') }}</p>
+      <p class="muted">{{ t('market.btcVsTop.none') }}</p>
     }
   </section>
 
-  <section class="panel">
-    <h2>{{ t('market.table.title') }}</h2>
-    <table>
-      <thead>
-        <!-- §11 English-by-rule: field names in a table of raw data (allow-listed with the reason) -->
-        <tr><th>coin</th><th class="num">cap (B USD)</th><th class="num">price</th><th class="num">share</th><th class="num">24h</th><th class="num">7d</th></tr>
-      </thead>
-      <tbody>
-        @for (row of current(); track row.coin) {
-          <tr>
-            <td>{{ row.coin }}</td>
-            <td class="num">{{ billions(row.capUsd) ?? '—' }}</td>
-            <td class="num">{{ price(row.priceUsd) ?? '—' }}</td>
-            <td class="num">{{ share(row.share) ?? '—' }}</td>
-            <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ percent(row.change24h) ?? '—' }}</td>
-            <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ percent(row.change7d) ?? '—' }}</td>
-          </tr>
-        } @empty {
-          <tr><td colspan="6" class="muted">{{ t('market.table.none') }}</td></tr>
-        }
-      </tbody>
-    </table>
-  </section>
+  @if (liquidations(); as liq) {
+    <!-- IB-038's card, mounted as dev-2 wrote it: input-only, nothing wrapped around it. -->
+    <app-liquidations-now [windows]="liq.windows" [venues]="liq.venues" [unmappedRows]="liq.unmappedRows" />
+  }
+</div>
+
+@if (liquidationsError(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+}
+@if (liquidations(); as liq) {
+  <app-liquidations-where [coins]="liq.perCoin" [venues]="liq.venues" />
+  <app-liquidations-feed
+    [events]="liq.feed"
+    [minUsd]="liq.feedMinUsd"
+    [venues]="liq.venues"
+    (minUsdChange)="onMinUsdChange($event)"
+  />
+}
+
+<section class="card wide">
+  <h2>{{ t('market.table.title') }}</h2>
+  @if (capsDay(); as day) {
+    <p class="muted">{{ t('market.asOf', { when: day }) }}</p>
+  }
+  <table>
+    <thead>
+      <!-- §11 English-by-rule: field names in a table of raw data (allow-listed with the reason) -->
+      <tr><th>coin</th><th class="num">cap</th><th class="num">price</th><th class="num">share</th><th class="num">24h</th><th class="num">7d</th></tr>
+    </thead>
+    <tbody>
+      @for (row of caps(); track row.coin) {
+        <tr>
+          <td>{{ row.coin }}</td>
+          <td class="num">{{ cap(row.capUsd) ?? t('market.unknown') }}</td>
+          <td class="num">{{ price(row.priceUsd) ?? t('market.unknown') }}</td>
+          <td class="num">{{ share(row.share) ?? t('market.unknown') }}</td>
+          <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ change(row.change24h) ?? t('market.unknown') }}</td>
+          <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ change(row.change7d) ?? t('market.unknown') }}</td>
+        </tr>
+      } @empty {
+        <tr><td colspan="6" class="muted">{{ t('market.table.none') }}</td></tr>
+      }
+    </tbody>
+  </table>
+  @if (cards(); as payload) {
+    <p class="muted source">{{ t('market.source', { source: payload.capsSource }) }}</p>
+  }
 </section>

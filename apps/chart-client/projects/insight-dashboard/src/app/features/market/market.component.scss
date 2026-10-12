@@ -1,26 +1,60 @@
-.market { padding: 1rem; display: flex; flex-direction: column; gap: 1.25rem; }
+/* Dark-terminal palette (AGENTS.md). Cards, and nothing that draws: there is no <svg> on this
+ * page, so there is no chart geometry to style either. The grid matches IB-038's (auto-fit from
+ * 280px, 12px gap) so their liquidations card sits in the same row as ours rather than beside it. */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
 header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 h1 { font-size: 1.1rem; margin: 0; }
 h2 { font-size: 0.85rem; margin: 0 0 0.5rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
 
-.group { display: flex; gap: 0.25rem; }
-button { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 0.15rem 0.5rem; font: inherit; cursor: pointer; }
-button.on { border-color: #26a69a; color: #26a69a; }
+button {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  cursor: pointer;
+}
 
-.panel { border: 1px solid #30363d; padding: 0.75rem; }
-.muted { color: #8b949e; margin: 0.25rem 0 0; }
-.error { color: #ef5350; }
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
 
-.gauge { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
-.gauge svg { width: 220px; max-width: 100%; }
-.value { font-size: 2rem; margin: 0; line-height: 1; }
-.classification { margin: 0; color: #c9d1d9; }
+.card {
+  border: 1px solid #30363d;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 13px;
+}
 
-.line, .stack { width: 100%; height: 120px; display: block; margin-top: 0.5rem; }
+.card p { margin: 0; }
+.card.wide { grid-column: 1 / -1; }
 
-.legend { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; padding: 0; margin: 0.5rem 0 0; }
-.legend li { display: flex; align-items: center; gap: 0.35rem; }
-.swatch { width: 0.7rem; height: 0.7rem; display: inline-block; }
+/* The figure a reader came for: large, and the only large thing on the card. */
+.value { font-size: 2rem; line-height: 1.1; }
+.label { font-size: 1rem; }
+.muted { color: #8b949e; font-size: 12px; }
+/* The basis sits last on every card, after the sentences, so the cards line up when read down. */
+.source { margin-top: auto; padding-top: 0.35rem; }
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #ef5350;
+  color: #ef5350;
+  font-size: 13px;
+}
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 0.15rem 0.6rem 0.15rem 0; white-space: nowrap; }
