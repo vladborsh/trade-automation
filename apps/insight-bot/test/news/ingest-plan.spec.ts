@@ -29,6 +29,19 @@ function item(source: string, url: string, title: string, atMs = T0): NewsItem {
 
 const nothingKnown = new Map<string, KnownNews>();
 
+/**
+ * **Positive control (IB-027 rule).** This spec carries at least one fixture that MUST FIRE, and
+ * this comment says why, so nobody "simplifies" the fixtures back to the cheap negative ones.
+ *
+ * A detector tested only on inputs that should NOT match is unfalsifiable: a dead pattern passes
+ * every one of those tests. Not hypothetical — the cashtag rule in `assets.ts` had never worked at
+ * all (a double-escaped pattern demanded a literal backslash in the article text), and its absence
+ * was indistinguishable from "no cashtag in this article". One firing fixture found it instantly.
+ *
+ * Negative cases prove precision; positive ones prove the detector is alive. Neither half alone is
+ * enough — the same pairing as the ON DELETE RESTRICT tests: the refusal AND the permitted case.
+ */
+
 describe('duplicates within one source', () => {
   it('skips an article the source has already given us, by URL', () => {
     const existing = item('coindesk', 'https://coindesk.com/a', 'SEC approves the thing');

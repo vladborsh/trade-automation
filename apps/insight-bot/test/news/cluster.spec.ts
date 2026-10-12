@@ -9,6 +9,19 @@ import {
 
 const at = (h: number) => new Date(Date.UTC(2026, 8, 28, h, 0));
 
+/**
+ * **Positive control (IB-027 rule).** This spec carries at least one fixture that MUST FIRE, and
+ * this comment says why, so nobody "simplifies" the fixtures back to the cheap negative ones.
+ *
+ * A detector tested only on inputs that should NOT match is unfalsifiable: a dead pattern passes
+ * every one of those tests. Not hypothetical — the cashtag rule in `assets.ts` had never worked at
+ * all (a double-escaped pattern demanded a literal backslash in the article text), and its absence
+ * was indistinguishable from "no cashtag in this article". One firing fixture found it instantly.
+ *
+ * Negative cases prove precision; positive ones prove the detector is alive. Neither half alone is
+ * enough — the same pairing as the ON DELETE RESTRICT tests: the refusal AND the permitted case.
+ */
+
 describe('trigrams match pg_trgm construction', () => {
   it('pads two leading and one trailing space, as Postgres does', () => {
     // Without the padding a short title scores very differently here than in the database,

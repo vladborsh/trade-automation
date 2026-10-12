@@ -9,6 +9,21 @@ import { AMBIGUOUS_TERMS, buildDictionary, matchAssets, nameFromCoingeckoId } fr
  * calibrated on. Recall is cheap to fix later; a false reaction is indistinguishable from a real one.
  */
 
+/**
+ * **Positive control (IB-027 rule).** Every detector in this task carries at least one fixture that
+ * MUST FIRE, and this comment says why so nobody "simplifies" the fixtures back to the cheap ones.
+ *
+ * A matcher tested only on inputs that should NOT match is unfalsifiable: a dead pattern passes
+ * every one of those tests. That is not hypothetical here — the cashtag rule in this very file had
+ * never worked at all (a double-escaped pattern demanded a literal backslash in the article text),
+ * and its absence was indistinguishable from "no cashtag in this article". One firing fixture found
+ * it instantly; no amount of reading had.
+ *
+ * The negative cases prove precision, the positive ones prove the detector is alive. Neither half
+ * is sufficient — the same pairing as the ON DELETE RESTRICT tests: refusal AND the permitted case.
+ */
+
+
 const UNIVERSE = [
   { id: 'BTCUSDT', base: 'BTC', coingecko_id: 'bitcoin' },
   { id: 'ETHUSDT', base: 'ETH', coingecko_id: 'ethereum' },
@@ -95,9 +110,11 @@ describe('text that is entirely upper case', () => {
 
 describe('the evidence is recorded, so a tag can be audited', () => {
   it('says what matched, and prefers the strongest evidence', () => {
-    expect(matchAssets('$BTC and bitcoin and BTC', DICT)).toEqual([{ symbol: 'BTCUSDT', matched: '$BTC' }]);
-    expect(matchAssets('bitcoin rallied', DICT)).toEqual([{ symbol: 'BTCUSDT', matched: 'bitcoin' }]);
-    expect(matchAssets('BTC rallied', DICT)).toEqual([{ symbol: 'BTCUSDT', matched: 'BTC' }]);
+    // the KIND is stored as well as the text: when a reaction looks spurious, the only way to tell
+    // whether the matcher or the market was wrong is to know which rule fired
+    expect(matchAssets('$BTC and bitcoin and BTC', DICT)).toEqual([{ symbol: 'BTCUSDT', kind: 'cashtag', matched: '$BTC' }]);
+    expect(matchAssets('bitcoin rallied', DICT)).toEqual([{ symbol: 'BTCUSDT', kind: 'name', matched: 'bitcoin' }]);
+    expect(matchAssets('BTC rallied', DICT)).toEqual([{ symbol: 'BTCUSDT', kind: 'ticker', matched: 'BTC' }]);
   });
 
   it('tags a symbol at most once however many times it appears', () => {
@@ -115,7 +132,7 @@ describe('the dictionary', () => {
 
   it('still matches a symbol with no coingecko id, by ticker alone', () => {
     const dict = buildDictionary([{ id: 'QNTUSDT', base: 'QNT', coingecko_id: null }]);
-    expect(matchAssets('QNT led the majors', dict)).toEqual([{ symbol: 'QNTUSDT', matched: 'QNT' }]);
+    expect(matchAssets('QNT led the majors', dict)).toEqual([{ symbol: 'QNTUSDT', kind: 'ticker', matched: 'QNT' }]);
   });
 
   it('pins the word-like tickers in the current universe, since a missing one fails OPEN', () => {

@@ -107,9 +107,9 @@ export async function persistPlan(db: Db, plan: IngestPlan, options: PersistOpti
       if (dictionary !== undefined && dictionary.length > 0) {
         for (const match of matchAssets(`${item.title}\n${item.body ?? ''}`, dictionary)) {
           await tx.query(
-            `insert into news_assets (news_id, symbol, matched) values ($1, $2, $3)
+            `insert into news_assets (news_id, symbol, via, matched) values ($1, $2, $3, $4)
              on conflict do nothing`,
-            [item.id, match.symbol, match.matched],
+            [item.id, match.symbol, match.kind, match.matched],
           );
           result.assetsTagged += 1;
         }

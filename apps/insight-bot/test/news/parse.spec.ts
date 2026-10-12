@@ -11,6 +11,19 @@ import {
 const fixture = (name: string): string =>
   fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'news', name), 'utf8');
 
+/**
+ * **Positive control (IB-027 rule).** This spec carries at least one fixture that MUST FIRE, and
+ * this comment says why, so nobody "simplifies" the fixtures back to the cheap negative ones.
+ *
+ * A detector tested only on inputs that should NOT match is unfalsifiable: a dead pattern passes
+ * every one of those tests. Not hypothetical — the cashtag rule in `assets.ts` had never worked at
+ * all (a double-escaped pattern demanded a literal backslash in the article text), and its absence
+ * was indistinguishable from "no cashtag in this article". One firing fixture found it instantly.
+ *
+ * Negative cases prove precision; positive ones prove the detector is alive. Neither half alone is
+ * enough — the same pairing as the ON DELETE RESTRICT tests: the refusal AND the permitted case.
+ */
+
 describe('parseDate', () => {
   it('reads RFC 822, ISO 8601 and epoch forms', () => {
     expect(parseDate('Mon, 28 Sep 2026 12:00:00 +0000')?.toISOString()).toBe('2026-09-28T12:00:00.000Z');

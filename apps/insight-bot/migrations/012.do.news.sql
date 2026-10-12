@@ -149,10 +149,35 @@ create index news_cluster_members_news_idx on news_cluster_members (news_id);
  * candidate is a guess from a ticker or name match, NOT a claim about relevance — no AI runs in
  * this task, and nothing here feeds a playbook.
  */
+/*
+ * IB-027 — the dictionary prefilter's candidate symbols. Candidates, not a classification: AI-1
+ * decides later.
+ *
+ * **Every tag records WHY.** `via` is the rule that fired and `matched` is the text that fired it,
+ * because this feeds `news_reactions` — a false tag becomes a price move attributed to a story that
+ * never mentioned the asset, and when a reaction looks spurious the only way to tell whether the
+ * matcher or the market was wrong is to know what tagged it.
+ *
+ * The three rules, strongest first:
+ *   - `cashtag`  — `$BTC`. Unambiguous by construction; nobody writes `$NEAR` meaning "near".
+ *   - `name`     — `bitcoin`, `bitcoin cash`. Matched LONGEST FIRST and claiming its span, because
+ *                  "Bitcoin Cash" contains "bitcoin" and every BCH story was tagging BTC.
+ *   - `ticker`   — a bare upper-case `BTC`, and only for tickers that are not also ordinary words.
+ *
+ * **Ambiguous terms, and the basis for the judgement** (`AMBIGUOUS_TERMS` in `news/assets.ts`): a
+ * term is ambiguous when it is an ordinary English word, a common abbreviation, or a proper noun
+ * that appears in news unrelated to the token. In the current universe that is ONE, NEAR, LINK,
+ * ARB, DASH, HYPE, PUMP, UNI, SOL, TAO, ENA, FIL — plus TRUMP, a surname in political coverage
+ * several times a day. It applies to NAMES as well as tickers: NEAR's coingecko id is literally
+ * `near`, and ONE's is `harmony`. An ambiguous term never tags on the bare form; it needs a
+ * cashtag. The list FAILS OPEN — a word-like ticker missing from it tags prose — so it is reviewed
+ * whenever `universe.yaml` is revised, which is monthly and by hand.
+ */
 create table news_assets (
   news_id text not null references raw_news (id) on delete cascade,
   symbol  text not null,                  -- universe.yaml id, e.g. BTCUSDT
-  matched text not null,                  -- what actually matched: the ticker, the name, an address
+  via     text not null check (via in ('cashtag', 'name', 'ticker')),
+  matched text not null,                  -- the text that fired the rule
   primary key (news_id, symbol)
 );
 

@@ -244,12 +244,12 @@ maybeDescribe('IB-027 news store against a real database', () => {
     const result = await persistPlan(db, plan, { ofSources: SOURCE_COUNT, dictionary });
 
     expect(result.assetsTagged).toBe(1);
-    const rows = await db.query<{ symbol: string; matched: string }>(
-      `select symbol, matched from news_assets where news_id = $1`, [a.id],
+    const rows = await db.query<{ symbol: string; via: string; matched: string }>(
+      `select symbol, via, matched from news_assets where news_id = $1`, [a.id],
     );
-    // BTC on the bare ticker; TRUMP is a surname here and must NOT be tagged, which is the whole
-    // point of the prefilter's ambiguity rule
-    expect(rows).toEqual([{ symbol: 'BTCUSDT', matched: 'BTC' }]);
+    // BTC on the bare ticker, and the row records WHICH rule fired; TRUMP is a surname here and
+    // must NOT be tagged, which is the whole point of the prefilter's ambiguity rule
+    expect(rows).toEqual([{ symbol: 'BTCUSDT', via: 'ticker', matched: 'BTC' }]);
   });
 
   it('tags nothing when there is no dictionary, rather than tagging against an empty one', async () => {

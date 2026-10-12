@@ -41,9 +41,17 @@ export interface AssetDictionaryEntry {
   name: string | null;
 }
 
+/**
+ * Which rule fired. Stored with the tag because when a reaction turns out spurious, the only way to
+ * tell whether the matcher or the market was wrong is to know what tagged it — a derived claim
+ * carries what it was derived from.
+ */
+export type AssetMatchKind = 'cashtag' | 'name' | 'ticker';
+
 export interface AssetMatch {
   symbol: string;
-  /** What actually matched, stored so a tag can be audited: `$BTC`, `bitcoin`, or `BTC`. */
+  kind: AssetMatchKind;
+  /** The text that actually matched: `$BTC`, `bitcoin`, or `BTC`. */
   matched: string;
 }
 
@@ -125,7 +133,7 @@ export function matchAssets(text: string, dictionary: readonly AssetDictionaryEn
 
   for (const entry of byNameLength) {
     if (wordBounded(`$${entry.base}`, 'iu').test(text)) {
-      out.push({ symbol: entry.symbol, matched: `$${entry.base}` });
+      out.push({ symbol: entry.symbol, kind: 'cashtag', matched: `$${entry.base}` });
       continue;
     }
 
@@ -135,7 +143,7 @@ export function matchAssets(text: string, dictionary: readonly AssetDictionaryEn
       const all = [...text.matchAll(wordBounded(entry.name, 'giu'))];
       const free = all.find((m) => !inClaimed(m.index ?? 0, (m.index ?? 0) + entry.name!.length));
       if (free !== undefined) {
-        out.push({ symbol: entry.symbol, matched: entry.name });
+        out.push({ symbol: entry.symbol, kind: 'name', matched: entry.name });
         for (const m of all) claimed.push({ start: m.index ?? 0, end: (m.index ?? 0) + entry.name.length });
         continue;
       }
@@ -143,7 +151,7 @@ export function matchAssets(text: string, dictionary: readonly AssetDictionaryEn
 
     // bare ticker: upper case only, never for an ambiguous one, never in shouting text
     if (!shouting && !isAmbiguous(entry.base) && wordBounded(entry.base, 'u').test(text)) {
-      out.push({ symbol: entry.symbol, matched: entry.base });
+      out.push({ symbol: entry.symbol, kind: 'ticker', matched: entry.base });
     }
   }
 
