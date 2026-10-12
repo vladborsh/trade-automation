@@ -22,6 +22,10 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   // IB-017. ~576 rows/day for P3 across 3 symbols and 2 arms; partitioned for the same reason
   // as the rest, so a year's audit trail is droppable by month rather than by delete.
   { table: 'playbook_evaluations', column: 'close_time' },
+  // IB-028 (migration 016). Registering a partitioned table here is not optional: there is no
+  // DEFAULT partition by design, so an unregistered table rejects every insert with "no partition
+  // of relation found" the moment the month rolls over — a failure that reads like a collector bug.
+  { table: 'dex_pools', column: 'observed_at' },
 ];
 
 export interface Partition {
