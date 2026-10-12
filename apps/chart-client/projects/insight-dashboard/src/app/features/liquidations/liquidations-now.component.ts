@@ -32,6 +32,15 @@ export class LiquidationsNowComponent {
   readonly venues = input.required<WebLiquidationsOverviewResponse['venues']>();
   /** Events in no coin's row. Shown only when non-zero — normally it is (IB-BUG-011). */
   readonly unmappedRows = input(0);
+  /**
+   * IB-039's narrow variant: the same card under the instrument chart, laid out in a row
+   * instead of a column. An input rather than a second component — §12.5 asks for "the same
+   * component, reused", and two copies of this card would be two places for the «нет нормы»
+   * rule to drift apart.
+   */
+  readonly narrow = input(false);
+  /** Overridden on the instrument page, where «Ликвидации сейчас» would repeat the page. */
+  readonly titleKey = input<StringKey>('liq.now.title');
 
   private readonly i18n = inject(I18nService);
   readonly t = this.i18n.t.bind(this.i18n);

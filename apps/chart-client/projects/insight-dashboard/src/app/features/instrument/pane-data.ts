@@ -1,5 +1,6 @@
 import type {
-  WebCandlesResponse, WebFundingResponse, WebLiquidationsResponse, WebLongShortResponse,
+  WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
+  WebLongShortResponse,
 } from '@trade-automation/contracts';
 
 /**
@@ -16,4 +17,8 @@ export interface PaneData {
   funding: WebFundingResponse;
   longShort: WebLongShortResponse;
   liquidations: WebLiquidationsResponse;
+  /** IB-039 §12.5 — individual events, drawn as bubbles over the price panel. */
+  liquidationEvents: readonly WebLiquidationEvent[];
+  /** The venues those events actually came from — the label is built from this, not a filter. */
+  liquidationVenues: readonly string[];
 }

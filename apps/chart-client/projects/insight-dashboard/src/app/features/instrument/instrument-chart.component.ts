@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { I18nService } from '../../i18n/i18n.service';
 import { InstrumentPanelComponent } from './instrument-panel.component';
-import { liquidationPaneTitle } from './liquidation-histogram.renderer';
+import { liquidationScopeLabel } from './liquidation-scope';
 import type { PaneData } from './pane-data';
 import { PANELS } from './panels.model';
 
@@ -53,11 +53,20 @@ export type { PaneData } from './pane-data';
 })
 export class InstrumentChartComponent {
   readonly data = input<PaneData | null>(null);
+  /**
+   * The 24 h liquidation total, already formatted, for the scope line above the fold.
+   * Null when the coin is outside IB-038's top 20 and no summary exists to point at.
+   */
+  readonly liquidationTotal24h = input<string | null>(null);
 
   readonly panels = PANELS;
 
   private readonly i18n = inject(I18nService);
   readonly t = this.i18n.t.bind(this.i18n);
-  readonly paneTitle = (bucket: string, venue: string, undercounted: boolean): string =>
-    liquidationPaneTitle(this.t, bucket, venue, undercounted);
+  /**
+   * IB-039: built from the venues the DATA came from, never from the filter the page sent —
+   * the Tech Lead's requirement, and the direct lesson of IB-BUG-011.
+   */
+  readonly scopeLabel = (venues: readonly string[], undercounted: boolean): string =>
+    liquidationScopeLabel(this.t, venues, undercounted, this.liquidationTotal24h());
 }

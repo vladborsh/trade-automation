@@ -121,4 +121,13 @@ export const en: Strings = {
   'liq.feed.col.venue': 'Venue',
   'liq.loadFailed': 'Could not load liquidations: {message}',
   'liq.placeholder': 'Temporary page. IB-037 adds the market cards.',
+  // IB-039
+  'instrument.liq.scope': 'Liquidations: {venues}',
+  'instrument.liq.scopeUndercounted': 'Liquidations: {venues}. Binance sends at most one event per second per symbol, so its flow is undercounted',
+  'instrument.liq.noVenues': 'No liquidations on any venue in this window',
+  'instrument.liq.markersTitle': 'Liquidations on the chart',
+  'instrument.liq.tooltip': '{side} · {usd} · {events} events · {venues}',
+  'instrument.liq.tooltipClamped': '{side} · {usd} · {events} events · {venues} — the bubble stops growing here',
+  'instrument.liq.summaryTitle': 'Liquidations for this instrument',
+  'instrument.liq.total24h': '{total} over 24h — detail below',
 };

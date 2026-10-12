@@ -1,6 +1,7 @@
 import { CandlestickSeries, LineSeries, type IChartApi, type Time } from 'lightweight-charts';
 import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
-import { LiquidationHistogramRenderer } from './liquidation-histogram.renderer';
+import { toLiquidationMarkers } from './liquidation-markers.adapter';
+import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
 import type { PaneData } from './pane-data';
 import type { PanelDef } from './panels.model';
 import {
@@ -24,32 +25,41 @@ import {
 /** Renderers that hold state across redraws, one set per panel instance. */
 export interface PanelRenderers {
   oi: MetricSeriesRenderer;
-  liquidations: LiquidationHistogramRenderer;
+  /** IB-039: the liquidation bubbles over the price series (§12.5). */
+  markers: LiquidationMarkersPrimitive;
 }
 
 export function createPanelRenderers(): PanelRenderers {
-  return { oi: new MetricSeriesRenderer(), liquidations: new LiquidationHistogramRenderer() };
+  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive() };
 }
 
 const asLine = (points: ReadonlyArray<{ time: number; value: number }>): Array<{ time: Time; value: number }> =>
   points as unknown as Array<{ time: Time; value: number }>;
 
-function drawPrice(chart: IChartApi, data: PaneData): void {
+function drawPrice(chart: IChartApi, data: PaneData, renderers: PanelRenderers): void {
   const price = chart.addSeries(CandlestickSeries, {
     upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
     wickUpColor: '#26a69a', wickDownColor: '#ef5350',
   });
   price.setData(toCandleData(data.candles.candles) as never);
+
+  // IB-039 §12.5 — liquidations as bubbles ON the price, bucketed to the bar on screen so a
+  // cascade reads as one big circle rather than a smear of overlapping dots.
+  price.attachPrimitive(renderers.markers);
+  renderers.markers.setMarkers(toLiquidationMarkers(data.liquidationEvents, {
+    barSeconds: barSecondsOf(data.timeframe),
+  }));
+}
+
+/** The chart's bar length, which is what the markers bucket to. */
+function barSecondsOf(timeframe: string): number {
+  const SEC: Record<string, number> = { '1m': 60, '15m': 900, '1h': 3_600, '4h': 14_400, '1d': 86_400 };
+  return SEC[timeframe] ?? 60;
 }
 
 function drawOpenInterest(chart: IChartApi, data: PaneData, renderers: PanelRenderers): void {
   if (!renderers.oi.series) renderers.oi.attach(chart, data.timeframe as never);
   renderers.oi.setData(toOpenInterestPoints(data.openInterest, data.instrument, data.timeframe));
-}
-
-function drawLiquidations(chart: IChartApi, data: PaneData, renderers: PanelRenderers): void {
-  if (!renderers.liquidations.attached) renderers.liquidations.attach(chart);
-  renderers.liquidations.setData(data.liquidations.bars);
 }
 
 function drawDelta(chart: IChartApi, data: PaneData): void {
@@ -82,7 +92,6 @@ function drawLongShort(chart: IChartApi, data: PaneData): void {
 const DRAW: Record<PanelDef['key'], (chart: IChartApi, data: PaneData, renderers: PanelRenderers) => void> = {
   price: drawPrice,
   openInterest: drawOpenInterest,
-  liquidations: drawLiquidations,
   delta: drawDelta,
   funding: drawFunding,
   longShort: drawLongShort,

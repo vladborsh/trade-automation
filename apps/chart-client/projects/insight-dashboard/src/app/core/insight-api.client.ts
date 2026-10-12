@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import type {
   WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
-  WebLiquidationsOverviewResponse, WebLongShortResponse, WebStreamsResponse, WebTimeframe,
-  WebTopLiquidation, WebUniverseTopResponse,
+  WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
+  WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -89,6 +89,19 @@ export class InsightApiClient {
 
   async topLiquidations(symbol: string, fromMs: number, toMs: number, n = 50): Promise<{ symbol: string; rows: WebTopLiquidation[] }> {
     return this.get('/series/liquidations/top', { symbol, from: fromMs, to: toMs, n });
+  }
+
+  /**
+   * IB-039 §12.5 — individual liquidations for the chart's markers.
+   *
+   * The server REFUSES a window holding more than 2 000 events rather than truncating it, and
+   * the `RANGE_TOO_WIDE` it answers with carries the `minUsd` that would fit. A silently
+   * truncated list would draw a chart that goes calm halfway through a cascade.
+   */
+  async liquidationEvents(symbol: string, fromMs: number, toMs: number, minUsd = 0): Promise<WebLiquidationEventsResponse> {
+    return this.get<WebLiquidationEventsResponse>('/series/liquidations/events', {
+      symbol, from: fromMs, to: toMs, min_usd: minUsd,
+    });
   }
 
   // ------------------------------------------------------ IB-038, the liquidation surfaces

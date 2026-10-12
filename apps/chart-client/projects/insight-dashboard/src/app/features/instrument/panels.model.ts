@@ -1,6 +1,6 @@
 import type { StringKey } from '../../i18n/keys';
 import type { PaneData } from './pane-data';
-import { LIQUIDATION_COLORS } from './liquidation-histogram.renderer';
+import { LIQUIDATION_COLORS } from './liquidation-scope';
 
 /**
  * IB-BUG-009 — the six panels of the instrument row, as data (user feedback 2026-10-07,
@@ -27,7 +27,7 @@ export interface PanelLegendEntry {
 
 export interface PanelDef {
   /** Stable key, used for `track` and for the panel's test hook. */
-  key: 'price' | 'openInterest' | 'liquidations' | 'delta' | 'funding' | 'longShort';
+  key: 'price' | 'openInterest' | 'delta' | 'funding' | 'longShort';
   titleKey: StringKey;
   /**
    * Shown after the title, e.g. "Открытый интерес · контракты". A unit, not prose.
@@ -47,30 +47,33 @@ const TEXT = '#c9d1d9';
 const UP = '#26a69a';
 
 /**
- * Left to right, exactly the order the user asked for:
- * Price | OI | Liquidations | CVD/delta | Funding | L/S.
+ * Left to right: Price | OI | CVD/delta | Funding | L/S.
+ *
+ * **Five, not six.** IB-039 removed the liquidations column (§12.5): liquidations are events at
+ * a price, not a series beside the price, so they are drawn as bubbles ON the price panel and
+ * summarised underneath. The price panel's legend carries their colours now — see
+ * `liquidation-scope.ts`, which still owns the rule that a liquidated long is the DOWN colour.
  */
 export const PANELS: readonly PanelDef[] = [
   // The price panel's unit is the instrument's QUOTE CURRENCY, which is data, not a translated
   // string: a BTC-USD perp must read "USD", not a hard-coded "USDT". `unitKey: null` means
   // "resolve it from the symbol" — see `panelUnit`.
-  { key: 'price', titleKey: 'instrument.panel.price', unitKey: null, legend: [] },
+  // The price panel's legend is the MARKERS' legend: the bubbles drawn over it are the only
+  // thing on this chart with two colours, and an unexplained red and green circle is a puzzle.
+  {
+    key: 'price',
+    titleKey: 'instrument.panel.price',
+    unitKey: null,
+    legend: [
+      { colour: LIQUIDATION_COLORS.long, labelKey: 'instrument.legend.longs' },
+      { colour: LIQUIDATION_COLORS.short, labelKey: 'instrument.legend.shorts' },
+    ],
+  },
   {
     key: 'openInterest',
     titleKey: 'instrument.panel.openInterest',
     unitKey: 'instrument.unit.contracts',
     legend: [],
-  },
-  {
-    key: 'liquidations',
-    titleKey: 'instrument.panel.liquidations',
-    unitKey: 'instrument.unit.usd',
-    // Longs in the down colour and shorts in the up colour: a long being liquidated is price
-    // falling, so the colour matches what the market did, not the noun (IB-031's rule, kept).
-    legend: [
-      { colour: LIQUIDATION_COLORS.long, labelKey: 'instrument.legend.longs' },
-      { colour: LIQUIDATION_COLORS.short, labelKey: 'instrument.legend.shorts' },
-    ],
   },
   {
     key: 'delta',

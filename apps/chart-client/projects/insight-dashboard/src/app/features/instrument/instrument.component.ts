@@ -3,11 +3,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import type {
-  WebCandlesResponse, WebFundingResponse, WebLiquidationsResponse, WebLongShortResponse,
+  WebCandlesResponse, WebFundingResponse, WebLiquidationEventsResponse, WebLiquidationCoin,
+  WebLiquidationsOverviewResponse, WebLiquidationsResponse, WebLongShortResponse,
   WebTimeframe, WebTopLiquidation, WebUniverseSymbol,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
+import { formatUsd } from '../liquidations/liquidations.format';
+import { LiquidationsNowComponent } from '../liquidations/liquidations-now.component';
 import { InstrumentChartComponent, type PaneData } from './instrument-chart.component';
 import {
   allowedTimeframes, bucketFor, effectiveTimeframe, findPreset, isRefused, RANGE_PRESETS,
@@ -26,7 +29,7 @@ import {
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, InstrumentChartComponent],
+  imports: [FormsModule, DatePipe, DecimalPipe, InstrumentChartComponent, LiquidationsNowComponent],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,6 +50,28 @@ export class InstrumentComponent {
 
   readonly panes = signal<PaneData | null>(null);
   readonly top = signal<WebTopLiquidation[]>([]);
+  /**
+   * IB-039 — this instrument's row out of IB-038's overview, for the summary under the chart.
+   *
+   * The SAME endpoint and the same component as the landing card, not a copy: the overview
+   * already computes 1 h / 4 h / 24 h per coin with the norm basis and the venue honesty line,
+   * it is cached 15 s server-side, and a second implementation of «× от нормы» is exactly the
+   * duplicated-threshold drift I deleted from the server in IB-038.
+   */
+  readonly liqCoin = signal<WebLiquidationCoin | null>(null);
+  readonly liqVenues = signal<WebLiquidationsOverviewResponse['venues']>({ present: [], missing: [] });
+  /**
+   * The 24 h total, for the scope line that sits ABOVE the fold.
+   *
+   * The summary card is below it — the Tech Lead ruled on 2026-10-12 that the row keeps its full
+   * height rather than shrinking to rescue the card — so the visible line carries the number and
+   * says where the detail is. Same figure as the card's 24 h window, formatted the same way, so
+   * the two cannot disagree.
+   */
+  readonly liqTotal24h = computed(() => {
+    const window = this.liqCoin()?.windows.find((w) => w.window === '24h');
+    return window ? formatUsd(window.total.usd) : null;
+  });
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   /** Set when the page asked for a coarser frame than the one chosen, so it can say so. */
@@ -112,16 +137,18 @@ export class InstrumentComponent {
     const bucket = bucketFor(preset);
 
     try {
-      const [candles, oi, funding, ls, liquidations, top] = await Promise.all([
+      const [candles, oi, funding, ls, liquidations, top, events] = await Promise.all([
         this.api.candles(symbol, fromMs, toMs, tf, this.market()),
         this.api.openInterest(symbol, fromMs, toMs),
         this.api.funding(symbol, fromMs, toMs),
         this.api.longShort(symbol, fromMs, toMs, 'global_account'),
         this.api.liquidations(symbol, fromMs, toMs, bucket),
         this.api.topLiquidations(symbol, fromMs, toMs, 50),
+        this.liquidationEvents(symbol, fromMs, toMs),
       ]);
-      this.panes.set(this.toPanes(candles, oi, funding, ls, liquidations, tf, bucket));
+      this.panes.set(this.toPanes(candles, oi, funding, ls, liquidations, events, tf, bucket));
       this.top.set(top.rows);
+      void this.loadSummary(symbol);
     } catch (error) {
       this.error.set((error as Error).message);
       this.panes.set(null);
@@ -131,12 +158,39 @@ export class InstrumentComponent {
     }
   }
 
+  /**
+   * The markers' events, degrading rather than failing the page.
+   *
+   * A window with more than 2 000 liquidations answers `RANGE_TOO_WIDE`, which is the server
+   * refusing to truncate. That is not a reason to show no chart: the candles are still worth
+   * looking at, so the markers drop out and the rest of the page loads.
+   */
+  private async liquidationEvents(symbol: string, fromMs: number, toMs: number): Promise<WebLiquidationEventsResponse> {
+    try {
+      return await this.api.liquidationEvents(symbol, fromMs, toMs);
+    } catch {
+      return { symbol, minUsd: 0, events: [], venuesPresent: [], undercounted: true };
+    }
+  }
+
+  /** IB-038's overview, narrowed to this coin. Failure leaves the summary off, not the page. */
+  private async loadSummary(symbol: string): Promise<void> {
+    try {
+      const overview = await this.api.liquidationsOverview();
+      this.liqCoin.set(overview.perCoin.find((c) => c.symbol === symbol) ?? null);
+      this.liqVenues.set(overview.venues);
+    } catch {
+      this.liqCoin.set(null);
+    }
+  }
+
   private toPanes(
     candles: WebCandlesResponse,
     oi: { points: Array<{ time: number; value: number; notional: number | null }> },
     funding: WebFundingResponse,
     ls: WebLongShortResponse,
     liquidations: WebLiquidationsResponse,
+    events: WebLiquidationEventsResponse,
     timeframe: WebTimeframe,
     bucket: string,
   ): PaneData {
@@ -149,6 +203,8 @@ export class InstrumentComponent {
       funding,
       longShort: ls,
       liquidations,
+      liquidationEvents: events.events,
+      liquidationVenues: events.venuesPresent,
     };
   }
 }

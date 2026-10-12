@@ -131,6 +131,41 @@ export const WebLiquidationsResponseSchema = z.object({
 });
 export type WebLiquidationsResponse = z.infer<typeof WebLiquidationsResponseSchema>;
 
+/**
+ * IB-039 — one liquidation event for the price chart's markers (§12.5).
+ *
+ * Deliberately NOT `WebLiquidationBar`: a bar is a bucket of money over time, a marker is one
+ * event at a price. The marker needs `price`, which a bucket cannot have, and the bucketing to
+ * the chart's bar happens on the client at whatever timeframe is on screen.
+ */
+export const WebLiquidationEventSchema = z.object({
+  time: TimeSec,
+  /** The side that was LIQUIDATED (§3.3), not the side of the filling order. */
+  side: z.enum(['long', 'short']),
+  usd: z.number().nonnegative(),
+  price: z.number(),
+  venue: z.string(),
+});
+export type WebLiquidationEvent = z.infer<typeof WebLiquidationEventSchema>;
+
+/** The most events one call will return before it refuses the range instead (§12.5). */
+export const WEB_MAX_LIQUIDATION_EVENTS = 2_000;
+
+export const WebLiquidationEventsResponseSchema = z.object({
+  symbol: z.string(),
+  minUsd: z.number().nonnegative(),
+  events: z.array(WebLiquidationEventSchema),
+  /**
+   * IB-BUG-011: the venues that actually contributed, derived from the rows. The instrument
+   * page labels the markers from THIS, never from a filter it sent — that is the whole lesson
+   * of the panel that said «все биржи» over one venue's money.
+   */
+  venuesPresent: z.array(z.string()),
+  /** §12.2: Binance publishes at most one forceOrder per second per symbol. */
+  undercounted: z.boolean(),
+});
+export type WebLiquidationEventsResponse = z.infer<typeof WebLiquidationEventsResponseSchema>;
+
 export const WebTopLiquidationSchema = z.object({
   time: TimeSec,
   venue: z.string(),

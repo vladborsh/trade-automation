@@ -100,3 +100,22 @@
 .note.warn {
   color: #d29922;
 }
+
+/* IB-039's narrow variant: the same card under the instrument chart, where the page is wide and
+ * short rather than tall. The three windows sit side by side instead of stacked, and nothing
+ * else changes — same numbers, same refusals, same honesty line. */
+.card.narrow {
+  .window {
+    flex: 1 1 0;
+    min-width: 200px;
+  }
+
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+
+  .card-title,
+  .note {
+    grid-column: 1 / -1;
+  }
+}

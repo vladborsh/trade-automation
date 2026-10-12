@@ -224,6 +224,40 @@ export async function liquidations(
   }));
 }
 
+/**
+ * IB-039 — individual liquidation events for the price chart's markers (§12.5).
+ *
+ * Asks for **one more row than the cap** so the caller can tell "exactly at the limit" from
+ * "more than we will send" without a second count query. A silently truncated list would draw a
+ * chart that looks calm after the two-thousandth event, which is the same failure as showing one
+ * venue and calling it all of them.
+ *
+ * Ordered by size, not by time: when a window holds more than the cap, the events worth seeing
+ * are the big ones. The client sorts back into time order to draw.
+ */
+export async function liquidationEvents(
+  db: Db,
+  q: Omit<RangeQuery, 'stride'> & { minUsd: number; limit: number },
+): Promise<Array<{ time: number; side: 'long' | 'short'; usd: number; price: number; venue: string }>> {
+  const spellings = await venueSpellings(db, q.symbol);
+  if (spellings.length === 0) return [];
+  const rows = await db.query<{ ts: Date; side: 'long' | 'short'; notional: string; price: string; venue: string }>(
+    `select ts, side, notional, price, venue
+       from liquidations
+      where symbol = any($1::text[]) and ts >= $2 and ts < $3 and notional >= $4
+      order by notional desc
+      limit $5`,
+    [spellings, asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.limit + 1],
+  );
+  return rows.map((r) => ({
+    time: sec(r.ts),
+    side: r.side,
+    usd: Number(r.notional),
+    price: Number(r.price),
+    venue: r.venue,
+  }));
+}
+
 export interface UniverseRow {
   id: string; base: string; quote: string; volumeRank: number | null; inSignalSet: boolean;
   binancePerp: boolean; binanceSpot: boolean; bybitLinear: boolean; okxSwap: boolean;

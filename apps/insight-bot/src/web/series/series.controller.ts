@@ -1,9 +1,9 @@
 import { Controller, Get, HttpException, Inject, Query } from '@nestjs/common';
 import {
-  WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema, WebTimeframeSchema,
-  WebVenueFilterSchema,
-  type WebCandlesResponse, type WebFundingResponse, type WebLiquidationsResponse,
-  type WebLongShortResponse, type WebTopLiquidation,
+  WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
+  WebTimeframeSchema, WebVenueFilterSchema,
+  type WebCandlesResponse, type WebFundingResponse, type WebLiquidationEventsResponse,
+  type WebLiquidationsResponse, type WebLongShortResponse, type WebTopLiquidation,
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
 import { bucketLiquidations, topLiquidations } from './liquidation-buckets';
@@ -159,6 +159,52 @@ export class SeriesController {
       // §12.2: Binance sends at most one forceOrder per second per symbol
       undercounted: parsedVenue.data === 'all' || parsedVenue.data === 'binance',
       downsampled,
+    };
+  }
+
+  /**
+   * IB-039 §12.5 — the events behind the price chart's markers.
+   *
+   * **Refuses rather than truncates.** A window holding more than `WEB_MAX_LIQUIDATION_EVENTS`
+   * answers `400 RANGE_TOO_WIDE` with the `minUsd` that would have fitted, so the caller raises
+   * its threshold or narrows its window knowingly. Quietly sending the first 2 000 would draw a
+   * chart that goes calm halfway through a cascade — the same class of lie as IB-BUG-011.
+   */
+  @Get('liquidations/events')
+  async liquidationEvents(
+    @Query('symbol') symbol: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('min_usd') minUsd = '0',
+  ): Promise<WebLiquidationEventsResponse> {
+    const { fromMs, toMs } = this.range(from, to, '1m');
+    const threshold = Math.max(0, Number(minUsd) || 0);
+
+    const rows = await repo.liquidationEvents(this.required, {
+      symbol, fromMs, toMs, minUsd: threshold, limit: WEB_MAX_LIQUIDATION_EVENTS,
+    });
+
+    if (rows.length > WEB_MAX_LIQUIDATION_EVENTS) {
+      // the smallest event we WOULD have sent: raising min_usd past it brings the window under
+      // the cap, so the error carries the fix rather than just the complaint
+      const smallestSent = rows[WEB_MAX_LIQUIDATION_EVENTS - 1]?.usd ?? threshold;
+      throw new HttpException(
+        {
+          code: 'RANGE_TOO_WIDE',
+          message: `more than ${WEB_MAX_LIQUIDATION_EVENTS} liquidations in this window; raise min_usd above ${Math.ceil(smallestSent)} or narrow the range`,
+          minUsd: Math.ceil(smallestSent),
+        },
+        400,
+      );
+    }
+
+    return {
+      symbol,
+      minUsd: threshold,
+      // back into time order: size order is how the cap picks, not how a chart draws
+      events: [...rows].sort((a, b) => a.time - b.time),
+      venuesPresent: [...new Set(rows.map((r) => r.venue))].sort(),
+      undercounted: true,
     };
   }
 

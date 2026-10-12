@@ -53,7 +53,19 @@
   }
 
   @if (panes(); as data) {
-    <app-instrument-chart [data]="data" />
+    <app-instrument-chart [data]="data" [liquidationTotal24h]="liqTotal24h()" />
+
+    <!-- IB-039 §12.5: the same card as the landing page, narrow variant, this coin's row out of
+         IB-038's overview. Absent rather than empty when the coin is outside the top 20. -->
+    @if (liqCoin(); as coin) {
+      <app-liquidations-now
+        class="liq-summary"
+        [windows]="coin.windows"
+        [venues]="liqVenues()"
+        [narrow]="true"
+        titleKey="instrument.liq.summaryTitle"
+      />
+    }
 
     <h2 class="table-title">{{ t('instrument.topTitle') }}</h2>
     <table class="top">

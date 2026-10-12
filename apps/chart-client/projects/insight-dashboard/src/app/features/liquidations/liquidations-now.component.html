@@ -1,5 +1,5 @@
-<section class="card">
-  <h2 class="card-title">{{ t('liq.now.title') }}</h2>
+<section class="card" [class.narrow]="narrow()">
+  <h2 class="card-title">{{ t(titleKey()) }}</h2>
 
   @for (w of windows(); track w.window) {
     <div class="window" [attr.data-window]="w.window">

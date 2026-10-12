@@ -130,7 +130,16 @@ export type StringKey =
   | 'liq.feed.col.price'
   | 'liq.feed.col.venue'
   | 'liq.loadFailed'
-  | 'liq.placeholder';
+  | 'liq.placeholder'
+  // IB-039 — liquidation markers on the price chart
+  | 'instrument.liq.scope'
+  | 'instrument.liq.scopeUndercounted'
+  | 'instrument.liq.noVenues'
+  | 'instrument.liq.markersTitle'
+  | 'instrument.liq.tooltip'
+  | 'instrument.liq.tooltipClamped'
+  | 'instrument.liq.summaryTitle'
+  | 'instrument.liq.total24h';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

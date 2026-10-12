@@ -5,7 +5,7 @@ import {
   windowBounds, type PanelDef,
 } from './panels.model';
 import type { PaneData } from './pane-data';
-import { LIQUIDATION_COLORS } from './liquidation-histogram.renderer';
+import { LIQUIDATION_COLORS } from './liquidation-scope';
 
 import type { StringKey } from '../../i18n/keys';
 
@@ -13,8 +13,10 @@ const t = (key: StringKey): string => (ru as Record<string, string>)[key] ?? `MI
 
 describe('the six panels (IB-BUG-009)', () => {
   it('are in the order the user asked for, left to right', () => {
+    // IB-039 removed the liquidations column (§12.5): liquidations are events at a price, so
+    // they are bubbles ON the price panel now, not a series beside it.
     expect(PANELS.map((p) => p.key)).toEqual([
-      'price', 'openInterest', 'liquidations', 'delta', 'funding', 'longShort',
+      'price', 'openInterest', 'delta', 'funding', 'longShort',
     ]);
   });
 
@@ -53,14 +55,19 @@ describe('the six panels (IB-BUG-009)', () => {
     expect(panelHeading(t, PANELS[1])).toBe('Открытый интерес · контракты');
   });
 
+  it('no longer carries a liquidations panel', () => {
+    // Pinned so the column is not quietly reinstated beside the markers that replaced it.
+    expect(PANELS.map((p) => p.key)).not.toContain('liquidations');
+  });
+
   it('gives a legend to the two-series panels and none to the one-series panels', () => {
     const legends = new Map(PANELS.map((p) => [p.key, p.legend.length]));
-    // Two series each: liquidations (longs/shorts), delta (CVD/per-bar), funding (settled/predicted).
-    expect(legends.get('liquidations')).toBe(2);
+    // Two each: delta (CVD/per-bar), funding (settled/predicted), and price — whose legend is
+    // the MARKERS' legend since IB-039, because an unexplained red and green bubble is a puzzle.
+    expect(legends.get('price')).toBe(2);
     expect(legends.get('delta')).toBe(2);
     expect(legends.get('funding')).toBe(2);
     // One series each: a legend of one entry is noise beside a title that already names it.
-    expect(legends.get('price')).toBe(0);
     expect(legends.get('openInterest')).toBe(0);
     expect(legends.get('longShort')).toBe(0);
   });
@@ -77,11 +84,11 @@ describe('the six panels (IB-BUG-009)', () => {
 
   it('keeps IB-031 colour rule: longs in the down colour, shorts in the up colour', () => {
     // A long being liquidated is price falling, so the colour matches what the market did.
-    const liquidations = PANELS.find((p) => p.key === 'liquidations') as PanelDef;
-    expect(liquidations.legend[0].colour).toBe(LIQUIDATION_COLORS.long);
-    expect(liquidations.legend[0].colour).toBe('#ef5350');
-    expect(liquidations.legend[1].colour).toBe(LIQUIDATION_COLORS.short);
-    expect(liquidations.legend[1].colour).toBe('#26a69a');
+    const price = PANELS.find((p) => p.key === 'price') as PanelDef;
+    expect(price.legend[0].colour).toBe(LIQUIDATION_COLORS.long);
+    expect(price.legend[0].colour).toBe('#ef5350');
+    expect(price.legend[1].colour).toBe(LIQUIDATION_COLORS.short);
+    expect(price.legend[1].colour).toBe('#26a69a');
   });
 
   it('uses only the AGENTS.md palette for swatches', () => {
@@ -127,6 +134,8 @@ describe('windowBounds (IB-BUG-009)', () => {
     funding: { settled: [{ venue: 'binance', points: [{ time: 500, rate: 0 }] }], predicted: [] } as never,
     longShort: { points: [{ time: 3000, ratio: 1 }] } as never,
     liquidations: { bars: [{ time: 2500, long: 0, short: 0, events: 0 }] } as never,
+    liquidationEvents: [],
+    liquidationVenues: [],
     ...over,
   });
 

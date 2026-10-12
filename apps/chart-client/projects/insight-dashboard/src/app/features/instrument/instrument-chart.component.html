@@ -5,5 +5,5 @@
 </div>
 
 @if (data(); as d) {
-  <p class="pane-note">{{ paneTitle(d.bucket, d.liquidations.venue, d.liquidations.undercounted) }}</p>
+  <p class="pane-note">{{ scopeLabel(d.liquidationVenues, d.liquidations.undercounted) }}</p>
 }

@@ -127,4 +127,13 @@ export const ru: Strings = {
   'liq.feed.col.venue': 'Биржа',
   'liq.loadFailed': 'Не удалось загрузить ликвидации: {message}',
   'liq.placeholder': 'Это временная страница. Карточки рынка добавит IB-037.',
+  // IB-039
+  'instrument.liq.scope': 'Ликвидации: {venues}',
+  'instrument.liq.scopeUndercounted': 'Ликвидации: {venues}. Binance шлёт не чаще одного события в секунду на символ, поэтому его поток занижен',
+  'instrument.liq.noVenues': 'Ликвидаций за период нет ни на одной бирже',
+  'instrument.liq.markersTitle': 'Ликвидации на графике',
+  'instrument.liq.tooltip': '{side} · {usd} · {events} событий · {venues}',
+  'instrument.liq.tooltipClamped': '{side} · {usd} · {events} событий · {venues} — кружок больше не растёт',
+  'instrument.liq.summaryTitle': 'Ликвидации по инструменту',
+  'instrument.liq.total24h': 'за 24 ч {total} — подробнее ниже',
 };
