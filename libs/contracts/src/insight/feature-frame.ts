@@ -143,15 +143,18 @@ export type WebFeatureFrame = z.infer<typeof WebFeatureFrameSchema>;
 export const WEB_FRAME_VERSION = 1;
 
 /**
- * **The version freezes at the first persisted frame.** Until migration 011 exists nothing has
- * ever been written, so there are no stored frames for a consumer to be version-aware about, and
- * a fingerprint change updates the committed literal without a bump. The moment the table exists
- * that exemption ends and every fingerprint change is a bump.
+ * **The version freezes at the first persisted frame, and that is ENFORCED rather than stated.**
  *
- * Stated rather than done quietly, because "we skipped the bump this once" is exactly the habit
- * the rule exists to prevent — the exemption has a boundary and the boundary is in the code.
+ * Migration 011's `feature_frame_versions` records the fingerprint the first frame under each
+ * version was written with, and `assertFrameVersionFingerprint` in the insight-bot checks the
+ * live fingerprint against it on every write, throwing and naming the fix on a mismatch.
+ *
+ * This replaced a `WEB_FRAME_VERSION_FROZEN_FROM_FIRST_WRITE = true` constant (Tech Lead,
+ * 2026-10-12): a boolean documents a boundary and enforces nothing, and the person changing the
+ * spec six months after the first frame lands will not read it. A spec protects the repository;
+ * only the stored row protects the database, because a test and the thing it tests get edited in
+ * the same commit.
  */
-export const WEB_FRAME_VERSION_FROZEN_FROM_FIRST_WRITE = true;
 
 
 /**

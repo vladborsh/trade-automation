@@ -16,6 +16,9 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   { table: 'long_short_5m', column: 'ts' },
   { table: 'liquidations', column: 'ts' },
   { table: 'collector_gaps', column: 'detected_at' },
+  // IB-015 (migration 011). `feature_frame_versions` is deliberately NOT here: it holds one row
+  // per frame_version for the life of the product, not a time series.
+  { table: 'feature_frames', column: 'close_time' },
 ];
 
 export interface Partition {

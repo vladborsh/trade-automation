@@ -70,13 +70,21 @@ describe('partitionsFor', () => {
     expect(december.to).toBe('2027-01-01');
   });
 
-  it('covers every partitioned table in migration 002, and nothing else', () => {
+  it('covers every partitioned table, and nothing else', () => {
+    // An "and nothing else" pin, deliberately: a table joining this list silently means its
+    // partitions start being created by a maintenance job nobody reviewed, and a table LEAVING
+    // it silently means writes start failing at the next month boundary.
     expect(PARTITIONED_TABLES.map((t) => t.table)).toEqual([
+      // migration 002
       'candles_1m', 'candles_agg', 'mark_funding_1m', 'open_interest_5m', 'long_short_5m', 'liquidations', 'collector_gaps',
+      // migration 011 (IB-015)
+      'feature_frames',
     ]);
     // The two unpartitioned tables of §3.3 must not appear.
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('funding_settlements');
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('calendar_events');
+    // Nor the version guard: one row per frame_version for the life of the product, not a series.
+    expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('feature_frame_versions');
     expect(partitionsFor(['2026-09', '2026-10'])).toHaveLength(PARTITIONED_TABLES.length * 2);
   });
 });
