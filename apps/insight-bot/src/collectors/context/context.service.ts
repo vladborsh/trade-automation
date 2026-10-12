@@ -4,6 +4,7 @@ import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { Db, DB } from '../../db/db.port';
 import { Writers } from '../writers/batch-writer';
+import { CoingeckoGate } from './coingecko.gate';
 import { COIN_CHART_DAYS, ContextClient } from './context.client';
 import { fearGreedRows, marketCapCoinRows, marketCapGlobalRow } from './mappers';
 import { COIN_REQUEST_SPACING_MS, dueDailyTasks, globalDueAfter, GLOBAL_POLL_MS } from './schedule';
@@ -16,6 +17,9 @@ export const VENUE_CG = 'coingecko';
 
 /** §10 — the dashboard charts the top 20 of the universe's 30-day volume rank. */
 export const TOP_N_COINS = 20;
+
+/** The cadence the two daily jobs speak at, for the watchdog to judge them against. */
+export const DAILY_INTERVAL_SEC = 24 * 60 * 60;
 
 /**
  * IB-036 — Fear & Greed and the two market-cap series (§10).
@@ -33,6 +37,12 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger('ContextCollector');
   private readonly client: ContextClient;
   private readonly sleep: (ms: number) => Promise<void>;
+  /**
+   * IB-BUG-006 — every CoinGecko request in this process goes through one queue, so the
+   * forward-only `/global` poll cannot be starved by the 365-day backfill sharing its allowance.
+   * Null in the specs, which inject their own client.
+   */
+  private readonly gate: CoingeckoGate | null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private globalDueAt = 0;
   private lastDailyDay = '';
@@ -48,11 +58,25 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
     @Optional() sleep?: (ms: number) => Promise<void>,
   ) {
     this.sleep = sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.gate = client
+      ? null
+      : new CoingeckoGate({
+          // the same spacing the backfill was already measured to need, now applied to every
+          // CoinGecko request rather than only between coins: the total rate is unchanged
+          minSpacingMs: COIN_REQUEST_SPACING_MS,
+          sleep: this.sleep,
+          onPreempt: ({ queuedBehind, waitedMs }) =>
+            this.logger.log(
+              `/global took the next CoinGecko slot ahead of ${queuedBehind} backfill request(s) ` +
+                `after ${Math.round(waitedMs / 1000)} s — this series cannot be backfilled`,
+            ),
+        });
     this.client =
       client ??
       new ContextClient({
         fngBaseUrl: this.config.env.get('FNG_BASE_URL'),
         coingeckoBaseUrl: this.config.env.get('COINGECKO_BASE_URL'),
+        gate: this.gate ?? undefined,
         onRetry: ({ url, attempt, of, waitMs }) =>
           this.logger.warn(
             `rate limited (429) by ${new URL(url).host}${new URL(url).pathname} — retry ${attempt}/${of} in ${waitMs / 1000} s`,
@@ -69,18 +93,49 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   onApplicationBootstrap(): void {
-    for (const [stream, venue] of [
-      [STREAM_FNG, VENUE_FNG],
-      [STREAM_GLOBAL, VENUE_CG],
-      [STREAM_COINS, VENUE_CG],
+    // IB-BUG-006: each stream declares the cadence it actually speaks at. Registered without one,
+    // all three were judged against the watchdog's 3-minute default — so a HEALTHY 10-minute
+    // `/global` poll and a once-a-day job would both be reported silent within minutes. The
+    // September alert («молчит 4 мин») was true because the poll really was starved; with the
+    // starvation fixed the same alert would fire on a working collector every single cycle, and
+    // an alert that cries wolf on correct behaviour is worth less than no alert at all.
+    for (const [stream, venue, intervalSec] of [
+      [STREAM_FNG, VENUE_FNG, DAILY_INTERVAL_SEC],
+      [STREAM_GLOBAL, VENUE_CG, GLOBAL_POLL_MS / 1000],
+      [STREAM_COINS, VENUE_CG, DAILY_INTERVAL_SEC],
     ] as const) {
-      this.registry.register(stream, venue);
+      this.registry.register(stream, venue, intervalSec);
     }
 
     this.startClock();
-    // Fire-and-forget: the one-shot backfills take a minute or two and must not delay the
-    // 10-minute poll, which is the series that cannot be recovered.
-    void this.backfill().catch((err) => this.logger.error(`context backfill failed: ${(err as Error).message}`));
+    // IB-BUG-006: the FIRST request this process makes is the forward-only one, and only then
+    // does the backfill start queueing behind it.
+    void this.primeThenBackfill().catch((err) =>
+      this.logger.error(`context backfill failed: ${(err as Error).message}`),
+    );
+  }
+
+  /**
+   * One `/global` sample, then the backfills.
+   *
+   * On a fresh database — the Tokyo box's first boot, and every rehearsal of it — the backfill
+   * fetches 365 days for twenty coins and holds the keyless allowance for ten minutes. Before
+   * IB-BUG-006 the `/global` poll simply lost that race: one row in twenty minutes, then none,
+   * and those samples are unrecoverable because CoinGecko's history endpoint is paid.
+   *
+   * **A failed first sample does not block the backfill.** If `/global` is broken or the venue is
+   * down, waiting for it would trade one missing series for two; the gate already guarantees the
+   * priority from here on, so one attempt is enough to put the forward-only series first.
+   */
+  private async primeThenBackfill(now = new Date()): Promise<void> {
+    try {
+      await this.pollGlobal(now);
+      this.globalDueAt = globalDueAfter(now.getTime(), 'ok');
+    } catch (err) {
+      this.globalDueAt = globalDueAfter(now.getTime(), 'failed');
+      this.logger.warn(`first /global sample failed (${(err as Error).message}) — backfilling anyway`);
+    }
+    await this.backfill(now);
   }
 
   private startClock(): void {
@@ -128,13 +183,11 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
 
   async pollCoins(now = new Date(), days = 2, coins = this.coins()): Promise<number> {
     let written = 0;
-    let first = true;
     for (const coin of coins) {
-      // Paced: 20 calls back-to-back is ~60/min instantaneously, however small the daily average
-      // is, and CoinGecko answers that with 429 (observed 2026-09-28 — it cost the first live run
-      // its /global samples). The average rate was never the binding constraint; the burst was.
-      if (!first) await this.sleep(COIN_REQUEST_SPACING_MS);
-      first = false;
+      // The pacing moved into the gate (IB-BUG-006). It used to be this loop's own sleep, which
+      // spaced coin from coin but knew nothing about `/global`, so the two schedulers competed.
+      // The interval is unchanged — 30 s between any two CoinGecko requests, measured — but it is
+      // now one queue, and `/global` can take a slot in the middle of a backfill.
       try {
         const rows = marketCapCoinRows(await this.client.coinMarketChart(coin, days), coin, now);
         written += await this.writers.marketCapCoin.write(rows);

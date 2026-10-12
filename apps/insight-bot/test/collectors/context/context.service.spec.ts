@@ -16,16 +16,25 @@ class FakeDb implements Db {
   }
 }
 
-function build(opts: { chart?: (coin: string) => unknown | Error } = {}) {
+function build(opts: { chart?: (coin: string) => unknown | Error; calls?: string[] } = {}) {
   const writer = { write: async (rows: unknown[]) => rows.length } as unknown as BatchWriter<never>;
   const writers = { marketCapCoin: writer, fearGreed: writer, marketCapGlobal: writer } as never;
   const streams = new StreamRegistry();
   const metrics = new MetricsService(streams);
   const client = {
     async coinMarketChart(coin: string) {
+      opts.calls?.push(`coin:${coin}`);
       const out = opts.chart?.(coin) ?? { prices: [[1790380800000, 1]], market_caps: [[1790380800000, 2]] };
       if (out instanceof Error) throw out;
       return out;
+    },
+    async global() {
+      opts.calls?.push('global');
+      return { data: { total_market_cap: { usd: 1 }, market_cap_percentage: { btc: 50, eth: 10 } } };
+    },
+    async fearGreed() {
+      opts.calls?.push('fear-greed');
+      return { data: [] };
     },
   } as unknown as ContextClient;
 
@@ -84,5 +93,42 @@ describe('pollCoins records the stream per coin, not per pass', () => {
     await expect(service.pollCoins(new Date(), 2)).resolves.toBeGreaterThanOrEqual(0);
     const metric = await metrics.registry.getSingleMetricAsString('ib_gaps_detected_total');
     expect(metric).toContain(STREAM_COINS);
+  });
+});
+
+
+/** Drains the microtask queue so the bootstrap's fire-and-forget work gets to run. */
+const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+describe('IB-BUG-006: the forward-only series goes first', () => {
+  it('polls /global BEFORE the backfill queues a single coin', async () => {
+    // On a fresh database the backfill fetches 365 days for twenty coins and holds the keyless
+    // allowance for ten minutes. Measured 2026-09-28, /global got one row in twenty minutes and
+    // then none — and CoinGecko's history endpoint is paid, so those samples are gone for good.
+    const calls: string[] = [];
+    const { service } = build({ calls });
+
+    service.onApplicationBootstrap();
+    for (let i = 0; i < 10; i += 1) await flush();
+    service.onModuleDestroy();
+
+    expect(calls[0]).toBe('global');
+    expect(calls.indexOf('global')).toBeLessThan(calls.findIndex((c) => c.startsWith('coin:')));
+  });
+
+  it('backfills anyway when the first /global fails, rather than trading one missing series for two', async () => {
+    const calls: string[] = [];
+    const { service } = build({ calls });
+    (service as unknown as { client: { global: () => Promise<unknown> } }).client.global = async () => {
+      calls.push('global');
+      throw new Error('HTTP 429');
+    };
+
+    service.onApplicationBootstrap();
+    for (let i = 0; i < 10; i += 1) await flush();
+    service.onModuleDestroy();
+
+    expect(calls[0]).toBe('global');
+    expect(calls.some((c) => c.startsWith('coin:'))).toBe(true);
   });
 });
