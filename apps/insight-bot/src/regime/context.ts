@@ -58,11 +58,23 @@ export interface RegimeContextInput {
   /** The frame's close. */
   price: FrameFeatureValue;
 
-  /** `atr.4h.14` now, and its trailing values over the lookback. */
+  /**
+   * `atr.4h.14` now, and its trailing values over the lookback.
+   *
+   * **The histories come from STORED FRAMES, not from the raw tables** (Tech Lead ruling,
+   * 2026-10-12). An axis reading `candles_agg` directly could disagree with the frame it is
+   * attached to: two numbers about the same instant, computed under different completeness
+   * decisions, with nothing to say which is right. Reading frames makes the axis measure exactly
+   * what the frame measured, at the same revision, under the same rules.
+   *
+   * The cost — no stored frames means no history — is removed by the frame pass gaining a history
+   * mode (`--from --to`, as IB-014's derive has), so past closes are backfilled into frames and
+   * these histories exist immediately *and* consistently. That is dev-2's, on IB-015.
+   */
   atr: FrameFeatureValue;
   atrHistory: readonly number[];
 
-  /** `oi.binance.now` now, and its trailing values over the lookback. */
+  /** `oi.binance.now` now, and its trailing values over the lookback — stored frames, as above. */
   oi: FrameFeatureValue;
   oiHistory: readonly number[];
 

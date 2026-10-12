@@ -182,6 +182,14 @@ export interface RegimeCalendarEvent {
  * data we do not have — and this axis feeds a veto, so the one direction it must never fail is
  * silently permissive.
  *
+ * **Ruling (Tech Lead, 2026-10-12), binding on whoever wires this:** `calendarLoaded` means
+ * **coverage of the window being asked about** — "is there calendar data spanning this frame's
+ * ±60 minutes?" — and NEVER "the table has rows". Measured the day it was written: `calendar_events`
+ * held 174 rows on `insight_dev1` whose newest event was nine days old, because the collector was
+ * switched off during the pause rather than broken. A `rows exist` check would have found those 174
+ * rows and reported CLEAR on every frame for nine days. A stale table has rows and no coverage, and
+ * those are the two facts IB-BUG-010 separated for collectors: `not_recorded` is not `no_events`.
+ *
  * The gate's side of this is ruled and belongs to IB-017: a refusal fails **closed**, under its
  * own reason `calendar_unknown` and counted separately — never as `EVENT_RISK`, so "we are blind"
  * can never masquerade as "there is an event".
