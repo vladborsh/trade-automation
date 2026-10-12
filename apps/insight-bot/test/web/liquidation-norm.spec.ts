@@ -86,8 +86,14 @@ describe('sideStats', () => {
    * Either way a spec fails and names what the number was FOR, which a bare constant cannot do.
    */
   describe('the dust floor, pinned to the measurement that justified it', () => {
-    const SMALLEST_NON_ZERO_HOUR_USD = 0.1848; // measured, insight_dev2, 2026-10-12
-    const FIRST_PERCENTILE_HOUR_USD = 5.44; //    measured, same query
+    // Both measured on insight_dev2, 2026-10-12, by the query recorded beside
+    // WEB_LIQUIDATION_MIN_NORM_USD in the contract — so these can be re-derived rather than
+    // trusted. They are the figures AT THE MOMENT THE FLOOR WAS CHOSEN and are deliberately
+    // frozen here: a re-run hours later gave p01 $5.04 as the tape grew, which does not change
+    // the decision ($1 is bracketed on both) but would silently rot this constant if it tracked
+    // the latest value. The minimum is stable; the percentile moves with the sample.
+    const SMALLEST_NON_ZERO_HOUR_USD = 0.1848;
+    const FIRST_PERCENTILE_HOUR_USD = 5.44;
 
     it('sits between the measured floor and the measured first percentile', () => {
       expect(WEB_LIQUIDATION_MIN_NORM_USD).toBeGreaterThan(SMALLEST_NON_ZERO_HOUR_USD);

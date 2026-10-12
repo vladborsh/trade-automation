@@ -332,6 +332,21 @@ export const WEB_FEATURE_SPEC = {
   // COMPLETE bars. The ATR of Bitcoin does not depend on which database you ask — every figure
   // we can produce does, so neither number is "the" ATR and the pair is quoted deliberately.
   //
+  // The query, so a reader can re-measure rather than trust the pair:
+  //
+  //   with b as (
+  //     select high, low, lag(close) over (order by open_time) as prev_close
+  //       from candles_agg
+  //      where tf='1h' and symbol='BTCUSDT' and venue='binance' and market='perp' and complete
+  //        and open_time >= now() - interval '7 days'
+  //   )
+  //   select count(*), avg(tr), percentile_cont(0.5) within group (order by tr)
+  //     from (select greatest(high-low, abs(high-prev_close), abs(low-prev_close)) as tr
+  //             from b where prev_close is not null) t;
+  //
+  // `and complete` is the clause that makes the two slots differ, and leaving it out would give
+  // a third number that is not the ATR either.
+  //
   // So the error is roughly ONE ATR(1h) — and P3's stop is `cascade low − 0.1·ATR`, a buffer of
   // about $27–36. The simplification would therefore move the stop by **an order of magnitude
   // more than the buffer the design puts there on purpose**, and a `px.low` that is too high

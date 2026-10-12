@@ -55,7 +55,26 @@ export const WEB_LIQUIDATION_MIN_HISTORY_DAYS = 7;
  * Not currently reachable — every coin's hourly median on that tape is exactly 0, measured, so
  * the existing guard catches all of them — but it costs one comparison to close, and the card is
  * user-facing. A judgement rather than a measurement: $1 sits above the $0.18 floor and well
- * below the $5.44 first percentile of non-zero hours.
+ * below the first percentile of non-zero hours.
+ *
+ * **The query, so the figures can be re-measured without asking anyone:**
+ *
+ * ```sql
+ * with hourly as (
+ *   select symbol, date_trunc('hour', ts) as h, sum(notional) as usd
+ *     from liquidations group by 1, 2
+ * )
+ * select count(*), min(usd),
+ *        percentile_cont(0.01) within group (order by usd)
+ *   from hourly where usd > 0;
+ * ```
+ *
+ * Two observations, and the drift between them is why the query is here rather than only the
+ * numbers. Both on `insight_dev2`, 2026-10-12: at the time the floor was chosen, n=?, min
+ * $0.1848, p01 **$5.44**; re-run hours later as the tape grew, n=4015, min **$0.1848**, p01
+ * **$5.04**. The minimum is stable, the percentile moves with the sample — so `$1` is bracketed
+ * on both, but a later reader comparing against a remembered "$5.44" would have had no way to
+ * tell drift from a different population.
  */
 export const WEB_LIQUIDATION_MIN_NORM_USD = 1;
 
