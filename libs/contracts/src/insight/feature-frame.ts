@@ -320,7 +320,22 @@ export const WEB_FEATURE_SPEC = {
   // because a 4h close IS its last 15m close — one bar, same number. A 4h HIGH is the maximum
   // over the sixteen 15m bars of that window, which is a different derivation from the same
   // input group. Borrow the close's phrasing and the next reader simplifies it to the final
-  // bar's high; P3's stop is `cascade low − 0.1·ATR`, so the stop then quietly moves.
+  // bar's high.
+  //
+  // **What that costs, measured rather than asserted.** On a real 4h frame (BTCUSDT,
+  // 2026-10-12T00:00Z) the correct max over sixteen bars was 83997 and the final 15m bar's high
+  // was 83634.9 — **$362 out on one bar**. Against ATR(1h) on BTCUSDT over the preceding seven
+  // days, measured independently on two slots: mean **$327–359**, median **$269–290**.
+  //
+  // So the error is roughly ONE ATR(1h) — and P3's stop is `cascade low − 0.1·ATR`, a buffer of
+  // about $27–36. The simplification would therefore move the stop by **an order of magnitude
+  // more than the buffer the design puts there on purpose**, and a `px.low` that is too high
+  // puts the stop INSIDE the cascade it was meant to sit under. Every test would stay green,
+  // because the levels are computed from whatever the key returns.
+  //
+  // The numbers live in this comment rather than in the `def` on purpose: `def` is inside the
+  // spec fingerprint, so prose added to it would move the hash and make a documentation edit
+  // look like a change of meaning — blunting the one signal that exists to flag real ones.
   'px.high': { inputs: ['agg:15m'], type: 'number', window: 'frame bar', params: { source: 'high', barTf: '15m', aggregation: 'max' }, def: 'high of the bar the frame is stamped by: for a 15m frame its own bar high, and for a 4h frame the MAXIMUM high across the sixteen 15m bars of that 4h window — not the final 15m bar high, which coincides with the 4h value only for the close' },
   'px.low': { inputs: ['agg:15m'], type: 'number', window: 'frame bar', params: { source: 'low', barTf: '15m', aggregation: 'min' }, def: 'low of the bar the frame is stamped by: for a 15m frame its own bar low, and for a 4h frame the MINIMUM low across the sixteen 15m bars of that 4h window — not the final 15m bar low, which coincides with the 4h value only for the close' },
   // ---- trend (IB-016). `seed` is in params because it is MEANING: an EMA seeded with the first
