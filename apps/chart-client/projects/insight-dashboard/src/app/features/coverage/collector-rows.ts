@@ -57,6 +57,34 @@ export function toCollectorViews(rows: readonly WebCollectorCoverage[]): Collect
 }
 
 /**
+ * IB-044 — whether the page has a basis to state at all.
+ *
+ * The bug this fixes: a collector that predates IB-BUG-010 writes its first heartbeat at startup,
+ * so `first_seen_at` is "now" and the window it has been responsible for is zero wide. The totals
+ * were then rendered as «покрыто 0 из 0 часов» — nothing, stated as a measurement. **Zero covered
+ * out of zero elapsed is not 0 % coverage; it is the absence of a basis**, and the two must not
+ * share a sentence. This is the aggregate form of the per-stream rule already in
+ * `toCollectorViews`, where a stream with no elapsed time shows '—' rather than '0%'.
+ *
+ * Note what is deliberately NOT folded in here: a stream with elapsed hours and **zero covered**
+ * stays `recorded`. "We were responsible for 24 hours and covered none" is a real and alarming
+ * measurement, and collapsing it into "not recorded" would hide an outage behind the words used
+ * for "we never looked".
+ *
+ * The third state in IB-038's ruling — *no events* — is not decidable here. It is a statement
+ * about the tape (we were listening and nothing was liquidated), and this endpoint carries no
+ * event counts. Inventing it from coverage alone would be the inference IB-BUG-010 exists to
+ * forbid, so it belongs to the consumer that has the numerator.
+ */
+export type BasisState = 'recorded' | 'not-recorded';
+
+export function basisState(totals: { streams: number; elapsedHours: number }): BasisState {
+  if (totals.streams === 0) return 'not-recorded';
+  if (totals.elapsedHours <= 0) return 'not-recorded';
+  return 'recorded';
+}
+
+/**
  * The covered and elapsed totals across streams, for the page's one-line basis.
  *
  * Both are summed rather than averaged: a ratio of the two answers "what fraction of the

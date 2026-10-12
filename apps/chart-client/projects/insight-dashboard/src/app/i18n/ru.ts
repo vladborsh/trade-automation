@@ -63,6 +63,7 @@ export const ru: Strings = {
   'coverage.collectors.title': 'Время работы сборщиков',
   'coverage.collectors.basis': 'За последние {days} дн.: покрыто {covered} из {elapsed} часов работы сборщиков, зафиксировано простоев: {outages}. Статистика делится на покрытые часы, а не на прошедшие.',
   'coverage.collectors.none': 'Пока ни один сборщик не сообщил о работе. Поток появится здесь после первого запуска.',
+  'coverage.collectors.notRecorded': 'Покрытие за последние {days} дн. не записано: эти сборщики начали сообщать о своей работе только что, поэтому измеренной базы пока нет — это не нулевое покрытие.',
   'coverage.col.stream': 'поток',
   'coverage.col.covered': 'покрыто',
   'coverage.col.elapsed': 'прошло, ч',

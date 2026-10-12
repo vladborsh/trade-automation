@@ -1,5 +1,5 @@
 import type { WebCollectorCoverage } from '@trade-automation/contracts';
-import { collectorTotals, toCollectorViews } from './collector-rows';
+import { basisState, collectorTotals, toCollectorViews } from './collector-rows';
 
 /**
  * IB-BUG-010 — the collector-uptime display.
@@ -83,5 +83,30 @@ describe('the basis totals', () => {
 
   it('is zeroed, not NaN, when nothing is instrumented', () => {
     expect(collectorTotals([])).toEqual({ streams: 0, coveredHours: 0, elapsedHours: 0, outages: 0 });
+  });
+});
+
+describe('IB-044 — whether a basis exists at all', () => {
+  it('is NOT recorded when every stream has zero elapsed hours', () => {
+    // the bug: a collector that predates IB-BUG-010 writes its first heartbeat at startup, so
+    // first_seen_at is "now" and the window it is responsible for is zero wide. The old code then
+    // rendered «покрыто 0 из 0 часов» — a measurement of nothing, stated as a measurement. Zero
+    // covered out of zero elapsed is not 0 % coverage; it is the absence of a basis.
+    expect(basisState({ streams: 2, elapsedHours: 0 })).toBe('not-recorded');
+  });
+
+  it('is NOT recorded when no stream is instrumented', () => {
+    expect(basisState({ streams: 0, elapsedHours: 0 })).toBe('not-recorded');
+  });
+
+  it('IS recorded once there are elapsed hours — including when none of them were covered', () => {
+    // this is the case that must NOT be swallowed by the fix. "We were responsible for 24 hours and
+    // covered none" is a real and alarming measurement; collapsing it into "not recorded" would
+    // hide an outage behind the same words used for "we never looked".
+    expect(basisState({ streams: 1, elapsedHours: 24 })).toBe('recorded');
+  });
+
+  it('IS recorded for a partial window', () => {
+    expect(basisState({ streams: 1, elapsedHours: 0.5 })).toBe('recorded');
   });
 });

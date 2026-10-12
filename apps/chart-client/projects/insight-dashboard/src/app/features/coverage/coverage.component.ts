@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
-import { collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
+import { basisState, collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
 import { coverageCounts, toCoverageViews, type CoverageView } from './coverage.rows';
 
 /** architecture/insight-bot-web-dashboard.md §2 — `GET /api/web/coverage`, per symbol × series. */
@@ -38,7 +38,14 @@ export class CoverageComponent {
    */
   readonly collectorBasis = computed(() => {
     const totals = collectorTotals(this.collectors());
-    if (totals.streams === 0) return this.t('coverage.collectors.none');
+    // IB-044: no basis is not a basis of zero. «покрыто 0 из 0 часов» stated a measurement that
+    // does not exist; a collector older than IB-BUG-010 has a zero-wide responsible window on its
+    // first run and must say so instead.
+    if (basisState(totals) === 'not-recorded') {
+      return totals.streams === 0
+        ? this.t('coverage.collectors.none')
+        : this.t('coverage.collectors.notRecorded', { days: this.windowDays() });
+    }
     return this.t('coverage.collectors.basis', {
       days: this.windowDays(),
       covered: totals.coveredHours,

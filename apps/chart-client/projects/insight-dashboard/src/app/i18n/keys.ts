@@ -68,6 +68,7 @@ export type StringKey =
   | 'coverage.collectors.title'
   | 'coverage.collectors.basis'
   | 'coverage.collectors.none'
+  | 'coverage.collectors.notRecorded'
   | 'coverage.col.stream'
   | 'coverage.col.covered'
   | 'coverage.col.elapsed'

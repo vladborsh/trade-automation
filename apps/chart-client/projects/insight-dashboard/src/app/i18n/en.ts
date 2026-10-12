@@ -57,6 +57,7 @@ export const en: Strings = {
   'coverage.collectors.title': 'Collector uptime',
   'coverage.collectors.basis': 'Last {days} days: {covered} of {elapsed} collector-hours covered, {outages} recorded outages. Statistics divide by covered hours, not elapsed.',
   'coverage.collectors.none': 'No collector reports uptime yet. A stream appears here once it has run.',
+  'coverage.collectors.notRecorded': 'Coverage is not recorded for the last {days} days: these collectors began reporting uptime only just now, so there is no measured basis yet — not 0% coverage.',
   'coverage.col.stream': 'stream',
   'coverage.col.covered': 'covered',
   'coverage.col.elapsed': 'elapsed h',
