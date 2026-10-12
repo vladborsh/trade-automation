@@ -36,6 +36,21 @@ export interface AssembleInput {
    * service decides membership after §8.1's re-checks at +30 s and +60 s.
    */
   incompleteGroups: ReadonlySet<string>;
+  /**
+   * Groups short by an amount fully accounted for by something that will never change — a
+   * recorded `collector_gaps` row, a halt, or minutes before the symbol listed.
+   *
+   * **They refuse too.** "The venue never produced these minutes" explains WHY the data is
+   * missing; it does not make a statistic over half a window correct. A symbol that listed at
+   * 02:00 has a fully explained shortfall at the 04:00 4 h close, and its ATR over 120 of 240
+   * minutes is not the 4 h ATR — publishing it would be the same confidently-wrong number the
+   * incomplete path exists to refuse.
+   *
+   * They refuse with a DIFFERENT reason, which is the whole point of separating them: an
+   * explained absence is permanent and must not be counted as an unhealed gap, or the counter
+   * never drains and the alarm stops being read.
+   */
+  explainedGroups: ReadonlySet<string>;
   /** Human-readable, one per short bucket or slot: "candles_agg 15m@12:00 bars 14 of 15". */
   reasons: readonly string[];
   basis: WebFrameBasis;
@@ -58,6 +73,7 @@ export function keysBlockedBy(incompleteGroups: ReadonlySet<string>): WebFeature
  */
 export function assembleFrame(input: AssembleInput): WebFeatureFrame {
   const blocked = new Set<string>(keysBlockedBy(input.incompleteGroups));
+  const explained = new Set<string>(keysBlockedBy(input.explainedGroups));
   const keys: Record<string, WebFeatureValue> = {};
 
   for (const key of WEB_FEATURE_KEYS) {
@@ -68,8 +84,14 @@ export function assembleFrame(input: AssembleInput): WebFeatureFrame {
         'computed or explicitly refused; a missing key is a bug, not missing data.',
       );
     }
-    // the refusal wins: a number computed from a short bucket must not reach a consumer
-    keys[key] = blocked.has(key) ? { ok: false, why: 'incomplete_input' } : computed;
+    // The refusal wins: a number computed from a short window must not reach a consumer.
+    //
+    // `incomplete_input` is checked first because a key reading two groups — one chaseably
+    // short, one explained — is chaseable. Resolving it the other way would file a real gap
+    // under "permanent, nothing to do" and lose it.
+    if (blocked.has(key)) keys[key] = { ok: false, why: 'incomplete_input' };
+    else if (explained.has(key)) keys[key] = { ok: false, why: 'explained_absence' };
+    else keys[key] = computed;
   }
 
   const complete = Object.values(keys).every((value) => value.ok);

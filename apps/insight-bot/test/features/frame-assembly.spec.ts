@@ -1,5 +1,6 @@
 import {
-  WEB_FEATURE_KEYS, WEB_FRAME_VERSION, canArm, type WebFeatureKey, type WebFeatureValue,
+  WEB_FEATURE_KEYS, WEB_FEATURE_PERMANENT_REASONS, WEB_FEATURE_SPEC, WEB_FRAME_VERSION, canArm,
+  type WebFeatureKey, type WebFeatureValue,
 } from '@trade-automation/contracts';
 import {
   assembleFrame, attemptOffsetsMs, isFinalAttempt, keysBlockedBy, type AssembleInput,
@@ -22,6 +23,7 @@ const input = (over: Partial<AssembleInput> = {}): AssembleInput => ({
   closeTimeSec: CLOSE,
   computed: allComputed(),
   incompleteGroups: new Set<string>(),
+  explainedGroups: new Set<string>(),
   reasons: [],
   basis: { venues: ['bybit', 'okx'], coverage: 'not_recorded', coveredHours: null },
   ...over,
@@ -122,5 +124,53 @@ describe('the §8.1 re-check schedule', () => {
     expect(isFinalAttempt(0)).toBe(false);
     expect(isFinalAttempt(1)).toBe(false);
     expect(isFinalAttempt(2)).toBe(true);
+  });
+});
+
+/**
+ * An EVIDENCED absence still refuses — it just refuses differently.
+ *
+ * `assessWindows` has always separated the two, but until now only `incompleteGroups` reached
+ * `assembleFrame`, so an explained shortfall fell straight through and the calculator's value
+ * over a short window was published as if the window were whole. The tell was in the contract:
+ * `explained_absence` is a declared refusal reason that no frame could hold.
+ *
+ * The case that makes it concrete: a symbol that listed at 02:00 has 120 of the 240 minutes the
+ * 04:00 4 h close expects, every missing minute explained by the listing date. Its ATR over half
+ * a window is not the 4 h ATR, and "the venue never produced those minutes" is a reason the data
+ * is absent, not a licence to publish a statistic computed without it.
+ */
+describe('an explained absence', () => {
+  it('refuses the keys reading that group, rather than publishing a half-window value', () => {
+    const frame = assembleFrame(input({ explainedGroups: new Set(['agg:4h']) }));
+    expect(frame.keys['atr.4h.14']).toEqual({ ok: false, why: 'explained_absence' });
+  });
+
+  it('refuses with a PERMANENT reason, so it is not chased as an unhealed gap', () => {
+    const frame = assembleFrame(input({ explainedGroups: new Set(['agg:4h']) }));
+    const why = (frame.keys['atr.4h.14'] as { ok: false; why: string }).why;
+    expect(WEB_FEATURE_PERMANENT_REASONS).toContain(why);
+    expect(why).not.toBe('incomplete_input');
+  });
+
+  it('leaves every other key alone', () => {
+    const frame = assembleFrame(input({ explainedGroups: new Set(['agg:4h']) }));
+    expect(frame.keys['funding.binance.rate']).toEqual({ ok: true, value: 1 });
+  });
+
+  it('still makes the frame incomplete — it holds a key nobody can compute', () => {
+    const frame = assembleFrame(input({ explainedGroups: new Set(['agg:4h']) }));
+    expect(frame.complete).toBe(false);
+  });
+
+  it('loses to incomplete_input when a key reads BOTH, because the gap is still chaseable', () => {
+    // `structure.failed_highs_24h` reads agg:15m and agg:1h — named rather than discovered, so
+    // the spec pins the real combination and fails if the registry stops having one.
+    expect(WEB_FEATURE_SPEC['structure.failed_highs_24h'].inputs).toEqual(['agg:15m', 'agg:1h']);
+    const frame = assembleFrame(input({
+      incompleteGroups: new Set(['agg:15m']),
+      explainedGroups: new Set(['agg:1h']),
+    }));
+    expect(frame.keys['structure.failed_highs_24h']).toEqual({ ok: false, why: 'incomplete_input' });
   });
 });
