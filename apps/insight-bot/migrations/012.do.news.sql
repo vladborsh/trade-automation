@@ -208,6 +208,12 @@ create table news_assets (
  * string — IB-BUG-011 twice over was exactly this. A move on one venue presented as "the asset's
  * reaction" is «все биржи» over one venue.
  *
+ * **3z. An article first seen LONG after it was published refuses.** `stale_at_ingest`, at a stated
+ * seven days: measured on 2026-10-12, news outlets lag 0.4-1.2 days and exchange announcement feeds
+ * 3.5-4.6, while dormant Binance catalogs deliver items 109-388 days old that are genuinely new to
+ * us. Anchoring those at first sight would measure today's price against a 2022 announcement. The
+ * article is still stored and clustered; only the reaction refuses.
+ *
  * **3a. An OPEN window refuses and is recomputed later, never measured early.** A window that has
  * not yet elapsed does not fail — it understates the magnitude and looks like a real small
  * reaction. `refused = 'window_not_closed'` until `anchor_at + horizon` has passed, so a row can
@@ -242,7 +248,7 @@ create table news_reactions (
 
   -- 3. the measurement, or the reason there is none. Never both, never neither.
   return_pct double precision,
-  refused    text check (refused in ('window_not_closed','window_not_covered','no_price_at_anchor','no_price_at_horizon','no_venue_spelling')),
+  refused    text check (refused in ('stale_at_ingest','window_not_closed','window_not_covered','no_price_at_anchor','no_price_at_horizon','no_venue_spelling')),
   constraint news_reactions_measured_or_refused
     check ((return_pct is not null and refused is null) or (return_pct is null and refused is not null)),
 

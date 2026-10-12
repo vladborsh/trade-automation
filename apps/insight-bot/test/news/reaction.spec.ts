@@ -76,6 +76,46 @@ describe('the anchor, because published_at is the publisher\'s claim', () => {
   });
 });
 
+describe('an article first seen long after publication (live-pass ruling)', () => {
+  // Threshold is 7 days, bracketed by measurement: news outlets lag 0.4-1.2 d, exchange
+  // announcement feeds 3.5-4.6 d, dormant Binance catalogs 109-388 d. Both sides are pinned so the
+  // judgement cannot drift unnoticed in either direction.
+  const daysOld = (d: number) => input({
+    publishedAt: new Date(FIRST_SEEN.getTime() - d * 86_400_000),
+  });
+
+  it('still measures an article inside the threshold — the positive control', () => {
+    // 6 days: slower than any feed measured, still measurable
+    const r = computeReaction(daysOld(6));
+    expect(r.refused).toBeNull();
+    expect(r.returnPct).toBeCloseTo(3, 10);
+  });
+
+  it('refuses one beyond it', () => {
+    const r = computeReaction(daysOld(8));
+    expect(r.refused).toBe('stale_at_ingest');
+    expect(r.returnPct).toBeNull();
+  });
+
+  it('refuses a dormant-catalog item by a wide margin', () => {
+    // the real case: a 2022 Binance airdrop announcement arriving today
+    expect(computeReaction(daysOld(388)).refused).toBe('stale_at_ingest');
+  });
+
+  it('is NOT triggered by a publisher clock running fast', () => {
+    // negative skew means the stamp is after our first sight; that is a different pathology and
+    // must not be read as staleness
+    const ahead = input({ publishedAt: new Date(FIRST_SEEN.getTime() + 600_000) });
+    expect(ahead.publishedAt.getTime()).toBeGreaterThan(FIRST_SEEN.getTime());
+    expect(computeReaction(ahead).refused).toBeNull();
+  });
+
+  it('is reported ahead of a missing spelling, since age makes the rest moot', () => {
+    const r = computeReaction({ ...daysOld(400), symbolSpelling: null, windowClosed: false });
+    expect(r.refused).toBe('stale_at_ingest');
+  });
+});
+
 describe('refusals carry a reason and never a number', () => {
   it('refuses a window that has not closed yet, rather than measuring it early', () => {
     // a partial window does not fail; it understates the magnitude and looks like a real small

@@ -29,11 +29,34 @@ export const HORIZON_MS: Record<Horizon, number> = {
 export type Anchor = 'published' | 'first_seen';
 
 export type RefusalReason =
+  | 'stale_at_ingest'
   | 'window_not_closed'
   | 'window_not_covered'
   | 'no_price_at_anchor'
   | 'no_price_at_horizon'
   | 'no_venue_spelling';
+
+/**
+ * How far the publisher's date may precede our first sight before a reaction is refused.
+ *
+ * **Seven days, and it is a judgement — stated, with the measurements that bracket it.** Measured
+ * on the live pass of 2026-10-12:
+ *
+ *   news outlets (cointelegraph, coindesk, theblock, decrypt)   0.4 – 1.2 days
+ *   exchange announcement feeds (bybit, okx)                    3.5 – 4.6 days
+ *   dormant catalogs (binance API Updates, Crypto Airdrop)      109 – 388 days
+ *
+ * Seven days sits above the slowest legitimate lag observed, with margin, and roughly two orders of
+ * magnitude below the dormant items. The gap is wide enough that the exact figure inside it barely
+ * matters, which is the reason to pick a round one and say so rather than tune it.
+ *
+ * Why refuse at all: `binance-announcements` returns the newest ~20 items PER CATALOG, so dormant
+ * catalogs keep delivering year-old announcements that are genuinely new *to us*. First-seen
+ * anchoring would then measure today's price against a 2022 announcement and record it as a
+ * reaction — a confidently wrong correlation, which is the one thing this table must not
+ * manufacture. The article is still stored and still clustered; only the reaction refuses.
+ */
+export const STALE_AT_INGEST_SEC = 7 * 24 * 60 * 60;
 
 export interface ReactionInput {
   horizon: Horizon;
@@ -111,6 +134,10 @@ export function computeReaction(input: ReactionInput): Reaction {
 
   // order matters only for which reason is reported; the most fundamental absence wins, so a
   // missing spelling is not reported as a missing price
+  // Before anything else: a story we first saw a week after it was published cannot have its
+  // 15m–4h reaction measured, whatever else is true. Reporting a missing price or an open window
+  // here would send a reader looking for a collection fault instead of an age problem.
+  if (base.anchorSkewSec > STALE_AT_INGEST_SEC) return refuse('stale_at_ingest');
   if (input.symbolSpelling === null) return refuse('no_venue_spelling');
   // before coverage and before prices: an open window has no horizon price yet, and reporting that
   // as `no_price_at_horizon` would send someone looking for a collection fault that is not there

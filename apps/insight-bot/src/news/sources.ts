@@ -16,6 +16,13 @@
  *   are, which is not authorised and not something a market-data bot should do to a regulator's
  *   site. Nine sources that work beat ten with one pretending. If CFTC matters later the answer is
  *   an official feed or API, not a disguise.
+ * - **Blockworks — dropped 2026-10-12, after the live pass.** `blockworks.co/feed` serves 50
+ *   entries whose newest is **2026-01-07**, about nine months old. Checked against the raw payload
+ *   rather than assumed: the feed is ordered newest-first, `published` equals `updated`, and there
+ *   is no newer date field — so this is the source, not our parsing. Our committed fixture records
+ *   the same January dates, which is the trap inverted: an accurate fixture of a dead feed. A
+ *   source whose newest item is nine months old contributes nothing but noise to the confounder
+ *   counts. If Blockworks publishes a working feed later, it slots back in unchanged.
  * - **Coinbase — dropped from scope.** Probed 2026-09-28: `api/v2/assets/search` answers 200 but
  *   is an **asset search, not announcements**, and no keyless Coinbase announcements feed was
  *   found. Recorded so the next reader re-probes rather than assuming we simply missed one; if a
@@ -94,7 +101,6 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
   { id: 'cointelegraph', url: 'https://cointelegraph.com/rss', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
   { id: 'decrypt', url: 'https://decrypt.co/feed', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
   { id: 'theblock', url: 'https://www.theblock.co/rss.xml', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'blockworks', url: 'https://blockworks.co/feed', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
   { id: 'sec', url: 'https://www.sec.gov/news/pressreleases.rss', kind: 'rss', shape: 'window', maxNewestAgeHours: 336, pollMs: SLOW_POLL_MS, followRedirects: true },
   // Exchange announcements — listings and delistings, which move a single asset hard.
   {
