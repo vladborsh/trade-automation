@@ -1,3 +1,4 @@
+import * as gateModule from '../../src/regime/gate';
 import { REGIME_OBSERVABLES, evaluateRegimeGate, readRegimeAxis, type RegimeObservable } from '../../src/regime/gate';
 import type { RegimeContext } from '../../src/regime/context';
 
@@ -98,5 +99,26 @@ describe('readRegimeAxis', () => {
   it('hands back the refusal intact rather than a null', () => {
     const axis = readRegimeAxis(context({ vol: { ok: false, why: 'incomplete_input' } }), 'regime.vol');
     expect(axis).toEqual({ ok: false, why: 'incomplete_input' });
+  });
+});
+
+describe('the module’s exported surface', () => {
+  /**
+   * This pins what `gate.ts` exports, for one reason: **there is no boolean helper and there must
+   * not be one** (see the note at the foot of that file). A three-state result forces every caller
+   * to name `gate_axis_unavailable`; a `gatePasses(): boolean` would decide centrally what that
+   * becomes, and folded into `false` it turns a missing EMA into a decision not to trade, in the
+   * quiet direction nobody investigates.
+   *
+   * Adding one is not forbidden for ever — it is forbidden *quietly*. Editing this list is the
+   * deliberate act, and it shows up in the diff next to the reasoning.
+   */
+  it('exports exactly the three-state API, and nothing that collapses it', () => {
+    expect(Object.keys(gateModule).sort()).toEqual(['REGIME_OBSERVABLES', 'evaluateRegimeGate', 'readRegimeAxis']);
+  });
+
+  it('has no export whose name promises a yes/no answer', () => {
+    const suspicious = Object.keys(gateModule).filter((name) => /^(is|passes|gatePasses|allows|should)/.test(name));
+    expect(suspicious).toEqual([]);
   });
 });

@@ -102,3 +102,39 @@ export function evaluateRegimeGate(context: RegimeContext, gate: RegimeGate): Re
     ? { outcome: 'pass', observed: axis.value }
     : { outcome: 'blocked', observed: axis.value };
 }
+
+/**
+ * ============ THE MISSING FUNCTION IS MISSING ON PURPOSE ============
+ *
+ * There is no `gatePasses(context, gate): boolean`, and there must not be one. This note is here,
+ * at the end of the file where somebody would add it, because **an unexplained absence reads as an
+ * oversight** and the next person writes the convenience helper in good faith — probably on a busy
+ * afternoon, probably because one call site reads awkwardly.
+ *
+ * A boolean has two values and this question has three answers. Any `boolean` helper must decide,
+ * once and centrally, what `gate_axis_unavailable` becomes — and whichever it picks is wrong
+ * somewhere:
+ *
+ * - folded into `false`, a missing EMA becomes a decision not to trade, in the quiet direction
+ *   nobody investigates, and §8.3's measured comparison against the unconditional arm turns into a
+ *   mixture of findings and blindness that cannot be read either way;
+ * - folded into `true`, a blind gate lets everything through, which is worse and at least obvious.
+ *
+ * The three-state result forces every caller to name the third case. That is the same move as
+ * IB-015's `WebFeatureValue` (no nullable number), `computed_mode` having no default, and the axes
+ * refusing instead of falling back to a middle band: **make the wrong thing impossible to write
+ * rather than discouraged.**
+ *
+ * If a call site genuinely needs a boolean, write the collapse *there*, in the open, where a
+ * reviewer sees which way that particular caller chose to fail:
+ *
+ * ```ts
+ * const outcome = evaluateRegimeGate(context, gate);
+ * // this caller treats an unavailable axis as a hold, and counts it under its own name
+ * const armed = outcome.outcome === 'pass';
+ * if (outcome.outcome === 'gate_axis_unavailable') metrics.gateAxisUnavailable.inc({ axis: outcome.observable });
+ * ```
+ *
+ * `test/regime/gate.spec.ts` pins this module's exported surface, so adding the helper fails a
+ * spec and has to be argued for in a diff rather than slipped in.
+ */
