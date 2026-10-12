@@ -81,6 +81,12 @@ export function clampDays(raw: string | undefined, fallback = 30): number {
 }
 
 /**
+ * **The months here are UTC, and that is half of a contract.** `getUTCMonth` below only lines up
+ * with the stored months because `monthsWithRows` truncates in UTC too (IB-043). Before that it
+ * truncated in the SESSION zone, the two halves disagreed about what a month is, and this
+ * function reported a month that held data as missing. If either side ever stops saying UTC
+ * explicitly, the bug comes back and neither function looks wrong on its own.
+ *
  * Pure: the months between the first and last stored row that hold nothing. Only the interior is
  * reported — a series that simply has not started yet, or has not caught up to today, is not
  * "missing" those months, and saying it is would make every healthy row look broken.

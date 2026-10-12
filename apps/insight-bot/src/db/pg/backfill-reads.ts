@@ -63,6 +63,21 @@ function where(filter: SeriesFilter): { sql: string; params: unknown[] } {
  * function's signature — the backfill asks about one series at a time, and handing it a
  * whole-universe query would make it pay for 29 symbols it is not backfilling.
  *
+ * **IB-043 — every month label here is UTC, stated and not inherited.** `date_trunc('month', ts)`
+ * on a `timestamptz` truncates in the SESSION zone, and this function's two callers both label
+ * months in UTC: `missingBetween` uses `getUTCMonth`, and the backfill's `calendar-range.ts`
+ * builds `YYYY-MM-01T00:00:00.000Z`. Under `US/Pacific` that mismatch did two things, and the
+ * second is the dangerous one:
+ *
+ * - the coverage page reported a month that HOLDS DATA as missing — it invents work;
+ * - the backfill's resume filter saw a month it had never downloaded as already stored and
+ *   **skipped it permanently**. One complete UTC month of August yields `{2025-07, 2025-08}`
+ *   under `US/Pacific`, because the first seven hours of August UTC are July locally.
+ *
+ * And the two hid each other: the page asked whether July was present, the same wrong label said
+ * yes, so the gap never showed on the one screen whose job is to find gaps. Proven on a scratch
+ * database; latent on today's dense series and realised on a fresh backfill into an empty one.
+ *
  * **`exists` per month, not "every month between first and last".** That shortcut is wrong in
  * exactly the case this function exists to find: a series with a hole in the middle would report
  * the hole as present, and `missingBetween` would then report nothing missing. The probe is what
@@ -73,11 +88,13 @@ export async function monthsWithRows(db: Db, table: SeriesTable, filter: SeriesF
   const { sql, params } = where(filter);
   const rows = await db.query<{ month: string }>(
     `with bounds as (
-       select min(${table.timeColumn}) as lo, max(${table.timeColumn}) as hi
+       select min(${table.timeColumn}) at time zone 'UTC' as lo,
+              max(${table.timeColumn}) at time zone 'UTC' as hi
          from ${table.table}
         where ${sql}
      ),
      months as (
+       -- lo/hi are already plain UTC wall-clock timestamps, so these month starts carry no zone
        select generate_series(
                 date_trunc('month', lo),
                 date_trunc('month', hi),
@@ -90,11 +107,13 @@ export async function monthsWithRows(db: Db, table: SeriesTable, filter: SeriesF
        from months
       where exists (
         -- bare column names bind to the probe row here: it is the only relation in scope with
-        -- them, and the months CTE carries nothing but m
+        -- them, and the months CTE carries nothing but m.
+        -- m at time zone 'UTC' turns the UTC month start back into an instant, so the
+        -- comparison is instant-to-instant and the session's zone never enters it.
         select 1 from ${table.table} probe
          where ${sql}
-           and probe.${table.timeColumn} >= m
-           and probe.${table.timeColumn} < m + interval '1 month'
+           and probe.${table.timeColumn} >= m at time zone 'UTC'
+           and probe.${table.timeColumn} < (m + interval '1 month') at time zone 'UTC'
       )
       order by m`,
     params,

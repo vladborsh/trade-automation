@@ -20,6 +20,18 @@ import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scr
  *
  * The old implementation is kept here verbatim as the oracle. A spec that only asserted the new
  * one against hand-written expectations would be me checking my own arithmetic twice.
+ *
+ * **IB-043 — THE ORACLE IS NOT THE AUTHORITY, and this file is the reason that matters.** When it
+ * was written, every case here passed, and the pair was still wrong: both implementations
+ * truncated months in the SESSION time zone while both CALLERS label months in UTC, so a row on
+ * a month boundary was filed under the wrong month by each of them equally. **An equivalence
+ * spec pins behaviour; it does not validate it.** The fixtures were all mid-month, so nothing
+ * here could see it.
+ *
+ * So the two IB-043 cases below assert LITERAL UTC months and deliberately do not consult the
+ * oracle: the oracle still has the bug. Everything else keeps comparing against it, because for
+ * mid-month rows the two zones agree and the oracle is still the best available check that the
+ * `exists` rewrite did not change the shape of the answer.
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -84,6 +96,11 @@ maybeDescribe('IB-042 monthsWithRows equivalence', () => {
       // EDGES: rows on the very first and very last instant of their months
       bar('EDGES', new Date(Date.UTC(2025, 7, 1, 0, 0, 0))),
       bar('EDGES', new Date(Date.UTC(2025, 8, 30, 23, 59, 0))),
+      // WHOLEMONTH: exactly one complete UTC month, first and last minute — the shape a single
+      // archive file produces, and the one that made the backfill skip the month before it
+      bar('WHOLEMONTH', new Date(Date.UTC(2025, 10, 1, 0, 0, 0))),
+      bar('WHOLEMONTH', new Date(Date.UTC(2025, 10, 15, 12, 0, 0))),
+      bar('WHOLEMONTH', new Date(Date.UTC(2025, 10, 30, 23, 59, 0))),
       // SPANSYEAR: December to January, so the generated series crosses a year boundary
       bar('SPANSYEAR', MONTH(2025, 12)),
       bar('SPANSYEAR', MONTH(2026, 1)),
@@ -138,27 +155,37 @@ maybeDescribe('IB-042 monthsWithRows equivalence', () => {
     await bothAgree(SERIES_TABLES.candles, candlesOf('ONEMONTH'), ['2025-07']);
   });
 
+  it('IB-043: A ROW EXACTLY ON A UTC MONTH BOUNDARY LANDS IN THAT MONTH', async () => {
+    // The only fixture that can see the bug IB-042's equivalence spec passed straight through.
+    // 2025-08-01T00:00Z is 2025-07-31 17:00 under US/Pacific, so the old SQL labelled it
+    // `2025-07` while both callers label months in UTC. The answer must not depend on where the
+    // server happens to be: these literals are correct in every zone.
+    expect(await monthsWithRows(db, SERIES_TABLES.candles, candlesOf('EDGES'))).toEqual(['2025-08', '2025-09']);
+  });
+
+  it('IB-043: THE BACKFILL CANNOT SKIP A MONTH IT NEVER DOWNLOADED', async () => {
+    // One complete UTC month and nothing else. Under the old SQL at US/Pacific this answered
+    // {2025-07, 2025-08}, and `monthsToFetch` — which filters a UTC want-list by this have-list
+    // — then dropped July from the downloads for good. The coverage page asked whether July was
+    // present, got the same wrong label back, and reported no gap: the fetcher and the detector
+    // shared the mistake, so the hole was invisible to the only thing that looks for holes.
+    const stored = await monthsWithRows(db, SERIES_TABLES.candles, candlesOf('WHOLEMONTH'));
+    expect(stored).toEqual(['2025-11']);
+    expect(stored).not.toContain('2025-10');
+
+    // and the resume filter the runner actually uses, exercised rather than described
+    const already = new Set(stored);
+    expect(['2025-10', '2025-11', '2025-12'].filter((m) => !already.has(m))).toEqual(['2025-10', '2025-12']);
+  });
+
   it('agrees on rows at the first and last instant of a month', async () => {
     // `>= m and < m + 1 month` is a half-open range; an off-by-one here would drop a month whose
     // only row sits on a boundary.
     //
-    // The literal months are NOT asserted, and that is deliberate. `date_trunc('month', ts)` on a
-    // `timestamptz` truncates in the SESSION time zone, so a row at 2025-08-01T00:00Z lands in
-    // `2025-07` on a server at UTC-7 and in `2025-08` on one at UTC. Both implementations are
-    // equally affected — which is exactly what this file is for — but hard-coding either answer
-    // would make the spec pass or fail by the machine's clock.
-    //
-    // That time-zone dependence is a PRE-EXISTING bug, not something IB-042 introduced, and it
-    // is worse than it looks: `missingBetween` in coverage.controller.ts generates its months in
-    // UTC (`getUTCMonth`), so on any non-UTC server the two disagree and a month that HAS rows is
-    // reported missing. Demonstrated and reported separately; deliberately not fixed here,
-    // because IB-042's contract is to return exactly what the scan returned.
-    const [fresh, oracle] = await Promise.all([
-      monthsWithRows(db, SERIES_TABLES.candles, candlesOf('EDGES')),
-      monthsByScan(db, SERIES_TABLES.candles, candlesOf('EDGES')),
-    ]);
-    expect(fresh).toEqual(oracle);
-    expect(fresh).toHaveLength(2);
+    // IB-043 made this assertable: the months are UTC by construction now, so the literals hold
+    // in every zone. The oracle is NOT compared here — it still truncates in the session zone,
+    // which is the bug, and the test above is the one that pins the right answer.
+    expect(await monthsWithRows(db, SERIES_TABLES.candles, candlesOf('EDGES'))).toEqual(['2025-08', '2025-09']);
   });
 
   it('agrees across a year boundary', async () => {
