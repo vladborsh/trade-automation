@@ -79,10 +79,18 @@ describe('partitionsFor', () => {
       'candles_1m', 'candles_agg', 'mark_funding_1m', 'open_interest_5m', 'long_short_5m', 'liquidations', 'collector_gaps',
       // migration 011 (IB-015)
       'feature_frames',
+      // migration 015 (IB-017) — the per-close audit row
+      'playbook_evaluations',
     ]);
     // The two unpartitioned tables of §3.3 must not appear.
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('funding_settlements');
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('calendar_events');
+    // Nor IB-017's current-state and signal tables: `playbook_state` holds one row per
+    // playbook x symbol x arm x mode for the life of the product, and `signals` is a handful of
+    // rows a day. Partitioning either would be maintenance with nothing to maintain.
+    expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('playbook_state');
+    expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('signals');
+    expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('cooldowns');
     // Nor the version guard: one row per frame_version for the life of the product, not a series.
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('feature_frame_versions');
     expect(partitionsFor(['2026-09', '2026-10'])).toHaveLength(PARTITIONED_TABLES.length * 2);

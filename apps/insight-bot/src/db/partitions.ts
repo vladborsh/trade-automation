@@ -19,6 +19,9 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   // IB-015 (migration 011). `feature_frame_versions` is deliberately NOT here: it holds one row
   // per frame_version for the life of the product, not a time series.
   { table: 'feature_frames', column: 'close_time' },
+  // IB-017. ~576 rows/day for P3 across 3 symbols and 2 arms; partitioned for the same reason
+  // as the rest, so a year's audit trail is droppable by month rather than by delete.
+  { table: 'playbook_evaluations', column: 'close_time' },
 ];
 
 export interface Partition {
