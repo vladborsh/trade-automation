@@ -1,4 +1,4 @@
-import type { WebFrameBasis, WebFrameTimeframe } from '@trade-automation/contracts';
+import { WEB_FEATURE_KEYS, type WebFrameBasis, type WebFrameTimeframe } from '@trade-automation/contracts';
 import type { DbHandle } from '../db/db.port';
 import type { CvdBar, CvdInput, CvdWindows } from './calculators/cvd';
 import type { FundingInput, Settlement } from './calculators/funding';
@@ -15,7 +15,7 @@ import {
   LIQUIDATION_STREAMS, coveredHourStarts, liquidationCoverage, type LiquidationCoverage,
 } from './liquidation-coverage';
 import * as inputs from './pg/feature-inputs.repo';
-import { lookbackMs } from './required-windows';
+import { keyWindowsForGroup, lookbackMs } from './required-windows';
 
 /**
  * IB-015 — one close's worth of inputs, read from the database and shaped for the calculators.
@@ -205,23 +205,40 @@ export async function gather(
     // holding ten, and the whole GROUP reported a 190-bucket shortfall — which would have
     // blocked `atr.1d.14` with `incomplete_input` too, and parked a permanent entry in the
     // unhealed-gap counter for every symbol. A shortfall has to be something somebody can fix.
-    const effectiveFrom = firstBucket === null ? until : Math.max(from, firstBucket);
-    const expected = Math.max(0, Math.round((until - effectiveFrom) / TF_MS[barTf]));
-    if (complete.length < expected) {
-      const partial = all.length - complete.length;
+    // IB-047: completeness is judged PER KEY WINDOW, not once for the whole group.
+    //
+    // The read above is still one query at the group's widest window — that part was right. What
+    // was wrong was reusing that window to judge every key in the group: `px.close` needs one
+    // 15m bar and `px.ret_24h` needs ninety-six, so a short 24-hour window made the frame-bar
+    // keys refuse too. 422 of 477 `px.*` refusals were that artefact.
+    for (const slice of keyWindowsForGroup(group, TF_MS[tf], WEB_FEATURE_KEYS)) {
+      // A key whose window is not expressible as a span falls back to the group's — no worse
+      // than before, and still safe.
+      const windowMs = slice.lookbackMs ?? lookbackMs(group);
+      const sliceFromMs = until - windowMs;
+      // Clamped to the history that could exist: buckets before this symbol's first row were
+      // never collected, so they are not missing.
+      const effectiveFrom = firstBucket === null ? until : Math.max(sliceFromMs, firstBucket);
+      const expected = Math.max(0, Math.round((until - effectiveFrom) / TF_MS[barTf]));
+      const present = complete.filter((b) => b.openTimeSec * 1000 >= effectiveFrom).length;
+      if (present >= expected) continue;
+
+      const partial = all.filter((b) => !b.complete && b.openTimeSec * 1000 >= effectiveFrom).length;
       shortfalls.push({
         group,
+        keys: slice.keys,
         expected,
-        present: complete.length,
+        present,
         detail:
-          `candles_agg ${barTf} ${iso(effectiveFrom)}–${iso(until)}, ${complete.length} of ${expected}` +
-          (partial > 0 ? ` (${partial} incomplete)` : ''),
+          `candles_agg ${barTf} ${iso(effectiveFrom)}–${iso(until)}, ${present} of ${expected}` +
+          (partial > 0 ? ` (${partial} incomplete)` : '') +
+          ` [${slice.keys.length} key(s)]`,
       });
       evidenceByGroup[group] = {
         recordedGapMinutes: await inputs.recordedGapMinutes(db, {
-          stream: `${PRIMARY_VENUE}:kline_1m`, symbols: binanceOnly, fromMs: from, toMsExclusive: until,
+          stream: `${PRIMARY_VENUE}:kline_1m`, symbols: binanceOnly, fromMs: effectiveFrom, toMsExclusive: until,
         }) / (TF_MS[barTf] / MINUTE),
-        notTradedMinutes: notTradedMinutes(from) / (TF_MS[barTf] / MINUTE),
+        notTradedMinutes: notTradedMinutes(effectiveFrom) / (TF_MS[barTf] / MINUTE),
       };
     }
     return [barTf, complete] as const;
@@ -236,17 +253,24 @@ export async function gather(
     const bars = await inputs.minuteBars(db, {
       venue: PRIMARY_VENUE, market, symbols: spellings, fromMs: from, toMsExclusive: closeMs,
     });
-    const expected = expectedMinutes(lookbackMs(group) / HOUR);
-    if (bars.length < expected) {
+    // IB-047, same per-key-window rule as the agg groups above: `cvd.*.4h` must not refuse
+    // because the 24-hour window is short.
+    for (const slice of keyWindowsForGroup(group, TF_MS[tf], WEB_FEATURE_KEYS)) {
+      const windowMs = slice.lookbackMs ?? lookbackMs(group);
+      const sliceFromMs = closeMs - windowMs;
+      const expected = expectedMinutes(windowMs / HOUR);
+      const present = bars.filter((b) => b.openTimeSec * 1000 >= sliceFromMs).length;
+      if (present >= expected) continue;
       shortfalls.push({
-        group, expected, present: bars.length,
-        detail: `candles_1m ${market} ${iso(from)}–${iso(closeMs)}, ${bars.length} of ${expected}`,
+        group, keys: slice.keys, expected, present,
+        detail: `candles_1m ${market} ${iso(sliceFromMs)}–${iso(closeMs)}, ${present} of ${expected}`
+          + ` [${slice.keys.length} key(s)]`,
       });
       evidenceByGroup[group] = {
         recordedGapMinutes: await inputs.recordedGapMinutes(db, {
-          stream: `${PRIMARY_VENUE}:kline_1m`, symbols: spellings, fromMs: from, toMsExclusive: closeMs,
+          stream: `${PRIMARY_VENUE}:kline_1m`, symbols: spellings, fromMs: sliceFromMs, toMsExclusive: closeMs,
         }),
-        notTradedMinutes: notTradedMinutes(from),
+        notTradedMinutes: notTradedMinutes(sliceFromMs),
       };
     }
     const toBars = (fromMs: number, toMs: number): CvdBar[] =>

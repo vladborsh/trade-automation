@@ -78,7 +78,7 @@ export class FeaturePassService {
     const ctx = context ?? await loadPassContext(this.db, closeMs - LIQ_LOOKBACK_MS, closeMs);
     const gathered = await gather(this.db, symbol, tf, closeMs, ctx);
     const computed = computeAll(gathered);
-    const { incompleteGroups, explainedGroups, reasons } =
+    const { incompleteKeys, explainedKeys, reasons } =
       assessWindows(gathered.shortfalls, gathered.evidenceByGroup);
 
     const fresh = assembleFrame({
@@ -86,8 +86,8 @@ export class FeaturePassService {
       tf,
       closeTimeSec: Math.floor(closeMs / 1000),
       computed,
-      incompleteGroups,
-      explainedGroups,
+      incompleteKeys,
+      explainedKeys,
       reasons,
       basis: gathered.basis,
       computedMode,

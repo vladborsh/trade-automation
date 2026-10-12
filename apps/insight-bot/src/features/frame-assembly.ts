@@ -32,12 +32,19 @@ export interface AssembleInput {
   /** What the calculators produced. Every registry key must be present — see below. */
   computed: Partial<Record<WebFeatureKey, WebFeatureValue>>;
   /**
-   * Input groups that were not reliably complete at this close, e.g. `agg:15m`, `oi`. The
-   * service decides membership after §8.1's re-checks at +30 s and +60 s.
+   * The KEYS whose own window was not reliably complete at this close — IB-047.
+   *
+   * Keys, not input groups. A group's keys span 96× inside `agg:15m` (`px.close` needs one bar,
+   * `px.ret_24h` ninety-six), so blocking per group made the narrow keys refuse whenever the
+   * widest one was short: 422 of 477 `px.*` refusals were that artefact, every one of them
+   * indistinguishable from an honest refusal from the outside.
+   *
+   * The service decides membership after §8.1's re-checks at +30 s and +60 s.
    */
-  incompleteGroups: ReadonlySet<string>;
+  incompleteKeys: ReadonlySet<string>;
   /**
-   * Groups short by an amount fully accounted for by something that will never change — a
+   * Keys whose window was short by an amount fully accounted for by something that will never
+   * change — a
    * recorded `collector_gaps` row, a halt, or minutes before the symbol listed.
    *
    * **They refuse too.** "The venue never produced these minutes" explains WHY the data is
@@ -50,7 +57,7 @@ export interface AssembleInput {
    * explained absence is permanent and must not be counted as an unhealed gap, or the counter
    * never drains and the alarm stops being read.
    */
-  explainedGroups: ReadonlySet<string>;
+  explainedKeys: ReadonlySet<string>;
   /** Human-readable, one per short bucket or slot: "candles_agg 15m@12:00 bars 14 of 15". */
   reasons: readonly string[];
   basis: WebFrameBasis;
@@ -71,6 +78,11 @@ export function keysBlockedBy(incompleteGroups: ReadonlySet<string>): WebFeature
     WEB_FEATURE_SPEC[key].inputs.some((group) => incompleteGroups.has(group)));
 }
 
+/** Everything a set of blocked keys covers, filtered to the registry so a typo cannot pass. */
+function blockedSet(keys: ReadonlySet<string>): Set<string> {
+  return new Set(WEB_FEATURE_KEYS.filter((key) => keys.has(key)));
+}
+
 /**
  * Builds the frame.
  *
@@ -80,8 +92,8 @@ export function keysBlockedBy(incompleteGroups: ReadonlySet<string>): WebFeature
  * that distinction; the alternative is a frame that looks complete in shape and is hollow.
  */
 export function assembleFrame(input: AssembleInput): WebFeatureFrame {
-  const blocked = new Set<string>(keysBlockedBy(input.incompleteGroups));
-  const explained = new Set<string>(keysBlockedBy(input.explainedGroups));
+  const blocked = blockedSet(input.incompleteKeys);
+  const explained = blockedSet(input.explainedKeys);
   const keys: Record<string, WebFeatureValue> = {};
 
   for (const key of WEB_FEATURE_KEYS) {

@@ -64,6 +64,57 @@ export function groupsFor(keys: readonly WebFeatureKey[] = WEB_FEATURE_KEYS): st
   return [...groups].sort();
 }
 
+/**
+ * IB-047 — the window ONE KEY needs, which is not the window its group is read over.
+ *
+ * `GROUP_LOOKBACK_MS` above is the widest window any key in the group needs, and reading at the
+ * widest is right: one query per group. **Using it for COMPLETENESS was the bug.** A group's
+ * keys span 96× inside `agg:15m` — `px.close` needs one bar, `px.ret_24h` needs ninety-six — so
+ * judging them all against ninety-six made the three frame-bar keys refuse whenever the
+ * 24-hour key was short. Measured by dev-1: **422 of 477 `px.*` refusals had their own 15m bar
+ * complete.**
+ *
+ * It fails SAFE, which is what made it survive: an over-refusal is indistinguishable from an
+ * honest one, so the system reported itself as more data-starved than it was and nothing looked
+ * wrong from outside. The inverse of every other defect this week — a confident "cannot know"
+ * rather than a confident wrong number — and the pressure it creates is the dangerous part: a
+ * playbook that cannot arm for reasons that do not exist is how someone comes to loosen a
+ * threshold.
+ *
+ * Returns null when the key's window is not expressible as a span, in which case the caller
+ * falls back to the group window — no worse than today's behaviour, and still safe.
+ */
+export function keyLookbackMs(key: WebFeatureKey, frameTfMs: number): number | null {
+  const { window } = WEB_FEATURE_SPEC[key];
+  // 'frame bar' and 'frame' mean the bar the frame is stamped by, so the span depends on the
+  // FRAME's timeframe, not on anything in the key's own params: px.close on a 4h frame needs
+  // the sixteen 15m bars of that bar, not one.
+  if (window === 'frame bar' || window === 'frame') return frameTfMs;
+  return declaredLookbackMs(key);
+}
+
+/**
+ * The distinct completeness windows inside one group, with the keys that need each.
+ *
+ * Sorted widest-first so the caller can short-circuit: if the widest window is whole, every
+ * narrower one inside it is too.
+ */
+export function keyWindowsForGroup(
+  group: string,
+  frameTfMs: number,
+  keys: readonly WebFeatureKey[] = WEB_FEATURE_KEYS,
+): Array<{ lookbackMs: number | null; keys: WebFeatureKey[] }> {
+  const byWindow = new Map<number | null, WebFeatureKey[]>();
+  for (const key of keys) {
+    if (!(WEB_FEATURE_SPEC[key].inputs as readonly string[]).includes(group)) continue;
+    const ms = keyLookbackMs(key, frameTfMs);
+    byWindow.set(ms, [...(byWindow.get(ms) ?? []), key]);
+  }
+  return [...byWindow.entries()]
+    .map(([lookbackMs, ks]) => ({ lookbackMs, keys: ks.sort() }))
+    .sort((a, b) => (b.lookbackMs ?? Infinity) - (a.lookbackMs ?? Infinity));
+}
+
 export function lookbackMs(group: string): number {
   const ms = GROUP_LOOKBACK_MS[group];
   if (ms === undefined) {

@@ -24,6 +24,14 @@ import type { WebFeatureUnavailable } from '@trade-automation/contracts';
 export interface WindowShortfall {
   /** The input group, e.g. `candles1m:perp` or `agg:15m`. */
   group: string;
+  /**
+   * The keys this shortfall actually affects — IB-047.
+   *
+   * A shortfall belongs to a (group, WINDOW) pair, not to a group. `px.close` needs one bar of
+   * `agg:15m` and `px.ret_24h` needs ninety-six; judging both against ninety-six made the first
+   * refuse whenever the second was short, and 422 of 477 `px.*` refusals were that artefact.
+   */
+  keys: readonly string[];
   expected: number;
   present: number;
   /** For the frame's `incompleteReason`: "candles_1m perp 12:00–16:00, 238 of 240". */
@@ -69,26 +77,24 @@ export function reasonForShortfall(
   return 'incomplete_input';
 }
 
-/** The groups that are short, with the reason each refuses for. */
+/** The KEYS that are short, with the reason each refuses for (IB-047). */
 export function assessWindows(
   shortfalls: readonly WindowShortfall[],
   evidenceByGroup: Readonly<Record<string, AbsenceEvidence>> = {},
-): { incompleteGroups: Set<string>; explainedGroups: Set<string>; reasons: string[] } {
-  const incompleteGroups = new Set<string>();
-  const explainedGroups = new Set<string>();
+): { incompleteKeys: Set<string>; explainedKeys: Set<string>; reasons: string[] } {
+  const incompleteKeys = new Set<string>();
+  const explainedKeys = new Set<string>();
   const reasons: string[] = [];
 
   for (const shortfall of shortfalls) {
     const reason = reasonForShortfall(shortfall, evidenceByGroup[shortfall.group] ?? NO_EVIDENCE);
-    if (reason === 'explained_absence') {
-      explainedGroups.add(shortfall.group);
-      reasons.push(`${shortfall.detail} (absence evidenced)`);
-    } else {
-      incompleteGroups.add(shortfall.group);
-      reasons.push(shortfall.detail);
-    }
+    // Per KEY, not per group (IB-047). A key is blocked by a shortfall only when that shortfall's
+    // window is one the key actually reads.
+    const target = reason === 'explained_absence' ? explainedKeys : incompleteKeys;
+    for (const key of shortfall.keys) target.add(key);
+    reasons.push(reason === 'explained_absence' ? `${shortfall.detail} (absence evidenced)` : shortfall.detail);
   }
-  return { incompleteGroups, explainedGroups, reasons };
+  return { incompleteKeys, explainedKeys, reasons };
 }
 
 /** Minutes a window of whole hours expects — the `candles_1m` completeness check. */
