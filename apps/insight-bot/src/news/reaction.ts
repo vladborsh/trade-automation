@@ -29,6 +29,7 @@ export const HORIZON_MS: Record<Horizon, number> = {
 export type Anchor = 'published' | 'first_seen';
 
 export type RefusalReason =
+  | 'window_not_closed'
   | 'window_not_covered'
   | 'no_price_at_anchor'
   | 'no_price_at_horizon'
@@ -44,8 +45,22 @@ export interface ReactionInput {
   /** Close at or immediately before anchor + horizon. */
   priceAtHorizon: number | null;
   /**
-   * Whether the whole window is inside collected time. From IB-BUG-010's coverage: a gap produces a
-   * confidently wrong magnitude and is invisible in the output unless the output says so.
+   * Whether `anchor + horizon` has actually elapsed.
+   *
+   * A window that has not closed does not fail — it **understates the magnitude and looks like a
+   * real small reaction**, which is the incomplete-bucket defect in another costume. So an open
+   * window refuses and is recomputed once it closes, rather than measured early and revised:
+   * refusal beats a computed value, and the stored row cannot then be read as a closed window.
+   */
+  windowClosed: boolean;
+  /**
+   * Whether the whole window is inside collected time **for the venue and market this reaction is
+   * measured on**. From IB-BUG-010's coverage: a gap produces a confidently wrong magnitude and is
+   * invisible in the output unless the output says so.
+   *
+   * Per venue deliberately — a window covered on Bybit but not on OKX must not pass for an OKX
+   * reaction. Global coverage over per-venue data is the «все биржи» error at one remove: true
+   * about something, just not about the thing it is attached to.
    */
   windowCovered: boolean;
   /** The venue spelling actually resolved; null when the symbol has none for this venue. */
@@ -97,6 +112,9 @@ export function computeReaction(input: ReactionInput): Reaction {
   // order matters only for which reason is reported; the most fundamental absence wins, so a
   // missing spelling is not reported as a missing price
   if (input.symbolSpelling === null) return refuse('no_venue_spelling');
+  // before coverage and before prices: an open window has no horizon price yet, and reporting that
+  // as `no_price_at_horizon` would send someone looking for a collection fault that is not there
+  if (!input.windowClosed) return refuse('window_not_closed');
   if (!input.windowCovered) return refuse('window_not_covered');
   if (input.priceAtAnchor === null || input.priceAtAnchor === 0) return refuse('no_price_at_anchor');
   if (input.priceAtHorizon === null) return refuse('no_price_at_horizon');

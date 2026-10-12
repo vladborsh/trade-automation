@@ -206,7 +206,14 @@ create table news_assets (
  * string — IB-BUG-011 twice over was exactly this. A move on one venue presented as "the asset's
  * reaction" is «все биржи» over one venue.
  *
- * **3. A reaction over a window that cannot be shown covered REFUSES.** `return_pct` is null and
+ * **3a. An OPEN window refuses and is recomputed later, never measured early.** A window that has
+ * not yet elapsed does not fail — it understates the magnitude and looks like a real small
+ * reaction. `refused = 'window_not_closed'` until `anchor_at + horizon` has passed, so a row can
+ * never be read as a closed window; the pass replaces it with a measurement once it closes.
+ *
+ * **3b. A reaction over a window that cannot be shown covered REFUSES.** Coverage is checked for
+ * the SAME venue and market the reaction is measured on — a window covered on Bybit but not on OKX
+ * must not pass for an OKX reaction. `return_pct` is null and
  * `refused` says why. A collection gap inside the window produces a confidently wrong magnitude and
  * is invisible in the output unless the output carries its basis — so there is no row that computed
  * anyway. Null-with-a-reason and a real zero are different things and must not look alike.
@@ -233,7 +240,7 @@ create table news_reactions (
 
   -- 3. the measurement, or the reason there is none. Never both, never neither.
   return_pct double precision,
-  refused    text check (refused in ('window_not_covered','no_price_at_anchor','no_price_at_horizon','no_venue_spelling')),
+  refused    text check (refused in ('window_not_closed','window_not_covered','no_price_at_anchor','no_price_at_horizon','no_venue_spelling')),
   constraint news_reactions_measured_or_refused
     check ((return_pct is not null and refused is null) or (return_pct is null and refused is not null)),
 

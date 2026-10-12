@@ -20,6 +20,7 @@ const input = (over: Partial<ReactionInput> = {}): ReactionInput => ({
   firstSeenAt: FIRST_SEEN,
   priceAtAnchor: 100,
   priceAtHorizon: 103,
+  windowClosed: true,
   windowCovered: true,
   symbolSpelling: 'BTCUSDT',
   othersInWindow: 0,
@@ -76,6 +77,19 @@ describe('the anchor, because published_at is the publisher\'s claim', () => {
 });
 
 describe('refusals carry a reason and never a number', () => {
+  it('refuses a window that has not closed yet, rather than measuring it early', () => {
+    // a partial window does not fail; it understates the magnitude and looks like a real small
+    // reaction. The row says the window is open, so it cannot be mistaken for a closed one.
+    const r = computeReaction(input({ windowClosed: false }));
+    expect(r.returnPct).toBeNull();
+    expect(r.refused).toBe('window_not_closed');
+  });
+
+  it('reports an open window rather than a missing horizon price, which it causes', () => {
+    const r = computeReaction(input({ windowClosed: false, priceAtHorizon: null }));
+    expect(r.refused).toBe('window_not_closed');
+  });
+
   it('refuses a window that cannot be shown covered', () => {
     // IB-BUG-010's coverage: a collection gap makes the magnitude confidently wrong, and the gap is
     // invisible in the output unless the output says so
