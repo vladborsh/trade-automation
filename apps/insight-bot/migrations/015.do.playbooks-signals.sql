@@ -132,8 +132,12 @@ create table playbook_evaluations (
                   'declined','refused','held')),
   -- Set only when the engine declined to DECIDE, as opposed to deciding not to arm. Null on
   -- 'declined', which is a statement about the market. The two are never summed.
+  -- `late_detection` is here with the others but is not a gap in the data: the evaluation
+  -- succeeded and the trigger fired, we simply noticed too long afterwards to act. A rising
+  -- count of it means the pass is running late, which is a fact about us, not the market.
   refusal      text check (refusal in
-                 ('insufficient_features','blind_while_armed','window_not_contiguous')),
+                 ('insufficient_features','blind_while_armed','window_not_contiguous',
+                  'late_detection')),
   -- The context gate's three-state answer, for the gated arm. Null when no gate is declared.
   gate_status  text check (gate_status in ('pass','blocked','unavailable')),
   gate_refusal text check (gate_refusal in

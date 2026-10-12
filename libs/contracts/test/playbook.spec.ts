@@ -105,9 +105,19 @@ describe('GateVerdict', () => {
 });
 
 describe('ArmRefusal — refusing to decide is not deciding not to arm', () => {
-  it('names the three ways the engine declines to answer', () => {
-    expect(ArmRefusalSchema.options)
-      .toEqual(['insufficient_features', 'blind_while_armed', 'window_not_contiguous']);
+  it('names the ways the engine does not produce a signal, each counted apart', () => {
+    expect(ArmRefusalSchema.options).toEqual([
+      'insufficient_features', 'blind_while_armed', 'window_not_contiguous', 'late_detection',
+    ]);
+  });
+
+  it('keeps late_detection distinct, because it is NOT a gap in the data', () => {
+    // The evaluation succeeded and the trigger fired; we noticed too late to act. A rising
+    // count means the pass is running late — a fact about us, not about the market, and not
+    // the same fact as a missing input.
+    expect(ArmRefusalSchema.options).toContain('late_detection');
+    expect(ArmRefusalSchema.options.indexOf('late_detection'))
+      .toBeGreaterThan(ArmRefusalSchema.options.indexOf('insufficient_features'));
   });
 
   it('keeps blind_while_armed as its own state rather than a pause', () => {

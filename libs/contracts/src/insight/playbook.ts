@@ -94,6 +94,16 @@ export const ArmRefusalSchema = z.enum([
   'blind_while_armed',
   /** A close in the armed window was never evaluated in this arm's own mode (§3.2's contiguity). */
   'window_not_contiguous',
+  /**
+   * The trigger fired, we agree it fired, and we noticed too long afterwards to act on it.
+   *
+   * Ruled 2026-10-12: past a stated bound the two timestamps diverging "is not a signal to
+   * send, it is a late detection, refused and counted as one". Unlike its neighbours this is
+   * not a gap in the data — the evaluation succeeded — which is why it is counted separately
+   * from both a refusal to decide and an ordinary decline. A rising count here means the pass
+   * is running late, which is an operational fact about us and not about the market.
+   */
+  'late_detection',
 ]);
 export type ArmRefusal = z.infer<typeof ArmRefusalSchema>;
 
