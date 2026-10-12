@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { WEB_FRAME_VERSION, featureSpecFingerprint } from '@trade-automation/contracts';
+import { emaFeatures } from '../../src/features/calculators/ema';
 import { fundingFeatures, type FundingInput, type Settlement } from '../../src/features/calculators/funding';
 
 /** 8-hourly settlements ending at a fixed UTC instant — the convention the keys assume. */
@@ -59,10 +60,26 @@ function buildGolden(): Record<string, unknown> {
     predictedBinance: -0.000018,
   };
 
+  /**
+   * IB-016's EMAs, with the 4h series sitting at EXACTLY its 50-bar boundary and the 1d series
+   * one bar short of its 200.
+   *
+   * Both boundaries on purpose, for the reason the funding fixture above was rebuilt: a golden
+   * whose fixture avoids the boundary tests nothing at the boundary. At exactly 50 bars the EMA
+   * is the SMA of them and no recurrence step has run — so an implementation that seeded from
+   * the first close instead of the SMA produces a different number HERE, where it is visible,
+   * rather than only during the first 50 bars of live data, where nobody is looking.
+   */
+  const wave = (n: number): number[] =>
+    Array.from({ length: n }, (_, i) => 100 + Math.sin(i / 3) * 7 + i * 0.25);
+
   return {
     frameVersion: WEB_FRAME_VERSION,
     specFingerprint: featureSpecFingerprint(),
-    keys: fundingFeatures(funding),
+    keys: {
+      ...fundingFeatures(funding),
+      ...emaFeatures({ closes4h: wave(50), closes1d: wave(199) }),
+    },
   };
 }
 

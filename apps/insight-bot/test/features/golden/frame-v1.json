@@ -1,6 +1,6 @@
 {
   "frameVersion": 1,
-  "specFingerprint": "5fbbcf4c",
+  "specFingerprint": "7a4a2a87",
   "keys": {
     "funding.binance.rate": {
       "ok": true,
@@ -43,6 +43,14 @@
     "funding.predicted.binance": {
       "ok": true,
       "value": -0.000018
+    },
+    "ema.4h.50": {
+      "ok": true,
+      "value": 106.83748086568139
+    },
+    "ema.1d.200": {
+      "ok": false,
+      "why": "insufficient_history"
     }
   }
 }

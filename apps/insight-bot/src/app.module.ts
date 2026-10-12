@@ -8,6 +8,7 @@ import { CollectorsModule } from './collectors/collectors.module';
 import { OpsModule } from './ops/ops.module';
 import { CalendarModule } from './collectors/calendar/calendar.module';
 import { DeriveModule } from './derive/derive.module';
+import { FeaturesModule } from './features/features.module';
 
 /**
  * architecture/insight-bot-system-design.md §2.1. IB-003 wires the three modules the rest hang
@@ -21,6 +22,6 @@ import { DeriveModule } from './derive/derive.module';
  * arrive with their own tasks.
  */
 @Module({
-  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeriveModule.register(), DeliveryModule.register(), WebModule.register(), DashboardStaticModule.register()],
+  imports: [AppConfigModule, OpsModule, DbModule, CalendarModule.register(), CollectorsModule.register(), DeriveModule.register(), FeaturesModule.register(), DeliveryModule.register(), WebModule.register(), DashboardStaticModule.register()],
 })
 export class AppModule {}

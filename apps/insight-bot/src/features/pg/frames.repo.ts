@@ -156,6 +156,39 @@ export async function recordConflicts(
   }
 }
 
+/**
+ * Symbols whose published frame for a close still holds a chaseable refusal.
+ *
+ * What the +30 s and +60 s looks iterate over. §8.1's re-check exists because the closing bucket
+ * was incomplete, so a frame with nothing chaseable left in it has nothing to re-check: running
+ * it again would cost a full gather per symbol, three times per close, to confirm that nothing
+ * changed.
+ *
+ * `incomplete_input` only, not `complete = false` — a frame refusing because the venue never
+ * produced those minutes would otherwise be re-gathered every 30 seconds, for ever.
+ */
+export async function symbolsAwaitingHeal(
+  db: DbHandle,
+  tf: WebFrameTimeframe,
+  closeTimeMs: number,
+): Promise<string[]> {
+  const rows = await db.query<{ symbol: string }>(
+    `with latest as (
+       select distinct on (symbol) symbol, keys
+         from feature_frames
+        where tf = $1 and close_time = $2
+        order by symbol, revision desc
+     )
+     select symbol from latest
+      where exists (
+        select 1 from jsonb_each(keys) kv where kv.value->>'why' = 'incomplete_input'
+      )
+      order by symbol`,
+    [tf, asDate(closeTimeMs)],
+  );
+  return rows.map((r) => r.symbol);
+}
+
 export interface FrameCountsRow {
   tf: string;
   written: number;

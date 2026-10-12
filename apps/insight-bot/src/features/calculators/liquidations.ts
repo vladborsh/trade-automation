@@ -47,10 +47,21 @@ export function liquidationFeatures(input: LiqInput): Partial<Record<WebFeatureK
     out[`liq.${side}.15m` as WebFeatureKey] = input.hasAnyHistory ? ok(sums.m15) : no('no_data');
     out[`liq.${side}.60m` as WebFeatureKey] = input.hasAnyHistory ? ok(sums.m60) : no('no_data');
 
-    const z = log1pZScore(
-      input.history[side], sums.m60, minSamples,
-      featureParamNumber(`liq.${side}.z60m` as 'liq.long.z60m', 'spreadEpsilonRelative'),
-    );
+    // The z-score is gated on `hasAnyHistory` as well as on the sample size, and the two are
+    // not the same check.
+    //
+    // Without this a frame could say `liq.long.60m: no_data` and `liq.long.z60m: 3.9` in the
+    // same breath — a standard-deviation score of a quantity the frame has just said it does
+    // not have. Observed on the first real run. A consumer reading per key, as it is supposed
+    // to, would take the z-score at face value and arm on it.
+    //
+    // Whatever makes the sum unmeasurable makes a statistic ABOUT that sum unmeasurable too.
+    const z = input.hasAnyHistory
+      ? log1pZScore(
+        input.history[side], sums.m60, minSamples,
+        featureParamNumber(`liq.${side}.z60m` as 'liq.long.z60m', 'spreadEpsilonRelative'),
+      )
+      : null;
     out[`liq.${side}.z60m` as WebFeatureKey] = z === null ? no('insufficient_history') : ok(z);
   }
   return out;

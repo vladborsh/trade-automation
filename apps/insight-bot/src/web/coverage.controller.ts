@@ -1,10 +1,14 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
-import type { WebCoverageResponse, WebCoverageRow } from '@trade-automation/contracts';
+import type { WebCoverageResponse, WebCoverageRow, WebFrameCoverage } from '@trade-automation/contracts';
 import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
 import { monthsWithRows, seriesBounds, SERIES_TABLES } from '../db/pg/backfill-reads';
 import { gapsOverlapping, heartbeats, unmappedLiquidations } from '../db/pg/coverage-reads';
 import { collectorCoverage } from './collector-coverage';
+import { expectedFrames } from '../features/frame-coverage';
+import { HEAL_LOOKBACK_MS } from '../features/input-completeness';
+import { frameCounts } from '../features/pg/frames.repo';
+import { FRAME_TIMEFRAMES } from '../features/recheck-schedule';
 
 /**
  * architecture/insight-bot-web-dashboard.md §2, §4 — `GET /api/web/coverage`: per symbol × series,
@@ -22,6 +26,11 @@ import { collectorCoverage } from './collector-coverage';
  *   `coveredHours`.
  * - **`unmapped`** — liquidation rows whose `(venue, symbol)` matches no `symbols` spelling, and so
  *   are unreachable from any canonical id and reach no page at all.
+ *
+ * IB-015 adds **`frames`**, its own block rather than a member of `collectors`. The two measure
+ * different things and merging them would make a frame problem read as a collector problem: a
+ * stream can be up for every hour of the window while every frame in it refuses, because
+ * liveness says a socket was connected and says nothing about whether the buckets it fed healed.
  */
 @Controller('api/web/coverage')
 export class WebCoverageController {
@@ -33,7 +42,7 @@ export class WebCoverageController {
   @Get()
   async get(@Query('days') daysRaw?: string): Promise<WebCoverageResponse> {
     const windowDays = clampDays(daysRaw);
-    if (!this.db) return { rows: [], collectors: [], unmapped: { total: 0, rows: [] }, windowDays };
+    if (!this.db) return { rows: [], collectors: [], unmapped: { total: 0, rows: [] }, frames: [], windowDays };
     const db = this.db;
     const rows: WebCoverageRow[] = [];
 
@@ -60,10 +69,31 @@ export class WebCoverageController {
     const beats = await heartbeats(db);
     const gaps = await gapsOverlapping(db, from, to, [...beats.keys()]);
 
+    // Past this instant no heal pass reaches back any further, so an incomplete frame is not
+    // merely young. Derived from derive's own lookback rather than restated, so shortening one
+    // moves the other (`input-completeness.ts` re-exports it for exactly this reason).
+    const healDeadline = to.getTime() - HEAL_LOOKBACK_MS;
+    const counts = await frameCounts(db, from.getTime(), to.getTime(), healDeadline);
+    const frames: WebFrameCoverage[] = FRAME_TIMEFRAMES.map((tf) => {
+      const row = counts.find((r) => r.tf === tf);
+      return {
+        tf,
+        // From the window, never from the rows: a count derived from what is stored can never
+        // notice that something is not stored.
+        expected: expectedFrames(tf, from.getTime(), to.getTime()),
+        written: row?.written ?? 0,
+        incomplete: row?.incomplete ?? 0,
+        explainedOnly: row?.explainedOnly ?? 0,
+        unhealed: row?.unhealed ?? 0,
+        oldestUnhealed: row?.oldestUnhealedMs ?? null,
+      };
+    });
+
     return {
       rows,
       collectors: collectorCoverage(beats, gaps, { from, to }),
       unmapped: await unmappedLiquidations(db),
+      frames,
       windowDays,
     };
   }

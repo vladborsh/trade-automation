@@ -14,7 +14,9 @@
     "backfill": "node dist/backfill/backfill.cli.js",
     "backfill:verify": "node dist/backfill/verify.cli.js",
     "derive": "node dist/derive/derive.cli.js",
-    "audit:months": "node dist/ops/month-label-audit.cli.js"
+    "audit:months": "node dist/ops/month-label-audit.cli.js",
+    "features": "node dist/features/features.cli.js",
+    "audit:frames": "node dist/ops/frame-audit.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",

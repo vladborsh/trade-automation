@@ -69,6 +69,40 @@ export async function aggBars(
   }));
 }
 
+/**
+ * The earliest aggregated bucket at or after `fromMs`, or null when the window holds none.
+ *
+ * The completeness check needs it to tell two absences apart. A window asking for 200 daily bars
+ * against a table holding ten is not a collection failure — nobody has backfilled the archive
+ * yet — and reporting it as `incomplete_input` would put a permanent, unfixable entry in the
+ * unhealed-gap counter for every symbol. Clamped to this, the shortfall disappears and the
+ * calculator refuses with `insufficient_history`, which is both true and not anyone's alarm.
+ *
+ * **Bounded by `fromMs`, which is the difference between 2 s and nothing.** The unbounded form
+ * — `min(open_time)` with no lower bound — has to visit every partition `candles_agg` has, back
+ * to 2020, because the minimum could be in any of them. Measured on `insight_dev2`: 2,216 ms
+ * cold and 2,029 ms WARM, every time, because there is nothing to warm up about a full scan.
+ * Four timeframes per symbol made that the single largest cost in the pass.
+ *
+ * The bound costs nothing in meaning: the clamp only ever needs `max(fromMs, firstBucket)`, so
+ * a bucket older than `fromMs` could not change the answer.
+ */
+export async function firstAggBucketMs(
+  db: DbHandle,
+  q: { venue: string; market: string; symbols: readonly string[]; tf: string; fromMs: number },
+): Promise<number | null> {
+  if (q.symbols.length === 0) return null;
+  const rows = await db.query<{ first: Date | null }>(
+    `select min(open_time) as first
+       from candles_agg
+      where venue = $1 and market = $2 and symbol = any($3::text[]) and tf = $4
+        and open_time >= $5`,
+    [q.venue, q.market, q.symbols, q.tf, asDate(q.fromMs)],
+  );
+  const first = rows[0]?.first;
+  return first === undefined || first === null ? null : new Date(first).getTime();
+}
+
 export interface MinuteBar {
   openTimeSec: number;
   close: number;
@@ -304,6 +338,67 @@ export async function listedPerpMs(db: DbHandle, symbolId: string): Promise<numb
   );
   const listed = rows[0]?.listed_perp;
   return listed === undefined ? null : new Date(listed).getTime();
+}
+
+export interface SymbolIdentity {
+  /** The perp spelling at every venue, de-duplicated. Empty when the symbol is unknown. */
+  perpSpellings: string[];
+  /** Binance's own perp spelling, for the single-venue reads. Empty when it has none. */
+  binancePerp: string[];
+  /** Binance's spot spelling, or null when the symbol has no spot market. */
+  binanceSpot: string | null;
+  /** When the perp listed, ms UTC. Minutes before it are minutes the venue never produced. */
+  listedPerpMs: number | null;
+}
+
+/**
+ * Everything the pass needs from the `symbols` row, in ONE read.
+ *
+ * It replaces four separate queries per symbol — `venueSpellings` twice, `spotSpelling` and
+ * `listedPerpMs` — all hitting the same row of the same small table. Thirty symbols made that
+ * 120 round trips per pass to answer a question that has one answer per symbol.
+ *
+ * The venue mapping is the same one `venueSpellings` applies (IB-BUG-011): canonical id ->
+ * each venue's own spelling, and an unknown symbol yields an EMPTY list, never a fallback to
+ * the raw string — a silent fallback is how that bug read as a quiet market.
+ */
+export async function symbolIdentity(db: DbHandle, symbolId: string): Promise<SymbolIdentity> {
+  const rows = await db.query<{
+    binance_perp: string | null; bybit_linear: string | null; okx_swap: string | null;
+    binance_spot: string | null; listed_perp: Date | null;
+  }>(
+    `select binance_perp, bybit_linear, okx_swap, binance_spot, listed_perp
+       from symbols where id = $1`,
+    [symbolId],
+  );
+  const row = rows[0];
+  if (!row) {
+    return { perpSpellings: [], binancePerp: [], binanceSpot: null, listedPerpMs: null };
+  }
+  const nonEmpty = (s: string | null): s is string => s !== null && s.length > 0;
+  return {
+    perpSpellings: [...new Set([row.binance_perp, row.bybit_linear, row.okx_swap].filter(nonEmpty))],
+    binancePerp: nonEmpty(row.binance_perp) ? [row.binance_perp] : [],
+    binanceSpot: nonEmpty(row.binance_spot) ? row.binance_spot : null,
+    listedPerpMs: row.listed_perp === null ? null : new Date(row.listed_perp).getTime(),
+  };
+}
+
+/**
+ * The venue's spelling of the SPOT listing, or null when the symbol has no spot market.
+ *
+ * `venueSpellings` resolves perpetual contracts only (`binance_perp`, `bybit_linear`,
+ * `okx_swap`), so the CVD spot keys need this. Null is a real answer and not a failure: a
+ * perp-only symbol has no spot CVD, and the calculator refuses rather than substituting the
+ * perp's — which would put one market's flow under the other's name.
+ */
+export async function spotSpelling(db: DbHandle, symbolId: string): Promise<string | null> {
+  const rows = await db.query<{ binance_spot: string | null }>(
+    `select binance_spot from symbols where id = $1`,
+    [symbolId],
+  );
+  const spot = rows[0]?.binance_spot;
+  return spot === undefined || spot === null || spot.length === 0 ? null : spot;
 }
 
 /** The signal set, in rank order — the symbols the pass runs for. */
