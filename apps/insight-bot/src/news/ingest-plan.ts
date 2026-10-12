@@ -1,3 +1,4 @@
+import { matchAssets, type AssetDictionaryEntry } from './assets';
 import { chooseCluster, CLUSTER_WINDOW_MS, SIMILARITY_THRESHOLD, type ClusterCandidate } from './cluster';
 import type { NewsItem } from './parse';
 
@@ -67,6 +68,14 @@ export interface IngestPlanInput {
   recent: readonly ClusterCandidate[];
   windowMs?: number;
   threshold?: number;
+  /**
+   * The symbol dictionary, so an incoming item's assets are known before it is clustered.
+   *
+   * Tagging runs ahead of clustering because two formulaic announcements about DIFFERENT assets
+   * match on words alone; the asset sets are what tell them apart. Omitted means no constraint —
+   * clustering falls back to similarity only, rather than refusing everything.
+   */
+  dictionary?: readonly AssetDictionaryEntry[];
 }
 
 export interface PlannedInsert {
@@ -121,7 +130,10 @@ export function planIngest(input: IngestPlanInput): IngestPlan {
       continue;
     }
 
-    const incoming: ClusterCandidate = { id: item.id, title: item.title, publishedAt: item.publishedAt };
+    const symbols = input.dictionary === undefined || input.dictionary.length === 0
+      ? undefined
+      : new Set(matchAssets(`${item.title}\n${item.body ?? ''}`, input.dictionary).map((m) => m.symbol));
+    const incoming: ClusterCandidate = { id: item.id, title: item.title, publishedAt: item.publishedAt, symbols };
     const decision = chooseCluster(incoming, representatives, windowMs, threshold);
     inserts.push({ item, joins: decision.joins, similarity: decision.similarity });
 

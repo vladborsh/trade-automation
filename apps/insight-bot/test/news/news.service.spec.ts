@@ -18,7 +18,7 @@ import type { NewsSource } from '../../src/news/sources';
 const FIXTURE = readFileSync(join(__dirname, '..', 'fixtures', 'news', 'cointelegraph.rss.xml'), 'utf8');
 
 const source = (id: string, over: Partial<NewsSource> = {}): NewsSource => ({
-  id, url: `https://example.test/${id}`, kind: 'rss', shape: 'window', pollMs: 5 * 60_000, followRedirects: true, ...over,
+  id, url: `https://example.test/${id}`, kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: 5 * 60_000, followRedirects: true, ...over,
 });
 
 /** Records which sources were asked for, and answers however the test says. */

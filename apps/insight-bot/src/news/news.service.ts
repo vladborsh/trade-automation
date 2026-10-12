@@ -8,7 +8,7 @@ import { NewsClient } from './news.client';
 import { JSON_PARSERS } from './parse-json';
 import { parseFeed, type NewsItem } from './parse';
 import { buildDictionary, type AssetDictionaryEntry } from './assets';
-import { afterAttempt, dueSources, type SourceState } from './schedule';
+import { afterAttempt, dueSources, newestAgeHours, type SourceState } from './schedule';
 import { NEWS_SOURCES, type NewsSource } from './sources';
 
 /** One tick a minute: the per-source cadences are 5 and 15 minutes, so this is fine-grained enough. */
@@ -67,6 +67,16 @@ export class NewsService implements OnApplicationBootstrap, OnModuleDestroy {
    * tagging against an empty dictionary, which would look identical to "this story mentions no
    * asset" — the distinction §10's prefilter exists to make.
    */
+  /**
+   * Public so a composition test can assert it is non-empty.
+   *
+   * An empty dictionary is the signature of the wiring failure that stored 366 articles with zero
+   * tags, and it cannot be seen from inside a unit test that passes the config in by hand.
+   */
+  symbolDictionary(): AssetDictionaryEntry[] {
+    return this.dictionary();
+  }
+
   private dictionary(): AssetDictionaryEntry[] {
     const symbols = this.config?.symbols ?? [];
     return buildDictionary(symbols.map((s) => ({ id: s.id, base: s.base, coingecko_id: s.coingecko_id })));
@@ -133,10 +143,22 @@ export class NewsService implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
 
+    // The third source state: it answered, it parsed, and none of it is new. A dead source
+    // serving old articles looks healthy — same volume, same shape — so the age is measured and
+    // reported rather than inferred from "we stored nothing", which has other causes.
+    const ageHours = newestAgeHours(items, now);
+    if (ageHours !== null && ageHours > source.maxNewestAgeHours) {
+      this.logger.warn(
+        `${source.id}: newest item is ${Math.round(ageHours / 24)} days old ` +
+        `(expected under ${Math.round(source.maxNewestAgeHours / 24)}) — dead feed, wrong URL, or an archive`,
+      );
+    }
+
     try {
       const since = new Date(now - DEDUPE_WINDOW_MS);
       const plan = planIngest({
         items,
+        dictionary: this.dictionary(),
         known: await knownNews(db, [source.id], since),
         // the clustering window is 24 h and applied by chooseCluster; this must not return less
         recent: await recentForClustering(db, new Date(now - Math.max(CLUSTER_WINDOW_MS, DEDUPE_WINDOW_MS))),

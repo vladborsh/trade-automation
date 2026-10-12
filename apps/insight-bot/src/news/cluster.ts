@@ -64,6 +64,32 @@ export interface ClusterCandidate {
   id: string;
   title: string;
   publishedAt: Date;
+  /**
+   * The symbols this item is tagged with, when known.
+   *
+   * Used to refuse a match that the words alone would accept: exchange listings are formulaic, so
+   * "New listing: Listing of USDEXUSDT on Bybit TradFi Perpetual" and the same sentence about
+   * BWETUSDT score 0.84 against a 0.6 threshold while being about different assets. Measured on
+   * the live pass of 2026-10-12, where six unrelated listings became one cluster.
+   *
+   * Undefined or empty imposes NO constraint — an untagged item must still be able to cluster, or
+   * the tagging pipeline silently becomes a clustering gate and today's zero-tags bug reappears
+   * wearing a different hat.
+   */
+  symbols?: ReadonlySet<string>;
+}
+
+/**
+ * True when both items name assets and name none in common.
+ *
+ * A story is about something; identical words about different assets are different stories. Empty
+ * on either side means "no opinion", never "no overlap".
+ */
+export function disjointAssets(a: ClusterCandidate, b: ClusterCandidate): boolean {
+  if (a.symbols === undefined || b.symbols === undefined) return false;
+  if (a.symbols.size === 0 || b.symbols.size === 0) return false;
+  for (const s of a.symbols) if (b.symbols.has(s)) return false;
+  return true;
 }
 
 export interface ClusterDecision {
@@ -91,6 +117,9 @@ export function chooseCluster(
 
   for (const candidate of existing) {
     if (candidate.id === incoming.id) continue;
+    // words alone are not enough: formulaic titles about different assets match far above the
+    // threshold, so a known disagreement about the subject overrides a similarity about the phrasing
+    if (disjointAssets(incoming, candidate)) continue;
     const apart = Math.abs(incoming.publishedAt.getTime() - candidate.publishedAt.getTime());
     if (apart > windowMs) continue;
     const score = titleSimilarity(incoming.title, candidate.title);

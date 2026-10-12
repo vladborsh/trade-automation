@@ -9,6 +9,13 @@
  *   free-tier key carries terms and a rate limit someone has to own, so that is the user's call,
  *   not a developer's. Nothing was registered. It slots in behind `NewsSource` unchanged if a
  *   token ever arrives.
+ * - **CFTC — dropped 2026-10-12, after the live pass.** `RSS/RSSGP/rssgp.xml` answers **HTTP 403 to
+ *   Node and HTTP 200 to `curl` with byte-identical headers**; neither the User-Agent, the Accept
+ *   header nor the HTTP version changes it, and Node's `https` module is refused too. That leaves
+ *   the TLS fingerprint: a deliberate client block. Getting past it would mean disguising what we
+ *   are, which is not authorised and not something a market-data bot should do to a regulator's
+ *   site. Nine sources that work beat ten with one pretending. If CFTC matters later the answer is
+ *   an official feed or API, not a disguise.
  * - **Coinbase — dropped from scope.** Probed 2026-09-28: `api/v2/assets/search` answers 200 but
  *   is an **asset search, not announcements**, and no keyless Coinbase announcements feed was
  *   found. Recorded so the next reader re-probes rather than assuming we simply missed one; if a
@@ -56,6 +63,20 @@ export interface NewsSource {
   kind: NewsSourceKind;
   /** What an empty response means. See `NewsSourceShape`. */
   shape: NewsSourceShape;
+  /**
+   * How old the NEWEST item a healthy version of this source serves may be, in hours.
+   *
+   * The third source state, after "answers" and "answers empty": **answers, with nothing new.**
+   * Blockworks serves content nine months old and looks perfectly healthy doing it — 50 articles
+   * every poll, parsed cleanly, none of it news. A dead source contributing old articles is worse
+   * than one contributing nothing, because nothing about the response says so.
+   *
+   * Exceeding this is reported as a NUMBER (the measured age), not a boolean: "newest item is 288
+   * days old" is actionable, "stale: true" is not. These are expectations about publishing cadence,
+   * set from the live pass of 2026-10-12 with slack — a news site quiet for two days is a finding,
+   * an announcements feed quiet for a fortnight is not.
+   */
+  maxNewestAgeHours: number;
   pollMs: number;
   /**
    * CoinDesk and Blockworks answer **308** unless redirects are followed (measured 2026-09-28).
@@ -69,28 +90,29 @@ const FAST_POLL_MS = 5 * 60_000;
 const SLOW_POLL_MS = 15 * 60_000;
 
 export const NEWS_SOURCES: readonly NewsSource[] = [
-  { id: 'coindesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'cointelegraph', url: 'https://cointelegraph.com/rss', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'decrypt', url: 'https://decrypt.co/feed', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'theblock', url: 'https://www.theblock.co/rss.xml', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'blockworks', url: 'https://blockworks.co/feed', kind: 'rss', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
-  { id: 'sec', url: 'https://www.sec.gov/news/pressreleases.rss', kind: 'rss', shape: 'window', pollMs: SLOW_POLL_MS, followRedirects: true },
-  { id: 'cftc', url: 'https://www.cftc.gov/RSS/RSSGP/rssgp.xml', kind: 'rss', shape: 'window', pollMs: SLOW_POLL_MS, followRedirects: true },
+  { id: 'coindesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'cointelegraph', url: 'https://cointelegraph.com/rss', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'decrypt', url: 'https://decrypt.co/feed', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'theblock', url: 'https://www.theblock.co/rss.xml', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'blockworks', url: 'https://blockworks.co/feed', kind: 'rss', shape: 'window', maxNewestAgeHours: 48, pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'sec', url: 'https://www.sec.gov/news/pressreleases.rss', kind: 'rss', shape: 'window', maxNewestAgeHours: 336, pollMs: SLOW_POLL_MS, followRedirects: true },
   // Exchange announcements — listings and delistings, which move a single asset hard.
   {
     id: 'binance-announcements',
     url: 'https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&pageNo=1&pageSize=20',
     kind: 'json',
     shape: 'window',
+    maxNewestAgeHours: 336,
     pollMs: FAST_POLL_MS,
     followRedirects: true,
   },
-  { id: 'okx-announcements', url: 'https://www.okx.com/api/v5/support/announcements', kind: 'json', shape: 'window', pollMs: FAST_POLL_MS, followRedirects: true },
+  { id: 'okx-announcements', url: 'https://www.okx.com/api/v5/support/announcements', kind: 'json', shape: 'window', maxNewestAgeHours: 336, pollMs: FAST_POLL_MS, followRedirects: true },
   {
     id: 'bybit-announcements',
     url: 'https://api.bybit.com/v5/announcements/index?locale=en-US&limit=20',
     kind: 'json',
     shape: 'window',
+    maxNewestAgeHours: 336,
     pollMs: FAST_POLL_MS,
     followRedirects: true,
   },

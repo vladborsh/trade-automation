@@ -17,6 +17,8 @@
  * Three kinds of evidence, in decreasing strength:
  *
  * 1. **A cashtag** (`$BTC`) — unambiguous by construction; nobody writes `$NEAR` meaning "near".
+ * 1b. **The pair** (`BTCUSDT`) — equally unambiguous, and the only way exchange announcements ever
+ *    name an asset. Added after the live pass found 159 announcement articles tagged with nothing.
  * 2. **The coin's name** (`bitcoin`, `bitcoin cash`, `arbitrum`) — a word nobody uses by accident.
  * 3. **A bare upper-case ticker** (`BTC`) — accepted only for tickers that are not also words,
  *    and only when the surrounding text is not itself shouting (see below).
@@ -37,6 +39,18 @@ export interface AssetDictionaryEntry {
   symbol: string;
   /** The ticker, e.g. `BTC`. */
   base: string;
+  /**
+   * The full pair as exchanges write it, e.g. `BTCUSDT` — the universe id.
+   *
+   * Its own tier because exchange announcements name assets this way and never by the bare ticker:
+   * "Listing of BTCUSDT on Bybit TradFi Perpetual". The bare-ticker rule explicitly refuses a
+   * ticker glued inside a longer word, so without this, every listing announcement tagged NOTHING —
+   * measured on the 2026-10-12 live pass, where 159 announcement articles produced no tags at all
+   * and the cluster-disjointness rule therefore could not engage on the case it was written for.
+   *
+   * Unambiguous by construction: no English word looks like `BTCUSDT`.
+   */
+  pair: string;
   /** The coin's name as words, from `coingecko_id` — `bitcoin-cash` becomes `bitcoin cash`. */
   name: string | null;
 }
@@ -46,7 +60,7 @@ export interface AssetDictionaryEntry {
  * tell whether the matcher or the market was wrong is to know what tagged it — a derived claim
  * carries what it was derived from.
  */
-export type AssetMatchKind = 'cashtag' | 'name' | 'ticker';
+export type AssetMatchKind = 'cashtag' | 'pair' | 'name' | 'ticker';
 
 export interface AssetMatch {
   symbol: string;
@@ -95,6 +109,7 @@ export function buildDictionary(
   return symbols.map((s) => ({
     symbol: s.id,
     base: s.base.toUpperCase(),
+    pair: s.id.toUpperCase(),
     name: nameFromCoingeckoId(s.coingecko_id),
   }));
 }
@@ -134,6 +149,12 @@ export function matchAssets(text: string, dictionary: readonly AssetDictionaryEn
   for (const entry of byNameLength) {
     if (wordBounded(`$${entry.base}`, 'iu').test(text)) {
       out.push({ symbol: entry.symbol, kind: 'cashtag', matched: `$${entry.base}` });
+      continue;
+    }
+
+    // the pair, which is how every exchange announcement names its asset
+    if (wordBounded(entry.pair, 'u').test(text)) {
+      out.push({ symbol: entry.symbol, kind: 'pair', matched: entry.pair });
       continue;
     }
 

@@ -47,15 +47,27 @@ export async function knownNews(
  * every member is within the threshold of one fixed title.
  */
 export async function recentForClustering(db: Db, since: Date): Promise<ClusterCandidate[]> {
-  const rows = await db.query<{ id: string; title: string; published_at: Date }>(
-    `select n.id, n.title, n.published_at
+  const rows = await db.query<{ id: string; title: string; published_at: Date; symbols: string[] | null }>(
+    // the representative's tagged assets come with it: clustering refuses a match whose asset set
+    // is known and disjoint, and that test needs both sides
+    `select n.id, n.title, n.published_at,
+            array_remove(array_agg(a.symbol), null) as symbols
        from news_clusters c
        join raw_news n on n.id = c.first_news_id
+       left join news_assets a on a.news_id = n.id
       where n.published_at >= $1
+      group by n.id, n.title, n.published_at
       order by n.published_at`,
     [since],
   );
-  return rows.map((r) => ({ id: r.id, title: r.title, publishedAt: new Date(r.published_at) }));
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    publishedAt: new Date(r.published_at),
+    // an untagged representative gets an EMPTY set, which imposes no constraint — not `undefined`,
+    // which would mean the same here but says something different to a reader
+    symbols: new Set(r.symbols ?? []),
+  }));
 }
 
 export interface PersistResult {

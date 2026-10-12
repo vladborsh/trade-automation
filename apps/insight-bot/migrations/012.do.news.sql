@@ -160,6 +160,8 @@ create index news_cluster_members_news_idx on news_cluster_members (news_id);
  *
  * The three rules, strongest first:
  *   - `cashtag`  — `$BTC`. Unambiguous by construction; nobody writes `$NEAR` meaning "near".
+ *   - `pair`     — `BTCUSDT`. Equally unambiguous, and how every exchange announcement names its
+ *                  asset; without it, listing announcements tag nothing at all.
  *   - `name`     — `bitcoin`, `bitcoin cash`. Matched LONGEST FIRST and claiming its span, because
  *                  "Bitcoin Cash" contains "bitcoin" and every BCH story was tagging BTC.
  *   - `ticker`   — a bare upper-case `BTC`, and only for tickers that are not also ordinary words.
@@ -176,7 +178,7 @@ create index news_cluster_members_news_idx on news_cluster_members (news_id);
 create table news_assets (
   news_id text not null references raw_news (id) on delete cascade,
   symbol  text not null,                  -- universe.yaml id, e.g. BTCUSDT
-  via     text not null check (via in ('cashtag', 'name', 'ticker')),
+  via     text not null check (via in ('cashtag', 'pair', 'name', 'ticker')),
   matched text not null,                  -- the text that fired the rule
   primary key (news_id, symbol)
 );

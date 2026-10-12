@@ -71,3 +71,16 @@ export function afterAttempt(previous: SourceState | undefined, now: number, ok:
     consecutiveFailures: ok ? 0 : base.consecutiveFailures + 1,
   };
 }
+
+/**
+ * How old the newest item a source just served is, in hours — or null when it served nothing.
+ *
+ * Pure, and reported as a NUMBER rather than a verdict: "the newest item is 288 days old" is
+ * actionable and "stale: true" is not, and the measured age is what tells a reader whether the URL
+ * is wrong, the publisher is quiet, or the feed is an archive.
+ */
+export function newestAgeHours(items: ReadonlyArray<{ publishedAt: Date }>, now: number): number | null {
+  if (items.length === 0) return null;
+  const newest = Math.max(...items.map((i) => i.publishedAt.getTime()));
+  return (now - newest) / 3_600_000;
+}

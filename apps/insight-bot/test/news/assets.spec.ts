@@ -83,9 +83,20 @@ describe('unambiguous tickers', () => {
     expect(symbolsIn('the btc of it all')).toEqual([]);
   });
 
-  it('does not match a ticker glued inside another word', () => {
-    expect(symbolsIn('BTCUSDT perpetual funding turned negative')).toEqual([]);
+  it('does not match a ticker glued inside an unrelated word', () => {
+    // the invariant that still holds: ETH inside "ETHGlobal" is not a mention of Ether
     expect(symbolsIn('Visit ETHGlobal next month')).toEqual([]);
+    expect(symbolsIn('a BTCUSDTX typo should not match')).toEqual([]);
+  });
+
+  it('DOES match the full pair, which is how exchanges name assets', () => {
+    // changed deliberately on 2026-10-12: this used to assert [] for BTCUSDT, which meant every
+    // listing announcement ("Listing of BTCUSDT on Bybit...") tagged nothing at all — 159 articles
+    // on the live pass. The pair is unambiguous; no English word looks like BTCUSDT.
+    expect(matchAssets('BTCUSDT perpetual funding turned negative', DICT))
+      .toEqual([{ symbol: 'BTCUSDT', kind: 'pair', matched: 'BTCUSDT' }]);
+    expect(matchAssets('New listing: Listing of BTCUSDT on Bybit TradFi Perpetual', DICT))
+      .toEqual([{ symbol: 'BTCUSDT', kind: 'pair', matched: 'BTCUSDT' }]);
   });
 
   it('matches the name case-insensitively and across its hyphen', () => {

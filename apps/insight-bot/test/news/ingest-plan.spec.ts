@@ -1,3 +1,4 @@
+import { buildDictionary } from '../../src/news/assets';
 import { titleSimilarity } from '../../src/news/cluster';
 import { planIngest, type KnownNews } from '../../src/news/ingest-plan';
 import { newsId, titleHash, urlHash } from '../../src/news/normalise';
@@ -231,5 +232,52 @@ describe('cluster identity depends on ARRIVAL order — known, not assumed away'
     const replay = planIngest({ items: [early, late], known: nothingKnown, recent: [] });
     expect(replay.inserts[0].item.id).toBe(early.id);
     expect(replay.inserts[0].joins).toBeNull();
+  });
+});
+
+describe('formulaic titles about DIFFERENT assets must not cluster (live-pass finding)', () => {
+  // Real titles from the 2026-10-12 live pass, where six unrelated Bybit listings became one
+  // cluster. The words are nearly identical; only the asset differs.
+  const BTC = 'New listing: Listing of BTCUSDT on Bybit TradFi Perpetual on Oct 12, 2026';
+  const ETH = 'New listing: Listing of ETHUSDT on Bybit TradFi Perpetual on Oct 12, 2026';
+  const DICT = buildDictionary([
+    { id: 'BTCUSDT', base: 'BTC', coingecko_id: 'bitcoin' },
+    { id: 'ETHUSDT', base: 'ETH', coingecko_id: 'ethereum' },
+  ]);
+
+  it('the similarity really is above the threshold — otherwise this tests nothing', () => {
+    expect(titleSimilarity(BTC, ETH)).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('keeps them apart when their tagged assets are disjoint', () => {
+    const a = item('bybit-announcements', 'https://bybit.com/a', BTC, T0);
+    const b = item('bybit-announcements', 'https://bybit.com/b', ETH, T0 + 60_000);
+    const plan = planIngest({ items: [a, b], known: nothingKnown, recent: [], dictionary: DICT });
+    expect(plan.inserts.map((i) => i.joins?.id ?? null)).toEqual([null, null]);
+  });
+
+  it('still clusters them when the assets AGREE — the positive control', () => {
+    // the same formulaic shape about the SAME asset is genuinely one story, and must still cluster;
+    // a rule that blocked everything would pass the test above and be useless
+    const a = item('coindesk', 'https://coindesk.com/a', 'Bitcoin ETF sees record inflows today', T0);
+    const b = item('decrypt', 'https://decrypt.co/b', 'Bitcoin ETF sees record inflows', T0 + 60_000);
+    const plan = planIngest({ items: [a, b], known: nothingKnown, recent: [], dictionary: DICT });
+    expect(plan.inserts[1].joins?.id).toBe(a.id);
+  });
+
+  it('an UNTAGGED item is not blocked from clustering', () => {
+    // empty sets impose no constraint. Blocking here would turn the tagging pipeline into a silent
+    // clustering gate — today's zero-tags bug wearing a different hat.
+    const a = item('coindesk', 'https://coindesk.com/x', 'Regulator publishes long awaited guidance', T0);
+    const b = item('decrypt', 'https://decrypt.co/y', 'Regulator publishes long awaited guidance', T0 + 60_000);
+    const plan = planIngest({ items: [a, b], known: nothingKnown, recent: [], dictionary: DICT });
+    expect(plan.inserts[1].joins?.id).toBe(a.id);
+  });
+
+  it('with no dictionary at all, clustering is unchanged', () => {
+    const a = item('bybit-announcements', 'https://bybit.com/a', BTC, T0);
+    const b = item('bybit-announcements', 'https://bybit.com/b', ETH, T0 + 60_000);
+    const plan = planIngest({ items: [a, b], known: nothingKnown, recent: [] });
+    expect(plan.inserts[1].joins?.id).toBe(a.id); // the old behaviour, deliberately preserved
   });
 });
