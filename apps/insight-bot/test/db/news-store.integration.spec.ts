@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { knownNews, persistPlan, recentForClustering } from '../../src/db/pg/news-store';
+import { buildDictionary } from '../../src/news/assets';
 import { planIngest } from '../../src/news/ingest-plan';
 import { newsId, titleHash, urlHash } from '../../src/news/normalise';
 import type { NewsItem } from '../../src/news/parse';
@@ -71,7 +72,7 @@ maybeDescribe('IB-027 news store against a real database', () => {
   it('stores a first article and founds a cluster of one', async () => {
     const a = item('coindesk', 'https://coindesk.com/one', 'Regulator approves the first thing');
     const { result } = await ingest([a]);
-    expect(result).toEqual({ inserted: 1, clustersCreated: 1, clustersJoined: 0 });
+    expect(result).toEqual({ inserted: 1, clustersCreated: 1, clustersJoined: 0, assetsTagged: 0 });
 
     const [row] = await db.query<{ confirmations: number }>(
       `select c.confirmations from news_clusters c where c.first_news_id = $1`, [a.id],
@@ -129,7 +130,7 @@ maybeDescribe('IB-027 news store against a real database', () => {
   it('an unrelated story gets its own cluster', async () => {
     const d = item('cftc', 'https://cftc.gov/x', 'Commission charges firm over derivatives misconduct', T0 + 180_000);
     const { result } = await ingest([d]);
-    expect(result).toEqual({ inserted: 1, clustersCreated: 1, clustersJoined: 0 });
+    expect(result).toEqual({ inserted: 1, clustersCreated: 1, clustersJoined: 0, assetsTagged: 0 });
     const [{ n }] = await db.query<{ n: string }>(`select count(*) n from news_clusters`, []);
     expect(Number(n)).toBe(2);
   });
@@ -231,5 +232,30 @@ maybeDescribe('IB-027 news store against a real database', () => {
     await db.query(`delete from news_clusters where first_news_id = $1`, [rep]);
     await db.query(`delete from raw_news where id = $1`, [rep]);
     expect(Number((await db.query<{ n: string }>(`select count(*) n from raw_news where id = $1`, [rep]))[0].n)).toBe(0);
+  });
+
+  it('tags candidate symbols in the same transaction as the article', async () => {
+    const dictionary = buildDictionary([
+      { id: 'BTCUSDT', base: 'BTC', coingecko_id: 'bitcoin' },
+      { id: 'TRUMPUSDT', base: 'TRUMP', coingecko_id: 'official-trump' },
+    ]);
+    const a = item('decrypt', 'https://decrypt.co/tagged', 'BTC rallies as Trump comments on tariffs', T0 + 1_000_000);
+    const plan = planIngest({ items: [a], known: new Map(), recent: [] });
+    const result = await persistPlan(db, plan, { ofSources: SOURCE_COUNT, dictionary });
+
+    expect(result.assetsTagged).toBe(1);
+    const rows = await db.query<{ symbol: string; matched: string }>(
+      `select symbol, matched from news_assets where news_id = $1`, [a.id],
+    );
+    // BTC on the bare ticker; TRUMP is a surname here and must NOT be tagged, which is the whole
+    // point of the prefilter's ambiguity rule
+    expect(rows).toEqual([{ symbol: 'BTCUSDT', matched: 'BTC' }]);
+  });
+
+  it('tags nothing when there is no dictionary, rather than tagging against an empty one', async () => {
+    const a = item('decrypt', 'https://decrypt.co/untagged', 'BTC rallies again', T0 + 1_100_000);
+    const plan = planIngest({ items: [a], known: new Map(), recent: [] });
+    const result = await persistPlan(db, plan, { ofSources: SOURCE_COUNT });
+    expect(result.assetsTagged).toBe(0);
   });
 });

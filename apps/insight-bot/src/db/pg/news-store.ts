@@ -1,4 +1,6 @@
 import type { Db } from '../db.port';
+import type { AssetDictionaryEntry } from '../../news/assets';
+import { matchAssets } from '../../news/assets';
 import type { ClusterCandidate } from '../../news/cluster';
 import type { IngestPlan, KnownNews } from '../../news/ingest-plan';
 
@@ -60,6 +62,14 @@ export interface PersistResult {
   inserted: number;
   clustersCreated: number;
   clustersJoined: number;
+  /** Rows written to `news_assets` — candidate symbols, not a classification. */
+  assetsTagged: number;
+}
+
+/** The universe to tag against. Empty disables tagging rather than tagging nothing silently. */
+export interface PersistOptions {
+  ofSources: number;
+  dictionary?: readonly AssetDictionaryEntry[];
 }
 
 /**
@@ -73,8 +83,9 @@ export interface PersistResult {
  * processes polling the same source concurrently would otherwise race, and the unique index on
  * `(source, url_hash)` would abort the transaction and lose the whole pass rather than one row.
  */
-export async function persistPlan(db: Db, plan: IngestPlan, ofSources: number): Promise<PersistResult> {
-  const result: PersistResult = { inserted: 0, clustersCreated: 0, clustersJoined: 0 };
+export async function persistPlan(db: Db, plan: IngestPlan, options: PersistOptions | number): Promise<PersistResult> {
+  const { ofSources, dictionary } = typeof options === 'number' ? { ofSources: options, dictionary: undefined } : options;
+  const result: PersistResult = { inserted: 0, clustersCreated: 0, clustersJoined: 0, assetsTagged: 0 };
   if (plan.inserts.length === 0) return result;
 
   await db.transaction(async (tx) => {
@@ -89,6 +100,20 @@ export async function persistPlan(db: Db, plan: IngestPlan, ofSources: number): 
       );
       if (inserted.length === 0) continue; // another writer got there first
       result.inserted += 1;
+
+      // Candidate symbols, inside the same transaction as the article: a tagged article with no
+      // tags and a genuinely untagged one are indistinguishable afterwards, so they must not be
+      // able to come apart.
+      if (dictionary !== undefined && dictionary.length > 0) {
+        for (const match of matchAssets(`${item.title}\n${item.body ?? ''}`, dictionary)) {
+          await tx.query(
+            `insert into news_assets (news_id, symbol, matched) values ($1, $2, $3)
+             on conflict do nothing`,
+            [item.id, match.symbol, match.matched],
+          );
+          result.assetsTagged += 1;
+        }
+      }
 
       if (planned.joins === null) {
         const [cluster] = await tx.query<{ id: string }>(

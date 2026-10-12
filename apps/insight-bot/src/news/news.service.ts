@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
+import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
 import { knownNews, persistPlan, recentForClustering } from '../db/pg/news-store';
 import { CLUSTER_WINDOW_MS } from './cluster';
@@ -6,6 +7,7 @@ import { planIngest } from './ingest-plan';
 import { NewsClient } from './news.client';
 import { JSON_PARSERS } from './parse-json';
 import { parseFeed, type NewsItem } from './parse';
+import { buildDictionary, type AssetDictionaryEntry } from './assets';
 import { afterAttempt, dueSources, type SourceState } from './schedule';
 import { NEWS_SOURCES, type NewsSource } from './sources';
 
@@ -52,9 +54,22 @@ export class NewsService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(DB) private readonly db: Db | null,
     @Optional() client?: NewsClient,
     @Optional() sources?: readonly NewsSource[],
+    @Optional() private readonly config?: AppConfigService,
   ) {
     this.client = client ?? new NewsClient();
     this.sources = sources ?? NEWS_SOURCES;
+  }
+
+  /**
+   * The universe to tag articles against, built once per pass from config.
+   *
+   * Empty when there is no config (the specs' path): `persistPlan` then tags nothing rather than
+   * tagging against an empty dictionary, which would look identical to "this story mentions no
+   * asset" — the distinction §10's prefilter exists to make.
+   */
+  private dictionary(): AssetDictionaryEntry[] {
+    const symbols = this.config?.symbols ?? [];
+    return buildDictionary(symbols.map((s) => ({ id: s.id, base: s.base, coingecko_id: s.coingecko_id })));
   }
 
   onApplicationBootstrap(): void {
@@ -126,12 +141,13 @@ export class NewsService implements OnApplicationBootstrap, OnModuleDestroy {
         // the clustering window is 24 h and applied by chooseCluster; this must not return less
         recent: await recentForClustering(db, new Date(now - Math.max(CLUSTER_WINDOW_MS, DEDUPE_WINDOW_MS))),
       });
-      const result = await persistPlan(db, plan, this.sources.length);
+      const result = await persistPlan(db, plan, { ofSources: this.sources.length, dictionary: this.dictionary() });
       this.state.set(source.id, afterAttempt(this.state.get(source.id), now, true));
 
       if (result.inserted > 0) {
         this.logger.log(
-          `${source.id}: +${result.inserted} (${result.clustersCreated} new clusters, ${result.clustersJoined} joined)`,
+          `${source.id}: +${result.inserted} (${result.clustersCreated} new clusters, ` +
+          `${result.clustersJoined} joined, ${result.assetsTagged} asset tags)`,
         );
       }
     } catch (error) {
