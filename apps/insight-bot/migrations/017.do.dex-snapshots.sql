@@ -1,17 +1,28 @@
 -- IB-028 — DEX pool snapshots (architecture/insight-bot-system-design.md §10, §13 p.4).
 --
--- Migration 016, allocated by the Tech Lead, who now keeps the ledger. It was 013 and moved for a
--- reason worth recording, because it is the mirror of the hazard this file's sibling warned about:
--- numbers were allocated 012/013/014/015 in order, and then **015 merged before 013 and 014
--- existed**. Master now holds 001-012 and 015, so any database migrated from master reaches
--- version 15 and would never apply a later 013 or 014 — postgrator only runs versions ABOVE the
--- current one.
+-- Migration 017, and the number was taken by reading this directory, not from a promise.
 --
--- So allocating in order does not prevent the skip; only merging in order would, and merges are
--- not ordered. The invariant that actually holds is therefore **not contiguity** — 015 is merged
--- and the 013/014 hole is permanent — but: no duplicates, and no new migration numbered at or
--- below the highest version already on master. A number nothing will ever claim cannot be skipped,
--- which is why the hole is harmless and this renumber is not optional.
+-- It has been 013, then 016, now 017, and each move taught the same thing from a different angle:
+--
+-- 1. **013 -> 016.** Numbers were allocated 012/013/014/015 in order, and then **015 merged before
+--    013 and 014 existed**. postgrator runs only versions ABOVE the current one, so any database
+--    migrated from master reached 15 and would never have applied a later 013 or 014. Allocating in
+--    order does not prevent that; only merging in order would, and merges are not ordered. 013 and
+--    014 are burned permanently, which is harmless precisely because nothing will ever claim them.
+--
+-- 2. **016 -> 017.** master took 016 for the frame-spec fingerprint while this branch held its own
+--    016, so the uniqueness guard fired on the first rebase. That firing **is** the rename signal,
+--    not an obstacle: without it postgrator would refuse EVERY migration, not just the colliding
+--    one, and the failure would land on whoever rebased next.
+--
+-- So the invariant is not contiguity — 015 merged early and the hole is permanent — but: **no
+-- duplicate versions, and no new migration numbered at or below the highest version already on
+-- master.** A number can never appear below a version some database has already passed.
+--
+-- And the corollary, which is why this comment does not name a reserved number: **no number is
+-- reserved for anybody.** The number is `master_highest + 1` read from the tree you are about to
+-- fast-forward into, taken immediately before the merge. A reservation held in anyone's head is
+-- how 013 and 014 got burned in the first place.
 --
 -- **Collection only. No filtering, no alerts, no scoring.** The point of this table is a history of
 -- every candidate pool INCLUDING the ones a later filter would throw away, so that filter can be
