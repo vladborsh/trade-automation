@@ -6,8 +6,10 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import {
-  MAX_SECURITY_ATTEMPTS, noteToken, tokensDueSecurity, writePools, writeSecurityFailure, writeTokenSecurity,
+  MAX_SECURITY_ATTEMPTS, noteToken, tokensDueSecurity, writePairSnapshots, writePools,
+  writeSecurityFailure, writeTokenSecurity,
 } from '../../src/db/pg/dex-store';
+import { mapPairs } from '../../src/dex/dexscreener';
 import { mapTokenSecurity } from '../../src/dex/goplus';
 import { mapPools } from '../../src/dex/mappers';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
@@ -80,6 +82,28 @@ maybeDescribe('IB-028 dex snapshots against a real database', () => {
   it('records the same pool under both listings, because they are different facts', async () => {
     const trending = mapPools(POOLS, 'solana', 'trending_pools', T0);
     expect(await writePools(db, trending.rows)).toBe(20);
+  });
+
+  it('stores DexScreener\'s EVM pairs with the CANONICAL address, not the venue\'s spelling', async () => {
+    // the Base fixture is the one that actually contains EIP-55 spellings, so this is the write
+    // path where a non-canonical value would have arrived — and the constraint would refuse it
+    const body = readFileSync(join(__dirname, '..', 'fixtures', 'dex', 'dexscreener-pairs-base.json'), 'utf8');
+    const requested = (JSON.parse(
+      readFileSync(join(__dirname, '..', 'fixtures', 'dex', 'dexscreener-requested-base.json'), 'utf8'),
+    ) as { requested: string[] }).requested;
+    const venueSpellings = (JSON.parse(body).pairs as Array<{ pairAddress: string }>).map((p) => p.pairAddress);
+    expect(venueSpellings.some((a) => a !== a.toLowerCase())).toBe(true); // the premise
+
+    const { rows } = mapPairs(body, 'base', requested, T0);
+    expect(await writePairSnapshots(db, rows)).toBe(rows.length);
+    const stored = await db.query<{ address: string; pool_id: string }>(
+      `select address, pool_id from dex_pair_snapshots where network = 'base'`, [],
+    );
+    expect(stored).toHaveLength(rows.length);
+    for (const row of stored) {
+      expect(row.address).toBe(row.address.toLowerCase());
+      expect(row.pool_id).toBe(row.pool_id.toLowerCase());
+    }
   });
 
   it('stores a null market cap as NULL, end to end', async () => {
@@ -240,6 +264,41 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     // and a FAILURE at one stage does not make another stage due early either
     await writeSecurityFailure(db, T3.tokenId, 'h6', new Date(T0.getTime() + 7 * 3_600_000), 'solana', 'HTTP 429');
     expect(due(await tokensDueSecurity(db, 'h24', new Date(T0.getTime() + 8 * 3_600_000)), T3.tokenId)).toBe(false);
+  });
+
+  /*
+   * The canonical stored form, as the DATABASE refuses it rather than as a convention.
+   *
+   * Attempting the forbidden insert is the only way to know the constraint works and not merely
+   * that it compiled — and `unique (network, address)` is the reason it matters: an index cannot
+   * see case-equivalence, so without the check two spellings of one EVM address would be two
+   * tokens, with two first_seen_at instants and two GoPlus budgets.
+   */
+  it('REFUSES a non-canonical EVM address, so the unique index means what it claims', async () => {
+    await expect(noteToken(db, {
+      tokenId: 'base_0xAbCd', network: 'base', address: '0xAbCd', symbol: null, name: null,
+    }, T0)).rejects.toThrow(/dex_tokens_canonical_address/);
+  });
+
+  it('accepts the SAME address lower-cased — the positive control for that refusal', async () => {
+    expect(await noteToken(db, {
+      tokenId: 'base_0xabcd', network: 'base', address: '0xabcd', symbol: null, name: null,
+    }, T0)).toBe(true);
+  });
+
+  it('accepts a mixed-case SOLANA address, because base58 case is meaningful', async () => {
+    // folding here would merge two different addresses: the exemption is correctness, not laziness
+    expect(await noteToken(db, {
+      tokenId: 'solana_MiXeDcAsE', network: 'solana', address: 'MiXeDcAsE', symbol: null, name: null,
+    }, T0)).toBe(true);
+  });
+
+  it('refuses a non-canonical ID even when the address column is canonical', async () => {
+    // the id is what joins to dex_token_security, so canonicalising only the address would put the
+    // inconsistency back in the column that actually joins
+    await expect(noteToken(db, {
+      tokenId: 'base_0xEEFF', network: 'base', address: '0xeeff', symbol: null, name: null,
+    }, T0)).rejects.toThrow(/dex_tokens_canonical_address/);
   });
 
   it('keeps the whole raw response, so an unmodelled field is not lost', async () => {

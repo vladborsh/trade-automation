@@ -1,3 +1,4 @@
+import { canonicalAddress } from './address';
 import { numberOrNull, type Network } from './mappers';
 
 /**
@@ -63,10 +64,11 @@ export interface PairMapResult {
   skipped: Array<{ reason: string; sample: string }>;
 }
 
-/** EVM hex is case-insensitive; Solana base58 is not. The one place that difference is decided. */
-export function addressKey(network: Network, address: string): string {
-  return network === 'solana' ? address : address.toLowerCase();
-}
+/**
+ * The lookup key, which is also the canonical stored form — deliberately the same function, so the
+ * key a row is found by and the string it is stored as cannot drift apart. See `address.ts`.
+ */
+export const addressKey = canonicalAddress;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -137,13 +139,15 @@ export function mapPairs(
       missing.push(asked);
       continue;
     }
-    const address = pair.pairAddress as string;
+    // DexScreener's own spelling goes to `raw`; the column gets the canonical form, or the unique
+    // and join guarantees downstream would rest on which venue happened to write the row first
+    const address = canonicalAddress(network, pair.pairAddress as string);
     const createdMs = numberOrNull(pair.pairCreatedAt);
     const liquidity = asRecord(pair.liquidity);
     rows.push({
       // built from the address we ASKED about, so this row joins to the dex_pools row it describes
       // even when DexScreener spells the address with different capitalisation
-      poolId: `${network}_${asked}`,
+      poolId: `${network}_${canonicalAddress(network, asked)}`,
       network,
       address,
       observedAt,

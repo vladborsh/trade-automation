@@ -15,6 +15,8 @@
  * strings, and `Number('')` is 0, which is exactly the silent conversion this file exists to stop.
  */
 
+import { canonicalAddress, canonicalId } from './address';
+
 export type Network = 'solana' | 'base' | 'bsc' | 'eth';
 export type Listing = 'new_pools' | 'trending_pools';
 
@@ -122,14 +124,19 @@ export function mapPools(
     const change = a['price_change_percentage'] as Record<string, unknown> | undefined;
     const txns = a['transactions'] as Record<string, Record<string, unknown>> | undefined;
 
+    const baseTokenId = stringOrNull(rel['base_token']?.data?.id);
+    const quoteTokenId = stringOrNull(rel['quote_token']?.data?.id);
     rows.push({
-      poolId,
+      // canonical, not verbatim: GeckoTerminal lower-cases EVM addresses today, which makes this a
+      // no-op and keeps it a no-op the day it stops. See `address.ts` for why that is lossless on
+      // EVM and would be a correctness bug on Solana.
+      poolId: canonicalId(network, poolId),
       network,
-      address,
+      address: canonicalAddress(network, address),
       dex: stringOrNull(rel['dex']?.data?.id),
       name: stringOrNull(a['name']),
-      baseTokenId: stringOrNull(rel['base_token']?.data?.id),
-      quoteTokenId: stringOrNull(rel['quote_token']?.data?.id),
+      baseTokenId: baseTokenId === null ? null : canonicalId(network, baseTokenId),
+      quoteTokenId: quoteTokenId === null ? null : canonicalId(network, quoteTokenId),
       poolCreatedAt: dateOrNull(a['pool_created_at']),
       listing,
       observedAt,

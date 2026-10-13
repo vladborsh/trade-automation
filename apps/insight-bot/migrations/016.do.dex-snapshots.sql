@@ -31,6 +31,34 @@
 -- meaningful (a pool with no transactions in the window) it is stored as 0 and is distinguishable
 -- precisely because the unknown case is null.
 
+/*
+ * ## ONE canonical stored form per chain, enforced rather than agreed
+ *
+ * The addresses here are join keys, and a join key with two spellings is the defect this file
+ * already fixes at ingest: GeckoTerminal lower-cases EVM addresses, DexScreener returns them
+ * EIP-55 checksummed, and an exact-string join silently drops 10-15 % of EVM pairs (measured
+ * 2026-10-12; see `src/dex/dexscreener.ts`).
+ *
+ * Fixing the join left the STORED form open, and that hole is worse, because `dex_tokens` carries
+ * `unique (network, address)` and **a unique index cannot see case-equivalence**: two spellings of
+ * one EVM address satisfy it and give two rows for one token. It holds today only because every
+ * address arrives from GeckoTerminal; it breaks silently the first time one arrives from
+ * DexScreener, from GoPlus's echo, or from a hand-typed query.
+ *
+ * So every address and id column below carries
+ *
+ *     check (network = 'solana' or <col> = lower(<col>))
+ *
+ * A non-canonical EVM value cannot be stored, `unique (network, address)` starts meaning what it
+ * claims, and the next person to write a join does not need to know EIP-55 exists.
+ *
+ * **Solana is exempt, and that is not laziness.** Base58 is case-SENSITIVE — `A` and `a` are
+ * different digits of different addresses — so there is no canonical form to move to and folding
+ * would be a correctness bug. Canonicalising is LOSSLESS on EVM, which is the only reason this is
+ * available here: hex case carries no information, EIP-55 is a typo detector layered on a
+ * case-insensitive string, and the venue's own spelling is kept in `raw` regardless.
+ */
+
 create table dex_pools (
   -- GeckoTerminal's own id, `<network>_<address>`, kept verbatim: it is the join key back to the
   -- API and inventing our own would mean maintaining a mapping nobody asked for.
@@ -58,13 +86,24 @@ create table dex_pools (
   txns_h24_buys       integer,
   txns_h24_sells      integer,
 
-  primary key (pool_id, listing, observed_at)
+  primary key (pool_id, listing, observed_at),
+  -- see the canonical-form note above; EVM only, because base58 case is meaningful
+  constraint dex_pools_canonical_address
+    check (network = 'solana' or (address = lower(address) and pool_id = lower(pool_id)))
 ) partition by range (observed_at);
 
 comment on table dex_pools is
   'IB-028. One row per pool per listing per poll — a history of candidates INCLUDING those a later '
   'filter would drop, so the filter can be judged against what it discarded. Every reading is '
   'nullable: absent is not zero.';
+
+comment on column dex_pools.address is
+  'Canonical form: lower-case on EVM, verbatim on Solana (base58 is case-sensitive). Enforced by '
+  'dex_pools_canonical_address; see the note above the table.';
+comment on column dex_pools.market_cap_usd is
+  'ABSENT IS NOT ZERO. All 20 pools of the recorded new_pools page carry market_cap_usd: null — '
+  'GeckoTerminal does not know the cap of a token minted minutes ago, so unknown is the NORM here. '
+  'A coalesce(…, 0) would report twenty tokens worth nothing.';
 
 create index dex_pools_network_idx on dex_pools (network, observed_at desc);
 create index dex_pools_address_idx on dex_pools (address, observed_at desc);
@@ -88,8 +127,16 @@ create table dex_tokens (
   symbol        text,
   name          text,
   first_seen_at timestamptz not null,
-  unique (network, address)
+  unique (network, address),
+  -- without this the unique index above cannot do its job: two spellings of one EVM address would
+  -- satisfy it and we would hold two token rows, two first_seen_at instants and two GoPlus budgets
+  constraint dex_tokens_canonical_address
+    check (network = 'solana' or (address = lower(address) and token_id = lower(token_id)))
 );
+
+comment on column dex_tokens.address is
+  'Canonical form: lower-case on EVM, verbatim on Solana (base58 is case-sensitive). Enforced by '
+  'dex_tokens_canonical_address, because unique (network, address) cannot see case-equivalence.';
 
 /*
  * GoPlus answers in TWO INCOMPATIBLE SHAPES, measured 2026-10-12 against the live API, and the
@@ -240,13 +287,25 @@ create table dex_pair_snapshots (
   price_change_pct_h24 numeric,
 
   raw jsonb not null,
-  primary key (pool_id, observed_at)
+  primary key (pool_id, observed_at),
+  -- DexScreener is the venue that spells EVM addresses differently, so this is the column where a
+  -- non-canonical value would actually have arrived; `raw` keeps the venue's own spelling
+  constraint dex_pair_snapshots_canonical_address
+    check (network = 'solana' or (address = lower(address) and pool_id = lower(pool_id)))
 ) partition by range (observed_at);
 
 comment on table dex_pair_snapshots is
   'IB-028. DexScreener''s reading of a pool, one row per pool per poll. Separate from dex_pools '
   'because it is a different venue at a different instant, and their disagreement is the point. '
   'A pool DexScreener does not know has NO ROW — absence is not a row of zeros.';
+
+comment on column dex_pair_snapshots.liquidity_usd is
+  'ABSENT IS NOT ZERO, and absent is the common case: measured 2026-10-12, only 1 of 20 and 6 of '
+  '19 new Solana pairs carried a liquidity object at all (19 of 20 on Base). A coalesce(…, 0) here '
+  'would report most new Solana pools as having no liquidity. It is the field §10 names first.';
+comment on column dex_pair_snapshots.address is
+  'Canonical form: lower-case on EVM, verbatim on Solana. DexScreener sends EIP-55 checksummed '
+  'addresses; its own spelling is kept in raw.';
 
 create index dex_pair_snapshots_network_idx on dex_pair_snapshots (network, observed_at desc);
 
