@@ -91,28 +91,66 @@ create table dex_tokens (
   unique (network, address)
 );
 
+/*
+ * GoPlus answers in TWO INCOMPATIBLE SHAPES, measured 2026-10-12 against the live API, and the
+ * schema says so rather than pretending one set of columns fits both:
+ *
+ *   solana  -> mintable, freezable, closable, balance_mutable_authority, metadata_mutable,
+ *              transfer_fee, non_transferable, default_account_state, creators, total_supply
+ *   evm     -> is_open_source, is_in_dex, buy_tax, sell_tax, holder_count, creator_address,
+ *              creator_balance, creator_percent, cannot_buy, honeypot_with_same_creator,
+ *              token_name, token_symbol, total_supply
+ *
+ * My first draft of this table had `is_honeypot`, `is_proxy` and `owner_can_change_balance`. **None
+ * of those three appears in either response** for the tokens probed — they were taken from GoPlus
+ * documentation rather than from the API, which is the mistake the live pass exists to catch.
+ *
+ * So:
+ *
+ * - **`raw` is the record.** Always stored, always complete. A field we do not model yet is kept
+ *   rather than lost, and a disagreement later is audited against the source instead of our mapping.
+ * - **`chain_family` says which shape to expect**, so a NULL in an EVM-only column for a Solana
+ *   token reads as NOT APPLICABLE rather than NOT TOLD. Those are different facts and a reader
+ *   cannot tell them apart without this column.
+ * - **A field ABSENT from the response is not the same as one present and empty.** `buy_tax` comes
+ *   back as the empty string `''` on a fresh EVM token, and `Number('')` is 0 — a 0 % tax claim
+ *   where GoPlus said nothing at all. Every numeric column here is nullable and written through
+ *   `numberOrNull`, which refuses `''`.
+ */
 create table dex_token_security (
-  token_id    text        not null references dex_tokens (token_id) on delete cascade,
+  token_id     text        not null references dex_tokens (token_id) on delete cascade,
   -- which of the three §10 checks this is; the schedule is part of the measurement
-  at_stage    text        not null check (at_stage in ('first_seen','h6','h24')),
-  checked_at  timestamptz not null,
-  -- Every flag nullable and three-valued in effect: true, false, or "GoPlus did not say".
-  is_honeypot          boolean,
-  is_open_source       boolean,
-  is_proxy             boolean,
-  is_mintable          boolean,
-  owner_can_change_balance boolean,
-  buy_tax              numeric,
-  sell_tax             numeric,
-  holder_count         integer,
-  -- What the provider actually returned, so a flag we do not model yet is not lost and a
-  -- disagreement later can be audited against the source rather than against our mapping.
-  raw                  jsonb,
+  at_stage     text        not null check (at_stage in ('first_seen','h6','h24')),
+  checked_at   timestamptz not null,
+  chain_family text        not null check (chain_family in ('solana','evm')),
+
+  -- solana shape; null on an EVM token means NOT APPLICABLE (see chain_family)
+  mintable                  boolean,
+  freezable                 boolean,
+  closable                  boolean,
+  metadata_mutable          boolean,
+  balance_mutable_authority boolean,
+
+  -- evm shape; null on a Solana token means NOT APPLICABLE
+  is_open_source boolean,
+  cannot_buy     boolean,
+  buy_tax        numeric,
+  sell_tax       numeric,
+  holder_count   integer,
+
+  -- both
+  total_supply numeric,
+
+  -- the whole response, always
+  raw jsonb not null,
   primary key (token_id, at_stage)
 );
 
 comment on column dex_token_security.checked_at is
   'When GoPlus was asked. A row exists only once asked; "not yet asked" is the ABSENCE of a row, '
   'and "asked and told nothing" is a row with null flags. The two must not be confused.';
+comment on column dex_token_security.chain_family is
+  'Which response shape this row came from. Without it a NULL in buy_tax cannot be told apart from '
+  '"this chain has no such concept", which is the difference between unknown and not applicable.';
 
 create index dex_token_security_stage_idx on dex_token_security (at_stage, checked_at desc);

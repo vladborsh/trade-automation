@@ -59,12 +59,54 @@ Within a cycle the eight calls are spaced **75 seconds apart** rather than issue
 is what respects the burst limit — eight requests fired at once would take the 429 on the fourth,
 and three of the four networks would silently collect nothing.
 
-## Other providers
+## DexScreener — measured 2026-10-12
 
-| provider | what we ask for | rate |
-|---|---|---|
-| DexScreener | pair details for pools seen | to be measured before the poller lands |
-| GoPlus | token security at first sight, +6 h, +24 h | to be measured before the poller lands |
+**It batches, and that changes the budget by 20x.** `/latest/dex/pairs/{chain}/{a,b,c,...}` accepts
+the whole page of 20 pool addresses in one request and returns 20 pairs. The estimate of "20 pools a
+pass is 2 req/min" assumed one request per pool; with batching it is **one request per network per
+cycle**.
 
-Neither is implemented yet, and neither will be until its limit is measured the same way. Writing
-"~N/min, per the docs" into a comment is the thing this file exists to prevent.
+| gap | attempts | successes | refused | median latency |
+|---|---|---|---|---|
+| 1000 ms | 28 (56/min) | 28 (56/min) | 0 | 43 ms |
+| 500 ms | 54 (107/min) | 54 (107/min) | **0** | 36 ms |
+
+Successes track attempts exactly — which is also the control that proves GeckoTerminal's flat ~5/min
+was a venue ceiling and not our own serialisation. Tolerated: **at least 107/min**.
+
+**Our budget: 4 requests per 10-minute cycle = 0.4/min**, under 0.4 % of what it tolerates.
+
+## GoPlus — measured 2026-10-12
+
+| gap | attempts | successes | refused | median latency |
+|---|---|---|---|---|
+| 2000 ms | 14 (26/min) | 14 (26/min) | 0 | 269 ms |
+| 1000 ms | 24 (46/min) | 24 (46/min) | **0** | 265 ms |
+
+Tolerated: **at least 46/min**.
+
+**It does NOT batch on Solana.** `contract_addresses=a,b,c,d` with four VERIFIED-distinct tokens
+returns exactly one result. (Checked the inputs were distinct before concluding — the first probe
+used five addresses that might have shared a base token, and "it does not batch" and "I sent the
+same token five times" produce identical output.)
+
+So GoPlus is **one request per token**, which makes it the dominant consumer:
+
+```
+first sight:  <= 20 new tokens x 4 networks per cycle = <= 80 req / 10 min = 8/min  (worst case)
+re-checks:    each token again at +6 h and +24 h
+```
+
+8/min against a measured 46/min is ~17 %. The worst case assumes every pool in every page is a new
+token every cycle, which it is not — tokens repeat across cycles and across pools, and only a
+first sighting needs the first-sight call.
+
+## Three APIs, three budgets
+
+| provider | our rate | measured ceiling | share |
+|---|---|---|---|
+| GeckoTerminal | 0.8/min | ~5/min (hard) | 16 % |
+| DexScreener | 0.4/min | >= 107/min | < 0.4 % |
+| GoPlus | <= 8/min worst case | >= 46/min | <= 17 % |
+
+GeckoTerminal is the binding constraint and the only one with a ceiling low enough to matter.
