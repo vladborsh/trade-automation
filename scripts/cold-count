@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+#
+# cold-count [app-dir] — produce the test count that may appear in a merge report.
+#
+# ## Why this is not just `npx jest`
+#
+# A test result is a measurement of (code + environment), and it is easy to report it as a
+# measurement of code. Three environment layers falsified a result on 2026-10-12 alone:
+#
+#   absent libs/*/dist   -> false RED:   "master is broken", suites failing to compile
+#   the wall clock       -> false GREEN: a spec gated on 00:10 UTC passed 23h50m a day
+#   ts-jest's cache      -> false GREEN: a type-check pass cached ACROSS a dependency change,
+#                                        so a spec with a real type error kept its cached pass
+#
+# Warm runs are fine while iterating — a cold run every time is a tax nobody pays, and a rule
+# nobody pays is not a rule. This is for the number someone else ACTS on.
+#
+# ## Why it lives in the repo
+#
+# It was first written under a job-scoped tmp directory, which ties a tool that gates merges to
+# the lifetime of one agent job. Committed here it is versioned alongside the code whose counts
+# it produces, survives any job id, and is reviewable like anything else.
+#
+# Usage:
+#   DATABASE_URL=postgres://localhost:5432/insight_<slot> scripts/cold-count [apps/insight-bot]
+#
+set -euo pipefail
+
+APP="${1:-apps/insight-bot}"
+
+# DATABASE_URL is REQUIRED and deliberately has no default.
+#
+# It briefly defaulted to one developer's slot, which would have pointed the DB-backed specs —
+# they create, migrate and DROP scratch databases — at somebody else's data. A default cannot
+# fail, and a connection string is the worst place for one because the failure is silent and
+# lands where the person running it cannot see it. Same reasoning as the NOT NULL columns in
+# migrations 015 and 016.
+if [ -z "${DATABASE_URL:-}" ]; then
+  cat >&2 <<'USAGE'
+cold-count: DATABASE_URL is not set, and there is deliberately no default.
+
+  Use YOUR slot's database (the table is in AGENTS.md):
+    DATABASE_URL=postgres://localhost:5432/insight_<your-slot> scripts/cold-count [app-dir]
+
+  There is no fallback: a wrong connection string fails silently and in someone
+  else's data, because the DB specs create, migrate and drop databases.
+USAGE
+  exit 2
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+[ -d "$APP" ] || { echo "cold-count: no such app directory: $APP" >&2; exit 2; }
+
+LOG_DIR="${COLD_COUNT_LOG_DIR:-$ROOT/.cold-count}"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/$(basename "$APP")-$(date -u +%Y%m%dT%H%M%SZ).log"
+
+echo "cold-count: clearing build state (tsbuildinfo across apps and libs)"
+rm -f apps/*/tsconfig.tsbuildinfo libs/*/tsconfig.tsbuildinfo
+
+echo "cold-count: rebuilding libs so no dist is stale or absent"
+npm run build --workspace=libs/contracts >/dev/null 2>&1 \
+  || { echo "cold-count: libs/contracts build FAILED — fix that before reading any count" >&2; exit 1; }
+
+cd "$ROOT/$APP"
+npx jest --clearCache >/dev/null 2>&1 || true
+
+echo "cold-count: running $APP"
+set +e
+npx jest 2>&1 | tee "$LOG" >/dev/null
+set -e
+
+# The compile trap: a suite that fails to RUN appears only in the "Test Suites:" line while
+# "Tests:" quietly gets smaller, so a broken build reads as a slightly shorter green.
+if grep -q "failed to run" "$LOG"; then
+  echo "cold-count: SUITES FAILED TO COMPILE — the Tests count below is NOT the whole suite:" >&2
+  grep -E "^FAIL" "$LOG" | sort -u >&2
+fi
+
+grep -E "^Test Suites:|^Tests:" "$LOG"
+echo "cold-count: UTC $(date -u '+%Y-%m-%dT%H:%M:%SZ')  db=$(basename "$DATABASE_URL")  log=${LOG#"$ROOT"/}"
+echo "cold-count: PASTE these lines into the report — retyping drops the instant and the db."

@@ -71,3 +71,6 @@ research/coinm-carry/data
 
 research/spot-lead/data
 research/spot-lead/cache
+
+# cold-count run logs (scripts/cold-count)
+.cold-count/
