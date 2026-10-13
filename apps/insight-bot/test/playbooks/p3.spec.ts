@@ -51,6 +51,10 @@ function frame(overrides: Record<string, WebFeatureValue> = {}): WebFeatureFrame
     amendedKeys: [],
     computedMode: 'live',
     computedAt: 1_790_000_100,
+    // IB-049: a frame carries the spec fingerprint it was computed under, so a retroactive version
+    // claim is contradicted by the rows themselves. Required, with no default — which is why this
+    // fixture failed to compile the moment the field landed rather than silently omitting it.
+    specFingerprint: '14f15ddd',
   } as WebFeatureFrame;
 }
 
