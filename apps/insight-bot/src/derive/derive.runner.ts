@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { Writers } from '../collectors/writers/batch-writer';
 import { DB, type Db } from '../db/db.port';
 import { DeriveService } from './derive.service';
+import { neverReject } from '../ops/never-reject';
 
 /** §8.1: the BarClock ticks at every UTC minute + 5 s grace, so the closing 1m row has landed. */
 export const GRACE_MS = 5_000;
@@ -39,7 +40,10 @@ export class DeriveRunner implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.stopped) return;
     const now = Date.now();
     const nextMinute = Math.floor(now / MINUTE_MS) * MINUTE_MS + MINUTE_MS;
-    this.timer = setTimeout(() => void this.tick(), nextMinute + GRACE_MS - now);
+    this.timer = setTimeout(
+      () => neverReject(this.logger, 'derive tick', () => this.tick()),
+      nextMinute + GRACE_MS - now,
+    );
     this.timer.unref?.();
   }
 

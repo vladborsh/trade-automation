@@ -5,6 +5,7 @@ import { DB, type Db } from '../db/db.port';
 import { candleCoverage, gapsForDay, saveGapReport, slotCoverage } from '../db/pg/collector-reads';
 import { buildGapReport, renderGapReport, type GapReport } from './gap-report';
 import { TelegramSender } from '../delivery/telegram-sender';
+import { neverReject } from './never-reject';
 
 const DAY_MS = 86_400_000;
 /** §6.2: "at 00:10 UTC" — ten minutes of slack so the last minute's writes have landed. */
@@ -35,7 +36,7 @@ export class GapReportService implements OnApplicationBootstrap, OnModuleDestroy
   }
 
   onApplicationBootstrap(): void {
-    this.timer = setInterval(() => void this.maybeRun(), CHECK_MS);
+    this.timer = setInterval(() => neverReject(this.logger, 'gap report', () => this.maybeRun()), CHECK_MS);
     this.timer.unref?.();
   }
 

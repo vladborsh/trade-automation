@@ -10,6 +10,7 @@ import { mapPools, type Network } from './mappers';
 import {
   afterAttempt, keyOf, nextDue, SECURITY_STAGES, type Call, type CallState, type SecurityStage,
 } from './schedule';
+import { neverReject } from '../ops/never-reject';
 
 /**
  * IB-028 — the DEX snapshot collector (§10, §13 p.4).
@@ -76,8 +77,8 @@ export class DexService implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.warn('no database — DEX snapshots disabled');
       return;
     }
-    void this.tick();
-    this.timer = setInterval(() => void this.tick(), TICK_MS);
+    neverReject(this.logger, 'dex tick', () => this.tick());
+    this.timer = setInterval(() => neverReject(this.logger, 'dex tick', () => this.tick()), TICK_MS);
     this.timer.unref?.();
     this.logger.log('DEX snapshots started (GeckoTerminal 0.8/min, DexScreener 0.8/min, GoPlus <= 4/min)');
   }

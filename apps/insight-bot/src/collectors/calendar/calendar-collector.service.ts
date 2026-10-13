@@ -9,6 +9,7 @@ import { FEED_CLIENT, FeedClient } from './feed-client.token';
 import { calendarEventRow } from './calendar-row';
 import { nextPreviousActuals } from './next-previous-actuals';
 import { HARD_POLL_FLOOR_MS, isPollDue, PollCadenceConfig } from './poll-cadence';
+import { neverReject } from '../../ops/never-reject';
 
 export const CALENDAR_STREAM_ID = 'calendar/forexfactory';
 
@@ -63,7 +64,7 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
     // §3.4: boot polls immediately, before the loop starts. The instant is read HERE, at the
     // origin, and passed down — see `poll`'s signature.
     await this.poll(Date.now());
-    this.timer = setInterval(() => void this.tick(), HARD_POLL_FLOOR_MS);
+    this.timer = setInterval(() => neverReject(this.logger, 'calendar tick', () => this.tick()), HARD_POLL_FLOOR_MS);
   }
 
   onModuleDestroy(): void {

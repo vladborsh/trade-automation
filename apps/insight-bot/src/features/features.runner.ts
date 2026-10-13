@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { DB, type Db } from '../db/db.port';
 import { FeaturePassService } from './feature-pass.service';
 import { type Attempt, isAttemptStillDue, nextAttempt } from './recheck-schedule';
+import { neverReject } from '../ops/never-reject';
 
 /**
  * IB-015 — the clock around `FeaturePassService` (design §8.1).
@@ -43,7 +44,10 @@ export class FeaturesRunner implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.stopped) return;
     const now = Date.now();
     const attempt = nextAttempt(now);
-    this.timer = setTimeout(() => void this.run(attempt), Math.max(0, attempt.atMs - now));
+    this.timer = setTimeout(
+      () => neverReject(this.logger, 'feature pass', () => this.run(attempt)),
+      Math.max(0, attempt.atMs - now),
+    );
     this.timer.unref?.();
   }
 

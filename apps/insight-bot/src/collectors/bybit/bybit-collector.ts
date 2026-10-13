@@ -4,6 +4,7 @@ import { isLiquidationMessage, isTickerMessage } from './payloads';
 import type { BybitRest } from './rest';
 import { shouldPageFurther } from './rest';
 import { TickerState } from './ticker-state';
+import { neverReject } from '../../ops/never-reject';
 
 /**
  * IB-008 — the Bybit collector (design §4.3).
@@ -131,7 +132,14 @@ export class BybitCollector {
   private handlers() {
     return {
       onOpen: () => this.ports.logger.log(`bybit socket open (${this.ports.symbols.length} symbols)`),
-      onMessage: (payload: unknown) => void this.onMessage(payload),
+      // BybitLogger has no `error`, so the sink forwards to `warn`: a malformed frame is not worth
+      // a different severity than the tick failures beside it, and inventing a method on another
+      // task's port to satisfy a type would be the wrong direction of change.
+      onMessage: (payload: unknown) => neverReject(
+        { error: (message: string) => this.ports.logger.warn(message) },
+        'bybit message',
+        () => this.onMessage(payload),
+      ),
       onClose: (code: number) => {
         this.ports.registry.recordReconnect(STREAM_TICKERS, this.now());
         this.ports.logger.warn(`bybit socket closed (${code})`);

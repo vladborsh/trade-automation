@@ -9,6 +9,7 @@ import { BinanceSocket } from '../binance-common/socket';
 import { BinanceSpotCollector, MARKET, VENUE_LOGGER_NAME } from './spot-collector';
 import { SpotCandleSource } from './spot-candles';
 import { SpotRest } from './rest';
+import { neverReject } from '../../ops/never-reject';
 
 /** One tick per second drives the mode policy and the degraded poller. */
 export const TICK_MS = 1_000;
@@ -65,7 +66,7 @@ export class BinanceSpotService implements OnApplicationBootstrap, OnModuleDestr
     });
 
     await this.collector.start();
-    this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
+    this.timer = setInterval(() => neverReject(this.logger, 'binance-spot tick', async () => this.collector?.tick()), TICK_MS);
     this.timer.unref?.();
     this.logger.log(`binance-spot collector started for ${symbols.length} symbols`);
   }

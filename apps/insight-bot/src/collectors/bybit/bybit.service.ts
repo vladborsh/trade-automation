@@ -9,6 +9,7 @@ import { BybitCollector, STREAM_LIQUIDATION } from './bybit-collector';
 import { BybitSocket } from './bybit-socket';
 import { VENUE } from './mappers';
 import { BybitRest } from './rest';
+import { neverReject } from '../../ops/never-reject';
 
 /** One tick a second: the silence watchdog and the minute boundary. */
 export const TICK_MS = 1_000;
@@ -56,7 +57,7 @@ export class BybitService implements OnApplicationBootstrap, OnModuleDestroy {
     // IB-BUG-010: this writes a collector_gaps row for however long we were NOT running, then
     // starts the heartbeat. After start(), so the window closes when the socket is actually up.
     await this.uptime.begin([{ stream: STREAM_LIQUIDATION, venue: VENUE, market: 'perp' }]);
-    this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
+    this.timer = setInterval(() => neverReject(this.logger, 'bybit tick', async () => this.collector?.tick()), TICK_MS);
     this.timer.unref?.();
     this.logger.log(`bybit collector started for ${symbols.length} symbols`);
   }

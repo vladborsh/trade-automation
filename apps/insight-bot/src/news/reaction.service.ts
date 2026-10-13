@@ -5,6 +5,7 @@ import {
   closeAtOrBefore, othersInWindow, pendingReactions, saveReaction, windowCoverage, type PriceScope,
 } from '../db/pg/reaction-reads';
 import { computeReaction, HORIZONS, reactionWindow, type Horizon } from './reaction';
+import { neverReject } from '../ops/never-reject';
 
 /** Every five minutes: the shortest horizon is 15m, so nothing waits long for its window to close. */
 export const REACTION_TICK_MS = 5 * 60_000;
@@ -37,8 +38,8 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
       this.logger.warn('no database — news reactions disabled');
       return;
     }
-    void this.tick();
-    this.timer = setInterval(() => void this.tick(), REACTION_TICK_MS);
+    neverReject(this.logger, 'reaction tick', () => this.tick());
+    this.timer = setInterval(() => neverReject(this.logger, 'reaction tick', () => this.tick()), REACTION_TICK_MS);
     this.timer.unref?.();
   }
 

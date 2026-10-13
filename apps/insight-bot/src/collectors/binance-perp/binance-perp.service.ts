@@ -10,6 +10,7 @@ import { BinanceWeightTracker } from './binance-weight.tracker';
 import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collector';
 import { BinanceSocket } from '../binance-common/socket';
 import { PerpRest } from './rest';
+import { neverReject } from '../../ops/never-reject';
 
 /** One tick per second drives the mode policy, the minute boundary and the degraded pollers. */
 export const TICK_MS = 1_000;
@@ -67,7 +68,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     });
 
     await this.collector.start();
-    this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
+    this.timer = setInterval(() => neverReject(this.logger, 'binance-perp tick', async () => this.collector?.tick()), TICK_MS);
     this.timer.unref?.();
     this.logger.log(`binance-perp collector started for ${symbols.length} symbols`);
   }

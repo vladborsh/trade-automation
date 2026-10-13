@@ -4,6 +4,7 @@ import { heartbeats, touchHeartbeat } from '../../db/pg/coverage-reads';
 import { Writers } from '../writers/batch-writer';
 import type { Market } from '../writers/tables';
 import { uptimeGap } from './uptime-gap';
+import { neverReject } from '../../ops/never-reject';
 
 /** How often a connected stream persists its liveness. */
 export const HEARTBEAT_MS = 30_000;
@@ -70,7 +71,10 @@ export class UptimeRecorder {
     // mark alive immediately, so a crash seconds from now still has a recent mark to measure from
     await this.touchAll(now);
     if (!this.timer) {
-      this.timer = setInterval(() => void this.touchAll(new Date()), HEARTBEAT_MS);
+      this.timer = setInterval(
+        () => neverReject(this.logger, 'uptime heartbeat', () => this.touchAll(new Date())),
+        HEARTBEAT_MS,
+      );
       this.timer.unref?.();
     }
   }

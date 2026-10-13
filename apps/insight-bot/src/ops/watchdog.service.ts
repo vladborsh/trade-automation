@@ -3,6 +3,7 @@ import { AppConfigService } from '../config/config.service';
 import { StreamRegistry } from './stream-registry';
 import { TelegramSender } from '../delivery/telegram-sender';
 import { Watchdog, renderAlert } from './watchdog';
+import { neverReject } from './never-reject';
 
 /** §6.2: "the watchdog (every 30 s)". */
 export const WATCHDOG_TICK_MS = 30_000;
@@ -28,7 +29,7 @@ export class WatchdogService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   onApplicationBootstrap(): void {
-    this.timer = setInterval(() => void this.tick(), WATCHDOG_TICK_MS);
+    this.timer = setInterval(() => neverReject(this.logger, 'watchdog tick', () => this.tick()), WATCHDOG_TICK_MS);
     this.timer.unref?.();
     this.logger.log(`watchdog started (threshold ${this.silenceMin} min, one alert per stream per 30 min)`);
   }

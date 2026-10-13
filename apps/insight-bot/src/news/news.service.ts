@@ -10,6 +10,7 @@ import { parseFeed, type NewsItem } from './parse';
 import { buildDictionary, type AssetDictionaryEntry } from './assets';
 import { afterAttempt, dueSources, newestAgeHours, type SourceState } from './schedule';
 import { NEWS_SOURCES, type NewsSource } from './sources';
+import { neverReject } from '../ops/never-reject';
 
 /** One tick a minute: the per-source cadences are 5 and 15 minutes, so this is fine-grained enough. */
 export const TICK_MS = 60_000;
@@ -87,8 +88,8 @@ export class NewsService implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.warn('no database — news ingest disabled');
       return;
     }
-    void this.tick();
-    this.timer = setInterval(() => void this.tick(), TICK_MS);
+    neverReject(this.logger, 'news tick', () => this.tick());
+    this.timer = setInterval(() => neverReject(this.logger, 'news tick', () => this.tick()), TICK_MS);
     this.timer.unref?.();
     this.logger.log(`news ingest started for ${this.sources.length} sources`);
   }
