@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readSourceTree, stripComments } from '../helpers/source-scan';
 import { join } from 'node:path';
 import { REGIME_SPEC, REGIME_VERSION, regimeParamNumber, regimeSpecFingerprint } from '../../src/regime/regime-spec';
 import { WEB_FEATURE_UNAVAILABLE } from '@trade-automation/contracts';
@@ -80,20 +80,6 @@ describe('playbooks/ must never import regime/', () => {
   const srcDir = join(process.cwd(), 'src');
   const playbooksDir = join(srcDir, 'playbooks');
 
-  const filesUnder = (dir: string): string[] => {
-    let entries: string[];
-    try {
-      entries = readdirSync(dir);
-    } catch {
-      return [];
-    }
-    return entries.flatMap((entry) => {
-      const path = join(dir, entry);
-      if (statSync(path).isDirectory()) return filesUnder(path);
-      return path.endsWith('.ts') ? [path] : [];
-    });
-  };
-
   /** Static `from '…'`, `require('…')` and dynamic `import('…')` — all three reach the same code. */
   const IMPORTS_REGIME = [
     /from\s+['"][^'"]*regime[^'"]*['"]/,
@@ -102,16 +88,25 @@ describe('playbooks/ must never import regime/', () => {
   ];
 
   it('holds for every file in playbooks/, and says how many it read', () => {
-    const files = filesUnder(playbooksDir);
-    // the guard asserts it SCANNED something: a renamed or moved tree would otherwise leave this
-    // green for ever while guarding nothing, which is the failure mode of every vacuous check
+    // the shared scanner (test/helpers/source-scan.ts) brings both properties this guard needs and
+    // only had one of: it THROWS rather than returning [] — this spec's own lesson, after an import
+    // guard passed vacuously over an empty directory — and it STRIPS COMMENTS, which this guard
+    // never did, so a comment mentioning `from '../regime/axes'` used to be able to fail it
+    const files = readSourceTree(playbooksDir, { skipSpecs: false });
     expect(files.length).toBeGreaterThan(0);
 
-    const offenders = files.filter((file) => {
-      const source = readFileSync(file, 'utf8');
-      return IMPORTS_REGIME.some((pattern) => pattern.test(source));
-    });
+    const offenders = files
+      .filter((file) => IMPORTS_REGIME.some((pattern) => pattern.test(file.code)))
+      .map((file) => file.rel);
     expect(offenders).toEqual([]);
+  });
+
+  it('does not fail on a comment that merely MENTIONS the forbidden import', () => {
+    // the half this guard was missing: prose about a boundary is not a breach of it
+    const commented = stripComments("// import { volAxis } from '../regime/axes';\nconst x = 1;");
+    expect(IMPORTS_REGIME.some((pattern) => pattern.test(commented))).toBe(false);
+    // and the real import still trips it, so the stripping has not disarmed the guard
+    expect(IMPORTS_REGIME.some((p) => p.test("import { volAxis } from '../regime/axes';"))).toBe(true);
   });
 
   it('catches every import form, not just the static one', () => {

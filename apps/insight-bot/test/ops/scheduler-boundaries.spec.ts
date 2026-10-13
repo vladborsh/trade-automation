@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Logger } from '@nestjs/common';
 import { neverReject, type ErrorSink } from '../../src/ops/never-reject';
+import { readSourceTree, scanLines } from '../helpers/source-scan';
 
 /**
  * IB-028 — every scheduler boundary must be unable to reject, and this is the guard that keeps it
@@ -40,50 +40,39 @@ const ALLOWED: ReadonlyArray<{ file: string; why: string }> = [
   },
 ];
 
-function tsFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((entry) => {
-    const path = join(dir, entry);
-    if (statSync(path).isDirectory()) return tsFiles(path);
-    return path.endsWith('.ts') && !path.endsWith('.spec.ts') ? [path] : [];
-  });
-}
-
 /** `void this.something(` with no `.catch` on the same line — the shape that kills the process. */
 const BARE = /void\s+(this|\(this)\b[^;]*\(/;
 
 describe('every scheduler boundary is unable to reject', () => {
-  const offenders: string[] = [];
   const allowedFiles = new Set(ALLOWED.map((a) => a.file));
+  // `readSourceTree` strips comments and THROWS if it reads no files — the two properties this
+  // guard, dev-1's import guard and the clock sweep each needed and each had to learn separately
+  const files = readSourceTree(SRC);
 
-  for (const path of tsFiles(SRC)) {
-    const rel = path.slice(SRC.length + 1).replace(/\\/g, '/');
-    const lines = readFileSync(path, 'utf8').split('\n');
-    lines.forEach((line, i) => {
-      // comments mention these boundaries by name — including this guard's own explanation of them,
-      // and the comment in `never-reject.ts` describing the shape it replaces. A scanner that reads
-      // prose as code reports its own documentation.
-      const trimmed = line.trim();
-      if (trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('//')) return;
-      const code = line.split('//')[0];
-      if (!BARE.test(code)) return;
-      if (code.includes('.catch(')) return;           // handled inline
-      if (code.includes('neverReject')) return;        // handled by the boundary helper
-      // a multi-line chain: `void this.x()` then `.catch(` on a following line
-      if (lines.slice(i + 1, i + 4).some((l) => l.includes('.catch('))) return;
-      if (allowedFiles.has(rel)) return;
-      offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
-    });
-  }
+  const offenders = scanLines(files, (code, file) => {
+    if (!BARE.test(code)) return false;
+    if (code.includes('.catch(')) return false;      // handled inline
+    if (code.includes('neverReject')) return false;   // handled by the boundary helper
+    // a multi-line chain: `void this.x()` with `.catch(` on a following line
+    const index = file.lines.indexOf(code);
+    if (file.lines.slice(index + 1, index + 4).some((l) => l.includes('.catch('))) return false;
+    return !allowedFiles.has(file.rel);
+  }).map((hit) => `${hit.rel}:${hit.line}: ${hit.text}`);
 
   it('has no boundary that discards a promise without recording its rejection', () => {
     expect(offenders).toEqual([]);
+  });
+
+  it('read the source tree, so a green result is about the code and not about the path', () => {
+    // the shared scanner throws on an empty tree, and this states the count the result rests on
+    expect(files.length).toBeGreaterThan(50);
   });
 
   it('allows only boundaries with a written reason', () => {
     // an allow-list is a record of decisions, so an entry without a reason is not a decision
     for (const entry of ALLOWED) {
       expect(entry.why.length).toBeGreaterThan(40);
-      expect(tsFiles(SRC).map((p) => p.slice(SRC.length + 1))).toContain(entry.file);
+      expect(files.map((f) => f.rel)).toContain(entry.file);
     }
   });
 
@@ -92,8 +81,6 @@ describe('every scheduler boundary is unable to reject', () => {
     // passed over an empty directory
     expect(BARE.test('    this.timer = setInterval(() => void this.tick(), MS);')).toBe(true);
     expect(BARE.test('    void this.pump();')).toBe(true);
-    // and the prose that describes the shape must not be read as the shape
-    expect('     * `setInterval(() => void this.tick(), MS)` is the shape'.trim().startsWith('*')).toBe(true);
     expect(BARE.test("    this.timer = setInterval(() => neverReject(this.logger, 'x', () => this.tick()), MS);"))
       .toBe(false);
   });

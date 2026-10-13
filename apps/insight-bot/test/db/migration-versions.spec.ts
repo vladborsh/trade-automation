@@ -1,4 +1,5 @@
-import { readdirSync } from 'node:fs';
+import { basename } from 'node:path';
+import { listFiles } from '../helpers/source-scan';
 import { join } from 'node:path';
 
 /**
@@ -39,7 +40,11 @@ function parse(file: string): Migration | null {
   return { version: match[1], direction: match[2] as 'do' | 'undo', name: match[3], file };
 }
 
-const files = readdirSync(MIGRATIONS_DIR).sort();
+// `listFiles` THROWS on an empty directory instead of returning [], so a moved or renamed
+// migrations path reads as "the guard cannot find the migrations" rather than as a clean tree. That
+// is the shared half of this spec's own lesson, now in test/helpers/source-scan.ts and used by the
+// two other source-scanning guards as well.
+const files = listFiles(MIGRATIONS_DIR, { ext: '.sql' }).map((path) => basename(path)).sort();
 const migrations = files.map(parse).filter((m): m is Migration => m !== null);
 
 describe('the migrations directory', () => {
@@ -71,7 +76,9 @@ describe('the migrations directory', () => {
   });
 
   it('finds the migrations at all — a wrong path would make every check above vacuous', () => {
-    // without this, a moved directory turns the whole suite green by finding nothing
+    // without this, a moved directory turns the whole suite green by finding nothing. `listFiles`
+    // now refuses the empty case outright, so this is the second line of defence rather than the
+    // only one — the count still has to be stated, because "it threw nothing" is not "it read 30".
     expect(migrations.length).toBeGreaterThan(10);
   });
 });
@@ -172,7 +179,7 @@ describe('burned version numbers', () => {
   const BURNED = [13, 14];
 
   const versions = () => [...new Set(
-    readdirSync(MIGRATIONS_DIR).map(parse).filter((m): m is Migration => m !== null)
+    listFiles(MIGRATIONS_DIR, { ext: '.sql' }).map((p) => basename(p)).map(parse).filter((m): m is Migration => m !== null)
       .map((m) => Number(m.version)),
   )].sort((a, b) => a - b);
 
