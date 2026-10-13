@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  absentFields, assertShapeRecognisable, DISTINCTIVE_FIELDS, EVM_FIELDS, FIELDS, flagOrNull,
-  mapTokenSecurity, SOLANA_FIELDS,
+  absentFields, ALWAYS_PRESENT, assertShapeRecognisable, EVM_FIELDS, FIELD_CONTRACTS, FIELDS,
+  flagOrNull, mapTokenSecurity, SOLANA_FIELDS,
 } from '../../src/dex/goplus';
 
 /**
@@ -88,18 +88,18 @@ describe('mapping, per chain family', () => {
  *
  * Both directions are asserted below, because the fix must not become "never throw".
  */
-describe('one absent field is "not told"; ZERO fields present is a shape change', () => {
-  it('maps a token that omits a field, and RECORDS which one — not a throw', () => {
+describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a shape change', () => {
+  it('maps a token that omits an optional field, and RECORDS which one — not a throw', () => {
     const payload = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
     const [addr, token] = Object.entries(payload.result)[0];
-    expect('buy_tax' in token).toBe(true); // the premise, before we remove it
-    delete token['buy_tax'];
+    expect('is_open_source' in token).toBe(true); // the premise, before we remove it
+    delete token['is_open_source'];
     payload.result[addr] = token;
 
     const mapped = mapTokenSecurity(JSON.stringify(payload), 'evm')!;
-    expect(mapped.row.buyTax).toBeNull();               // not told
-    expect(mapped.row.absentFields).toEqual(['buy_tax']); // and we know we were not told
-    expect(mapped.row.holderCount).not.toBeNull();      // the rest still mapped
+    expect(mapped.row.isOpenSource).toBeNull();                 // not told
+    expect(mapped.row.absentFields).toEqual(['is_open_source']); // and we know we were not told
+    expect(mapped.row.holderCount).not.toBeNull();              // the rest still mapped
   });
 
   it('records nothing absent for a response that carries every field — the positive control', () => {
@@ -107,43 +107,86 @@ describe('one absent field is "not told"; ZERO fields present is a shape change'
     expect(mapTokenSecurity(SOLANA, 'solana')!.row.absentFields).toEqual([]);
   });
 
-  it('THROWS when no distinctive field is present, naming what it did see', () => {
-    const payload = { result: { '0xabc': { code: 4011, message: 'not supported' } } };
+  it('tolerates every omission MEASURED on the live API, and records it', () => {
+    // these four are the whole evidence base for the `optional` class, so they are the four cases
+    // the mapper must survive; if any of them throws again we are back to losing rows
+    const omit = (body: string, field: string) => {
+      const payload = JSON.parse(body) as { result: Record<string, Record<string, unknown>> };
+      const [addr, token] = Object.entries(payload.result)[0];
+      expect(field in token).toBe(true); // the premise, before removing it
+      delete token[field];
+      payload.result[addr] = token;
+      return JSON.stringify(payload);
+    };
+
+    for (const field of ['metadata_mutable']) {
+      const mapped = mapTokenSecurity(omit(SOLANA, field), 'solana')!;
+      expect(mapped.row.absentFields).toEqual([field]);
+      expect(mapped.row.mintable).not.toBeNull(); // the rest still mapped
+    }
+    for (const field of ['is_open_source', 'cannot_buy', 'total_supply']) {
+      const mapped = mapTokenSecurity(omit(EVM, field), 'evm')!;
+      expect(mapped.row.absentFields).toEqual([field]);
+      expect(mapped.row.holderCount).not.toBeNull();
+    }
+  });
+
+  it('THROWS when an ALWAYS-present field is missing, and says what the classification rests on', () => {
+    const payload = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
+    const [addr, token] = Object.entries(payload.result)[0];
+    expect('buy_tax' in token).toBe(true);
+    delete token['buy_tax'];
+    payload.result[addr] = token;
+
     expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm'))
-      .toThrow(/contains NONE of the \d+ fields distinctive to evm/);
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/keys present: code, message/);
+      .toThrow(/missing field\(s\) measured as ALWAYS present: buy_tax/);
+    // the throw must name its own evidence: whoever sees it needs to know whether the API changed
+    // or whether this classification was too strong
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/Evidence for that classification/);
   });
 
-  it('throws on the WRONG chain family, which is the same failure wearing a 200', () => {
-    // and this is why the check needs DISTINCTIVE fields: total_supply is in both lists, so a
-    // Solana payload read as EVM does carry one field we read — the first threshold let it through
-    expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/NONE of the/);
-    expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/NONE of the/);
-    expect(DISTINCTIVE_FIELDS.evm).not.toContain('total_supply');
-    expect(DISTINCTIVE_FIELDS.solana).not.toContain('total_supply');
+  it('throws on the WRONG chain family, with no separate check for it', () => {
+    // no Solana payload carries buy_tax/sell_tax/holder_count and no EVM payload carries mintable,
+    // so the per-field contract covers this. `total_supply` is in BOTH lists and cannot carry a
+    // family on its own — which is exactly what defeated my first, coarser threshold.
+    expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/ALWAYS present/);
+    expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/ALWAYS present/);
+    expect(() => assertShapeRecognisable({ total_supply: '1' }, 'evm')).toThrow(/ALWAYS present/);
   });
 
-  it('the SHARED field alone is not enough, and one distinctive field is', () => {
-    expect(() => assertShapeRecognisable({ total_supply: '1' }, 'evm')).toThrow(/NONE of the/);
-    expect(() => assertShapeRecognisable({ total_supply: '1', buy_tax: '' }, 'evm')).not.toThrow();
-    expect(absentFields({ total_supply: '1' }, 'evm')).toEqual(
-      EVM_FIELDS.filter((f) => f !== 'total_supply'),
-    );
+  it('an error object wearing a 200 throws rather than becoming a row of nulls', () => {
+    const payload = { result: { '0xabc': { code: 4011, message: 'not supported' } } };
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/ALWAYS present/);
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/Keys present: code, message/);
   });
 
-  it('tolerates the omissions actually measured on the live API', () => {
-    // solana: metadata_mutable on 1 of 12; bsc: is_open_source on 4 of 9
-    const sol = JSON.parse(SOLANA) as { result: Record<string, Record<string, unknown>> };
-    const [sa, st] = Object.entries(sol.result)[0];
-    delete st['metadata_mutable'];
-    sol.result[sa] = st;
-    expect(mapTokenSecurity(JSON.stringify(sol), 'solana')!.row.absentFields).toEqual(['metadata_mutable']);
+  describe('the field contracts', () => {
+    it('classify every field of both families exactly once', () => {
+      for (const family of ['solana', 'evm'] as const) {
+        expect(FIELD_CONTRACTS[family].map((c) => c.field)).toEqual([...FIELDS[family]]);
+      }
+    });
 
-    const evm = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
-    const [ea, et] = Object.entries(evm.result)[0];
-    delete et['is_open_source'];
-    evm.result[ea] = et;
-    expect(mapTokenSecurity(JSON.stringify(evm), 'evm')!.row.absentFields).toEqual(['is_open_source']);
+    it('carry evidence with a population, not an adjective', () => {
+      // a classification is a measured claim; "always present" with nothing behind it is the thing
+      // that cost us rows in the first place
+      for (const family of ['solana', 'evm'] as const) {
+        for (const contract of FIELD_CONTRACTS[family]) {
+          expect(contract.evidence).toMatch(/\d/);
+          expect(contract.evidence.length).toBeGreaterThan(30);
+        }
+      }
+    });
+
+    it('classify as OPTIONAL every field observed absent on the live API', () => {
+      // the asymmetry: a wrong `optional` is a null we can see in absent_fields, a wrong `always`
+      // throws on normal data and loses the row for good
+      const optional = (family: 'solana' | 'evm') =>
+        FIELD_CONTRACTS[family].filter((c) => c.presence === 'optional').map((c) => c.field);
+      expect(optional('solana')).toEqual(['metadata_mutable']);
+      expect(optional('evm')).toEqual(['is_open_source', 'cannot_buy', 'total_supply']);
+      expect(ALWAYS_PRESENT.evm).not.toContain('total_supply');
+    });
   });
 
   it('a field PRESENT but empty does not throw — that is a measured absence', () => {

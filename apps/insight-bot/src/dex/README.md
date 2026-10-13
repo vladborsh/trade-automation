@@ -155,3 +155,51 @@ first sight has the largest and most renewable backlog: a fixed order would let 
 Solana permanently starve the re-checks, and the re-check is the entire reason the schedule has
 three looks rather than one.
 
+
+## GoPlus field presence, per chain family
+
+A field we read being absent has two causes and they need opposite handling: the API changing shape
+must throw, a token GoPlus has nothing to say about must become `null` meaning *not told*. One
+assertion covering both threw on normal data and lost the row — permanently, because a failed ask
+is retried and then abandoned, so we would have ended up ignorant about a token's security
+*because* the venue answered. Found by the live pass inside the hour.
+
+So every field is classified in `FIELD_CONTRACTS` and the classification carries its evidence:
+
+| occasion | tokens from | solana answered | evm answered |
+|---|---|---|---|
+| A, 00:30–00:50 UTC (three sequential probes) | GeckoTerminal `new_pools` | 12 | 24 (base 8, eth 7, bsc 9) |
+| B, 00:56 UTC | `dex_tokens`, after a 25-minute live run | 8 | 12 (base 7, eth 5, bsc 0 answered) |
+
+Two occasions ~20 minutes apart with ≥ 5 answered tokens per family in each, on **different token
+sets** — a per-token property measured twice on the same tokens is measured once. Absences seen, by
+distinct token:
+
+| family | field | observed absent | class |
+|---|---|---|---|
+| solana | `metadata_mutable` | 1 of 12 in A, 1 more during the live run | optional |
+| evm | `is_open_source` | 4 of 9 answered BSC tokens in A | optional |
+| evm | `total_supply` | 1 of 7 answered base tokens in B, 1 in the live run | optional |
+| evm | `cannot_buy` | 1 base token during the live run | optional |
+
+Everything else was present in every answered token on both occasions and is `always`: its absence
+throws, and the throw quotes the evidence so the next person can tell "the API changed" from "this
+classification was too strong". **A field without two occasions behind it is `optional`**, because
+the errors are not symmetric — a wrong `optional` is a null visible in `absent_fields`, a wrong
+`always` loses the row.
+
+Reproduce with `infra/insight-bot/probe-goplus-field-presence.mjs` (reads tokens from
+`DATABASE_URL`, so it costs no GeckoTerminal budget).
+
+### A counting error worth recording
+
+The live log showed **11** warning lines naming these fields and I first reported them to the Tech
+Lead as 11 tokens. They are **3 distinct tokens**: a failed ask is retried up to five times, so the
+retry inflated the count fivefold. *A rate of absence measured from a log that retries is a rate of
+retries.*
+
+### Not a number: GoPlus's "no result at all" rate
+
+BSC answered 0 of 8 tokens in occasion B against 9 of 10 in A, and `empty` results appeared on every
+network. One occasion per direction, so this is a note, not a rate — but a token GoPlus returns no
+result for is state 3 (asked, told nothing), not a failure, and must not be retried for ever.

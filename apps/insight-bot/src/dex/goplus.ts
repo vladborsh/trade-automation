@@ -28,35 +28,47 @@ import { numberOrNull } from './mappers';
 export type ChainFamily = 'solana' | 'evm';
 
 /*
- * ## A field absent for ONE TOKEN is not a shape change, and treating it as one loses data
+ * ## Two absences, and a mechanism that cannot tell them apart loses rows
  *
- * My first version required every field below to be present and threw otherwise. The live pass
- * found that wrong within 25 minutes, which is the whole argument for the live pass. Measured
- * 2026-10-12 against the real API:
+ * The first version of this file required every field below to be PRESENT and threw otherwise. The
+ * live pass found that wrong inside the hour, and the reason is the distinction that has settled
+ * every other ruling today:
  *
- * | family | sample | observed absent |
- * |---|---|---|
- * | solana | 12 tokens answered | `metadata_mutable` on **1** |
- * | base   | 8 tokens answered  | none |
- * | eth    | 7 tokens answered  | none |
- * | bsc    | 9 tokens answered  | `is_open_source` on **4** |
+ * - **the API changed shape** — a field we rely on no longer exists -> THROW;
+ * - **this token has no answer for this field** — normal, measured, routine -> null, *not told*.
  *
- * and the collector's own warnings add `cannot_buy` (5 tokens) and `total_supply` (1) on EVM. So
- * GoPlus simply omits an attribute it has nothing to say about, per token, routinely.
+ * One assertion covering both throws on normal data and loses the row, and because a failed ask is
+ * retried and then abandoned, the loss is permanent: we end up ignorant about a token's security
+ * BECAUSE the venue answered.
  *
- * Under the strict rule every such token became a FAILED ask: retried five times, then abandoned,
- * with a message blaming the venue for a shape change that never happened. We would have been
- * permanently ignorant about the security of a token BECAUSE the venue answered — the exact
- * failure the fourth state exists to prevent, arriving through the guard instead of the gap.
+ * So each field is classified **per chain family**, and the classification carries its evidence
+ * rather than a sentence about it. `always` is the only class that throws, so a wrong `always`
+ * costs rows — which is why a field without two occasions of evidence is `optional`, and says so.
  *
- * So the invariant moves to the one that is actually about shape:
+ * ### The measurements (live API, 2026-10-12 / 2026-10-13 UTC)
  *
- * - **NONE of the family's fields present -> THROW.** That is a renamed payload, the wrong chain
- *   family, or an error object wearing a 200, and it must not become a row of nulls.
- * - **SOME absent -> null, meaning "not told"**, which is precisely true and is a state the schema
- *   already distinguishes. Which fields were absent is RECORDED in `absent_fields`, so
- *   "the venue stopped sending buy_tax for everyone" is a query over stored rows rather than a
- *   guess — the audit the throw was standing in for, and one that does not need a release to run.
+ * | occasion | source | solana answered | evm answered |
+ * |---|---|---|---|
+ * | A, 00:30–00:50 (three sequential probes) | tokens from GeckoTerminal `new_pools` | 12 | 24 (base 8, eth 7, bsc 9) |
+ * | B, 00:56 (one probe) | tokens from `dex_tokens` after a 25-min live run | 8 | 12 (base 7, eth 5, bsc 0 answered) |
+ *
+ * Two occasions ~20 minutes apart with ≥ 5 answered tokens per family in each, which is what
+ * AGENTS.md's repetition rule asks of a claim of this shape. Occasion A is three probes run back to
+ * back rather than one, and the token sets differ between A and B — which is the point, since a
+ * per-token property measured twice on the same tokens is measured once. Absences seen, by DISTINCT token:
+ *
+ * - solana `metadata_mutable`: 1 token in A, 1 more in the live run itself -> **optional**
+ * - evm `is_open_source`: 4 of 9 BSC tokens in A -> **optional**
+ * - evm `total_supply`: 1 token in B (base), 1 in the live run -> **optional**
+ * - evm `cannot_buy`: 1 token in the live run (base) -> **optional**
+ *
+ * **A counting error worth recording**: the live log showed 11 warning lines naming these fields and
+ * I first reported them as 11 tokens. They are **3 distinct tokens** — a failed ask is retried up to
+ * five times, so the retry inflated the count fivefold. A rate of absence measured from a log that
+ * retries is a rate of retries.
+ *
+ * BSC answered 0 of 8 in occasion B against 9 of 10 in A, so GoPlus's "no result at all" rate is
+ * highly variable per network. That is a note, not a number: it has one occasion per direction.
  */
 
 /** Fields read from a Solana response. */
@@ -85,21 +97,65 @@ export const FIELDS: Record<ChainFamily, readonly string[]> = {
 };
 
 /**
- * The fields that belong to ONE family only.
+ * `always` means every answered token carried it across both occasions above, so its absence is a
+ * shape change and MUST throw. `optional` means at least one token legitimately lacked it, so its
+ * absence is "not told" and becomes null.
  *
- * `total_supply` is in both lists, and that one shared name defeated the first version of the
- * shape check: a Solana token object read as EVM carries `total_supply` and nothing else we read,
- * so "none of the family's fields are present" was false and the mapper happily produced a row of
- * nulls for the wrong chain. A spec caught it, but only because it tried the wrong family on
- * purpose.
- *
- * So the check asks for a DISTINCTIVE field — one that could not have come from the other shape.
- * A token missing `is_open_source` (measured: 4 of 9 on BSC) still carries four others and maps
- * fine; a Solana payload read as EVM carries none and throws.
+ * A field with fewer than two occasions of evidence is `optional` whatever it looked like, because
+ * the two errors are not symmetric: a wrong `optional` silently nulls a field we could have read
+ * and is visible in `absent_fields`, while a wrong `always` throws on normal data and loses the
+ * row for good.
  */
-export const DISTINCTIVE_FIELDS: Record<ChainFamily, readonly string[]> = {
-  solana: SOLANA_FIELDS.filter((f) => !(EVM_FIELDS as readonly string[]).includes(f)),
-  evm: EVM_FIELDS.filter((f) => !(SOLANA_FIELDS as readonly string[]).includes(f)),
+export type Presence = 'always' | 'optional';
+
+export interface FieldContract {
+  field: string;
+  presence: Presence;
+  /** What was observed, with counts and populations. The claim carries this, not a sentence. */
+  evidence: string;
+}
+
+const PRESENT_IN_BOTH = 'present in all answered tokens, occasions A (n=12 solana / 24 evm) and B (n=8 / 12)';
+
+export const FIELD_CONTRACTS: Record<ChainFamily, readonly FieldContract[]> = {
+  solana: [
+    { field: 'mintable', presence: 'always', evidence: PRESENT_IN_BOTH },
+    { field: 'freezable', presence: 'always', evidence: PRESENT_IN_BOTH },
+    { field: 'closable', presence: 'always', evidence: PRESENT_IN_BOTH },
+    {
+      field: 'metadata_mutable',
+      presence: 'optional',
+      evidence: 'absent on 1 of 12 tokens in occasion A, and on 1 more distinct token during the 25-minute live run',
+    },
+    { field: 'balance_mutable_authority', presence: 'always', evidence: PRESENT_IN_BOTH },
+    { field: 'total_supply', presence: 'always', evidence: PRESENT_IN_BOTH },
+  ],
+  evm: [
+    {
+      field: 'is_open_source',
+      presence: 'optional',
+      evidence: 'absent on 4 of 9 answered BSC tokens in occasion A; present on all base and eth tokens in both',
+    },
+    {
+      field: 'cannot_buy',
+      presence: 'optional',
+      evidence: 'absent on 1 distinct base token during the live run (the log\'s 5 lines are 5 retries of it)',
+    },
+    { field: 'buy_tax', presence: 'always', evidence: PRESENT_IN_BOTH },
+    { field: 'sell_tax', presence: 'always', evidence: PRESENT_IN_BOTH },
+    { field: 'holder_count', presence: 'always', evidence: PRESENT_IN_BOTH },
+    {
+      field: 'total_supply',
+      presence: 'optional',
+      evidence: 'absent on 1 of 7 answered base tokens in occasion B, and on 1 distinct token during the live run',
+    },
+  ],
+};
+
+/** The fields whose absence is a shape change rather than an unanswered question. */
+export const ALWAYS_PRESENT: Record<ChainFamily, readonly string[]> = {
+  solana: FIELD_CONTRACTS.solana.filter((c) => c.presence === 'always').map((c) => c.field),
+  evm: FIELD_CONTRACTS.evm.filter((c) => c.presence === 'always').map((c) => c.field),
 };
 
 export interface TokenSecurityRow {
@@ -150,22 +206,29 @@ export function absentFields(token: Record<string, unknown>, family: ChainFamily
 }
 
 /**
- * Throws when the token carries NO field distinctive to this family.
+ * Throws when a field classified `always` is missing.
  *
- * The threshold is "not one" rather than "not all", because one absent field is a token GoPlus has
- * nothing to say about (measured: routine) while a token with none of the family's own fields
- * cannot be a token of that family at all — it is a renamed payload, the wrong chain family, or an
- * error object wearing a 200. Those must not become a row of nulls indistinguishable from "asked
- * and told nothing".
+ * That is the shape-change case and only that case: an `optional` field's absence is a question
+ * the venue did not answer and is recorded, not raised. The message names the evidence, because
+ * the next person to see this throw needs to know whether the API changed or whether my
+ * classification was too strong — and the second is a real possibility I cannot rule out from two
+ * occasions.
+ *
+ * It also covers the WRONG CHAIN FAMILY without a separate check: no Solana payload carries
+ * `buy_tax`, `sell_tax` and `holder_count`, and no EVM payload carries `mintable`. The one shared
+ * name, `total_supply`, cannot carry a family on its own.
  */
 export function assertShapeRecognisable(token: Record<string, unknown>, family: ChainFamily): void {
-  const own = DISTINCTIVE_FIELDS[family];
-  if (own.every((f) => !(f in token))) {
+  const missing = ALWAYS_PRESENT[family].filter((f) => !(f in token));
+  if (missing.length > 0) {
+    const contracts = FIELD_CONTRACTS[family].filter((c) => missing.includes(c.field));
     throw new Error(
-      `GoPlus ${family} response contains NONE of the ${own.length} fields distinctive to ${family} ` +
-      `(${own.join(', ')}); keys present: ${Object.keys(token).slice(0, 8).join(', ') || '<none>'}. ` +
-      'This is a shape change or the wrong chain family — it must fail rather than become a row of ' +
-      'nulls meaning "asked and told nothing".',
+      `GoPlus ${family} response is missing field(s) measured as ALWAYS present: ${missing.join(', ')}. ` +
+      `Evidence for that classification: ${contracts.map((c) => `${c.field} — ${c.evidence}`).join('; ')}. ` +
+      `Keys present: ${Object.keys(token).slice(0, 8).join(', ') || '<none>'}. ` +
+      'Either the API changed shape, or this is the wrong chain family, or the field is in fact ' +
+      'optional and the classification needs re-measuring — it must not become a null meaning ' +
+      '"asked and told nothing".',
     );
   }
 }
