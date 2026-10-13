@@ -209,6 +209,22 @@ export async function tokensDueSecurity(
  * every consumer has to remember is the shape of defect this subsystem has spent the day replacing
  * with mechanisms. A 100 % for a field that does not apply is worse than noise — it is a
  * measurement of nothing, presented beside real ones.
+ *
+ * ## If you are rewriting this query: do not generate then filter
+ *
+ * This is generate-then-filter. The impossible rows **do exist in the intermediate** — the
+ * cross-join makes them — and any new variant of the query can reintroduce them by forgetting this
+ * call, which is precisely what happened one level up when a third caller was added.
+ *
+ * The structural version is to **join on `(family, field)`** so an impossible pair is never
+ * generated: a values list or a lateral carrying each family with its own fields. Then there is
+ * nothing to filter and nothing to forget.
+ *
+ * Left as-is deliberately on 2026-10-13: the invariant is asserted by an integration spec with a
+ * non-zero assertion beside it, a 24-hour measurement was live on the only database to test
+ * against, and that database was about to be renumbered. A read-path rewrite under those three
+ * conditions was the worse trade. **Whoever next touches this query should take the structural
+ * route and delete this function**, rather than adding a fourth caller that has to remember.
  */
 function belongsTo(chainFamily: string, field: string): boolean {
   const fields = FIELDS[chainFamily as ChainFamily] as readonly string[] | undefined;
