@@ -37,6 +37,8 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger('ContextCollector');
   private readonly client: ContextClient;
   private readonly sleep: (ms: number) => Promise<void>;
+  /** The one clock. `Date.now` in production; a spec's own function under test (IB-050). */
+  private readonly clock: () => number;
   /**
    * IB-BUG-006 — every CoinGecko request in this process goes through one queue, so the
    * forward-only `/global` poll cannot be starved by the 365-day backfill sharing its allowance.
@@ -69,7 +71,21 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
     // @Optional(): the specs' injection point; the real client is built below from config.
     @Optional() client?: ContextClient,
     @Optional() sleep?: (ms: number) => Promise<void>,
+    /**
+     * IB-050 — **the clock, injected**, because this service schedules on the UTC time of day.
+     *
+     * It used to take `now` as a parameter on `tick` while reading `new Date()` / `Date.now()`
+     * internally: a partially-threaded clock, which is worse than no injection at all. A spec
+     * passing a fixed instant got the service's own wall clock in the places that mattered, so
+     * the two disagreed about what day it was — and across a UTC midnight that silently changed
+     * the answer (`lastDailyDay` marked 10-13 while the spec asked about 10-12, so the daily pass
+     * ran twice and the duplicate-suppression spec read 6 fetches where it expected 3).
+     *
+     * One clock, used everywhere an instant is taken.
+     */
+    @Optional() now?: () => number,
   ) {
+    this.clock = now ?? Date.now;
     this.sleep = sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.gate = client
       ? null
@@ -140,7 +156,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
    * down, waiting for it would trade one missing series for two; the gate already guarantees the
    * priority from here on, so one attempt is enough to put the forward-only series first.
    */
-  private async primeThenBackfill(now = new Date()): Promise<void> {
+  private async primeThenBackfill(now = new Date(this.clock())): Promise<void> {
     await this.pollGlobalGuarded();
 
     // **On a fresh database the backfills ARE today's collection**, so the daily passes must not
@@ -184,7 +200,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Drives both cadences off one cheap timer; every decision is in `schedule.ts` and spec'd. */
-  async tick(now = new Date()): Promise<void> {
+  async tick(now = new Date(this.clock())): Promise<void> {
     if (now.getTime() >= this.globalDueAt && !this.globalInFlight) {
       await this.pollGlobalGuarded();
     }
@@ -212,9 +228,9 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
     this.globalInFlight = true;
     try {
       await this.pollGlobal();
-      this.globalDueAt = globalDueAfter(Date.now(), 'ok');
+      this.globalDueAt = globalDueAfter(this.clock(), 'ok');
     } catch (err) {
-      this.globalDueAt = globalDueAfter(Date.now(), 'failed');
+      this.globalDueAt = globalDueAfter(this.clock(), 'failed');
       this.logger.warn(`/global poll failed: ${(err as Error).message}`);
     } finally {
       this.globalInFlight = false;
@@ -233,7 +249,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
    */
   async pollGlobal(): Promise<number> {
     const payload = await this.client.global();
-    const arrivedAt = new Date();
+    const arrivedAt = new Date(this.clock());
     const written = await this.writers.marketCapGlobal.write([marketCapGlobalRow(payload, arrivedAt)]);
     this.registry.recordMessage(STREAM_GLOBAL, arrivedAt.getTime());
     return written;
@@ -242,7 +258,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
   async pollFearGreed(limit = 2): Promise<number> {
     const payload = await this.client.fearGreed(limit);
     // same rule as pollGlobal: the answer's arrival, not the question's departure
-    const arrivedAt = new Date();
+    const arrivedAt = new Date(this.clock());
     const written = await this.writers.fearGreed.write(fearGreedRows(payload, arrivedAt));
     this.registry.recordMessage(STREAM_FNG, arrivedAt.getTime());
     return written;
@@ -259,20 +275,20 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
         const payload = await this.client.coinMarketChart(coin, days);
         // per coin, because a 20-coin backfill spans ten minutes: one `now` for the whole pass
         // would stamp the twentieth coin with the first coin's clock
-        written += await this.writers.marketCapCoin.write(marketCapCoinRows(payload, coin, new Date()));
+        written += await this.writers.marketCapCoin.write(marketCapCoinRows(payload, coin, new Date(this.clock())));
         // Per coin, NOT per pass: the 365-day backfill takes ten minutes at the measured rate,
         // and a pass-level record would leave this stream reading silent throughout. The
         // watchdog's threshold is 3 minutes, so a first boot on a fresh box would raise a false
         // alert on its very first run — the cry-wolf case, at exactly the moment trust in the
         // alerts is being established.
-        this.registry.recordMessage(STREAM_COINS, Date.now());
+        this.registry.recordMessage(STREAM_COINS, this.clock());
       } catch (err) {
         // One coin failing must not cost the other nineteen their day.
         this.logger.warn(`market cap for ${coin}: ${(err as Error).message}`);
         this.metrics.gapsDetected.inc({ stream: STREAM_COINS });
       }
     }
-    this.registry.recordMessage(STREAM_COINS, Date.now());
+    this.registry.recordMessage(STREAM_COINS, this.clock());
     return written;
   }
 
@@ -281,7 +297,7 @@ export class ContextService implements OnApplicationBootstrap, OnModuleDestroy {
    * per coin. Both are skipped when the tables already hold them, so a restart is cheap.
    * `market_cap_global` has no backfill — there is nothing to backfill from.
    */
-  async backfill(now = new Date()): Promise<void> {
+  async backfill(now = new Date(this.clock())): Promise<void> {
     // Both one-shot backfills are skipped when the tables already hold them. Without this a
     // restart re-fetches 20 x 365-day charts and spends the keyless allowance on data it already
     // has — which is exactly how the first live run ran into 429.

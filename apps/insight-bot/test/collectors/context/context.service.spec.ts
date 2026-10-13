@@ -16,7 +16,7 @@ class FakeDb implements Db {
   }
 }
 
-function build(opts: { chart?: (coin: string) => unknown | Error; calls?: string[] } = {}) {
+function build(opts: { chart?: (coin: string) => unknown | Error; calls?: string[]; now?: () => number } = {}) {
   const writer = { write: async (rows: unknown[]) => rows.length } as unknown as BatchWriter<never>;
   const writers = { marketCapCoin: writer, fearGreed: writer, marketCapGlobal: writer } as never;
   const streams = new StreamRegistry();
@@ -45,7 +45,11 @@ function build(opts: { chart?: (coin: string) => unknown | Error; calls?: string
   } as never;
 
   // No pacing in the spec: the delay is the subject of schedule.spec.ts, not of this one.
-  const service = new ContextService(config, new FakeDb(), writers, streams, metrics, client, async () => undefined);
+  // IB-050: the clock is injected, so nothing in this file depends on when it is run.
+  const service = new ContextService(
+    config, new FakeDb(), writers, streams, metrics, client, async () => undefined,
+    opts.now ?? (() => AFTER_DAILY.getTime()),
+  );
   return { service, streams, metrics };
 }
 
@@ -100,6 +104,26 @@ describe('pollCoins records the stream per coin, not per pass', () => {
 /** Drains the microtask queue so the bootstrap's fire-and-forget work gets to run. */
 const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
+/**
+ * A FIXED instant, because `dueDailyTasks` reads the wall clock's UTC time of day.
+ *
+ * These specs used `new Date()`. dev-2 ran them at 00:02 UTC and found the file red: the coins
+ * pass is due only from 00:10, so before then nothing is due — "still runs the daily pass when the
+ * database is only PARTLY backfilled" fails for ten minutes a day.
+ *
+ * **The worse half is the test that kept passing.** "A fresh database does not fetch every coin
+ * twice" asserts there are no DUPLICATE fetches, and in that same ten-minute window that is
+ * trivially true because the daily pass never ran at all — so the spec guarding IB-BUG-006's
+ * actual regression was, for ten minutes a day, evidence of nothing. It passed for exactly the
+ * reason its neighbour failed.
+ *
+ * Noon UTC: both daily tasks (00:05 and 00:10) are due, so the duplicate path is genuinely
+ * exercised rather than skipped.
+ */
+const AFTER_DAILY = new Date('2026-10-12T12:00:00Z');
+/** 00:05 UTC: Fear & Greed is due (00:05) and the coins pass is NOT (00:10). */
+const BEFORE_COINS_DUE = new Date('2026-10-12T00:05:00Z');
+
 describe('IB-BUG-006: the forward-only series goes first', () => {
   it('polls /global BEFORE the backfill queues a single coin', async () => {
     // On a fresh database the backfill fetches 365 days for twenty coins and holds the keyless
@@ -145,11 +169,14 @@ describe('IB-BUG-006: a fresh database does not fetch every coin twice', () => {
     service.onApplicationBootstrap();
     for (let i = 0; i < 10; i += 1) await flush();
     // the clock's own tick, which on a fresh process used to start the duplicate pass
-    await service.tick(new Date());
+    await service.tick(AFTER_DAILY);
     service.onModuleDestroy();
 
     const perCoin = calls.filter((c) => c.startsWith('coin:'));
-    expect(perCoin).toHaveLength(new Set(perCoin).size); // each coin fetched exactly once
+    // the backfill must actually have RUN: "no duplicates" is trivially true of an empty list, and
+    // that is precisely how this test passed while its neighbour failed
+    expect(perCoin.length).toBeGreaterThan(0);
+    expect(perCoin).toHaveLength(new Set(perCoin).size); // and each coin exactly once
   });
 
   it('still runs the daily pass when the database is only PARTLY backfilled', async () => {
@@ -161,7 +188,7 @@ describe('IB-BUG-006: a fresh database does not fetch every coin twice', () => {
 
     service.onApplicationBootstrap();
     for (let i = 0; i < 10; i += 1) await flush();
-    await service.tick(new Date());
+    await service.tick(AFTER_DAILY);
     service.onModuleDestroy();
 
     const perCoin = calls.filter((c) => c.startsWith('coin:'));
@@ -186,10 +213,10 @@ describe('IB-BUG-006: one /global poll at a time', () => {
       return { data: { total_market_cap: { usd: 1 }, market_cap_percentage: { btc: 50 } } };
     };
 
-    const first = service.tick(new Date());
+    const first = service.tick(AFTER_DAILY);
     await flush();
-    await service.tick(new Date()); // the next 30-second tick, while the first is still waiting
-    await service.tick(new Date());
+    await service.tick(AFTER_DAILY); // the next 30-second tick, while the first is still waiting
+    await service.tick(AFTER_DAILY);
     expect(calls.filter((c) => c === 'global')).toHaveLength(1);
 
     release();
@@ -200,9 +227,43 @@ describe('IB-BUG-006: one /global poll at a time', () => {
   it('polls again once the in-flight one has settled and its slot is due', async () => {
     const calls: string[] = [];
     const { service } = build({ calls });
-    await service.tick(new Date());
+    await service.tick(AFTER_DAILY);
     // the slot is ten minutes out after a success, so the next poll is the one AFTER that
-    await service.tick(new Date(Date.now() + 11 * 60_000));
+    await service.tick(new Date(AFTER_DAILY.getTime() + 11 * 60_000));
     expect(calls.filter((c) => c === 'global')).toHaveLength(2);
   });
+});
+
+describe('IB-050: the daily boundary is asserted on BOTH sides', () => {
+  /**
+   * The pair this replaces gave no coverage at any time: one test was red between 00:00 and 00:10
+   * UTC (the coins pass is due from 00:10), and for the other 23 h 50 m its neighbour passed
+   * vacuously — "no duplicate fetches" is trivially true of a pass that never ran. One was red
+   * exactly when the other was meaningful.
+   *
+   * So the boundary itself is now the subject, from both sides, on an injected clock.
+   */
+  const closes = [
+    { label: '00:05 UTC — Fear & Greed due, coins not', at: BEFORE_COINS_DUE, coinsExpected: false },
+    { label: '12:00 UTC — both due', at: AFTER_DAILY, coinsExpected: true },
+  ];
+
+  for (const { label, at, coinsExpected } of closes) {
+    it(`runs the coins pass only after 00:10 — ${label}`, async () => {
+      const calls: string[] = [];
+      // a PARTLY backfilled database, so the daily pass is not suppressed and the only thing
+      // deciding whether coins are fetched is the time of day
+      const { service } = build({ calls, now: () => at.getTime() });
+      (service as unknown as { db: unknown }).db = {
+        query: async () => [{ coin: 'bitcoin', n: 365 }, { coin: 'ethereum', n: 365 }],
+      };
+
+      await service.tick(at);
+
+      expect(calls.some((c) => c.startsWith('coin:'))).toBe(coinsExpected);
+      // Fear & Greed is due at 00:05, so it runs at BOTH closes — which is what proves the 00:05
+      // case is a real evaluation rather than a tick that did nothing at all
+      expect(calls).toContain('fear-greed');
+    });
+  }
 });
