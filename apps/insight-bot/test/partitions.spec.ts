@@ -81,6 +81,8 @@ describe('partitionsFor', () => {
       'feature_frames',
       // migration 015 (IB-017) — the per-close audit row
       'playbook_evaluations',
+      // migration 018 (IB-054) — one frame pin per close per mode, no arm dimension
+      'playbook_frame_pins',
     ]);
     // The two unpartitioned tables of §3.3 must not appear.
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('funding_settlements');

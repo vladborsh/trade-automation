@@ -144,30 +144,72 @@ export async function recordEvaluation(db: DbHandle, row: EvaluationRow): Promis
 }
 
 /**
- * The frame revision already pinned for this close, by whichever arm touched it first.
+ * Claims the frame pin for a close, and returns **the pin that holds** — which may not be the one
+ * offered.
  *
- * Across ARMS deliberately — the pin is a property of `(playbook, symbol, close_time)`, not of
- * one arm. That is the whole point: the two arms of a close must be compared on the same
- * information, and the hazard is precisely that one of them is evaluated later, after a heal
- * pass has produced a better-informed revision.
+ * The pin is a property of `(playbook, symbol, close_time, source_mode)`, not of one arm: the two
+ * arms of a close must be compared on the same information, and the hazard is that one of them is
+ * evaluated later, after a heal pass has produced a better-informed revision. IB-054 moved it out
+ * of `playbook_evaluations`, where it was a per-arm column and so could not express the property
+ * it promised.
  *
- * Null when nothing has touched this close yet, in which case the caller's frame sets the pin.
+ * **Claim and read are ONE statement, deliberately.** A caller that read first and wrote second
+ * could lose a race and then evaluate against a frame that is not the pin — and nothing
+ * downstream would know. Here the only way to learn the pin is to offer one, so an arm cannot
+ * proceed on an unclaimed assumption.
+ *
+ * **Settled by content, not arrival.** `do update … where` keeps the LOWEST
+ * `(frame_version, frame_revision)` offered, so two writers racing reach the same pin in either
+ * order and a replay reproduces it. "Whichever arrived first" would be a pin whose value depends
+ * on scheduling, which is the one kind of race that cannot be reproduced when it goes wrong.
+ *
+ * Lowest rather than newest because the pin must be what the FIRST evaluation could have seen: a
+ * later, better-informed revision is precisely what the second arm must NOT be given.
  */
-export async function pinnedFrameRevision(
+export async function pinFrame(
   db: DbHandle,
-  q: { playbook: string; symbol: string; sourceMode: SourceMode; closeTimeMs: number },
-): Promise<{ revision: number; frameVersion: number } | null> {
+  q: {
+    playbook: string;
+    symbol: string;
+    sourceMode: SourceMode;
+    closeTimeMs: number;
+    frameRevision: number;
+    frameVersion: number;
+  },
+): Promise<{ revision: number; frameVersion: number }> {
   const rows = await db.query<{ frame_revision: number; frame_version: number }>(
-    `select frame_revision, frame_version from playbook_evaluations
-      where playbook = $1 and symbol = $2 and source_mode = $3 and close_time = $4
-      order by frame_revision
-      limit 1`,
-    [q.playbook, q.symbol, q.sourceMode, asDate(q.closeTimeMs)],
+    `insert into playbook_frame_pins
+       (playbook, symbol, close_time, source_mode, frame_revision, frame_version)
+     values ($1, $2, $3, $4, $5, $6)
+     on conflict (playbook, symbol, close_time, source_mode) do update
+        set frame_revision = excluded.frame_revision,
+            frame_version  = excluded.frame_version
+      where (excluded.frame_version, excluded.frame_revision)
+          < (playbook_frame_pins.frame_version, playbook_frame_pins.frame_revision)
+     returning frame_revision, frame_version`,
+    [q.playbook, q.symbol, asDate(q.closeTimeMs), q.sourceMode, q.frameRevision, q.frameVersion],
   );
-  const row = rows[0];
-  // Both halves or neither: a revision without its version is the ambiguity IB-053 removed, so
-  // it is not returned in a shape that lets a caller use one and forget the other.
-  return row ? { revision: row.frame_revision, frameVersion: row.frame_version } : null;
+
+  const written = rows[0];
+  if (written) return { revision: written.frame_revision, frameVersion: written.frame_version };
+
+  // `do update … where` that matches nothing returns NO row — the existing pin is older and
+  // stands. That is the common case (the second arm of a close), not an error, so the pin is
+  // read back rather than inferred from the value we offered.
+  const [held] = await db.query<{ frame_revision: number; frame_version: number }>(
+    `select frame_revision, frame_version from playbook_frame_pins
+      where playbook = $1 and symbol = $2 and close_time = $3 and source_mode = $4`,
+    [q.playbook, q.symbol, asDate(q.closeTimeMs), q.sourceMode],
+  );
+  if (!held) {
+    // Neither written nor present: the row was deleted between the two statements, which no code
+    // path does. Throwing beats returning the offered value and calling it the pin.
+    throw new Error(
+      `pinFrame: no pin for ${q.playbook}/${q.symbol}/${new Date(q.closeTimeMs).toISOString()}`
+      + ` (${q.sourceMode}) after an upsert that wrote nothing`,
+    );
+  }
+  return { revision: held.frame_revision, frameVersion: held.frame_version };
 }
 
 /** Has this close already been evaluated for this arm? The idempotency question, asked first. */

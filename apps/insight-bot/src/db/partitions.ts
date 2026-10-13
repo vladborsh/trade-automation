@@ -22,6 +22,9 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   // IB-017. ~576 rows/day for P3 across 3 symbols and 2 arms; partitioned for the same reason
   // as the rest, so a year's audit trail is droppable by month rather than by delete.
   { table: 'playbook_evaluations', column: 'close_time' },
+  // IB-054. One pin per close per mode — about half the evaluations rate, since it does not
+  // multiply by arm. Partitioned with the rest so the audit trail drops by month.
+  { table: 'playbook_frame_pins', column: 'close_time' },
 ];
 
 export interface Partition {

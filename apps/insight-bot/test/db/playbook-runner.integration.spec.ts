@@ -5,6 +5,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import type { Playbook } from '../../src/playbooks/playbook.port';
+import * as pinRepo from '../../src/playbooks/pg/playbooks.repo';
 import { PlaybookRunner } from '../../src/playbooks/runner.service';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
@@ -90,6 +91,9 @@ maybeDescribe('IB-017 the runner', () => {
     // run while passing alone — the ordering dependency was in the fixture, not the code.
     await db.query(`delete from feature_frames`);
     await db.query(`delete from playbook_evaluations`);
+    // IB-054: the pin now outlives the evaluations row, so clearing evaluations alone would
+    // leave a close pinned and the next test's first arm would silently inherit it.
+    await db.query(`delete from playbook_frame_pins`);
     await db.query(`delete from signals`);
     await db.query(`delete from playbook_state`);
     await db.query(`delete from cooldowns`);
@@ -459,6 +463,75 @@ maybeDescribe('IB-017 the runner', () => {
       const rows = await db.query<{ close_time: Date; frame_revision: number }>(
         `select distinct close_time, frame_revision from playbook_evaluations order by close_time`);
       expect(rows.map((r) => r.frame_revision)).toEqual([1, 3]);
+    });
+  });
+
+  /**
+   * IB-054 — the properties a per-arm COLUMN could not express.
+   *
+   * The pin's promise is that the two arms of one close are judged on the same frame. As a
+   * column on `playbook_evaluations` that was enforced by logic: nothing stopped two arms
+   * carrying different values, and once evaluations gain revisions a re-evaluation could write a
+   * new row with a different revision and silently re-pin the close. The table's PRIMARY KEY
+   * `(playbook, symbol, close_time, source_mode)` — note the absence of `arm` — makes a second,
+   * disagreeing pin impossible rather than forbidden.
+   */
+  describe('the frame pin table', () => {
+    const pin = (revision: number, frameVersion = 1, closeMs = T0) => pinRepo.pinFrame(db, {
+      playbook: 'P3', symbol: SYMBOL, sourceMode: 'live', closeTimeMs: closeMs,
+      frameRevision: revision, frameVersion,
+    });
+
+    it('returns the HELD pin to a second arm, not the one it offered', async () => {
+      expect(await pin(1)).toEqual({ revision: 1, frameVersion: 1 });
+      // The second arm arrives after a heal and offers revision 2. It is told revision 1.
+      expect(await pin(2)).toEqual({ revision: 1, frameVersion: 1 });
+
+      const rows = await db.query<{ n: string }>(
+        `select count(*) as n from playbook_frame_pins where close_time = $1`, [new Date(T0)]);
+      expect(Number(rows[0]?.n)).toBe(1); // one pin per close, structurally
+    });
+
+    it('settles by CONTENT, so the two arrival orders agree', async () => {
+      // The property that makes a race reproducible. Offering the lower revision second must
+      // reach the same pin as offering it first — otherwise the pin depends on scheduling and a
+      // replay of the same inputs can disagree with the original run.
+      await pin(2, 1, T0);
+      const lateLow = await pin(1, 1, T0);
+
+      const other = T0 + 900_000;
+      await pin(1, 1, other);
+      const earlyLow = await pin(2, 1, other);
+
+      expect(lateLow).toEqual({ revision: 1, frameVersion: 1 });
+      expect(earlyLow).toEqual({ revision: 1, frameVersion: 1 });
+      expect(lateLow).toEqual(earlyLow);
+    });
+
+    it('orders by VERSION before revision — a v1 frame precedes any v2 frame', async () => {
+      // (frame_version, frame_revision) compared row-wise, not revision alone: v2 revision 1 is
+      // a later frame than v1 revision 9, because the definition changed after it (IB-053).
+      await pin(1, 2);
+      expect(await pin(9, 1)).toEqual({ revision: 9, frameVersion: 1 });
+    });
+
+    it('cannot hold two disagreeing pins for one close — the key says so', async () => {
+      await pin(1);
+      await expect(db.query(
+        `insert into playbook_frame_pins
+           (playbook, symbol, close_time, source_mode, frame_revision, frame_version)
+         values ('P3',$1,$2,'live',2,1)`, [SYMBOL, new Date(T0)],
+      )).rejects.toThrow(/duplicate key|unique/i);
+    });
+
+    it('keeps modes apart: a backtest pin does not bind the live one', async () => {
+      await pin(1);
+      const bt = await pinRepo.pinFrame(db, {
+        playbook: 'P3', symbol: SYMBOL, sourceMode: 'backtest', closeTimeMs: T0,
+        frameRevision: 7, frameVersion: 1,
+      });
+      expect(bt).toEqual({ revision: 7, frameVersion: 1 });
+      expect(await pin(5)).toEqual({ revision: 1, frameVersion: 1 });
     });
   });
 });

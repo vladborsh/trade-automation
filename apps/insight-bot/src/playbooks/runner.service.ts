@@ -329,24 +329,28 @@ export class PlaybookRunner {
   }
 
   /**
-   * The frame this arm must evaluate against: the pinned revision, or the handed one when this
-   * arm is the first to touch the close.
+   * The frame this arm must evaluate against: whatever the close is PINNED to.
    *
-   * Returns null only when a pin exists and that revision cannot be read. Frames are
-   * append-only, so that is a real finding about the frames table rather than an expected miss
-   * — and substituting the newest revision instead is exactly the defect being prevented.
+   * Since IB-054 this arm does not decide the pin and cannot skip claiming one — `pinFrame`
+   * claims and reads in a single statement, so the only way to learn the pin is to offer the
+   * frame in hand. When this arm is first its own frame becomes the pin and is returned
+   * unchanged; when it is second it gets whatever the first arm settled on.
+   *
+   * Returns null only when the pin names a frame that cannot be read. Frames are append-only,
+   * so that is a real finding about the frames table rather than an expected miss — and
+   * substituting the newest revision instead is exactly the defect being prevented.
    */
   private async frameForClose(ctx: {
     playbook: Playbook; symbol: string; sourceMode: SourceMode; closeMs: number; frame: WebFeatureFrame;
   }): Promise<WebFeatureFrame | null> {
-    const pinned = await repo.pinnedFrameRevision(this.deps.db, {
+    const pinned = await repo.pinFrame(this.deps.db, {
       playbook: ctx.playbook.id, symbol: ctx.symbol, sourceMode: ctx.sourceMode,
       closeTimeMs: ctx.closeMs,
+      frameRevision: ctx.frame.revision, frameVersion: ctx.frame.frameVersion,
     });
     // The pin matches only when BOTH halves do: same revision of the same version. A v2 frame
     // at revision 1 is not the frame a v1 pin at revision 1 refers to (IB-053).
-    if (pinned === null
-      || (pinned.revision === ctx.frame.revision && pinned.frameVersion === ctx.frame.frameVersion)) {
+    if (pinned.revision === ctx.frame.revision && pinned.frameVersion === ctx.frame.frameVersion) {
       return ctx.frame;
     }
     const read = this.deps.readFrameRevision ?? defaultReadFrameRevision;
