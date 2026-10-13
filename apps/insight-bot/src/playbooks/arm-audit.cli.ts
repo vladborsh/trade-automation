@@ -71,6 +71,18 @@ async function main(): Promise<void> {
   const fromMs = parseBound(arg('from') ?? '', 'from');
   const toMs = parseBound(arg('to') ?? '', 'to');
   const showRows = Number(arg('rows', '10'));
+  /**
+   * Which DEFINITION this audit is about (IB-053).
+   *
+   * `frame_version` is in the frames key now, so one close can hold a v1 and a v2 frame and they
+   * answer different questions: v2's `atr.4h.14` needs 71 four-hourly bars where v1's needed 15,
+   * so the same close legitimately computes under one and refuses under the other. An audit that
+   * did not name its version would average two definitions and read as a single finding.
+   *
+   * Defaults to the current version — "what would arm today" — and takes an older one explicitly,
+   * because auditing history under a superseded definition is a deliberate act.
+   */
+  const frameVersion = Number(arg('frame-version', String(WEB_FRAME_VERSION)));
 
   const playbook = buildRegistry().get(playbookId);
   if (!playbook) throw new Error(`no playbook ${playbookId} in the registry`);
@@ -82,19 +94,34 @@ async function main(): Promise<void> {
     // below: a v1 and a v2 frame for one close are different definitions, and an audit that
     // mixed them would report a count belonging to neither. The version audited is printed
     // rather than assumed — see the header line.
-    const all = await publishedFramesBetween(db, tf, fromMs, toMs, WEB_FRAME_VERSION);
+    const all = await publishedFramesBetween(db, tf, fromMs, toMs, frameVersion);
     const frames = all.filter((f) => f.symbol === symbol);
     // The audit must not straddle live and backfilled frames: a backfilled frame saw buckets that
     // derive healed after the close, so its refusals are a LOWER bound on what the live pass
     // refused. Mixing the two would produce a count that is neither.
     assertSingleComputedMode(frames);
+    // The query filters by version, so this cannot fire today — it is here so that a future change
+    // to the read cannot silently widen the audit across a definition boundary.
+    const strayVersion = frames.find((f) => f.frameVersion !== frameVersion);
+    if (strayVersion) {
+      throw new Error(
+        `frame at ${new Date(strayVersion.closeTime * 1000).toISOString()} is version ` +
+          `${strayVersion.frameVersion}, not the ${frameVersion} this audit is about`,
+      );
+    }
     console.log(
       `${playbookId} arming audit — ${symbol} ${tf}, ${new Date(fromMs).toISOString().slice(0, 10)} … ` +
         `${new Date(toMs).toISOString().slice(0, 10)}: ${frames.length} stored frames`,
     );
-    console.log(`frame version: ${WEB_FRAME_VERSION} (frames of other versions are NOT in this count)`);
     console.log(`armKeys: ${playbook.keys.armKeys.join(', ')}`);
-    console.log(`computed mode: ${frames[0]?.computedMode ?? 'n/a'} (uniform — assertSingleComputedMode passed)`);
+    // The version printed is the one AUDITED (--frame-version), not WEB_FRAME_VERSION: an audit of
+    // an older definition is a legitimate run, and a header naming the code's current version while
+    // the counts come from another one is the mix-up frame_version exists to prevent.
+    console.log(
+      `frame_version: ${frameVersion} (the definition this audit is about; ` +
+        `frames of other versions are NOT in these counts) | ` +
+        `computed mode: ${frames[0]?.computedMode ?? 'n/a'} (uniform — assertSingleComputedMode passed)`,
+    );
 
     const reasonCounts = new Map<string, number>();
     let armable = 0;
