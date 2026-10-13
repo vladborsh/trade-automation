@@ -9,6 +9,15 @@ import { CalendarEventRow } from '../../src/collectors/writers/tables';
  */
 const WED = '2026-09-30T12:30:00-04:00'; // ForexFactory JSON carries an ET offset
 
+/**
+ * One fixed instant for the whole file.
+ *
+ * IB-051 made `poll(now)` REQUIRED rather than defaulted, which turned every call here into a
+ * compile error — and that is the point: a default cannot fail, so these calls were silently
+ * taking the real wall clock, exactly as `tick()` did before it passed its own instant down.
+ */
+const POLL_AT = Date.parse('2026-10-12T12:00:00Z');
+
 function jsonRow(overrides: Record<string, string> = {}) {
   return {
     title: 'Non-Farm Employment Change',
@@ -43,7 +52,7 @@ class FakeFeed {
 }
 
 function snapshot(json: unknown[], xml: FeedXmlRow[]): FeedFetchOutcome {
-  return { changed: true, json, xml, etag: { json: 'a', xml: 'b' }, fetchedAt: Date.now() };
+  return { changed: true, json, xml, etag: { json: 'a', xml: 'b' }, fetchedAt: POLL_AT };
 }
 
 function build() {
@@ -79,7 +88,7 @@ describe('CalendarCollectorService', () => {
     const { service, feed, written } = build();
     feed.outcomes.push(snapshot([jsonRow()], [xmlRow()]));
 
-    await service.poll();
+    await service.poll(POLL_AT);
 
     expect(written).toHaveLength(1);
     expect(written[0]).toMatchObject({
@@ -98,9 +107,9 @@ describe('CalendarCollectorService', () => {
     const { service, feed, written } = build();
     feed.outcomes.push(snapshot([jsonRow()], [xmlRow()]), snapshot([jsonRow()], [xmlRow()]));
 
-    await service.poll();
+    await service.poll(POLL_AT);
     written.length = 0;
-    await service.poll();
+    await service.poll(POLL_AT);
 
     expect(written).toEqual([]);
   });
@@ -112,8 +121,8 @@ describe('CalendarCollectorService', () => {
       snapshot([jsonRow({ forecast: '170K' })], [xmlRow({ forecast: '170K' })]),
     );
 
-    await service.poll();
-    await service.poll();
+    await service.poll(POLL_AT);
+    await service.poll(POLL_AT);
 
     expect(written.map((r) => [r.revision, r.forecast])).toEqual([
       [1, '165K'],
@@ -130,9 +139,9 @@ describe('CalendarCollectorService', () => {
       snapshot([jsonRow()], [xmlRow()]),
     );
 
-    await service.poll();
+    await service.poll(POLL_AT);
     written.length = 0;
-    await service.poll();
+    await service.poll(POLL_AT);
 
     expect(written).toHaveLength(1);
     expect(written[0]).toMatchObject({ title: 'ISM Services PMI', status: 'cancelled', revision: 2 });
@@ -148,9 +157,9 @@ describe('CalendarCollectorService', () => {
       snapshot([jsonRow({ previous: '151K' })], [xmlRow()]),
     );
 
-    await service.poll();
+    await service.poll(POLL_AT);
     written.length = 0;
-    await service.poll();
+    await service.poll(POLL_AT);
 
     const backfilled = written.find((r) => r.id === 'ff:832:2026-09-02');
     expect(backfilled).toMatchObject({ actual: '151K', actualSource: 'next-previous', revision: 2 });
@@ -160,7 +169,7 @@ describe('CalendarCollectorService', () => {
     const { service, feed, written, streams } = build();
     feed.outcomes.push({ changed: false });
 
-    await service.poll();
+    await service.poll(POLL_AT);
 
     expect(written).toEqual([]);
     expect(streams.recordMessage).toHaveBeenCalled(); // a 304 is a healthy poll, not silence
@@ -169,13 +178,13 @@ describe('CalendarCollectorService', () => {
   it('swallows a feed error, counts it, and keeps the events it already holds', async () => {
     const { service, feed, written } = build();
     feed.outcomes.push(snapshot([jsonRow()], [xmlRow()]));
-    await service.poll();
+    await service.poll(POLL_AT);
     written.length = 0;
 
     feed.fetch = async () => {
       throw new Error('ForexFactory feed JSON request failed: 503');
     };
-    await expect(service.poll()).resolves.toBeUndefined();
+    await expect(service.poll(POLL_AT)).resolves.toBeUndefined();
 
     expect(written).toEqual([]);
     expect(service.healthStatus().eventsHeld).toBe(1);

@@ -60,7 +60,9 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
     this.streams.register(CALENDAR_STREAM_ID, 'forexfactory', Math.round(this.cadence.intervalMs / 1000));
 
     await this.seedCache();
-    await this.poll(); // §3.4: boot polls immediately, before the loop starts
+    // §3.4: boot polls immediately, before the loop starts. The instant is read HERE, at the
+    // origin, and passed down — see `poll`'s signature.
+    await this.poll(Date.now());
     this.timer = setInterval(() => void this.tick(), HARD_POLL_FLOOR_MS);
   }
 
@@ -84,10 +86,15 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
   private async tick(): Promise<void> {
     const now = Date.now();
     if (!isPollDue(now, this.lastPolledAt, [...this.cache.values()], this.consecutiveErrors, this.cadence)) return;
-    await this.poll();
+    // IB-051: the SAME instant the due-check used. It used to call `poll()` and let the default
+    // fire, so the decision and the stamp came from two reads — and `lastPolledAt`, which the next
+    // due-check compares against, was the second one. Microseconds apart in production and no
+    // outcome I could construct changed, but it is the partial-threading shape, and `poll`'s
+    // parameter is now required so the next caller cannot repeat it by omission.
+    await this.poll(now);
   }
 
-  async poll(now = Date.now()): Promise<void> {
+  async poll(now: number): Promise<void> {
     this.lastPolledAt = now;
     try {
       const result = await this.feedClient.fetch(this.lastEtag);
