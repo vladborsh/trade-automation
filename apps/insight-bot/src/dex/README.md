@@ -118,16 +118,21 @@ returns exactly one result. (Checked the inputs were distinct before concluding 
 used five addresses that might have shared a base token, and "it does not batch" and "I sent the
 same token five times" produce identical output.)
 
-So GoPlus is **one request per token**, which makes it the dominant consumer:
+So GoPlus is **one request per token**, which would make it the dominant consumer if the data
+decided the rate:
 
 ```
-first sight:  <= 20 new tokens x 4 networks per cycle = <= 80 req / 10 min = 8/min  (worst case)
-re-checks:    each token again at +6 h and +24 h
+if the queue were drained:  <= 20 new tokens x 4 networks per cycle = <= 80 req / 10 min = 8/min
+plus re-checks:             each token again at +6 h and +24 h
 ```
 
-8/min against a measured 46/min is ~17 %. The worst case assumes every pool in every page is a new
-token every cycle, which it is not — tokens repeat across cycles and across pools, and only a
-first sighting needs the first-sight call.
+**It does not, because the loop caps it.** `SECURITY_CALLS_PER_TICK = 1` on a 15-second tick is
+**4/min, flat**, whatever a cycle discovers: a backlog of 80 tokens is worked through over the
+following ten minutes instead of in a burst. That is the one budget here driven by data rather than
+by the schedule, which is exactly why it is the one with a cap — a backlog is visible and harmless,
+a burst is a 429 and a hole in the history.
+
+4/min against a measured ≥ 46/min is under 9 %, and it cannot drift upwards with the market.
 
 ## Three APIs, three budgets
 
@@ -158,11 +163,20 @@ three looks rather than one.
 
 ## GoPlus field presence, per chain family
 
-A field we read being absent has two causes and they need opposite handling: the API changing shape
-must throw, a token GoPlus has nothing to say about must become `null` meaning *not told*. One
-assertion covering both threw on normal data and lost the row — permanently, because a failed ask
-is retried and then abandoned, so we would have ended up ignorant about a token's security
-*because* the venue answered. Found by the live pass inside the hour.
+A field we read being absent has two possible causes and they need opposite handling: **the API
+changed shape**, or **this token has nothing to say about that field**. One assertion covering both
+threw on normal data and lost the row — permanently, because a failed ask is retried and then
+abandoned, so we would have ended up ignorant about a token's security *because* the venue answered.
+Found by the live pass inside the hour.
+
+Where each case is handled now, since this section has been rewritten by measurement twice:
+
+| case | what happens | why |
+|---|---|---|
+| the payload is not GoPlus | `assertEnvelope` **throws** | the envelope has never varied; it is the only thing that identifies the API |
+| it is the other chain family | **throws** on positive evidence | storing it would file one chain's data under another's label |
+| a field is absent for this token | `null`, recorded in `absent_fields` | precisely true, and a state the schema already distinguishes |
+| a field classified `always` is absent | row kept, **ERROR logged** | either a shape change or my classification was too strong; both need a human, neither is worth the row |
 
 So every field is classified in `FIELD_CONTRACTS` and the classification carries its evidence:
 
@@ -182,6 +196,32 @@ distinct token:
 | evm | `total_supply` | 1 of 7 answered base tokens in B, 1 in the live run | optional |
 | evm | `cannot_buy` | 1 base token during the live run | optional |
 | evm | `buy_tax`, `sell_tax` | **both** absent on BSC token `0x8d0d…08b0d`, 20 minutes into the 24-hour run | optional |
+
+### The classification was falsified within minutes, and that changed the mechanism
+
+Minutes after `holder_count` was classified `always` on the strength of 36 answered tokens, the live
+run hit an Ethereum token omitting **both `holder_count` and `total_supply`**. Comparing the two real
+EVM responses:
+
+```
+shared by both:  buy_tax, cannot_buy, is_in_dex, is_open_source, sell_tax   (5)
+one only:        14 fields in one, 29 in the other
+```
+
+**GoPlus EVM is not one shape with optional fields; it is a per-token field set** — 5 of 29 names in
+common. "Present in every token I sampled" is a weak basis for a rule that throws, and the next
+sample keeps falsifying it. So:
+
+- a field classified `always` going missing is **recorded and raised, not thrown**: the row is
+  stored, `absent_fields` names it, and the collector logs it at ERROR with the evidence behind the
+  classification, so the reader can tell "the API changed" from "that classification was too strong";
+- a **throw** is reserved for a payload carrying no field distinctive to the family, where there is
+  nothing to record — a renamed payload, the wrong chain family, or an error object wearing a 200.
+
+That keeps the requirement that a key we rely on must not vanish into a silent null, without the
+data loss: the first version discarded rows for tokens whose response does carry `is_honeypot`.
+**A field without two occasions behind it is `optional`** for the same asymmetry — a wrong
+`optional` is a null visible in `absent_fields`, a wrong `always` was losing rows.
 
 ### EVM has NO always-present field, and that is a measurement
 
@@ -210,32 +250,6 @@ So `ALWAYS_PRESENT.evm` is deliberately empty, which means:
 `test/dex/field-contracts.spec.ts` pins the emptiness together with its reason, so refilling the
 list from a clean window is a failing test rather than a tidy-up. Solana still has five
 always-present fields on 37-for-37; if the run falsifies one, the move is the same again.
-
-### The classification was falsified within minutes, and that changed the mechanism
-
-Minutes after `holder_count` was classified `always` on the strength of 36 answered tokens, the live
-run hit an Ethereum token omitting **both `holder_count` and `total_supply`**. Comparing the two real
-EVM responses:
-
-```
-shared by both:  buy_tax, cannot_buy, is_in_dex, is_open_source, sell_tax   (5)
-one only:        14 fields in one, 29 in the other
-```
-
-**GoPlus EVM is not one shape with optional fields; it is a per-token field set** — 5 of 29 names in
-common. "Present in every token I sampled" is a weak basis for a rule that throws, and the next
-sample keeps falsifying it. So:
-
-- a field classified `always` going missing is **recorded and raised, not thrown**: the row is
-  stored, `absent_fields` names it, and the collector logs it at ERROR with the evidence behind the
-  classification, so the reader can tell "the API changed" from "that classification was too strong";
-- a **throw** is reserved for a payload carrying no field distinctive to the family, where there is
-  nothing to record — a renamed payload, the wrong chain family, or an error object wearing a 200.
-
-That keeps the requirement that a key we rely on must not vanish into a silent null, without the
-data loss: the first version discarded rows for tokens whose response does carry `is_honeypot`.
-**A field without two occasions behind it is `optional`** for the same asymmetry — a wrong
-`optional` is a null visible in `absent_fields`, a wrong `always` was losing rows.
 
 ### And a correction to my own earlier finding
 

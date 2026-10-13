@@ -25,13 +25,15 @@ import { neverReject } from '../ops/never-reject';
  * ```
  * GeckoTerminal  8 calls / 10 min cycle                  = 0.8/min   (16 % of ~5/min measured)
  * DexScreener    1 batched call per GeckoTerminal page    = 0.8/min   (< 1 % of >= 107/min)
- * GoPlus         <= 1 call per tick, capped per cycle     = <= 4/min  (<= 9 % of >= 46/min)
+ * GoPlus         <= 1 call per TICK, not per cycle        = <= 4/min  (<= 9 % of >= 46/min)
  * ```
  *
- * GoPlus is the only one whose worst case is driven by data rather than by the schedule — a cycle
- * can discover up to 80 new tokens — so it is capped at `SECURITY_CALLS_PER_TICK` per tick instead
- * of being allowed to drain the queue. A backlog is visible and harmless; a burst is a 429 and a
- * gap in the history.
+ * GoPlus is the only one whose demand is driven by data rather than by the schedule — a cycle can
+ * discover up to 80 new tokens, which would be 8/min if the queue were drained — so it is capped at
+ * `SECURITY_CALLS_PER_TICK` per tick, making the rate **4/min flat whatever the market does**. A
+ * backlog is visible and harmless; a burst is a 429 and a gap in the history. The cap is why the
+ * README's budget table can state a number for GoPlus at all: without it the figure would be a
+ * function of how many new pools exist today.
  *
  * **Collection only.** Nothing here filters, scores or alerts. Every pool seen is written,
  * including the ones a later rule would discard, because the discarded ones are what makes that
