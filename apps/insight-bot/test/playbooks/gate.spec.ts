@@ -1,4 +1,4 @@
-import type { WebFeatureFrame } from '@trade-automation/contracts';
+import { featureSpecFingerprint, type WebFeatureFrame } from '@trade-automation/contracts';
 import { NO_REGIME_AXES, evaluateContextGate, type ReadRegimeAxis } from '../../src/playbooks/gate';
 import type { ContextGate } from '../../src/playbooks/config';
 
@@ -13,7 +13,7 @@ const frame = (keys: WebFeatureFrame['keys']): WebFeatureFrame => ({
   symbol: 'BTCUSDT', tf: '15m', closeTime: 1_760_000_000, frameVersion: 1,
   keys, basis: { venues: [], coverage: 'not_recorded', coveredHours: null },
   complete: false, incompleteReason: [], revision: 1, amendedAt: null, amendedKeys: [],
-  computedMode: 'live', computedAt: 1_760_000_015,
+  computedMode: 'live', computedAt: 1_760_000_015, specFingerprint: featureSpecFingerprint(),
 });
 
 const axis = (read: ReturnType<ReadRegimeAxis>): ReadRegimeAxis => () => read;

@@ -1,5 +1,6 @@
 import {
-  WEB_FEATURE_KEYS, WEB_FRAME_VERSION, assertSingleRevisionPerClose, latestRevisions,
+  WEB_FEATURE_KEYS, WEB_FRAME_VERSION, assertSingleRevisionPerClose, featureSpecFingerprint,
+  latestRevisions,
   type WebFeatureFrame, type WebFeatureValue,
 } from '@trade-automation/contracts';
 import { applyAmendment, decideAmendment } from '../../src/features/frame-amendment';
@@ -13,7 +14,8 @@ const frame = (keys: Record<string, WebFeatureValue>, over: Partial<WebFeatureFr
   keys, basis: { venues: ['bybit'], coverage: 'not_recorded', coveredHours: null },
   complete: Object.values(keys).every((v) => v.ok), incompleteReason: [],
   revision: 1, amendedAt: null, amendedKeys: [],
-  computedMode: 'live' as const, computedAt: CLOSE, ...over,
+  computedMode: 'live' as const, computedAt: CLOSE,
+  specFingerprint: featureSpecFingerprint(), ...over,
 });
 
 describe('decideAmendment', () => {
@@ -177,6 +179,7 @@ describe('a chaseable refusal becoming a permanent one', () => {
     complete: false, incompleteReason: ['x'], revision: 1,
     amendedAt: null as number | null, amendedKeys: [] as string[],
     computedMode: 'live' as const, computedAt: 1_760_000_000,
+    specFingerprint: featureSpecFingerprint(),
   });
 
   it('AMENDS, so the unhealed-gap counter can drain', () => {
@@ -245,6 +248,7 @@ describe('comparing a value that has been through jsonb', () => {
     complete: true, incompleteReason: [] as string[], revision: 1,
     amendedAt: null as number | null, amendedKeys: [] as string[],
     computedMode: 'live' as const, computedAt: 1_760_000_015,
+    specFingerprint: featureSpecFingerprint(),
   });
 
   it('writes NOTHING when only the key ORDER differs — the 17,000-a-day bug', () => {
