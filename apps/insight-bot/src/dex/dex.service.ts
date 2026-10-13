@@ -5,7 +5,7 @@ import {
 } from '../db/pg/dex-store';
 import { DexClient } from './dex.client';
 import { mapPairs } from './dexscreener';
-import { mapTokenSecurity, type ChainFamily } from './goplus';
+import { FIELDS, mapTokenSecurity, type ChainFamily } from './goplus';
 import { mapPools, type Network } from './mappers';
 import {
   afterAttempt, keyOf, nextDue, SECURITY_STAGES, type Call, type CallState, type SecurityStage,
@@ -234,7 +234,9 @@ export class DexService implements OnApplicationBootstrap, OnModuleDestroy {
         await writeTokenSecurity(db, token.tokenId, stage, new Date(now), {
           chainFamily: family, mintable: null, freezable: null, closable: null, metadataMutable: null,
           balanceMutableAuthority: null, isOpenSource: null, cannotBuy: null, buyTax: null,
-          sellTax: null, holderCount: null, totalSupply: null, raw: JSON.parse(outcome.body),
+          sellTax: null, holderCount: null, totalSupply: null,
+          // nothing was said about ANY field, because there was no token object to read
+          absentFields: [...FIELDS[family]], raw: JSON.parse(outcome.body),
         });
         this.logger.log(`goplus ${token.tokenId} @ ${stage}: answered with no data for this token`);
         return;

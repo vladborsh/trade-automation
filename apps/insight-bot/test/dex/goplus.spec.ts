@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertFieldsPresent, EVM_FIELDS, FIELDS, flagOrNull, mapTokenSecurity, SOLANA_FIELDS } from '../../src/dex/goplus';
+import {
+  absentFields, assertShapeRecognisable, DISTINCTIVE_FIELDS, EVM_FIELDS, FIELDS, flagOrNull,
+  mapTokenSecurity, SOLANA_FIELDS,
+} from '../../src/dex/goplus';
 
 /**
  * IB-028 — GoPlus's two response shapes, pinned by committed fixtures from real calls.
@@ -74,20 +77,73 @@ describe('mapping, per chain family', () => {
   });
 });
 
-describe('a field we read disappearing from the API must THROW', () => {
-  it('throws, rather than producing a null that means "not told"', () => {
+/*
+ * The invariant the live pass corrected.
+ *
+ * My first version threw when ANY field was absent. Measured 2026-10-12 on the real API, GoPlus
+ * omits an attribute it has nothing to say about per token, routinely: `metadata_mutable` on 1 of
+ * 12 Solana tokens, `is_open_source` on 4 of 9 BSC tokens, plus `cannot_buy` and `total_supply` on
+ * EVM. Under the strict rule each of those became a FAILED ask, retried five times and abandoned —
+ * so we would have been permanently ignorant about a token's security BECAUSE the venue answered.
+ *
+ * Both directions are asserted below, because the fix must not become "never throw".
+ */
+describe('one absent field is "not told"; ZERO fields present is a shape change', () => {
+  it('maps a token that omits a field, and RECORDS which one — not a throw', () => {
     const payload = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
     const [addr, token] = Object.entries(payload.result)[0];
+    expect('buy_tax' in token).toBe(true); // the premise, before we remove it
     delete token['buy_tax'];
     payload.result[addr] = token;
 
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm'))
-      .toThrow(/missing field\(s\) we read: buy_tax/);
+    const mapped = mapTokenSecurity(JSON.stringify(payload), 'evm')!;
+    expect(mapped.row.buyTax).toBeNull();               // not told
+    expect(mapped.row.absentFields).toEqual(['buy_tax']); // and we know we were not told
+    expect(mapped.row.holderCount).not.toBeNull();      // the rest still mapped
   });
 
-  it('names every missing field, not just the first', () => {
-    expect(() => assertFieldsPresent({ total_supply: '1' }, 'evm'))
-      .toThrow(/is_open_source, cannot_buy, buy_tax, sell_tax, holder_count/);
+  it('records nothing absent for a response that carries every field — the positive control', () => {
+    expect(mapTokenSecurity(EVM, 'evm')!.row.absentFields).toEqual([]);
+    expect(mapTokenSecurity(SOLANA, 'solana')!.row.absentFields).toEqual([]);
+  });
+
+  it('THROWS when no distinctive field is present, naming what it did see', () => {
+    const payload = { result: { '0xabc': { code: 4011, message: 'not supported' } } };
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm'))
+      .toThrow(/contains NONE of the \d+ fields distinctive to evm/);
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/keys present: code, message/);
+  });
+
+  it('throws on the WRONG chain family, which is the same failure wearing a 200', () => {
+    // and this is why the check needs DISTINCTIVE fields: total_supply is in both lists, so a
+    // Solana payload read as EVM does carry one field we read — the first threshold let it through
+    expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/NONE of the/);
+    expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/NONE of the/);
+    expect(DISTINCTIVE_FIELDS.evm).not.toContain('total_supply');
+    expect(DISTINCTIVE_FIELDS.solana).not.toContain('total_supply');
+  });
+
+  it('the SHARED field alone is not enough, and one distinctive field is', () => {
+    expect(() => assertShapeRecognisable({ total_supply: '1' }, 'evm')).toThrow(/NONE of the/);
+    expect(() => assertShapeRecognisable({ total_supply: '1', buy_tax: '' }, 'evm')).not.toThrow();
+    expect(absentFields({ total_supply: '1' }, 'evm')).toEqual(
+      EVM_FIELDS.filter((f) => f !== 'total_supply'),
+    );
+  });
+
+  it('tolerates the omissions actually measured on the live API', () => {
+    // solana: metadata_mutable on 1 of 12; bsc: is_open_source on 4 of 9
+    const sol = JSON.parse(SOLANA) as { result: Record<string, Record<string, unknown>> };
+    const [sa, st] = Object.entries(sol.result)[0];
+    delete st['metadata_mutable'];
+    sol.result[sa] = st;
+    expect(mapTokenSecurity(JSON.stringify(sol), 'solana')!.row.absentFields).toEqual(['metadata_mutable']);
+
+    const evm = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
+    const [ea, et] = Object.entries(evm.result)[0];
+    delete et['is_open_source'];
+    evm.result[ea] = et;
+    expect(mapTokenSecurity(JSON.stringify(evm), 'evm')!.row.absentFields).toEqual(['is_open_source']);
   });
 
   it('a field PRESENT but empty does not throw — that is a measured absence', () => {

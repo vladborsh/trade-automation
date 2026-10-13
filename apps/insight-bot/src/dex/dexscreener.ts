@@ -25,6 +25,23 @@ import { numberOrNull, type Network } from './mappers';
  * case on Solana would be a correctness bug rather than a convenience, which is why this is a
  * per-chain decision and not one `toLowerCase()`.
  *
+ * ## The CHAIN SLUG is a third spelling of the same entity
+ *
+ * GeckoTerminal calls Ethereum `eth`; DexScreener calls it `ethereum`. Measured 2026-10-12 on the
+ * live API: `/latest/dex/pairs/eth/<any address>` answers **HTTP 400 for one address and for
+ * twenty alike** — it is the slug, not the batch size — while `/latest/dex/pairs/ethereum/<the
+ * same 20>` returns all 20 pairs. `solana`, `base` and `bsc` are spelled the same by both venues.
+ *
+ * So passing our own network name through would have been a **permanent, total loss of DexScreener
+ * data for one of the four networks**, reported as `HTTP 400` in a warning line next to three
+ * networks that worked — a wrong number wearing a believable explanation, again. Found by the live
+ * pass, not by a spec, because every fixture had been recorded with a slug that happened to work.
+ *
+ * The slug map below is therefore pinned by `assertChainId`: the response echoes `chainId`, so a
+ * venue that renames a chain makes the mapper THROW rather than quietly storing another chain's
+ * pairs under our label. That is the shape carrying a behavioural invariant, which AGENTS.md says
+ * to assert at runtime rather than measure.
+ *
  * ## A pool DexScreener does not know gets NO ROW
  *
  * 19 pairs for 20 addresses is routine, and the missing one is not a pair with zero liquidity —
@@ -62,6 +79,36 @@ export interface PairMapResult {
   /** Addresses we asked about and were told nothing about. Reported, never written as zeros. */
   missing: string[];
   skipped: Array<{ reason: string; sample: string }>;
+}
+
+/**
+ * DexScreener's own name for each chain. `eth` -> `ethereum`; the other three agree.
+ *
+ * Measured, not read from documentation: `eth` is an HTTP 400 for a single address as much as for
+ * twenty, and `ethereum` returns the full page for the same addresses.
+ */
+export const DEXSCREENER_CHAINS: Record<Network, string> = {
+  solana: 'solana',
+  base: 'base',
+  bsc: 'bsc',
+  eth: 'ethereum',
+};
+
+/**
+ * The response says which chain it is about, so the slug map is checkable at runtime.
+ *
+ * Throws rather than warns: a mismatch means we are about to store one chain's pairs under another
+ * chain's label, and the rows would be indistinguishable from correct ones afterwards.
+ */
+export function assertChainId(pair: Record<string, unknown>, network: Network): void {
+  const expected = DEXSCREENER_CHAINS[network];
+  const got = pair.chainId;
+  if (typeof got === 'string' && got !== expected) {
+    throw new Error(
+      `dexscreener ${network}: response says chainId "${got}" but we asked for "${expected}" — ` +
+      'the chain slug map is wrong or the venue renamed a chain',
+    );
+  }
 }
 
 /**
@@ -122,6 +169,7 @@ export function mapPairs(
       skipped.push({ reason: 'pair without a pairAddress', sample: JSON.stringify(entry).slice(0, 120) });
       continue;
     }
+    assertChainId(pair as Record<string, unknown>, network);
     const key = addressKey(network, address);
     if (byKey.has(key)) {
       // two pairs folding to one key would mean the fold is wrong for this chain, not that the

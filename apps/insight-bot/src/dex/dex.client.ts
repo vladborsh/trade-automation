@@ -1,3 +1,4 @@
+import { DEXSCREENER_CHAINS } from './dexscreener';
 import type { Listing, Network } from './mappers';
 
 /**
@@ -49,12 +50,18 @@ export class DexClient {
    *
    * Measured to return 20 pairs for 20 addresses, which is why this takes a list rather than an
    * address — per-pool calls would be 20x the requests for identical data.
+   *
+   * **The chain slug is DexScreener's, not ours.** It calls Ethereum `ethereum`; GeckoTerminal
+   * calls it `eth`, and `/pairs/eth/...` is an HTTP 400 for one address as much as for twenty.
+   * Passing our name through lost 100 % of Ethereum pairs and reported it as a 400 beside three
+   * networks that worked. See `DEXSCREENER_CHAINS`.
    */
   dexScreener(network: Network, addresses: readonly string[]): Promise<Fetched> {
     if (addresses.length === 0) {
       return Promise.resolve({ ok: false, status: null, reason: 'no addresses — refusing to call with an empty batch' });
     }
-    return this.get(`https://api.dexscreener.com/latest/dex/pairs/${network}/${addresses.join(',')}`);
+    const chain = DEXSCREENER_CHAINS[network];
+    return this.get(`https://api.dexscreener.com/latest/dex/pairs/${chain}/${addresses.join(',')}`);
   }
 
   /**

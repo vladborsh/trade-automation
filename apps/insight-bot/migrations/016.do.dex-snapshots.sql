@@ -212,6 +212,20 @@ create table dex_token_security (
   -- both
   total_supply numeric,
 
+  /*
+   * Which fields of this family the response did not carry FOR THIS TOKEN.
+   *
+   * GoPlus omits an attribute it has nothing to say about, per token, routinely — measured
+   * 2026-10-12: `metadata_mutable` on 1 of 12 Solana tokens, `is_open_source` on 4 of 9 BSC
+   * tokens, `cannot_buy` and `total_supply` on EVM besides. That is "not told", not a shape
+   * change, so it is a null in the column and a name in here rather than a failed ask.
+   *
+   * Recording it is what the earlier hard failure was standing in for: if a field starts appearing
+   * here for EVERY token, that IS the shape change, and it is then a query over stored rows
+   * instead of a guess — and it needs no release to ask.
+   */
+  absent_fields text[] not null default '{}',
+
   -- the whole response, always
   raw jsonb not null,
   primary key (token_id, at_stage)

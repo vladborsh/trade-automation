@@ -301,6 +301,22 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     }, T0)).rejects.toThrow(/dex_tokens_canonical_address/);
   });
 
+  it('stores the fields the venue said nothing about, so drift becomes a query', async () => {
+    // if a name starts appearing here for EVERY token, that IS the shape change the earlier hard
+    // failure was standing in for — and it is then answerable from stored rows, with no release
+    const T4 = { tokenId: 'solana_absent', network: 'solana', address: 'absent', symbol: null, name: null };
+    await noteToken(db, T4, T0);
+    const mapped = mapTokenSecurity(GOPLUS_SOL, 'solana')!;
+    await writeTokenSecurity(db, T4.tokenId, 'first_seen', T0, {
+      ...mapped.row, metadataMutable: null, absentFields: ['metadata_mutable'],
+    });
+    const [row] = await db.query<{ absent_fields: string[]; answered: boolean }>(
+      `select absent_fields, answered from dex_token_security where token_id = $1`, [T4.tokenId],
+    );
+    expect(row.absent_fields).toEqual(['metadata_mutable']);
+    expect(row.answered).toBe(true); // an omitted field is an ANSWER, not a failed ask
+  });
+
   it('keeps the whole raw response, so an unmodelled field is not lost', async () => {
     const [{ raw }] = await db.query<{ raw: Record<string, unknown> }>(
       `select raw from dex_token_security where token_id = $1 and at_stage = 'h6'`, [TOKEN.tokenId],

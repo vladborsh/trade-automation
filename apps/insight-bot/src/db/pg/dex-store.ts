@@ -112,13 +112,13 @@ export async function writeTokenSecurity(
     `insert into dex_token_security (
        token_id, at_stage, checked_at, chain_family, mintable, freezable, closable,
        metadata_mutable, balance_mutable_authority, is_open_source, cannot_buy,
-       buy_tax, sell_tax, holder_count, total_supply, raw, answered, failure_reason, attempts)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,null,1)
+       buy_tax, sell_tax, holder_count, total_supply, raw, absent_fields, answered, failure_reason, attempts)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,true,null,1)
      on conflict (token_id, at_stage) do update set
        checked_at = excluded.checked_at, raw = excluded.raw,
        -- an answer clears the failure but NOT the attempt count: answered alone stops the asking,
        -- so zeroing it would erase how many calls this stage cost without changing any behaviour
-       answered = true, failure_reason = null,
+       answered = true, failure_reason = null, absent_fields = excluded.absent_fields,
        mintable = excluded.mintable, freezable = excluded.freezable, closable = excluded.closable,
        metadata_mutable = excluded.metadata_mutable,
        balance_mutable_authority = excluded.balance_mutable_authority,
@@ -129,6 +129,7 @@ export async function writeTokenSecurity(
       tokenId, stage, checkedAt, row.chainFamily, row.mintable, row.freezable, row.closable,
       row.metadataMutable, row.balanceMutableAuthority, row.isOpenSource, row.cannotBuy,
       row.buyTax, row.sellTax, row.holderCount, row.totalSupply, JSON.stringify(row.raw),
+      row.absentFields,
     ],
   );
 }
