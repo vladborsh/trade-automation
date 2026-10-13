@@ -32,10 +32,10 @@ describe('GoPlus field contracts', () => {
   });
 
   it('still catches a WRONG FAMILY with no always-present field to lean on', () => {
-    // the reason the shape check was kept separate from the per-field classification: it keys on
-    // DISTINCTIVE_FIELDS, so emptying ALWAYS_PRESENT.evm cannot disarm it
+    // the family check keys on DISTINCTIVE_FIELDS, so emptying ALWAYS_PRESENT.evm cannot disarm it;
+    // and it fires on POSITIVE evidence — the other family's markers present, ours absent
     const solana = readFileSync(join(__dirname, '..', 'fixtures', 'dex', 'goplus-solana-token-security.json'), 'utf8');
-    expect(() => mapTokenSecurity(solana, 'evm')).toThrow(/carries NONE of the/);
+    expect(() => mapTokenSecurity(solana, 'evm')).toThrow(/asked for evm and got a solana token/);
     expect(DISTINCTIVE_FIELDS.evm.length).toBeGreaterThan(0);
   });
 

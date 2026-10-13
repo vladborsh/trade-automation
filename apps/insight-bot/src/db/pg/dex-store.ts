@@ -233,3 +233,49 @@ export async function dexFieldPresence(
     present: Number(r.present),
   }));
 }
+
+/**
+ * The same presence counts, **per UTC day** — the series a baseline needs.
+ *
+ * With no always-present EVM field left, the rate is the ONLY way a disappearing field can ever be
+ * noticed, which makes it load-bearing rather than supplementary. An alarm needs a threshold and a
+ * threshold needs a baseline, so this exposes the history that is already stored: every answered
+ * row carries `checked_at` and `absent_fields`, so the series is derivable for any past window
+ * without a new table.
+ *
+ * **The alarm is deliberately absent.** One window is not a baseline — the same reason the
+ * GeckoTerminal ceiling needed two occasions and a warm-up needed a population. What would justify
+ * one: several days of these rows showing a stable floor per field, after which "below its own
+ * observed floor, over a population of at least N" is a measured threshold rather than a guess.
+ * Until then the number is reported and a human reads it, and that is stated rather than implied.
+ *
+ * `date_trunc('day', checked_at at time zone 'UTC')` and not a bare `date_trunc`: the session zone
+ * would otherwise decide where a day starts, which is the defect IB-043 fixed on month labels.
+ */
+export async function dexFieldPresenceByDay(
+  db: Db,
+  fields: readonly string[],
+  since: Date,
+): Promise<Array<{ day: string; chainFamily: string; field: string; answered: number; present: number }>> {
+  const rows = await db.query<{
+    day: string; chain_family: string; field: string; answered: string; present: string;
+  }>(
+    `select to_char(date_trunc('day', s.checked_at at time zone 'UTC'), 'YYYY-MM-DD') as day,
+            s.chain_family, f.field,
+            count(*) as answered,
+            count(*) filter (where not (f.field = any(s.absent_fields))) as present
+       from dex_token_security s
+       cross join unnest($2::text[]) as f(field)
+      where s.answered and s.checked_at >= $1
+      group by 1, 2, 3
+      order by 1, 2, 3`,
+    [since, [...fields]],
+  );
+  return rows.map((r) => ({
+    day: r.day,
+    chainFamily: r.chain_family,
+    field: r.field,
+    answered: Number(r.answered),
+    present: Number(r.present),
+  }));
+}

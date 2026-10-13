@@ -195,9 +195,17 @@ So `ALWAYS_PRESENT.evm` is deliberately empty, which means:
   5-of-29 shared names means, and pretending otherwise is what discarded good rows;
 - **the detector is the rate** — a field answered for most tokens dropping to none, on the coverage
   surface. It was built for this and is now the only thing that could see it;
-- **wrong-family and renamed-payload are still caught**, because `assertShapeRecognisable` keys on
-  the family's *distinctive* fields rather than on this classification. That is why the two checks
-  were kept separate.
+- **the API is identified by its ENVELOPE, not by the per-token fields.** With nothing guaranteed
+  per token, a guard on the union of per-token names is the weakest in the subsystem: one
+  coincidentally-matching key would pass it. The envelope — numeric `code`, string `message`,
+  `result` object-or-null — has not varied once across every fixture and both families, so that is
+  what `assertEnvelope` throws on;
+- **the family check fires on POSITIVE evidence only.** It throws when the *other* family's
+  distinctive fields are present and this family's are not, which is evidence we are about to file
+  one chain's data under another's label. It no longer throws on a sparse token carrying neither
+  family's markers: with every EVM field optional, a genuine token answering with only
+  `is_honeypot` and `total_supply` has no distinctive field, and throwing on it would discard a real
+  answer. Absence of evidence is not evidence — the day's distinction, applied to the guard itself.
 
 `test/dex/field-contracts.spec.ts` pins the emptiness together with its reason, so refilling the
 list from a clean window is a failing test rather than a tidy-up. Solana still has five
@@ -269,3 +277,26 @@ Five defects have come out of these passes that no fixture could have caught: ze
 (IB-027), the `eth` vs `ethereum` chain slug, a presence assertion that discarded good rows, a field
 set 83 % unstable between two responses, and three documented GoPlus fields that turned out to be
 one invented name rather than three.
+
+## The rate is the only detector, so the baseline is readable
+
+With no always-present EVM field, nothing per-response can notice a field disappearing: the rate is
+it. A detector whose only consumer is "somebody remembers to look" is not a detector, so:
+
+```
+DATABASE_URL=… npx ts-node -P tsconfig.json src/ops/dex-field-presence.cli.ts [days]
+```
+
+prints presence per family per **UTC day** plus each field's **observed floor** — the figure a
+threshold would be built from. The series needs no new table: every answered row already carries
+`checked_at` and `absent_fields`.
+
+**No alarm is wired to it, deliberately.** One window is not a baseline, which is the same standard
+the GeckoTerminal ceiling and the feature warm-up were held to. What would justify one: several days
+of these rows showing a stable floor per field, after which *"below this field's own observed floor,
+over a population of at least N"* is measured rather than guessed. The CLI says so in its own output,
+so the missing alarm reads as a decision rather than an omission.
+
+First day of the 24-hour run, for the record: solana floors 100 % except `metadata_mutable` at 92 %
+(48/52); evm floors 97–100 %, with `cannot_buy` lowest at 97 %.
+

@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  absentFields, ALWAYS_PRESENT, assertShapeRecognisable, DISTINCTIVE_FIELDS, EVM_FIELDS,
-  FIELD_CONTRACTS, FIELDS, flagOrNull, mapTokenSecurity, SOLANA_FIELDS, unexpectedAbsences,
+  absentFields, ALWAYS_PRESENT, assertEnvelope, assertNotTheOtherFamily, DISTINCTIVE_FIELDS,
+  EVM_FIELDS, FIELD_CONTRACTS, FIELDS, flagOrNull, mapTokenSecurity, SOLANA_FIELDS,
+  unexpectedAbsences,
 } from '../../src/dex/goplus';
 
 /**
@@ -223,38 +224,70 @@ describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a sh
     expect(unexpectedAbsences(mapped.row)).toEqual([]); // holder_count is now classified optional
   });
 
-  it('throws on the WRONG chain family, where there is nothing to record', () => {
-    expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/carries NONE of the/);
-    expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/carries NONE of the/);
-    // and this is why the check needs DISTINCTIVE fields: total_supply is in both lists, so a
-    // Solana payload read as EVM does carry one field we read
-    expect(DISTINCTIVE_FIELDS.evm).not.toContain('total_supply');
-    expect(() => assertShapeRecognisable({ total_supply: '1' }, 'evm')).toThrow(/carries NONE of the/);
-    expect(() => assertShapeRecognisable({ total_supply: '1', buy_tax: '' }, 'evm')).not.toThrow();
-  });
-
   /*
-   * The shapes that mean "answered, told nothing" and must NOT throw.
+   * The shape check moved to the ENVELOPE, and the family check moved to positive evidence.
    *
-   * `result: null` was found by the 24-hour run: `Object.keys(null)` throws, so a token GoPlus had
-   * nothing to say about became a FAILED ask — retried five times, then abandoned, and recorded as
-   * our ignorance rather than the venue's silence. The same confusion as the presence assertion,
-   * reached through a different door.
+   * The per-token field set has varied three times (14 fields, 29 fields, and a third with neither
+   * tax field), so a guard on the union of per-token names is the weakest in the subsystem: with
+   * every EVM field optional, one coincidentally-matching key would pass it. The envelope — numeric
+   * `code`, string `message`, `result` object-or-null — has not varied once across every fixture
+   * and both families.
    */
-  it.each([
-    ['result is null', '{"code":1,"message":"ok","result":null}'],
-    ['result is an empty object', '{"code":1,"message":"ok","result":{}}'],
-    ['result is missing', '{"code":1,"message":"ok"}'],
-    ['result is not an object', '{"code":1,"result":"none"}'],
-  ])('returns null, not a throw, when %s', (_label, body) => {
-    expect(() => mapTokenSecurity(body, 'solana')).not.toThrow();
-    expect(mapTokenSecurity(body, 'solana')).toBeNull();
+  describe('the envelope is what identifies the API', () => {
+    it('accepts every real response we hold — the positive control', () => {
+      for (const [body, family] of [[SOLANA, 'solana'], [EVM, 'evm'], [EVM_VARIABLE, 'evm']] as const) {
+        expect(() => assertEnvelope(JSON.parse(body), family)).not.toThrow();
+      }
+    });
+
+    it.each([
+      ['a non-object body', '"just a string"'],
+      ['no code', '{"message":"ok","result":{}}'],
+      ['a non-numeric code', '{"code":"1","message":"ok","result":{}}'],
+      ['no message', '{"code":1,"result":{}}'],
+      ['a result that is an array', '{"code":1,"message":"ok","result":[]}'],
+      ['an empty object', '{}'],
+    ])('throws on %s', (_label, body) => {
+      expect(() => mapTokenSecurity(body, 'evm')).toThrow(/not a GoPlus envelope/);
+    });
+
+    it('names what was wrong, so the next reader does not have to guess', () => {
+      expect(() => assertEnvelope({ code: '1', message: 2, result: [] }, 'evm'))
+        .toThrow(/code is a string.*message is a number.*result is an array/s);
+    });
+
+    it('accepts result: null, which is a real answer and not a broken envelope', () => {
+      expect(() => assertEnvelope({ code: 1, message: 'ok', result: null }, 'solana')).not.toThrow();
+    });
   });
 
-  it('an error object wearing a 200 throws rather than becoming a row of nulls', () => {
-    const payload = { result: { '0xabc': { code: 4011, message: 'not supported' } } };
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/carries NONE of the/);
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/keys present: code, message/);
+  describe('the family check fires on POSITIVE evidence only', () => {
+    it('throws when the other family s markers are there and ours are not', () => {
+      expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/asked for evm and got a solana token/);
+      expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/asked for solana and got a evm token/);
+    });
+
+    it('does NOT throw on a sparse token carrying neither family s markers', () => {
+      // the change that matters: with every EVM field optional, a genuine token answering with only
+      // is_honeypot and total_supply has no distinctive field, and throwing on it would discard a
+      // real answer — the failure this subsystem spent the day correcting
+      expect(() => assertNotTheOtherFamily({ total_supply: '1', is_honeypot: '0' }, 'evm')).not.toThrow();
+      const body = JSON.stringify({
+        code: 1, message: 'ok', result: { '0xabc': { total_supply: '1', is_honeypot: '0' } },
+      });
+      const mapped = mapTokenSecurity(body, 'evm')!;
+      expect(mapped.row.totalSupply).toBe(1);
+      expect(mapped.row.absentFields).toContain('buy_tax'); // recorded, not raised
+    });
+
+    it('does not throw when our own markers are present, whatever else is', () => {
+      expect(() => assertNotTheOtherFamily({ buy_tax: '', mintable: {} }, 'evm')).not.toThrow();
+    });
+  });
+
+  it('an error object wearing a 200 throws on the ENVELOPE, before any token is read', () => {
+    expect(() => mapTokenSecurity('{"result":{"0xabc":{"code":4011}}}', 'evm'))
+      .toThrow(/not a GoPlus envelope/);
   });
 
   describe('the field contracts', () => {

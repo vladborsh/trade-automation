@@ -123,6 +123,13 @@ const ALLOWED: readonly Allowance[] = [
     why: 'a CLI entry point: the audit window is relative to the moment it is run, and nothing is injected',
   },
   {
+    file: 'ops/dex-field-presence.cli.ts',
+    line: 'const now = Date.now();',
+    count: 1,
+    category: 'origin',
+    why: 'a CLI entry point (IB-028): the presence window is relative to the moment it is run, the instant is read once and passed as a value, and nothing is injected',
+  },
+  {
     file: 'ops/gap-report.cli.ts',
     line: "const day = index === -1 ? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10) : process.argv[index + 1];",
     count: 1,

@@ -6,8 +6,8 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import {
-  dexFieldPresence as countFieldPresence, MAX_SECURITY_ATTEMPTS, noteToken, tokensDueSecurity,
-  writePairSnapshots, writePools, writeSecurityFailure, writeTokenSecurity,
+  dexFieldPresence as countFieldPresence, dexFieldPresenceByDay, MAX_SECURITY_ATTEMPTS, noteToken,
+  tokensDueSecurity, writePairSnapshots, writePools, writeSecurityFailure, writeTokenSecurity,
 } from '../../src/db/pg/dex-store';
 import { ALL_GOPLUS_FIELDS, dexFieldPresence } from '../../src/web/dex-field-presence';
 import { mapPairs } from '../../src/dex/dexscreener';
@@ -353,6 +353,30 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     expect(mutable.presentRate).toBe(0.5);
     expect(mintable.answered).toBe(2);
     expect(mintable.presentRate).toBe(1);
+  });
+
+  it('groups the same counts per UTC DAY, which is what a baseline needs', async () => {
+    // the rate is the only detector left for EVM, so a threshold has to be built from a series.
+    // The day boundary is UTC explicitly: a bare date_trunc would let the session zone decide where
+    // a day starts, which is the defect IB-043 fixed on month labels.
+    const days = await dexFieldPresenceByDay(db, ALL_GOPLUS_FIELDS, new Date('2026-11-01T00:00:00Z'));
+    const mutable = days.filter((d) => d.chainFamily === 'solana' && d.field === 'metadata_mutable');
+    expect(mutable).toHaveLength(1);
+    expect(mutable[0].day).toBe('2026-11-20'); // the instant the rate rows were written at
+    expect(mutable[0].answered).toBe(2);
+    expect(mutable[0].present).toBe(1);
+  });
+
+  it('counts a row written at 00:30 UTC into that UTC day, not the session s', async () => {
+    const T8 = { tokenId: 'solana_tz', network: 'solana', address: 'tz', symbol: null, name: null };
+    await noteToken(db, T8, T0);
+    const mapped = mapTokenSecurity(GOPLUS_SOL, 'solana')!;
+    // 00:30 UTC on the 1st is the previous day in every negative offset, including this machine's
+    await writeTokenSecurity(db, T8.tokenId, 'first_seen', new Date('2026-12-01T00:30:00Z'), mapped.row);
+    const days = await dexFieldPresenceByDay(db, ALL_GOPLUS_FIELDS, new Date('2026-11-30T00:00:00Z'));
+    const mine = days.filter((d) => d.day === '2026-12-01' && d.field === 'mintable');
+    expect(mine).toHaveLength(1);
+    expect(days.some((d) => d.day === '2026-11-30')).toBe(false);
   });
 
   it('excludes asks from before the window, so the rate is about the window', async () => {

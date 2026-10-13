@@ -277,29 +277,77 @@ export function unexpectedAbsences(row: Pick<TokenSecurityRow, 'chainFamily' | '
 }
 
 /**
- * Throws when the token carries NO field distinctive to this family.
+ * Is this GoPlus at all? **The check that identifies the API sits on the ENVELOPE.**
  *
- * The one case where throwing is right, because it is the only one with nothing to record: a
- * payload sharing no name with the shape we asked for is not a token of that family, and storing it
- * would mean a row of nulls indistinguishable from "asked and told nothing".
+ * The per-token field set has now been proven to vary three times — 14 fields, 29 fields, and a
+ * third set with neither tax field — so a guard built on the union of per-token names is the
+ * weakest one available: with every EVM field optional, a truncated or unrelated payload carrying
+ * one coincidentally-matching key would pass it.
  *
- * This covers the wrong chain family too — no Solana payload carries `buy_tax`, no EVM payload
- * carries `mintable` — and an error object wearing a 200.
+ * The envelope has not varied once. Every real response, across both chain families and every
+ * fixture: a numeric `code`, a string `message`, and a `result` that is an object or `null`. So
+ * that is what the throw keys on, and it is the only thing here that throws.
  */
-export function assertShapeRecognisable(token: Record<string, unknown>, family: ChainFamily): void {
-  const own = DISTINCTIVE_FIELDS[family];
-  if (own.every((f) => !(f in token))) {
+export function assertEnvelope(payload: unknown, family: ChainFamily): void {
+  const envelope = payload as { code?: unknown; message?: unknown; result?: unknown } | null;
+  const problems: string[] = [];
+  if (envelope === null || typeof envelope !== 'object' || Array.isArray(envelope)) {
+    problems.push('the body is not a JSON object');
+  } else {
+    if (typeof envelope.code !== 'number') problems.push(`code is ${describeType(envelope.code)}, expected a number`);
+    if (typeof envelope.message !== 'string') problems.push(`message is ${describeType(envelope.message)}, expected a string`);
+    const result = envelope.result;
+    const resultOk = result === null || result === undefined
+      || (typeof result === 'object' && !Array.isArray(result));
+    if (!resultOk) problems.push(`result is ${describeType(result)}, expected an object or null`);
+  }
+  if (problems.length > 0) {
     throw new Error(
-      `GoPlus ${family} response carries NONE of the ${own.length} fields distinctive to ${family} ` +
-      `(${own.join(', ')}); keys present: ${Object.keys(token).slice(0, 8).join(', ') || '<none>'}. ` +
-      'This is a shape change, the wrong chain family, or an error object wearing a 200 — it must ' +
-      'fail rather than become a row of nulls meaning "asked and told nothing".',
+      `GoPlus ${family}: this is not a GoPlus envelope — ${problems.join('; ')}. `
+      + 'The envelope (code, message, result) is the one part of this payload measured never to vary, '
+      + 'so it is what identifies the API; the per-token field set has varied three times and cannot.',
+    );
+  }
+}
+
+function describeType(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'absent';
+  if (Array.isArray(value)) return 'an array';
+  return `a ${typeof value}`;
+}
+
+/**
+ * Throws only on POSITIVE evidence of the wrong chain family.
+ *
+ * The earlier version threw when the token carried no field distinctive to the family we asked
+ * about — absence of evidence. With every EVM field now optional that is both near-vacuous and
+ * dangerous: a genuine token answering with only `is_honeypot` and `total_supply` carries no
+ * distinctive field, and throwing on it would discard a real answer, which is the failure this
+ * whole subsystem has been correcting all day.
+ *
+ * So it throws when the OTHER family's distinctive fields are present and this family's are not.
+ * That is evidence we are about to file one chain's data under another's label, which must never be
+ * stored. A sparse token with neither family's markers is simply recorded — `absent_fields` already
+ * says what was missing.
+ */
+export function assertNotTheOtherFamily(token: Record<string, unknown>, family: ChainFamily): void {
+  const other: ChainFamily = family === 'solana' ? 'evm' : 'solana';
+  const mine = DISTINCTIVE_FIELDS[family].filter((f) => f in token);
+  const theirs = DISTINCTIVE_FIELDS[other].filter((f) => f in token);
+  if (mine.length === 0 && theirs.length > 0) {
+    throw new Error(
+      `GoPlus: asked for ${family} and got a ${other} token — it carries ${theirs.join(', ')} and `
+      + `none of ${family}'s own fields. Storing it would file one chain's data under another's label.`,
     );
   }
 }
 
 export function mapTokenSecurity(body: string, family: ChainFamily): { address: string; row: TokenSecurityRow } | null {
   const payload = JSON.parse(body) as { code?: unknown; result?: Record<string, Record<string, unknown>> };
+  // the envelope first: it is what says this is GoPlus, and it is the only throw that is about the
+  // API rather than about one token
+  assertEnvelope(payload, family);
   const result = payload.result;
   // `result: null` is a shape GoPlus really sends — seen in the 24-hour run, and `Object.keys(null)`
   // THROWS, which turned "the venue answered and said nothing" into a failed ask that retried five
@@ -309,7 +357,7 @@ export function mapTokenSecurity(body: string, family: ChainFamily): { address: 
   if (Object.keys(result).length === 0) return null;
 
   const [address, token] = Object.entries(result)[0];
-  assertShapeRecognisable(token, family);
+  assertNotTheOtherFamily(token, family);
 
   return {
     address,
