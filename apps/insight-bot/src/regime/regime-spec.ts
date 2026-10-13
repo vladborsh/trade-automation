@@ -28,8 +28,12 @@ export const REGIME_SPEC = {
        * the frame is where computed inputs live, and a second path reading `candles_agg` would
        * re-implement the completeness and refusal logic IB-015 already owns.
        *
-       * `ema.1d.200` needs 200 daily bars where `candles_agg` holds about ten, so this axis
-       * refuses until the Binance archive backfill lands — a known prerequisite, not a surprise.
+       * `ema.1d.200` needs **`length + warmupBars` daily bars** — read the figure from
+       * `WEB_FEATURE_SPEC['ema.1d.200'].params`, never from here. It was 200 when this was
+       * written and IB-052 made it 300 by adding the warm-up a recursive indicator needs to be
+       * reproducible; a number restated in prose is a number that drifts, and this comment had
+       * already drifted once. `candles_agg` holds about ten days, so the axis refuses until the
+       * Binance archive backfill lands — a known prerequisite, and work rather than waiting.
        */
       fastKey: 'ema.4h.50',
       slowKey: 'ema.1d.200',

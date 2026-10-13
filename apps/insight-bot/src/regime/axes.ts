@@ -62,8 +62,11 @@ function numberOf(value: WebFeatureValue): { ok: true; n: number } | { ok: false
  * is RANGE, which is a finding ("the two disagree") rather than a default.
  *
  * All three inputs are frame keys: `ema.4h.50` now and at the frame `slopeBars` back, `ema.1d.200`
- * now, and the close. **`ema.1d.200` needs 200 daily bars where `candles_agg` holds about ten**,
- * so this axis refuses with the key's own `insufficient_history` until the archive backfill lands.
+ * now, and the close. **`ema.1d.200` needs `length + warmupBars` daily bars** (the registry's
+ * figure, not one restated here — IB-052 moved it from 200 to 300) where `candles_agg` holds about
+ * ten, so this axis refuses with the key's own `insufficient_history` until the archive backfill
+ * lands. The refusal is the axis working: a trend label computed from a shorter EMA would be a
+ * different statement wearing this one's name.
  */
 export function trendAxis(input: {
   /** `ema.4h.50` at this frame. */
