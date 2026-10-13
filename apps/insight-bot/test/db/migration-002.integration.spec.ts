@@ -108,7 +108,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
       );
       expect(stored.tableoid).toBe('candles_1m_2031_07');
       expect(stored.close).toBe(1.5);
-    });
+    }, DB_HOOK_TIMEOUT_MS);
   });
 
   it('creates the current month + 3 ahead on ensureAhead, and is a no-op when re-run', async () => {
@@ -122,7 +122,12 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
 
     await service.ensureAhead(now); // IF NOT EXISTS: same set, no error
     expect(await partitionNames('candles_1m')).toEqual(before);
-  });
+    // DB_HOOK_TIMEOUT_MS, not the 5 s default: this creates 4 months x every partitioned table,
+    // TWICE, and the table count grows — IB-028 added dex_pools and dex_pair_snapshots, so the
+    // same test now does ~20 % more work than when the default was last comfortable. It timed out
+    // at 5 s under a full concurrent suite on 2026-10-13 (evidence in the run log). A test whose
+    // cost is a function of a shared list must not be budgeted as if it were constant.
+  }, DB_HOOK_TIMEOUT_MS);
 
   const partitionNames = async (parent: string): Promise<string[]> =>
     (await db.query<{ relname: string }>(

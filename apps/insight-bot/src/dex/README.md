@@ -232,3 +232,19 @@ retries.*
 BSC answered 0 of 8 tokens in occasion B against 9 of 10 in A, and `empty` results appeared on every
 network. One occasion per direction, so this is a note, not a rate — but a token GoPlus returns no
 result for is state 3 (asked, told nothing), not a failure, and must not be retried for ever.
+
+## Running a live pass
+
+```
+DATABASE_URL=postgres://localhost:5432/insight_dev<N> LIVE_MINUTES=30 \
+  npx ts-node -P tsconfig.json scripts/live-dex-pass.ts
+```
+
+One instance at a time per slot: two would double the GeckoTerminal rate, and the whole schedule is
+sized against a measured ~5 requests/minute ceiling. It migrates, ensures the partitions, then
+drives `tick()` until the duration is up — no Nest boot, so nothing else in the app starts.
+
+Five defects have come out of these passes that no fixture could have caught: zero-tagged articles
+(IB-027), the `eth` vs `ethereum` chain slug, a presence assertion that discarded good rows, a field
+set 83 % unstable between two responses, and three documented GoPlus fields that turned out to be
+one invented name rather than three.

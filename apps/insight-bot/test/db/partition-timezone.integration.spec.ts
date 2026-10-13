@@ -57,7 +57,7 @@ maybeDescribe('partition bounds on a non-UTC session (IB-BUG-002)', () => {
   it('the session really is non-UTC, otherwise this spec proves nothing', async () => {
     const rows = await db.query<{ TimeZone: string }>('show timezone');
     expect(rows[0]).toMatchObject({ TimeZone: 'US/Pacific' });
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('creates partitions whose bounds are the UTC month, not the session\'s', async () => {
     await new PartitionMaintenanceService(db).ensureRange(FIRST_OF_MONTH_0030Z, FIRST_OF_MONTH_0030Z);
@@ -67,7 +67,7 @@ maybeDescribe('partition bounds on a non-UTC session (IB-BUG-002)', () => {
     expect(rows).toHaveLength(1);
     // Postgres echoes the bound in the session's zone: 2026-10-01T00:00Z is 2026-09-30 17:00-07
     expect(rows[0].bound).toContain('2026-09-30 17:00:00-07');
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('a row at 00:30 UTC on the 1st lands in that month\'s partition', async () => {
     const writer = new BatchWriter<t.Candle1mRow>(db, t.CANDLES_1M, t.candle1mTuple);
@@ -85,7 +85,7 @@ maybeDescribe('partition bounds on a non-UTC session (IB-BUG-002)', () => {
     expect(stored).toHaveLength(1);
     expect(new Date(stored[0].open_time).toISOString()).toBe('2026-10-01T00:30:00.000Z');
     expect(stored[0].part).toBe('candles_1m_2026_10'); // the OCTOBER partition, not September's
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('the last minute of the previous UTC month still lands in the previous partition', async () => {
     const lastMinute = new Date('2026-09-30T23:59:00.000Z');
@@ -100,5 +100,5 @@ maybeDescribe('partition bounds on a non-UTC session (IB-BUG-002)', () => {
       `select tableoid::regclass::text as part from candles_1m where symbol = 'ETHUSDT'`,
     );
     expect(stored[0].part).toBe('candles_1m_2026_09'); // the boundary is exact, not off by 7h
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 });
