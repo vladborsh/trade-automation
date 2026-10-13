@@ -26,6 +26,18 @@ export interface MigrationResult {
  * cluster-wide, so a shared key would make either app's boot wait on the other's migrations.
  * The lock is session-scoped, so it is taken and released on the one dedicated `pg.Client`
  * this function opens and closes itself.
+ *
+ * **No timeout here, by design — but the work under the lock grows.** Checked 2026-10-13 (Tech
+ * Lead, prompted by a TEST that aged into failing for the same reason): there is no constant
+ * timeout, deadline or `statement_timeout` anywhere in the migration path or the partition path,
+ * so nothing fails as the migration count and `PARTITIONED_TABLES` grow — this side scales without
+ * a cliff, which is why the hazard was confined to a test budget.
+ *
+ * What does grow is **boot latency**: two slots booting together serialise on this lock, and the
+ * work it covers is proportional to both lists. On the 1 GB box that is slower than any dev
+ * machine, so it is worth knowing here rather than discovering it later as "the deploy is slow".
+ * Not a defect and nothing to fix today; a note so the next person does not measure it from
+ * scratch.
  */
 export async function runMigrations(options: MigrationRunnerOptions): Promise<MigrationResult> {
   const migrationPattern = options.migrationPattern ?? `${__dirname}/../../migrations/*`;
