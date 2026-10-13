@@ -96,7 +96,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (row of agg(); track row.seriesLabel + row.tf) {
+          @for (row of aggShown(); track row.seriesLabel + row.tf) {
             <tr [class]="row.state">
               <td>{{ row.seriesLabel }}</td>
               <td>{{ row.tf }}</td>
@@ -108,6 +108,9 @@
           }
         </tbody>
       </table>
+      @if (aggHidden()) {
+        <p class="muted">{{ t('coverage.agg.more', { hidden: aggHidden() }) }}</p>
+      }
       <p class="muted">{{ t('coverage.agg.why') }}</p>
     }
 

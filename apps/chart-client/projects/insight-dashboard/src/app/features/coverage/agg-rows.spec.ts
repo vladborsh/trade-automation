@@ -1,5 +1,5 @@
 import type { WebAggCoverage } from '@trade-automation/contracts';
-import { aggTotals, heldFloorByTf, toAggViews } from './agg-rows';
+import { AGG_ROW_LIMIT, aggTotals, heldFloorByTf, hiddenAggCount, toAggViews, visibleAggRows } from './agg-rows';
 
 function row(over: Partial<WebAggCoverage> = {}): WebAggCoverage {
   return {
@@ -105,5 +105,43 @@ describe('heldFloorByTf', () => {
 
   it('is empty for no rows, so the block can hide rather than show an empty table', () => {
     expect(heldFloorByTf([])).toEqual([]);
+  });
+});
+
+describe('visibleAggRows', () => {
+  const many = (n: number, over: Partial<WebAggCoverage> = {}) =>
+    toAggViews(Array.from({ length: n }, (_, i) => row({ symbol: `S${String(i).padStart(3, '0')}`, ...over })));
+
+  it('omits the rows with nothing to act on, however many there are', () => {
+    const views = toAggViews([
+      row({ symbol: 'AAA', derivable: 5 }),
+      row({ symbol: 'BBB' }),
+      row({ symbol: 'CCC' }),
+    ]);
+
+    expect(visibleAggRows(views).map((v) => v.symbol)).toEqual(['AAA']);
+    expect(hiddenAggCount(views)).toBe(2);
+  });
+
+  it('caps a long list, because a table nobody reads is as latent as a command nobody runs', () => {
+    const views = many(240, { derivable: 7 });
+
+    expect(visibleAggRows(views)).toHaveLength(AGG_ROW_LIMIT);
+    expect(hiddenAggCount(views)).toBe(240 - AGG_ROW_LIMIT);
+  });
+
+  it('keeps the worst rows when it caps, never an arbitrary slice', () => {
+    const views = toAggViews([
+      ...Array.from({ length: 30 }, (_, i) => row({ symbol: `S${i}`, derivable: 1 })),
+      row({ symbol: 'WORST', derivable: 9999 }),
+    ]);
+
+    expect(visibleAggRows(views)[0].symbol).toBe('WORST');
+  });
+
+  it('hides nothing when everything fits and everything is actionable', () => {
+    const views = many(3, { derivable: 1 });
+    expect(visibleAggRows(views)).toHaveLength(3);
+    expect(hiddenAggCount(views)).toBe(0);
   });
 });

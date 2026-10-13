@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
-import { aggTotals, heldFloorByTf, toAggViews, type AggView } from './agg-rows';
+import { aggTotals, heldFloorByTf, hiddenAggCount, toAggViews, visibleAggRows, type AggView } from './agg-rows';
 import { basisState, collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
 import { coverageCounts, toCoverageViews, type CoverageView } from './coverage.rows';
 import { frameTotals, toFrameViews, type FrameView } from './frame-rows';
@@ -99,6 +99,12 @@ export class CoverageComponent {
 
   /** The per-timeframe floor and max. Never a mean — see `heldFloorByTf`. */
   readonly aggFloors = computed(() => heldFloorByTf(this.agg()));
+
+  /** Only the rows with something to act on, capped — see `AGG_ROW_LIMIT`. */
+  readonly aggShown = computed(() => visibleAggRows(this.agg()));
+
+  /** Stated on the page, so the table never implies it is the whole list. */
+  readonly aggHidden = computed(() => hiddenAggCount(this.agg()));
 
   readonly unmappedSummary = computed(() =>
     this.unmappedTotal() === 0

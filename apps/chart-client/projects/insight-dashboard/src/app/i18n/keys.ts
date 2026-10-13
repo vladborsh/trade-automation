@@ -90,6 +90,7 @@ export type StringKey =
   | 'coverage.agg.clean'
   | 'coverage.agg.why'
   | 'coverage.agg.floors'
+  | 'coverage.agg.more'
   | 'coverage.col.symbolMarket'
   | 'coverage.col.held'
   | 'coverage.col.derivable'

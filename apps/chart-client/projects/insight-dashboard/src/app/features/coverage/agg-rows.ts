@@ -53,6 +53,24 @@ export function toAggViews(rows: readonly WebAggCoverage[]): AggView[] {
     );
 }
 
+/**
+ * How many rows the page shows. Every series × timeframe is 240 rows on the current universe, and
+ * a 240-row table is not read — it is scrolled past, which makes it latent in the same way a CLI
+ * nobody runs is latent. The rows worth a reader's attention are the ones with something to act
+ * on; the CLI prints the rest.
+ */
+export const AGG_ROW_LIMIT = 20;
+
+/** The actionable rows, worst first, capped. `ok` rows are omitted: there is nothing to do. */
+export function visibleAggRows(views: readonly AggView[], limit: number = AGG_ROW_LIMIT): AggView[] {
+  return views.filter((v) => v.state !== 'ok').slice(0, limit);
+}
+
+/** How many rows the table is not showing, so the page can say so rather than imply it has them all. */
+export function hiddenAggCount(views: readonly AggView[], limit: number = AGG_ROW_LIMIT): number {
+  return views.length - visibleAggRows(views, limit).length;
+}
+
 export interface AggTotals {
   series: number;
   derivable: number;

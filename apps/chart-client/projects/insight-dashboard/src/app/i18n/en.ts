@@ -60,13 +60,14 @@ export const en: Strings = {
   'coverage.frames.why': 'Unhealed means a frame still refuses a key for want of input that no further heal pass will reach. Permanently explained refusals are counted separately and need no action.',
   'coverage.agg.title': 'Aggregate coverage',
   'coverage.agg.basis':
-    'Last {days} days: {derivable} buckets could be built from minute data we already hold, across {seriesWithGap} of {series} series. {unfetchable} cannot be built at all — those minutes were never collected.',
+    'Last {days} days: {derivable} buckets could be built from minute data we already hold, in {seriesWithGap} of {series} series-and-timeframe pairs. {unfetchable} cannot be built at all — those minutes were never collected.',
   'coverage.agg.none': 'No aggregate coverage yet. A series appears here once minute data exists for it.',
-  'coverage.agg.clean': 'Last {days} days: every bucket the minute data supports has been built, across all {series} series.',
+  'coverage.agg.clean': 'Last {days} days: every bucket the minute data supports has been built, across all {series} series-and-timeframe pairs.',
   'coverage.agg.why':
     'A missing aggregate and missing market data look identical to every other part of this system — both make a feature refuse for want of history. They are not the same thing: one is a pass that has not run and is fixed by re-running it, the other needs fetching from the venue. This report never builds anything itself, so the gap stays visible until someone decides to close it.',
   'coverage.agg.floors':
     'Worst series per timeframe (not an average: an average over series this uneven describes none of them).',
+  'coverage.agg.more': '{hidden} further rows are not shown. The full list, over all history rather than this window, comes from the agg-coverage command.',
   'coverage.col.symbolMarket': 'Series',
   'coverage.col.held': 'Built',
   'coverage.col.derivable': 'Can be built',
