@@ -87,7 +87,21 @@ export class DexService implements OnApplicationBootstrap, OnModuleDestroy {
     this.timer = null;
   }
 
-  /** One tick: at most one listing page, plus at most one security check. Public so specs can drive it. */
+  /**
+   * One tick: at most one listing page, plus at most one security check. Public so specs can drive it.
+   *
+   * **It never rejects, and that is load-bearing rather than tidy.** The timer calls it as
+   * `void this.tick()`, so a rejection is an unhandled promise rejection — and since Node 15 the
+   * default for those is to **terminate the process**. A single transient database error inside
+   * `checkSecurity` (outside the per-venue try/catch, because it is our own database and not a
+   * venue) would therefore take the whole bot down, killing the collectors, the news ingest and the
+   * web API with it. For a loop meant to run for days against three third-party APIs, "one bad
+   * minute ends the process" is the wrong trade: the next tick is 15 seconds away and the venues
+   * still hold everything.
+   *
+   * Logged at ERROR rather than swallowed, because a tick that fails every time must not look like
+   * a tick that is working.
+   */
   async tick(now = Date.now()): Promise<void> {
     // A slow tick must not overlap the next: two in flight would issue two GeckoTerminal calls
     // inside the spacing and take the burst 429 this schedule exists to avoid.
@@ -97,6 +111,8 @@ export class DexService implements OnApplicationBootstrap, OnModuleDestroy {
       const call = nextDue(now, this.state, this.lastCallAt);
       if (call !== null) await this.pollListing(call, now);
       await this.checkSecurity(now);
+    } catch (error) {
+      this.logger.error(`tick failed — ${(error as Error).message}`);
     } finally {
       this.running = false;
     }

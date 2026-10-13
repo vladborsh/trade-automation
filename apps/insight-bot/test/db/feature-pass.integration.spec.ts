@@ -102,10 +102,23 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
+  /*
+   * DB_HOOK_TIMEOUT_MS on every test and hook in this describe, not jest's 5 s default.
+   *
+   * Observed 2026-10-13: five of these timed out at 5 s under a full concurrent suite, and then a
+   * SIXTH failed with `duplicate key value violates unique constraint candles_agg_2026_10_pkey` —
+   * a timed-out test had left its seed half-written, so one tight budget produced a cascade that
+   * looks like a data bug in an unrelated test. Every test here does real database work; the
+   * `beforeAll` above already carries this constant, and the `it`s are no cheaper than the hook.
+   *
+   * Second instance of the class in one session (the first was `migration-002.integration.spec.ts`,
+   * which aged into failing as `PARTITIONED_TABLES` grew), which is what makes it a shape rather
+   * than an incident.
+   */
   beforeEach(async () => {
     await db.query(`delete from feature_frames`);
     await db.query(`delete from feature_value_conflicts`);
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('writes a frame at the grace look, refusing the keys the short bucket poisoned', async () => {
     await seedAgg(95); // the closing bucket is short
@@ -118,14 +131,14 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     // bucket short of its bars is something a heal can still deliver.
     expect(outcome.frame.keys['px.ret_4h']).toEqual({ ok: false, why: 'incomplete_input' });
     expect(outcome.frame.incompleteReason.join(' ')).toContain('candles_agg 15m');
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('writes the frame even when it refuses — a missing frame is not a refusal', async () => {
     await seedAgg(95);
     await service.runClose(SYMBOL, '15m', CLOSE, CLOSE + 15_000, 'live');
     const stored = await publishedFrame(db, SYMBOL, '15m', CLOSE);
     expect(stored).not.toBeNull();
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('AMENDS to revision 2 when the bucket heals between two looks', async () => {
     await seedAgg(95);
@@ -139,7 +152,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     expect(second.frame.amendedKeys).toContain('px.ret_4h');
     expect(second.frame.amendedAt).toBe(Math.floor((CLOSE + 30_000) / 1000));
     expect((second.frame.keys['px.ret_4h'] as { ok: true }).ok).toBe(true);
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('keeps revision 1 saying what it said, so an armed-on answer survives', async () => {
     await seedAgg(95);
@@ -153,7 +166,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     );
     expect(rows.map((r) => r.revision)).toEqual([1, 2]);
     expect(rows[0]?.complete).toBe(false); // the frame something may have armed on, untouched
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('WRITES NOTHING when a re-check changes nothing, proven by running twice', async () => {
     // The Tech Lead's condition. Asserted on the ROW COUNT rather than on the returned action,
@@ -171,7 +184,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     expect(third.action).toBe('unchanged');
     expect(Number(after2[0]?.n)).toBe(Number(after1[0]?.n));
     expect(Number(after3[0]?.n)).toBe(Number(after1[0]?.n));
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('records a conflict and KEEPS the published value when an input moved underneath', async () => {
     // Rule 2: a recompute that would change an already-published value is a data defect, not a
@@ -198,7 +211,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
       `select feature_key from feature_value_conflicts`,
     );
     expect(conflicts.map((c) => c.feature_key)).toContain('px.ret_4h');
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   it('a re-check visits only the frames still awaiting a heal', async () => {
     await seedAgg(95);
@@ -221,7 +234,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     expect(stillChaseable.map((r) => r.key)).toEqual([]);
     const after = await service.runPass('15m', CLOSE, CLOSE + 60_000, 'live', 'awaiting-heal');
     expect(after.outcomes).toEqual([]);
-  });
+  }, DB_HOOK_TIMEOUT_MS);
 
   /**
    * IB-015's provenance column (Tech Lead, 2026-10-12).
