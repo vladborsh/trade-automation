@@ -51,11 +51,64 @@ fi
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+# ---- provenance, captured BEFORE anything runs -----------------------------------------------
+#
+# A pasted count from the wrong branch looks exactly like a pasted count from the right one —
+# "paste, do not retype" is necessary and insufficient. So the line carries the tree it measured.
+#
+# `+dirty` is here because a count from a modified working tree is not a count for that sha
+# either, and that is the commoner mistake: the sha says one thing and the files say another.
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$BRANCH" = "HEAD" ]; then BRANCH="detached"; fi
+SHA="$(git rev-parse --short HEAD)"
+git diff --quiet HEAD -- 2>/dev/null || SHA="$SHA+dirty"
+[ -z "$(git status --porcelain --untracked-files=normal)" ] || SHA="${SHA%+dirty}+dirty"
+
+# ---- one cold run at a time, across slots ----------------------------------------------------
+#
+# The tool built to make counts trustworthy is itself a load generator, and three developers now
+# run it before every merge against one Postgres holding five slot databases. Concurrent
+# DB-backed suites produced 5-second timeouts and a false red on 2026-10-13.
+#
+# A cold count is a gate, not a loop, so waiting costs nothing. The lock is a directory because
+# mkdir is atomic everywhere and macOS has no flock. It is shared across worktrees on purpose.
+LOCK="/tmp/cold-count.lock"
+STALE_SECONDS=1800
+acquire_lock() {
+  local waited=0
+  while ! mkdir "$LOCK" 2>/dev/null; do
+    local age
+    age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || date +%s) ))
+    if [ "$age" -gt "$STALE_SECONDS" ]; then
+      echo "cold-count: lock is ${age}s old, assuming a dead run and taking it" >&2
+      rm -rf "$LOCK"; continue
+    fi
+    if [ "$waited" -eq 0 ]; then
+      echo "cold-count: another cold run holds the lock (${age}s old), waiting…"
+    fi
+    sleep 5; waited=$((waited + 5))
+  done
+  trap 'rm -rf "$LOCK"' EXIT INT TERM
+  # `if`, not `[ ] && echo`: under `set -e` a false test as a function's LAST statement makes the
+  # function return 1 and kills the script. That is how the first version of this lock silently
+  # exited before running anything — a bug whose symptom was a completely empty output.
+  if [ "$waited" -gt 0 ]; then
+    echo "cold-count: waited ${waited}s for the lock"
+  fi
+}
+acquire_lock
+
 [ -d "$APP" ] || { echo "cold-count: no such app directory: $APP" >&2; exit 2; }
 
 LOG_DIR="${COLD_COUNT_LOG_DIR:-$ROOT/.cold-count}"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(basename "$APP")-$(date -u +%Y%m%dT%H%M%SZ).log"
+
+# Concurrency the lock CANNOT control: a collector or a dev server on another slot. Reported
+# rather than prevented, so a red run is interpretable instead of merely surprising.
+BACKENDS="$(psql -qtA "$DATABASE_URL" -c \
+  "select count(*) from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid()" \
+  2>/dev/null | tr -d ' ' || echo '?')"
 
 echo "cold-count: clearing build state (tsbuildinfo across apps and libs)"
 rm -f apps/*/tsconfig.tsbuildinfo libs/*/tsconfig.tsbuildinfo
@@ -80,5 +133,5 @@ if grep -q "failed to run" "$LOG"; then
 fi
 
 grep -E "^Test Suites:|^Tests:" "$LOG"
-echo "cold-count: UTC $(date -u '+%Y-%m-%dT%H:%M:%SZ')  db=$(basename "$DATABASE_URL")  log=${LOG#"$ROOT"/}"
+echo "cold-count: UTC $(date -u '+%Y-%m-%dT%H:%M:%SZ')  branch=$BRANCH  sha=$SHA  db=$(basename "$DATABASE_URL")  busy-backends-at-start=$BACKENDS  log=${LOG#"$ROOT"/}"
 echo "cold-count: PASTE these lines into the report — retyping drops the instant and the db."
