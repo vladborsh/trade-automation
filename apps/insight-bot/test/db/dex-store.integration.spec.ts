@@ -11,7 +11,7 @@ import {
 } from '../../src/db/pg/dex-store';
 import { ALL_GOPLUS_FIELDS, dexFieldPresence } from '../../src/web/dex-field-presence';
 import { mapPairs } from '../../src/dex/dexscreener';
-import { mapTokenSecurity } from '../../src/dex/goplus';
+import { FIELDS, mapTokenSecurity } from '../../src/dex/goplus';
 import { mapPools } from '../../src/dex/mappers';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
@@ -353,6 +353,27 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     expect(mutable.presentRate).toBe(0.5);
     expect(mintable.answered).toBe(2);
     expect(mintable.presentRate).toBe(1);
+  });
+
+  it('never returns a family/field pair that cannot exist', async () => {
+    // the counting queries cross-join the UNION of both families' fields, so the rows come back
+    // containing `evm:mintable` and `solana:buy_tax`. Dropped in the read rather than in each
+    // caller: the summary CLI printed `evm balance_mutable_authority 112/112` because it was the
+    // one caller that forgot, and a 100 % for a field that does not apply is a measurement of
+    // nothing presented beside real ones.
+    const since = new Date(T0.getTime() - 86_400_000);
+    for (const rows of [
+      (await countFieldPresence(db, ALL_GOPLUS_FIELDS, since)).map((r) => r),
+      (await dexFieldPresenceByDay(db, ALL_GOPLUS_FIELDS, since)).map((r) => r),
+    ]) {
+      expect(rows.length).toBeGreaterThan(0); // the premise: it read something
+      for (const row of rows) {
+        const belongs = FIELDS[row.chainFamily as 'solana' | 'evm'].includes(row.field);
+        expect({ pair: `${row.chainFamily}:${row.field}`, belongs }).toEqual({
+          pair: `${row.chainFamily}:${row.field}`, belongs: true,
+        });
+      }
+    }
   });
 
   it('groups the same counts per UTC DAY, which is what a baseline needs', async () => {

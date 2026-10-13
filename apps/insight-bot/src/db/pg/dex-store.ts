@@ -1,5 +1,6 @@
 import type { Db } from '../db.port';
 import type { DexPairRow } from '../../dex/dexscreener';
+import { FIELDS, type ChainFamily } from '../../dex/goplus';
 import type { DexPoolRow } from '../../dex/mappers';
 import type { TokenSecurityRow } from '../../dex/goplus';
 import { SECURITY_STAGE_OFFSETS_MS, type SecurityStage } from '../../dex/schedule';
@@ -199,6 +200,22 @@ export async function tokensDueSecurity(
 }
 
 /**
+ * Does this field exist in this family's shape at all?
+ *
+ * The counting queries cross-join the union of both families' fields against the rows, which is one
+ * query instead of two but produces pairs that cannot exist — `evm:mintable`, `solana:buy_tax`. They
+ * are dropped HERE rather than in each caller: the summary CLI printed
+ * `evm balance_mutable_authority 112/112` because it was the one caller that forgot, and a rule
+ * every consumer has to remember is the shape of defect this subsystem has spent the day replacing
+ * with mechanisms. A 100 % for a field that does not apply is worse than noise — it is a
+ * measurement of nothing, presented beside real ones.
+ */
+function belongsTo(chainFamily: string, field: string): boolean {
+  const fields = FIELDS[chainFamily as ChainFamily] as readonly string[] | undefined;
+  return fields !== undefined && fields.includes(field);
+}
+
+/**
  * How often each GoPlus field was actually answered, per chain family, over a window.
  *
  * **The only form in which a shape change is detectable here.** GoPlus's EVM payload varies per
@@ -226,12 +243,14 @@ export async function dexFieldPresence(
       order by 1, 2`,
     [since, [...fields]],
   );
-  return rows.map((r) => ({
-    chainFamily: r.chain_family,
-    field: r.field,
-    answered: Number(r.answered),
-    present: Number(r.present),
-  }));
+  return rows
+    .filter((r) => belongsTo(r.chain_family, r.field))
+    .map((r) => ({
+      chainFamily: r.chain_family,
+      field: r.field,
+      answered: Number(r.answered),
+      present: Number(r.present),
+    }));
 }
 
 /**
@@ -271,11 +290,13 @@ export async function dexFieldPresenceByDay(
       order by 1, 2, 3`,
     [since, [...fields]],
   );
-  return rows.map((r) => ({
-    day: r.day,
-    chainFamily: r.chain_family,
-    field: r.field,
-    answered: Number(r.answered),
-    present: Number(r.present),
-  }));
+  return rows
+    .filter((r) => belongsTo(r.chain_family, r.field))
+    .map((r) => ({
+      day: r.day,
+      chainFamily: r.chain_family,
+      field: r.field,
+      answered: Number(r.answered),
+      present: Number(r.present),
+    }));
 }

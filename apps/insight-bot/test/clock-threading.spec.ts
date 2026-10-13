@@ -123,6 +123,13 @@ const ALLOWED: readonly Allowance[] = [
     why: 'a CLI entry point: the audit window is relative to the moment it is run, and nothing is injected',
   },
   {
+    file: 'ops/dex-run-summary.cli.ts',
+    line: 'const now = Date.now();',
+    count: 1,
+    category: 'origin',
+    why: 'a CLI entry point (IB-028): the extraction window is relative to the moment it is run, the instant is read once and passed as a value to every query',
+  },
+  {
     file: 'ops/dex-field-presence.cli.ts',
     line: 'const now = Date.now();',
     count: 1,

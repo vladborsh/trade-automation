@@ -62,9 +62,9 @@ async function main(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log('day        family  field                      present/answered   rate   declared');
     for (const row of rows) {
-      const key = `${row.chainFamily}:${row.field}`;
-      const presence = classified.get(key);
-      if (presence === undefined) continue; // a field that does not belong to this family
+      // the read already drops pairs that cannot exist, so a missing classification here would be
+      // a real inconsistency rather than an expected cross-join artefact
+      const presence = classified.get(`${row.chainFamily}:${row.field}`) ?? '(unclassified!)';
       const rate = row.answered === 0 ? '—' : `${Math.round((row.present / row.answered) * 100)}%`;
       // eslint-disable-next-line no-console
       console.log([
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
       ].join(' '));
     }
 
-    const progress = baselineProgress(rows).filter((p) => classified.has(`${p.chainFamily}:${p.field}`));
+    const progress = baselineProgress(rows);
     // eslint-disable-next-line no-console
     console.log(`\nbaseline progress (${BASELINE_DAYS_REQUIRED} days per field would justify an alarm):`);
     for (const row of progress) {
