@@ -33,6 +33,36 @@
 --
 -- The claims go with them: a claim describes frames, and keeping one whose frames are gone would
 -- certify the next write against a fingerprint nothing was ever written under.
+-- Say what is being destroyed BEFORE destroying it.
+--
+-- Today's whole diagnosis rested on a shape that existed only in these rows — "903 frames at 45
+-- keys, 2 at 47" — and a migration that deletes them silently removes the ability to know what
+-- was there. That is the same loss we spent the day preventing in the product, so the census is
+-- printed first: how many, which key-set sizes, over what range, and what the claims said.
+do $$
+declare
+  n        bigint;
+  lo       timestamptz;
+  hi       timestamptz;
+  sizes    text;
+  claims   text;
+begin
+  select count(*), min(close_time), max(close_time) into n, lo, hi from feature_frames;
+  if n = 0 then
+    raise notice '016: no feature_frames to remove.';
+  else
+    select string_agg(t.k || ' keys x ' || t.c, '; ' order by t.k) into sizes
+      from (select (select count(*) from jsonb_object_keys(f.keys)) as k, count(*) as c
+              from feature_frames f group by 1) t;
+    select string_agg(frame_version || '=' || spec_fingerprint, ', ' order by frame_version)
+      into claims from feature_frame_versions;
+    raise notice '016: deleting % feature_frames (%) spanning % .. %; claims were [%]',
+      n, coalesce(sizes, 'unknown key sets'), lo, hi, coalesce(claims, 'NONE');
+    raise notice '016: they are derived data — rebuild with: npm run features -- --from % --to %',
+      to_char(lo, 'YYYY-MM-DD'), to_char(hi + interval '1 day', 'YYYY-MM-DD');
+  end if;
+end $$;
+
 delete from feature_frames;
 delete from feature_frame_versions;
 

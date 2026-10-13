@@ -33,6 +33,13 @@ export async function runMigrations(options: MigrationRunnerOptions): Promise<Mi
   // BUG-013: a connection error must not surface as an unhandled 'error' event. The in-flight
   // query rejects with it, so runMigrations still fails loudly, as an error rather than a crash.
   client.on('error', () => undefined);
+  // A `raise notice` in a migration is invisible unless something listens: node-postgres emits
+  // it as an event and drops it when nobody is attached. Migration 016 deletes rows and prints
+  // a census of what it removed first — without this handler that census would be written and
+  // never read, which is worse than not writing it, because the file would claim to be loud.
+  client.on('notice', (notice) => {
+    process.stdout.write(`migration: ${notice.message ?? String(notice)}\n`);
+  });
   await client.connect();
   try {
     await client.query(`SELECT pg_advisory_lock(${ADVISORY_LOCK_KEY})`);
