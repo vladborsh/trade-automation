@@ -3,6 +3,9 @@ import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { basisState, collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
 import { coverageCounts, toCoverageViews, type CoverageView } from './coverage.rows';
+import {
+  dexFieldTotals, MIN_ASKS_FOR_A_RATE, toDexFieldViews, type DexFieldView,
+} from './dex-field-rows';
 import { frameTotals, toFrameViews, type FrameView } from './frame-rows';
 
 /** architecture/insight-bot-web-dashboard.md §2 — `GET /api/web/coverage`, per symbol × series. */
@@ -24,6 +27,9 @@ export class CoverageComponent {
   readonly unmappedTotal = signal(0);
   /** IB-015 — feature-frame coverage. Its own block: see `frame-rows.ts`. */
   readonly frames = signal<FrameView[]>([]);
+  /** IB-028 — GoPlus field presence as a rate. Its own block: see `dex-field-rows.ts`. */
+  readonly dexFields = signal<DexFieldView[]>([]);
+  readonly minAsks = MIN_ASKS_FOR_A_RATE;
   readonly windowDays = signal(30);
   readonly error = signal<string | null>(null);
   readonly loading = signal(true);
@@ -74,6 +80,22 @@ export class CoverageComponent {
     });
   });
 
+  /**
+   * The field-presence basis. It states how many fields a rate is even possible for, because the
+   * alarm here is a RATE going to zero and a rate needs a population: '0 %' over two asks and
+   * '0 %' over four hundred are the same number about different worlds.
+   */
+  readonly dexBasis = computed(() => {
+    const totals = dexFieldTotals(this.dexFields());
+    if (totals.answered === 0) return this.t('coverage.dex.none');
+    return this.t('coverage.dex.basis', {
+      days: this.windowDays(),
+      measured: totals.measured,
+      fields: totals.fields,
+      gone: totals.gone,
+    });
+  });
+
   readonly unmappedSummary = computed(() =>
     this.unmappedTotal() === 0
       ? this.t('coverage.unmapped.none')
@@ -92,6 +114,7 @@ export class CoverageComponent {
       this.collectors.set(toCollectorViews(response.collectors ?? []));
       this.unmappedTotal.set(response.unmapped?.total ?? 0);
       this.frames.set(toFrameViews(response.frames ?? []));
+      this.dexFields.set(toDexFieldViews(response.dexFields ?? []));
       this.windowDays.set(response.windowDays ?? 30);
     } catch (err) {
       this.error.set((err as Error).message);

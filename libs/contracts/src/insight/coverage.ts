@@ -104,6 +104,29 @@ export const WebFrameCoverageSchema = z.object({
 });
 export type WebFrameCoverage = z.infer<typeof WebFrameCoverageSchema>;
 
+/**
+ * IB-028 — GoPlus field presence per chain family, as a RATE over a window.
+ *
+ * A single absent field is not evidence of anything: GoPlus's EVM payload varies per token, and two
+ * real responses share only 5 of 29 field names. So "this field vanished from the API" is **not
+ * detectable in one response** — it exists only as a rate, and a field that was answered for 90 % of
+ * tokens dropping to 0 % is the signal. This block is what makes `dex_token_security.absent_fields`
+ * a measurement rather than an honesty column with no consumer.
+ */
+export const WebDexFieldPresenceSchema = z.object({
+  chainFamily: z.enum(['solana', 'evm']),
+  field: z.string(),
+  /** Answered asks for this family in the window — the population the rate is over. */
+  answered: z.number().int(),
+  /** Of those, how many carried the field. */
+  present: z.number().int(),
+  /** `present / answered`, or null when nothing was answered — never 0, which would read as "gone". */
+  presentRate: z.number().nullable(),
+  /** What the mapper declares: `always` is reported loudly when absent, `optional` is not. */
+  presence: z.enum(['always', 'optional']),
+});
+export type WebDexFieldPresence = z.infer<typeof WebDexFieldPresenceSchema>;
+
 export const WebCoverageResponseSchema = z.object({
   rows: z.array(WebCoverageRowSchema),
   /** Defaulted, so a client built against the earlier shape keeps parsing. */
@@ -117,6 +140,12 @@ export const WebCoverageResponseSchema = z.object({
    * who sees them in one table will treat one as evidence about the other.
    */
   frames: z.array(WebFrameCoverageSchema).default([]),
+  /**
+   * IB-028's GoPlus field presence, per chain family per field. Its own block for the same reason
+   * as `frames`: a venue's per-token optionality is not a collector problem and must not read as
+   * one.
+   */
+  dexFields: z.array(WebDexFieldPresenceSchema).default([]),
   /** The window `collectors` was computed over, so the page can state its basis. */
   windowDays: z.number().int().default(30),
 });

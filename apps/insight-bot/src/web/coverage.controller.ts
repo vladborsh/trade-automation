@@ -1,5 +1,7 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
 import type { WebCoverageResponse, WebCoverageRow, WebFrameCoverage } from '@trade-automation/contracts';
+import { dexFieldPresence as countFieldPresence } from '../db/pg/dex-store';
+import { ALL_GOPLUS_FIELDS, dexFieldPresence } from './dex-field-presence';
 import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
 import { monthsWithRows, seriesBounds, SERIES_TABLES } from '../db/pg/backfill-reads';
@@ -27,6 +29,13 @@ import { FRAME_TIMEFRAMES } from '../features/recheck-schedule';
  * - **`unmapped`** — liquidation rows whose `(venue, symbol)` matches no `symbols` spelling, and so
  *   are unreachable from any canonical id and reach no page at all.
  *
+ * IB-028 adds **`dexFields`**: how often each GoPlus field was answered, per chain family, over the
+ * same window. It is here because a vanished field is **not detectable in one response** — GoPlus's
+ * EVM payload varies per token and two real responses share 5 of 29 field names — so the only form
+ * the signal takes is a rate, and a field answered for 90 % of tokens dropping to 0 % is it. Its own
+ * block, not a member of `collectors`: a venue's per-token optionality is not a collector problem
+ * and a reader who sees them in one table will treat one as evidence about the other.
+ *
  * IB-015 adds **`frames`**, its own block rather than a member of `collectors`. The two measure
  * different things and merging them would make a frame problem read as a collector problem: a
  * stream can be up for every hour of the window while every frame in it refuses, because
@@ -42,7 +51,9 @@ export class WebCoverageController {
   @Get()
   async get(@Query('days') daysRaw?: string): Promise<WebCoverageResponse> {
     const windowDays = clampDays(daysRaw);
-    if (!this.db) return { rows: [], collectors: [], unmapped: { total: 0, rows: [] }, frames: [], windowDays };
+    if (!this.db) {
+      return { rows: [], collectors: [], unmapped: { total: 0, rows: [] }, frames: [], dexFields: [], windowDays };
+    }
     const db = this.db;
     const rows: WebCoverageRow[] = [];
 
@@ -94,6 +105,8 @@ export class WebCoverageController {
       collectors: collectorCoverage(beats, gaps, { from, to }),
       unmapped: await unmappedLiquidations(db),
       frames,
+      // the same window as `collectors`, so the page states one basis rather than two
+      dexFields: dexFieldPresence(await countFieldPresence(db, ALL_GOPLUS_FIELDS, from)),
       windowDays,
     };
   }

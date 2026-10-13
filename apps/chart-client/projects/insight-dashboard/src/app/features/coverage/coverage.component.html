@@ -64,6 +64,35 @@
       <p class="muted">{{ t('coverage.frames.why') }}</p>
     }
 
+    <h2>{{ t('coverage.dex.title') }}</h2>
+    <p class="muted">{{ dexBasis() }}</p>
+    @if (dexFields().length) {
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('coverage.col.family') }}</th>
+            <th>{{ t('coverage.col.field') }}</th>
+            <th>{{ t('coverage.col.answered') }}</th>
+            <th>{{ t('coverage.col.presentRate') }}</th>
+            <th>{{ t('coverage.col.declared') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of dexFields(); track row.chainFamily + row.field) {
+            <tr [class]="row.state">
+              <td>{{ row.chainFamily }}</td>
+              <td>{{ row.field }}</td>
+              <td>{{ row.presentLabel }}</td>
+              <td>{{ row.rateLabel }}</td>
+              <td>{{ row.presence }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <p class="muted">{{ t('coverage.dex.thin', { min: minAsks }) }}</p>
+      <p class="muted">{{ t('coverage.dex.why') }}</p>
+    }
+
     <h2>{{ t('coverage.unmapped.title') }}</h2>
     <p [class]="unmappedTotal() ? 'warn' : 'muted'">{{ unmappedSummary() }}</p>
     @if (unmappedTotal()) {

@@ -6,9 +6,10 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import {
-  MAX_SECURITY_ATTEMPTS, noteToken, tokensDueSecurity, writePairSnapshots, writePools,
-  writeSecurityFailure, writeTokenSecurity,
+  dexFieldPresence as countFieldPresence, MAX_SECURITY_ATTEMPTS, noteToken, tokensDueSecurity,
+  writePairSnapshots, writePools, writeSecurityFailure, writeTokenSecurity,
 } from '../../src/db/pg/dex-store';
+import { ALL_GOPLUS_FIELDS, dexFieldPresence } from '../../src/web/dex-field-presence';
 import { mapPairs } from '../../src/dex/dexscreener';
 import { mapTokenSecurity } from '../../src/dex/goplus';
 import { mapPools } from '../../src/dex/mappers';
@@ -315,6 +316,48 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     );
     expect(row.absent_fields).toEqual(['metadata_mutable']);
     expect(row.answered).toBe(true); // an omitted field is an ANSWER, not a failed ask
+  });
+
+  /*
+   * The rate, against real SQL. A shape change is only visible in the aggregate here, so the
+   * aggregate is the thing that has to be right — and `absent_fields` is a text[], which no fake
+   * store would have told me behaves correctly under `= any(...)`.
+   */
+  it('counts a field as present or absent per ANSWERED ask, and a failure counts as neither', async () => {
+    // its own instant, far from every other row in this file: the earlier tests in this describe
+    // write answered rows too, and a window that included them would measure THEM. A rate is about
+    // a population, so the population has to be the one the test controls.
+    const RATE_AT = new Date('2026-11-20T00:00:00Z');
+    const T5 = { tokenId: 'solana_rate1', network: 'solana', address: 'rate1', symbol: null, name: null };
+    const T6 = { tokenId: 'solana_rate2', network: 'solana', address: 'rate2', symbol: null, name: null };
+    const T7 = { tokenId: 'solana_rate3', network: 'solana', address: 'rate3', symbol: null, name: null };
+    for (const t of [T5, T6, T7]) await noteToken(db, t, T0);
+    const mapped = mapTokenSecurity(GOPLUS_SOL, 'solana')!;
+
+    await writeTokenSecurity(db, T5.tokenId, 'h24', RATE_AT, { ...mapped.row, absentFields: [] });
+    await writeTokenSecurity(db, T6.tokenId, 'h24', RATE_AT, {
+      ...mapped.row, metadataMutable: null, absentFields: ['metadata_mutable'],
+    });
+    // a FAILED ask tells us nothing about the venue's field set; counting it would make an outage
+    // look like a vanished field
+    await writeSecurityFailure(db, T7.tokenId, 'h24', RATE_AT, 'solana', 'HTTP 500');
+
+    const counted = await countFieldPresence(db, ALL_GOPLUS_FIELDS, new Date(RATE_AT.getTime() - 60_000));
+    const rows = dexFieldPresence(counted);
+    const mutable = rows.find((r) => r.chainFamily === 'solana' && r.field === 'metadata_mutable')!;
+    const mintable = rows.find((r) => r.chainFamily === 'solana' && r.field === 'mintable')!;
+
+    // only the two ANSWERED rows are in the population, and only one of them lacked the field
+    expect(mutable.answered).toBe(2);
+    expect(mutable.present).toBe(1);
+    expect(mutable.presentRate).toBe(0.5);
+    expect(mintable.answered).toBe(2);
+    expect(mintable.presentRate).toBe(1);
+  });
+
+  it('excludes asks from before the window, so the rate is about the window', async () => {
+    const counted = await countFieldPresence(db, ALL_GOPLUS_FIELDS, new Date(T0.getTime() + 730 * 86_400_000));
+    expect(dexFieldPresence(counted).every((r) => r.answered === 0 && r.presentRate === null)).toBe(true);
   });
 
   it('keeps the whole raw response, so an unmodelled field is not lost', async () => {

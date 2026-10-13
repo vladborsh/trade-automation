@@ -148,9 +148,30 @@ comment on column dex_tokens.address is
  *              creator_balance, creator_percent, cannot_buy, honeypot_with_same_creator,
  *              token_name, token_symbol, total_supply
  *
- * My first draft of this table had `is_honeypot`, `is_proxy` and `owner_can_change_balance`. **None
- * of those three appears in either response** for the tokens probed — they were taken from GoPlus
- * documentation rather than from the API, which is the mistake the live pass exists to catch.
+ * My first draft of this table had `is_honeypot`, `is_proxy` and `owner_can_change_balance`, taken
+ * from GoPlus documentation rather than from the API. I then claimed all three "appear in neither
+ * response", **and that claim was wrong** — it was a statement about the API made from two
+ * fixtures, and the live pass falsified it:
+ *
+ *   - `is_honeypot`, `is_proxy` and `is_mintable` DO exist, on some EVM tokens;
+ *   - what does not exist is the documentation's SPELLING `owner_can_change_balance`. The real
+ *     field is `owner_change_balance`.
+ *
+ * So the original mistake was one invented name, not three. None of them is read into a column yet;
+ * all of them are in `raw`, so reading them later is a backfill rather than a loss.
+ *
+ * ## And the reason two fixtures could not settle it
+ *
+ * GoPlus's EVM field set varies PER TOKEN. Two real responses, measured 2026-10-13, share only
+ * **5 of 29** field names (`buy_tax`, `cannot_buy`, `is_in_dex`, `is_open_source`, `sell_tax`); one
+ * carries 14 fields and the other 29. AGENTS.md exempts payload shapes from the repetition rule
+ * because "a shape does not drift and a fixture catches it immediately" — **this API falsifies that
+ * premise for itself**, so here a shape claim needs repetition too, and two responses are not a
+ * sample. A measured exception to a stated rule, not a general relaxation of it.
+ *
+ * Consequence for this table: "a field vanished from the API" is **not detectable in one response**.
+ * It is only visible as a RATE, which is why `absent_fields` exists and why the coverage surface
+ * reads field presence per family over time rather than alerting on a single absence.
  *
  * So:
  *

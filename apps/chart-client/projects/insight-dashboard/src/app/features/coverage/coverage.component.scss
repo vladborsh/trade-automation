@@ -46,3 +46,10 @@ tr.holes td { color: #d29922; }
 tr.missing td { color: var(--down); }
 tr.unhealed td { color: #d29922; }
 tr.explained td { color: #8b949e; }
+
+/* IB-028 — the field-presence states. `gone` is the only alarm: an always-present field answered
+   for nobody. `thin` is deliberately grey, not amber — too few asks is not a problem, it is the
+   absence of a claim, and colouring it would make "we have not asked enough" read as a fault. */
+tr.gone td { color: #ef5350; }
+tr.varies td { color: #c9d1d9; }
+tr.thin td { color: #8b949e; }

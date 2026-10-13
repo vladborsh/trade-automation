@@ -197,3 +197,39 @@ export async function tokensDueSecurity(
   );
   return rows.map((r) => ({ tokenId: r.token_id, network: r.network, address: r.address }));
 }
+
+/**
+ * How often each GoPlus field was actually answered, per chain family, over a window.
+ *
+ * **The only form in which a shape change is detectable here.** GoPlus's EVM payload varies per
+ * token — two real responses share 5 of 29 field names — so one absent field says nothing, and
+ * "this field vanished from the API" exists only as a rate: 90 % of tokens carrying a field and
+ * then 0 % is the signal. Without this read, `absent_fields` would be an honesty column with no
+ * consumer, which is the trap it was added to avoid.
+ *
+ * Only `answered` rows count. A failed ask carries no information about the venue's field set, and
+ * including it would make an outage look like a vanished field.
+ */
+export async function dexFieldPresence(
+  db: Db,
+  fields: readonly string[],
+  since: Date,
+): Promise<Array<{ chainFamily: string; field: string; answered: number; present: number }>> {
+  const rows = await db.query<{ chain_family: string; field: string; answered: string; present: string }>(
+    `select s.chain_family, f.field,
+            count(*) as answered,
+            count(*) filter (where not (f.field = any(s.absent_fields))) as present
+       from dex_token_security s
+       cross join unnest($2::text[]) as f(field)
+      where s.answered and s.checked_at >= $1
+      group by 1, 2
+      order by 1, 2`,
+    [since, [...fields]],
+  );
+  return rows.map((r) => ({
+    chainFamily: r.chain_family,
+    field: r.field,
+    answered: Number(r.answered),
+    present: Number(r.present),
+  }));
+}
