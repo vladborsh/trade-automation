@@ -349,14 +349,15 @@ maybeDescribe('IB-017 the runner', () => {
    * invisible afterwards unless the revision each arm read is written down.
    */
   describe('frame revision pinning', () => {
-    const storeFrame = async (closeMs: number, revision: number, close: number) => db.query(
-      `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete,
-                                   revision, computed_mode, computed_at, spec_fingerprint)
-       values ($1,'15m',$2,1,$3::jsonb,'{}'::jsonb,false,$4,'live',$5,$6)
-       on conflict do nothing`,
-      [SYMBOL, new Date(closeMs), JSON.stringify({ 'px.close': { ok: true, value: close } }),
-        revision, new Date(closeMs), featureSpecFingerprint()],
-    );
+    const storeFrame = async (closeMs: number, revision: number, close: number, frameVersion = 1) =>
+      db.query(
+        `insert into feature_frames (symbol, tf, close_time, frame_version, keys, basis, complete,
+                                     revision, computed_mode, computed_at, spec_fingerprint)
+         values ($1,'15m',$2,$7,$3::jsonb,'{}'::jsonb,false,$4,'live',$5,$6)
+         on conflict do nothing`,
+        [SYMBOL, new Date(closeMs), JSON.stringify({ 'px.close': { ok: true, value: close } }),
+          revision, new Date(closeMs), featureSpecFingerprint(), frameVersion],
+      );
 
     const frameRev = (closeMs: number, revision: number, close: number): WebFeatureFrame =>
       ({ ...frameAt(closeMs, close), revision });
@@ -394,6 +395,33 @@ maybeDescribe('IB-017 the runner', () => {
         // read the pinned revision 1 and therefore armed, exactly like its sibling
         { arm: 'gated', frame_revision: 1, outcome: 'armed' },
         { arm: 'unconditional', frame_revision: 1, outcome: 'armed' },
+      ]);
+    });
+
+    it('does NOT satisfy a v1 pin with the v2 frame of the same revision number', async () => {
+      // IB-053. The pin is (revision, frame_version) and this is the case that forced it: both
+      // versions have a revision 1 for this close, so a pin carrying only "revision 1" points at
+      // two frames while looking exact.
+      //
+      // The two frames deliberately DISAGREE — 105 arms, 50 does not — so if the wrong one were
+      // served the outcome column would say so. A fixture whose two sides agree cannot tell you
+      // which was read, which is the mistake this suite's own heal test avoided.
+      await storeFrame(T0, 1, 105, 1);
+      await run(T0, 105);
+      await db.query(`delete from playbook_evaluations where arm = 'gated'`);
+      await db.query(`delete from playbook_state where arm = 'gated'`);
+
+      // A v2 frame for the same close, same revision number, different answer.
+      await storeFrame(T0, 1, 50, 2);
+      await runner.runClose('15m', T0, T0 + 15_000, [SYMBOL],
+        new Map([[SYMBOL, { ...frameRev(T0, 1, 50), frameVersion: 2 }]]), 'live');
+
+      const rows = await db.query<{ arm: string; frame_revision: number; frame_version: number; outcome: string }>(
+        `select arm, frame_revision, frame_version, outcome from playbook_evaluations order by arm`);
+      expect(rows).toEqual([
+        // the v1 pin resolved to the v1 frame, so the gated arm armed like its sibling
+        { arm: 'gated', frame_revision: 1, frame_version: 1, outcome: 'armed' },
+        { arm: 'unconditional', frame_revision: 1, frame_version: 1, outcome: 'armed' },
       ]);
     });
 

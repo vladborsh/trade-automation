@@ -94,7 +94,10 @@ export class FeaturePassService {
       computedAtSec: Math.floor(nowMs / 1000),
     });
 
-    const published = await frames.publishedFrame(this.db, symbol, tf, closeMs);
+    // Scoped to the version this pass computes under: a v2 pass re-checks v2 frames and is
+    // blind to the v1 frames for the same close, which is the point — they are a different
+    // measurement, not an earlier attempt at this one (IB-053).
+    const published = await frames.publishedFrame(this.db, symbol, tf, closeMs, fresh.frameVersion);
 
     if (published === null) {
       await this.db.transaction(async (tx) => {
@@ -111,7 +114,9 @@ export class FeaturePassService {
       if (decision.conflicts.length > 0) {
         await this.db.transaction(async (tx) => {
           await frames.recordConflicts(
-            tx, { symbol, tf, closeTimeMs: closeMs, revision: published.revision }, decision.conflicts,
+            tx,
+            { symbol, tf, closeTimeMs: closeMs, revision: published.revision, frameVersion: published.frameVersion },
+            decision.conflicts,
           );
         });
       }
@@ -125,7 +130,9 @@ export class FeaturePassService {
     await this.db.transaction(async (tx) => {
       await frames.insertFrame(tx, amended);
       await frames.recordConflicts(
-        tx, { symbol, tf, closeTimeMs: closeMs, revision: published.revision }, decision.conflicts,
+        tx,
+        { symbol, tf, closeTimeMs: closeMs, revision: published.revision, frameVersion: published.frameVersion },
+        decision.conflicts,
       );
     });
     return { symbol, action: 'amended', frame: amended, conflicts: decision.conflicts.length };

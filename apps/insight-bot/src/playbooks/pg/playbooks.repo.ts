@@ -110,6 +110,12 @@ export interface EvaluationRow {
    * every other column.
    */
   frameRevision: number;
+  /**
+   * The frame VERSION the pin refers to (IB-053). `frameRevision` alone stopped identifying one
+   * frame when v1 and v2 began to coexist for a close, and an audit row whose pin is ambiguous
+   * is worse than one with no pin: it still looks exact.
+   */
+  frameVersion: number;
 }
 
 /**
@@ -126,13 +132,13 @@ export async function recordEvaluation(db: DbHandle, row: EvaluationRow): Promis
   const rows = await db.query<{ playbook: string }>(
     `insert into playbook_evaluations
        (playbook, version, symbol, arm, source_mode, close_time, outcome, refusal,
-        gate_status, gate_refusal, exclude_from_comparison, frame_revision)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        gate_status, gate_refusal, exclude_from_comparison, frame_revision, frame_version)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      on conflict (playbook, symbol, arm, close_time, source_mode) do nothing
      returning playbook`,
     [row.playbook, row.version, row.symbol, row.arm, row.sourceMode, asDate(row.closeTimeMs),
       row.outcome, row.refusal, row.gateStatus, row.gateRefusal, row.excludeFromComparison,
-      row.frameRevision],
+      row.frameRevision, row.frameVersion],
   );
   return rows.length > 0;
 }
@@ -150,15 +156,18 @@ export async function recordEvaluation(db: DbHandle, row: EvaluationRow): Promis
 export async function pinnedFrameRevision(
   db: DbHandle,
   q: { playbook: string; symbol: string; sourceMode: SourceMode; closeTimeMs: number },
-): Promise<number | null> {
-  const rows = await db.query<{ frame_revision: number }>(
-    `select frame_revision from playbook_evaluations
+): Promise<{ revision: number; frameVersion: number } | null> {
+  const rows = await db.query<{ frame_revision: number; frame_version: number }>(
+    `select frame_revision, frame_version from playbook_evaluations
       where playbook = $1 and symbol = $2 and source_mode = $3 and close_time = $4
       order by frame_revision
       limit 1`,
     [q.playbook, q.symbol, q.sourceMode, asDate(q.closeTimeMs)],
   );
-  return rows[0]?.frame_revision ?? null;
+  const row = rows[0];
+  // Both halves or neither: a revision without its version is the ambiguity IB-053 removed, so
+  // it is not returned in a shape that lets a caller use one and forget the other.
+  return row ? { revision: row.frame_revision, frameVersion: row.frame_version } : null;
 }
 
 /** Has this close already been evaluated for this arm? The idempotency question, asked first. */

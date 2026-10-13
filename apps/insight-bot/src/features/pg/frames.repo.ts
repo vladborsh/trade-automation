@@ -61,24 +61,33 @@ const FRAME_COLUMNS =
   'revision, amended_at, amended_keys, computed_mode, computed_at, spec_fingerprint';
 
 /**
- * The frame as currently published for a close, or null when nothing has been written for it.
+ * The frame as currently published for a close **under one version**, or null when nothing has
+ * been written for it.
  *
  * Null is what makes the re-check path decidable: a first write and an amendment are different
  * operations and the caller must not guess which one it is doing.
+ *
+ * **`frameVersion` is required and has no default (IB-053).** v1 and v2 frames for one close
+ * coexist, so "the published frame" is not a question with an answer until a version is named.
+ * Making the caller say which one is what makes a cross-version comparison impossible to
+ * assemble rather than merely forbidden: `decideAmendment` can only ever be handed two frames of
+ * the same version, so a difference it sees is always a difference in the DATA. A default would
+ * have put the whole guarantee behind whichever version somebody forgot to pass.
  */
 export async function publishedFrame(
   db: DbHandle,
   symbol: string,
   tf: WebFrameTimeframe,
   closeTimeMs: number,
+  frameVersion: number,
 ): Promise<WebFeatureFrame | null> {
   const rows = await db.query<FrameRow>(
     `select ${FRAME_COLUMNS}
        from feature_frames
-      where symbol = $1 and tf = $2 and close_time = $3
+      where symbol = $1 and tf = $2 and close_time = $3 and frame_version = $4
       order by revision desc
       limit 1`,
-    [symbol, tf, asDate(closeTimeMs)],
+    [symbol, tf, asDate(closeTimeMs), frameVersion],
   );
   const row = rows[0];
   return row ? toFrame(row) : null;
@@ -94,6 +103,10 @@ export async function publishedFrame(
  *
  * Revisions are append-only, so this is satisfiable whenever the pin was real; a null is a
  * genuine finding rather than an expected miss.
+ *
+ * **The pin is (revision, frameVersion) since IB-053.** A revision alone stopped identifying one
+ * frame the moment v1 and v2 coexisted for a close, and this function would then have returned
+ * an arbitrary one of two while still looking exact — which is worse than returning nothing.
  */
 export async function frameAtRevision(
   db: DbHandle,
@@ -101,30 +114,42 @@ export async function frameAtRevision(
   tf: WebFrameTimeframe,
   closeTimeMs: number,
   revision: number,
+  frameVersion: number,
 ): Promise<WebFeatureFrame | null> {
   const rows = await db.query<FrameRow>(
     `select ${FRAME_COLUMNS}
        from feature_frames
-      where symbol = $1 and tf = $2 and close_time = $3 and revision = $4`,
-    [symbol, tf, asDate(closeTimeMs), revision],
+      where symbol = $1 and tf = $2 and close_time = $3 and revision = $4
+        and frame_version = $5`,
+    [symbol, tf, asDate(closeTimeMs), revision, frameVersion],
   );
   const row = rows[0];
   return row ? toFrame(row) : null;
 }
 
-/** Every published frame in a window, latest revision each, oldest first. */
+/**
+ * Every published frame in a window **of one version**, latest revision each, oldest first.
+ *
+ * `frameVersion` is required for the same reason as on `publishedFrame`, and here the old
+ * signature was quietly worse than wrong: `distinct on (symbol, tf, close_time)` collapses a v1
+ * and a v2 frame for one close into a SINGLE row and picks whichever sorted first. An audit over
+ * a window would then have reported a mixture of two definitions as though it were one body of
+ * results, with nothing in the output saying so. Verified against a real table before fixing:
+ * two rows in, one row out.
+ */
 export async function publishedFramesBetween(
   db: DbHandle,
   tf: WebFrameTimeframe,
   fromMs: number,
   toMsExclusive: number,
+  frameVersion: number,
 ): Promise<WebFeatureFrame[]> {
   const rows = await db.query<FrameRow>(
     `select distinct on (symbol, tf, close_time) ${FRAME_COLUMNS}
        from feature_frames
-      where tf = $1 and close_time >= $2 and close_time < $3
+      where tf = $1 and close_time >= $2 and close_time < $3 and frame_version = $4
       order by symbol, tf, close_time, revision desc`,
-    [tf, asDate(fromMs), asDate(toMsExclusive)],
+    [tf, asDate(fromMs), asDate(toMsExclusive), frameVersion],
   );
   return rows.map(toFrame).sort((a, b) => a.closeTime - b.closeTime);
 }
@@ -159,7 +184,7 @@ export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise
        (symbol, tf, close_time, frame_version, keys, basis, complete, incomplete_reason,
         revision, amended_at, amended_keys, computed_mode, computed_at, spec_fingerprint)
      values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8::text[], $9, $10, $11::text[], $12, $13, $14)
-     on conflict (symbol, tf, close_time, revision) do nothing
+     on conflict (symbol, tf, close_time, frame_version, revision) do nothing
      returning revision`,
     [
       frame.symbol,
@@ -187,23 +212,41 @@ export async function insertFrame(db: DbHandle, frame: WebFeatureFrame): Promise
  * Records recomputes that would have changed a published value. The published value stands;
  * this is the evidence that an input moved under us.
  *
+ * **Within one version only (IB-053).** Across versions the DEFINITION changed, so a difference
+ * is expected rather than defective — `atr.4h.14` going value -> insufficient_history under v2 is
+ * the new 71-bar window working, not an input moving. Such rows would bury the real findings
+ * under every definition change we ever make, which is the failure IB-048 already cost us once.
+ * The scoping is structural: this writes the version `publishedFrame` was asked for.
+ *
  * Expected to stay empty, which is what makes it worth writing to: a table that is routinely
  * non-empty tells nobody anything.
  */
 export async function recordConflicts(
   db: DbHandle,
-  at: { symbol: string; tf: WebFrameTimeframe; closeTimeMs: number; revision: number },
+  at: {
+    symbol: string;
+    tf: WebFrameTimeframe;
+    closeTimeMs: number;
+    revision: number;
+    /**
+     * The version BOTH sides were computed under (IB-053). Not the current registry version —
+     * the version of the published frame being re-checked, which `publishedFrame` was asked for
+     * and therefore returned.
+     */
+    frameVersion: number;
+  },
   conflicts: readonly ValueConflict[],
 ): Promise<void> {
   for (const conflict of conflicts) {
     await db.query(
       `insert into feature_value_conflicts
-         (symbol, tf, close_time, revision, feature_key, published, recomputed)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+         (symbol, tf, close_time, frame_version, revision, feature_key, published, recomputed)
+       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
       [
         at.symbol,
         at.tf,
         asDate(at.closeTimeMs),
+        at.frameVersion,
         at.revision,
         conflict.key,
         JSON.stringify(conflict.published),

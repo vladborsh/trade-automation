@@ -64,7 +64,7 @@ export interface RunnerDeps {
    * frames from wherever it holds them; defaults to the frames table.
    */
   readFrameRevision?: (
-    db: DbHandle, symbol: string, tf: string, closeMs: number, revision: number,
+    db: DbHandle, symbol: string, tf: string, closeMs: number, revision: number, frameVersion: number,
   ) => Promise<WebFeatureFrame | null>;
 }
 
@@ -273,7 +273,9 @@ export class PlaybookRunner {
         gateStatus: gate?.status ?? null,
         gateRefusal: gate !== null && gate.status === 'unavailable' ? gate.refusal : null,
         excludeFromComparison: result.excludeFromComparison,
+        // Both halves of the pin: which revision, and of which definition (IB-053).
         frameRevision: frame.revision,
+        frameVersion: frame.frameVersion,
       });
 
       await repo.writeState(tx, {
@@ -341,9 +343,14 @@ export class PlaybookRunner {
       playbook: ctx.playbook.id, symbol: ctx.symbol, sourceMode: ctx.sourceMode,
       closeTimeMs: ctx.closeMs,
     });
-    if (pinned === null || pinned === ctx.frame.revision) return ctx.frame;
+    // The pin matches only when BOTH halves do: same revision of the same version. A v2 frame
+    // at revision 1 is not the frame a v1 pin at revision 1 refers to (IB-053).
+    if (pinned === null
+      || (pinned.revision === ctx.frame.revision && pinned.frameVersion === ctx.frame.frameVersion)) {
+      return ctx.frame;
+    }
     const read = this.deps.readFrameRevision ?? defaultReadFrameRevision;
-    return read(this.deps.db, ctx.symbol, ctx.playbook.tf, ctx.closeMs, pinned);
+    return read(this.deps.db, ctx.symbol, ctx.playbook.tf, ctx.closeMs, pinned.revision, pinned.frameVersion);
   }
 
   /** Records a refusal that happened before the machine could be run at all. */
@@ -367,6 +374,7 @@ export class PlaybookRunner {
       // What we were handed and could not use — the pin it failed to satisfy is in the sibling
       // arm's row, which is the only place it was ever true.
       frameRevision: ctx.frame.revision,
+      frameVersion: ctx.frame.frameVersion,
     });
   }
 
@@ -393,9 +401,9 @@ export class PlaybookRunner {
 }
 
 const defaultReadFrameRevision = (
-  db: DbHandle, symbol: string, tf: string, closeMs: number, revision: number,
+  db: DbHandle, symbol: string, tf: string, closeMs: number, revision: number, frameVersion: number,
 ): Promise<WebFeatureFrame | null> =>
-  frameAtRevision(db, symbol, tf as WebFeatureFrame['tf'], closeMs, revision);
+  frameAtRevision(db, symbol, tf as WebFeatureFrame['tf'], closeMs, revision, frameVersion);
 
 /** `armed_ttl_bars` from the config, defaulting to §9.1's 8 when a playbook does not say. */
 function ttlBars(config: PlaybookConfigRow): number {

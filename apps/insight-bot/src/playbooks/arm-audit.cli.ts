@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
-  assertSingleComputedMode, canArm, type WebFeatureFrame, type WebFrameTimeframe,
+  WEB_FRAME_VERSION, assertSingleComputedMode, canArm, type WebFeatureFrame, type WebFrameTimeframe,
 } from '@trade-automation/contracts';
 import { AppConfigModule } from '../config/config.module';
 import { DB, type Db } from '../db/db.port';
@@ -78,7 +78,11 @@ async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(ArmAuditCliModule, { logger: ['warn', 'error'] });
   const db = app.get<Db>(DB);
   try {
-    const all = await publishedFramesBetween(db, tf, fromMs, toMs);
+    // Scoped to one frame version, for the same reason the mode must be uniform two lines
+    // below: a v1 and a v2 frame for one close are different definitions, and an audit that
+    // mixed them would report a count belonging to neither. The version audited is printed
+    // rather than assumed — see the header line.
+    const all = await publishedFramesBetween(db, tf, fromMs, toMs, WEB_FRAME_VERSION);
     const frames = all.filter((f) => f.symbol === symbol);
     // The audit must not straddle live and backfilled frames: a backfilled frame saw buckets that
     // derive healed after the close, so its refusals are a LOWER bound on what the live pass
@@ -88,6 +92,7 @@ async function main(): Promise<void> {
       `${playbookId} arming audit — ${symbol} ${tf}, ${new Date(fromMs).toISOString().slice(0, 10)} … ` +
         `${new Date(toMs).toISOString().slice(0, 10)}: ${frames.length} stored frames`,
     );
+    console.log(`frame version: ${WEB_FRAME_VERSION} (frames of other versions are NOT in this count)`);
     console.log(`armKeys: ${playbook.keys.armKeys.join(', ')}`);
     console.log(`computed mode: ${frames[0]?.computedMode ?? 'n/a'} (uniform — assertSingleComputedMode passed)`);
 

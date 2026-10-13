@@ -123,7 +123,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
   it('writes the frame even when it refuses — a missing frame is not a refusal', async () => {
     await seedAgg(95);
     await service.runClose(SYMBOL, '15m', CLOSE, CLOSE + 15_000, 'live');
-    const stored = await publishedFrame(db, SYMBOL, '15m', CLOSE);
+    const stored = await publishedFrame(db, SYMBOL, '15m', CLOSE, WEB_FRAME_VERSION);
     expect(stored).not.toBeNull();
   });
 
@@ -190,7 +190,7 @@ maybeDescribe('IB-015 the feature pass against a real database', () => {
     expect(second.conflicts).toBeGreaterThan(0);
     expect(second.action).toBe('unchanged');
     // the published value STANDS
-    const stored = await publishedFrame(db, SYMBOL, '15m', CLOSE);
+    const stored = await publishedFrame(db, SYMBOL, '15m', CLOSE, WEB_FRAME_VERSION);
     expect(stored?.keys['px.ret_4h']).toEqual(publishedRet);
     expect(stored?.revision).toBe(1);
 

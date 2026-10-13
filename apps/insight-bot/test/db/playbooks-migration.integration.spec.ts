@@ -131,12 +131,12 @@ maybeDescribe('IB-017 migration 015', () => {
     const evaluation = (over: Record<string, unknown> = {}) => db.query(
       `insert into playbook_evaluations
          (playbook, version, symbol, arm, source_mode, close_time, outcome, refusal,
-          gate_status, gate_refusal, exclude_from_comparison, frame_revision)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          gate_status, gate_refusal, exclude_from_comparison, frame_revision, frame_version)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [over.playbook ?? 'P3', over.version ?? 1, over.symbol ?? 'BTCUSDT', over.arm ?? 'gated',
         over.source_mode ?? 'live', over.close_time ?? new Date(CLOSE), over.outcome ?? 'declined',
         over.refusal ?? null, over.gate_status ?? null, over.gate_refusal ?? null,
-        over.exclude_from_comparison ?? false, over.frame_revision ?? 1],
+        over.exclude_from_comparison ?? false, over.frame_revision ?? 1, over.frame_version ?? 1],
     );
 
     it('records one row per playbook x symbol x arm x close x mode', async () => {
@@ -195,11 +195,24 @@ maybeDescribe('IB-017 migration 015', () => {
       // Not nullable: without it nobody can tell afterwards whether the arms of one close read
       // the same information, and the case where they did not is invisible in every other
       // column. A default would let a writer omit it and reintroduce exactly that blindness.
+      // `frame_version` is supplied so the rejection is unambiguously ABOUT frame_revision:
+      // IB-053 made both not-null, and omitting both would let this pass on the wrong column.
       await expect(db.query(
         `insert into playbook_evaluations
-           (playbook, version, symbol, arm, source_mode, close_time, outcome)
-         values ('P3',1,'LTCUSDT','gated','live',$1,'declined')`, [new Date(CLOSE)],
+           (playbook, version, symbol, arm, source_mode, close_time, outcome, frame_version)
+         values ('P3',1,'LTCUSDT','gated','live',$1,'declined',1)`, [new Date(CLOSE)],
       )).rejects.toThrow(/frame_revision/i);
+    });
+
+    it('REQUIRES the frame VERSION too — a revision alone stopped identifying one frame', async () => {
+      // IB-053. The mirror of the assertion above, and it exists because the pin is now two
+      // halves: v1 revision 1 and v2 revision 1 are different frames, so an audit row carrying
+      // only the revision points at both while looking exact.
+      await expect(db.query(
+        `insert into playbook_evaluations
+           (playbook, version, symbol, arm, source_mode, close_time, outcome, frame_revision)
+         values ('P3',1,'XRPUSDT','gated','live',$1,'declined',1)`, [new Date(CLOSE)],
+      )).rejects.toThrow(/frame_version/i);
     });
 
     it('accepts frame_revision_unavailable as a refusal', async () => {

@@ -112,9 +112,10 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
 
   it('records a value conflict without touching the published frame', async () => {
     await db.query(
-      `insert into feature_value_conflicts (symbol, tf, close_time, revision, feature_key, published, recomputed)
-       values ('BTCUSDT','15m',$1,1,'cvd.perp.4h','{"ok":true,"value":100}','{"ok":true,"value":999}')`,
-      [new Date(CLOSE)],
+      `insert into feature_value_conflicts
+         (symbol, tf, close_time, frame_version, revision, feature_key, published, recomputed)
+       values ('BTCUSDT','15m',$1,$2,1,'cvd.perp.4h','{"ok":true,"value":100}','{"ok":true,"value":999}')`,
+      [new Date(CLOSE), WEB_FRAME_VERSION],
     );
     const [row] = await db.query<{ n: string }>(`select count(*) as n from feature_value_conflicts`);
     expect(Number(row?.n)).toBe(1);
@@ -180,7 +181,7 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
     it('round-trips a frame through insert and read', async () => {
       const at = CLOSE + 10 * 900_000;
       expect(await frames.insertFrame(db, frameAt(at))).toBe(true);
-      const read = await frames.publishedFrame(db, SYM, '15m', at);
+      const read = await frames.publishedFrame(db, SYM, '15m', at, WEB_FRAME_VERSION);
       expect(read?.closeTime).toBe(Math.floor(at / 1000));
       expect(read?.keys['oi.d24h_pct']).toEqual({ ok: true, value: 1.5 });
       expect(read?.revision).toBe(1);
@@ -192,7 +193,7 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
       await frames.insertFrame(db, frameAt(at, {
         revision: 2, amendedAt: Math.floor(at / 1000), amendedKeys: ['oi.d24h_pct'],
       }));
-      const read = await frames.publishedFrame(db, SYM, '15m', at);
+      const read = await frames.publishedFrame(db, SYM, '15m', at, WEB_FRAME_VERSION);
       expect(read?.revision).toBe(2);
       expect(read?.amendedKeys).toEqual(['oi.d24h_pct']);
       expect(read?.complete).toBe(true);
@@ -204,18 +205,18 @@ maybeDescribe('IB-015 feature frames against a real database', () => {
       const at = CLOSE + 12 * 900_000;
       expect(await frames.insertFrame(db, frameAt(at))).toBe(true);
       expect(await frames.insertFrame(db, frameAt(at, { complete: false }))).toBe(false);
-      const read = await frames.publishedFrame(db, SYM, '15m', at);
+      const read = await frames.publishedFrame(db, SYM, '15m', at, WEB_FRAME_VERSION);
       expect(read?.complete).toBe(true); // the first write stands
     });
 
     it('returns null for a close nothing was written for', async () => {
-      expect(await frames.publishedFrame(db, SYM, '15m', CLOSE + 500 * 900_000)).toBeNull();
+      expect(await frames.publishedFrame(db, SYM, '15m', CLOSE + 500 * 900_000, WEB_FRAME_VERSION)).toBeNull();
     });
 
     it('records conflicts against the published revision', async () => {
       const at = CLOSE + 13 * 900_000;
       await frames.insertFrame(db, frameAt(at));
-      await frames.recordConflicts(db, { symbol: SYM, tf: '15m', closeTimeMs: at, revision: 1 }, [
+      await frames.recordConflicts(db, { symbol: SYM, tf: '15m', closeTimeMs: at, revision: 1, frameVersion: WEB_FRAME_VERSION }, [
         { key: 'oi.d24h_pct', published: { ok: true, value: 1.5 }, recomputed: { ok: true, value: 9 } },
       ]);
       const [row] = await db.query<{ n: string }>(
