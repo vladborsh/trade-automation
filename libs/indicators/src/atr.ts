@@ -17,10 +17,30 @@ import { Candle } from '@trade-automation/contracts';
  * A Wilder implementation exists at `apps/insight-bot/src/features/math/wilder-atr.ts`, written
  * for IB-015 because design §8.2 requires Wilder's specifically. **It is not importable from
  * here today** — insight-bot deliberately does not depend on `libs/indicators`, and that
- * coupling is a bigger decision than a convenient import. **BUG-024** is the task that decides
- * whether a call site in this package (`vwap-band-reversal`) meant Wilder when its spec said
- * "ATR"; if it did, that task lifts the insight-bot implementation into this package rather than
- * writing a third one.
+ * coupling is a bigger decision than a convenient import.
+ *
+ * ---------------------------------------------------------------------------------------------
+ * **BUG-024, ANSWERED 2026-10-13: this function is CORRECT. Only its name misled.**
+ *
+ * The question was whether `vwap-band-reversal` meant Wilder when its spec said "ATR". It did
+ * not. `cmc-bot-main/src/indicator/tools/atr.indicator.ts` — the original the plug-in is a
+ * *faithful* port of — computes
+ *
+ *     trueRanges.slice(i - length, i).reduce((a, b) => a + b, 0) / length
+ *
+ * which is the arithmetic mean of true range, exactly what this function does. **Switching this
+ * to Wilder would make the port unfaithful**: it would silently become a different strategy from
+ * the one under research, and every result gathered for it would describe something else.
+ *
+ * So the two implementations are **both wanted and must stay apart** — they are different
+ * statistics, not a duplication to consolidate. Measured on 30 Binance perp symbols, 1h,
+ * length 20 with an 80-bar warm-up: `ATR_wilder / ATR_mean` has a median of 1.02 (per-symbol
+ * medians 0.97–1.06) but ranges 0.73–2.09 on individual bars. They agree when it is calm and
+ * diverge hardest when volatility spikes.
+ *
+ * The misleading name is left alone deliberately: renaming is cosmetic, the pause is on, and a
+ * reader who arrives here now gets the deciding fact instead of the open question.
+ * ---------------------------------------------------------------------------------------------
  */
 export function computeAtr(bars: readonly Candle[], length: number): number | undefined {
   const n = bars.length;
