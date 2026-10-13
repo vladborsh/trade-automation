@@ -41,10 +41,11 @@ describe('required windows', () => {
     expect(tooShort).toEqual([]);
   });
 
-  it('gives the ATR groups period + 1 bars, because Wilder seeds from a previous close', () => {
-    // atr.4h.14 over exactly 14 bars returns null: a window one bar short turns a working key
-    // into a permanent refusal, which looks like missing data rather than a short read.
-    expect(declaredLookbackMs('atr.4h.14')).toBe(15 * 4 * 3_600_000);
+  it('gives the ATR groups period + 1 + WARM-UP bars', () => {
+    // +1 because Wilder seeds from a previous close; +warmup because the recursion is only
+    // reproducible over a fixed window (IB-052). A window one bar short turns a working key
+    // into a permanent refusal that looks like missing data rather than a short read.
+    expect(declaredLookbackMs('atr.4h.14')).toBe((15 + 56) * 4 * 3_600_000);
     expect(lookbackMs('agg:4h')).toBeGreaterThanOrEqual(declaredLookbackMs('atr.4h.14') as number);
   });
 
@@ -82,7 +83,7 @@ describe('keyLookbackMs', () => {
   it('leaves span-expressed keys on their own declared window', () => {
     expect(keyLookbackMs('px.ret_24h', M15)).toBe(24 * H);
     expect(keyLookbackMs('px.ret_4h', M15)).toBe(4 * H);
-    expect(keyLookbackMs('atr.4h.14', M15)).toBe(15 * 4 * H);
+    expect(keyLookbackMs('atr.4h.14', M15)).toBe((15 + 56) * 4 * H);
   });
 
   it('separates the two keys that caused the defect by 96x', () => {
@@ -111,8 +112,8 @@ describe('keyWindowsForGroup', () => {
   it('separates atr.1d.14 from ema.1d.200, which is the same bug one group over', () => {
     const windows = keyWindowsForGroup('agg:1d', M15);
     const of = (key: string) => windows.find((w) => w.keys.includes(key as never))?.lookbackMs;
-    expect(of('atr.1d.14')).toBe(15 * 24 * H);
-    expect(of('ema.1d.200')).toBe(200 * 24 * H);
+    expect(of('atr.1d.14')).toBe((15 + 56) * 24 * H);
+    expect(of('ema.1d.200')).toBe((200 + 400) * 24 * H);
   });
 
   it('covers every key of the group exactly once', () => {

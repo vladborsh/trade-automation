@@ -16,14 +16,13 @@ describe('the key set is pinned', () => {
     // moves, bump WEB_FRAME_VERSION and update the literal here — in that order, deliberately,
     // because a frame written before and after a silent change would otherwise be compared by a
     // consumer with neither noticing. §8.2: "a change is a new frame_version".
-    expect(featureSpecFingerprint()).toBe('14f15ddd');
-    // Still 1, and that is a decision with an expiry date rather than an oversight. IB-016 added
-    // px.close, ema.4h.50 and ema.1d.200 on 2026-10-12, when NOTHING had ever been persisted
-    // under version 1 — so no stored frame means something different from a new one and there is
-    // nothing to be incomparable with. The moment real frames exist, the next change to this
-    // registry bumps the version and dual-reads. `feature_frame_versions` enforces it from the
-    // database rather than from this comment.
-    expect(WEB_FRAME_VERSION).toBe(1);
+    expect(featureSpecFingerprint()).toBe('65021b2c');
+    // **2 since IB-052**, and the expiry date in the previous version of this comment is what
+    // came due. Version 1 changed three times while `feature_frames` was empty, which is why
+    // keeping it at 1 was right each time. Frames now exist — 961 on one slot — so the warm-up
+    // params, which change every ATR and EMA value, are the first change that must bump.
+    // Version-1 frames are kept and read version-aware, never recomputed in place.
+    expect(WEB_FRAME_VERSION).toBe(2);
   });
 
   it('CHANGING A WINDOW MOVES THE FINGERPRINT, not just a comment', () => {
@@ -267,8 +266,8 @@ describe('the IB-016 trend keys', () => {
     // with the SMA of the first `length` closes disagree for roughly `length` bars and then
     // converge — two readers of "EMA200" getting different numbers for 200 days and identical
     // ones after is the hardest kind of disagreement to notice, so it is fingerprinted.
-    expect(WEB_FEATURE_SPEC['ema.4h.50'].params).toEqual({ length: 50, barTf: '4h', source: 'close', seed: 'sma' });
-    expect(WEB_FEATURE_SPEC['ema.1d.200'].params).toEqual({ length: 200, barTf: '1d', source: 'close', seed: 'sma' });
+    expect(WEB_FEATURE_SPEC['ema.4h.50'].params).toEqual({ length: 50, barTf: '4h', source: 'close', seed: 'sma', warmupBars: 100 });
+    expect(WEB_FEATURE_SPEC['ema.1d.200'].params).toEqual({ length: 200, barTf: '1d', source: 'close', seed: 'sma', warmupBars: 400 });
   });
 
   it('reads each EMA from the aggregate of its OWN bar timeframe', () => {
@@ -296,7 +295,7 @@ describe('the IB-016 trend keys', () => {
     const before = featureSpecFingerprint();
     const retuned = {
       ...WEB_FEATURE_SPEC,
-      'ema.1d.200': { ...WEB_FEATURE_SPEC['ema.1d.200'], params: { length: 100, barTf: '1d', source: 'close', seed: 'sma' } },
+      'ema.1d.200': { ...WEB_FEATURE_SPEC['ema.1d.200'], params: { length: 100, barTf: '1d', source: 'close', seed: 'sma', warmupBars: 400 } },
     };
     expect(featureSpecFingerprint(retuned)).not.toBe(before);
   });
@@ -305,7 +304,7 @@ describe('the IB-016 trend keys', () => {
     const before = featureSpecFingerprint();
     const reseeded = {
       ...WEB_FEATURE_SPEC,
-      'ema.4h.50': { ...WEB_FEATURE_SPEC['ema.4h.50'], params: { length: 50, barTf: '4h', source: 'close', seed: 'first' } },
+      'ema.4h.50': { ...WEB_FEATURE_SPEC['ema.4h.50'], params: { length: 50, barTf: '4h', source: 'close', seed: 'first', warmupBars: 100 } },
     };
     expect(featureSpecFingerprint(reseeded)).not.toBe(before);
   });
@@ -390,7 +389,7 @@ describe('computedMode', () => {
     // The fingerprint is over the key registry. Adding a field that describes how a frame was
     // produced says nothing about what any key MEANS, so stored frames stay comparable and the
     // version does not bump.
-    expect(featureSpecFingerprint()).toBe('14f15ddd');
+    expect(featureSpecFingerprint()).toBe('65021b2c');
   });
 });
 
@@ -435,6 +434,6 @@ describe('specFingerprint', () => {
   it('does not move the spec fingerprint — the frame SHAPE is not the key registry', () => {
     // Adding a field describing how a frame was produced says nothing about what any key means,
     // so stored frames stay comparable and the version does not bump.
-    expect(featureSpecFingerprint()).toBe('14f15ddd');
+    expect(featureSpecFingerprint()).toBe('65021b2c');
   });
 });

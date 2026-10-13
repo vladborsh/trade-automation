@@ -233,7 +233,21 @@ export type WebFeatureFrame = z.infer<typeof WebFeatureFrameSchema>;
  * comparison is ever needed, recompute into a separate set and compare — and note that
  * **mixing versions inside one comparison is an error a consumer must refuse**, not a footnote.
  */
-export const WEB_FRAME_VERSION = 1;
+/**
+ * **Version 2 since 2026-10-13 (IB-052) — the first real bump, and it was not free.**
+ *
+ * Version 1 changed three times while `feature_frames` was empty, which is why keeping it at 1
+ * was correct each time: no stored frame could mean something different from a new one. That
+ * window is closed — 961 frames exist on one slot and 5 on another — so IB-052's `warmupBars`,
+ * which changes every ATR and EMA value, is the first change that must bump.
+ *
+ * **Version-1 frames are KEPT and read version-aware, never recomputed in place.** A v1 frame is
+ * an honest record of what was published and what something may have armed on; rewriting it
+ * would destroy the audit trail that `revision` and `spec_fingerprint` exist to hold. The
+ * machinery for doing this honestly — the claim inside the write, the per-frame fingerprint,
+ * `assertSingleComputedMode` — was built hours before it was needed for exactly this.
+ */
+export const WEB_FRAME_VERSION = 2;
 
 /**
  * **The version freezes at the first persisted frame, and that is ENFORCED rather than stated.**
@@ -295,9 +309,49 @@ export const WEB_FEATURE_SPEC = {
   'cvd.spot.slope_4h': { inputs: ['candles1m:spot'], type: 'number', window: 'window vs previous window', params: { hours: 4, previousHours: 4, market: 'spot' }, def: 'sign of the change in window CVD against the previous window' },
   'cvd.perp.slope_4h': { inputs: ['candles1m:perp'], type: 'number', window: 'window vs previous window', params: { hours: 4, previousHours: 4, market: 'perp' }, def: 'sign of the change in window CVD against the previous window' },
   // ---- volatility
-  'atr.1h.14': { inputs: ['agg:1h'], type: 'number', window: 'N bars', params: { period: 14, barTf: '1h', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
-  'atr.4h.14': { inputs: ['agg:4h'], type: 'number', window: 'N bars', params: { period: 14, barTf: '4h', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
-  'atr.1d.14': { inputs: ['agg:1d'], type: 'number', window: 'N bars', params: { period: 14, barTf: '1d', smoothing: 'wilder' }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
+  //
+  // **`warmupBars` is why these are reproducible at all** (IB-052). Wilder smoothing and the EMA
+  // are RECURSIVE: every value carries each earlier bar with a decaying weight, so ATR(14) over
+  // 24 bars is not ATR(14) over 100 bars. Feeding whatever history happened to be complete made
+  // the published value a function of OUR COVERAGE rather than of the market — it moved when a
+  // derive run healed buckets (84 recorded conflicts, mean 13.30, max 52.55), and two slots with
+  // different coverage disagreed about the same close with neither identifiable as the wrong one.
+  //
+  // A FIXED window is what makes it reproducible. The SIZE of the warm-up is a separate and much
+  // smaller question — how close we sit to the conventional long-history value — and it is
+  // chosen from a POPULATION, because the residual is not monotonic and one symbol cannot rank
+  // one multiple against another (dev-1's caution, made a requirement).
+  //
+  // 30 symbols on insight_dev2, 2026-10-13, residual against a 200-bar reference:
+  //
+  //   ATR(14) 1h      median    min      max
+  //     0 warm-up     7.204%   0.864%  15.528%
+  //     2x period     0.369%   0.003%   1.069%
+  //     3x period     0.277%   0.008%   0.845%     <- no knee: barely better than 2x
+  //     4x period     0.130%   0.008%   0.295%     <- chosen
+  //     6x period     0.029%   0.001%   0.048%
+  //
+  //   EMA(50)         median    min      max
+  //     0 warm-up     0.4837%  0.1773%  1.9662%
+  //     1x length     0.1005%  0.0180%  0.3335%
+  //     2x length     0.0103%  0.0008%  0.0325%    <- chosen
+  //
+  // **A single symbol would have chosen 3x and been wrong about why.** On BTCUSDT alone the
+  // curve looked like it had a knee at 3x (0.293%); across 30 symbols 3x is indistinguishable
+  // from 2x in the median and its WORST symbol is 0.845% — three times the figure BTCUSDT
+  // suggested. The real steps are at 4x and 6x.
+  //
+  // So 4x period for the ATRs (56) and 2x length for the EMAs (100 / 400). Different multiples
+  // because the two recursions converge at different rates — the EMA's SMA seed is already a
+  // good estimate — and one shared multiple would be tidier and wrong.
+  //
+  // The cost is availability: a key needs period+1+warmup bars to compute AT ALL, so atr.1d.14
+  // wants 71 daily bars rather than 15 and will refuse for about eight more weeks on this tape.
+  // It is not consumed by anything shipping. P3 uses atr.1h.14, which wants 71 hours against the
+  // 410 bars we hold.
+  'atr.1h.14': { inputs: ['agg:1h'], type: 'number', window: 'N bars', params: { period: 14, barTf: '1h', smoothing: 'wilder', warmupBars: 56 }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
+  'atr.4h.14': { inputs: ['agg:4h'], type: 'number', window: 'N bars', params: { period: 14, barTf: '4h', smoothing: 'wilder', warmupBars: 56 }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
+  'atr.1d.14': { inputs: ['agg:1d'], type: 'number', window: 'N bars', params: { period: 14, barTf: '1d', smoothing: 'wilder', warmupBars: 56 }, def: 'average true range on candles_agg, smoothed as the smoothing parameter states' },
   // ---- structure
   'structure.swing_high_12h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'highest pivot high over the window' },
   'structure.swing_low_12h': { inputs: ['agg:15m'], type: 'number', window: 'rolling hours of bars', params: { hours: 12, barTf: '15m', pivotBars: 3 }, def: 'lowest pivot low over the window' },
@@ -381,8 +435,8 @@ export const WEB_FEATURE_SPEC = {
   // close and one seeded with the SMA of the first `length` closes disagree for roughly `length`
   // bars and then converge, so two readers of "EMA200" get different numbers for 200 days and
   // identical ones afterwards — the hardest kind of disagreement to notice.
-  'ema.4h.50': { inputs: ['agg:4h'], type: 'number', window: 'N bars', params: { length: 50, barTf: '4h', source: 'close', seed: 'sma' }, def: 'exponential moving average of the close over the last N bars of candles_agg, alpha = 2/(length+1), seeded with the SMA of the first N closes' },
-  'ema.1d.200': { inputs: ['agg:1d'], type: 'number', window: 'N bars', params: { length: 200, barTf: '1d', source: 'close', seed: 'sma' }, def: 'exponential moving average of the close over the last N bars of candles_agg, alpha = 2/(length+1), seeded with the SMA of the first N closes' },
+  'ema.4h.50': { inputs: ['agg:4h'], type: 'number', window: 'N bars', params: { length: 50, barTf: '4h', source: 'close', seed: 'sma', warmupBars: 100 }, def: 'exponential moving average of the close over the last N bars of candles_agg, alpha = 2/(length+1), seeded with the SMA of the first N closes' },
+  'ema.1d.200': { inputs: ['agg:1d'], type: 'number', window: 'N bars', params: { length: 200, barTf: '1d', source: 'close', seed: 'sma', warmupBars: 400 }, def: 'exponential moving average of the close over the last N bars of candles_agg, alpha = 2/(length+1), seeded with the SMA of the first N closes' },
   // ---- label
   'label.p4': { inputs: ['agg:15m', 'candles1m:perp', 'candles1m:spot'], type: 'enum', window: 'frame', params: { source: 'design 9.2' }, values: ['SPOT_LED', 'PERP_LED', 'ABSORPTION', 'DISTRIBUTION', 'NONE'], def: 'P4 label from the design section named in params' },
 } as const;

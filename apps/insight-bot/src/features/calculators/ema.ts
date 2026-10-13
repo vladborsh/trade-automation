@@ -33,10 +33,19 @@ export function emaFeatures(input: EmaInput): Partial<Record<WebFeatureKey, WebF
   const length4h = featureParamNumber('ema.4h.50', 'length');
   const length1d = featureParamNumber('ema.1d.200', 'length');
 
-  const e4h = emaLast(input.closes4h, length4h);
+  // IB-052: the EMA is recursive too, so it is computed over its DECLARED window and nothing
+  // else. Sliced here rather than by the caller so "feed more history, get the same answer" is
+  // a property of this function and can be asserted without a database.
+  const fixed = (closes: readonly number[], length: number, warmup: number): number | null => {
+    const window = length + warmup;
+    if (closes.length < window) return null;
+    return emaLast(closes.slice(closes.length - window), length);
+  };
+
+  const e4h = fixed(input.closes4h, length4h, featureParamNumber('ema.4h.50', 'warmupBars'));
   out['ema.4h.50'] = e4h === null ? no('insufficient_history') : ok(e4h);
 
-  const e1d = emaLast(input.closes1d, length1d);
+  const e1d = fixed(input.closes1d, length1d, featureParamNumber('ema.1d.200', 'warmupBars'));
   out['ema.1d.200'] = e1d === null ? no('insufficient_history') : ok(e1d);
 
   return out;

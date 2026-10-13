@@ -29,17 +29,17 @@ const DAY = 24 * HOUR;
 export const GROUP_LOOKBACK_MS: Readonly<Record<string, number>> = {
   // px.* and structure.* read 24 h of 15m bars; structure's pivots need the same window.
   'agg:15m': 24 * HOUR,
-  // atr.1h.14 needs 15 bars — but structure.failed_highs_24h reads 24 h of the SAME group, so
-  // the group's window is the wider of the two. Written as 15 h first and caught by the spec
-  // below on its first run: the key would have answered a 24-hour question with 15 hours of
-  // bars, and nothing would have failed.
-  'agg:1h': 24 * HOUR,
-  // 50 bars for ema.4h.50 (IB-016), which is wider than atr.4h.14's 15.
-  'agg:4h': 50 * 4 * HOUR,
-  // 200 bars for ema.1d.200 (IB-016). On today's tape candles_agg holds about ten days, so the
-  // key refuses — correctly, and as a stated prerequisite of the archive backfill rather than a
-  // defect. The window is written for what the key MEANS, not for what the table currently has.
-  'agg:1d': 200 * DAY,
+  // atr.1h.14 needs period+1+warmup = 71 bars since IB-052; structure.failed_highs_24h reads
+  // 24 h of the same group. The group's window is the wider of the two, and the cross-check
+  // spec below named both when the warm-up made the ATR the wider one.
+  'agg:1h': 71 * HOUR,
+  // ema.4h.50 needs length+warmup = 150 bars since IB-052, wider than atr.4h.14's 71.
+  'agg:4h': 150 * 4 * HOUR,
+  // ema.1d.200 needs length+warmup = 600 bars since IB-052. On today's tape candles_agg holds
+  // about sixteen days, so the key refuses — correctly, and as a stated prerequisite of the
+  // archive backfill rather than a defect. The window is written for what the key MEANS, not
+  // for what the table currently has.
+  'agg:1d': 600 * DAY,
   // cvd.*.24h reads 24 h; the slope reads 4 h against the previous 4 h, which is inside it.
   'candles1m:perp': 24 * HOUR,
   'candles1m:spot': 24 * HOUR,
@@ -141,12 +141,17 @@ export function declaredLookbackMs(key: WebFeatureKey): number | null {
   // An EMA's `length` and an ATR's `period` are both "N bars", but they need different counts:
   // Wilder seeds from a previous close and so needs N + 1, while the EMA seeds from the SMA of
   // its first N and needs exactly N.
+  // IB-052: a recursive indicator's window includes its warm-up, or the group read would not
+  // cover what the calculator now requires and the key would refuse for want of bars nobody
+  // fetched.
+  const warmup = num('warmupBars') ?? 0;
+
   const length = num('length');
   if (length !== null) {
     const barTf = params['barTf'];
     const barMs = typeof barTf === 'string' ? TF_MS[barTf] : undefined;
     if (barMs === undefined) return null;
-    return length * barMs;
+    return (length + warmup) * barMs;
   }
 
   const period = num('period');
@@ -154,7 +159,7 @@ export function declaredLookbackMs(key: WebFeatureKey): number | null {
     const barTf = params['barTf'];
     const barMs = typeof barTf === 'string' ? TF_MS[barTf] : undefined;
     if (barMs === undefined) return null;
-    return (period + 1) * barMs; // +1: Wilder seeds from a previous close
+    return (period + 1 + warmup) * barMs; // +1: Wilder seeds from a previous close
   }
 
   const hours = num('hours');

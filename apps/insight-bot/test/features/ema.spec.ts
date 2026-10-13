@@ -57,6 +57,15 @@ describe('emaLast refuses rather than shortening', () => {
 describe('emaFeatures', () => {
   const closes = (n: number) => Array.from({ length: n }, (_, i) => 100 + Math.sin(i) * 5);
 
+  /**
+   * IB-052 — the key's window is `length + warmupBars`, and this spec reads both from the
+   * registry rather than naming 50 and 200. The EMA is recursive, so a value computed from
+   * `length` closes is not the same number as one computed from `length + warmup` closes; the
+   * window is therefore part of the key's definition and lives where the definition lives.
+   */
+  const window = (key: 'ema.4h.50' | 'ema.1d.200') =>
+    featureParamNumber(key, 'length') + featureParamNumber(key, 'warmupBars');
+
   it('refuses both keys on today’s tape, which is the stated prerequisite not a defect', () => {
     // candles_agg holds about ten days, so ema.1d.200 cannot be computed until the archive
     // backfill lands. `insufficient_history` says that; a number would claim a trend nobody has
@@ -67,16 +76,17 @@ describe('emaFeatures', () => {
   });
 
   it('computes each key once its own window is filled, independently', () => {
-    const out = emaFeatures({ closes4h: closes(50), closes1d: closes(10) });
+    const out = emaFeatures({ closes4h: closes(window('ema.4h.50')), closes1d: closes(10) });
     expect(out['ema.4h.50']?.ok).toBe(true);
     expect(out['ema.1d.200']?.ok).toBe(false); // one key's history does not vouch for another's
   });
 
-  it('uses the LENGTH the registry declares, not a literal', () => {
-    // The guard against the key's name, its parameter and the number used drifting apart.
-    const length4h = featureParamNumber('ema.4h.50', 'length');
-    expect(length4h).toBe(50);
-    expect(emaFeatures({ closes4h: closes(length4h - 1), closes1d: [] })['ema.4h.50']?.ok).toBe(false);
-    expect(emaFeatures({ closes4h: closes(length4h), closes1d: [] })['ema.4h.50']?.ok).toBe(true);
+  it('uses the WINDOW the registry declares, not a literal', () => {
+    // The guard against the key's name, its parameters and the number of closes used drifting
+    // apart. Since IB-052 the boundary is length + warmupBars, not length: an EMA50 over exactly
+    // 50 closes is the SMA of them, which is a different quantity from the one this key names.
+    expect(featureParamNumber('ema.4h.50', 'length')).toBe(50);
+    expect(emaFeatures({ closes4h: closes(window('ema.4h.50') - 1), closes1d: [] })['ema.4h.50']?.ok).toBe(false);
+    expect(emaFeatures({ closes4h: closes(window('ema.4h.50')), closes1d: [] })['ema.4h.50']?.ok).toBe(true);
   });
 });

@@ -25,13 +25,29 @@ export function volatilityFeatures(input: AtrInput): Partial<Record<WebFeatureKe
   for (const tf of ATR_TFS) {
     const key = `atr.${tf}.14` as WebFeatureKey;
     const period = featureParamNumber(key, 'period');
-    const bars = input.bars[tf];
-    if (!bars || bars.length === 0) {
+    const warmup = featureParamNumber(key, 'warmupBars');
+    const available = input.bars[tf];
+    if (!available || available.length === 0) {
       out[key] = no('no_data');
       continue;
     }
-    const atr = wilderAtr(bars, period);
-    // null means fewer than period + 1 bars: a real shortage of history, not absent data
+
+    // IB-052: slice to the DECLARED window before computing, and do it here rather than in the
+    // caller so the invariant is a property of this pure function: feed it more history and the
+    // answer does not move.
+    //
+    // Wilder smoothing is recursive, so handing it "whatever was complete" made the value a
+    // function of our coverage — it moved when a derive run healed buckets, and two slots with
+    // different coverage disagreed about the same close. `period + 1 + warmupBars` is the only
+    // thing this key is ever computed over.
+    const window = period + 1 + warmup;
+    if (available.length < window) {
+      // Not enough history for the DECLARED window. A shortage, not absent data — and
+      // deliberately not "compute it from what we have", which is the defect itself.
+      out[key] = no('insufficient_history');
+      continue;
+    }
+    const atr = wilderAtr(available.slice(available.length - window), period);
     out[key] = atr === null ? no('insufficient_history') : ok(atr);
   }
   return out;

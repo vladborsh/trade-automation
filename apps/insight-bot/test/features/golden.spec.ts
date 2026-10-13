@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { WEB_FRAME_VERSION, featureSpecFingerprint } from '@trade-automation/contracts';
+import { WEB_FRAME_VERSION, featureParamNumber, featureSpecFingerprint } from '@trade-automation/contracts';
 import { emaFeatures } from '../../src/features/calculators/ema';
 import { fundingFeatures, type FundingInput, type Settlement } from '../../src/features/calculators/funding';
 
@@ -61,15 +61,21 @@ function buildGolden(): Record<string, unknown> {
   };
 
   /**
-   * IB-016's EMAs, with the 4h series sitting at EXACTLY its 50-bar boundary and the 1d series
-   * one bar short of its 200.
+   * IB-016's EMAs, with the 4h series sitting at EXACTLY its declared window and the 1d series
+   * one bar short of its own.
    *
    * Both boundaries on purpose, for the reason the funding fixture above was rebuilt: a golden
-   * whose fixture avoids the boundary tests nothing at the boundary. At exactly 50 bars the EMA
-   * is the SMA of them and no recurrence step has run — so an implementation that seeded from
-   * the first close instead of the SMA produces a different number HERE, where it is visible,
-   * rather than only during the first 50 bars of live data, where nobody is looking.
+   * whose fixture avoids the boundary tests nothing at the boundary.
+   *
+   * **IB-052 moved both boundaries, and that is the whole point of the v2 file.** The window is
+   * now `length + warmupBars` — 150 closes for ema.4h.50, 600 for ema.1d.200 — because the EMA
+   * is recursive and a value computed from 50 closes is a different number from one computed
+   * from 150. Under v1 these fixtures were 50 and 199 and the golden recorded the 50-close
+   * value; it is kept, unmodified, as frame-v1.json. The counts are read from the registry
+   * rather than written here, so the fixture cannot drift from the definition it is pinning.
    */
+  const emaWindow = (key: 'ema.4h.50' | 'ema.1d.200') =>
+    featureParamNumber(key, 'length') + featureParamNumber(key, 'warmupBars');
   const wave = (n: number): number[] =>
     Array.from({ length: n }, (_, i) => 100 + Math.sin(i / 3) * 7 + i * 0.25);
 
@@ -78,7 +84,7 @@ function buildGolden(): Record<string, unknown> {
     specFingerprint: featureSpecFingerprint(),
     keys: {
       ...fundingFeatures(funding),
-      ...emaFeatures({ closes4h: wave(50), closes1d: wave(199) }),
+      ...emaFeatures({ closes4h: wave(emaWindow('ema.4h.50')), closes1d: wave(emaWindow('ema.1d.200') - 1) }),
     },
   };
 }
