@@ -290,7 +290,12 @@ export function assertShapeRecognisable(token: Record<string, unknown>, family: 
 export function mapTokenSecurity(body: string, family: ChainFamily): { address: string; row: TokenSecurityRow } | null {
   const payload = JSON.parse(body) as { code?: unknown; result?: Record<string, Record<string, unknown>> };
   const result = payload.result;
-  if (result === undefined || Object.keys(result).length === 0) return null;
+  // `result: null` is a shape GoPlus really sends — seen in the 24-hour run, and `Object.keys(null)`
+  // THROWS, which turned "the venue answered and said nothing" into a failed ask that retried five
+  // times and was then abandoned. `== null` covers both null and undefined deliberately; a
+  // non-object is the same case and must not reach Object.keys either.
+  if (result == null || typeof result !== 'object') return null;
+  if (Object.keys(result).length === 0) return null;
 
   const [address, token] = Object.entries(result)[0];
   assertShapeRecognisable(token, family);

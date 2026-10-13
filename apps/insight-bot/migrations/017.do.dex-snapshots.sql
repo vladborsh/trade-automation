@@ -19,6 +19,19 @@
 -- duplicate versions, and no new migration numbered at or below the highest version already on
 -- master.** A number can never appear below a version some database has already passed.
 --
+-- **A renumber breaks any database that already applied the old number**, and it breaks it
+-- completely. Measured here immediately after the rename: `insight_dev3` had version 16 recorded
+-- with the MD5 of `016.do.dex-snapshots.sql`, so postgrator's checksum validation refused the
+-- WHOLE chain —
+--
+--     Error: MD5 checksum failed for migration [16]     appliedMigrations: []
+--
+-- which is the same blast radius as the duplicate-version case and arrives at a different moment:
+-- not on rebase, but the next time a rehearsal database migrates. The fix in a slot database is to
+-- drop what the old migration created and delete its `schema_migrations` row, after which master's
+-- 016 and this 017 apply in order. Nothing to do for a database that never applied the old number,
+-- which is every database but the renaming developer's own.
+--
 -- And the corollary, which is why this comment does not name a reserved number: **no number is
 -- reserved for anybody.** The number is `master_highest + 1` read from the tree you are about to
 -- fast-forward into, taken immediately before the merge. A reservation held in anyone's head is

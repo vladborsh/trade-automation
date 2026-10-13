@@ -218,6 +218,24 @@ describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a sh
     expect(() => assertShapeRecognisable({ total_supply: '1', buy_tax: '' }, 'evm')).not.toThrow();
   });
 
+  /*
+   * The shapes that mean "answered, told nothing" and must NOT throw.
+   *
+   * `result: null` was found by the 24-hour run: `Object.keys(null)` throws, so a token GoPlus had
+   * nothing to say about became a FAILED ask — retried five times, then abandoned, and recorded as
+   * our ignorance rather than the venue's silence. The same confusion as the presence assertion,
+   * reached through a different door.
+   */
+  it.each([
+    ['result is null', '{"code":1,"message":"ok","result":null}'],
+    ['result is an empty object', '{"code":1,"message":"ok","result":{}}'],
+    ['result is missing', '{"code":1,"message":"ok"}'],
+    ['result is not an object', '{"code":1,"result":"none"}'],
+  ])('returns null, not a throw, when %s', (_label, body) => {
+    expect(() => mapTokenSecurity(body, 'solana')).not.toThrow();
+    expect(mapTokenSecurity(body, 'solana')).toBeNull();
+  });
+
   it('an error object wearing a 200 throws rather than becoming a row of nulls', () => {
     const payload = { result: { '0xabc': { code: 4011, message: 'not supported' } } };
     expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/carries NONE of the/);
