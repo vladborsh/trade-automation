@@ -103,13 +103,28 @@ describe('CalendarCollectorService', () => {
     expect(written[0].id).toBe('ff:832:2026-09-30');
   });
 
-  it('writes nothing at all when the next snapshot repeats the same event unchanged', async () => {
+  it('writes nothing when a snapshot repeats — and, at the SAME instant, proves the dedup is by CONTENT', async () => {
+    /**
+     * **The two polls share `POLL_AT` deliberately. Do not "tidy" the duplicate timestamp.**
+     *
+     * This became possible only once IB-051 made `poll(now)` required and the spec stopped using
+     * the wall clock: before that, two polls could not share an instant, because each read
+     * `Date.now()` a few milliseconds apart.
+     *
+     * What it now proves is stronger than what it was written for. Passing with two polls at one
+     * instant means the "nothing changed" decision is made from the event's CONTENT, not from its
+     * timestamp — if any part of the diff compared `fetched_at` or a revision clock, two polls
+     * sharing an instant would behave differently and this test would have moved when the clock
+     * was frozen. It did not.
+     *
+     * Give the two polls different instants and the test still passes, but it stops proving that.
+     */
     const { service, feed, written } = build();
     feed.outcomes.push(snapshot([jsonRow()], [xmlRow()]), snapshot([jsonRow()], [xmlRow()]));
 
     await service.poll(POLL_AT);
     written.length = 0;
-    await service.poll(POLL_AT);
+    await service.poll(POLL_AT); // same instant, on purpose — see above
 
     expect(written).toEqual([]);
   });
