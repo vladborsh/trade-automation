@@ -1,6 +1,6 @@
 import { PgDatabase } from '../db/pg/pg-database';
 import { dexFieldPresenceByDay } from '../db/pg/dex-store';
-import { ALL_GOPLUS_FIELDS } from '../web/dex-field-presence';
+import { ALL_GOPLUS_FIELDS, BASELINE_DAYS_REQUIRED, baselineProgress } from '../web/dex-field-presence';
 import { FIELD_CONTRACTS, type ChainFamily } from '../dex/goplus';
 
 /**
@@ -14,10 +14,16 @@ import { FIELD_CONTRACTS, type ChainFamily } from '../dex/goplus';
  * not a detector.
  *
  * An alarm needs a threshold, and a threshold needs a baseline. One window is not a baseline. So this
- * prints the series the stored history already contains, so that after a few days
+ * prints the series the stored history already contains, so that after enough days
  * *"below this field's own observed floor, over a population of at least N"* is a **measured**
  * threshold rather than a guessed one — the same order imposed on the GeckoTerminal ceiling and on
  * the feature warm-up.
+ *
+ * **"Enough" is `BASELINE_DAYS_REQUIRED` days per field per family, and this prints how far each
+ * one has got.** A deferral with no stated horizon becomes permanent, and a deliberate absence with
+ * no removal condition is indistinguishable from an omission six months later — the reader cannot
+ * tell whether to act. So the condition is a number, it is measurable, and the output says which
+ * fields have met it.
  *
  *   DATABASE_URL=postgres://localhost:5432/insight_dev3 \
  *     npx ts-node -P tsconfig.json src/ops/dex-field-presence.cli.ts [days]
@@ -71,24 +77,28 @@ async function main(): Promise<void> {
       ].join(' '));
     }
 
-    const byField = new Map<string, number[]>();
-    for (const row of rows) {
-      if (row.answered === 0) continue;
-      const key = `${row.chainFamily}:${row.field}`;
-      if (!classified.has(key)) continue;
-      byField.set(key, [...(byField.get(key) ?? []), row.present / row.answered]);
-    }
+    const progress = baselineProgress(rows).filter((p) => classified.has(`${p.chainFamily}:${p.field}`));
     // eslint-disable-next-line no-console
-    console.log('\nobserved floor per field (the figure a threshold would be built from):');
-    for (const [key, rates] of [...byField].sort()) {
-      const floor = Math.min(...rates);
+    console.log(`\nbaseline progress (${BASELINE_DAYS_REQUIRED} days per field would justify an alarm):`);
+    for (const row of progress) {
+      const floor = row.floor === null ? '—' : `${Math.round(row.floor * 100)}%`;
       // eslint-disable-next-line no-console
-      console.log(`  ${key.padEnd(34)} floor ${Math.round(floor * 100)}% over ${rates.length} day(s)`);
+      console.log(
+        `  ${`${row.chainFamily}:${row.field}`.padEnd(34)} floor ${floor.padEnd(5)} `
+        + `${String(row.days).padStart(2)}/${BASELINE_DAYS_REQUIRED} days  ${row.ready ? 'READY' : 'accumulating'}`,
+      );
     }
+
+    const ready = progress.filter((p) => p.ready).length;
     // eslint-disable-next-line no-console
     console.log(
-      '\nNo alarm is wired to these numbers, deliberately: a threshold needs a baseline and this is '
-      + 'how the baseline accumulates. See the comment at the top of this file.',
+      `\n${ready} of ${progress.length} fields have ${BASELINE_DAYS_REQUIRED} days of history. `
+      + 'No alarm is wired to these numbers, deliberately — the threshold would be "below this '
+      + "field's own observed floor over a population of at least 5 answered asks\", and it is not "
+      + 'wired because a floor from fewer days is a guess. When every field reads READY, that '
+      + 'deferral has met its condition and the alarm should be built. The floor rather than the '
+      + 'mean, because a mean hides a bad day and the question is whether a field ever stopped '
+      + 'arriving at all.',
     );
   } finally {
     await db.end();

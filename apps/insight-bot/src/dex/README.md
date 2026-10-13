@@ -291,11 +291,21 @@ prints presence per family per **UTC day** plus each field's **observed floor** 
 threshold would be built from. The series needs no new table: every answered row already carries
 `checked_at` and `absent_fields`.
 
-**No alarm is wired to it, deliberately.** One window is not a baseline, which is the same standard
-the GeckoTerminal ceiling and the feature warm-up were held to. What would justify one: several days
-of these rows showing a stable floor per field, after which *"below this field's own observed floor,
-over a population of at least N"* is measured rather than guessed. The CLI says so in its own output,
-so the missing alarm reads as a decision rather than an omission.
+**No alarm is wired to it, deliberately — and the deferral has a stated expiry.**
+`BASELINE_DAYS_REQUIRED = 14` days per field per family, and the CLI prints how far each field has
+got (`1/14 days accumulating` / `READY`) with a line saying what the threshold would then be:
+*"below this field's own observed floor, over a population of at least 5 answered asks"*.
+
+Not a fixed percentage across fields: `metadata_mutable` sits near 92 % legitimately while
+`mintable` sits at 100 %, so one threshold would either miss the first or cry about the second. And
+the **floor** rather than the mean, because a mean hides a bad day and the question is exactly
+whether a field ever stopped arriving.
+
+Fourteen days matches the discipline used on the GeckoTerminal ceiling and the feature warm-up. The
+number exists because *"pending enough history"* with no horizon becomes never, and **a deliberate
+absence with no removal condition is indistinguishable from an omission six months later** — the
+person reading it cannot tell whether to act. When every field reads READY the condition is met and
+the alarm should be built.
 
 First day of the 24-hour run, for the record: solana floors 100 % except `metadata_mutable` at 92 %
 (48/52); evm floors 97–100 %, with `cannot_buy` lowest at 97 %.

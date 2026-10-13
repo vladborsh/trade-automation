@@ -1,4 +1,6 @@
-import { ALL_GOPLUS_FIELDS, dexFieldPresence } from '../../src/web/dex-field-presence';
+import {
+  ALL_GOPLUS_FIELDS, BASELINE_DAYS_REQUIRED, baselineProgress, dexFieldPresence,
+} from '../../src/web/dex-field-presence';
 import { FIELD_CONTRACTS } from '../../src/dex/goplus';
 
 /**
@@ -67,3 +69,54 @@ describe('dexFieldPresence', () => {
     expect(new Set(ALL_GOPLUS_FIELDS).size).toBe(ALL_GOPLUS_FIELDS.length);
   });
 });
+
+/*
+ * The deferral's removal condition.
+ *
+ * The alarm is deliberately absent, and a deliberate absence with no removal condition is
+ * indistinguishable from an omission six months later — the reader cannot tell whether to act. So
+ * "enough history" is a number, and this is what makes it measurable rather than merely stated.
+ */
+describe('baselineProgress', () => {
+  const day = (day: string, field: string, answered: number, present: number) =>
+    ({ day, chainFamily: 'evm', field, answered, present });
+
+  it('counts DISTINCT days, not rows — the population is days', () => {
+    const progress = baselineProgress([
+      day('2026-10-13', 'buy_tax', 10, 10),
+      day('2026-10-13', 'buy_tax', 5, 5),   // same day, a second batch
+      day('2026-10-14', 'buy_tax', 10, 9),
+    ]);
+    expect(progress).toHaveLength(1);
+    expect(progress[0].days).toBe(2);
+  });
+
+  it('reports the FLOOR, not the mean — a mean hides a bad day', () => {
+    const progress = baselineProgress([
+      day('2026-10-13', 'buy_tax', 100, 100),
+      day('2026-10-14', 'buy_tax', 100, 40),
+      day('2026-10-15', 'buy_tax', 100, 100),
+    ]);
+    expect(progress[0].floor).toBeCloseTo(0.4);
+  });
+
+  it('is not READY below the stated horizon, and IS at it', () => {
+    const days = (n: number) => Array.from({ length: n }, (_, i) =>
+      day(`2026-10-${String(i + 1).padStart(2, '0')}`, 'buy_tax', 10, 10));
+    expect(baselineProgress(days(BASELINE_DAYS_REQUIRED - 1))[0].ready).toBe(false);
+    expect(baselineProgress(days(BASELINE_DAYS_REQUIRED))[0].ready).toBe(true);
+  });
+
+  it('ignores a day with nothing answered, which is not evidence about the field', () => {
+    const progress = baselineProgress([day('2026-10-13', 'buy_tax', 0, 0), day('2026-10-14', 'buy_tax', 4, 4)]);
+    expect(progress[0].days).toBe(1);
+    expect(progress[0].floor).toBe(1);
+  });
+
+  it('states a horizon at all, which is the whole requirement', () => {
+    // "pending enough history" with no number becomes never
+    expect(BASELINE_DAYS_REQUIRED).toBeGreaterThan(1);
+    expect(Number.isInteger(BASELINE_DAYS_REQUIRED)).toBe(true);
+  });
+});
+
