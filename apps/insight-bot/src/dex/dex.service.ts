@@ -5,7 +5,7 @@ import {
 } from '../db/pg/dex-store';
 import { DexClient } from './dex.client';
 import { mapPairs } from './dexscreener';
-import { FIELDS, mapTokenSecurity, type ChainFamily } from './goplus';
+import { FIELDS, mapTokenSecurity, unexpectedAbsences, type ChainFamily } from './goplus';
 import { mapPools, type Network } from './mappers';
 import {
   afterAttempt, keyOf, nextDue, SECURITY_STAGES, type Call, type CallState, type SecurityStage,
@@ -240,6 +240,17 @@ export class DexService implements OnApplicationBootstrap, OnModuleDestroy {
         });
         this.logger.log(`goplus ${token.tokenId} @ ${stage}: answered with no data for this token`);
         return;
+      }
+      // A field measured as ALWAYS present going missing is either a shape change or a
+      // classification of mine that was too strong. Both need a human; neither is worth throwing
+      // the row away, which is what the first version did — so this is loud and the row is kept.
+      const surprising = unexpectedAbsences(mapped.row);
+      if (surprising.length > 0) {
+        this.logger.error(
+          `goplus ${token.tokenId}: field(s) measured as ALWAYS present are missing: ` +
+          `${surprising.map((c) => `${c.field} (${c.evidence})`).join('; ')} — the API changed shape, ` +
+          'or that classification needs re-measuring. The row IS stored, with the names in absent_fields.',
+        );
       }
       await writeTokenSecurity(db, token.tokenId, stage, new Date(now), mapped.row);
     } catch (error) {

@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  absentFields, ALWAYS_PRESENT, assertShapeRecognisable, EVM_FIELDS, FIELD_CONTRACTS, FIELDS,
-  flagOrNull, mapTokenSecurity, SOLANA_FIELDS,
+  absentFields, ALWAYS_PRESENT, assertShapeRecognisable, DISTINCTIVE_FIELDS, EVM_FIELDS,
+  FIELD_CONTRACTS, FIELDS, flagOrNull, mapTokenSecurity, SOLANA_FIELDS, unexpectedAbsences,
 } from '../../src/dex/goplus';
 
 /**
@@ -22,6 +22,14 @@ const fixture = (name: string) =>
 
 const SOLANA = fixture('goplus-solana-token-security.json');
 const EVM = fixture('goplus-evm-token-security.json');
+/**
+ * A SECOND real EVM response, recorded because it shares only 5 field names with the first.
+ *
+ * It is the token the live run choked on: it omits `holder_count` and `total_supply` and carries 24
+ * fields the other does not — including `is_honeypot` and `is_proxy`, which I had concluded exist
+ * in neither response. Two fixtures were not a sample of the EVM shape; they were two shapes.
+ */
+const EVM_VARIABLE = fixture('goplus-evm-variable-shape.json');
 
 describe('the committed fixtures are real responses', () => {
   it('each fixture contains EVERY field the mapper claims to read', () => {
@@ -33,13 +41,47 @@ describe('the committed fixtures are real responses', () => {
     }
   });
 
-  it('does not pin the three fields that came from the DOCS and exist in neither response', () => {
-    // is_honeypot, is_proxy and owner_can_change_balance were in my first schema, taken from
-    // documentation. This asserts they are still absent, so nobody re-adds them from the docs.
+  /*
+   * A CORRECTION to my own earlier finding, and it went the wrong way round.
+   *
+   * I reported that `is_honeypot`, `is_proxy` and `owner_can_change_balance` — the three fields my
+   * first schema took from GoPlus's documentation — "exist in neither response". That was a claim
+   * about the API made from two fixtures. The second EVM response carries `is_honeypot`, `is_proxy`
+   * and `is_mintable`; what does not exist is the DOCS SPELLING `owner_can_change_balance`, which
+   * appears as `owner_change_balance`.
+   *
+   * So the right pin is not "these fields are not real" but "we do not read them yet, and the one
+   * spelled the docs' way is not real". `raw` keeps all of them, so nothing is lost while that is
+   * decided — but a honeypot flag being available for some tokens is a Tech Lead decision, not
+   * mine, and it is in the report.
+   */
+  it('corrects the "exists in neither response" claim: is_honeypot and is_proxy DO exist', () => {
+    const token = Object.values(JSON.parse(EVM_VARIABLE).result as Record<string, Record<string, unknown>>)[0];
+    expect('is_honeypot' in token).toBe(true);
+    expect('is_proxy' in token).toBe(true);
+    expect('is_mintable' in token).toBe(true);
+    // and the docs spelling is still absent — THAT is what was wrong in my first schema
+    expect('owner_can_change_balance' in token).toBe(false);
+    expect('owner_change_balance' in token).toBe(true);
+  });
+
+  it('does not read them yet, so nobody adds a column from the docs without a ruling', () => {
     const all = [...SOLANA_FIELDS, ...EVM_FIELDS];
-    for (const invented of ['is_honeypot', 'is_proxy', 'owner_can_change_balance']) {
-      expect(all).not.toContain(invented);
+    for (const notReadYet of ['is_honeypot', 'is_proxy', 'owner_change_balance', 'owner_can_change_balance']) {
+      expect(all).not.toContain(notReadYet);
     }
+  });
+
+  it('the two EVM responses share only FIVE names — the measurement behind the mechanism', () => {
+    const keys = (body: string) =>
+      Object.keys(Object.values(JSON.parse(body).result as Record<string, Record<string, unknown>>)[0]);
+    const a = keys(EVM);
+    const b = new Set(keys(EVM_VARIABLE));
+    expect(a.filter((k) => b.has(k)).sort()).toEqual(
+      ['buy_tax', 'cannot_buy', 'is_in_dex', 'is_open_source', 'sell_tax'],
+    );
+    // if this ever grows, the per-token variability has changed and the contracts can be tightened
+    expect(a.length).toBeLessThan(b.size);
   });
 });
 
@@ -131,33 +173,55 @@ describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a sh
     }
   });
 
-  it('THROWS when an ALWAYS-present field is missing, and says what the classification rests on', () => {
+  it('KEEPS the row when an always-present field vanishes, and reports it instead', () => {
+    // the correction: throwing here lost rows for tokens the venue DID answer about, and the live
+    // run proved the classification itself is falsifiable. Loud, not fatal.
     const payload = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
     const [addr, token] = Object.entries(payload.result)[0];
     expect('buy_tax' in token).toBe(true);
     delete token['buy_tax'];
     payload.result[addr] = token;
 
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm'))
-      .toThrow(/missing field\(s\) measured as ALWAYS present: buy_tax/);
-    // the throw must name its own evidence: whoever sees it needs to know whether the API changed
-    // or whether this classification was too strong
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/Evidence for that classification/);
+    const mapped = mapTokenSecurity(JSON.stringify(payload), 'evm')!;
+    expect(mapped.row.buyTax).toBeNull();
+    expect(mapped.row.absentFields).toContain('buy_tax');
+
+    const surprising = unexpectedAbsences(mapped.row);
+    expect(surprising.map((c) => c.field)).toEqual(['buy_tax']);
+    expect(surprising[0].evidence).toMatch(/\d/); // the signal carries its own basis
   });
 
-  it('throws on the WRONG chain family, with no separate check for it', () => {
-    // no Solana payload carries buy_tax/sell_tax/holder_count and no EVM payload carries mintable,
-    // so the per-field contract covers this. `total_supply` is in BOTH lists and cannot carry a
-    // family on its own — which is exactly what defeated my first, coarser threshold.
-    expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/ALWAYS present/);
-    expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/ALWAYS present/);
-    expect(() => assertShapeRecognisable({ total_supply: '1' }, 'evm')).toThrow(/ALWAYS present/);
+  it('reports NOTHING surprising for the real responses — the positive control', () => {
+    for (const [body, family] of [[SOLANA, 'solana'], [EVM, 'evm']] as const) {
+      expect(unexpectedAbsences(mapTokenSecurity(body, family)!.row)).toEqual([]);
+    }
+  });
+
+  it('the live-run token that started this is mapped, not discarded', () => {
+    // it omits holder_count and total_supply; under the first rule it became a failed ask, was
+    // retried five times and abandoned — while carrying is_honeypot, which we most want to know
+    const mapped = mapTokenSecurity(EVM_VARIABLE, 'evm')!;
+    expect(mapped.row.holderCount).toBeNull();
+    expect(mapped.row.totalSupply).toBeNull();
+    expect(mapped.row.absentFields).toEqual(expect.arrayContaining(['holder_count', 'total_supply']));
+    expect(mapped.row.buyTax).not.toBeNull(); // and what it DID carry is read
+    expect(unexpectedAbsences(mapped.row)).toEqual([]); // holder_count is now classified optional
+  });
+
+  it('throws on the WRONG chain family, where there is nothing to record', () => {
+    expect(() => mapTokenSecurity(SOLANA, 'evm')).toThrow(/carries NONE of the/);
+    expect(() => mapTokenSecurity(EVM, 'solana')).toThrow(/carries NONE of the/);
+    // and this is why the check needs DISTINCTIVE fields: total_supply is in both lists, so a
+    // Solana payload read as EVM does carry one field we read
+    expect(DISTINCTIVE_FIELDS.evm).not.toContain('total_supply');
+    expect(() => assertShapeRecognisable({ total_supply: '1' }, 'evm')).toThrow(/carries NONE of the/);
+    expect(() => assertShapeRecognisable({ total_supply: '1', buy_tax: '' }, 'evm')).not.toThrow();
   });
 
   it('an error object wearing a 200 throws rather than becoming a row of nulls', () => {
     const payload = { result: { '0xabc': { code: 4011, message: 'not supported' } } };
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/ALWAYS present/);
-    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/Keys present: code, message/);
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/carries NONE of the/);
+    expect(() => mapTokenSecurity(JSON.stringify(payload), 'evm')).toThrow(/keys present: code, message/);
   });
 
   describe('the field contracts', () => {
@@ -184,8 +248,9 @@ describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a sh
       const optional = (family: 'solana' | 'evm') =>
         FIELD_CONTRACTS[family].filter((c) => c.presence === 'optional').map((c) => c.field);
       expect(optional('solana')).toEqual(['metadata_mutable']);
-      expect(optional('evm')).toEqual(['is_open_source', 'cannot_buy', 'total_supply']);
+      expect(optional('evm')).toEqual(['is_open_source', 'cannot_buy', 'holder_count', 'total_supply']);
       expect(ALWAYS_PRESENT.evm).not.toContain('total_supply');
+      expect(ALWAYS_PRESENT.evm).not.toContain('holder_count'); // falsified by the live run
     });
   });
 

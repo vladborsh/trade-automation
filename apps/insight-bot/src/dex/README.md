@@ -182,11 +182,40 @@ distinct token:
 | evm | `total_supply` | 1 of 7 answered base tokens in B, 1 in the live run | optional |
 | evm | `cannot_buy` | 1 base token during the live run | optional |
 
-Everything else was present in every answered token on both occasions and is `always`: its absence
-throws, and the throw quotes the evidence so the next person can tell "the API changed" from "this
-classification was too strong". **A field without two occasions behind it is `optional`**, because
-the errors are not symmetric — a wrong `optional` is a null visible in `absent_fields`, a wrong
-`always` loses the row.
+### The classification was falsified within minutes, and that changed the mechanism
+
+Minutes after `holder_count` was classified `always` on the strength of 36 answered tokens, the live
+run hit an Ethereum token omitting **both `holder_count` and `total_supply`**. Comparing the two real
+EVM responses:
+
+```
+shared by both:  buy_tax, cannot_buy, is_in_dex, is_open_source, sell_tax   (5)
+one only:        14 fields in one, 29 in the other
+```
+
+**GoPlus EVM is not one shape with optional fields; it is a per-token field set** — 5 of 29 names in
+common. "Present in every token I sampled" is a weak basis for a rule that throws, and the next
+sample keeps falsifying it. So:
+
+- a field classified `always` going missing is **recorded and raised, not thrown**: the row is
+  stored, `absent_fields` names it, and the collector logs it at ERROR with the evidence behind the
+  classification, so the reader can tell "the API changed" from "that classification was too strong";
+- a **throw** is reserved for a payload carrying no field distinctive to the family, where there is
+  nothing to record — a renamed payload, the wrong chain family, or an error object wearing a 200.
+
+That keeps the requirement that a key we rely on must not vanish into a silent null, without the
+data loss: the first version discarded rows for tokens whose response does carry `is_honeypot`.
+**A field without two occasions behind it is `optional`** for the same asymmetry — a wrong
+`optional` is a null visible in `absent_fields`, a wrong `always` was losing rows.
+
+### And a correction to my own earlier finding
+
+I reported that `is_honeypot`, `is_proxy` and `owner_can_change_balance` "exist in neither
+response" — a claim about the API made from two fixtures. The second EVM response carries
+`is_honeypot`, `is_proxy` and `is_mintable`. What does not exist is the **documentation's spelling**
+`owner_can_change_balance`; the real name is `owner_change_balance`. We do not read any of them yet
+and `raw` keeps them all, so nothing is lost while whether to read them is decided — but a honeypot
+flag being available for some tokens is worth a decision.
 
 Reproduce with `infra/insight-bot/probe-goplus-field-presence.mjs` (reads tokens from
 `DATABASE_URL`, so it costs no GeckoTerminal budget).

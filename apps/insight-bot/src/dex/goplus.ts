@@ -69,6 +69,33 @@ export type ChainFamily = 'solana' | 'evm';
  *
  * BSC answered 0 of 8 in occasion B against 9 of 10 in A, so GoPlus's "no result at all" rate is
  * highly variable per network. That is a note, not a number: it has one occasion per direction.
+ *
+ * ### The classification was falsified within minutes, and that changed the mechanism
+ *
+ * Minutes after I classified `holder_count` as `always` on the strength of 36 answered tokens, the
+ * live run hit an Ethereum token whose response omits BOTH `holder_count` and `total_supply` — and
+ * carries 24 fields the other EVM response does not. Comparing the two real responses:
+ *
+ * ```
+ * shared by both:  buy_tax, cannot_buy, is_in_dex, is_open_source, sell_tax   (5)
+ * one only:        14 fields in one, 29 in the other
+ * ```
+ *
+ * **GoPlus EVM is not one shape with optional fields; it is a per-token field set.** Five of
+ * twenty-nine names are common. So "present in every token I sampled" is a weak basis for a rule
+ * that THROWS, and the next sample will keep falsifying it.
+ *
+ * Hence the mechanism below, which is not what I first built:
+ *
+ * - a field classified `always` going missing is RECORDED AND RAISED, not thrown: the row is
+ *   stored, `absent_fields` names it, and the collector logs it at ERROR. A rename is loud and
+ *   nothing is lost;
+ * - a throw is reserved for a payload carrying NO field distinctive to the family, where there is
+ *   nothing to record — a renamed payload, the wrong chain family, or an error object wearing a 200.
+ *
+ * That keeps the requirement that a key we rely on must not vanish into a silent null, while
+ * removing the data loss: the alternative discards rows for tokens whose response does carry
+ * `is_honeypot`.
  */
 
 /** Fields read from a Solana response. */
@@ -143,7 +170,12 @@ export const FIELD_CONTRACTS: Record<ChainFamily, readonly FieldContract[]> = {
     },
     { field: 'buy_tax', presence: 'always', evidence: PRESENT_IN_BOTH },
     { field: 'sell_tax', presence: 'always', evidence: PRESENT_IN_BOTH },
-    { field: 'holder_count', presence: 'always', evidence: PRESENT_IN_BOTH },
+    {
+      field: 'holder_count',
+      presence: 'optional',
+      evidence: 'present in all 36 answered tokens of A and B, then ABSENT on a live eth token minutes later'
+        + ' — the falsification that showed sampling cannot support an always-claim on this payload',
+    },
     {
       field: 'total_supply',
       presence: 'optional',
@@ -152,7 +184,20 @@ export const FIELD_CONTRACTS: Record<ChainFamily, readonly FieldContract[]> = {
   ],
 };
 
-/** The fields whose absence is a shape change rather than an unanswered question. */
+/**
+ * The fields that belong to ONE family only.
+ *
+ * `total_supply` is in both lists and that shared name matters: a Solana token object read as EVM
+ * carries it and nothing else we read, so "no field we read is present" would be false and the
+ * mapper would build a row of nulls for the wrong chain. A distinctive field cannot have come from
+ * the other shape, which is what makes it evidence about which shape this is.
+ */
+export const DISTINCTIVE_FIELDS: Record<ChainFamily, readonly string[]> = {
+  solana: SOLANA_FIELDS.filter((f) => !(EVM_FIELDS as readonly string[]).includes(f)),
+  evm: EVM_FIELDS.filter((f) => !(SOLANA_FIELDS as readonly string[]).includes(f)),
+};
+
+/** The fields whose absence is reported loudly rather than treated as an unanswered question. */
 export const ALWAYS_PRESENT: Record<ChainFamily, readonly string[]> = {
   solana: FIELD_CONTRACTS.solana.filter((c) => c.presence === 'always').map((c) => c.field),
   evm: FIELD_CONTRACTS.evm.filter((c) => c.presence === 'always').map((c) => c.field),
@@ -206,29 +251,38 @@ export function absentFields(token: Record<string, unknown>, family: ChainFamily
 }
 
 /**
- * Throws when a field classified `always` is missing.
+ * Fields classified `always` that this token did not carry.
  *
- * That is the shape-change case and only that case: an `optional` field's absence is a question
- * the venue did not answer and is recorded, not raised. The message names the evidence, because
- * the next person to see this throw needs to know whether the API changed or whether my
- * classification was too strong — and the second is a real possibility I cannot rule out from two
- * occasions.
+ * Returned, not thrown. Either the API changed shape or my classification was too strong — both
+ * need a human, and neither is worth discarding a row the venue did answer. The caller logs it at
+ * ERROR and `absent_fields` stores it, so the signal survives the log rotation. Empty in the normal
+ * case, which is what makes a non-empty one worth reading.
+ */
+export function unexpectedAbsences(row: Pick<TokenSecurityRow, 'chainFamily' | 'absentFields'>): FieldContract[] {
+  // derived from the row the mapper already built, not by re-reading the body: two places computing
+  // "which fields were absent" is two places that can disagree about it
+  return FIELD_CONTRACTS[row.chainFamily]
+    .filter((c) => c.presence === 'always' && row.absentFields.includes(c.field));
+}
+
+/**
+ * Throws when the token carries NO field distinctive to this family.
  *
- * It also covers the WRONG CHAIN FAMILY without a separate check: no Solana payload carries
- * `buy_tax`, `sell_tax` and `holder_count`, and no EVM payload carries `mintable`. The one shared
- * name, `total_supply`, cannot carry a family on its own.
+ * The one case where throwing is right, because it is the only one with nothing to record: a
+ * payload sharing no name with the shape we asked for is not a token of that family, and storing it
+ * would mean a row of nulls indistinguishable from "asked and told nothing".
+ *
+ * This covers the wrong chain family too — no Solana payload carries `buy_tax`, no EVM payload
+ * carries `mintable` — and an error object wearing a 200.
  */
 export function assertShapeRecognisable(token: Record<string, unknown>, family: ChainFamily): void {
-  const missing = ALWAYS_PRESENT[family].filter((f) => !(f in token));
-  if (missing.length > 0) {
-    const contracts = FIELD_CONTRACTS[family].filter((c) => missing.includes(c.field));
+  const own = DISTINCTIVE_FIELDS[family];
+  if (own.every((f) => !(f in token))) {
     throw new Error(
-      `GoPlus ${family} response is missing field(s) measured as ALWAYS present: ${missing.join(', ')}. ` +
-      `Evidence for that classification: ${contracts.map((c) => `${c.field} — ${c.evidence}`).join('; ')}. ` +
-      `Keys present: ${Object.keys(token).slice(0, 8).join(', ') || '<none>'}. ` +
-      'Either the API changed shape, or this is the wrong chain family, or the field is in fact ' +
-      'optional and the classification needs re-measuring — it must not become a null meaning ' +
-      '"asked and told nothing".',
+      `GoPlus ${family} response carries NONE of the ${own.length} fields distinctive to ${family} ` +
+      `(${own.join(', ')}); keys present: ${Object.keys(token).slice(0, 8).join(', ') || '<none>'}. ` +
+      'This is a shape change, the wrong chain family, or an error object wearing a 200 — it must ' +
+      'fail rather than become a row of nulls meaning "asked and told nothing".',
     );
   }
 }
