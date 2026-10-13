@@ -78,8 +78,8 @@ create index dex_pools_address_idx on dex_pools (address, observed_at desc);
  *
  * The GoPlus columns are a SNAPSHOT AT A TIME, not a verdict: §10 asks for the check at first
  * sight, then again at 6 h and 24 h, because the answer changes — a contract can be renounced, a
- * honeypot flag can appear. `checked_at` null means we have not asked yet, which is not the same as
- * "asked and told nothing", which is a row with `checked_at` set and the flags null.
+ * honeypot flag can appear. The four states "never asked / the ask failed / asked and told nothing
+ * / asked and told" are spelled out on `dex_token_security` below.
  */
 create table dex_tokens (
   token_id      text        primary key,     -- '<network>_<address>', GeckoTerminal's id
@@ -124,6 +124,30 @@ create table dex_token_security (
   checked_at   timestamptz not null,
   chain_family text        not null check (chain_family in ('solana','evm')),
 
+  /*
+   * **FOUR states, not three**, and conflating any pair of them costs something different:
+   *
+   *   1. not asked                  -> no row at all
+   *   2. the ask FAILED             -> row, answered = false, failure_reason set
+   *   3. asked, venue said nothing  -> row, answered = true,  flags all null
+   *   4. asked, venue answered      -> row, answered = true,  flags set
+   *
+   * (2) and (3) are the pair that matters. If a failed ask were written as an answer with null
+   * flags it would be indistinguishable from "the venue told us nothing", the token would never be
+   * retried, and we would be **permanently ignorant about that token's security** — silently,
+   * which is worse than the infinite re-queue it mirrors. If a failure wrote no row at all the
+   * token looks un-asked and retries for ever, burning the rate budget on a token that cannot be
+   * answered.
+   *
+   * So a failure is a recorded ATTEMPT that is not an ANSWER, and every "has this been done" test
+   * keys on `answered`, never on a row existing.
+   */
+  answered       boolean not null,
+  failure_reason text,
+  attempts       integer not null default 1,
+  constraint dex_token_security_answer_or_reason
+    check ((answered and failure_reason is null) or (not answered and failure_reason is not null)),
+
   -- solana shape; null on an EVM token means NOT APPLICABLE (see chain_family)
   mintable                  boolean,
   freezable                 boolean,
@@ -146,11 +170,83 @@ create table dex_token_security (
   primary key (token_id, at_stage)
 );
 
+comment on column dex_token_security.answered is
+  'FOUR states: no row = never asked; answered=false with a reason = the ask FAILED and the token '
+  'is still due; answered=true with null flags = asked and the venue told us nothing; answered=true '
+  'with flags = asked and told. Every "has this been done" test keys on this column, never on a '
+  'row existing, or a failure silently becomes a permanent answer.';
+comment on column dex_token_security.attempts is
+  'Failed asks at this stage. Bounds the retry so a token GoPlus can never answer about stops '
+  'consuming the rate budget, and records what the stage cost; an answer clears the reason but '
+  'not the count.';
 comment on column dex_token_security.checked_at is
-  'When GoPlus was asked. A row exists only once asked; "not yet asked" is the ABSENCE of a row, '
-  'and "asked and told nothing" is a row with null flags. The two must not be confused.';
+  'When GoPlus was last asked — on a failure too, which is why it cannot carry the "has it been '
+  'answered" meaning; see the answered column.';
 comment on column dex_token_security.chain_family is
   'Which response shape this row came from. Without it a NULL in buy_tax cannot be told apart from '
   '"this chain has no such concept", which is the difference between unknown and not applicable.';
 
 create index dex_token_security_stage_idx on dex_token_security (at_stage, checked_at desc);
+
+/*
+ * DexScreener's reading of the same pools (§10: "pair details for each pool seen").
+ *
+ * A SEPARATE table rather than more columns on `dex_pools`, because it is a different venue's
+ * answer at a different instant. Merging them would make "GeckoTerminal said the reserve was X"
+ * and "DexScreener said the liquidity was Y" one row that implies a single observation, and when
+ * they disagree — which is the interesting case — there would be nothing left to compare.
+ *
+ * ## Absence is a MISSING ROW, and here that is routine
+ *
+ * Measured 2026-10-12 against the live API, two occasions ~20 minutes apart: a batch of 20 pool
+ * addresses taken straight from GeckoTerminal's `new_pools` came back with 19 and then 20 pairs on
+ * Solana. A pool GeckoTerminal lists may simply not be known to DexScreener, so there is **no row**
+ * for it — not a row of zeros, and not a row of nulls either, since we were never told anything at
+ * all about that pair.
+ *
+ * `liquidity` is absent from the pair object far more often than not on Solana (1 of 20, and 6 of
+ * 19 on the earlier occasion; 19 of 20 both times on Base). It is the field §10 names first, so a
+ * `coalesce(liquidity_usd, 0)` anywhere downstream would report most new Solana pools as having no
+ * liquidity. Nullable, like everything else here.
+ */
+create table dex_pair_snapshots (
+  -- '<network>_<address>', built the same way GeckoTerminal builds its pool id, so this joins to
+  -- dex_pools.pool_id without a mapping table
+  pool_id     text        not null,
+  network     text        not null check (network in ('solana','base','bsc','eth')),
+  address     text        not null,   -- as DexScreener spells it; see the casing note in dexscreener.ts
+  observed_at timestamptz not null,
+
+  dex            text,
+  pair_created_at timestamptz,
+
+  price_usd     numeric,
+  price_native  numeric,
+  liquidity_usd numeric,              -- absent on most new Solana pairs: see above
+  fdv_usd       numeric,
+  market_cap_usd numeric,
+
+  volume_usd_m5  numeric,
+  volume_usd_h1  numeric,
+  volume_usd_h6  numeric,
+  volume_usd_h24 numeric,
+
+  txns_h1_buys  integer,
+  txns_h1_sells integer,
+  txns_h24_buys  integer,
+  txns_h24_sells integer,
+
+  price_change_pct_h1  numeric,
+  price_change_pct_h24 numeric,
+
+  raw jsonb not null,
+  primary key (pool_id, observed_at)
+) partition by range (observed_at);
+
+comment on table dex_pair_snapshots is
+  'IB-028. DexScreener''s reading of a pool, one row per pool per poll. Separate from dex_pools '
+  'because it is a different venue at a different instant, and their disagreement is the point. '
+  'A pool DexScreener does not know has NO ROW — absence is not a row of zeros.';
+
+create index dex_pair_snapshots_network_idx on dex_pair_snapshots (network, observed_at desc);
+

@@ -4,3 +4,4 @@
 drop table if exists dex_token_security;
 drop table if exists dex_tokens;
 drop table if exists dex_pools;
+drop table if exists dex_pair_snapshots;

@@ -5,7 +5,9 @@ import { Client } from 'pg';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
-import { noteToken, tokensDueSecurity, writePools, writeTokenSecurity } from '../../src/db/pg/dex-store';
+import {
+  MAX_SECURITY_ATTEMPTS, noteToken, tokensDueSecurity, writePools, writeSecurityFailure, writeTokenSecurity,
+} from '../../src/db/pg/dex-store';
 import { mapTokenSecurity } from '../../src/dex/goplus';
 import { mapPools } from '../../src/dex/mappers';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
@@ -116,6 +118,8 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
+  const due = (rows: readonly { tokenId: string }[], tokenId: string) => rows.some((r) => r.tokenId === tokenId);
+
   const TOKEN = { tokenId: 'solana_abc', network: 'solana', address: 'abc', symbol: 'ABC', name: 'Abc' };
 
   it('reports first sight exactly once', async () => {
@@ -156,6 +160,86 @@ maybeDescribe('IB-028 token first sight and the security schedule', () => {
     });
     const due24 = await tokensDueSecurity(db, 'h24', new Date(T0.getTime() + 26 * 3_600_000));
     expect(due24.map((d) => d.tokenId)).not.toContain(TOKEN.tokenId);
+  });
+
+  /*
+   * The FOUR states, as behaviour. The expensive bug here is the infinite re-queue, so each of
+   * these would fail LOUDLY if the `answered` key regressed to "a row exists" — and the failure
+   * direction is asserted both ways, not just the safe one.
+   */
+  const T2 = { tokenId: 'solana_fourstate', network: 'solana', address: 'fourstate', symbol: 'FS', name: 'Four State' };
+
+  it('a FAILED ask leaves the token due — the state that "a row exists" would lose', async () => {
+    expect(await noteToken(db, T2, T0)).toBe(true);
+    const asked = new Date(T0.getTime() + 7 * 3_600_000);
+    await writeSecurityFailure(db, T2.tokenId, 'h6', asked, 'solana', 'timeout after 20000 ms');
+
+    // the row EXISTS. If the predicate keyed on existence this would be empty and the token would
+    // be permanently unasked — the mirror of the loop, and invisible.
+    const [{ n }] = await db.query<{ n: string }>(
+      `select count(*) n from dex_token_security where token_id = $1 and at_stage = 'h6'`, [T2.tokenId],
+    );
+    expect(Number(n)).toBe(1);
+
+    const due = await tokensDueSecurity(db, 'h6', new Date(T0.getTime() + 8 * 3_600_000));
+    expect(due.map((d) => d.tokenId)).toContain(T2.tokenId);
+  });
+
+  it('records the failure reason rather than an answer with null flags', async () => {
+    const [row] = await db.query<{ answered: boolean; failure_reason: string; attempts: number }>(
+      `select answered, failure_reason, attempts from dex_token_security
+        where token_id = $1 and at_stage = 'h6'`, [T2.tokenId],
+    );
+    expect(row.answered).toBe(false);
+    expect(row.failure_reason).toContain('timeout');
+    expect(row.attempts).toBe(1);
+  });
+
+  it('counts attempts and ABANDONS the stage, so a never-answerable token stops costing budget', async () => {
+    const at = (h: number) => new Date(T0.getTime() + h * 3_600_000);
+    for (let i = 2; i <= MAX_SECURITY_ATTEMPTS; i += 1) {
+      await writeSecurityFailure(db, T2.tokenId, 'h6', at(7 + i), 'solana', 'HTTP 500');
+      const stillDue = await tokensDueSecurity(db, 'h6', at(8 + i));
+      // due on every attempt UP TO the last — a failure must be retried, it may be a timeout
+      expect(due(stillDue, T2.tokenId)).toBe(i < MAX_SECURITY_ATTEMPTS);
+    }
+    const [row] = await db.query<{ attempts: number; answered: boolean }>(
+      `select attempts, answered from dex_token_security where token_id = $1 and at_stage = 'h6'`,
+      [T2.tokenId],
+    );
+    expect(row.attempts).toBe(MAX_SECURITY_ATTEMPTS);
+    expect(row.answered).toBe(false); // abandoned is recorded, not inferred from an absence
+  });
+
+  it('an answer AFTER failures clears the reason but KEEPS the attempt count', async () => {
+    const mapped = mapTokenSecurity(GOPLUS_SOL, 'solana')!;
+    await writeTokenSecurity(db, T2.tokenId, 'h6', new Date(T0.getTime() + 20 * 3_600_000), mapped.row);
+    const [row] = await db.query<{ answered: boolean; failure_reason: string | null; attempts: number }>(
+      `select answered, failure_reason, attempts from dex_token_security
+        where token_id = $1 and at_stage = 'h6'`, [T2.tokenId],
+    );
+    expect(row.answered).toBe(true);
+    expect(row.failure_reason).toBeNull();
+    // `answered` alone stops the asking, so zeroing the count would buy nothing and erase a
+    // measurement: this stage cost five calls, and that is worth knowing when the budget is argued
+    expect(row.attempts).toBe(MAX_SECURITY_ATTEMPTS);
+    expect(due(await tokensDueSecurity(db, 'h6', new Date(T0.getTime() + 21 * 3_600_000)), T2.tokenId)).toBe(false);
+  });
+
+  it('suppression is per STAGE: answering at first sight does not cancel +6 h and +24 h', async () => {
+    // three looks is the point of the schedule; a token answered once must still be asked twice more
+    const T3 = { tokenId: 'solana_perstage', network: 'solana', address: 'perstage', symbol: 'PS', name: 'Per Stage' };
+    expect(await noteToken(db, T3, T0)).toBe(true);
+    const mapped = mapTokenSecurity(GOPLUS_SOL, 'solana')!;
+    await writeTokenSecurity(db, T3.tokenId, 'first_seen', T0, mapped.row);
+
+    expect(due(await tokensDueSecurity(db, 'first_seen', new Date(T0.getTime() + 60_000)), T3.tokenId)).toBe(false);
+    expect(due(await tokensDueSecurity(db, 'h6', new Date(T0.getTime() + 7 * 3_600_000)), T3.tokenId)).toBe(true);
+    expect(due(await tokensDueSecurity(db, 'h24', new Date(T0.getTime() + 25 * 3_600_000)), T3.tokenId)).toBe(true);
+
+    // and a FAILURE at one stage does not make another stage due early either
+    await writeSecurityFailure(db, T3.tokenId, 'h6', new Date(T0.getTime() + 7 * 3_600_000), 'solana', 'HTTP 429');
+    expect(due(await tokensDueSecurity(db, 'h24', new Date(T0.getTime() + 8 * 3_600_000)), T3.tokenId)).toBe(false);
   });
 
   it('keeps the whole raw response, so an unmodelled field is not lost', async () => {

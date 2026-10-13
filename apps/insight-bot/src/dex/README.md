@@ -74,7 +74,35 @@ cycle**.
 Successes track attempts exactly — which is also the control that proves GeckoTerminal's flat ~5/min
 was a venue ceiling and not our own serialisation. Tolerated: **at least 107/min**.
 
-**Our budget: 4 requests per 10-minute cycle = 0.4/min**, under 0.4 % of what it tolerates.
+**Our budget: one batched request per GeckoTerminal page = 8 per 10-minute cycle = 0.8/min**,
+under 1 % of what it tolerates. It rides along with the page rather than having a schedule of its
+own, because the addresses it needs are the page.
+
+### Two shape findings, measured 2026-10-12 on two occasions ~20 minutes apart
+
+**1. EVM pair addresses come back in different letter case.** GeckoTerminal returns them
+lower-cased; DexScreener returns them EIP-55 checksummed.
+
+| network | requested | returned | matched exactly | matched case-folded |
+|---|---|---|---|---|
+| solana | 20 | 19, then 20 | 19, then 20 | same |
+| base | 20 | 20, then 20 | **17, then 18** | 20, then 20 |
+
+An exact-string join would have **silently dropped 10–15 % of EVM pairs**, and the loss would have
+looked exactly like "DexScreener does not know these pools". So the join folds case on EVM, where
+hex case carries no meaning, and **not on Solana**, where base58 is case-sensitive and `A` and `a`
+are different addresses. `dexscreener.ts` throws if two pairs ever fold to one key, because at that
+point the fold is wrong for the chain rather than the venue being odd.
+
+**2. `liquidity` is absent from the pair object more often than not on Solana** — 1 of 20 and 6 of
+19 carried it on the two occasions, against 19 of 20 both times on Base. It is the field §10 names
+first, so a `coalesce(liquidity_usd, 0)` anywhere downstream would report most new Solana pools as
+having no liquidity at all. Null, like every other reading here.
+
+Both are *shapes*, pinned by committed fixtures that carry the **requested address list beside the
+response** — without it neither claim is expressible, since both are properties of the request set.
+Neither is a number, so neither is subject to the repetition rule; the counts above are reported
+because they are what was seen, not as limits.
 
 ## GoPlus — measured 2026-10-12
 
@@ -106,7 +134,24 @@ first sighting needs the first-sight call.
 | provider | our rate | measured ceiling | share |
 |---|---|---|---|
 | GeckoTerminal | 0.8/min | ~5/min (hard) | 16 % |
-| DexScreener | 0.4/min | >= 107/min | < 0.4 % |
-| GoPlus | <= 8/min worst case | >= 46/min | <= 17 % |
+| DexScreener | 0.8/min | >= 107/min | < 1 % |
+| GoPlus | <= 4/min (capped) | >= 46/min | <= 9 % |
 
 GeckoTerminal is the binding constraint and the only one with a ceiling low enough to matter.
+
+## The loop that spends it (`dex.service.ts`)
+
+The tick is the rate limiter, not a comment asking the caller to be careful:
+
+- a 15-second tick does **at most one** GeckoTerminal call, and `nextDue` refuses to return
+  anything within 75 s of the last one, so the spacing is a property of the loop;
+- DexScreener is one batched call per page, so it cannot exceed GeckoTerminal's rate;
+- GoPlus is capped at **one call per tick = 4/min**, which is the only budget driven by data
+  rather than by the schedule — a cycle can discover up to 80 new tokens. A backlog is visible and
+  harmless; a burst is a 429 and a hole in the history.
+
+The three security stages (`first_seen` at offset 0, `h6`, `h24`) are **round-robined**, because
+first sight has the largest and most renewable backlog: a fixed order would let a busy day on
+Solana permanently starve the re-checks, and the re-check is the entire reason the schedule has
+three looks rather than one.
+

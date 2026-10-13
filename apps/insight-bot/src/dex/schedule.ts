@@ -106,3 +106,23 @@ export function afterAttempt(previous: CallState | undefined, now: number, ok: b
     consecutiveFailures: ok ? 0 : base.consecutiveFailures + 1,
   };
 }
+
+/**
+ * The three GoPlus looks at a token, as ONE table.
+ *
+ * §10 asks for a security check at first sight, +6 h and +24 h. First sight is offset 0 rather
+ * than a separate code path: a token seen a second ago is immediately due, which is the same
+ * sentence the other two stages say, and one query covers all three. The alternative — asking at
+ * ingest and scheduling only the later two — needs a second place that can fail differently, and
+ * the first look would be the one observation with no retry.
+ */
+export const SECURITY_STAGE_OFFSETS_MS = {
+  first_seen: 0,
+  h6: 6 * 3_600_000,
+  h24: 24 * 3_600_000,
+} as const;
+
+export type SecurityStage = keyof typeof SECURITY_STAGE_OFFSETS_MS;
+
+export const SECURITY_STAGES = Object.keys(SECURITY_STAGE_OFFSETS_MS) as readonly SecurityStage[];
+

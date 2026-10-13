@@ -81,8 +81,8 @@ describe('partitionsFor', () => {
       'feature_frames',
       // migration 015 (IB-017) — the per-close audit row
       'playbook_evaluations',
-      // migration 016 (IB-028) — the DEX snapshot history
-      'dex_pools',
+      // migration 016 (IB-028) — the DEX snapshot history, one table per venue
+      'dex_pools', 'dex_pair_snapshots',
     ]);
     // The two unpartitioned tables of §3.3 must not appear.
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('funding_settlements');

@@ -26,6 +26,7 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   // DEFAULT partition by design, so an unregistered table rejects every insert with "no partition
   // of relation found" the moment the month rolls over — a failure that reads like a collector bug.
   { table: 'dex_pools', column: 'observed_at' },
+  { table: 'dex_pair_snapshots', column: 'observed_at' },
 ];
 
 export interface Partition {

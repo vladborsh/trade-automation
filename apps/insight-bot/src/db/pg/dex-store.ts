@@ -1,6 +1,8 @@
 import type { Db } from '../db.port';
+import type { DexPairRow } from '../../dex/dexscreener';
 import type { DexPoolRow } from '../../dex/mappers';
 import type { TokenSecurityRow } from '../../dex/goplus';
+import { SECURITY_STAGE_OFFSETS_MS, type SecurityStage } from '../../dex/schedule';
 
 /**
  * IB-028 — the DEX snapshot writes. SQL lives in `src/db/pg/` (IB-004).
@@ -34,6 +36,39 @@ export async function writePools(db: Db, rows: readonly DexPoolRow[]): Promise<n
 }
 
 /**
+ * DexScreener's reading of the same pools. Append-only, like `writePools`, and for the same reason.
+ *
+ * A pool DexScreener did not answer about is simply not in `rows` — the mapper reports it as
+ * missing and nothing is written, because a row of nulls here would be a measurement never made.
+ */
+export async function writePairSnapshots(db: Db, rows: readonly DexPairRow[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  let written = 0;
+  for (const r of rows) {
+    const inserted = await db.query<{ pool_id: string }>(
+      `insert into dex_pair_snapshots (
+         pool_id, network, address, observed_at, dex, pair_created_at,
+         price_usd, price_native, liquidity_usd, fdv_usd, market_cap_usd,
+         volume_usd_m5, volume_usd_h1, volume_usd_h6, volume_usd_h24,
+         txns_h1_buys, txns_h1_sells, txns_h24_buys, txns_h24_sells,
+         price_change_pct_h1, price_change_pct_h24, raw)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       on conflict (pool_id, observed_at) do nothing
+       returning pool_id`,
+      [
+        r.poolId, r.network, r.address, r.observedAt, r.dex, r.pairCreatedAt,
+        r.priceUsd, r.priceNative, r.liquidityUsd, r.fdvUsd, r.marketCapUsd,
+        r.volumeUsdM5, r.volumeUsdH1, r.volumeUsdH6, r.volumeUsdH24,
+        r.txnsH1Buys, r.txnsH1Sells, r.txnsH24Buys, r.txnsH24Sells,
+        r.priceChangePctH1, r.priceChangePctH24, JSON.stringify(r.raw),
+      ],
+    );
+    if (inserted.length > 0) written += 1;
+  }
+  return written;
+}
+
+/**
  * Records a token the first time it is seen, and returns whether this call was that first sight.
  *
  * `first_seen_at` is OURS and never the venue's: it is the instant from which we are responsible
@@ -55,11 +90,21 @@ export async function noteToken(
   return rows.length > 0;
 }
 
+/**
+ * How many failed attempts before a stage is abandoned.
+ *
+ * A failure must be retried (it may be a timeout) but not for ever (it may be a token GoPlus will
+ * never answer about). Giving up is recorded in the row — `answered = false` with a reason and the
+ * attempt count — so "we stopped asking" is visible rather than being an absence somebody has to
+ * infer.
+ */
+export const MAX_SECURITY_ATTEMPTS = 5;
+
 /** The security snapshot for one stage. Re-running a stage replaces it rather than duplicating. */
 export async function writeTokenSecurity(
   db: Db,
   tokenId: string,
-  stage: 'first_seen' | 'h6' | 'h24',
+  stage: SecurityStage,
   checkedAt: Date,
   row: TokenSecurityRow,
 ): Promise<void> {
@@ -67,10 +112,13 @@ export async function writeTokenSecurity(
     `insert into dex_token_security (
        token_id, at_stage, checked_at, chain_family, mintable, freezable, closable,
        metadata_mutable, balance_mutable_authority, is_open_source, cannot_buy,
-       buy_tax, sell_tax, holder_count, total_supply, raw)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       buy_tax, sell_tax, holder_count, total_supply, raw, answered, failure_reason, attempts)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,null,1)
      on conflict (token_id, at_stage) do update set
        checked_at = excluded.checked_at, raw = excluded.raw,
+       -- an answer clears the failure but NOT the attempt count: answered alone stops the asking,
+       -- so zeroing it would erase how many calls this stage cost without changing any behaviour
+       answered = true, failure_reason = null,
        mintable = excluded.mintable, freezable = excluded.freezable, closable = excluded.closable,
        metadata_mutable = excluded.metadata_mutable,
        balance_mutable_authority = excluded.balance_mutable_authority,
@@ -86,29 +134,65 @@ export async function writeTokenSecurity(
 }
 
 /**
- * Tokens due a security check at a stage: first seen longer ago than the stage's offset, and not
- * yet checked at it.
+ * Records that an ask FAILED: an attempt, not an answer.
  *
- * "Not yet asked" is the ABSENCE of a row, which is why this is a NOT EXISTS rather than a null
- * test — the schema comment says the same thing and the two must agree.
+ * The row makes the failure visible and the attempt count makes repeated failure bounded, while
+ * `answered = false` keeps the token due — which is the whole distinction. A failure written as an
+ * answer with null flags would look exactly like "the venue told us nothing" and the token would
+ * never be asked again.
+ */
+export async function writeSecurityFailure(
+  db: Db,
+  tokenId: string,
+  stage: SecurityStage,
+  at: Date,
+  chainFamily: 'solana' | 'evm',
+  reason: string,
+): Promise<void> {
+  await db.query(
+    `insert into dex_token_security (token_id, at_stage, checked_at, chain_family, raw, answered, failure_reason, attempts)
+          values ($1,$2,$3,$4,'{}'::jsonb,false,$5,1)
+     on conflict (token_id, at_stage) do update set
+       checked_at = excluded.checked_at,
+       failure_reason = excluded.failure_reason,
+       -- only a FAILED row accumulates attempts; an answered row that later fails starts again,
+       -- which is correct: the previous success is evidence the token can be answered about
+       attempts = case when dex_token_security.answered then 1 else dex_token_security.attempts + 1 end,
+       answered = false`,
+    [tokenId, stage, at, chainFamily, reason],
+  );
+}
+
+/**
+ * Tokens due a security check at a stage.
+ *
+ * **Keyed on `answered`, never on a row existing.** A row may be a recorded FAILURE, which must
+ * leave the token due; only an answer — including one where the venue told us nothing — stops the
+ * asking. Abandoned after `MAX_SECURITY_ATTEMPTS` so a token that can never be answered does not
+ * consume the rate budget for ever.
+ *
+ * Suppression is per STAGE: `at_stage` is in the predicate, so answering at first sight does not
+ * silently cancel the +6 h and +24 h observations. Three looks is the point of the schedule, and
+ * all three come through here — `first_seen` is offset 0, not a separate path (see `schedule.ts`).
  */
 export async function tokensDueSecurity(
   db: Db,
-  stage: 'h6' | 'h24',
+  stage: SecurityStage,
   now: Date,
   limit = 50,
 ): Promise<Array<{ tokenId: string; network: string; address: string }>> {
-  const offsetMs = stage === 'h6' ? 6 * 3_600_000 : 24 * 3_600_000;
+  const offsetMs = SECURITY_STAGE_OFFSETS_MS[stage];
   const rows = await db.query<{ token_id: string; network: string; address: string }>(
     `select t.token_id, t.network, t.address
        from dex_tokens t
       where t.first_seen_at <= $1
         and not exists (
           select 1 from dex_token_security s
-           where s.token_id = t.token_id and s.at_stage = $2)
+           where s.token_id = t.token_id and s.at_stage = $2
+             and (s.answered or s.attempts >= $4))
       order by t.first_seen_at
       limit $3`,
-    [new Date(now.getTime() - offsetMs), stage, limit],
+    [new Date(now.getTime() - offsetMs), stage, limit, MAX_SECURITY_ATTEMPTS],
   );
   return rows.map((r) => ({ tokenId: r.token_id, network: r.network, address: r.address }));
 }
