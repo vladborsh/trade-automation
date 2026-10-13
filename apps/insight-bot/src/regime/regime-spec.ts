@@ -32,8 +32,9 @@ export const REGIME_SPEC = {
        * `WEB_FEATURE_SPEC['ema.1d.200'].params`, never from here. It was 200 when this was
        * written and IB-052 made it 300 by adding the warm-up a recursive indicator needs to be
        * reproducible; a number restated in prose is a number that drifts, and this comment had
-       * already drifted once. `candles_agg` holds about ten days, so the axis refuses until the
-       * Binance archive backfill lands — a known prerequisite, and work rather than waiting.
+       * already drifted once. Until enough daily bars exist the axis refuses, which is a
+       * prerequisite of the Binance archive backfill rather than a wait — how many are held today
+       * is a query, not a comment.
        */
       fastKey: 'ema.4h.50',
       slowKey: 'ema.1d.200',
