@@ -4,6 +4,9 @@ import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
 import { monthsWithRows, seriesBounds, SERIES_TABLES } from '../db/pg/backfill-reads';
 import { gapsOverlapping, heartbeats, unmappedLiquidations } from '../db/pg/coverage-reads';
+import { aggCoverage as readAggCoverage } from '../db/pg/agg-coverage-reads';
+import { AGG_TIMEFRAMES } from '../derive/bucket';
+import { aggCoverage } from './agg-coverage';
 import { collectorCoverage } from './collector-coverage';
 import { expectedFrames } from '../features/frame-coverage';
 import { HEAL_LOOKBACK_MS } from '../features/input-completeness';
@@ -42,7 +45,8 @@ export class WebCoverageController {
   @Get()
   async get(@Query('days') daysRaw?: string): Promise<WebCoverageResponse> {
     const windowDays = clampDays(daysRaw);
-    if (!this.db) return { rows: [], collectors: [], unmapped: { total: 0, rows: [] }, frames: [], windowDays };
+    if (!this.db)
+      return { rows: [], collectors: [], unmapped: { total: 0, rows: [] }, frames: [], agg: [], windowDays };
     const db = this.db;
     const rows: WebCoverageRow[] = [];
 
@@ -89,11 +93,25 @@ export class WebCoverageController {
       };
     });
 
+    // IB-056. Over the page's own window, not all history: the classification touches every 1m
+    // row in its span, and `feature-inputs.repo.ts` records 2,216 ms for a far cheaper unbounded
+    // read of this table. The block states its window on the page, and `npm run agg-coverage`
+    // answers the same question over everything for anyone who needs the whole backlog.
+    const agg = aggCoverage(
+      await readAggCoverage(db, {
+        fromMs: from.getTime(),
+        nowMs: to.getTime(),
+        venue: 'binance',
+        timeframes: AGG_TIMEFRAMES,
+      }),
+    );
+
     return {
       rows,
       collectors: collectorCoverage(beats, gaps, { from, to }),
       unmapped: await unmappedLiquidations(db),
       frames,
+      agg,
       windowDays,
     };
   }

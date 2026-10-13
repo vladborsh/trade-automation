@@ -187,6 +187,28 @@ const ALLOWED: readonly Allowance[] = [
     category: 'elapsed',
     why: 'the other half of that duration',
   },
+  // IB-056 — the aggregate-coverage CLI, the same three shapes as the derive CLI above.
+  {
+    file: 'db/agg-coverage.cli.ts',
+    line: "const nowMs = toArg ? parseBound(toArg, 'to') : Date.now();",
+    count: 1,
+    category: 'origin',
+    why: 'the default upper bound of a report run from a shell, overridable with --to',
+  },
+  {
+    file: 'db/agg-coverage.cli.ts',
+    line: 'const started = Date.now();',
+    count: 1,
+    category: 'elapsed',
+    why: 'start of the query duration printed with the result',
+  },
+  {
+    file: 'db/agg-coverage.cli.ts',
+    line: 'const elapsed = ((Date.now() - started) / 1000).toFixed(1);',
+    count: 1,
+    category: 'elapsed',
+    why: 'the other half of that duration',
+  },
 ];
 
 const SRC = join(process.cwd(), 'src');

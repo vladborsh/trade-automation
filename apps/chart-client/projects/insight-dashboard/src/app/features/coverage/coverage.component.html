@@ -64,6 +64,53 @@
       <p class="muted">{{ t('coverage.frames.why') }}</p>
     }
 
+    <h2>{{ t('coverage.agg.title') }}</h2>
+    <p class="muted">{{ aggBasis() }}</p>
+    @if (agg().length) {
+      <p class="muted">{{ t('coverage.agg.floors') }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('coverage.col.tf') }}</th>
+            <th>{{ t('coverage.col.held') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (floor of aggFloors(); track floor.tf) {
+            <tr>
+              <td>{{ floor.tf }}</td>
+              <td>{{ floor.heldFloor }} … {{ floor.heldMax }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('coverage.col.symbolMarket') }}</th>
+            <th>{{ t('coverage.col.tf') }}</th>
+            <th>{{ t('coverage.col.held') }}</th>
+            <th>{{ t('coverage.col.derivable') }}</th>
+            <th>{{ t('coverage.col.unfetchable') }}</th>
+            <th>{{ t('coverage.col.oldestDerivable') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of agg(); track row.seriesLabel + row.tf) {
+            <tr [class]="row.state">
+              <td>{{ row.seriesLabel }}</td>
+              <td>{{ row.tf }}</td>
+              <td>{{ row.held }}</td>
+              <td>{{ row.derivable }}</td>
+              <td>{{ row.unfetchable }}</td>
+              <td>{{ row.oldestDerivableLabel }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <p class="muted">{{ t('coverage.agg.why') }}</p>
+    }
+
     <h2>{{ t('coverage.unmapped.title') }}</h2>
     <p [class]="unmappedTotal() ? 'warn' : 'muted'">{{ unmappedSummary() }}</p>
     @if (unmappedTotal()) {

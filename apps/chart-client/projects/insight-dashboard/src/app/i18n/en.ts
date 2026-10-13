@@ -58,6 +58,20 @@ export const en: Strings = {
   'coverage.frames.basis': 'Last {days} days: {written} of {expected} frames written, {unhealed} still unhealed past the heal window, {missing} never written.',
   'coverage.frames.none': 'No feature frames yet. A timeframe appears here once the pass has run for it.',
   'coverage.frames.why': 'Unhealed means a frame still refuses a key for want of input that no further heal pass will reach. Permanently explained refusals are counted separately and need no action.',
+  'coverage.agg.title': 'Aggregate coverage',
+  'coverage.agg.basis':
+    'Last {days} days: {derivable} buckets could be built from minute data we already hold, across {seriesWithGap} of {series} series. {unfetchable} cannot be built at all — those minutes were never collected.',
+  'coverage.agg.none': 'No aggregate coverage yet. A series appears here once minute data exists for it.',
+  'coverage.agg.clean': 'Last {days} days: every bucket the minute data supports has been built, across all {series} series.',
+  'coverage.agg.why':
+    'A missing aggregate and missing market data look identical to every other part of this system — both make a feature refuse for want of history. They are not the same thing: one is a pass that has not run and is fixed by re-running it, the other needs fetching from the venue. This report never builds anything itself, so the gap stays visible until someone decides to close it.',
+  'coverage.agg.floors':
+    'Worst series per timeframe (not an average: an average over series this uneven describes none of them).',
+  'coverage.col.symbolMarket': 'Series',
+  'coverage.col.held': 'Built',
+  'coverage.col.derivable': 'Can be built',
+  'coverage.col.unfetchable': 'Cannot be built',
+  'coverage.col.oldestDerivable': 'Oldest missing',
   'coverage.col.tf': 'Timeframe',
   'coverage.col.framesWritten': 'Written',
   'coverage.col.unhealed': 'Unhealed',

@@ -104,6 +104,49 @@ export const WebFrameCoverageSchema = z.object({
 });
 export type WebFrameCoverage = z.infer<typeof WebFrameCoverageSchema>;
 
+/**
+ * IB-056 — one row per `(symbol, market, tf)`: what `candles_agg` holds against what the 1m tape
+ * could support.
+ *
+ * The distinction this exists to draw is between **two shortfalls that are spelled identically
+ * everywhere else in the system**. A feature key refuses `insufficient_history` whether the 1m
+ * bars are sitting in `candles_1m` underived or were never collected at all — and those call for
+ * opposite responses: run a pass, or fetch from the venue. Three times on 2026-10-12 that question
+ * was answered by an ad-hoc query, and each answer changed a conclusion (480 refusals became 4,
+ * 188 became 0, and a shortfall asserted to be unfillable turned out to be 88 % derivable).
+ *
+ * `derivable` is therefore the only number here anyone should act on, and acting on it is a
+ * decision for a person: this report never triggers a derive. A check that silently repaired what
+ * it measures would hide the very backlog it exists to show.
+ *
+ * Keyed by symbol **and** market because `candles_agg` is: spot and perp are separate series, and
+ * collapsing them halves every average. That conflation was the most repeated measurement error of
+ * 2026-10-11/12 — three instances in a day.
+ */
+export const WebAggCoverageSchema = z.object({
+  /** An identifier — not translated. */
+  symbol: z.string(),
+  /** `spot` or `perp`. Its own field, never folded into `symbol`. */
+  market: z.string(),
+  /** `15m`, `1h`, `4h` or `1d`. An identifier — not translated. */
+  tf: z.string(),
+  /** Buckets `candles_agg` holds with `complete = true`. */
+  held: z.number().int(),
+  /**
+   * Buckets whose every expected 1m bar is in `candles_1m`, but which `candles_agg` has no
+   * complete row for. **A pass we have not run** — the actionable figure.
+   */
+  derivable: z.number().int(),
+  /**
+   * Buckets the 1m tape cannot support: the minutes themselves are missing, so no derive will
+   * ever produce them and only the venue's archive can. Not an alarm — a different task.
+   */
+  unfetchable: z.number().int(),
+  /** ms UTC of the oldest derivable bucket, or null when there is none. */
+  oldestDerivable: z.number().int().nullable(),
+});
+export type WebAggCoverage = z.infer<typeof WebAggCoverageSchema>;
+
 export const WebCoverageResponseSchema = z.object({
   rows: z.array(WebCoverageRowSchema),
   /** Defaulted, so a client built against the earlier shape keeps parsing. */
@@ -117,6 +160,13 @@ export const WebCoverageResponseSchema = z.object({
    * who sees them in one table will treat one as evidence about the other.
    */
   frames: z.array(WebFrameCoverageSchema).default([]),
+  /**
+   * IB-056's aggregate-coverage block. Computed over the same `windowDays` as the rest of the
+   * page — the figure is a window's worth, not all history, and the page must say so. Full
+   * history is the CLI's job (`npm run agg-coverage`), because an unbounded scan of the 1m
+   * partitions is seconds of work, not milliseconds.
+   */
+  agg: z.array(WebAggCoverageSchema).default([]),
   /** The window `collectors` was computed over, so the page can state its basis. */
   windowDays: z.number().int().default(30),
 });

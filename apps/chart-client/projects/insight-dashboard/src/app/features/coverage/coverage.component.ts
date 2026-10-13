@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
+import { aggTotals, heldFloorByTf, toAggViews, type AggView } from './agg-rows';
 import { basisState, collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
 import { coverageCounts, toCoverageViews, type CoverageView } from './coverage.rows';
 import { frameTotals, toFrameViews, type FrameView } from './frame-rows';
@@ -24,6 +25,7 @@ export class CoverageComponent {
   readonly unmappedTotal = signal(0);
   /** IB-015 — feature-frame coverage. Its own block: see `frame-rows.ts`. */
   readonly frames = signal<FrameView[]>([]);
+  readonly agg = signal<AggView[]>([]);
   readonly windowDays = signal(30);
   readonly error = signal<string | null>(null);
   readonly loading = signal(true);
@@ -74,6 +76,30 @@ export class CoverageComponent {
     });
   });
 
+  /**
+   * IB-056's basis line. It names the window, because the figure is a window's worth and not the
+   * whole backlog: the full-history answer costs seconds of scanning and belongs to the CLI. A
+   * block that showed a windowed number while implying all of history would be the same defect as
+   * a stale apology — true once, wrong afterwards, and unfalsifiable from the page.
+   */
+  readonly aggBasis = computed(() => {
+    const totals = aggTotals(this.agg());
+    if (totals.series === 0) return this.t('coverage.agg.none');
+    if (totals.derivable === 0 && totals.unfetchable === 0) {
+      return this.t('coverage.agg.clean', { days: this.windowDays(), series: totals.series });
+    }
+    return this.t('coverage.agg.basis', {
+      days: this.windowDays(),
+      derivable: totals.derivable,
+      seriesWithGap: totals.seriesWithGap,
+      series: totals.series,
+      unfetchable: totals.unfetchable,
+    });
+  });
+
+  /** The per-timeframe floor and max. Never a mean — see `heldFloorByTf`. */
+  readonly aggFloors = computed(() => heldFloorByTf(this.agg()));
+
   readonly unmappedSummary = computed(() =>
     this.unmappedTotal() === 0
       ? this.t('coverage.unmapped.none')
@@ -92,6 +118,7 @@ export class CoverageComponent {
       this.collectors.set(toCollectorViews(response.collectors ?? []));
       this.unmappedTotal.set(response.unmapped?.total ?? 0);
       this.frames.set(toFrameViews(response.frames ?? []));
+      this.agg.set(toAggViews(response.agg ?? []));
       this.windowDays.set(response.windowDays ?? 30);
     } catch (err) {
       this.error.set((err as Error).message);

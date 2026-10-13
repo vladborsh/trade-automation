@@ -46,3 +46,10 @@ tr.holes td { color: #d29922; }
 tr.missing td { color: var(--down); }
 tr.unhealed td { color: #d29922; }
 tr.explained td { color: #8b949e; }
+
+/* IB-056 — the aggregate block. `derivable` is the only actionable column, so it takes the amber
+   that already means "holes someone can close"; `unfetchable` is muted like an explained refusal,
+   because no action clears it and an alarm that cannot be cleared stops being read. Palette only
+   (AGENTS.md). */
+tr.derivable td { color: #d29922; }
+tr.unfetchable td { color: #8b949e; }
