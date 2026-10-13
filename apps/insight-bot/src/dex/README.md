@@ -181,6 +181,27 @@ distinct token:
 | evm | `is_open_source` | 4 of 9 answered BSC tokens in A | optional |
 | evm | `total_supply` | 1 of 7 answered base tokens in B, 1 in the live run | optional |
 | evm | `cannot_buy` | 1 base token during the live run | optional |
+| evm | `buy_tax`, `sell_tax` | **both** absent on BSC token `0x8d0d…08b0d`, 20 minutes into the 24-hour run | optional |
+
+### EVM has NO always-present field, and that is a measurement
+
+The 24-hour run falsified the last two candidates inside twenty minutes: that BSC token answers with
+`cannot_buy`, `holder_count`, `is_open_source`, `total_supply`, `is_honeypot` and `is_proxy` — and
+neither tax field. A **third** distinct EVM field set, after the 14-field and 29-field fixtures.
+
+So `ALWAYS_PRESENT.evm` is deliberately empty, which means:
+
+- **a per-response detector for "this field vanished" does not exist on this payload.** That is what
+  5-of-29 shared names means, and pretending otherwise is what discarded good rows;
+- **the detector is the rate** — a field answered for most tokens dropping to none, on the coverage
+  surface. It was built for this and is now the only thing that could see it;
+- **wrong-family and renamed-payload are still caught**, because `assertShapeRecognisable` keys on
+  the family's *distinctive* fields rather than on this classification. That is why the two checks
+  were kept separate.
+
+`test/dex/field-contracts.spec.ts` pins the emptiness together with its reason, so refilling the
+list from a clean window is a failing test rather than a tidy-up. Solana still has five
+always-present fields on 37-for-37; if the run falsifies one, the move is the same again.
 
 ### The classification was falsified within minutes, and that changed the mechanism
 

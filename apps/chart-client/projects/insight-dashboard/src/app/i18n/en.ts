@@ -61,6 +61,7 @@ export const en: Strings = {
   'coverage.dex.basis': 'Last {days} days: {measured} of {fields} fields have enough answered asks to state a rate; {gone} declared always-present and answered for nobody.',
   'coverage.dex.none': 'No token security asks answered yet. A field appears here once the collector has asked about tokens.',
   'coverage.dex.thin': 'Fewer than {min} answered asks: no rate is stated rather than a 0 % that would read as a field that vanished.',
+  'coverage.dex.unpromoted': '{field} ({family}) is answered for every token in this window and is still optional on purpose: {evidence}. A full window is not a contract, so it is not promoted — promoting it would make a later absence discard the whole answer.',
   'coverage.dex.why': 'GoPlus sends a different set of fields per token — two real responses shared only 5 of 29 names — so a field missing from one answer means nothing. A field that was answered for most tokens and is now answered for none is the shape change, which is why this is a rate with its denominator next to it.',
   'coverage.col.family': 'Chain',
   'coverage.col.field': 'Field',

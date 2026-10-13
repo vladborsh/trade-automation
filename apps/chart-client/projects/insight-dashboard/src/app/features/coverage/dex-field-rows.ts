@@ -16,6 +16,18 @@ import type { WebDexFieldPresence } from '@trade-automation/contracts';
  *   zero: "we have not asked enough" and "the venue stopped sending it" are different facts, and
  *   showing the first as the second is the defect this whole task has been about.
  * - **varies** — an optional field, absent for some tokens. Expected, measured, never an alarm.
+ *
+ * ## And one row has to explain itself
+ *
+ * A field can sit at **100 % for a whole window and still be `optional`**, because the
+ * classification is a claim about the API's CONTRACT and one window cannot establish a contract —
+ * the same repetition argument the venue's shapes get, applied to our own classification.
+ *
+ * Correct, and it **reads as an error**: the next person sees 100 % labelled optional, concludes the
+ * classification is stale, and "corrects" it to `always` — reinstating the throw-on-absence that
+ * discarded good rows on 2026-10-13. So `unpromoted()` picks exactly those rows and the page prints
+ * the evidence beside them. A decision that looks wrong gets fixed by someone acting in good faith,
+ * and the only defence is for the artefact to explain itself at the point of reading.
  */
 
 /**
@@ -79,3 +91,17 @@ export function dexFieldTotals(rows: readonly WebDexFieldPresence[]): {
     answered: rows.reduce((max, r) => Math.max(max, r.answered), 0),
   };
 }
+
+/**
+ * The rows whose correctness is invisible: `optional`, yet answered for every token in a window
+ * long enough to state a rate.
+ *
+ * These are the ones a reader would "fix". Everything else explains itself — an optional field below
+ * 100 % is obviously optional, and a thin row says so.
+ */
+export function unpromoted(rows: readonly WebDexFieldPresence[]): DexFieldView[] {
+  return toDexFieldViews(rows).filter(
+    (v) => v.presence === 'optional' && v.state === 'ok' && v.answered >= MIN_ASKS_FOR_A_RATE,
+  );
+}
+

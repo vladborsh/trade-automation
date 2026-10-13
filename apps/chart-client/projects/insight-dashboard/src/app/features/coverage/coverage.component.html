@@ -89,6 +89,9 @@
           }
         </tbody>
       </table>
+      @for (note of dexUnpromoted(); track note) {
+        <p class="muted">{{ note }}</p>
+      }
       <p class="muted">{{ t('coverage.dex.thin', { min: minAsks }) }}</p>
       <p class="muted">{{ t('coverage.dex.why') }}</p>
     }

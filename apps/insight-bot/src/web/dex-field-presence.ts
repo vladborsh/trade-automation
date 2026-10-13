@@ -28,6 +28,9 @@ export function dexFieldPresence(
         present,
         presentRate: answered === 0 ? null : present / answered,
         presence: contract.presence,
+        // carried through so the page can explain a 100 % field that is still optional; see the
+        // contract's comment on `evidence`
+        evidence: contract.evidence,
       });
     }
   }

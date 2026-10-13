@@ -124,6 +124,16 @@ export const WebDexFieldPresenceSchema = z.object({
   presentRate: z.number().nullable(),
   /** What the mapper declares: `always` is reported loudly when absent, `optional` is not. */
   presence: z.enum(['always', 'optional']),
+  /**
+   * What the classification rests on, carried to the page rather than left in the source.
+   *
+   * A field can sit at 100 % for a whole window and still be `optional`, because the classification
+   * is a claim about the API's CONTRACT and one window cannot establish a contract. Without the
+   * evidence beside it that correct row reads as a stale classification, and the obvious
+   * "correction" — promoting it to `always` — reinstates the throw-on-absence that discarded good
+   * rows on 2026-10-13. Defaulted so an older client keeps parsing.
+   */
+  evidence: z.string().default(''),
 });
 export type WebDexFieldPresence = z.infer<typeof WebDexFieldPresenceSchema>;
 

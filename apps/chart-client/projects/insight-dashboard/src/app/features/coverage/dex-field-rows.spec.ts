@@ -1,5 +1,5 @@
 import type { WebDexFieldPresence } from '@trade-automation/contracts';
-import { dexFieldTotals, MIN_ASKS_FOR_A_RATE, toDexFieldViews } from './dex-field-rows';
+import { dexFieldTotals, MIN_ASKS_FOR_A_RATE, toDexFieldViews, unpromoted } from './dex-field-rows';
 
 /**
  * IB-028 — the GoPlus field-presence block.
@@ -14,6 +14,7 @@ const row = (over: Partial<WebDexFieldPresence> = {}): WebDexFieldPresence => ({
   present: 40,
   presentRate: 1,
   presence: 'always',
+  evidence: 'present in all answered tokens, occasions A and B',
   ...over,
 });
 
@@ -87,3 +88,37 @@ describe('dexFieldTotals', () => {
       .toEqual({ fields: 1, gone: 0, measured: 0, answered: 0 });
   });
 });
+
+describe('unpromoted — the rows whose correctness is invisible', () => {
+  it('picks an OPTIONAL field answered for every token in a long-enough window', () => {
+    // the exact row a reader would "correct" to always, reinstating the throw that lost rows
+    const views = unpromoted([row({
+      field: 'holder_count', presence: 'optional', answered: 35, present: 35, presentRate: 1,
+      evidence: 'present in all 36 answered tokens of A and B, then ABSENT on a live eth token minutes later',
+    })]);
+    expect(views.map((v) => v.field)).toEqual(['holder_count']);
+    expect(views[0].evidence).toContain('ABSENT on a live eth token');
+  });
+
+  it('leaves out an optional field that is visibly below 100 %, which explains itself', () => {
+    expect(unpromoted([row({
+      field: 'is_open_source', presence: 'optional', answered: 9, present: 5, presentRate: 5 / 9,
+    })])).toEqual([]);
+  });
+
+  it('leaves out an ALWAYS field at 100 %, which is not a surprise to anybody', () => {
+    expect(unpromoted([row({ answered: 40, present: 40, presentRate: 1 })])).toEqual([]);
+  });
+
+  it('leaves out a thin row, because it is not claiming 100 % in the first place', () => {
+    expect(unpromoted([row({
+      presence: 'optional', answered: MIN_ASKS_FOR_A_RATE - 1, present: MIN_ASKS_FOR_A_RATE - 1, presentRate: 1,
+    })])).toEqual([]);
+  });
+
+  it('carries the evidence, so the page can print WHY rather than just flagging it', () => {
+    const [view] = unpromoted([row({ presence: 'optional', answered: 20, present: 20, presentRate: 1 })]);
+    expect(view.evidence.length).toBeGreaterThan(20);
+  });
+});
+

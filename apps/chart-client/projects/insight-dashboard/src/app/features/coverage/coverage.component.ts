@@ -4,7 +4,7 @@ import { I18nService } from '../../i18n/i18n.service';
 import { basisState, collectorTotals, toCollectorViews, type CollectorView } from './collector-rows';
 import { coverageCounts, toCoverageViews, type CoverageView } from './coverage.rows';
 import {
-  dexFieldTotals, MIN_ASKS_FOR_A_RATE, toDexFieldViews, type DexFieldView,
+  dexFieldTotals, MIN_ASKS_FOR_A_RATE, toDexFieldViews, unpromoted, type DexFieldView,
 } from './dex-field-rows';
 import { frameTotals, toFrameViews, type FrameView } from './frame-rows';
 
@@ -95,6 +95,18 @@ export class CoverageComponent {
       gone: totals.gone,
     });
   });
+
+  /**
+   * Why a field at 100 % is still optional, printed next to the number.
+   *
+   * Without this the correct row reads as a stale classification, and the obvious "correction" —
+   * promoting it to always-present — reinstates the throw-on-absence that discarded good rows.
+   * A decision that looks wrong gets fixed by someone acting in good faith.
+   */
+  readonly dexUnpromoted = computed(() => unpromoted(this.dexFields()).map((view) => this.t(
+    'coverage.dex.unpromoted',
+    { field: view.field, family: view.chainFamily, evidence: view.evidence },
+  )));
 
   readonly unmappedSummary = computed(() =>
     this.unmappedTotal() === 0

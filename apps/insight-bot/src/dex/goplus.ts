@@ -168,8 +168,19 @@ export const FIELD_CONTRACTS: Record<ChainFamily, readonly FieldContract[]> = {
       presence: 'optional',
       evidence: 'absent on 1 distinct base token during the live run (the log\'s 5 lines are 5 retries of it)',
     },
-    { field: 'buy_tax', presence: 'always', evidence: PRESENT_IN_BOTH },
-    { field: 'sell_tax', presence: 'always', evidence: PRESENT_IN_BOTH },
+    {
+      field: 'buy_tax',
+      presence: 'optional',
+      evidence: 'present in all 36 answered tokens of A and B, then absent together with sell_tax on BSC token '
+        + '0x8d0d…08b0d during the 24-hour run (2026-10-13), whose response carries cannot_buy, holder_count, '
+        + 'is_open_source, total_supply, is_honeypot and is_proxy but neither tax field',
+    },
+    {
+      field: 'sell_tax',
+      presence: 'optional',
+      evidence: 'absent together with buy_tax on BSC token 0x8d0d…08b0d during the 24-hour run (2026-10-13); '
+        + 'present in all 36 answered tokens of occasions A and B before that',
+    },
     {
       field: 'holder_count',
       presence: 'optional',

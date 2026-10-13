@@ -31,7 +31,11 @@ describe('dexFieldPresence', () => {
     const rows = dexFieldPresence([{ chainFamily: 'evm', field: 'buy_tax', answered: 40, present: 0 }]);
     const row = rows.find((r) => r.chainFamily === 'evm' && r.field === 'buy_tax')!;
     expect(row.presentRate).toBe(0);
-    expect(row.presence).toBe('always'); // and it is declared always-present, so this is loud
+    // `optional`, because the 24-hour run falsified the last always-present EVM candidates — and
+    // that is what makes the rate the ONLY detector here: nothing per-response can fire for an
+    // optional field, so a 0 % over a real population is all there is to see
+    expect(row.presence).toBe('optional');
+    expect(row.answered).toBe(40); // the population, without which 0 % means nothing
   });
 
   it('does not show a family a field does not belong to', () => {

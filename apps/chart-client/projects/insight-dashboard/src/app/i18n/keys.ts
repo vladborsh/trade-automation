@@ -74,6 +74,7 @@ export type StringKey =
   | 'coverage.dex.none'
   | 'coverage.dex.thin'
   | 'coverage.dex.why'
+  | 'coverage.dex.unpromoted'
   | 'coverage.col.family'
   | 'coverage.col.field'
   | 'coverage.col.answered'

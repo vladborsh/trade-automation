@@ -176,19 +176,34 @@ describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a sh
   it('KEEPS the row when an always-present field vanishes, and reports it instead', () => {
     // the correction: throwing here lost rows for tokens the venue DID answer about, and the live
     // run proved the classification itself is falsifiable. Loud, not fatal.
-    const payload = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
+    //
+    // Demonstrated on SOLANA, because EVM no longer has an always-present field to remove — the run
+    // falsified the last two, which is the point rather than a gap in this test.
+    const payload = JSON.parse(SOLANA) as { result: Record<string, Record<string, unknown>> };
     const [addr, token] = Object.entries(payload.result)[0];
-    expect('buy_tax' in token).toBe(true);
-    delete token['buy_tax'];
+    expect('mintable' in token).toBe(true);
+    delete token['mintable'];
     payload.result[addr] = token;
 
-    const mapped = mapTokenSecurity(JSON.stringify(payload), 'evm')!;
-    expect(mapped.row.buyTax).toBeNull();
-    expect(mapped.row.absentFields).toContain('buy_tax');
+    const mapped = mapTokenSecurity(JSON.stringify(payload), 'solana')!;
+    expect(mapped.row.mintable).toBeNull();
+    expect(mapped.row.absentFields).toContain('mintable');
 
     const surprising = unexpectedAbsences(mapped.row);
-    expect(surprising.map((c) => c.field)).toEqual(['buy_tax']);
+    expect(surprising.map((c) => c.field)).toEqual(['mintable']);
     expect(surprising[0].evidence).toMatch(/\d/); // the signal carries its own basis
+  });
+
+  it('reports nothing for an EVM field, because none is classified always-present', () => {
+    // not an omission: `field-contracts.spec.ts` pins why the list is empty
+    const payload = JSON.parse(EVM) as { result: Record<string, Record<string, unknown>> };
+    const [addr, token] = Object.entries(payload.result)[0];
+    delete token['buy_tax'];
+    delete token['sell_tax'];
+    payload.result[addr] = token;
+    const mapped = mapTokenSecurity(JSON.stringify(payload), 'evm')!;
+    expect(mapped.row.absentFields).toEqual(expect.arrayContaining(['buy_tax', 'sell_tax']));
+    expect(unexpectedAbsences(mapped.row)).toEqual([]);
   });
 
   it('reports NOTHING surprising for the real responses — the positive control', () => {
@@ -266,9 +281,11 @@ describe('an OPTIONAL field absent is "not told"; an ALWAYS field absent is a sh
       const optional = (family: 'solana' | 'evm') =>
         FIELD_CONTRACTS[family].filter((c) => c.presence === 'optional').map((c) => c.field);
       expect(optional('solana')).toEqual(['metadata_mutable']);
-      expect(optional('evm')).toEqual(['is_open_source', 'cannot_buy', 'holder_count', 'total_supply']);
-      expect(ALWAYS_PRESENT.evm).not.toContain('total_supply');
-      expect(ALWAYS_PRESENT.evm).not.toContain('holder_count'); // falsified by the live run
+      // every EVM field is optional now; the tax pair was falsified by the 24-hour run itself
+      expect(optional('evm')).toEqual([
+        'is_open_source', 'cannot_buy', 'buy_tax', 'sell_tax', 'holder_count', 'total_supply',
+      ]);
+      expect(ALWAYS_PRESENT.evm).toEqual([]);
     });
   });
 
