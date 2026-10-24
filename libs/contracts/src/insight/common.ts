@@ -31,6 +31,8 @@ export const WEB_ERROR_CODES = [
   'TOKEN_EXPIRED',
   'UNAUTHENTICATED',
   'FORBIDDEN',
+  /** The exchange did not answer a live read (or our weight budget is spent): retry later. */
+  'VENUE_UNAVAILABLE',
 ] as const;
 export type WebErrorCode = (typeof WEB_ERROR_CODES)[number];
 

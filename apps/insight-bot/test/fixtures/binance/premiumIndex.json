@@ -1,0 +1,32 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "markPrice": "80567.90000000",
+    "indexPrice": "80605.61586957",
+    "estimatedSettlePrice": "80557.05037742",
+    "lastFundingRate": "0.00002673",
+    "interestRate": "0.00010000",
+    "nextFundingTime": 1792857600000,
+    "time": 1792835675000
+  },
+  {
+    "symbol": "ETHUSDT",
+    "markPrice": "2365.36000000",
+    "indexPrice": "2366.53465116",
+    "estimatedSettlePrice": "2362.08267183",
+    "lastFundingRate": "0.00003641",
+    "interestRate": "0.00010000",
+    "nextFundingTime": 1792857600000,
+    "time": 1792835675000
+  },
+  {
+    "symbol": "SOLUSDT",
+    "markPrice": "101.31000000",
+    "indexPrice": "101.36052335",
+    "estimatedSettlePrice": "101.33593077",
+    "lastFundingRate": "0.00002307",
+    "interestRate": "0.00010000",
+    "nextFundingTime": 1792857600000,
+    "time": 1792835675000
+  }
+]

@@ -1,9 +1,25 @@
-<div class="panel-row">
-  @for (panel of panels; track panel.key) {
-    <app-instrument-panel [panel]="panel" [data]="data()" />
+<div class="chart" (pointermove)="onPointerMove($event)">
+  <div #chartHost class="chart-host"></div>
+  @for (legend of legends(); track legend.key) {
+    @if (legend.top !== null) {
+      <div class="pane-legend" [attr.data-pane]="legend.key" [style.top.px]="legend.top">
+        <span class="pane-title">{{ legend.heading }}</span>
+        @for (entry of legend.entries; track entry.label) {
+          <span class="entry">
+            @if (entry.colour) {
+              <span class="swatch" [class.line]="entry.line" [style.background]="entry.colour"></span>
+            }
+            {{ entry.label }}
+          </span>
+        }
+      </div>
+    }
   }
 </div>
-
-@if (data(); as d) {
-  <p class="pane-note">{{ scopeLabel(d.liquidationVenues, d.liquidations.undercounted) }}</p>
-}
+<div class="chart-foot">
+  @if (data(); as d) {
+    <p class="pane-note">{{ scopeLabel(d.liquidationVenues, d.liquidations.undercounted) }}</p>
+  }
+  <p class="hint">{{ t('instrument.resizeHint') }}</p>
+  <button type="button" class="reset" (click)="resetHeights()">{{ t('instrument.resetHeights') }}</button>
+</div>

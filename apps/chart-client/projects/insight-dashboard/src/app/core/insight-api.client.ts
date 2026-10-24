@@ -1,10 +1,10 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
-  WebCandlesResponse, WebCoverageResponse, WebDbHealthResponse, WebExchangeRequest, WebMarketCardsResponse,
+  WebCandlesResponse, WebDbHealthResponse, WebExchangeRequest, WebMarketCardsResponse,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
-  WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseTopResponse,
+  WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -51,14 +51,15 @@ export class InsightApiClient {
     return this.get<{ user?: { lang?: unknown } }>('/auth/me');
   }
 
-  async coverage(): Promise<WebCoverageResponse> {
-    return this.get<WebCoverageResponse>('/coverage');
-  }
-
   // ------------------------------------------------------ IB-031, the instrument view
 
   async universeTop(n = 20): Promise<WebUniverseTopResponse> {
     return this.get<WebUniverseTopResponse>('/universe/top', { n });
+  }
+
+  /** The symbol dropdown's figures, read live from Binance and cached about a minute server-side. */
+  async universeSummary(n = 20): Promise<WebUniverseSummaryResponse> {
+    return this.get<WebUniverseSummaryResponse>('/universe/summary', { n });
   }
 
   /**

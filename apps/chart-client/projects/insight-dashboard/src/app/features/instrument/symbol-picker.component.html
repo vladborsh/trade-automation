@@ -1,0 +1,63 @@
+<div class="picker" (keydown.escape)="close()" (focusout)="onFocusOut($event)">
+  <button
+    type="button"
+    class="trigger"
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="t('instrument.picker.open', { symbol: symbol() })"
+    (click)="toggle()"
+  >
+    <span class="sym">{{ symbol() }}</span>
+    @if (current(); as c) {
+      @if (c.price) {
+        <span class="price num">{{ c.price }}</span>
+      }
+      @if (c.change) {
+        <span class="num" [attr.data-sign]="c.changeSign">{{ c.change }} %</span>
+      }
+    }
+  </button>
+  @if (open()) {
+    <div class="panel">
+      <label class="search">
+        <span class="visually-hidden">{{ t('instrument.picker.search') }}</span>
+        <input
+          #search
+          type="text"
+          autocomplete="off"
+          [value]="query()"
+          [placeholder]="t('instrument.picker.search')"
+          (input)="query.set($any($event.target).value)"
+          (keydown.enter)="enter()"
+        />
+      </label>
+      <div class="head" aria-hidden="true">
+        <span>{{ t('instrument.picker.topList') }}</span>
+        <span>{{ t('instrument.picker.change') }}</span>
+        <span>{{ t('instrument.picker.funding') }}</span>
+        <span>{{ t('instrument.picker.oi') }}</span>
+      </div>
+      <ul role="listbox" [attr.aria-label]="t('instrument.picker.topList')">
+        @for (row of rows(); track row.id) {
+          <li role="option" [attr.aria-selected]="row.active">
+            <button type="button" class="row" [class.active]="row.active" (click)="choose(row.id)">
+              <span class="id">{{ row.id }}</span>
+              <span class="num" [attr.data-sign]="row.changeSign">{{ row.change ?? '—' }}</span>
+              <span class="num" [attr.data-sign]="row.fundingSign">{{ row.funding ?? '—' }}</span>
+              <span class="num" [attr.data-sign]="row.oiSign">{{ row.oi ?? '—' }}</span>
+            </button>
+          </li>
+        } @empty {
+          <li class="empty">{{ t('instrument.picker.noMatch', { query: query() }) }}</li>
+        }
+      </ul>
+      <p class="note">
+        @if (summaryFailed()) {
+          {{ t('instrument.picker.unavailable') }}
+        } @else {
+          {{ t('instrument.picker.basis') }}
+        }
+      </p>
+    </div>
+  }
+</div>

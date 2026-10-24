@@ -1,0 +1,85 @@
+<section class="block" aria-labelledby="now-title">
+  <h2 id="now-title">{{ t('instrument.now.title', { symbol: symbol() }) }}</h2>
+  <dl class="tiles">
+    <div class="tile">
+      <dt>{{ t('instrument.panel.openInterest') }}</dt>
+      <dd class="value">
+        @if (now().oi; as oi) {
+          {{ oi }} {{ now().oiUnit }}
+        } @else {
+          {{ t('instrument.now.none') }}
+        }
+      </dd>
+      @if (now().oiChange; as change) {
+        <dd class="sub" [attr.data-sign]="now().oiChangeSign">{{ t('instrument.now.oiChange', { change }) }}</dd>
+      }
+    </div>
+    <div class="tile">
+      <dt>{{ t('instrument.now.funding') }}</dt>
+      <dd class="value" [attr.data-sign]="now().fundingSign">
+        @if (now().funding; as f) {
+          {{ f }} %
+        } @else {
+          {{ t('instrument.now.none') }}
+        }
+      </dd>
+      @if (now().nextFunding; as time) {
+        <dd class="sub">{{ t('instrument.now.nextFunding', { time }) }}</dd>
+      }
+    </div>
+    <div class="tile">
+      <dt>{{ t('instrument.now.cvd') }}</dt>
+      <dd class="value" [attr.data-sign]="now().cvdSign">
+        @if (now().cvd; as cvd) {
+          {{ cvd }} {{ now().cvdUnit }}
+        } @else {
+          {{ t('instrument.now.none') }}
+        }
+      </dd>
+      <dd class="sub">{{ t('instrument.now.cvdHint') }}</dd>
+    </div>
+    <div class="tile">
+      <dt>{{ t('instrument.now.ls') }}</dt>
+      <dd class="value">{{ now().ls ?? t('instrument.now.none') }}</dd>
+    </div>
+  </dl>
+</section>
+
+@if (liqCoin(); as coin) {
+  <app-liquidations-now
+    class="block"
+    [windows]="coin.windows"
+    [venues]="liqVenues()"
+    [narrow]="true"
+    titleKey="instrument.liq.summaryTitle"
+  />
+}
+
+<section class="block" aria-labelledby="market-title">
+  <div class="block-head">
+    <h2 id="market-title">{{ t('instrument.market') }}</h2>
+    <a routerLink="/market">{{ t('instrument.market.all') }}</a>
+  </div>
+  <dl class="tiles">
+    <div class="tile">
+      <dt>{{ t('market.fg.title') }}</dt>
+      @if (fearGreed(); as fg) {
+        <dd class="value" [style.color]="fg.colour">{{ fg.value }}</dd>
+        <dd class="sub" [style.color]="fg.colour">{{ fg.label }}</dd>
+      } @else {
+        <dd class="value">{{ t('instrument.now.none') }}</dd>
+      }
+    </div>
+    <div class="tile">
+      <dt>{{ t('market.dominance.title') }}</dt>
+      @if (dominance(); as dom) {
+        <dd class="value">{{ dom.share }} %</dd>
+        @if (dom.change) {
+          <dd class="sub">{{ dom.change }}</dd>
+        }
+      } @else {
+        <dd class="value">{{ t('instrument.now.none') }}</dd>
+      }
+    </div>
+  </dl>
+</section>

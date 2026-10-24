@@ -1,0 +1,180 @@
+/*
+ * Design tokens for both Angular projects in this workspace (chart-client, insight-dashboard).
+ * Single source of truth for colour, type, spacing and radius. Spec: architecture/design-system.md.
+ *
+ * Three layers: primitives (raw values, never used in components) → semantic (what a value
+ * means) → component (per-widget knobs). Components reference semantic or component tokens only.
+ * Every value below was measured from the stylesheets on 2026-10-24, not invented: the palette
+ * is the one AGENTS.md already names, the scales are the sizes the 52 stylesheets actually use.
+ */
+
+/* === PRIMITIVES === */
+:root {
+  /* Greys (dark-terminal ramp) */
+  --gray-950: #0d1117;
+  --gray-900: #161b22;
+  --gray-800: #21262d;
+  --gray-700: #30363d;
+  --gray-500: #6e7681;
+  --gray-400: #8b949e;
+  --gray-200: #c9d1d9;
+
+  /* Hues */
+  --teal-500: #26a69a;
+  --red-500: #ef5350;
+  --amber-500: #d29922;
+  --amber-400: #e3b341;
+  --amber-950: #2b2111;
+  --blue-400: #58a6ff;
+  --blue-500: #2f81f7;
+  --blue-600: #1f6feb;
+  --green-500: #3fb950;
+  --purple-400: #bc8cff;
+  --purple-500: #a371f7;
+  --purple-600: #8957e5;
+  --orange-400: #f0883e;
+  --orange-500: #db6d28;
+  --slate-400: #787b86; /* TradingView neutral: axis, rays, flat markers */
+  --yellow-binance: #f0b90b;
+
+  /* Type */
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, 'Courier New', monospace;
+  --font-size-2xs: 10px;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-figure: 15px; /* headline figures (stats tiles) */
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 24px;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --letter-spacing-caps: 0.04em;
+
+  /* Spacing: 2 px grid */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  /* Radius */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+/* === SEMANTIC === */
+:root {
+  /* Surfaces */
+  --color-bg: var(--gray-950);
+  --color-bg-raised: var(--gray-900);    /* panels, toasts, popovers */
+  --color-bg-overlay: var(--gray-800);   /* hover rows, selected chips */
+  --color-border: var(--gray-700);
+  --color-border-strong: var(--gray-400); /* active / selected outline */
+
+  /* Text */
+  --color-text: var(--gray-200);
+  --color-text-muted: var(--gray-400);
+  --color-text-faint: var(--gray-500);
+
+  /* Market direction: the only pair that may carry money meaning */
+  --color-up: var(--teal-500);
+  --color-down: var(--red-500);
+
+  /* Intent */
+  --color-accent: var(--teal-500);      /* links, primary action, "ok" */
+  --color-focus: var(--blue-400);       /* focus ring, selected view / timeframe */
+  --color-info: var(--blue-400);
+  --color-warning: var(--amber-500);
+  --color-warning-text: var(--amber-400);
+  --color-warning-bg: var(--amber-950);
+  --color-danger: var(--red-500);
+  --color-success: var(--green-500);
+
+  /* Chart */
+  --color-chart-grid: var(--gray-900);
+  --color-chart-neutral: var(--slate-400);
+  --color-series-1: var(--amber-500);
+  --color-series-2: var(--blue-400);
+  --color-series-3: var(--purple-400);
+  --color-series-4: var(--teal-500);
+  --color-series-5: var(--red-500);
+  --color-metric-up: var(--blue-400);    /* non-price metric series: never reuse up/down */
+  --color-metric-down: var(--orange-400);
+  --color-venue-binance: var(--yellow-binance);
+
+  /* Layout */
+  --page-gutter: clamp(16px, 3vw, 40px);
+}
+
+/* === COMPONENTS === */
+:root {
+  --button-bg: var(--color-bg);
+  --button-fg: var(--color-text-muted);
+  --button-border: var(--color-border);
+  --button-fg-hover: var(--color-text);
+  --button-border-active: var(--color-border-strong);
+  --button-padding: var(--space-2) var(--space-8);
+  --button-radius: var(--radius);
+  --button-font-size: var(--font-size-sm);
+
+  --input-bg: var(--color-bg);
+  --input-fg: var(--color-text);
+  --input-border: var(--color-border);
+  --input-focus: var(--color-focus);
+  --input-padding: var(--space-6) var(--space-8);
+  --input-radius: var(--radius);
+
+  --panel-bg: var(--color-bg-raised);
+  --panel-border: var(--color-border);
+  --panel-padding: var(--space-12) var(--space-14);
+  --panel-radius: var(--radius-md);
+
+  --figure-border: var(--color-border);
+  --figure-padding: var(--space-8) var(--space-10);
+  --figure-label-size: var(--font-size-xs);
+  --figure-value-size: var(--font-size-figure);
+
+  --table-row-border: var(--color-bg-overlay);
+  --table-head-fg: var(--color-text-muted);
+  --table-cell-padding: var(--space-4) var(--space-8);
+
+  --badge-padding: var(--space-2) var(--space-6);
+  --badge-radius: var(--radius-sm);
+  --badge-font-size: var(--font-size-xs);
+
+  --toast-bg: var(--color-bg-raised);
+  --toast-accent: var(--color-info);
+  --toast-padding: var(--space-8) var(--space-12);
+
+  --focus-ring: 1px solid var(--color-focus);
+}
+
+/* === LEGACY ALIASES ===
+ * insight-dashboard shipped these short names before the token file existed. Kept so nothing
+ * breaks; new code uses the --color-* names. Remove once no stylesheet references them. */
+:root {
+  --bg: var(--color-bg);
+  --border: var(--color-border);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --up: var(--color-up);
+  --down: var(--color-down);
+}

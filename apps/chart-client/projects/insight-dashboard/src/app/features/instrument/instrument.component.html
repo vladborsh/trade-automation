@@ -1,29 +1,13 @@
 <section class="instrument">
   <header class="controls">
-    <div class="picker">
-      <label for="symbol-input">{{ t('instrument.symbol') }}</label>
-      <input
-        id="symbol-input"
-        type="text"
-        [value]="typed()"
-        (input)="typed.set($any($event.target).value)"
-        (keyup.enter)="select(typed())"
-        placeholder="{{ symbol() }}"
-        list="top-symbols"
-        autocomplete="off"
-      />
-      <datalist id="top-symbols">
-        @for (s of universe(); track s.id) {
-          <option [value]="s.id">{{ s.volumeRank }} · {{ s.base }}</option>
-        }
-      </datalist>
-      <div class="chips">
-        @for (s of universe(); track s.id) {
-          <button type="button" class="chip" [class.active]="s.id === symbol()" (click)="select(s.id)">{{ s.id }}</button>
-        }
-      </div>
-    </div>
-
+    <app-symbol-picker
+      [symbol]="symbol()"
+      [universe]="universe()"
+      [summary]="summary()"
+      [summaryFailed]="summaryFailed()"
+      (selected)="select($event)"
+      (opened)="loadFigures()"
+    />
     <div class="switches">
       <div class="group" role="group" [attr.aria-label]="t('instrument.range')">
         @for (p of presets; track p.key) {
@@ -35,10 +19,8 @@
           <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ tf }}</button>
         }
       </div>
-      <button type="button" class="market" (click)="toggleMarket()">{{ market() }}</button>
     </div>
   </header>
-
   @if (coarsenedTo(); as tf) {
     <p class="note">{{ t('instrument.coarsened', { tf }) }}</p>
   }
@@ -51,22 +33,21 @@
   @if (loading()) {
     <p class="note">{{ t('state.loading') }}</p>
   }
-
-  @if (panes(); as data) {
-    <app-instrument-chart [data]="data" [liquidationTotal24h]="liqTotal24h()" />
-
-    <!-- IB-039 §12.5: the same card as the landing page, narrow variant, this coin's row out of
-         IB-038's overview. Absent rather than empty when the coin is outside the top 20. -->
-    @if (liqCoin(); as coin) {
-      <app-liquidations-now
-        class="liq-summary"
-        [windows]="coin.windows"
-        [venues]="liqVenues()"
-        [narrow]="true"
-        titleKey="instrument.liq.summaryTitle"
-      />
-    }
-
+  <div class="body">
+    <div class="chart-column">
+      @if (panes(); as data) {
+        <app-instrument-chart [data]="data" [symbol]="symbol()" />
+      }
+    </div>
+    <app-instrument-context
+      class="context"
+      [symbol]="symbol()"
+      [now]="now()"
+      [liqCoin]="liqCoin()"
+      [liqVenues]="liqVenues()"
+    />
+  </div>
+  @if (panes()) {
     <h2 class="table-title">{{ t('instrument.topTitle') }}</h2>
     <table class="top">
       <thead>

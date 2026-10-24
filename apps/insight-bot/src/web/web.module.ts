@@ -1,6 +1,7 @@
 import { Module, type DynamicModule, Logger } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AppConfigModule } from '../config/config.module';
+import { AppConfigService } from '../config/config.service';
 import { DbModule } from '../db/db.module';
 import { OpsModule } from '../ops/ops.module';
 import { WebAuthController } from './auth/web-auth.controller';
@@ -12,6 +13,7 @@ import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
+import { UniverseSummaryService } from './market/universe-summary.service';
 import { UniverseController } from './universe.controller';
 
 /**
@@ -51,6 +53,12 @@ export class WebModule {
       providers: [
         WebAuthService,
         LiquidationsOverviewService,
+        {
+          provide: UniverseSummaryService,
+          inject: [AppConfigService],
+          useFactory: (config: AppConfigService) =>
+            new UniverseSummaryService({ futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL') }),
+        },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
       exports: [WebAuthService],

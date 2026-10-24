@@ -21,4 +21,10 @@ export interface PaneData {
   liquidationEvents: readonly WebLiquidationEvent[];
   /** The venues those events actually came from — the label is built from this, not a filter. */
   liquidationVenues: readonly string[];
+  /**
+   * 2026-10-24 — the spot market's candles for the same window, drawn as a line on the price pane.
+   * `null` with `spotState` saying why: the symbol has no Binance spot market, or the read failed.
+   */
+  spotCandles: WebCandlesResponse | null;
+  spotState: 'shown' | 'none' | 'failed';
 }

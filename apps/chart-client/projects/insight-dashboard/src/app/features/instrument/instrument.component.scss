@@ -1,76 +1,72 @@
-/* The dark-terminal palette (AGENTS.md): #0d1117 background, #30363d borders, #c9d1d9 text,
-   #8b949e muted, #26a69a / #ef5350 up/down. Reused, never approximated. */
+/* The dark-terminal palette, through the shared tokens (architecture/design-system.md). */
 .instrument {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  color: #c9d1d9;
-  background: #0d1117;
-  /*
-   * IB-BUG-009: the user asked that on a narrow screen the ROW scrolls sideways and the page
-   * does not. Shutting horizontal overflow off here is what guarantees that — the only element
-   * that may ever show a horizontal scrollbar is `.panel-row`. Vertical scrolling is left alone
-   * so the «50 крупнейших ликвидаций» table below the row is still reachable.
-   */
-  overflow-x: hidden;
+  gap: var(--space-8);
+  color: var(--color-text);
+  background: var(--color-bg);
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-start;
+  gap: var(--space-12);
+  align-items: center;
   justify-content: space-between;
 }
 
-.picker {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  label {
-    color: #8b949e;
-    font-size: 12px;
-  }
-
-  input {
-    min-width: 180px;
-    padding: 4px 6px;
-    color: #c9d1d9;
-    background: #0d1117;
-    border: 1px solid #30363d;
-  }
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  /* twenty symbols is a lot of chrome; cap the strip and let it scroll rather than pushing the
-     chart below the fold on a 1280px screen */
-  max-height: 56px;
-  overflow-y: auto;
-}
-
-.chip,
-.group button,
-.market {
-  padding: 3px 8px;
-  color: #c9d1d9;
+.group button {
+  padding: 3px var(--space-8);
+  color: var(--color-text-muted);
   background: transparent;
-  border: 1px solid #30363d;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
   cursor: pointer;
-  font-size: 12px;
+  font: inherit;
+  font-size: var(--font-size-sm);
 
   &.active {
-    border-color: #26a69a;
-    color: #26a69a;
+    border-color: var(--color-focus);
+    color: var(--color-focus);
+    background: var(--color-bg-overlay);
   }
 
   &:hover {
-    border-color: #8b949e;
+    border-color: var(--color-border-strong);
+    color: var(--color-text);
   }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+/*
+ * 2026-10-24 (§13): the chart in the middle, the context column beside it. The pair fills the
+ * viewport under the header, so the chart is the screen; the liquidations table below scrolls.
+ * On a narrow screen the column wraps under the chart instead of squeezing it.
+ */
+.body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  min-height: calc(100dvh - 160px);
+}
+
+.chart-column {
+  display: flex;
+  flex-direction: column;
+  flex: 999 1 560px;
+  min-width: 0;
+  min-height: 560px;
+}
+
+.context {
+  flex: 1 1 300px;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  align-self: flex-start;
 }
 
 .switches {

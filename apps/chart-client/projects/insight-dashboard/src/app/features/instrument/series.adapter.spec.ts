@@ -1,5 +1,5 @@
 import {
-  toCandleData, toCvdSegments, toFundingSteps, toLiquidationHistogram, toLongShortLine,
+  toCandleData, toCloseLine, toCvdSegments, toFundingSteps, toLiquidationHistogram, toLongShortLine,
   toOpenInterestPoints, toPredictedFunding, toTakerDelta, toVolumeData,
 } from './series.adapter';
 
@@ -109,19 +109,26 @@ describe('toTakerDelta', () => {
 describe('toFundingSteps', () => {
   it('holds each rate until the next settlement — a step, not a drift', () => {
     const out = toFundingSteps([{ time: 100, rate: 0.0001 }, { time: 200, rate: -0.0002 }]);
-    expect(out).toEqual([
-      { time: 100, value: 0.0001 },
-      { time: 199, value: 0.0001 },
-      { time: 200, value: -0.0002 },
-    ]);
+    expect(out.map((p) => p.time)).toEqual([100, 199, 200]);
+    expect(out[0].value).toBeCloseTo(0.01, 12);
+    expect(out[1].value).toBeCloseTo(0.01, 12);
+    expect(out[2].value).toBeCloseTo(-0.02, 12);
   });
 
   it('a single settlement is one point, with nothing invented after it', () => {
-    expect(toFundingSteps([{ time: 100, rate: 0.0001 }])).toEqual([{ time: 100, value: 0.0001 }]);
+    const out = toFundingSteps([{ time: 100, rate: 0.0001 }]);
+    expect(out).toHaveLength(1);
+    expect(out[0].value).toBeCloseTo(0.01, 12);
   });
 
   it('keeps a negative rate — the sign is the signal', () => {
-    expect(toFundingSteps([{ time: 1, rate: -0.00075 }])[0].value).toBe(-0.00075);
+    expect(toFundingSteps([{ time: 1, rate: -0.00075 }])[0].value).toBeCloseTo(-0.075, 12);
+  });
+
+  it('draws the venue FRACTION as a percentage, because the pane is labelled %', () => {
+    // 0.0001 per interval is 0.01 %; drawing 0.0001 under a % label understates it 100-fold
+    expect(toFundingSteps([{ time: 1, rate: 0.0001 }])[0].value).not.toBeCloseTo(0.0001, 6);
+    expect(toFundingSteps([{ time: 1, rate: 0.0001 }])[0].value).toBeCloseTo(0.01, 12);
   });
 });
 
@@ -153,7 +160,10 @@ describe('the simple mappings', () => {
   });
 
   it('predicted funding is a plain line', () => {
-    expect(toPredictedFunding({ predicted: [{ time: 1, rate: 0.0001 }] })).toEqual([{ time: 1, value: 0.0001 }]);
+    const out = toPredictedFunding({ predicted: [{ time: 1, rate: 0.0001 }] });
+    expect(out).toHaveLength(1);
+    expect(out[0].time).toBe(1);
+    expect(out[0].value).toBeCloseTo(0.01, 12); // percent, like the settled steps
   });
 
   it('empty in, empty out, for every mapping', () => {
@@ -162,5 +172,18 @@ describe('the simple mappings', () => {
     expect(toOpenInterestPoints([], 'i', '1h')).toEqual([]);
     expect(toFundingSteps([])).toEqual([]);
     expect(toLiquidationHistogram([], { long: 'a', short: 'b' })).toEqual({ longs: [], shorts: [] });
+  });
+});
+
+describe('toCloseLine (the spot line over the futures candles)', () => {
+  it('takes the CLOSE of each candle, not the open or a midpoint', () => {
+    const out = toCloseLine([{ ...candle(100), open: 1, high: 50, low: 0.5, close: 42 }]);
+    expect(out).toEqual([{ time: 100, value: 42 }]);
+  });
+
+  it('sorts and de-duplicates like every other series, last value winning', () => {
+    const out = toCloseLine([candle(300), { ...candle(100), close: 7 }, { ...candle(100), close: 8 }, candle(200)]);
+    expect(out.map((p) => p.time)).toEqual([100, 200, 300]);
+    expect(out[0].value).toBe(8);
   });
 });

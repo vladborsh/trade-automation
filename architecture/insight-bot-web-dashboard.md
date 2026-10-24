@@ -342,3 +342,70 @@ summary with the ratio and the honesty line (same component as the landing
 card, narrow variant). Endpoint: `GET /api/web/series/liquidations/events?symbol&from&to&min_usd`
 (≤ 2,000 events per call, else 400 `RANGE_TOO_WIDE`, the bucketing is
 client-side at the chart's tf).
+
+## 13. Instrument page redesign (user, 2026-10-24)
+
+The user chose this layout from two mockups ("variant A"). It reverses IB-BUG-009's one row
+of independent charts, on the user's own decision: **price is the centre of the screen**, and the
+indicators sit **under** it on **one shared time axis**.
+
+- **One chart, five panes**: price | open interest | delta/CVD | funding | long/short. Each pane
+  keeps its own autoscaled price scale (the reason IB-BUG-009 split them: OI at 10^9 can no longer
+  flatten candles at 10^4, because no two panes share a scale). The time axis is shared, so a
+  crosshair moment is the same moment in every pane.
+- **Every pane is resizable by height**, by dragging the separator, and the heights are
+  **remembered in the browser** (`localStorage` key `insight.instrument.paneHeights.v1`). A
+  blocked or corrupt storage falls back to the defaults; "Reset pane heights" restores them.
+- **Spot is a line on the futures price pane**, not a separate chart and not a toggle. The old
+  perp/spot switch only swapped the candles and left every other pane on perp data, so it showed
+  nothing a reader could compare. The gap between the candles and the spot line is the premium.
+  A symbol with no Binance spot market simply has no line, and the legend says so.
+- **The symbol list is a dropdown**, not a sidebar. It shows per coin: 24 h price change,
+  predicted funding and open-interest change over 24 h, from the new endpoint below.
+- **A context column** beside the chart: the current values (OI, funding, CVD, long/short), the
+  1 h / 4 h / 24 h liquidation summary (§12.5, same component), the largest liquidations in the
+  window, and two market cards (fear and greed, BTC share).
+
+### 13.1 `GET /api/web/universe/summary?n=20`
+
+Answers `WebUniverseSummaryResponse` (`libs/contracts/src/insight/universe.ts`). The coins and
+their order come from the same top list as `/universe/top`; every figure is read **live from
+Binance USD-M**, nothing is stored. That is the on-demand direction of `tasks/wind-down.jsonl`
+(WD-008, WD-009), built ahead of the shared venue layer; when WD-008 lands its `TtlCache` and
+`VenuesModule`, `web/market/universe-summary.service.ts` should move onto them.
+
+| Venue call | Documented weight | Calls per refresh |
+|---|---|---|
+| `GET /fapi/v1/ticker/24hr` (all symbols) | 40 | 1 |
+| `GET /fapi/v1/premiumIndex` (all symbols) | 10 | 1 |
+| `GET /futures/data/openInterestHist?period=1h&limit=25` | 1, no weight header | 20 |
+
+Cached 60 s server-side with one shared in-flight read, so the venue sees at most one refresh a
+minute however many tabs are open: about 50 `fapi` weight a minute (about 2 % of 2,400) plus 20
+calls against the separate `/futures/data` limit. Above 1,800 used weight the endpoint refuses
+with 503 `VENUE_UNAVAILABLE` instead of adding load. One coin whose OI call fails shows a dash
+in its row; a failure of either all-symbol call fails the request. The three response shapes are
+pinned by fixtures captured 2026-10-24 (`apps/insight-bot/test/fixtures/binance/`).
+
+### 13.2 Removed pages
+
+**Coverage (`/coverage`), removed from the dashboard 2026-10-24.** It was an operator page about
+the completeness of the *stored* tape, which the wind-down retires. The page is gone; **its server
+endpoint still exists** until WD-009 deletes it. What that endpoint offers, so the capability is not
+forgotten with the page:
+
+- **`GET /api/web/coverage?days=N`** (behind the session guard), contract `WebCoverageResponse` in
+  `libs/contracts/src/insight/coverage.ts`, controller `apps/insight-bot/src/web/coverage.controller.ts`.
+- **Per symbol × series** (`rows`): first and last stored row (ms UTC, null when empty) and the
+  months missing between them. This was IB-012's coverage report, read live.
+- **Collector uptime** (`collectors`, IB-BUG-010): per stream, hours covered vs hours elapsed in the
+  window, first and last liveness, and the outage count. It exists because "no liquidation this
+  hour" and "nobody was listening" look identical in the data; any rate must divide by covered
+  hours.
+- **Unmapped liquidations** (`unmapped`, IB-BUG-010): stored liquidation rows whose venue symbol
+  matches no known spelling, which is how a venue renaming a contract shows up.
+- **Feature-frame coverage** (`frames`, IB-015): per timeframe, frames expected vs written,
+  incomplete, explained-only and unhealed past the heal window.
+
+All four measure the accumulating tape. Under the on-demand architecture none has a subject. If
+an accumulating store ever comes back, this is the list to rebuild from.

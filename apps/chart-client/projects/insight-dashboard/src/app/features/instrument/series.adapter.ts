@@ -46,6 +46,17 @@ export function toCandleData(candles: readonly WebCandle[]): CandleDatum[] {
   return ascending(candles.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
 }
 
+/**
+ * The spot market's closes, drawn as one line over the futures candles (user, 2026-10-24).
+ *
+ * Closes rather than candles: two sets of candles on one pane are unreadable, while a line shows
+ * the premium as the gap between it and the candle bodies. Same sort and de-duplication as every
+ * other series, because the chart throws on an out-of-order time.
+ */
+export function toCloseLine(candles: readonly WebCandle[]): LineDatum[] {
+  return ascending(candles.map((c) => ({ time: c.time, value: c.close })));
+}
+
 export function toVolumeData(candles: readonly WebCandle[]): LineDatum[] {
   return ascending(candles.map((c) => ({ time: c.time, value: c.volume })));
 }
@@ -118,12 +129,19 @@ export function toTakerDelta(candles: readonly WebCandle[]): LineDatum[] {
 }
 
 /**
+ * Funding rates arrive as a FRACTION per interval (Binance's `0.0001`); the pane's unit is `%`,
+ * so they are drawn ×100 (`0.01`). Until 2026-10-24 the raw fraction was drawn under a `%`
+ * label, which read a hundred times smaller than the rate really was.
+ */
+export const fundingPercent = (rate: number): number => rate * 100;
+
+/**
  * Settled funding as a **step**: it holds until the next settlement, so each point is repeated
  * at the instant before the next one. Drawing it as a line between settlements would imply the
  * rate drifted continuously, which is not what a settlement is.
  */
 export function toFundingSteps(points: readonly { time: number; rate: number }[]): LineDatum[] {
-  const sorted = ascending(points.map((p) => ({ time: p.time, value: p.rate })));
+  const sorted = ascending(points.map((p) => ({ time: p.time, value: fundingPercent(p.rate) })));
   const out: LineDatum[] = [];
   for (let i = 0; i < sorted.length; i++) {
     out.push(sorted[i]);
@@ -134,7 +152,7 @@ export function toFundingSteps(points: readonly { time: number; rate: number }[]
 }
 
 export function toPredictedFunding(response: Pick<WebFundingResponse, 'predicted'>): LineDatum[] {
-  return ascending(response.predicted.map((p) => ({ time: p.time, value: p.rate })));
+  return ascending(response.predicted.map((p) => ({ time: p.time, value: fundingPercent(p.rate) })));
 }
 
 export function toLongShortLine(response: Pick<WebLongShortResponse, 'points'>): LineDatum[] {

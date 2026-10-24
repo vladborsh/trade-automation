@@ -1,11 +1,13 @@
+@import './design-tokens.css';
+
 html,
 body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #0d1117;
-  color: #c9d1d9;
-  font-family: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Courier New', monospace;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
 }
 
 * {
@@ -20,7 +22,7 @@ body {
 .fluid-page {
   display: block;
   width: 100%;
-  padding: 20px clamp(16px, 3vw, 40px) 32px;
+  padding: var(--space-20) var(--page-gutter) var(--space-32);
 }
 
 /*

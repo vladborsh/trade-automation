@@ -38,19 +38,21 @@ describe('landing', () => {
     expect(paths).toContain('market');
     expect(paths).toContain('instrument/:symbol');
     expect(paths).toContain('health');
-    expect(paths).toContain('coverage');
+    // Coverage was removed 2026-10-24 (an operator page about the stored tape; see
+    // architecture/insight-bot-web-dashboard.md, "Removed pages").
+    expect(paths).not.toContain('coverage');
     expect(paths).toContain('login');
   });
 
   it('orders the table the way the nav reads: market, instrument, then the operator pages', () => {
     const order = routes.map((r) => r.path).filter((p) => p && !['', '**', 'login'].includes(p));
-    expect(order).toEqual(['health', 'coverage', 'instrument/:symbol', 'market']);
+    expect(order).toEqual(['health', 'instrument/:symbol', 'market']);
   });
 });
 
 describe('the nav labels', () => {
   it('are prose in both languages, not identifiers', () => {
-    for (const key of ['nav.market', 'nav.instrument', 'nav.health', 'nav.coverage'] as const) {
+    for (const key of ['nav.market', 'nav.instrument', 'nav.health'] as const) {
       expect(ru[key]).toBeTruthy();
       expect(en[key]).toBeTruthy();
       expect(ru[key]).not.toBe(en[key]); // a label identical in both is usually untranslated

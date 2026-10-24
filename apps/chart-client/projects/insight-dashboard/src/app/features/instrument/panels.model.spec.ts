@@ -1,8 +1,8 @@
 import { ru } from '../../i18n/ru';
 import { en } from '../../i18n/en';
 import {
-  PANELS, PANEL_PRICE_SCALE, PANEL_SCALE_MARGINS, PANEL_TIME_SCALE, panelHeading, quoteCurrency,
-  windowBounds, type PanelDef,
+  PANELS, PANEL_PRICE_SCALE, PANEL_SCALE_MARGINS, PANEL_TIME_SCALE, baseAsset, paneIndexOf, panelHeading,
+  quoteCurrency, windowBounds, type PanelDef,
 } from './panels.model';
 import type { PaneData } from './pane-data';
 import { LIQUIDATION_COLORS } from './liquidation-scope';
@@ -52,7 +52,21 @@ describe('the six panels (IB-BUG-009)', () => {
 
   it('reads "Цена · USDT" — a title and a unit, not prose', () => {
     expect(panelHeading(t, PANELS[0], 'BTCUSDT')).toBe('Цена · USDT');
-    expect(panelHeading(t, PANELS[1])).toBe('Открытый интерес · контракты');
+    // USD: the renderer plots the notional, so "contracts" was the wrong unit (fixed 2026-10-24)
+    expect(panelHeading(t, PANELS[1])).toBe('Открытый интерес · USD');
+  });
+
+  it('labels CVD in the BASE asset, because it sums taker BASE volume', () => {
+    // It read "USD" until 2026-10-24, which overstated a BTC figure by the price of BTC.
+    const delta = PANELS.find((p) => p.key === 'delta')!;
+    expect(panelHeading(t, delta, 'BTCUSDT')).toBe(`${ru['instrument.panel.delta']} · BTC`);
+    expect(panelHeading(t, delta, 'ETHUSDC')).toBe(`${ru['instrument.panel.delta']} · ETH`);
+    expect(panelHeading(t, delta, '')).toBe(ru['instrument.panel.delta']);
+    expect(baseAsset('WEIRD')).toBe('WEIRD'); // an unknown quote shows itself, not a guess
+  });
+
+  it('draws each panel in its own pane, top to bottom in list order', () => {
+    expect(PANELS.map((p) => paneIndexOf(p.key))).toEqual([0, 1, 2, 3, 4]);
   });
 
   it('no longer carries a liquidations panel', () => {
@@ -136,6 +150,8 @@ describe('windowBounds (IB-BUG-009)', () => {
     liquidations: { bars: [{ time: 2500, long: 0, short: 0, events: 0 }] } as never,
     liquidationEvents: [],
     liquidationVenues: [],
+    spotCandles: null,
+    spotState: 'none',
     ...over,
   });
 

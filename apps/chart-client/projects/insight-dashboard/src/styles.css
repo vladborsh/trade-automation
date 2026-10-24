@@ -1,19 +1,13 @@
 /* Dashboard globals only — everything else is per-component and scoped (AGENTS.md).
-   Palette is the backtest SPA's dark terminal, reused rather than re-invented. */
-:root {
-  --bg: #0d1117;
-  --border: #30363d;
-  --text: #c9d1d9;
-  --muted: #8b949e;
-  --up: #26a69a;
-  --down: #ef5350;
-}
+   Palette and the --bg/--border/--text/--muted/--up/--down aliases come from the shared token
+   file (architecture/design-system.md); nothing is defined here twice. */
+@import '../../../src/design-tokens.css';
 
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
 }

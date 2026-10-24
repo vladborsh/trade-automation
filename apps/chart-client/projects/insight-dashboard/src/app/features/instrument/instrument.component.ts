@@ -1,26 +1,27 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import type {
   WebCandlesResponse, WebFundingResponse, WebLiquidationEventsResponse, WebLiquidationCoin,
   WebLiquidationsOverviewResponse, WebLiquidationsResponse, WebLongShortResponse,
-  WebTimeframe, WebTopLiquidation, WebUniverseSymbol,
+  WebTimeframe, WebTopLiquidation, WebUniverseSummaryRow, WebUniverseSymbol,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
-import { formatUsd } from '../liquidations/liquidations.format';
-import { LiquidationsNowComponent } from '../liquidations/liquidations-now.component';
 import { InstrumentChartComponent, type PaneData } from './instrument-chart.component';
+import { InstrumentContextComponent } from './instrument-context.component';
+import { nowTiles } from './instrument-now';
+import { SymbolPickerComponent } from './symbol-picker.component';
 import {
   allowedTimeframes, bucketFor, effectiveTimeframe, findPreset, isRefused, RANGE_PRESETS,
   rangeOf, type RangePreset,
 } from './time-range';
 
 /**
- * architecture/insight-bot-web-dashboard.md §2 — one time-aligned screen for a symbol: price,
- * open interest, liquidations, taker delta and CVD, funding, long/short, and the 50 largest
- * liquidations in the window.
+ * architecture/insight-bot-web-dashboard.md §2 and §13 — one time-aligned screen for a symbol:
+ * price with the spot line and liquidation bubbles, open interest, taker delta and CVD, funding,
+ * long/short; beside it the coin's current figures and the market context; below it the 50
+ * largest liquidations in the window.
  *
  * The class is wiring only; every mapping lives in `series.adapter.ts` and every range rule in
  * `time-range.ts`, each with its own spec (AGENTS.md). The charts are a child component so this
@@ -29,7 +30,7 @@ import {
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, InstrumentChartComponent, LiquidationsNowComponent],
+  imports: [DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, SymbolPickerComponent],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,8 +46,9 @@ export class InstrumentComponent {
   readonly universe = signal<WebUniverseSymbol[]>([]);
   readonly preset = signal<RangePreset>(findPreset('1d') as RangePreset);
   readonly timeframe = signal<WebTimeframe>('1m');
-  readonly market = signal<'perp' | 'spot'>('perp');
-  readonly typed = signal('');
+  /** The dropdown's live figures (`/universe/summary`); null until the first answer. */
+  readonly summary = signal<WebUniverseSummaryRow[] | null>(null);
+  readonly summaryFailed = signal(false);
 
   readonly panes = signal<PaneData | null>(null);
   readonly top = signal<WebTopLiquidation[]>([]);
@@ -60,18 +62,6 @@ export class InstrumentComponent {
    */
   readonly liqCoin = signal<WebLiquidationCoin | null>(null);
   readonly liqVenues = signal<WebLiquidationsOverviewResponse['venues']>({ present: [], missing: [] });
-  /**
-   * The 24 h total, for the scope line that sits ABOVE the fold.
-   *
-   * The summary card is below it — the Tech Lead ruled on 2026-10-12 that the row keeps its full
-   * height rather than shrinking to rescue the card — so the visible line carries the number and
-   * says where the detail is. Same figure as the card's 24 h window, formatted the same way, so
-   * the two cannot disagree.
-   */
-  readonly liqTotal24h = computed(() => {
-    const window = this.liqCoin()?.windows.find((w) => w.window === '24h');
-    return window ? formatUsd(window.total.usd) : null;
-  });
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   /** Set when the page asked for a coarser frame than the one chosen, so it can say so. */
@@ -79,6 +69,10 @@ export class InstrumentComponent {
 
   readonly presets = RANGE_PRESETS;
   readonly timeframes = computed(() => allowedTimeframes(this.preset()));
+  /** The context column's tiles: the window's latest points plus the live summary's row. */
+  readonly now = computed(() =>
+    nowTiles(this.panes(), this.summary()?.find((r) => r.id === this.symbol()) ?? null, this.symbol()));
+
   readonly downsampled = computed(() => {
     const panes = this.panes();
     return panes !== null && (panes.candles.downsampled || panes.liquidations.downsampled);
@@ -88,7 +82,21 @@ export class InstrumentComponent {
     const fromRoute = this.route.snapshot.paramMap.get('symbol');
     if (fromRoute) this.symbol.set(fromRoute.toUpperCase());
     void this.loadUniverse();
+    void this.loadFigures();
     void this.load();
+  }
+
+  /**
+   * The dropdown's figures. Called on arrival and every time the dropdown opens; the server caches
+   * them for a minute, so opening it repeatedly costs the venue nothing extra.
+   */
+  async loadFigures(): Promise<void> {
+    try {
+      this.summary.set((await this.api.universeSummary(20)).rows);
+      this.summaryFailed.set(false);
+    } catch {
+      this.summaryFailed.set(true); // the list still works from /universe/top; only the figures go
+    }
   }
 
   async loadUniverse(): Promise<void> {
@@ -118,11 +126,6 @@ export class InstrumentComponent {
     void this.load();
   }
 
-  toggleMarket(): void {
-    this.market.set(this.market() === 'perp' ? 'spot' : 'perp');
-    void this.load();
-  }
-
   async load(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
@@ -137,8 +140,9 @@ export class InstrumentComponent {
     const bucket = bucketFor(preset);
 
     try {
-      const [candles, oi, funding, ls, liquidations, top, events] = await Promise.all([
-        this.api.candles(symbol, fromMs, toMs, tf, this.market()),
+      const [candles, spot, oi, funding, ls, liquidations, top, events] = await Promise.all([
+        this.api.candles(symbol, fromMs, toMs, tf, 'perp'),
+        this.spot(symbol, fromMs, toMs, tf),
         this.api.openInterest(symbol, fromMs, toMs),
         this.api.funding(symbol, fromMs, toMs),
         this.api.longShort(symbol, fromMs, toMs, 'global_account'),
@@ -146,7 +150,7 @@ export class InstrumentComponent {
         this.api.topLiquidations(symbol, fromMs, toMs, 50),
         this.liquidationEvents(symbol, fromMs, toMs),
       ]);
-      this.panes.set(this.toPanes(candles, oi, funding, ls, liquidations, events, tf, bucket));
+      this.panes.set(this.toPanes(candles, spot, oi, funding, ls, liquidations, events, tf, bucket));
       this.top.set(top.rows);
       void this.loadSummary(symbol);
     } catch (error) {
@@ -173,6 +177,22 @@ export class InstrumentComponent {
     }
   }
 
+  /**
+   * The spot candles for the line on the price pane, degrading rather than failing the page.
+   * `none` when the top list says the coin has no Binance spot market, or the read came back
+   * empty; `failed` when it errored. The legend says which, because they mean different things.
+   */
+  private async spot(symbol: string, fromMs: number, toMs: number, tf: WebTimeframe): Promise<{ candles: WebCandlesResponse | null; state: PaneData['spotState'] }> {
+    const known = this.universe().find((s) => s.id === symbol);
+    if (known && !known.venues.binanceSpot) return { candles: null, state: 'none' };
+    try {
+      const candles = await this.api.candles(symbol, fromMs, toMs, tf, 'spot');
+      return candles.candles.length > 0 ? { candles, state: 'shown' } : { candles: null, state: 'none' };
+    } catch {
+      return { candles: null, state: 'failed' };
+    }
+  }
+
   /** IB-038's overview, narrowed to this coin. Failure leaves the summary off, not the page. */
   private async loadSummary(symbol: string): Promise<void> {
     try {
@@ -186,6 +206,7 @@ export class InstrumentComponent {
 
   private toPanes(
     candles: WebCandlesResponse,
+    spot: { candles: WebCandlesResponse | null; state: PaneData['spotState'] },
     oi: { points: Array<{ time: number; value: number; notional: number | null }> },
     funding: WebFundingResponse,
     ls: WebLongShortResponse,
@@ -205,6 +226,8 @@ export class InstrumentComponent {
       liquidations,
       liquidationEvents: events.events,
       liquidationVenues: events.venuesPresent,
+      spotCandles: spot.candles,
+      spotState: spot.state,
     };
   }
 }

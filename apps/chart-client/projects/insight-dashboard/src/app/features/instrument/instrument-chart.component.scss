@@ -1,25 +1,98 @@
-/* The dark-terminal palette (AGENTS.md), not a near-duplicate of it. */
-
 /*
- * The row. `overflow-x: auto` here is what the user asked for in so many words: on a narrow
- * screen THE ROW scrolls sideways and the page does not. The page's own horizontal overflow is
- * shut off in instrument.component.scss, so the scrollbar can only ever appear on this element.
+ * The chart fills whatever height the page gives it. `:host` must be a flex item with
+ * `min-height: 0`: an inline host collapses the chart to a sliver while every unit test passes
+ * (IB-BUG-009's first acceptance run).
  */
-.panel-row {
+:host {
   display: flex;
-  flex-direction: row;
-  gap: 4px;
-  /* Tall enough to read six narrow charts, and tied to the viewport so the row — not the page —
-     is what fills the screen. The header and the note above it are the rest of the 100dvh. */
-  height: calc(100dvh - 190px);
-  min-height: 420px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
 }
 
-.pane-note {
-  margin: 0;
-  padding: 2px 4px;
-  color: #8b949e;
-  font-size: 12px;
+.chart {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 420px;
+}
+
+.chart-host {
+  position: absolute;
+  inset: 0;
+}
+
+.pane-legend {
+  position: absolute;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  margin-top: 4px;
+  padding: 1px 4px;
+  max-width: calc(100% - 96px);
+  border-radius: 3px;
+  background: rgba(13, 17, 23, 0.72);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  pointer-events: none;
+}
+
+.pane-title {
+  color: var(--color-text);
+}
+
+.entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+
+  &.line {
+    width: 12px;
+    height: 2px;
+    border-radius: 0;
+  }
+}
+
+.chart-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 4px 4px 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+
+  p {
+    margin: 0;
+  }
+}
+
+.reset {
+  margin-left: auto;
+  padding: var(--button-padding);
+  border: 1px solid var(--button-border);
+  border-radius: var(--button-radius);
+  background: var(--button-bg);
+  color: var(--button-fg);
+  font: inherit;
+  font-size: var(--button-font-size);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--button-fg-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
 }

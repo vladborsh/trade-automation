@@ -28,10 +28,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/health/health.component').then((m) => m.HealthComponent),
   },
   {
-    path: 'coverage',
-    loadComponent: () => import('./features/coverage/coverage.component').then((m) => m.CoverageComponent),
-  },
-  {
     path: 'instrument/:symbol',
     loadComponent: () => import('./features/instrument/instrument.component').then((m) => m.InstrumentComponent),
   },

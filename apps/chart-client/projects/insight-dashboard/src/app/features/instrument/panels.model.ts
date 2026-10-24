@@ -36,6 +36,13 @@ export interface PanelDef {
    */
   unitKey: StringKey | null;
   /**
+   * Where a data-derived unit comes from when `unitKey` is null: the symbol's quote currency
+   * (price, the default) or its BASE asset. CVD is a sum of taker-buy minus taker-sell **base**
+   * volume (`WebCandle.takerBuyVolume` is base units), so its unit is BTC for BTCUSDT. It was
+   * labelled USD until 2026-10-24, which overstated it by the price.
+   */
+  unitFrom?: 'quote' | 'base';
+  /**
    * Two-series panels get a legend; one-series panels do not, because a legend of one entry is
    * noise next to a title that already says what the series is.
    */
@@ -72,13 +79,16 @@ export const PANELS: readonly PanelDef[] = [
   {
     key: 'openInterest',
     titleKey: 'instrument.panel.openInterest',
-    unitKey: 'instrument.unit.contracts',
+    // USD, not contracts: `MetricSeriesRenderer` plots the point's NOTIONAL (`toMetricLineData`).
+    // It was labelled "contracts" until 2026-10-24 while the axis read 7.6B, which is dollars.
+    unitKey: 'instrument.unit.usd',
     legend: [],
   },
   {
     key: 'delta',
     titleKey: 'instrument.panel.delta',
-    unitKey: 'instrument.unit.usd',
+    unitKey: null,
+    unitFrom: 'base',
     legend: [
       { colour: GREY, labelKey: 'instrument.legend.cvd' },
       { colour: TEXT, labelKey: 'instrument.legend.delta' },
@@ -156,9 +166,20 @@ export function quoteCurrency(symbol: string): string {
   return symbol.toUpperCase();
 }
 
+/**
+ * The base asset of a Binance-style symbol: `BTCUSDT` → `BTC`. Falls back to the whole symbol for
+ * one whose quote it does not recognise, like `quoteCurrency`, so a misread is visible.
+ */
+export function baseAsset(symbol: string): string {
+  const upper = symbol.toUpperCase();
+  const quote = quoteCurrency(upper);
+  return quote !== upper && upper.length > quote.length ? upper.slice(0, upper.length - quote.length) : upper;
+}
+
 /** `Цена · USDT` — a title and its unit, joined once so every panel reads the same. */
 export function panelHeading(t: (key: StringKey) => string, panel: PanelDef, symbol = ''): string {
-  const unit = panel.unitKey === null ? quoteCurrency(symbol) : t(panel.unitKey);
+  const fromSymbol = panel.unitFrom === 'base' ? baseAsset(symbol) : quoteCurrency(symbol);
+  const unit = panel.unitKey === null ? (symbol === '' ? '' : fromSymbol) : t(panel.unitKey);
   return unit.length > 0 ? `${t(panel.titleKey)} · ${unit}` : t(panel.titleKey);
 }
 
@@ -193,4 +214,21 @@ export function windowBounds(data: PaneData): { from: number; to: number } | nul
   // A single-point window has zero width, which lightweight-charts cannot display; widen it by
   // one minute so the point is visible rather than the panel going blank.
   return from === to ? { from: from - 30, to: to + 30 } : { from, to };
+}
+
+/**
+ * 2026-10-24 redesign: ONE chart, the five panels as its panes, top to bottom in `PANELS` order.
+ * The separators are the library's own and draggable; `pane-heights.ts` remembers where they were
+ * left. Each pane still autoscales on its own right price scale (`PANEL_PRICE_SCALE`), so open
+ * interest cannot flatten the candles: no two panes share a scale.
+ */
+export const CHART_PANES_OPTIONS = {
+  enableResize: true,
+  separatorColor: '#30363d',
+  separatorHoverColor: '#58a6ff',
+} as const;
+
+/** The pane a panel is drawn in: its position in `PANELS`. */
+export function paneIndexOf(key: PanelDef['key']): number {
+  return PANELS.findIndex((p) => p.key === key);
 }

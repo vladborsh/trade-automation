@@ -1,0 +1,170 @@
+:host {
+  display: block;
+  position: relative;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-10);
+  min-height: 36px;
+  padding: var(--space-4) var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+
+  /* the caret is drawn here, not typed in the template: a glyph there would be untranslated text */
+  &::after {
+    content: '';
+    align-self: center;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--color-text-muted);
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+.sym {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.price {
+  font-size: var(--font-size-xl);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-sign='1'] {
+  color: var(--color-up);
+}
+
+[data-sign='-1'] {
+  color: var(--color-down);
+}
+
+.panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.search {
+  display: flex;
+  padding: var(--space-8);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: var(--input-padding);
+    border: 1px solid var(--input-border);
+    border-radius: var(--input-radius);
+    background: var(--input-bg);
+    color: var(--input-fg);
+    font: inherit;
+
+    &:focus-visible {
+      outline: 1px solid var(--input-focus);
+    }
+  }
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: 1fr 76px 84px 76px;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.head {
+  padding: var(--space-2) var(--space-12) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+
+  span:not(:first-child) {
+    text-align: right;
+  }
+}
+
+ul {
+  max-height: 360px;
+  margin: 0;
+  padding: 0 0 var(--space-4);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-12) 0 var(--space-10);
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: right;
+  cursor: pointer;
+
+  .id {
+    text-align: left;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-bg-overlay);
+    outline: none;
+  }
+
+  &.active {
+    border-left-color: var(--color-focus);
+    background: var(--color-bg-overlay);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+
+.empty,
+.note {
+  margin: 0;
+  padding: var(--space-6) var(--space-12);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.note {
+  border-top: 1px solid var(--color-bg-overlay);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

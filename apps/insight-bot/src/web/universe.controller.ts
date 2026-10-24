@@ -1,6 +1,7 @@
-import { Controller, Get, HttpException, Inject, Query } from '@nestjs/common';
-import type { WebUniverseTopResponse } from '@trade-automation/contracts';
+import { Controller, Get, HttpException, Inject, Optional, Query } from '@nestjs/common';
+import type { WebUniverseSummaryResponse, WebUniverseTopResponse } from '@trade-automation/contracts';
 import { DB, type Db } from '../db/db.port';
+import { UniverseSummaryService, VenueUnavailableError } from './market/universe-summary.service';
 import * as repo from './series/pg/series.repo';
 
 /**
@@ -10,7 +11,10 @@ import * as repo from './series/pg/series.repo';
  */
 @Controller('api/web/universe')
 export class UniverseController {
-  constructor(@Inject(DB) private readonly db: Db | null) {}
+  constructor(
+    @Inject(DB) private readonly db: Db | null,
+    @Optional() private readonly summaryService?: UniverseSummaryService,
+  ) {}
 
   @Get('top')
   async top(@Query('n') n = '20'): Promise<WebUniverseTopResponse> {
@@ -27,5 +31,25 @@ export class UniverseController {
         },
       })),
     };
+  }
+
+  /**
+   * The symbol dropdown: the same top list, with live price change, predicted funding and
+   * open-interest change per coin (`market/universe-summary.service.ts` has the weight budget).
+   */
+  @Get('summary')
+  async summary(@Query('n') n = '20'): Promise<WebUniverseSummaryResponse> {
+    if (!this.db) throw new HttpException({ code: 'NOT_FOUND', message: 'no database' }, 503);
+    if (!this.summaryService) throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'summary not configured' }, 503);
+    const count = Math.min(Math.max(1, Number(n) || 20), 20); // 20, not 100: each symbol costs a venue call
+    const rows = await repo.topSymbols(this.db, count);
+    try {
+      return await this.summaryService.summary(rows.map((r) => ({ id: r.id, base: r.base, volumeRank: r.volumeRank })));
+    } catch (error) {
+      if (error instanceof VenueUnavailableError) {
+        throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: error.message }, 503);
+      }
+      throw error;
+    }
   }
 }
