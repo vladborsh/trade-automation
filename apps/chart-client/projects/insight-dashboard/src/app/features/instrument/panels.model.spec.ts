@@ -151,6 +151,7 @@ describe('windowBounds (IB-BUG-009)', () => {
     liquidationEvents: [],
     liquidationVenues: [],
     dailyCandles: [],
+    calendarEvents: [],
     ...over,
   });
 

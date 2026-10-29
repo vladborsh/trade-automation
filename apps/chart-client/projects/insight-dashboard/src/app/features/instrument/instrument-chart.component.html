@@ -13,7 +13,8 @@
       }
     </div>
   }
-  @for (handle of handles(); track handle.key) {
+  <app-calendar-tooltip [mark]="hoverMark()" [x]="hover()?.x ?? 0" />
+  @for (handle of edges(); track handle.key) {
     <!-- A pane's lower edge: dragging it resizes that pane alone and moves the ones below. -->
     <div
       class="pane-handle"
@@ -21,7 +22,7 @@
       aria-orientation="horizontal"
       [attr.aria-label]="t('instrument.resizeHandle')"
       [attr.data-pane]="handle.key"
-      [style.top.px]="handle.y"
+      [style.top.px]="handle.bottom"
       (pointerdown)="startDrag($event, handle.key)"
     ></div>
   }

@@ -1,4 +1,4 @@
-import type { WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
+import type { EconomicEvent, WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
 import type { PaneData } from './pane-data';
 
@@ -20,11 +20,12 @@ const LEVELS_LOOKBACK_MS = 14 * 86_400_000;
  * keep the component under the AGENTS.md ceiling.
  *
  * The perp candles failing fails the window; the daily candles behind the previous day/week
- * levels and the liquidation markers degrade to nothing instead, each for its own reason below.
+ * levels, the liquidation markers and the calendar degrade to nothing instead, each for its own
+ * reason below.
  */
 export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Promise<PaneData> {
   const { symbol, fromMs, toMs, timeframe, bucket } = req;
-  const [candles, daily, oi, funding, longShort, liquidations, events] = await Promise.all([
+  const [candles, daily, oi, funding, longShort, liquidations, events, calendar] = await Promise.all([
     api.candles(symbol, fromMs, toMs, timeframe, 'perp'),
     fetchDaily(api, symbol, fromMs - LEVELS_LOOKBACK_MS, toMs),
     api.openInterest(symbol, fromMs, toMs),
@@ -32,6 +33,7 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     api.longShort(symbol, fromMs, toMs, 'global_account'),
     api.liquidations(symbol, fromMs, toMs, bucket),
     fetchLiquidationEvents(api, symbol, fromMs, toMs),
+    fetchCalendar(api, fromMs, toMs),
   ]);
   return {
     instrument: `binance:${symbol}`,
@@ -45,6 +47,7 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     liquidationEvents: events.events,
     liquidationVenues: events.venuesPresent,
     dailyCandles: daily,
+    calendarEvents: calendar,
   };
 }
 
@@ -72,5 +75,18 @@ async function fetchLiquidationEvents(api: InsightApiClient, symbol: string, fro
     return await api.liquidationEvents(symbol, fromMs, toMs);
   } catch {
     return { symbol, minUsd: 0, events: [], venuesPresent: [], undercounted: true };
+  }
+}
+
+/**
+ * IB-060 — the USD events and holidays for the event lines and the holiday bands. A failed read
+ * (the bot's calendar is off, or a window wider than the server's 90 days) costs the marks, not
+ * the chart: they are context, like the levels.
+ */
+async function fetchCalendar(api: InsightApiClient, fromMs: number, toMs: number): Promise<readonly EconomicEvent[]> {
+  try {
+    return (await api.calendarEvents(fromMs, toMs)).events;
+  } catch {
+    return [];
   }
 }

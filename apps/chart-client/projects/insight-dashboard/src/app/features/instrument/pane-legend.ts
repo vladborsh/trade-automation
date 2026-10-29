@@ -1,13 +1,16 @@
 import type { StringKey } from '../../i18n/keys';
 import type { PaneData } from './pane-data';
 import type { PanelDef } from './panels.model';
+import { EVENT_LINE_COLOUR } from './calendar-marks';
 import { LEVEL_COLOURS } from './prior-levels';
 import { SESSIONS, showsSessions } from './trading-sessions';
+import { CLOSED_BAND_SWATCH, showsClosedBands } from './weekend-bands';
 
 /**
  * One pane's legend, drawn over its top-left corner: the panel's own entries, and on the price
  * pane the overlays drawn over it (2026-10-24): the session bands, when the timeframe shows them,
- * and the previous day and week levels.
+ * and the previous day and week levels; and (IB-060) the economic-event lines and the
+ * weekend / US-holiday bands, the latter where the timeframe shows them.
  */
 export interface LegendEntry {
   label: string;
@@ -27,10 +30,15 @@ export function legendEntries(
   const sessions = showsSessions(data.timeframe)
     ? SESSIONS.map((s) => ({ label: t(s.labelKey), colour: s.swatch, line: false }))
     : [];
+  const closed = showsClosedBands(data.timeframe)
+    ? [{ label: t('instrument.legend.usClosed'), colour: CLOSED_BAND_SWATCH, line: false }]
+    : [];
   return [
     ...own,
     ...sessions,
     { label: t('instrument.legend.prevDay'), colour: LEVEL_COLOURS.day, line: true },
     { label: t('instrument.legend.prevWeek'), colour: LEVEL_COLOURS.week, line: true },
+    { label: t('instrument.legend.usdEvents'), colour: EVENT_LINE_COLOUR, line: true },
+    ...closed,
   ];
 }

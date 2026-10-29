@@ -4,7 +4,7 @@ import type {
   WebCandlesResponse, WebDbHealthResponse, WebExchangeRequest, WebMarketCardsResponse,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
-  WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
+  WebCalendarEventsResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -103,6 +103,18 @@ export class InsightApiClient {
     return this.get<WebLiquidationEventsResponse>('/series/liquidations/events', {
       symbol, from: fromMs, to: toMs, min_usd: minUsd,
     });
+  }
+
+  // ------------------------------------------------------ IB-059, the economic calendar
+
+  /** USD high-impact events and holidays in `[fromMs, toMs)`; the server refuses over 90 days. */
+  async calendarEvents(fromMs: number, toMs: number): Promise<WebCalendarEventsResponse> {
+    return this.get<WebCalendarEventsResponse>('/calendar/events', { from: fromMs, to: toMs });
+  }
+
+  /** High-impact USD events from 5 minutes ago to `withinMin` ahead — the browser alerts' read. */
+  async calendarUpcoming(withinMin = 60): Promise<WebCalendarEventsResponse> {
+    return this.get<WebCalendarEventsResponse>('/calendar/upcoming', { withinMin });
   }
 
   // ------------------------------------------------------ IB-038, the liquidation surfaces

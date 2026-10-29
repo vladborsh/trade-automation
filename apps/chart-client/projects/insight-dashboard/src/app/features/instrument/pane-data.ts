@@ -1,5 +1,5 @@
 import type {
-  WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
+  EconomicEvent, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
   WebLongShortResponse,
 } from '@trade-automation/contracts';
 
@@ -28,6 +28,12 @@ export interface PaneData {
    * the chart.
    */
   dailyCandles: readonly WebCandle[];
+  /**
+   * IB-060 — USD high-impact events and holidays in the window (`/api/web/calendar/events`), for
+   * the event lines, their tooltip and the holiday bands. Empty when the read failed: the marks
+   * drop out, not the chart.
+   */
+  calendarEvents: readonly EconomicEvent[];
   /**
    * True when this is the previous window with earlier history prepended (scrolling left), so the
    * chart keeps the reader's view instead of jumping to the whole window. Absent on a fresh load.

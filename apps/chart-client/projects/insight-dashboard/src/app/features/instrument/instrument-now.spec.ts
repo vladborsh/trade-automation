@@ -16,6 +16,7 @@ function pane(over: Partial<PaneData> = {}): PaneData {
     liquidations: { bars: [], downsampled: false, undercounted: false } as never,
     liquidationEvents: [], liquidationVenues: [],
     dailyCandles: [],
+    calendarEvents: [],
     ...over,
   };
 }

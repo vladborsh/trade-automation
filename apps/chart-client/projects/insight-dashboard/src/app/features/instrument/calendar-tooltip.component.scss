@@ -1,0 +1,32 @@
+/* Over the price pane, beside the crosshair; never in the way of the pointer it follows. */
+.calendar-tooltip {
+  position: absolute;
+  top: 28px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 280px;
+  padding: 6px 8px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: rgba(13, 17, 23, 0.94);
+  color: #c9d1d9;
+  font-size: var(--font-size-xs);
+  pointer-events: none;
+}
+
+.title {
+  color: #d2a8ff;
+}
+
+.time,
+.figures {
+  color: #8b949e;
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+}

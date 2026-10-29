@@ -1,0 +1,15 @@
+@if (mark(); as m) {
+  <div class="calendar-tooltip" role="tooltip" [style.left.px]="x() + 12">
+    @for (e of m.events; track e.id) {
+      <div class="event">
+        <div class="title">{{ e.title }}</div>
+        <div class="time">{{ when(e.scheduledAt) }}</div>
+        <div class="figures">
+          <span>{{ t('calendar.tooltip.forecast') }} {{ e.forecast ?? '—' }}</span>
+          <span>{{ t('calendar.tooltip.previous') }} {{ e.previous ?? '—' }}</span>
+          <span>{{ t('calendar.tooltip.actual') }} {{ e.actual ?? '—' }}</span>
+        </div>
+      </div>
+    }
+  </div>
+}

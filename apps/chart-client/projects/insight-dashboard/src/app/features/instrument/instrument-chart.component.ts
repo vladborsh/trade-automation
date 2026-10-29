@@ -2,14 +2,16 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal,
   untracked, viewChild, type OnDestroy,
 } from '@angular/core';
-import { createChart, type IChartApi, type LogicalRange, type Time } from 'lightweight-charts';
+import { createChart, type IChartApi, type LogicalRange, type MouseEventParams, type Time } from 'lightweight-charts';
 import { I18nService } from '../../i18n/i18n.service';
 import { LoaderComponent } from '../../ui/loader.component';
+import { CalendarTooltipComponent } from './calendar-tooltip.component';
+import { markAt } from './calendar-marks';
 import { liquidationScopeLabel } from './liquidation-scope';
-import { createPanelRenderers, drawPanel, type PanelRenderers } from './panel-series';
+import { createPanelRenderers, drawPanel, eventMarks, type PanelRenderers } from './panel-series';
 import type { PaneData } from './pane-data';
 import {
-  DEFAULT_PANE_HEIGHTS, browserStore, loadPaneHeights, resizePane, savePaneHeights, totalPaneHeight,
+  DEFAULT_PANE_HEIGHTS, browserStore, loadPaneHeights, paneEdges, resizePane, savePaneHeights, totalPaneHeight,
   type PaneHeights, type PaneKey,
 } from './pane-heights';
 import { legendEntries } from './pane-legend';
@@ -59,7 +61,7 @@ export type { PaneData } from './pane-data';
 @Component({
   selector: 'app-instrument-chart',
   standalone: true,
-  imports: [LoaderComponent],
+  imports: [LoaderComponent, CalendarTooltipComponent],
   templateUrl: './instrument-chart.component.html',
   styleUrl: './instrument-chart.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -94,33 +96,23 @@ export class InstrumentChartComponent implements OnDestroy {
   /** Panes and the 1 px separators between them; the time axis is the sticky strip below. */
   readonly chartHeight = computed(() => totalPaneHeight(this.heights()) + (PANELS.length - 1));
 
-  /** Each pane's top edge in px from the chart's top: its legend sits there, its handle at the next. */
-  private readonly tops = computed(() => {
-    const heights = this.heights();
-    let y = 0;
-    return PANELS.map((panel) => {
-      const top = y;
-      y += heights[panel.key] + 1;
-      return top;
-    });
-  });
+  /** Each pane's edges in px from the chart's top: its legend at the top, its handle at the bottom. */
+  readonly edges = computed(() => paneEdges(this.heights()));
 
   readonly legends = computed(() => {
     const data = this.data();
-    const tops = this.tops();
     return PANELS.map((panel, i) => ({
       key: panel.key,
       heading: panelHeading(this.t, panel, this.symbol()),
       entries: legendEntries(panel, data, this.t),
-      top: tops[i],
+      top: this.edges()[i].top,
     }));
   });
 
-  /** One handle per pane, on its lower edge. */
-  readonly handles = computed(() => {
-    const heights = this.heights();
-    return PANELS.map((panel, i) => ({ key: panel.key, y: this.tops()[i] + heights[panel.key] }));
-  });
+  /** IB-060: the bar under the crosshair, and the economic events on it for the tooltip. */
+  readonly hover = signal<{ time: number; x: number } | null>(null);
+  private readonly marks = computed(() => { const d = this.data(); return d ? eventMarks(d) : []; });
+  readonly hoverMark = computed(() => markAt(this.marks(), this.hover()?.time ?? null));
 
   /** IB-039: built from the venues the DATA came from, never from the filter the page sent. */
   readonly scopeLabel = (venues: readonly string[], undercounted: boolean): string =>
@@ -199,6 +191,8 @@ export class InstrumentChartComponent implements OnDestroy {
     if (view && first !== undefined) chart.timeScale().setVisibleLogicalRange(shiftedView(view, first, chartTimes(chart)));
     else if (bounds) chart.timeScale().setVisibleRange({ from: bounds.from as Time, to: bounds.to as Time });
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
+    chart.subscribeCrosshairMove((p: MouseEventParams) =>
+      this.hover.set(p.time !== undefined && p.point ? { time: p.time as number, x: p.point.x } : null));
     this.axis = new TimeAxisStrip(this.axisHost().nativeElement, this.i18n.lang);
     this.axis.attach(chart, { background: '#0d1117', text: '#c9d1d9' }, data.timeframe);
     this.observer = new ResizeObserver(() => this.schedule());

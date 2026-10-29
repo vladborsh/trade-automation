@@ -34,6 +34,9 @@ export function prependEarlier(current: PaneData, earlier: PaneData): PaneData {
     // The two reads' daily candles overlap by the two-week lookback; one bar per day, the
     // current read winning, because the overlap's last day can still have been forming earlier.
     dailyCandles: byTime([...earlier.dailyCandles, ...current.dailyCandles]),
+    // Calendar windows meet at the seam, and an event exactly on it can come back in both: one per
+    // id, the current read winning (it may carry a later revision).
+    calendarEvents: byId([...earlier.calendarEvents, ...current.calendarEvents]),
     extendsPrevious: true,
   };
 }
@@ -47,6 +50,12 @@ function byTime<T extends { time: number }>(points: readonly T[]): T[] {
   const m = new Map<number, T>();
   for (const p of points) m.set(p.time, p);
   return [...m.values()].sort((a, b) => a.time - b.time);
+}
+
+function byId<T extends { id: string; scheduledAt: number }>(events: readonly T[]): T[] {
+  const m = new Map<string, T>();
+  for (const e of events) m.set(e.id, e);
+  return [...m.values()].sort((a, b) => a.scheduledAt - b.scheduledAt);
 }
 
 function mergeVenues<T extends { venue: string; points: unknown[] }>(earlier: readonly T[], current: readonly T[]): T[] {

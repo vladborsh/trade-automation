@@ -24,6 +24,9 @@ export interface TimeBand {
 export interface TimeMarks {
   lines: readonly number[];
   bands: readonly TimeBand[];
+  /** IB-060: solid lines through the MIDDLE of a bar (an economic event in it), in `eventColour`. */
+  eventLines?: readonly number[];
+  eventColour?: string;
 }
 
 export const DAY_SEPARATOR_COLOUR = '#30363d';
@@ -39,6 +42,7 @@ class TimeMarksRenderer implements IPrimitivePaneRenderer {
   constructor(
     private readonly lines: readonly number[],
     private readonly bands: ReadonlyArray<{ x1: number; x2: number; colour: string }>,
+    private readonly events: { xs: readonly number[]; colour: string } = { xs: [], colour: '' },
   ) {}
 
   draw(target: Target): void {
@@ -46,6 +50,17 @@ class TimeMarksRenderer implements IPrimitivePaneRenderer {
       for (const b of this.bands) {
         ctx.fillStyle = b.colour;
         ctx.fillRect(Math.round(b.x1 * h), 0, Math.max(1, Math.round((b.x2 - b.x1) * h)), bitmapSize.height);
+      }
+      if (this.events.xs.length > 0) {
+        ctx.strokeStyle = this.events.colour;
+        ctx.lineWidth = Math.max(1, Math.floor(h));
+        ctx.beginPath();
+        for (const x of this.events.xs) {
+          const px = Math.round(x * h) + 0.5;
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, bitmapSize.height);
+        }
+        ctx.stroke();
       }
       if (this.lines.length === 0) return;
       ctx.strokeStyle = DAY_SEPARATOR_COLOUR;
@@ -112,6 +127,11 @@ export class TimeMarksPrimitive implements IPanePrimitive<Time> {
       const x2 = x(band.last);
       if (x1 !== null && x2 !== null) bands.push({ x1: x1 - half, x2: x2 + half, colour: band.colour });
     }
-    return new TimeMarksRenderer(lines, bands);
+    const events: number[] = [];
+    for (const t of this.marks.eventLines ?? []) {
+      const at = x(t);
+      if (at !== null) events.push(at); // the bar's centre: the event is IN the bar
+    }
+    return new TimeMarksRenderer(lines, bands, { xs: events, colour: this.marks.eventColour ?? DAY_SEPARATOR_COLOUR });
   }
 }

@@ -1,7 +1,8 @@
 import {
   DEFAULT_PANE_HEIGHTS, MAX_PANE_HEIGHT, MIN_PANE_HEIGHT, PANE_HEIGHTS_STORAGE_KEY, loadPaneHeights,
-  normaliseHeights, resizePane, savePaneHeights, totalPaneHeight, type KeyValueStore, type PaneHeights,
+  normaliseHeights, paneEdges, resizePane, savePaneHeights, totalPaneHeight, type KeyValueStore, type PaneHeights,
 } from './pane-heights';
+import { PANELS } from './panels.model';
 
 /** A store backed by a map, so a spec can see exactly what was written. */
 function memoryStore(initial: Record<string, string> = {}): KeyValueStore & { data: Record<string, string> } {
@@ -61,5 +62,22 @@ describe('pane heights', () => {
 
   it('a drag up shrinks the pane, never below the minimum', () => {
     expect(resizePane(CUSTOM, 'price', 300, -1000).price).toBe(MIN_PANE_HEIGHT);
+  });
+});
+
+describe('paneEdges', () => {
+  it('stacks the panes with a 1 px separator, top to bottom in panel order', () => {
+    const edges = paneEdges({ price: 300, openInterest: 100, delta: 100, funding: 80, longShort: 80 });
+    expect(edges).toEqual([
+      { key: 'price', top: 0, bottom: 300 },
+      { key: 'openInterest', top: 301, bottom: 401 },
+      { key: 'delta', top: 402, bottom: 502 },
+      { key: 'funding', top: 503, bottom: 583 },
+      { key: 'longShort', top: 584, bottom: 664 },
+    ]);
+  });
+
+  it('is in the order the chart draws its panes', () => {
+    expect(paneEdges(DEFAULT_PANE_HEIGHTS).map((e) => e.key)).toEqual(PANELS.map((p) => p.key));
   });
 });

@@ -69,6 +69,20 @@ export function totalPaneHeight(heights: Readonly<PaneHeights>): number {
   return KEYS.reduce((acc, key) => acc + heights[key], 0);
 }
 
+/**
+ * Each pane's top and bottom edge in px from the chart's top, panes in `KEYS` order with the 1 px
+ * separator between neighbours: the legend sits at `top`, the resize handle at `bottom`. Lifted
+ * out of the chart component (IB-060) to keep it under the AGENTS.md ceiling.
+ */
+export function paneEdges(heights: Readonly<PaneHeights>): Array<{ key: PaneKey; top: number; bottom: number }> {
+  let y = 0;
+  return KEYS.map((key) => {
+    const top = y;
+    y += heights[key] + 1;
+    return { key, top, bottom: top + heights[key] };
+  });
+}
+
 /** The remembered heights, or the defaults when there are none or the store cannot be read. */
 export function loadPaneHeights(store: KeyValueStore | null): PaneHeights {
   if (!store) return defaults();

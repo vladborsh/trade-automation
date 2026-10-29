@@ -1,5 +1,6 @@
 import { CandlestickSeries, LineSeries, LineStyle, LineType, type IChartApi, type Time } from 'lightweight-charts';
 import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
+import { calendarMarks, EVENT_LINE_COLOUR, type CalendarMark } from './calendar-marks';
 import { daySeparatorTimes, showsDaySeparators } from './day-separators';
 import { toLiquidationMarkers } from './liquidation-markers.adapter';
 import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
@@ -13,6 +14,7 @@ import {
 import { barSeconds, snapToGrid } from './time-grid';
 import { TimeMarksPrimitive } from './time-marks.primitive';
 import { sessionBands, showsSessions } from './trading-sessions';
+import { closedBands } from './weekend-bands';
 
 /**
  * What each pane draws, one function per panel key.
@@ -75,17 +77,27 @@ function drawLevels(chart: IChartApi, data: PaneData, pane: number): void {
 /** The candle times every overlay is placed on: one time-scale slot per bar (time-grid.ts). */
 const candleTimes = (data: PaneData): number[] => toCandleData(data.candles.candles).map((c) => c.time);
 
+/** IB-060: the event lines on the price pane — one definition for the lines and their tooltip. */
+export const eventMarks = (data: PaneData): CalendarMark[] =>
+  calendarMarks(data.calendarEvents, candleTimes(data), barSeconds(data.timeframe));
+
 /**
- * Day separators on every pane up to 4h, and on the price pane the London and New York session
- * bands up to 1h, as one pane primitive under the series (time-marks.primitive.ts).
+ * Day separators and the US-closed bands (weekends, US holidays: IB-060) on every pane up to 4h;
+ * on the price pane also the London and New York session bands up to 1h and a line on each bar
+ * holding a high-impact USD event. One pane primitive under the series (time-marks.primitive.ts).
  */
 function drawTimeMarks(chart: IChartApi, data: PaneData, key: PanelDef['key'], pane: number): void {
   const target = chart.panes()[pane];
   if (!target) return;
   const times = candleTimes(data);
+  const step = barSeconds(data.timeframe);
   const lines = showsDaySeparators(data.timeframe) ? daySeparatorTimes(times) : [];
-  const bands = key === 'price' && showsSessions(data.timeframe) ? sessionBands(times, barSeconds(data.timeframe)) : [];
-  if (lines.length > 0 || bands.length > 0) target.attachPrimitive(new TimeMarksPrimitive({ lines, bands }));
+  const sessions = key === 'price' && showsSessions(data.timeframe) ? sessionBands(times, step) : [];
+  const bands = [...closedBands(times, data.timeframe, data.calendarEvents), ...sessions];
+  const eventLines = key === 'price' ? eventMarks(data).map((m) => m.time) : [];
+  if (lines.length > 0 || bands.length > 0 || eventLines.length > 0) {
+    target.attachPrimitive(new TimeMarksPrimitive({ lines, bands, eventLines, eventColour: EVENT_LINE_COLOUR }));
+  }
 }
 
 /** Any series onto the candle grid: one time-scale slot per bar however many series (time-grid.ts). */

@@ -14,6 +14,7 @@ function window(t: number, over: Partial<PaneData> = {}): PaneData {
     liquidations: { symbol: 'BTCUSDT', bucket: '1m', venue: 'all', venuesPresent: [], bars: [{ time: t, long: 1, short: 1 }], downsampled: false, undercounted: false } as never,
     liquidationEvents: [{ time: t } as never], liquidationVenues: ['binance'],
     dailyCandles: [candle(t, 2)],
+    calendarEvents: [{ id: `ev:${t}`, scheduledAt: t * 1000, revision: 1 } as never],
     ...over,
   };
 }
@@ -73,5 +74,14 @@ describe('isBeforeHistory', () => {
     const empty = window(1);
     empty.candles = { ...empty.candles, candles: [] };
     expect(isBeforeHistory(empty)).toBe(true);
+  });
+});
+
+describe('prependEarlier — calendar events (IB-060)', () => {
+  it('joins both reads, one per id, the current read winning at the seam', () => {
+    const seam = { id: 'ev:seam', scheduledAt: 5_000_000, revision: 1 } as never;
+    const revised = { id: 'ev:seam', scheduledAt: 5_000_000, revision: 2 } as never;
+    const out = prependEarlier(window(7_200, { calendarEvents: [revised] }), window(3_600, { calendarEvents: [{ id: 'ev:a', scheduledAt: 1_000, revision: 1 } as never, seam] }));
+    expect(out.calendarEvents.map((e) => [e.id, e.revision])).toEqual([['ev:a', 1], ['ev:seam', 2]]);
   });
 });
