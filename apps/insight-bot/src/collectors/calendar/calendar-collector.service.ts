@@ -8,7 +8,7 @@ import { CalendarRepository } from './calendar.repository';
 import { FEED_CLIENT, FeedClient } from './feed-client.token';
 import { calendarEventRow } from './calendar-row';
 import { nextPreviousActuals } from './next-previous-actuals';
-import { HARD_POLL_FLOOR_MS, isPollDue, PollCadenceConfig } from './poll-cadence';
+import { DAY_MS, isFetchDue, utcDay } from './fetch-schedule';
 
 export const CALENDAR_STREAM_ID = 'calendar/forexfactory';
 
@@ -21,9 +21,9 @@ export const CALENDAR_STREAM_ID = 'calendar/forexfactory';
  * side: signal-server keeps events in a File/S3 `EventStore` and a cache, this writes SQL rows
  * through `Writers.calendarEvents` and keeps the same in-memory picture seeded from the table.
  *
- * Cadence is signal-server's, in `poll-cadence.ts`. signal-server rides its 1-minute `BarClock`;
- * this app has no bar clock, so the loop is its own 60 s timer — the same hard floor, and the
- * cadence function decides on each tick whether a poll is actually due.
+ * Cadence (IB-058): **once per UTC day**, see `fetch-schedule.ts`. A timer checks every
+ * `CALENDAR_CHECK_INTERVAL_MS`; it fetches only when `calendar_fetch_runs` has no row for today,
+ * so a restart on a day already collected makes no request at all.
  */
 @Injectable()
 export class CalendarCollectorService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -33,9 +33,14 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
   /** The events of the current window at their latest revision, by id — the diff's `existing`. */
   private readonly cache = new Map<string, EconomicEvent>();
   private lastEtag: { json: string | null; xml: string | null } = { json: null, xml: null };
-  private lastPolledAt: number | null = null;
+  /** UTC day of the last successful fetch, mirrored from `calendar_fetch_runs`. */
+  private lastRunDay: string | null = null;
+  /** Snapshot size of the last changed fetch — what a 304 day records as its `events`. */
+  private lastSnapshotSize = 0;
   private lastSuccessAt: number | null = null;
   private consecutiveErrors = 0;
+  private fetching = false;
+  private skipAnnouncedFor: string | null = null;
 
   constructor(
     private readonly config: AppConfigService,
@@ -45,25 +50,27 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
     private readonly streams: StreamRegistry,
   ) {}
 
-  private get cadence(): PollCadenceConfig {
-    return {
-      intervalMs: this.config.env.get('CALENDAR_POLL_INTERVAL_MS'),
-      hotIntervalMs: this.config.env.get('CALENDAR_POLL_HOT_INTERVAL_MS'),
-    };
-  }
-
   async onApplicationBootstrap(): Promise<void> {
     if (!this.config.env.get('CALENDAR_ENABLED')) {
       this.logger.log('CALENDAR_ENABLED=false — calendar collector disabled');
       return;
     }
-    this.streams.register(CALENDAR_STREAM_ID, 'forexfactory', Math.round(this.cadence.intervalMs / 1000));
+    // The stream speaks once a day; the watchdog judges it against that, not against minutes.
+    this.streams.register(CALENDAR_STREAM_ID, 'forexfactory', DAY_MS / 1000);
 
     await this.seedCache();
-    // §3.4: boot polls immediately, before the loop starts. The instant is read HERE, at the
-    // origin, and passed down — see `poll`'s signature.
-    await this.poll(Date.now());
-    this.timer = setInterval(() => void this.tick(), HARD_POLL_FLOOR_MS);
+    const last = await this.repo.lastFetchRun();
+    if (last) {
+      this.lastRunDay = last.day;
+      this.lastSnapshotSize = last.events;
+      this.lastSuccessAt = last.fetchedAt;
+      this.streams.recordMessage(CALENDAR_STREAM_ID, last.fetchedAt);
+    }
+    // The instant is read HERE, at the origin, and passed down (IB-051).
+    await this.tick(Date.now());
+    const checkMs = this.config.env.get('CALENDAR_CHECK_INTERVAL_MS');
+    this.timer = setInterval(() => void this.tick(Date.now()), checkMs);
+    this.timer.unref?.();
   }
 
   onModuleDestroy(): void {
@@ -83,39 +90,54 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
     this.logger.log(`Calendar cache seeded with ${stored.length} stored events`);
   }
 
-  private async tick(): Promise<void> {
-    const now = Date.now();
-    if (!isPollDue(now, this.lastPolledAt, [...this.cache.values()], this.consecutiveErrors, this.cadence)) return;
-    // IB-051: the SAME instant the due-check used. It used to call `poll()` and let the default
-    // fire, so the decision and the stamp came from two reads — and `lastPolledAt`, which the next
-    // due-check compares against, was the second one. Microseconds apart in production and no
-    // outcome I could construct changed, but it is the partial-threading shape, and `poll`'s
-    // parameter is now required so the next caller cannot repeat it by omission.
-    await this.poll(now);
+  /** One check: fetch if today has no successful run yet, otherwise do nothing. */
+  async tick(now: number): Promise<void> {
+    if (this.fetching) return;
+    if (!isFetchDue(now, this.lastRunDay)) {
+      // Said once per collected day, so a restart's log shows why no request was made.
+      if (this.skipAnnouncedFor !== this.lastRunDay) {
+        this.skipAnnouncedFor = this.lastRunDay;
+        this.logger.log(`Calendar already collected for ${this.lastRunDay} — skipping fetch`);
+      }
+      return;
+    }
+    this.fetching = true;
+    try {
+      await this.poll(now);
+    } finally {
+      this.fetching = false;
+    }
   }
 
+  /**
+   * One fetch of the feed. Records the day in `calendar_fetch_runs` only on success; a failure
+   * leaves the day uncollected, so the next check retries.
+   */
   async poll(now: number): Promise<void> {
-    this.lastPolledAt = now;
     try {
       const result = await this.feedClient.fetch(this.lastEtag);
-      if (!result.changed) {
-        this.lastSuccessAt = now;
-        this.consecutiveErrors = 0;
-        this.streams.recordMessage(CALENDAR_STREAM_ID, now);
-        return;
+      let written = 0;
+      if (result.changed) {
+        const drafts = mapFeedSnapshot(result.json, result.xml);
+        written = await this.applySnapshot(drafts, now);
+        this.lastEtag = result.etag;
+        this.lastSnapshotSize = drafts.length;
       }
 
-      const drafts = mapFeedSnapshot(result.json, result.xml);
-      const written = await this.applySnapshot(drafts, now);
-
-      this.lastEtag = result.etag;
+      const day = utcDay(now);
+      await this.repo.recordFetchRun({ day, fetchedAt: now, events: this.lastSnapshotSize });
+      this.lastRunDay = day;
       this.lastSuccessAt = now;
       this.consecutiveErrors = 0;
       this.streams.recordMessage(CALENDAR_STREAM_ID, now);
-      this.logger.log(`Calendar poll: ${drafts.length} rows in snapshot, ${written} revisions written`);
+      this.logger.log(
+        result.changed
+          ? `Calendar fetch for ${day}: ${this.lastSnapshotSize} rows in snapshot, ${written} revisions written`
+          : `Calendar fetch for ${day}: feed unchanged (304)`,
+      );
     } catch (err) {
       this.consecutiveErrors++;
-      this.logger.warn(`Calendar poll failed (attempt ${this.consecutiveErrors}): ${(err as Error).message}`);
+      this.logger.warn(`Calendar fetch failed (attempt ${this.consecutiveErrors}): ${(err as Error).message}`);
     }
   }
 

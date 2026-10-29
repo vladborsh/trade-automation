@@ -40,4 +40,29 @@ export class CalendarRepository {
     const cancelled = await this.eventsInWindow({ from, to, status: 'cancelled' });
     return [...scheduled, ...cancelled].map((row) => economicEventFromRow(row, now));
   }
+
+  /** IB-058: the latest UTC day with a successful fetch, and when it ran; null before the first. */
+  async lastFetchRun(): Promise<FetchRun | null> {
+    const rows = await this.db.query<{ day: string; fetched_at: Date; events: number }>(
+      `select to_char(day, 'YYYY-MM-DD') as day, fetched_at, events from calendar_fetch_runs order by day desc limit 1`,
+    );
+    const row = rows[0];
+    return row ? { day: row.day, fetchedAt: row.fetched_at.getTime(), events: row.events } : null;
+  }
+
+  /** IB-058: marks `day` collected. A second fetch the same day (manual, or a race) overwrites. */
+  async recordFetchRun(run: FetchRun): Promise<void> {
+    await this.db.query(
+      `insert into calendar_fetch_runs (day, fetched_at, events) values ($1::date, $2, $3)
+       on conflict (day) do update set fetched_at = excluded.fetched_at, events = excluded.events`,
+      [run.day, new Date(run.fetchedAt), run.events],
+    );
+  }
+}
+
+export interface FetchRun {
+  /** UTC date, `YYYY-MM-DD`. */
+  day: string;
+  fetchedAt: number;
+  events: number;
 }

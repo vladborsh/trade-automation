@@ -1,5 +1,6 @@
 import { FeedFetchOutcome, FeedXmlRow } from '@trade-automation/calendar-core';
 import { CalendarCollectorService } from '../../src/collectors/calendar/calendar-collector.service';
+import { FetchRun } from '../../src/collectors/calendar/calendar.repository';
 import { CalendarEventRow } from '../../src/collectors/writers/tables';
 
 /**
@@ -46,7 +47,9 @@ function xmlRow(overrides: Partial<FeedXmlRow> = {}): FeedXmlRow {
 
 class FakeFeed {
   outcomes: FeedFetchOutcome[] = [];
+  calls = 0;
   async fetch(): Promise<FeedFetchOutcome> {
+    this.calls++;
     return this.outcomes.shift() ?? { changed: false };
   }
 }
@@ -55,7 +58,7 @@ function snapshot(json: unknown[], xml: FeedXmlRow[]): FeedFetchOutcome {
   return { changed: true, json, xml, etag: { json: 'a', xml: 'b' }, fetchedAt: POLL_AT };
 }
 
-function build() {
+function build(storedRun: FetchRun | null = null) {
   const feed = new FakeFeed();
   const written: CalendarEventRow[] = [];
   const writers = { calendarEvents: { write: async (rows: CalendarEventRow[]) => void written.push(...rows) } };
@@ -64,13 +67,17 @@ function build() {
       get: (key: string) =>
         ({
           CALENDAR_ENABLED: true,
-          CALENDAR_POLL_INTERVAL_MS: 600_000,
-          CALENDAR_POLL_HOT_INTERVAL_MS: 120_000,
+          CALENDAR_CHECK_INTERVAL_MS: 600_000,
           CALENDAR_CACHE_LOOKBACK_DAYS: 30,
         })[key],
     },
   };
-  const repo = { latestInWindow: async () => [] };
+  const runs: FetchRun[] = storedRun ? [storedRun] : [];
+  const repo = {
+    latestInWindow: async () => [],
+    lastFetchRun: async () => runs[runs.length - 1] ?? null,
+    recordFetchRun: async (run: FetchRun) => void runs.push(run),
+  };
   const streams = { register: jest.fn(), recordMessage: jest.fn() };
 
   const service = new CalendarCollectorService(
@@ -80,7 +87,7 @@ function build() {
     writers as never,
     streams as never,
   );
-  return { service, feed, written, streams };
+  return { service, feed, written, streams, runs };
 }
 
 describe('CalendarCollectorService', () => {
@@ -203,5 +210,74 @@ describe('CalendarCollectorService', () => {
 
     expect(written).toEqual([]);
     expect(service.healthStatus().eventsHeld).toBe(1);
+  });
+
+  describe('once per UTC day (IB-058)', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('records the day in calendar_fetch_runs with the snapshot size', async () => {
+      const { service, feed, runs } = build();
+      feed.outcomes.push(snapshot([jsonRow()], [xmlRow()]));
+
+      await service.tick(POLL_AT);
+
+      expect(runs).toEqual([{ day: '2026-10-12', fetchedAt: POLL_AT, events: 1 }]);
+    });
+
+    it('makes no second request on the same UTC day, and fetches again after 00:00 UTC', async () => {
+      const { service, feed, runs } = build();
+      feed.outcomes.push(snapshot([jsonRow()], [xmlRow()]));
+
+      await service.tick(POLL_AT);
+      await service.tick(POLL_AT + 10 * 60_000);
+      await service.tick(Date.parse('2026-10-12T23:59:00Z'));
+      expect(feed.calls).toBe(1);
+
+      await service.tick(Date.parse('2026-10-13T00:00:00Z'));
+      expect(feed.calls).toBe(2);
+      // the unchanged (304) day is still a collected day, carrying the last snapshot's size
+      expect(runs[1]).toEqual({ day: '2026-10-13', fetchedAt: Date.parse('2026-10-13T00:00:00Z'), events: 1 });
+    });
+
+    it('does not record a failed fetch, so the next check retries', async () => {
+      const { service, feed, runs } = build();
+      feed.fetch = async () => {
+        feed.calls++;
+        throw new Error('ForexFactory feed JSON request failed: 503');
+      };
+
+      await service.tick(POLL_AT);
+      await service.tick(POLL_AT + 10 * 60_000);
+
+      expect(runs).toEqual([]);
+      expect(feed.calls).toBe(2);
+    });
+
+    it('after a restart on a collected day makes no request, and says so', async () => {
+      jest.useFakeTimers({ now: POLL_AT, doNotFake: ['nextTick', 'setImmediate'] });
+      const stored = { day: '2026-10-12', fetchedAt: POLL_AT - 3_600_000, events: 87 };
+      const { service, feed, streams } = build(stored);
+      const log = jest.spyOn((service as unknown as { logger: { log: (m: string) => void } }).logger, 'log');
+
+      await service.onApplicationBootstrap();
+      service.onModuleDestroy();
+
+      expect(feed.calls).toBe(0);
+      expect(log).toHaveBeenCalledWith('Calendar already collected for 2026-10-12 — skipping fetch');
+      // the watchdog's clock starts from the stored run, not from boot, and the period is a day
+      expect(streams.register).toHaveBeenCalledWith('calendar/forexfactory', 'forexfactory', 86_400);
+      expect(streams.recordMessage).toHaveBeenCalledWith('calendar/forexfactory', stored.fetchedAt);
+      expect(service.healthStatus().lastSuccessfulPollAge).toBe(3_600_000);
+    });
+
+    it('a restart on a new day fetches at boot', async () => {
+      jest.useFakeTimers({ now: POLL_AT, doNotFake: ['nextTick', 'setImmediate'] });
+      const { service, feed } = build({ day: '2026-10-11', fetchedAt: POLL_AT - 86_400_000, events: 87 });
+
+      await service.onApplicationBootstrap();
+      service.onModuleDestroy();
+
+      expect(feed.calls).toBe(1);
+    });
   });
 });

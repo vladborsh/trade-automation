@@ -61,17 +61,17 @@ const ALLOWED: readonly Allowance[] = [
   // ---- origins: where time ENTERS a module, with everything below taking it as a parameter
   {
     file: 'collectors/calendar/calendar-collector.service.ts',
-    line: 'const now = Date.now();',
+    line: 'this.timer = setInterval(() => void this.tick(Date.now()), checkMs);',
     count: 1,
     category: 'origin',
-    why: 'the poll timer; passed into poll(now), whose parameter is now REQUIRED so a caller cannot repeat IB-051 by omission',
+    why: 'the daily-fetch check timer (IB-058); passed into tick(now) and poll(now), both of which REQUIRE the instant so a caller cannot repeat IB-051 by omission',
   },
   {
     file: 'collectors/calendar/calendar-collector.service.ts',
-    line: 'await this.poll(Date.now());',
+    line: 'await this.tick(Date.now());',
     count: 1,
     category: 'origin',
-    why: 'the boot poll (§3.4) — the other place time enters, read explicitly at the call rather than by a default',
+    why: 'the boot check (§3.4) — the other place time enters, read explicitly at the call rather than by a default',
   },
   {
     file: 'collectors/okx/okx.service.ts',

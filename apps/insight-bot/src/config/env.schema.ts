@@ -54,8 +54,9 @@ export const EnvSchema = z.object({
   // two requests less than 60 s apart.
   CALENDAR_ENABLED: booleanFlag(true),
   CALENDAR_FEED_BASE_URL: z.string().default('https://nfs.faireconomy.media/ff_calendar_thisweek'),
-  CALENDAR_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
-  CALENDAR_POLL_HOT_INTERVAL_MS: z.coerce.number().int().positive().default(120_000),
+  // IB-058: how often the collector checks whether today's once-a-day fetch has happened. A
+  // check makes no request on a collected day; it only bounds how late the day's fetch can be.
+  CALENDAR_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
   // How far back the collector seeds its diff picture from calendar_events at boot.
   CALENDAR_CACHE_LOOKBACK_DAYS: z.coerce.number().int().positive().default(30),
 
