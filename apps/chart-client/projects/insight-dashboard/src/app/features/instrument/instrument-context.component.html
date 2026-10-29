@@ -1,5 +1,12 @@
 <section class="block" aria-labelledby="now-title">
   <h2 id="now-title">{{ t('instrument.now.title', { symbol: symbol() }) }}</h2>
+  @if (loading()) {
+    <div class="tiles">
+      @for (tile of [1, 2, 3, 4]; track tile) {
+        <div class="tile"><app-loader variant="skeleton" [lines]="2" [label]="t('instrument.now.loading')" /></div>
+      }
+    </div>
+  } @else {
   <dl class="tiles">
     <div class="tile">
       <dt>{{ t('instrument.panel.openInterest') }}</dt>
@@ -43,6 +50,7 @@
       <dd class="value">{{ now().ls ?? t('instrument.now.none') }}</dd>
     </div>
   </dl>
+  }
 </section>
 
 @if (liqCoin(); as coin) {
@@ -63,7 +71,9 @@
   <dl class="tiles">
     <div class="tile">
       <dt>{{ t('market.fg.title') }}</dt>
-      @if (fearGreed(); as fg) {
+      @if (cardsLoading()) {
+        <dd><app-loader variant="skeleton" [lines]="2" [label]="t('instrument.now.loading')" /></dd>
+      } @else if (fearGreed(); as fg) {
         <dd class="value" [style.color]="fg.colour">{{ fg.value }}</dd>
         <dd class="sub" [style.color]="fg.colour">{{ fg.label }}</dd>
       } @else {
@@ -72,7 +82,9 @@
     </div>
     <div class="tile">
       <dt>{{ t('market.dominance.title') }}</dt>
-      @if (dominance(); as dom) {
+      @if (cardsLoading()) {
+        <dd><app-loader variant="skeleton" [lines]="2" [label]="t('instrument.now.loading')" /></dd>
+      } @else if (dominance(); as dom) {
         <dd class="value">{{ dom.share }} %</dd>
         @if (dom.change) {
           <dd class="sub">{{ dom.change }}</dd>

@@ -1,5 +1,5 @@
 import {
-  toCandleData, toCloseLine, toCvdSegments, toFundingSteps, toLiquidationHistogram, toLongShortLine,
+  toCandleData, toCvdSegments, toFundingSteps, toLiquidationHistogram, toLongShortLine,
   toOpenInterestPoints, toPredictedFunding, toTakerDelta, toVolumeData,
 } from './series.adapter';
 
@@ -42,7 +42,14 @@ describe('toOpenInterestPoints', () => {
       time: 100_000, unit: 'base', value: 1500,
       ohlc: { open: 1500, high: 1500, low: 1500, close: 1500 },
       notional: 90_000, notionalBasis: 'venue', samples: 1,
+      notionalOhlc: { open: 90_000, high: 90_000, low: 90_000, close: 90_000 },
     });
+  });
+
+  it('carries a flat notionalOhlc, which is all the renderer plots in its candle style', () => {
+    // 2026-10-24: without it every point mapped to whitespace and OI vanished above 1m
+    const [point] = toOpenInterestPoints([{ time: 1, value: 7, notional: 560 }], 'i', '1h');
+    expect(point.notionalOhlc).toEqual({ open: 560, high: 560, low: 560, close: 560 });
   });
 
   it('a flat ohlc, because a snapshot has no range — wicks we did not measure would be invented', () => {
@@ -172,18 +179,5 @@ describe('the simple mappings', () => {
     expect(toOpenInterestPoints([], 'i', '1h')).toEqual([]);
     expect(toFundingSteps([])).toEqual([]);
     expect(toLiquidationHistogram([], { long: 'a', short: 'b' })).toEqual({ longs: [], shorts: [] });
-  });
-});
-
-describe('toCloseLine (the spot line over the futures candles)', () => {
-  it('takes the CLOSE of each candle, not the open or a midpoint', () => {
-    const out = toCloseLine([{ ...candle(100), open: 1, high: 50, low: 0.5, close: 42 }]);
-    expect(out).toEqual([{ time: 100, value: 42 }]);
-  });
-
-  it('sorts and de-duplicates like every other series, last value winning', () => {
-    const out = toCloseLine([candle(300), { ...candle(100), close: 7 }, { ...candle(100), close: 8 }, candle(200)]);
-    expect(out.map((p) => p.time)).toEqual([100, 200, 300]);
-    expect(out[0].value).toBe(8);
   });
 });

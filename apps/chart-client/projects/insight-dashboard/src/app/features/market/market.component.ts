@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal, type OnDe
 import type { WebLiquidationsOverviewResponse, WebMarketCardsResponse } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
+import { LoaderComponent } from '../../ui/loader.component';
 import { LiquidationsFeedComponent } from '../liquidations/liquidations-feed.component';
 import { LiquidationsNowComponent } from '../liquidations/liquidations-now.component';
 import { LiquidationsWhereComponent } from '../liquidations/liquidations-where.component';
@@ -33,7 +34,7 @@ export const POLL_MS = 30_000;
 @Component({
   selector: 'app-market',
   standalone: true,
-  imports: [LiquidationsNowComponent, LiquidationsWhereComponent, LiquidationsFeedComponent],
+  imports: [LiquidationsNowComponent, LiquidationsWhereComponent, LiquidationsFeedComponent, LoaderComponent],
   templateUrl: './market.component.html',
   styleUrl: './market.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,12 +50,22 @@ export class MarketComponent implements OnDestroy {
   readonly liquidationsError = signal<string | null>(null);
   readonly loading = signal(true);
   readonly minUsd = signal(100_000);
+  readonly liquidationsLoading = signal(true);
+  /** Nothing to show yet: the cards draw skeletons. A refresh over shown cards is the header's inline loader. */
+  readonly firstLoad = computed(() => this.loading() && this.cards() === null);
+  /** Only the first liquidation read gets a loader; the 30 s poll replaces content in place. */
+  readonly liquidationsFirstLoad = computed(() => this.liquidationsLoading() && this.liquidations() === null);
 
   readonly fearGreed = computed(() => this.cards()?.fearGreed ?? null);
   readonly dominance = computed(() => this.cards()?.dominance ?? null);
   readonly btcVsTop = computed(() => this.cards()?.btcVsTop ?? null);
   readonly caps = computed(() => this.cards()?.caps ?? []);
   readonly capsDay = computed(() => this.cards()?.capsDay ?? null);
+  /**
+   * Read live from the venues, nothing stored (2026-10-24). A move the venue does not publish free
+   * is then simply not shown, rather than explained as a collection that is still young.
+   */
+  readonly live = computed(() => this.cards()?.live ?? false);
 
   /**
    * Only the coins that actually have a cap for the day, and a count of the ones that do not.
@@ -99,10 +110,13 @@ export class MarketComponent implements OnDestroy {
    */
   async loadLiquidations(): Promise<void> {
     this.liquidationsError.set(null);
+    this.liquidationsLoading.set(true);
     try {
       this.liquidations.set(await this.api.liquidationsOverview(this.minUsd()));
     } catch (err) {
       this.liquidationsError.set(this.t('liq.loadFailed', { message: (err as Error).message }));
+    } finally {
+      this.liquidationsLoading.set(false);
     }
   }
 

@@ -209,8 +209,10 @@ export function windowBounds(data: PaneData): { from: number; to: number } | nul
     ...data.funding.settled.flatMap((v) => v.points.map((p) => p.time)),
   ];
   if (times.length === 0) return null;
-  const from = Math.min(...times);
-  const to = Math.max(...times);
+  // reduce, not Math.min(...times): a window extended by scrolling left can pass the engine's
+  // argument limit, and spreading it throws a RangeError
+  const from = times.reduce((m, t) => (t < m ? t : m), Infinity);
+  const to = times.reduce((m, t) => (t > m ? t : m), -Infinity);
   // A single-point window has zero width, which lightweight-charts cannot display; widen it by
   // one minute so the point is visible rather than the panel going blank.
   return from === to ? { from: from - 30, to: to + 30 } : { from, to };
@@ -218,12 +220,14 @@ export function windowBounds(data: PaneData): { from: number; to: number } | nul
 
 /**
  * 2026-10-24 redesign: ONE chart, the five panels as its panes, top to bottom in `PANELS` order.
- * The separators are the library's own and draggable; `pane-heights.ts` remembers where they were
- * left. Each pane still autoscales on its own right price scale (`PANEL_PRICE_SCALE`), so open
+ * The separators are drawn by the library but not draggable; the chart's own handles size the
+ * panes and `pane-heights.ts` remembers the heights. Each pane still autoscales on its own right price scale (`PANEL_PRICE_SCALE`), so open
  * interest cannot flatten the candles: no two panes share a scale.
  */
 export const CHART_PANES_OPTIONS = {
-  enableResize: true,
+  // Off: the library's separators trade height between neighbours inside a fixed chart; the
+  // chart's own handles grow one pane and push the rest down (instrument-chart.component.ts).
+  enableResize: false,
   separatorColor: '#30363d',
   separatorHoverColor: '#58a6ff',
 } as const;

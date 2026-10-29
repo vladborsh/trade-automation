@@ -13,6 +13,7 @@ import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
+import { MarketCardsService } from './market/market-cards.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
 import { UniverseController } from './universe.controller';
 
@@ -58,6 +59,15 @@ export class WebModule {
           inject: [AppConfigService],
           useFactory: (config: AppConfigService) =>
             new UniverseSummaryService({ futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL') }),
+        },
+        {
+          provide: MarketCardsService,
+          inject: [AppConfigService],
+          useFactory: (config: AppConfigService) =>
+            new MarketCardsService({
+              fngBaseUrl: config.env.get('FNG_BASE_URL'),
+              coingeckoBaseUrl: config.env.get('COINGECKO_BASE_URL'),
+            }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],

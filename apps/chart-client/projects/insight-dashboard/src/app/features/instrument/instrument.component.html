@@ -5,38 +5,40 @@
       [universe]="universe()"
       [summary]="summary()"
       [summaryFailed]="summaryFailed()"
+      [listLoading]="universeLoading()"
       (selected)="select($event)"
       (opened)="loadFigures()"
     />
     <div class="switches">
-      <div class="group" role="group" [attr.aria-label]="t('instrument.range')">
-        @for (p of presets; track p.key) {
-          <button type="button" [class.active]="p.key === preset().key" (click)="choosePreset(p)">{{ t(p.labelKey) }}</button>
-        }
-      </div>
       <div class="group" role="group" [attr.aria-label]="t('instrument.timeframe')">
-        @for (tf of timeframes(); track tf) {
+        @for (tf of timeframes; track tf) {
           <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ tf }}</button>
         }
       </div>
     </div>
   </header>
-  @if (coarsenedTo(); as tf) {
-    <p class="note">{{ t('instrument.coarsened', { tf }) }}</p>
-  }
   @if (downsampled()) {
     <p class="note">{{ t('instrument.downsampled') }}</p>
   }
   @if (error(); as message) {
     <p class="error">{{ t('instrument.loadFailed', { message }) }}</p>
   }
-  @if (loading()) {
-    <p class="note">{{ t('state.loading') }}</p>
-  }
   <div class="body">
     <div class="chart-column">
       @if (panes(); as data) {
-        <app-instrument-chart [data]="data" [symbol]="symbol()" />
+        <app-instrument-chart
+          [data]="data"
+          [symbol]="symbol()"
+          [edgeNote]="edgeNote()"
+          [loadingEarlier]="loadingEarlier()"
+          (nearLeftEdge)="loadEarlier()"
+        />
+        @if (loading()) {
+          <!-- a timeframe or symbol switch: the old chart stays readable under the loader -->
+          <app-loader variant="overlay" [label]="t('instrument.loadingChart')" />
+        }
+      } @else if (loading()) {
+        <app-loader class="chart-placeholder" variant="block" [label]="t('instrument.loadingChart')" />
       }
     </div>
     <app-instrument-context
@@ -45,6 +47,7 @@
       [now]="now()"
       [liqCoin]="liqCoin()"
       [liqVenues]="liqVenues()"
+      [loading]="loading()"
     />
   </div>
   @if (panes()) {

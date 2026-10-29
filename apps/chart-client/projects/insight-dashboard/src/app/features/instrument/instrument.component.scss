@@ -54,11 +54,20 @@
 }
 
 .chart-column {
+  position: relative; /* the overlay loader covers the chart while a new timeframe loads */
   display: flex;
   flex-direction: column;
   flex: 999 1 560px;
   min-width: 0;
   min-height: 560px;
+}
+
+/* Before the first chart: the chart's space, reserved, so the page does not jump when it lands. */
+.chart-placeholder {
+  flex: 1 1 auto;
+  min-height: 560px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
 }
 
 .context {

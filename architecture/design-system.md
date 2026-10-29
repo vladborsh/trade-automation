@@ -78,6 +78,30 @@ over 15 px tabular value. **Badge** — 11 px, 2/6 padding, `--radius-sm`; the r
 warning variant (`--color-warning-bg` / `--color-warning-text`). **Toast** — raised background,
 3 px left border in `--toast-accent` (info) or `--color-danger`.
 
+## Loading
+
+One component, `insight-dashboard/src/app/ui/loader.component.ts` (`<app-loader>`), four variants.
+Pick by what the reader is looking at while they wait:
+
+| Variant | When | Example |
+|---|---|---|
+| `skeleton` | The layout is known and nothing is shown yet | Market cards and caps table on first load; the "now" tiles while a coin loads |
+| `block` | A region whose shape is not known yet | Liquidations block; the coin list before the top 20 arrive |
+| `overlay` | Content is being **replaced** | The chart while a timeframe switch loads: the old chart stays readable underneath |
+| `inline` | A small part of a line or header is refreshing | Market "refresh"; the dropdown's figures; earlier history under the chart |
+
+Rules:
+
+- **Only the first load gets a skeleton or block.** A refresh or a poll over content already on
+  screen uses `inline` or `overlay` and never blanks the content. Blanking makes the page jump.
+- **Every loader appears after 150 ms** (CSS `animation-delay`, no timer), so a fast answer never
+  flashes one.
+- **The label says what is loading** («Загружаю график…»), and it is the `role="status"` accessible
+  name. A bare spinner says nothing to a screen reader.
+- **Reduced motion:** no spin and no shimmer under `prefers-reduced-motion`; the shapes stay.
+- Colours are tokens only: ring `--color-border` with a `--color-focus` arc, skeleton
+  `--color-bg-overlay` → `--color-border`.
+
 ## Canvas renderers
 
 lightweight-charts and the overlay renderers take colour strings in TypeScript, not CSS. They

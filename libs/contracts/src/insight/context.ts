@@ -188,5 +188,13 @@ export const WebMarketCardsResponseSchema = z.object({
    *  source for every figure it shows, and a source hard-coded in the client is a claim the
    *  server never made. */
   capsSource: WebCardSourceSchema.default('coingecko'),
+  /**
+   * 2026-10-24: true when the cards were read live from the venues rather than from stored rows.
+   * Nothing is collected any more (the collectors stopped 2026-10-21, wind-down), so a move over
+   * days is only there when the venue itself publishes it: Fear & Greed's history is free, the
+   * 24 h cap change is in CoinGecko's payload, dominance and cap history are paid. The page then
+   * leaves the unknown moves out instead of explaining them as a young collection.
+   */
+  live: z.boolean().default(false),
 });
 export type WebMarketCardsResponse = z.infer<typeof WebMarketCardsResponseSchema>;

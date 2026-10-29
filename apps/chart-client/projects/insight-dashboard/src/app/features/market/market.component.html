@@ -1,13 +1,16 @@
 <header>
   <h1>{{ t('market.title') }}</h1>
-  <button type="button" (click)="load()">{{ t('action.refresh') }}</button>
+  <button type="button" (click)="load()" [disabled]="loading()">{{ t('action.refresh') }}</button>
+  @if (loading() && !firstLoad()) {
+    <app-loader variant="inline" [label]="t('market.loading')" />
+  }
 </header>
 
 @if (error(); as message) {
   <p class="error" role="alert">{{ message }}</p>
 }
-@if (loading()) {
-  <p class="muted">{{ t('state.loading') }}</p>
+@if (live()) {
+  <p class="muted">{{ t('market.live') }}</p>
 }
 
 <div class="cards">
@@ -15,7 +18,9 @@
        own classification stays beside it verbatim (§11) so the two can never disagree. -->
   <section class="card">
     <h2>{{ t('market.fg.title') }}</h2>
-    @if (fearGreed(); as fg) {
+    @if (firstLoad()) {
+      <app-loader variant="skeleton" [lines]="4" [label]="t('market.loading')" />
+    } @else if (fearGreed(); as fg) {
       <p class="value" [style.color]="band(fg.now.value).colour">{{ fg.now.value }}</p>
       <p class="label" [style.color]="band(fg.now.value).colour">{{ t(band(fg.now.value).key) }}</p>
       <p class="muted">{{ t('market.asOf', { when: fg.now.day }) }} · {{ fg.now.classification }}</p>
@@ -35,12 +40,18 @@
        "rose 2 %" would be ambiguous where "rose 2 points" is not. -->
   <section class="card">
     <h2>{{ t('market.dominance.title') }}</h2>
-    @if (dominance(); as dom) {
+    @if (firstLoad()) {
+      <app-loader variant="skeleton" [lines]="4" [label]="t('market.loading')" />
+    } @else if (dominance(); as dom) {
       <p class="value">{{ percent(dom.btcPct) }}</p>
       <p class="muted">{{ t('market.asOf', { when: asOf(dom.atMs) ?? t('market.unknown') }) }}</p>
-      <p>{{ t('market.dominance.day', { change: points(dom.changePct24h) }) }}</p>
-      <p>{{ t('market.dominance.week', { change: points(dom.changePct7d) }) }}</p>
-      @if (dom.changePct7d === null) {
+      @if (!live() || dom.changePct24h !== null) {
+        <p>{{ t('market.dominance.day', { change: points(dom.changePct24h) }) }}</p>
+      }
+      @if (!live() || dom.changePct7d !== null) {
+        <p>{{ t('market.dominance.week', { change: points(dom.changePct7d) }) }}</p>
+      }
+      @if (!live() && dom.changePct7d === null) {
         <!-- §10: this series is collected forward and cannot be backfilled. Two different reasons
              for a missing 7-day move, and the card must not give the wrong one: under a week of
              collection is youth, a week or more of it with no comparable sample is a gap in the
@@ -67,11 +78,17 @@
        share of twenty, and the deltas compare only days with the same coverage. -->
   <section class="card">
     <h2>{{ t('market.btcVsTop.title') }}</h2>
-    @if (btcVsTop(); as top) {
+    @if (firstLoad()) {
+      <app-loader variant="skeleton" [lines]="3" [label]="t('market.loading')" />
+    } @else if (btcVsTop(); as top) {
       <p class="value">{{ percent(top.sharePct) }}</p>
       <p class="muted">{{ t('market.btcVsTop.counted', { counted: top.coinsCounted, expected: top.coinsExpected, day: top.day }) }}</p>
-      <p>{{ t('market.btcVsTop.week', { change: points(top.changePct7d) }) }}</p>
-      <p>{{ t('market.btcVsTop.month', { change: points(top.changePct30d) }) }}</p>
+      @if (!live() || top.changePct7d !== null) {
+        <p>{{ t('market.btcVsTop.week', { change: points(top.changePct7d) }) }}</p>
+      }
+      @if (!live() || top.changePct30d !== null) {
+        <p>{{ t('market.btcVsTop.month', { change: points(top.changePct30d) }) }}</p>
+      }
       <p class="muted source">{{ t('market.source', { source: top.source }) }}</p>
     } @else {
       <p class="muted">{{ t('market.btcVsTop.none') }}</p>
@@ -84,6 +101,11 @@
   }
 </div>
 
+@if (liquidationsFirstLoad()) {
+  <section class="card wide">
+    <app-loader variant="block" [label]="t('market.loadingLiquidations')" />
+  </section>
+}
 @if (liquidationsError(); as message) {
   <p class="error" role="alert">{{ message }}</p>
 }
@@ -105,7 +127,7 @@
   <table>
     <thead>
       <!-- §11 English-by-rule: field names in a table of raw data (allow-listed with the reason) -->
-      <tr><th>coin</th><th class="num">cap</th><th class="num">price</th><th class="num">share</th><th class="num">24h</th><th class="num">7d</th></tr>
+      <tr><th>coin</th><th class="num">cap</th><th class="num">price</th><th class="num">share</th><th class="num">24h</th>@if (!live()) {<th class="num">7d</th>}</tr>
     </thead>
     <tbody>
       @for (row of heldCaps(); track row.coin) {
@@ -115,10 +137,17 @@
           <td class="num">{{ price(row.priceUsd) ?? t('market.unknown') }}</td>
           <td class="num">{{ fraction(row.share) }}</td>
           <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ fraction(row.change24h, { sign: true }) }}</td>
-          <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ fraction(row.change7d, { sign: true }) }}</td>
+          @if (!live()) {
+            <!-- live: the 7-day cap move is paid history, so the column would be all «нет данных» -->
+            <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ fraction(row.change7d, { sign: true }) }}</td>
+          }
         </tr>
       } @empty {
-        <tr><td colspan="6" class="muted">{{ t('market.table.none') }}</td></tr>
+        @if (firstLoad()) {
+          <tr><td colspan="6"><app-loader variant="skeleton" [lines]="5" [label]="t('market.loading')" /></td></tr>
+        } @else {
+          <tr><td colspan="6" class="muted">{{ t('market.table.none') }}</td></tr>
+        }
       }
     </tbody>
   </table>

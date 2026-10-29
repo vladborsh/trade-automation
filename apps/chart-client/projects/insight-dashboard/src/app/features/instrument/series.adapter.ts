@@ -46,17 +46,6 @@ export function toCandleData(candles: readonly WebCandle[]): CandleDatum[] {
   return ascending(candles.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
 }
 
-/**
- * The spot market's closes, drawn as one line over the futures candles (user, 2026-10-24).
- *
- * Closes rather than candles: two sets of candles on one pane are unreadable, while a line shows
- * the premium as the gap between it and the candle bodies. Same sort and de-duplication as every
- * other series, because the chart throws on an out-of-order time.
- */
-export function toCloseLine(candles: readonly WebCandle[]): LineDatum[] {
-  return ascending(candles.map((c) => ({ time: c.time, value: c.close })));
-}
-
 export function toVolumeData(candles: readonly WebCandle[]): LineDatum[] {
   return ascending(candles.map((c) => ({ time: c.time, value: c.volume })));
 }
@@ -70,9 +59,10 @@ export function toVolumeData(candles: readonly WebCandle[]): LineDatum[] {
  * `Value is null` during paint, far from the cause. The `/api/web` wire stays in seconds like
  * the rest of the dashboard; converting here is this file's job.
  *
- * `ohlc` is flat (the reading is a snapshot, not a bar) and `samples` is 1: the renderer uses
- * them for candle styling at coarse timeframes, and claiming a range we did not measure would
- * draw wicks that never existed.
+ * `ohlc` and `notionalOhlc` are flat (the reading is a snapshot, not a bar) and `samples` is 1:
+ * claiming a range we did not measure would draw wicks that never existed. `notionalOhlc` must be
+ * there at all because the renderer's candle style plots it and nothing else; without it every
+ * point was whitespace and open interest vanished at any timeframe above 1m (2026-10-24).
  */
 export function toOpenInterestPoints(
   rows: readonly { time: number; value: number; notional: number | null }[],
@@ -87,7 +77,11 @@ export function toOpenInterestPoints(
     unit: 'base' as const,
     value: r.value,
     ohlc: { open: r.value, high: r.value, low: r.value, close: r.value },
-    ...(r.notional === null ? {} : { notional: r.notional, notionalBasis: 'venue' as const }),
+    ...(r.notional === null ? {} : {
+      notional: r.notional,
+      notionalBasis: 'venue' as const,
+      notionalOhlc: { open: r.notional, high: r.notional, low: r.notional, close: r.notional },
+    }),
     samples: 1,
   })) as MetricPoint[];
 }

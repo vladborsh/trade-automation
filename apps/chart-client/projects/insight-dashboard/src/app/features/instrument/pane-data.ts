@@ -1,5 +1,5 @@
 import type {
-  WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
+  WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
   WebLongShortResponse,
 } from '@trade-automation/contracts';
 
@@ -22,9 +22,15 @@ export interface PaneData {
   /** The venues those events actually came from — the label is built from this, not a filter. */
   liquidationVenues: readonly string[];
   /**
-   * 2026-10-24 — the spot market's candles for the same window, drawn as a line on the price pane.
-   * `null` with `spotState` saying why: the symbol has no Binance spot market, or the read failed.
+   * 2026-10-24 — 1d perp candles for the window plus the two weeks before it, for the previous
+   * day/week high and low (`prior-levels.ts`). Separate from `candles` because on 1m the window
+   * is one day and holds no previous day. Empty when the read failed: the levels drop out, not
+   * the chart.
    */
-  spotCandles: WebCandlesResponse | null;
-  spotState: 'shown' | 'none' | 'failed';
+  dailyCandles: readonly WebCandle[];
+  /**
+   * True when this is the previous window with earlier history prepended (scrolling left), so the
+   * chart keeps the reader's view instead of jumping to the whole window. Absent on a fresh load.
+   */
+  extendsPrevious?: boolean;
 }

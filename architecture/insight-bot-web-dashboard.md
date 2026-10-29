@@ -353,13 +353,47 @@ indicators sit **under** it on **one shared time axis**.
   keeps its own autoscaled price scale (the reason IB-BUG-009 split them: OI at 10^9 can no longer
   flatten candles at 10^4, because no two panes share a scale). The time axis is shared, so a
   crosshair moment is the same moment in every pane.
-- **Every pane is resizable by height**, by dragging the separator, and the heights are
-  **remembered in the browser** (`localStorage` key `insight.instrument.paneHeights.v1`). A
-  blocked or corrupt storage falls back to the defaults; "Reset pane heights" restores them.
-- **Spot is a line on the futures price pane**, not a separate chart and not a toggle. The old
-  perp/spot switch only swapped the candles and left every other pane on perp data, so it showed
-  nothing a reader could compare. The gap between the candles and the spot line is the premium.
-  A symbol with no Binance spot market simply has no line, and the legend says so.
+- **Every pane is resizable by height**, by dragging its lower edge. Only that pane changes; the
+  panes under it move down and the chart grows, the page scrolls (user's correction, 2026-10-24:
+  the first cut used the library's separators, which trade height between neighbours inside a
+  fixed chart). Heights are pixels, **remembered in the browser** (`localStorage` key
+  `insight.instrument.paneHeights.v2`; v1 held shares and is ignored). A blocked or corrupt
+  storage falls back to the defaults; "Reset pane heights" restores them.
+- **Every series sits on the candle grid.** The panes share one time scale, and the library gives
+  every distinct time of every series a slot on it: 5-minute OI and long/short on a 1 h chart made
+  twelve slots per candle and drew the candles as sparse sticks. Each series is snapped to the
+  candle timeframe, last reading in a bar winning (`time-grid.ts`).
+- **Scrolling or zooming out past the oldest bar loads the window before it**, the same width,
+  and joins it on (`pane-merge.ts`); the view stays where the reader is. An empty earlier read means
+  the venue's history starts there, and the page says so under the chart and stops asking.
+- **No range buttons; the window follows the timeframe** (user, 2026-10-24): 1m opens on 1 day,
+  15m on 7, 1h on 30, 4h on 90, 1d on 365, and scrolling left loads the same width again
+  (`time-range.ts`). The liquidation bucket follows too: 1m → 1m, 15m → 15m, coarser → 1h, the
+  coarsest `WebLiquidationBucketSchema` has. No frame's window is one the server refuses, so the
+  old "1m coarsened to 15m" note has no case and is gone.
+- **No spot line** (removed 2026-10-24, user). The price pane is perp only.
+- **Indicators on the chart**, each a pure, specced module, drawn in `panel-series.ts`:
+  - *Day separators* (`day-separators.ts`): a dashed `#30363d` line at every UTC midnight on all
+    five panes, up to 4h (off on 1d).
+  - *London and New York sessions* (`trading-sessions.ts`, one `SESSIONS` constant): translucent
+    bands over the price pane's full height, behind the candles, on 1m/15m/1h only (a session is
+    narrower than a 4h bar). Local exchange hours with the zone's own DST via `Intl`: London
+    08:00–16:30 `Europe/London`, New York 09:30–16:00 `America/New_York`, local weekdays only;
+    exchange holidays are not modelled.
+  - *PDH/PDL and PWH/PWL* (`prior-levels.ts`): each UTC day drawn at the previous day's high/low,
+    each ISO week (Monday 00:00 UTC) at the previous week's, as thin dashed step lines titled on
+    the price axis. Computed from **1d candles fetched for the purpose** — the window plus the two
+    weeks before it, extended when earlier history loads — because on 1m the window holds no
+    previous day. A week's level needs all seven daily candles; a missing period is a gap in the
+    line, not yesterday's value carried on. The lines are left out of the pane's autoscale, so a
+    level far from the price is off screen rather than flattening the candles. A failed daily read
+    drops the four lines, not the chart.
+  - Every mark is placed on a **candle time** (`barsWithin` in `time-grid.ts`), never on a raw
+    clock time, so no indicator adds a slot to the shared time scale. Lines and bands are one pane
+    primitive per pane (`time-marks.primitive.ts`), drawn under the series.
+- **Loaders** use the shared `<app-loader>`: a block in the chart's reserved space before the first
+  chart, an overlay over the old chart while a timeframe or symbol switch loads, and an inline one
+  in the chart foot while earlier history loads.
 - **The symbol list is a dropdown**, not a sidebar. It shows per coin: 24 h price change,
   predicted funding and open-interest change over 24 h, from the new endpoint below.
 - **A context column** beside the chart: the current values (OI, funding, CVD, long/short), the
@@ -386,6 +420,25 @@ calls against the separate `/futures/data` limit. Above 1,800 used weight the en
 with 503 `VENUE_UNAVAILABLE` instead of adding load. One coin whose OI call fails shows a dash
 in its row; a failure of either all-symbol call fails the request. The three response shapes are
 pinned by fixtures captured 2026-10-24 (`apps/insight-bot/test/fixtures/binance/`).
+
+### 13.1a Market cards, live (2026-10-24)
+
+`GET /api/web/context/cards` reads alternative.me and CoinGecko **live** when `MarketCardsService`
+is wired, which it is in `WebModule`; nothing is stored. Until then the cards read stored rows, and
+since the collectors stopped (2026-10-21) every card said «пока не собран». This is WD-009's default
+("keep the current snapshot, drop the historical parts") done ahead of it.
+
+| Call | Cache | At most |
+|---|---|---|
+| alternative.me `/fng/?limit=8` | 10 min | 0.1/min |
+| CoinGecko `/api/v3/global` | 2 min | 0.5/min |
+| CoinGecko `/api/v3/coins/markets?ids=<top 20>` | 2 min | 0.5/min |
+
+No Binance weight. A failed read serves the last good answer, else only that card is empty. Fear &
+Greed keeps yesterday and a week ago (the venue's history is free). The total cap's 24 h move and
+each coin's 24 h cap move are the venue's own figures. Dominance moves and 7/30-day moves need
+CoinGecko's paid history and are null; the payload says `live: true` and the page leaves those
+lines out instead of calling the collection young.
 
 ### 13.2 Removed pages
 

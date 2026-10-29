@@ -1,75 +1,47 @@
-import { WEB_MAX_1M_RANGE_DAYS, type WebTimeframe } from '@trade-automation/contracts';
-import type { StringKey } from '../../i18n/keys';
+import { WEB_MAX_1M_RANGE_DAYS, type WebLiquidationBucket, type WebTimeframe } from '@trade-automation/contracts';
 
 /**
- * IB-031 — the instrument page's range and timeframe choices
- * (architecture/insight-bot-web-dashboard.md §2).
+ * The instrument page's timeframe choice and what follows from it
+ * (architecture/insight-bot-web-dashboard.md §13).
  *
- * Pure and specced, per AGENTS.md, because the interesting part is not the arithmetic: it is
- * that **the page must never offer a combination the server will refuse.** The server rejects a
- * 1m range over 90 days with `RANGE_TOO_WIDE`; a picker that lets someone choose "1 year" and
- * "1m" and then shows them an error is a worse page than one that quietly coarsens the frame.
+ * 2026-10-24: **no range buttons.** The window follows the timeframe: a frame gets as much history
+ * as reads well at its bar width, and scrolling left loads more (`pane-merge.ts`). That retires the
+ * range × timeframe matrix and with it the case the old module existed for: no frame's window is
+ * wider than the server serves (1m over `WEB_MAX_1M_RANGE_DAYS` is refused), so there is nothing to
+ * coarsen and no pair to disable. The spec pins that, so a wider 1m window fails the build rather
+ * than the page.
  */
-
-export type RangeKey = '1d' | '3d' | '1w' | '1m' | '3m' | '1y';
-
-export interface RangePreset {
-  key: RangeKey;
-  /**
-   * The i18n key, not the text (§11, IB-BUG-004). The label lives in `i18n/{ru,en}.ts`, so this
-   * module stays pure and the page renders it in the member's language.
-   */
-  labelKey: StringKey;
-  days: number;
-}
-
-export const RANGE_PRESETS: readonly RangePreset[] = [
-  { key: '1d', labelKey: 'range.1d', days: 1 },
-  { key: '3d', labelKey: 'range.3d', days: 3 },
-  { key: '1w', labelKey: 'range.1w', days: 7 },
-  { key: '1m', labelKey: 'range.1m', days: 30 },
-  { key: '3m', labelKey: 'range.3m', days: 90 },
-  { key: '1y', labelKey: 'range.1y', days: 365 },
-];
 
 export const TIMEFRAMES: readonly WebTimeframe[] = ['1m', '15m', '1h', '4h', '1d'];
 
+/** Days of history a timeframe opens with: roughly 1 000–2 200 bars, a screen's worth at any frame. */
+export const WINDOW_DAYS: Readonly<Record<WebTimeframe, number>> = {
+  '1m': 1,
+  '15m': 7,
+  '1h': 30,
+  '4h': 90,
+  '1d': 365,
+};
+
 const DAY_MS = 86_400_000;
 
-export function rangeOf(preset: RangePreset, nowMs: number): { fromMs: number; toMs: number } {
-  return { fromMs: nowMs - preset.days * DAY_MS, toMs: nowMs };
-}
-
-/** True when the server would refuse this pair outright. */
-export function isRefused(preset: RangePreset, tf: WebTimeframe): boolean {
-  return tf === '1m' && preset.days > WEB_MAX_1M_RANGE_DAYS;
+/** The window a timeframe opens with, ending at `toMs`; also the width of each earlier window. */
+export function windowFor(tf: WebTimeframe, toMs: number): { fromMs: number; toMs: number } {
+  return { fromMs: toMs - WINDOW_DAYS[tf] * DAY_MS, toMs };
 }
 
 /**
- * The timeframe to actually request: the chosen one, or the finest the server will serve for
- * this range. Coarsening silently is the right call *only because the page says it did* — the
- * caller shows `coarsenedTo` next to the switch.
+ * The liquidation bucket for a timeframe: the bar width where the server has one, else its
+ * coarsest (`WebLiquidationBucketSchema` is 1m | 15m | 1h). A bubble is bucketed to the bar on
+ * screen anyway (`liquidation-markers.adapter.ts`); this is the histogram behind the summary.
  */
-export function effectiveTimeframe(preset: RangePreset, tf: WebTimeframe): WebTimeframe {
-  return isRefused(preset, tf) ? '15m' : tf;
-}
-
-/** The timeframes that may be offered for a range, so the switch disables the rest. */
-export function allowedTimeframes(preset: RangePreset): WebTimeframe[] {
-  return TIMEFRAMES.filter((tf) => !isRefused(preset, tf));
-}
-
-/**
- * The liquidation bucket that suits a range: fine enough to see a cascade, coarse enough that a
- * quarter is not 129,600 bars. Independent of the candle timeframe, because a cascade is worth
- * seeing at 1m even when price is drawn at 1h.
- */
-export function bucketFor(preset: RangePreset): '1m' | '15m' | '1h' {
-  if (preset.days <= 3) return '1m';
-  if (preset.days <= 30) return '15m';
+export function bucketFor(tf: WebTimeframe): WebLiquidationBucket {
+  if (tf === '1m') return '1m';
+  if (tf === '15m') return '15m';
   return '1h';
 }
 
-export function findPreset(key: string): RangePreset | null {
-  return RANGE_PRESETS.find((p) => p.key === key) ?? null;
+/** True when the timeframe's window is one the server serves; every offered frame must be. */
+export function isServed(tf: WebTimeframe): boolean {
+  return tf !== '1m' || WINDOW_DAYS[tf] <= WEB_MAX_1M_RANGE_DAYS;
 }

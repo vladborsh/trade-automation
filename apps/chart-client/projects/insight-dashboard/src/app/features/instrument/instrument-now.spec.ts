@@ -15,7 +15,7 @@ function pane(over: Partial<PaneData> = {}): PaneData {
     longShort: { symbol: 'BTCUSDT', kind: 'global_account', points: [{ time: 50, ratio: 9 }, { time: 90, ratio: 2.0412 }], downsampled: false },
     liquidations: { bars: [], downsampled: false, undercounted: false } as never,
     liquidationEvents: [], liquidationVenues: [],
-    spotCandles: null, spotState: 'none',
+    dailyCandles: [],
     ...over,
   };
 }

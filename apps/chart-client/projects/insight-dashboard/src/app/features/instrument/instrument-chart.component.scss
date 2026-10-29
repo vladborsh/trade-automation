@@ -1,7 +1,7 @@
 /*
- * The chart fills whatever height the page gives it. `:host` must be a flex item with
- * `min-height: 0`: an inline host collapses the chart to a sliver while every unit test passes
- * (IB-BUG-009's first acceptance run).
+ * The chart is as tall as its panes (bound in the template); the page scrolls when they outgrow
+ * the screen. `:host` stays a flex item with `min-height: 0`: an inline host collapsed the chart
+ * to a sliver while every unit test passed (IB-BUG-009's first acceptance run).
  */
 :host {
   display: flex;
@@ -13,8 +13,7 @@
 
 .chart {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 420px;
+  flex: 0 0 auto;
 }
 
 .chart-host {
@@ -61,6 +60,45 @@
     height: 2px;
     border-radius: 0;
   }
+}
+
+/*
+ * Sticky to the bottom of the screen while the panes run past it; under the last pane when they
+ * end on screen. Opaque, because the panes scroll beneath it.
+ */
+.time-axis {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  height: 30px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.axis-host {
+  height: 100%;
+}
+
+/* Centred on the pane's lower edge, wider than the 1 px line so it is easy to grab. */
+.pane-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  height: 9px;
+  margin-top: -4px;
+  cursor: row-resize;
+  touch-action: none;
+
+  &:hover,
+  &:active {
+    background: linear-gradient(transparent 3px, var(--color-focus) 3px, var(--color-focus) 6px, transparent 6px);
+    opacity: 0.6;
+  }
+}
+
+.edge-note {
+  color: var(--color-text);
 }
 
 .chart-foot {

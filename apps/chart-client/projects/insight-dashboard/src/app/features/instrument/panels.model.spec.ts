@@ -150,8 +150,7 @@ describe('windowBounds (IB-BUG-009)', () => {
     liquidations: { bars: [{ time: 2500, long: 0, short: 0, events: 0 }] } as never,
     liquidationEvents: [],
     liquidationVenues: [],
-    spotCandles: null,
-    spotState: 'none',
+    dailyCandles: [],
     ...over,
   });
 

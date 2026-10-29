@@ -48,12 +48,18 @@
             </button>
           </li>
         } @empty {
-          <li class="empty">{{ t('instrument.picker.noMatch', { query: query() }) }}</li>
+          @if (listLoading()) {
+            <li class="empty"><app-loader variant="block" [label]="t('instrument.picker.loadingList')" /></li>
+          } @else {
+            <li class="empty">{{ t('instrument.picker.noMatch', { query: query() }) }}</li>
+          }
         }
       </ul>
       <p class="note">
         @if (summaryFailed()) {
           {{ t('instrument.picker.unavailable') }}
+        } @else if (summary() === null) {
+          <app-loader variant="inline" [label]="t('instrument.picker.loadingFigures')" />
         } @else {
           {{ t('instrument.picker.basis') }}
         }

@@ -2,35 +2,34 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import type {
-  WebCandlesResponse, WebFundingResponse, WebLiquidationEventsResponse, WebLiquidationCoin,
-  WebLiquidationsOverviewResponse, WebLiquidationsResponse, WebLongShortResponse,
-  WebTimeframe, WebTopLiquidation, WebUniverseSummaryRow, WebUniverseSymbol,
+  WebLiquidationCoin, WebLiquidationsOverviewResponse, WebTimeframe, WebTopLiquidation,
+  WebUniverseSummaryRow, WebUniverseSymbol,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { InstrumentChartComponent, type PaneData } from './instrument-chart.component';
 import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
+import { fetchWindow } from './instrument-window';
+import { isBeforeHistory, prependEarlier } from './pane-merge';
+import { LoaderComponent } from '../../ui/loader.component';
 import { SymbolPickerComponent } from './symbol-picker.component';
-import {
-  allowedTimeframes, bucketFor, effectiveTimeframe, findPreset, isRefused, RANGE_PRESETS,
-  rangeOf, type RangePreset,
-} from './time-range';
+import { bucketFor, TIMEFRAMES, windowFor } from './time-range';
 
 /**
  * architecture/insight-bot-web-dashboard.md §2 and §13 — one time-aligned screen for a symbol:
- * price with the spot line and liquidation bubbles, open interest, taker delta and CVD, funding,
+ * price with liquidation bubbles, sessions and previous day/week levels, open interest, taker delta and CVD, funding,
  * long/short; beside it the coin's current figures and the market context; below it the 50
  * largest liquidations in the window.
  *
- * The class is wiring only; every mapping lives in `series.adapter.ts` and every range rule in
- * `time-range.ts`, each with its own spec (AGENTS.md). The charts are a child component so this
+ * The class is wiring only; every mapping lives in `series.adapter.ts` and the window each
+ * timeframe opens with in `time-range.ts`, each with its own spec (AGENTS.md). The charts are a child component so this
  * one stays about *what to fetch* and that one about *how to draw*.
  */
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, SymbolPickerComponent],
+  imports: [DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LoaderComponent, SymbolPickerComponent],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,7 +43,8 @@ export class InstrumentComponent {
 
   readonly symbol = signal<string>('BTCUSDT');
   readonly universe = signal<WebUniverseSymbol[]>([]);
-  readonly preset = signal<RangePreset>(findPreset('1d') as RangePreset);
+  /** True until the top list has answered or failed: the picker shows a loader meanwhile. */
+  readonly universeLoading = signal(true);
   readonly timeframe = signal<WebTimeframe>('1m');
   /** The dropdown's live figures (`/universe/summary`); null until the first answer. */
   readonly summary = signal<WebUniverseSummaryRow[] | null>(null);
@@ -62,16 +62,26 @@ export class InstrumentComponent {
    */
   readonly liqCoin = signal<WebLiquidationCoin | null>(null);
   readonly liqVenues = signal<WebLiquidationsOverviewResponse['venues']>({ present: [], missing: [] });
+  /** The first load, a timeframe switch or a symbol switch: the chart shows a loader over it. */
   readonly loading = signal(true);
+  /** An earlier window is being fetched after a scroll to the left edge. */
+  readonly loadingEarlier = signal(false);
+  /** An earlier read came back empty: the venue's history starts at the left edge. */
+  readonly historyStart = signal(false);
+  /** The start of what is on screen, which is where the next earlier window ends. */
+  private loadedFromMs = 0;
+  /** Bumped by every fresh load, so an answer for an abandoned choice is dropped. */
+  private generation = 0;
   readonly error = signal<string | null>(null);
-  /** Set when the page asked for a coarser frame than the one chosen, so it can say so. */
-  readonly coarsenedTo = signal<WebTimeframe | null>(null);
 
-  readonly presets = RANGE_PRESETS;
-  readonly timeframes = computed(() => allowedTimeframes(this.preset()));
+  /** No range buttons since 2026-10-24: the window follows the timeframe (`time-range.ts`). */
+  readonly timeframes = TIMEFRAMES;
   /** The context column's tiles: the window's latest points plus the live summary's row. */
   readonly now = computed(() =>
     nowTiles(this.panes(), this.summary()?.find((r) => r.id === this.symbol()) ?? null, this.symbol()));
+
+  /** Under the chart, so it does not push the chart down; the loading state is the chart's loader. */
+  readonly edgeNote = computed(() => (this.historyStart() ? this.t('instrument.historyStart') : null));
 
   readonly downsampled = computed(() => {
     const panes = this.panes();
@@ -104,6 +114,8 @@ export class InstrumentComponent {
       this.universe.set((await this.api.universeTop(20)).symbols);
     } catch {
       this.universe.set([]); // the picker degrades to free typing; the page still works
+    } finally {
+      this.universeLoading.set(false);
     }
   }
 
@@ -116,80 +128,71 @@ export class InstrumentComponent {
     void this.load();
   }
 
-  choosePreset(preset: RangePreset): void {
-    this.preset.set(preset);
-    void this.load();
-  }
-
   chooseTimeframe(tf: WebTimeframe): void {
     this.timeframe.set(tf);
     void this.load();
   }
 
   async load(): Promise<void> {
+    const generation = ++this.generation;
     this.loading.set(true);
     this.error.set(null);
+    this.historyStart.set(false);
 
-    const preset = this.preset();
-    const chosen = this.timeframe();
-    const tf = effectiveTimeframe(preset, chosen);
-    this.coarsenedTo.set(isRefused(preset, chosen) ? tf : null);
-
-    const { fromMs, toMs } = rangeOf(preset, Date.now());
+    const tf = this.timeframe();
+    const { fromMs, toMs } = windowFor(tf, Date.now());
     const symbol = this.symbol();
-    const bucket = bucketFor(preset);
+    const bucket = bucketFor(tf);
 
     try {
-      const [candles, spot, oi, funding, ls, liquidations, top, events] = await Promise.all([
-        this.api.candles(symbol, fromMs, toMs, tf, 'perp'),
-        this.spot(symbol, fromMs, toMs, tf),
-        this.api.openInterest(symbol, fromMs, toMs),
-        this.api.funding(symbol, fromMs, toMs),
-        this.api.longShort(symbol, fromMs, toMs, 'global_account'),
-        this.api.liquidations(symbol, fromMs, toMs, bucket),
+      const [panes, top] = await Promise.all([
+        fetchWindow(this.api, { symbol, fromMs, toMs, timeframe: tf, bucket }),
         this.api.topLiquidations(symbol, fromMs, toMs, 50),
-        this.liquidationEvents(symbol, fromMs, toMs),
       ]);
-      this.panes.set(this.toPanes(candles, spot, oi, funding, ls, liquidations, events, tf, bucket));
+      if (generation !== this.generation) return; // a newer choice was made while this was loading
+      this.loadedFromMs = fromMs;
+      this.panes.set(panes);
       this.top.set(top.rows);
       void this.loadSummary(symbol);
     } catch (error) {
+      if (generation !== this.generation) return;
       this.error.set((error as Error).message);
       this.panes.set(null);
       this.top.set([]);
     } finally {
-      this.loading.set(false);
+      if (generation === this.generation) this.loading.set(false);
     }
   }
 
   /**
-   * The markers' events, degrading rather than failing the page.
-   *
-   * A window with more than 2 000 liquidations answers `RANGE_TOO_WIDE`, which is the server
-   * refusing to truncate. That is not a reason to show no chart: the candles are still worth
-   * looking at, so the markers drop out and the rest of the page loads.
+   * The reader scrolled to the left edge: fetch the window before the one on screen, the same
+   * width, and join it on (2026-10-24 bug: scrolling left loaded nothing). One read at a time;
+   * an empty earlier read means the venue's history starts there, and the page stops asking.
+   * The top-50 table stays about the opening window, not about however far the reader scrolled.
    */
-  private async liquidationEvents(symbol: string, fromMs: number, toMs: number): Promise<WebLiquidationEventsResponse> {
+  async loadEarlier(): Promise<void> {
+    const current = this.panes();
+    if (!current || this.loadingEarlier() || this.historyStart() || this.loading()) return;
+    const generation = this.generation;
+    const toMs = this.loadedFromMs - 1;
+    const { fromMs } = windowFor(current.timeframe as WebTimeframe, toMs);
+    this.loadingEarlier.set(true);
     try {
-      return await this.api.liquidationEvents(symbol, fromMs, toMs);
+      const earlier = await fetchWindow(this.api, {
+        symbol: this.symbol(), fromMs, toMs, timeframe: current.timeframe as WebTimeframe,
+        bucket: current.bucket,
+      });
+      if (generation !== this.generation) return;
+      if (isBeforeHistory(earlier)) {
+        this.historyStart.set(true);
+        return;
+      }
+      this.loadedFromMs = fromMs;
+      this.panes.set(prependEarlier(current, earlier));
     } catch {
-      return { symbol, minUsd: 0, events: [], venuesPresent: [], undercounted: true };
-    }
-  }
-
-  /**
-   * The spot candles for the line on the price pane, degrading rather than failing the page.
-   * `none` when the top list says the coin has no Binance spot market, or the read came back
-   * empty; `failed` when it errored. The legend says which, because they mean different things.
-   */
-  private async spot(symbol: string, fromMs: number, toMs: number, tf: WebTimeframe): Promise<{ candles: WebCandlesResponse | null; state: PaneData['spotState'] }> {
-    const known = this.universe().find((s) => s.id === symbol);
-    if (known && !known.venues.binanceSpot) return { candles: null, state: 'none' };
-    try {
-      const candles = await this.api.candles(symbol, fromMs, toMs, tf, 'spot');
-      return candles.candles.length > 0 ? { candles, state: 'shown' } : { candles: null, state: 'none' };
-    } catch {
-      return { candles: null, state: 'failed' };
+      // a failed earlier read leaves the window as it was; the next scroll to the edge retries
+    } finally {
+      this.loadingEarlier.set(false);
     }
   }
 
@@ -202,32 +205,5 @@ export class InstrumentComponent {
     } catch {
       this.liqCoin.set(null);
     }
-  }
-
-  private toPanes(
-    candles: WebCandlesResponse,
-    spot: { candles: WebCandlesResponse | null; state: PaneData['spotState'] },
-    oi: { points: Array<{ time: number; value: number; notional: number | null }> },
-    funding: WebFundingResponse,
-    ls: WebLongShortResponse,
-    liquidations: WebLiquidationsResponse,
-    events: WebLiquidationEventsResponse,
-    timeframe: WebTimeframe,
-    bucket: string,
-  ): PaneData {
-    return {
-      instrument: `binance:${this.symbol()}`,
-      timeframe,
-      bucket,
-      candles,
-      openInterest: oi.points,
-      funding,
-      longShort: ls,
-      liquidations,
-      liquidationEvents: events.events,
-      liquidationVenues: events.venuesPresent,
-      spotCandles: spot.candles,
-      spotState: spot.state,
-    };
   }
 }

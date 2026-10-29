@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import type { WebUniverseSummaryRow, WebUniverseSymbol } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
+import { LoaderComponent } from '../../ui/loader.component';
 import { coinPrice } from '../market/market.adapter';
 import { signed } from '../market/market.format';
 import { enterTarget, pickerRows } from './symbol-picker.rows';
@@ -19,6 +20,7 @@ import { enterTarget, pickerRows } from './symbol-picker.rows';
 @Component({
   selector: 'app-symbol-picker',
   standalone: true,
+  imports: [LoaderComponent],
   templateUrl: './symbol-picker.component.html',
   styleUrl: './symbol-picker.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -28,6 +30,8 @@ export class SymbolPickerComponent {
   readonly universe = input<readonly WebUniverseSymbol[]>([]);
   readonly summary = input<readonly WebUniverseSummaryRow[] | null>(null);
   readonly summaryFailed = input(false);
+  /** The top list has not arrived: an empty list then means "wait", not "no match". */
+  readonly listLoading = input(false);
 
   readonly selected = output<string>();
   readonly opened = output<void>();

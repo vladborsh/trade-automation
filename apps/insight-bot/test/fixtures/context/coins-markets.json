@@ -1,0 +1,35 @@
+[
+  {
+    "id": "bitcoin",
+    "symbol": "btc",
+    "name": "Bitcoin",
+    "current_price": 80518,
+    "market_cap": 1618630511548,
+    "market_cap_rank": 1,
+    "market_cap_change_percentage_24h": -0.03642,
+    "price_change_percentage_24h": -0.03736,
+    "last_updated": "2026-10-24T22:56:46.000Z"
+  },
+  {
+    "id": "ethereum",
+    "symbol": "eth",
+    "name": "Ethereum",
+    "current_price": 2341.79,
+    "market_cap": 286063542552,
+    "market_cap_rank": 2,
+    "market_cap_change_percentage_24h": -0.49756,
+    "price_change_percentage_24h": -0.49808,
+    "last_updated": "2026-10-24T22:56:46.000Z"
+  },
+  {
+    "id": "solana",
+    "symbol": "sol",
+    "name": "Solana",
+    "current_price": 101.51,
+    "market_cap": 59868651691,
+    "market_cap_rank": 7,
+    "market_cap_change_percentage_24h": -0.28423,
+    "price_change_percentage_24h": -0.29328,
+    "last_updated": "2026-10-24T22:56:46.000Z"
+  }
+]

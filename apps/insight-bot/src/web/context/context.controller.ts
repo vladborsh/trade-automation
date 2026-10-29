@@ -1,8 +1,9 @@
-import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Inject, Optional, Query } from '@nestjs/common';
 import type { WebFearGreedResponse, WebMarketCapResponse, WebMarketCardsResponse } from '@trade-automation/contracts';
 import { AppConfigService } from '../../config/config.service';
 import { DB, type Db } from '../../db/db.port';
 import { coinCapsBetween, dominanceBetween, dominanceStart, fearGreedBetween, latestFearGreed } from '../../db/pg/web-context-reads';
+import { MarketCardsService } from '../market/market-cards.service';
 import { DAY_MS, thin } from '../series/range';
 import { marketCapCurrent, marketCapDays } from './market-shares';
 import { btcVsTopCard, capsCard, dominanceCard, fearGreedCard } from './market-cards';
@@ -23,6 +24,7 @@ export class WebContextController {
   constructor(
     private readonly config: AppConfigService,
     @Inject(DB) private readonly db: Db | null,
+    @Optional() private readonly live?: MarketCardsService,
   ) {}
 
   /**
@@ -36,8 +38,12 @@ export class WebContextController {
    */
   @Get('cards')
   async cards(): Promise<WebMarketCardsResponse> {
+    // 2026-10-24: live from the venues when the service is wired (it is, in WebModule). Nothing
+    // collects any more, so the stored path below would answer «not collected yet» for ever; it
+    // stays for the specs and until WD-009 deletes the tables it reads.
+    if (this.live) return this.live.cards(this.topCoins());
     if (!this.db) {
-      return { fearGreed: null, dominance: null, btcVsTop: null, caps: [], capsDay: null, capsSource: 'coingecko' };
+      return { fearGreed: null, dominance: null, btcVsTop: null, caps: [], capsDay: null, capsSource: 'coingecko', live: false };
     }
     const now = Date.now();
     // the same top-20 the chart endpoint uses, in the same order: two pages that disagree about
@@ -59,6 +65,7 @@ export class WebContextController {
       caps: capsCard(marketCapCurrent(days, capRows)),
       capsDay: days.at(-1)?.day ?? null,
       capsSource: 'coingecko',
+      live: false,
     };
   }
 
