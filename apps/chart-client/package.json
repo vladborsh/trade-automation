@@ -18,6 +18,7 @@
   "private": true,
   "packageManager": "npm@11.13.0",
   "dependencies": {
+    "@trade-automation/calendar-core": "0.1.0",
     "@trade-automation/contracts": "0.1.0",
     "@trade-automation/indicators": "0.1.0",
     "@trade-automation/replay-core": "0.1.0",

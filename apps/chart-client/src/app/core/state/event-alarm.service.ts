@@ -1,11 +1,11 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import type { CalendarWeekResponse, EconomicEvent } from '../contracts/calendar';
 import { CHIME } from '../audio/chime';
-import { CalendarFiltersStore } from './calendar-filters.store';
+import { CalendarFiltersStore, passesFilters } from './calendar-filters.store';
 import { mergeEvent } from './calendar.store';
 import { NotificationsStore } from './notifications.store';
 import { eventGroupLabel } from './calendar-labels';
-import { dueAlerts, pruneFired, type DueAlert } from './due-alerts';
+import { dueAlerts, pruneFired, type DueAlert } from '@trade-automation/calendar-core/due-alerts';
 
 export const FIRED_KEY = 'chart-client:calendar-alerts-fired';
 /** Background tabs throttle timers to ~1/min, so an alert can be up to ~1 min late there (§11.5). */
@@ -78,7 +78,8 @@ export class EventAlarmService {
     }
     this.fired = pruneFired(this.fired, now);
     const leadMs = this.settings.alert().leadMinutes * 60_000;
-    const due = dueAlerts(this.upcomingMap().values(), this.settings.filters(), leadMs, now, new Set(Object.keys(this.fired)));
+    const filters = this.settings.filters();
+    const due = dueAlerts(this.upcomingMap().values(), (e) => passesFilters(e, filters), leadMs, now, new Set(Object.keys(this.fired)));
     if (due.length === 0) {
       return due;
     }

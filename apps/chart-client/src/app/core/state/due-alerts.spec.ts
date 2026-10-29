@@ -1,11 +1,16 @@
-import { alertKey, dueAlerts, pruneFired, FIRED_RETENTION_MS } from './due-alerts';
-import type { CalendarFilters } from './calendar-filters.store';
+import { alertKey, dueAlerts as dueAlertsWith, pruneFired, FIRED_RETENTION_MS } from '@trade-automation/calendar-core/due-alerts';
+import { passesFilters, type CalendarFilters } from './calendar-filters.store';
 import { testEvent } from './calendar-test-events';
 
 const AT = 1_790_000_000_000;
 const LEAD = 5 * 60_000;
 const FILTERS: CalendarFilters = { impacts: ['medium', 'high', 'holiday'], countries: ['USD', 'EUR', 'GBP'], hideRemoved: false };
 const NONE = new Set<string>();
+
+// IB-061: the rule moved to @trade-automation/calendar-core with the filter as a parameter; this
+// spec keeps testing it through the SPA's own filters, unchanged.
+const dueAlerts = (events: Iterable<ReturnType<typeof testEvent>>, filters: CalendarFilters, lead: number, now: number, fired: ReadonlySet<string>) =>
+  dueAlertsWith(events, (e) => passesFilters(e, filters), lead, now, fired);
 
 describe('dueAlerts (§11.5)', () => {
   it('is due from scheduledAt − lead, not before', () => {

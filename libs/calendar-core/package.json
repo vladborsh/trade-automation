@@ -4,6 +4,16 @@
   "description": "ForexFactory calendar feed client, mapper and snapshot diff, shared by the signal server and the insight bot (architecture/insight-bot-system-design.md §2.2)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./due-alerts": {
+      "types": "./dist/due-alerts.d.ts",
+      "default": "./dist/due-alerts.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "jest",
