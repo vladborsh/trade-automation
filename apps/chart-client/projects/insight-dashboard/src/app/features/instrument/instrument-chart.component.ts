@@ -199,8 +199,8 @@ export class InstrumentChartComponent implements OnDestroy {
     if (view && first !== undefined) chart.timeScale().setVisibleLogicalRange(shiftedView(view, first, chartTimes(chart)));
     else if (bounds) chart.timeScale().setVisibleRange({ from: bounds.from as Time, to: bounds.to as Time });
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
-    this.axis = new TimeAxisStrip(this.axisHost().nativeElement);
-    this.axis.attach(chart, { background: '#0d1117', text: '#c9d1d9' });
+    this.axis = new TimeAxisStrip(this.axisHost().nativeElement, this.i18n.lang);
+    this.axis.attach(chart, { background: '#0d1117', text: '#c9d1d9' }, data.timeframe);
     this.observer = new ResizeObserver(() => this.schedule());
     this.observer.observe(host);
     this.schedule();
