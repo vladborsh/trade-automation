@@ -694,14 +694,14 @@ updated, removed}` and one per notification.
 
 ## 9. Deliberately not designed here
 
-- **Event markers on the chart panels** (vertical lines at high-impact
-  times). Natural next step; would be a client-only feature over the
-  `calendar` topic and the existing overlay vocabulary. Not asked for.
+- ~~**Event markers on the chart panels**~~ — done for the insight dashboard
+  (§12, IB-060); the backtest SPA's charts still have none.
 - **Strategy access to events** (`StrategyContext.events`). That is the
   backlog idea's territory and a strategy-engine change; explicitly out of
   scope per the brief.
 - **Actuals from a paid/keyed provider** — user decision (§1.3).
-- **External notification channels** — user decision (§5.1).
+- ~~**External notification channels**~~ — reopened by the user on 2026-10-29 for the insight
+  bot only: Telegram DMs to members (§12, IB-062). The signal server still has none.
 - **Per-user timezone / server-side saved filters / multi-user** — no user
   model exists (base §4.5 "single-user, private").
 - **Recovering a missed week from another source** (§3.4).
@@ -924,3 +924,42 @@ unknown), storage v2 read + old-key discard, `CALENDAR_DEFAULTS` applied on empt
 reset-to-defaults, `currencyFlag` for every row of §11.4, `dueAlerts` (lead window, grouping,
 fired dedupe, revision re-arm, late drop), alarm independent of week navigation, toast
 filtering. All existing client tests stay green.
+
+---
+
+## 12. insight-bot: once a day, and notifications (2026-10-29, IB-058…IB-062)
+
+User decisions, 2026-10-29: the calendar stays in the insight bot (the wind-down keeps it),
+fetched **once per UTC day**; the dashboard shows major USD events and shades the hours the US
+market is shut; members get Telegram DMs and, optionally, browser notifications.
+
+- **Ingestion (IB-058).** `collectors/calendar` checks every `CALENDAR_CHECK_INTERVAL_MS`
+  (10 min) and fetches only when `calendar_fetch_runs` has no row for today's UTC date. The
+  §3.2 cadence (hot interval, Sunday rollover window) is gone: Monday 00:00 UTC is Sunday
+  20:00 ET, when the feed already carries the new week, so the first fetch of Monday sees all of
+  it. "Collected" is that row, not `calendar_events.fetched_at` — the diff writes nothing on an
+  unchanged feed. A failed fetch writes no row, so the next check retries. Budget: 2 requests a
+  day. `actual` therefore arrives about a day late (from the next day's feed or the §3.5
+  next-occurrence rule): accepted. `/health` expects the stream once per 86 400 s.
+- **API (IB-059).** `GET /api/web/calendar/events?from&to&currency=USD&impact=high,holiday`
+  (≤ 90 days, `RANGE_TOO_WIDE` beyond) and `GET /api/web/calendar/upcoming?withinMin=60`;
+  latest revision per id through the collector's own `buildEventsInWindow`, plus
+  `lastFetchedAt`. Contract `WebCalendarEventsResponse` (`libs/contracts/src/insight/calendar.ts`),
+  shape pinned by `apps/insight-bot/test/fixtures/web/calendar-events.json`.
+- **Chart (IB-060).** A line on each bar holding a high-impact USD event (price pane), a tooltip
+  with forecast / previous / actual, and bands over Saturday–Sunday UTC and each USD holiday's New
+  York day on every pane, 1m–4h only. Pure helpers `calendar-marks.ts`, `weekend-bands.ts`.
+- **Browser (IB-061).** `dueAlerts` moved to `libs/calendar-core` (browser entry
+  `@trade-automation/calendar-core/due-alerts`) and is shared by both SPAs. The dashboard polls
+  `/upcoming` once a minute while the member's header switch is on and the browser permits, and
+  shows a notification 15 minutes ahead. **Only while a dashboard tab is open** — no service
+  worker, no web push.
+- **Telegram (IB-062).** `CalendarNotifierService`, 60 s check: a morning digest at
+  `CALENDAR_DIGEST_TIME` (07:00 UTC) once today's fetch has succeeded (skipped on a day with no
+  high-impact USD event and no holiday; sendable for 6 h), and a reminder
+  `CALENDAR_REMIND_LEAD_MIN` (15) before each high-impact USD event, grouped by instant, dropped
+  when more than 5 minutes late. Times in UTC and Kyiv. Each message is claimed in
+  `calendar_notifications_sent (user_id, key)` before it is sent, so a restart never repeats one
+  (and a send that fails after its claim is not retried). `/calendar` toggles
+  `users.calendar_alerts` (default on).
+
