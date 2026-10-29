@@ -7,20 +7,25 @@ import { WEB_MAX_1M_RANGE_DAYS, type WebLiquidationBucket, type WebTimeframe } f
  * 2026-10-24: **no range buttons.** The window follows the timeframe: a frame gets as much history
  * as reads well at its bar width, and scrolling left loads more (`pane-merge.ts`). That retires the
  * range × timeframe matrix and with it the case the old module existed for: no frame's window is
- * wider than the server serves (1m over `WEB_MAX_1M_RANGE_DAYS` is refused), so there is nothing to
- * coarsen and no pair to disable. The spec pins that, so a wider 1m window fails the build rather
- * than the page.
+ * wider than the server serves (a 1m-granular read over `WEB_MAX_1M_RANGE_DAYS` is refused), so there
+ * is nothing to coarsen and no pair to disable. The spec pins that, so a wider window fails the
+ * build rather than the page.
  */
 
 export const TIMEFRAMES: readonly WebTimeframe[] = ['1m', '15m', '1h', '4h', '1d'];
 
-/** Days of history a timeframe opens with: roughly 1 000–2 200 bars, a screen's worth at any frame. */
+/**
+ * Days of history a timeframe opens with: roughly 1 000–2 200 bars, a screen's worth, at the
+ * intraday frames. 1d is held to `WEB_MAX_1M_RANGE_DAYS`: funding and the top liquidations are
+ * read at 1m granularity whatever the frame, so the server refuses any window wider than that
+ * (2026-10-29: a 365-day 1d window failed the whole page with `RANGE_TOO_WIDE`).
+ */
 export const WINDOW_DAYS: Readonly<Record<WebTimeframe, number>> = {
   '1m': 1,
   '15m': 7,
   '1h': 30,
   '4h': 90,
-  '1d': 365,
+  '1d': 90,
 };
 
 const DAY_MS = 86_400_000;
@@ -41,7 +46,10 @@ export function bucketFor(tf: WebTimeframe): WebLiquidationBucket {
   return '1h';
 }
 
-/** True when the timeframe's window is one the server serves; every offered frame must be. */
+/**
+ * True when the timeframe's window is one the server serves; every offered frame must be. Not
+ * only 1m: a window carries 1m-granular reads (funding, top liquidations) at every frame.
+ */
 export function isServed(tf: WebTimeframe): boolean {
-  return tf !== '1m' || WINDOW_DAYS[tf] <= WEB_MAX_1M_RANGE_DAYS;
+  return WINDOW_DAYS[tf] <= WEB_MAX_1M_RANGE_DAYS;
 }
