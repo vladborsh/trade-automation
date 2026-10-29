@@ -47,8 +47,25 @@ export class TelegramSender {
       this.logger.warn(`[service chat, not sent] ${text}`);
       return false;
     }
+    return this.deliver(this.chatId as string, text);
+  }
+
+  /**
+   * IB-062 — one message to a member's own chat (the calendar digest and reminders). Needs only
+   * the token, not the service chat. Never throws, for the same reason as `send`: a member who
+   * blocked the bot must not stop the next member's reminder.
+   */
+  async sendTo(chatId: number | string, text: string): Promise<boolean> {
+    if (this.bot === null) {
+      this.logger.warn(`[chat ${chatId}, not sent: no TELEGRAM_BOT_TOKEN] ${text}`);
+      return false;
+    }
+    return this.deliver(chatId, text);
+  }
+
+  private async deliver(chatId: number | string, text: string): Promise<boolean> {
     try {
-      await (this.bot as Bot).api.sendMessage(this.chatId as string, text, { link_preview_options: { is_disabled: true } });
+      await (this.bot as Bot).api.sendMessage(chatId, text, { link_preview_options: { is_disabled: true } });
       this.failures = 0;
       return true;
     } catch (error) {

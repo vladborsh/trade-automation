@@ -53,6 +53,10 @@ describe('every template has both languages and neither is empty', () => {
     missingArgument: T.missingArgument('/deposit 1000'),
     inviteCreated: T.inviteCreated('https://t.me/b?start=x', new Date('2026-10-05T12:00:00Z')),
     userList: T.userList([{ tgUserId: 1, role: 'admin', disabled: false, createdAt: new Date('2026-09-01') }]),
+    calendarDigest: T.calendarDigest('2026-10-29', [{ title: 'CPI m/m', scheduledAt: Date.UTC(2026, 9, 29, 12, 30), forecast: '0.3%', previous: null }], [], 15),
+    calendarReminder: T.calendarReminder(Date.UTC(2026, 9, 29, 12, 30), [{ title: 'CPI m/m', scheduledAt: Date.UTC(2026, 9, 29, 12, 30), forecast: null, previous: null }], 15),
+    calendarToggledOn: T.calendarToggled(true),
+    calendarToggledOff: T.calendarToggled(false),
   };
 
   it.each(Object.keys(samples))('%s is present and distinct in ru and en', (name) => {
@@ -111,5 +115,43 @@ describe('userList', () => {
     ]), 'en');
     expect(text).toContain('Members (2)');
     expect(text).toContain('222 — member (disabled)');
+  });
+});
+
+describe('calendar messages (IB-062)', () => {
+  const CPI = { title: 'CPI m/m', scheduledAt: Date.UTC(2026, 9, 29, 12, 30), forecast: '0.3%', previous: '0.2%' };
+  const CORE = { title: 'Core CPI m/m', scheduledAt: Date.UTC(2026, 9, 29, 12, 30), forecast: null, previous: '0.3%' };
+
+  it('gives every time in UTC and in Kyiv, with Kyiv\'s DST', () => {
+    // 2026-10-29 is after the EU switch: Kyiv is UTC+2
+    expect(T.calendarTime(CPI.scheduledAt, 'ru')).toBe('12:30 UTC / 14:30 Киев');
+    // in July Kyiv is UTC+3
+    expect(T.calendarTime(Date.UTC(2026, 6, 1, 12, 30), 'en')).toBe('12:30 UTC / 15:30 Kyiv');
+  });
+
+  it('renders the digest: date, holiday, each event with its figures, the lead and the off switch', () => {
+    const texts = T.calendarDigest('2026-11-26', [CPI], [{ title: 'Bank Holiday' }], 15);
+    expect(texts.ru).toBe([
+      'Календарь США на 26.11',
+      '• Праздник в США: Bank Holiday — рынки США закрыты или работают сокращённо',
+      '• 12:30 UTC / 14:30 Киев — CPI m/m (прогноз 0.3%, пред. 0.2%)',
+      '',
+      'Напомню за 15 мин до каждого. Отключить: /calendar',
+    ].join('\n'));
+    expect(texts.en).toContain('• 12:30 UTC / 14:30 Kyiv — CPI m/m (forecast 0.3%, prev. 0.2%)');
+  });
+
+  it('a holiday-only digest says there are no high-impact events', () => {
+    expect(T.calendarDigest('2026-11-26', [], [{ title: 'Bank Holiday' }], 15).en).toContain('No high-impact USD events.');
+  });
+
+  it('renders one reminder for grouped events, keeping the feed\'s English titles in Russian', () => {
+    const texts = T.calendarReminder(CPI.scheduledAt, [CORE, CPI], 15);
+    expect(texts.ru).toBe([
+      'Через 15 мин, 12:30 UTC / 14:30 Киев — важное по USD:',
+      '• Core CPI m/m (пред. 0.3%)',
+      '• CPI m/m (прогноз 0.3%, пред. 0.2%)',
+    ].join('\n'));
+    expect(texts.en.split('\n')[0]).toBe('In 15 min, 12:30 UTC / 14:30 Kyiv — high-impact USD:');
   });
 });

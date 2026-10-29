@@ -23,7 +23,7 @@ const BOT_INFO = {
 
 const member: User = {
   id: 2, tgUserId: 222, chatId: 222, role: 'member', lang: 'ru', deposit: null, riskPct: 1,
-  dailyLossLimitPct: null, dexAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date('2026-09-01'),
+  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, invitedBy: 1, disabled: false, createdAt: new Date('2026-09-01'),
 };
 const admin: User = { ...member, id: 1, tgUserId: 111, chatId: 111, role: 'admin' };
 
@@ -179,6 +179,33 @@ describe('member settings', () => {
     const h = harness({}, { 222: member });
     await h.bot.handleUpdate(text(222, '/dex вкл') as never);
     expect(h.patches).toEqual([{ userId: 2, patch: { dexAlerts: true } }]);
+  });
+
+  it('/calendar (IB-062) toggles, and /calendar on|off sets', async () => {
+    const h = harness({}, { 222: member, 223: { ...member, id: 3, tgUserId: 223, chatId: 223, calendarAlerts: false } });
+    await h.bot.handleUpdate(text(222, '/calendar') as never);
+    await h.bot.handleUpdate(text(223, '/calendar') as never);
+    await h.bot.handleUpdate(text(222, '/calendar on') as never);
+    expect(h.patches).toEqual([
+      { userId: 2, patch: { calendarAlerts: false } },
+      { userId: 3, patch: { calendarAlerts: true } },
+      { userId: 2, patch: { calendarAlerts: true } },
+    ]);
+    expect(h.sent).toEqual([T.calendarToggled(false).ru, T.calendarToggled(true).ru, T.calendarToggled(true).ru]);
+  });
+
+  it('/calendar with a word it does not know changes nothing', async () => {
+    const h = harness({}, { 222: member });
+    await h.bot.handleUpdate(text(222, '/calendar maybe') as never);
+    expect(h.patches).toEqual([]);
+    expect(h.sent).toEqual([T.BAD_ON_OFF.ru]);
+  });
+
+  it('/settings shows the calendar line', async () => {
+    const h = harness({}, { 222: member });
+    await h.bot.handleUpdate(text(222, '/settings') as never);
+    expect(h.sent[0]).toContain('Календарь США: включён');
+    expect(h.sent[0]).toContain('/calendar');
   });
 
   it('an unknown command from a MEMBER is answered, unlike a stranger\'s', async () => {

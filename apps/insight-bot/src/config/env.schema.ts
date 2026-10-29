@@ -57,6 +57,9 @@ export const EnvSchema = z.object({
   // IB-058: how often the collector checks whether today's once-a-day fetch has happened. A
   // check makes no request on a collected day; it only bounds how late the day's fetch can be.
   CALENDAR_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
+  // IB-062: members' calendar DMs — the morning digest (UTC, HH:MM) and the reminder lead.
+  CALENDAR_DIGEST_TIME: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM, UTC').default('07:00'),
+  CALENDAR_REMIND_LEAD_MIN: z.coerce.number().int().positive().max(24 * 60).default(15),
   // How far back the collector seeds its diff picture from calendar_events at boot.
   CALENDAR_CACHE_LOOKBACK_DAYS: z.coerce.number().int().positive().default(30),
 

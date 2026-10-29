@@ -167,6 +167,18 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         await reply(ctx, T.saved('dex', parsed.value ? 'on' : 'off'), lang);
         return;
       }
+      case 'calendar': {
+        // IB-062: bare /calendar toggles; /calendar on|off sets
+        let value = !user.calendarAlerts;
+        if (args[0] !== undefined) {
+          const parsed = parseOnOff(args[0]);
+          if (!parsed.ok) { await reply(ctx, T.BAD_ON_OFF, lang); return; }
+          value = parsed.value;
+        }
+        await deps.users.updateSettings(user.id, { calendarAlerts: value });
+        await reply(ctx, T.calendarToggled(value), lang);
+        return;
+      }
       case 'invite': {
         if (user.role !== 'admin') { await reply(ctx, T.ADMIN_ONLY, lang); return; }
         const code = generateInviteCode();

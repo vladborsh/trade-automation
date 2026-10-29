@@ -74,6 +74,20 @@ const ALLOWED: readonly Allowance[] = [
     why: 'the boot check (§3.4) — the other place time enters, read explicitly at the call rather than by a default',
   },
   {
+    file: 'delivery/calendar-notifier.service.ts',
+    line: 'this.timer = setInterval(() => void this.tick(Date.now()), CHECK_MS);',
+    count: 1,
+    category: 'origin',
+    why: 'the calendar DM check timer (IB-062); tick(now) threads the instant into selectDue and the journal claim',
+  },
+  {
+    file: 'delivery/calendar-notifier.service.ts',
+    line: 'void this.tick(Date.now());',
+    count: 1,
+    category: 'origin',
+    why: 'the boot check of the same notifier, read explicitly at the call',
+  },
+  {
     file: 'web/calendar/calendar.controller.ts',
     line: 'const now = Date.now();',
     count: 2,

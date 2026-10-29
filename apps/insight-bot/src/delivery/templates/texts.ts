@@ -67,6 +67,8 @@ export function settings(user: {
   dailyLossLimitPct: number | null;
   dexAlerts: boolean;
   lang: Lang;
+  /** IB-062; optional so callers from before the calendar still render. */
+  calendarAlerts?: boolean;
 }): Texts {
   const deposit = user.deposit === null ? { ru: 'не задан', en: 'not set' } : { ru: `${money(user.deposit)} USDT`, en: `${money(user.deposit)} USDT` };
   const limit = user.dailyLossLimitPct === null ? { ru: 'не задан', en: 'not set' } : { ru: pct(user.dailyLossLimitPct), en: pct(user.dailyLossLimitPct) };
@@ -76,15 +78,17 @@ export function settings(user: {
       + `• Риск на сделку: ${pct(user.riskPct)}\n`
       + `• Дневной лимит убытка: ${limit.ru}\n`
       + `• Алерты по DEX: ${user.dexAlerts ? 'включены' : 'выключены'}\n`
+      + (user.calendarAlerts === undefined ? '' : `• Календарь США: ${user.calendarAlerts ? 'включён' : 'выключен'}\n`)
       + `• Язык: ${user.lang}\n\n`
-      + 'Изменить: /deposit 1000, /risk 1, /limit 3, /dex on, /lang en',
+      + `Изменить: /deposit 1000, /risk 1, /limit 3, /dex on, ${user.calendarAlerts === undefined ? '' : '/calendar, '}/lang en`,
     en: 'Your settings\n'
       + `• Deposit: ${deposit.en}\n`
       + `• Risk per trade: ${pct(user.riskPct)}\n`
       + `• Daily loss limit: ${limit.en}\n`
       + `• DEX alerts: ${user.dexAlerts ? 'on' : 'off'}\n`
+      + (user.calendarAlerts === undefined ? '' : `• US calendar: ${user.calendarAlerts ? 'on' : 'off'}\n`)
       + `• Language: ${user.lang}\n\n`
-      + 'Change with: /deposit 1000, /risk 1, /limit 3, /dex on, /lang ru',
+      + `Change with: /deposit 1000, /risk 1, /limit 3, /dex on, ${user.calendarAlerts === undefined ? '' : '/calendar, '}/lang ru`,
   };
 }
 
@@ -218,3 +222,62 @@ export const UNKNOWN_COMMAND: Texts = {
   ru: 'Не знаю такой команды. /settings — ваши настройки.',
   en: 'I do not know that command. /settings shows your settings.',
 };
+
+/**
+ * IB-062 — the economic-calendar messages: a morning digest and a reminder before a high-impact
+ * USD event. Event titles stay as the feed spells them (English), like tickers: they are names a
+ * member will search for. Times are given in UTC and in Kyiv, where the members are.
+ */
+interface CalendarLine {
+  title: string;
+  scheduledAt: number;
+  forecast: string | null;
+  previous: string | null;
+}
+
+const hhmm = (ms: number, timeZone: string): string =>
+  new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms));
+
+/** `12:30 UTC / 14:30 Kyiv` — both, because the feed is UTC and the members live in Kyiv. */
+export function calendarTime(ms: number, lang: Lang): string {
+  return `${hhmm(ms, 'UTC')} UTC / ${hhmm(ms, 'Europe/Kyiv')} ${lang === 'ru' ? 'Киев' : 'Kyiv'}`;
+}
+
+function figures(e: CalendarLine, lang: Lang): string {
+  const parts = [
+    e.forecast !== null ? `${lang === 'ru' ? 'прогноз' : 'forecast'} ${e.forecast}` : null,
+    e.previous !== null ? `${lang === 'ru' ? 'пред.' : 'prev.'} ${e.previous}` : null,
+  ].filter((p): p is string => p !== null);
+  return parts.length > 0 ? ` (${parts.join(', ')})` : '';
+}
+
+export function calendarDigest(
+  day: string, events: readonly CalendarLine[], holidays: readonly { title: string }[], leadMin: number,
+): Texts {
+  const [, m, d] = day.split('-');
+  const build = (lang: Lang): string => {
+    const lines: string[] = [lang === 'ru' ? `Календарь США на ${d}.${m}` : `US calendar for ${d}.${m}`];
+    for (const h of holidays) lines.push(lang === 'ru' ? `• Праздник в США: ${h.title} — рынки США закрыты или работают сокращённо` : `• US holiday: ${h.title} — US markets closed or on short hours`);
+    for (const e of events) lines.push(`• ${calendarTime(e.scheduledAt, lang)} — ${e.title}${figures(e, lang)}`);
+    if (events.length === 0) lines.push(lang === 'ru' ? 'Важных событий по USD нет.' : 'No high-impact USD events.');
+    lines.push('', lang === 'ru' ? `Напомню за ${leadMin} мин до каждого. Отключить: /calendar` : `I will remind you ${leadMin} min before each. Turn off: /calendar`);
+    return lines.join('\n');
+  };
+  return { ru: build('ru'), en: build('en') };
+}
+
+export function calendarReminder(scheduledAt: number, events: readonly CalendarLine[], minutesLeft: number): Texts {
+  const build = (lang: Lang): string => {
+    const head = lang === 'ru'
+      ? `Через ${minutesLeft} мин, ${calendarTime(scheduledAt, lang)} — важное по USD:`
+      : `In ${minutesLeft} min, ${calendarTime(scheduledAt, lang)} — high-impact USD:`;
+    return [head, ...events.map((e) => `• ${e.title}${figures(e, lang)}`)].join('\n');
+  };
+  return { ru: build('ru'), en: build('en') };
+}
+
+export function calendarToggled(on: boolean): Texts {
+  return on
+    ? { ru: 'Календарь США включён: утренняя сводка и напоминание перед важными событиями. Выключить: /calendar', en: 'US calendar on: a morning digest and a reminder before high-impact events. Turn off: /calendar' }
+    : { ru: 'Календарь США выключен. Включить: /calendar', en: 'US calendar off. Turn on: /calendar' };
+}

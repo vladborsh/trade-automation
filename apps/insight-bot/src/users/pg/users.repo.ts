@@ -20,6 +20,7 @@ interface UserRow {
   risk_pct: number;
   daily_loss_limit_pct: number | null;
   dex_alerts: boolean;
+  calendar_alerts: boolean;
   invited_by: number | null;
   disabled: boolean;
   created_at: Date;
@@ -36,13 +37,14 @@ const toUser = (r: UserRow): User => ({
   riskPct: Number(r.risk_pct),
   dailyLossLimitPct: r.daily_loss_limit_pct === null ? null : Number(r.daily_loss_limit_pct),
   dexAlerts: r.dex_alerts,
+  calendarAlerts: r.calendar_alerts,
   invitedBy: r.invited_by,
   disabled: r.disabled,
   createdAt: new Date(r.created_at),
 });
 
 const COLUMNS = `id, tg_user_id, chat_id, role, lang, deposit, risk_pct, daily_loss_limit_pct,
-                 dex_alerts, invited_by, disabled, created_at`;
+                 dex_alerts, calendar_alerts, invited_by, disabled, created_at`;
 
 export async function findByTgUserId(db: DbHandle, tgUserId: number): Promise<User | null> {
   const rows = await db.query<UserRow>(`select ${COLUMNS} from users where tg_user_id = $1`, [tgUserId]);
@@ -73,13 +75,14 @@ export async function setChatId(db: DbHandle, userId: number, chatId: number): P
   await db.query('update users set chat_id = $2 where id = $1', [userId, chatId]);
 }
 
-export type SettingsPatch = Partial<Pick<User, 'deposit' | 'riskPct' | 'dailyLossLimitPct' | 'dexAlerts' | 'lang'>>;
+export type SettingsPatch = Partial<Pick<User, 'deposit' | 'riskPct' | 'dailyLossLimitPct' | 'dexAlerts' | 'calendarAlerts' | 'lang'>>;
 
 const SETTING_COLUMN: Record<keyof SettingsPatch, string> = {
   deposit: 'deposit',
   riskPct: 'risk_pct',
   dailyLossLimitPct: 'daily_loss_limit_pct',
   dexAlerts: 'dex_alerts',
+  calendarAlerts: 'calendar_alerts',
   lang: 'lang',
 };
 

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { CalendarRepository } from '../../src/collectors/calendar/calendar.repository';
 import { calendarEvents, lastFetchedAt } from '../../src/web/calendar/pg/calendar.repo';
+import { PgCalendarNotifyStore } from '../../src/delivery/pg/calendar-notify.repo';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
@@ -105,5 +106,27 @@ maybeDescribe('IB-058 calendar_fetch_runs against a real database', () => {
       ['ff:3:2026-10-29', 1, 'Bank Holiday', 'holiday'],
     ]);
     expect(await lastFetchedAt(db)).toBe(Date.parse('2026-10-28T23:45:00Z'));
+  });
+
+  it('IB-062: the notifier store — recipients, collected day, claim once, journal by member', async () => {
+    const store = new PgCalendarNotifyStore(db);
+    // user 1001 exists from the test above (calendar_alerts default true); add one opted out,
+    // one disabled and one never started (no chat)
+    await db.query(`insert into users (tg_user_id, chat_id, role, calendar_alerts) values (1002, 1002, 'member', false)`);
+    await db.query(`insert into users (tg_user_id, chat_id, role, disabled) values (1003, 1003, 'member', true)`);
+    await db.query(`insert into users (tg_user_id, role) values (1004, 'member')`);
+
+    const recipients = await store.recipients();
+    expect(recipients.map((r) => r.chatId)).toEqual([1001]);
+    const id = recipients[0].userId;
+
+    expect(await store.collected('2026-10-28')).toBe(true);
+    expect(await store.collected('2026-10-29')).toBe(false);
+
+    const at = Date.parse('2026-10-29T12:15:00Z');
+    expect(await store.claim(id, 'due:42', at)).toBe(true);
+    expect(await store.claim(id, 'due:42', at)).toBe(false);
+    const keys = await store.sentKeys(at - 86_400_000);
+    expect([...(keys.get(id) ?? [])].sort()).toEqual(['due:1', 'due:42']);
   });
 });

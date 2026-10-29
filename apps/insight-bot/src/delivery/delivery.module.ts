@@ -2,6 +2,7 @@ import { Logger, Module, type DynamicModule } from '@nestjs/common';
 import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { UsersService } from '../users/users.service';
+import { CalendarNotifierService } from './calendar-notifier.service';
 import { TelegramSender } from './telegram-sender';
 import { TelegramBotService } from './telegram-bot.service';
 import { WebModule } from '../web/web.module';
@@ -25,7 +26,8 @@ export class DeliveryModule {
     return {
       module: DeliveryModule,
       imports: [AppConfigModule, DbModule, WebModule.register()],
-      providers: [UsersService, TelegramSender, TelegramBotService],
+      // IB-062: the calendar DMs live here, beside the bot, because they need the sender and users
+      providers: [UsersService, TelegramSender, TelegramBotService, CalendarNotifierService],
       exports: [UsersService, TelegramSender],
     };
   }

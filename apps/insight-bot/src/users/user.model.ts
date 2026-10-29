@@ -15,6 +15,8 @@ export interface User {
   riskPct: number;
   dailyLossLimitPct: number | null;
   dexAlerts: boolean;
+  /** IB-062: calendar digest and pre-event reminders in the member's DM. */
+  calendarAlerts: boolean;
   invitedBy: number | null;
   disabled: boolean;
   createdAt: Date;

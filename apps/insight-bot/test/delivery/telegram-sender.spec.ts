@@ -24,4 +24,23 @@ describe('TelegramSender', () => {
     // that the rejection is swallowed rather than taking the watchdog down with it
     await expect(sender.send('hello')).resolves.toBe(false);
   });
+
+  it('sendTo (IB-062) needs only the token, and sends to the member\'s chat, not the service chat', async () => {
+    const sender = new TelegramSender(config('123:abc', undefined));
+    const calls: Array<{ method: string; chat_id: unknown; text: unknown }> = [];
+    (sender as unknown as { bot: import('grammy').Bot }).bot.api.config.use(async (_prev, method, payload) => {
+      const p = payload as { chat_id: unknown; text: unknown };
+      calls.push({ method, chat_id: p.chat_id, text: p.text });
+      return { ok: true, result: { message_id: 1 } } as never;
+    });
+
+    await expect(sender.sendTo(4242, 'CPI in 15 min')).resolves.toBe(true);
+    expect(calls).toEqual([{ method: 'sendMessage', chat_id: 4242, text: 'CPI in 15 min' }]);
+  });
+
+  it('sendTo without a token logs and returns false; a failure never escapes', async () => {
+    await expect(new TelegramSender(config(undefined, undefined)).sendTo(4242, 'x')).resolves.toBe(false);
+    // network guard blocks api.telegram.org: the rejection is swallowed
+    await expect(new TelegramSender(config('123:abc', undefined)).sendTo(4242, 'x')).resolves.toBe(false);
+  });
 });
