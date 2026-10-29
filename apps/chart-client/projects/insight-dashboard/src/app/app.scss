@@ -22,6 +22,11 @@
   color: var(--text);
 }
 
+/* IB-061: the alerts switch sits at the right end of the bar. */
+.nav-end {
+  margin-left: auto;
+}
+
 .page {
   padding: 16px;
 }

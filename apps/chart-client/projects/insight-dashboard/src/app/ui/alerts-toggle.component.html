@@ -1,0 +1,11 @@
+<button
+  type="button"
+  class="alerts-toggle"
+  [class.on]="active()"
+  [attr.aria-pressed]="active()"
+  [disabled]="blocked()"
+  [title]="hint()"
+  (click)="toggle()"
+>
+  {{ label() }}
+</button>

@@ -1,0 +1,28 @@
+.alerts-toggle {
+  padding: 2px 8px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: transparent;
+  color: #8b949e;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+
+  &.on {
+    border-color: #d2a8ff;
+    color: #c9d1d9;
+  }
+
+  &:hover:not(:disabled) {
+    color: #c9d1d9;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
