@@ -20,3 +20,5 @@ export * from './liquidations-overview';
 export * from './feature-frame';
 // IB-037 — the market-context page (Fear & Greed, dominance, top-20 caps).
 export * from './context';
+// IB-059 — the economic calendar: events on the chart, upcoming events for the alerts.
+export * from './calendar';

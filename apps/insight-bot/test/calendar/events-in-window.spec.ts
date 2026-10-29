@@ -44,6 +44,10 @@ describe('buildEventsInWindow', () => {
     expect(both.sql).toContain('currency = $4');
     expect(both.sql).toContain('where status = $5');
 
+    const anyOf = buildEventsInWindow({ from, to, impacts: ['high', 'holiday'], currency: 'USD' });
+    expect(anyOf.params).toEqual([from, to, ['high', 'holiday'], 'USD', 'scheduled']);
+    expect(anyOf.sql).toContain('impact = any($3::text[])');
+
     const currencyOnly = buildEventsInWindow({ from, to, currency: 'EUR' });
     expect(currencyOnly.params).toEqual([from, to, 'EUR', 'scheduled']);
     expect(currencyOnly.sql).toContain('currency = $3');

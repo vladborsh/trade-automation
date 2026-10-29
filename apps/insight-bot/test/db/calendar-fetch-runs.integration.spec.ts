@@ -1,13 +1,15 @@
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { CalendarRepository } from '../../src/collectors/calendar/calendar.repository';
+import { calendarEvents, lastFetchedAt } from '../../src/web/calendar/pg/calendar.repo';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
  * IB-058 against a real Postgres: migration 019's `calendar_fetch_runs` and the two repository
- * calls "already collected today" is decided from. Skipped without DATABASE_URL.
+ * calls "already collected today" is decided from; and IB-059's dashboard read over
+ * `calendar_events`. Skipped without DATABASE_URL.
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -79,5 +81,29 @@ maybeDescribe('IB-058 calendar_fetch_runs against a real database', () => {
       [user.id],
     );
     expect(again).toEqual([]);
+  });
+
+  it('IB-059: the dashboard read keeps the latest revision of high + holiday USD events only', async () => {
+    const at = new Date('2026-10-28T08:00:00Z');
+    const insert = `insert into calendar_events (id, revision, source, series_id, event_time, currency, title, impact, status, fetched_at)
+      values ($1, $2, 'forexfactory', $3, $4, $5, $6, $7, $8, $9)`;
+    await db.query(insert, ['ff:1:2026-10-28', 1, '1', new Date('2026-10-28T12:30:00Z'), 'USD', 'CPI', 'high', 'scheduled', at]);
+    await db.query(insert, ['ff:1:2026-10-28', 2, '1', new Date('2026-10-28T12:30:00Z'), 'USD', 'CPI m/m', 'high', 'scheduled', at]);
+    await db.query(insert, ['ff:2:2026-10-28', 1, '2', new Date('2026-10-28T14:00:00Z'), 'USD', 'Pending Home Sales', 'medium', 'scheduled', at]);
+    await db.query(insert, ['ff:3:2026-10-29', 1, '3', new Date('2026-10-29T04:00:00Z'), 'USD', 'Bank Holiday', 'holiday', 'scheduled', at]);
+    await db.query(insert, ['ff:4:2026-10-28', 1, '4', new Date('2026-10-28T13:00:00Z'), 'EUR', 'ECB', 'high', 'scheduled', at]);
+    await db.query(insert, ['ff:5:2026-10-28', 1, '5', new Date('2026-10-28T15:00:00Z'), 'USD', 'Withdrawn', 'high', 'scheduled', at]);
+    await db.query(insert, ['ff:5:2026-10-28', 2, '5', new Date('2026-10-28T15:00:00Z'), 'USD', 'Withdrawn', 'high', 'cancelled', at]);
+
+    const events = await calendarEvents(
+      db,
+      { fromMs: Date.parse('2026-10-26T00:00:00Z'), toMs: Date.parse('2026-11-02T00:00:00Z') - 1, currency: 'USD', impacts: ['high', 'holiday'] },
+      Date.parse('2026-10-29T08:00:00Z'),
+    );
+    expect(events.map((e) => [e.id, e.revision, e.title, e.impact])).toEqual([
+      ['ff:1:2026-10-28', 2, 'CPI m/m', 'high'],
+      ['ff:3:2026-10-29', 1, 'Bank Holiday', 'holiday'],
+    ]);
+    expect(await lastFetchedAt(db)).toBe(Date.parse('2026-10-28T23:45:00Z'));
   });
 });

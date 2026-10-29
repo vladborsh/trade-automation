@@ -24,6 +24,8 @@ export interface EventWindowFilter {
   to: Date;
   /** `'high'` for the veto. Omit for every impact. */
   impact?: string;
+  /** IB-059: any of several impacts (the dashboard reads `high` and `holiday`). Ignored when `impact` is set. */
+  impacts?: readonly string[];
   /** `'USD'` for the veto. Omit for every currency. */
   currency?: string;
   /** Defaults to `'scheduled'` — §9.3's positive filter. */
@@ -69,6 +71,9 @@ export function buildEventsInWindow(filter: EventWindowFilter): { sql: string; p
   if (filter.impact !== undefined) {
     params.push(filter.impact);
     conditions.push(`impact = $${params.length}`);
+  } else if (filter.impacts !== undefined) {
+    params.push([...filter.impacts]);
+    conditions.push(`impact = any($${params.length}::text[])`);
   }
   if (filter.currency !== undefined) {
     params.push(filter.currency);

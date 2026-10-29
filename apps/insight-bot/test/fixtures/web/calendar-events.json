@@ -1,0 +1,45 @@
+{
+  "events": [
+    {
+      "id": "ff:832:2026-10-28",
+      "source": "forexfactory",
+      "seriesId": "832",
+      "sourceUrl": null,
+      "title": "Non-Farm Employment Change",
+      "country": "USD",
+      "impact": "high",
+      "scheduledAt": 1793190600000,
+      "scheduledDay": "2026-10-28",
+      "forecast": "165K",
+      "previous": "142K",
+      "actual": "171K",
+      "actualSource": "next-previous",
+      "actualAt": 1793260000000,
+      "status": "released",
+      "firstSeenAt": 1793260000000,
+      "lastSeenAt": 1793260000000,
+      "revision": 2
+    },
+    {
+      "id": "ff:900:2026-11-26",
+      "source": "forexfactory",
+      "seriesId": "900",
+      "sourceUrl": null,
+      "title": "Bank Holiday",
+      "country": "USD",
+      "impact": "holiday",
+      "scheduledAt": 1795669200000,
+      "scheduledDay": "2026-11-26",
+      "forecast": null,
+      "previous": null,
+      "actual": null,
+      "actualSource": null,
+      "actualAt": null,
+      "status": "scheduled",
+      "firstSeenAt": 1793260000000,
+      "lastSeenAt": 1793260000000,
+      "revision": 1
+    }
+  ],
+  "lastFetchedAt": 1793260000000
+}

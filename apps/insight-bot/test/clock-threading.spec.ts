@@ -74,6 +74,13 @@ const ALLOWED: readonly Allowance[] = [
     why: 'the boot check (§3.4) — the other place time enters, read explicitly at the call rather than by a default',
   },
   {
+    file: 'web/calendar/calendar.controller.ts',
+    line: 'const now = Date.now();',
+    count: 2,
+    category: 'origin',
+    why: 'two request handlers (IB-059): the event status (released/scheduled) and the /upcoming window are relative to the request, and nothing is injected',
+  },
+  {
     file: 'collectors/okx/okx.service.ts',
     line: 'const now = Date.now();',
     count: 2,

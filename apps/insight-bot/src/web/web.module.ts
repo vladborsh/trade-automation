@@ -4,6 +4,7 @@ import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
 import { DbModule } from '../db/db.module';
 import { OpsModule } from '../ops/ops.module';
+import { CalendarController } from './calendar/calendar.controller';
 import { WebAuthController } from './auth/web-auth.controller';
 import { WebAuthGuard } from './auth/web-auth.guard';
 import { WebAuthService } from './auth/web-auth.service';
@@ -50,6 +51,7 @@ export class WebModule {
       controllers: [
         WebAuthController, WebHealthController, WebCoverageController,
         SeriesController, UniverseController, LiquidationsController, WebContextController,
+        CalendarController,
       ],
       providers: [
         WebAuthService,
