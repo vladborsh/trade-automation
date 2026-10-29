@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
+import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.tracker';
 import { HealthController } from './health.controller';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
@@ -13,6 +14,9 @@ import { StreamRegistry } from './stream-registry';
  * the daily gap report (§6.2) join this module with IB-008.
  *
  * `StreamRegistry` and `MetricsService` are exported because the collectors write to them.
+ * IB-063: `BinanceWeightTracker` lives here too, so the collectors and the web module's on-demand
+ * candles record into ONE instance — the one `/health` reads. Two trackers would each report half
+ * of what the IP spent.
  */
 @Module({
   imports: [
@@ -30,7 +34,7 @@ import { StreamRegistry } from './stream-registry';
     }),
   ],
   controllers: [HealthController, MetricsController],
-  providers: [MetricsService, StreamRegistry],
-  exports: [MetricsService, StreamRegistry],
+  providers: [MetricsService, StreamRegistry, BinanceWeightTracker],
+  exports: [MetricsService, StreamRegistry, BinanceWeightTracker],
 })
 export class OpsModule {}

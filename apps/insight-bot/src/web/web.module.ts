@@ -15,6 +15,9 @@ import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
 import { MarketCardsService } from './market/market-cards.service';
+import { CandlesService } from './market/candles.service';
+import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.tracker';
+import { MetricsService } from '../ops/metrics.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
 import { UniverseController } from './universe.controller';
 
@@ -69,6 +72,18 @@ export class WebModule {
             new MarketCardsService({
               fngBaseUrl: config.env.get('FNG_BASE_URL'),
               coingeckoBaseUrl: config.env.get('COINGECKO_BASE_URL'),
+            }),
+        },
+        {
+          // IB-063: the chart's candles, live from Binance; weight into the shared tracker
+          provide: CandlesService,
+          inject: [AppConfigService, BinanceWeightTracker, MetricsService],
+          useFactory: (config: AppConfigService, weight: BinanceWeightTracker, metrics: MetricsService) =>
+            new CandlesService({
+              futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL'),
+              spotBaseUrl: config.env.get('BINANCE_SPOT_REST_BASE_URL'),
+              weight,
+              onSpotWeight: (w) => metrics.setBinanceSpotWeightUsed1m(w),
             }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },

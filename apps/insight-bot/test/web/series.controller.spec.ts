@@ -2,6 +2,8 @@ import { HttpException } from '@nestjs/common';
 import { SeriesController } from '../../src/web/series/series.controller';
 import { UniverseController } from '../../src/web/universe.controller';
 import type { Db } from '../../src/db/db.port';
+import { BinanceWeightTracker } from '../../src/collectors/binance-perp/binance-weight.tracker';
+import { CandlesService } from '../../src/web/market/candles.service';
 
 /**
  * IB-031 — the controller's guard rails (architecture/insight-bot-web-dashboard.md §4).
@@ -21,6 +23,19 @@ const fakeDb = () => {
     transaction: async (fn) => fn(db),
   };
   return { db, queries };
+};
+
+/** IB-063: candles come from the venue. This one answers every page empty and counts the calls. */
+const fakeCandles = () => {
+  const calls: string[] = [];
+  const service = new CandlesService({
+    futuresBaseUrl: 'https://fapi.example', spotBaseUrl: 'https://api.example', weight: new BinanceWeightTracker(),
+    fetchImpl: (async (url: URL) => {
+      calls.push(String(url));
+      return { ok: true, status: 200, statusText: 'OK', headers: { get: () => null }, json: async () => [] };
+    }) as unknown as typeof fetch,
+  });
+  return { service, calls };
 };
 
 const body = (error: unknown) => (error as HttpException).getResponse() as { code: string; maxDays?: number };
@@ -43,13 +58,23 @@ describe('range caps', () => {
 
   it('accepts exactly 90 days at 1m', async () => {
     const { db, queries } = fakeDb();
-    await new SeriesController(db).candles('BTCUSDT', String(T0), String(T0 + 90 * DAY), '1m');
-    expect(queries).toHaveLength(1);
+    await new SeriesController(db).funding('BTCUSDT', String(T0), String(T0 + 90 * DAY));
+    expect(queries).toHaveLength(2); // settled + predicted
+  });
+
+  it('IB-063: candles hold a tighter cap of their own — every 1m bar is a venue page bought', async () => {
+    const { db } = fakeDb();
+    const candles = fakeCandles();
+    const error = await new SeriesController(db, candles.service)
+      .candles('BTCUSDT', String(T0), String(T0 + 90 * DAY), '1m').catch((e: unknown) => e);
+    expect((error as HttpException).getStatus()).toBe(400);
+    expect(body(error)).toMatchObject({ code: 'RANGE_TOO_WIDE', maxDays: 7 });
+    expect(candles.calls).toEqual([]);
   });
 
   it('a 91-day window is fine at a coarser timeframe', async () => {
     const { db } = fakeDb();
-    await expect(new SeriesController(db).candles('BTCUSDT', String(T0), String(T0 + 91 * DAY), '4h'))
+    await expect(new SeriesController(db, fakeCandles().service).candles('BTCUSDT', String(T0), String(T0 + 91 * DAY), '4h'))
       .resolves.toMatchObject({ timeframe: '4h' });
   });
 
@@ -81,6 +106,33 @@ describe('range caps', () => {
     await expect(c.liquidations('BTCUSDT', ...ok, '5m', 'all')).rejects.toThrow(HttpException);
     await expect(c.liquidations('BTCUSDT', ...ok, '1m', 'kraken')).rejects.toThrow(HttpException);
     await expect(c.ls('BTCUSDT', ...ok, 'nonsense')).rejects.toThrow(HttpException);
+  });
+});
+
+describe('IB-063 candles route', () => {
+  it('reads the venue, never the database, and answers the unchanged contract', async () => {
+    const { db, queries } = fakeDb();
+    const candles = fakeCandles();
+    const res = await new SeriesController(db, candles.service)
+      .candles('BTCUSDT', String(T0), String(T0 + DAY), '1h', 'binance', 'spot');
+    expect(res).toEqual({ venue: 'binance', market: 'spot', symbol: 'BTCUSDT', timeframe: '1h', candles: [], downsampled: false });
+    expect(queries).toEqual([]);
+    expect(candles.calls).toHaveLength(1);
+    expect(candles.calls[0]).toContain('/api/v3/klines');
+  });
+
+  it('a venue other than Binance is an empty answer, as the tape gave it (it only held Binance)', async () => {
+    const { db } = fakeDb();
+    const candles = fakeCandles();
+    const res = await new SeriesController(db, candles.service).candles('BTCUSDT', String(T0), String(T0 + DAY), '1h', 'bybit');
+    expect(res.candles).toEqual([]);
+    expect(candles.calls).toEqual([]);
+  });
+
+  it('without the service the route says so with a 503, not a 500', async () => {
+    const { db } = fakeDb();
+    const error = await new SeriesController(db).candles('BTCUSDT', String(T0), String(T0 + DAY), '1h').catch((e: unknown) => e);
+    expect((error as HttpException).getStatus()).toBe(503);
   });
 });
 

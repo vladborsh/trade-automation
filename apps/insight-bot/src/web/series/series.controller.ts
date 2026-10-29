@@ -1,4 +1,4 @@
-import { Controller, Get, HttpException, Inject, Query } from '@nestjs/common';
+import { Controller, Get, HttpException, Inject, Optional, Query } from '@nestjs/common';
 import {
   WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
   WebTimeframeSchema, WebVenueFilterSchema,
@@ -6,6 +6,7 @@ import {
   type WebLiquidationsResponse, type WebLongShortResponse, type WebTopLiquidation,
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
+import { CandlesService } from '../market/candles.service';
 import { bucketLiquidations, topLiquidations } from './liquidation-buckets';
 import { checkRange, strideFor, thin } from './range';
 import * as repo from './pg/series.repo';
@@ -21,7 +22,10 @@ import * as repo from './pg/series.repo';
  */
 @Controller('api/web/series')
 export class SeriesController {
-  constructor(@Inject(DB) private readonly db: Db | null) {}
+  constructor(
+    @Inject(DB) private readonly db: Db | null,
+    @Optional() private readonly candlesService?: CandlesService,
+  ) {}
 
   private get required(): Db {
     if (!this.db) throw new HttpException({ code: 'NOT_FOUND', message: 'no database' }, 503);
@@ -56,12 +60,16 @@ export class SeriesController {
     if (!parsedMarket.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'unknown market' }, 400);
     const { fromMs, toMs, tf: timeframe } = this.range(from, to, tf);
 
-    const stride = strideFor(fromMs, toMs, timeframe);
-    const rows = await repo.candles(this.required, {
-      symbol, fromMs, toMs, stride, venue, market: parsedMarket.data, timeframe,
-    });
+    // IB-063: read from Binance on demand, not from the tape (which starts 2026-09-28). The tape's
+    // `repo.candles` stays until WD-009 removes the reads together. Only Binance is served, as the
+    // tape only ever held Binance candles.
+    if (!this.candlesService) {
+      throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'candles not configured' }, 503);
+    }
+    if (venue !== 'binance') return { venue, market: parsedMarket.data, symbol, timeframe, candles: [], downsampled: false };
+    const rows = await this.candlesService.candles(parsedMarket.data, symbol, timeframe, fromMs, toMs);
     const { rows: candles, downsampled } = thin(rows);
-    return { venue, market: parsedMarket.data, symbol, timeframe, candles, downsampled: downsampled || stride > 1 };
+    return { venue, market: parsedMarket.data, symbol, timeframe, candles, downsampled };
   }
 
   @Get('funding')
