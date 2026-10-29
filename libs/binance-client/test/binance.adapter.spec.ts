@@ -1,5 +1,5 @@
 import { Instrument } from '@trade-automation/contracts';
-import { BinanceAdapter } from '../src/binance.adapter';
+import { BinanceAdapter, BinanceHttpError } from '../src/binance.adapter';
 import { BinanceRestKline } from '../src/binance.mapper';
 
 /**
@@ -117,6 +117,50 @@ describe('BinanceAdapter.fetchCandles native coarse fetch (architecture/live-sig
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(candles).toHaveLength(REST_PAGE_LIMIT + 1);
+  });
+
+  it('IB-063: uses an injected fetch, passes the signal, and reports every answered page', async () => {
+    const from = 1_700_000_000_000;
+    const rows = [kline(from, from + 59_999)];
+    const globalMock = jest.fn();
+    global.fetch = globalMock as unknown as typeof fetch;
+    const signal = new AbortController().signal;
+    const seen: unknown[] = [];
+    const fetchImpl = jest.fn(async (_url: URL, init?: RequestInit) => {
+      seen.push(init?.signal);
+      return { ok: true, json: async () => rows } as Response;
+    });
+    const onResponse = jest.fn();
+
+    const adapter = new BinanceAdapter('https://fapi.example', 'wss://example');
+    await adapter.fetchCandles(instrument, '1m', from, from, {
+      fetchImpl: fetchImpl as unknown as typeof fetch, signal, onResponse,
+    });
+
+    expect(globalMock).not.toHaveBeenCalled();
+    expect(seen).toEqual([signal]);
+    expect(onResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('IB-063: an error status throws BinanceHttpError with the status and the venue code, same message as before', async () => {
+    const response = { ok: false, status: 400, statusText: 'Bad Request', json: async () => ({ code: -1121, msg: 'Invalid symbol.' }) };
+    global.fetch = jest.fn(async () => response as Response) as unknown as typeof fetch;
+    const onResponse = jest.fn();
+
+    const adapter = new BinanceAdapter('https://fapi.example', 'wss://example');
+    const error = await adapter.fetchCandles(instrument, '1h', 0, 1, { onResponse }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(BinanceHttpError);
+    expect(error).toMatchObject({ status: 400, venueCode: -1121, message: 'Binance klines request failed: 400 Bad Request' });
+    expect(onResponse).toHaveBeenCalledTimes(1); // the failed call still cost weight
+  });
+
+  it('IB-063: a non-JSON error body still throws, with a null venue code', async () => {
+    const response = { ok: false, status: 502, statusText: 'Bad Gateway', json: async () => { throw new SyntaxError('html'); } };
+    global.fetch = jest.fn(async () => response as unknown as Response) as unknown as typeof fetch;
+
+    const adapter = new BinanceAdapter('https://fapi.example', 'wss://example');
+    await expect(adapter.fetchCandles(instrument, '1h', 0, 1)).rejects.toMatchObject({ status: 502, venueCode: null });
   });
 });
 

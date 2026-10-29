@@ -56,7 +56,33 @@ interface BinanceCombinedMessage {
 // Binance futures kline REST page size — fapi/v1/klines `limit` max, per venue docs
 // (https://binance-docs.github.io/apidocs/futures/en/#kline-candlestick-data), mirrored from
 // cmc-bot-main's BinanceClient which requests the same endpoint.
-const REST_PAGE_LIMIT = 1500;
+export const REST_PAGE_LIMIT = 1500;
+
+/**
+ * IB-063: a klines request the venue answered with an error status. The message is the one this
+ * adapter always threw; `status` and Binance's own `code` (e.g. -1121 "Invalid symbol") are there
+ * so a caller can tell "this symbol does not exist" from "the venue is down" from "we are banned".
+ */
+export class BinanceHttpError extends Error {
+  constructor(
+    readonly status: number,
+    statusText: string,
+    readonly venueCode: number | null,
+  ) {
+    super(`Binance klines request failed: ${status} ${statusText}`);
+    this.name = 'BinanceHttpError';
+  }
+}
+
+/** IB-063: what an on-demand caller adds to `fetchCandles`; every field is optional. */
+export interface FetchCandlesOptions {
+  /** Defaults to the global `fetch`. */
+  fetchImpl?: typeof fetch;
+  /** Passed to every page request, e.g. `AbortSignal.timeout(…)`. */
+  signal?: AbortSignal;
+  /** Called once per answered page request, before its status is checked: weight accounting. */
+  onResponse?: (response: Response) => void;
+}
 
 export class BinanceAdapter {
   readonly venue = 'binance' as const;
@@ -82,7 +108,14 @@ export class BinanceAdapter {
    * `1m`/`5m`/`15m`/`1h`/`4h`/`1d`), same pagination shape as the original 1m-only path, just
    * walking `REST_PAGE_LIMIT` bars of `tf` at a time instead of always 1m.
    */
-  async fetchCandles(instrument: Instrument, tf: Timeframe, from: number, to: number): Promise<Candle[]> {
+  async fetchCandles(
+    instrument: Pick<Instrument, 'id' | 'symbol'>,
+    tf: Timeframe,
+    from: number,
+    to: number,
+    options: FetchCandlesOptions = {},
+  ): Promise<Candle[]> {
+    const fetchImpl = options.fetchImpl ?? fetch;
     const out: Candle[] = [];
     const tfMs = TIMEFRAME_MS[tf];
     let cursor = from;
@@ -95,9 +128,11 @@ export class BinanceAdapter {
       url.searchParams.set('endTime', String(to));
       url.searchParams.set('limit', String(REST_PAGE_LIMIT));
 
-      const res = await fetch(url);
+      const res = await fetchImpl(url, options.signal ? { signal: options.signal } : undefined);
+      options.onResponse?.(res);
       if (!res.ok) {
-        throw new Error(`Binance klines request failed: ${res.status} ${res.statusText}`);
+        const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+        throw new BinanceHttpError(res.status, res.statusText, typeof body?.code === 'number' ? body.code : null);
       }
       const rows = (await res.json()) as BinanceRestKline[];
       if (rows.length === 0) break;
