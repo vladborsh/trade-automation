@@ -1,12 +1,13 @@
-import type { WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contracts';
-import { timeframeMs } from '../series/range';
+import { WEB_MAX_CANDLE_BARS, type WebCandle, type WebMarket, type WebTimeframe } from '@trade-automation/contracts';
+import { floorToGrid, timeframeMs } from '../series/range';
 
 /**
  * IB-063 — the pure half of `CandlesService`: how a window is cut into venue pages, which part of
  * a page may be remembered, and the cache that remembers it.
  *
  * **Pages are aligned to a fixed grid** (`pageStart = floor(t / span) * span`), not to the
- * caller's `from`. A reader scrolling left asks for windows that start anywhere; aligned pages make
+ * caller's `from`. For 1w the grid is shifted to Monday (`floorToGrid`, IB-065): a page that
+ * started on a Thursday would cut a week in two. A reader scrolling left asks for windows that start anywhere; aligned pages make
  * the second window that touches a page a cache hit instead of a fresh request.
  */
 
@@ -23,7 +24,7 @@ export const PAGE_LIMIT: Readonly<Record<WebMarket, number>> = { perp: 1500, spo
  * 8 perp pages = 80 weight) is well past anything the dashboard asks for (its widest window is
  * 1 440 bars, `time-range.ts`) and still above `WEB_MAX_POINTS`, so `thin()` keeps its job.
  */
-export const MAX_BARS_PER_REQUEST = 10_080;
+export const MAX_BARS_PER_REQUEST = WEB_MAX_CANDLE_BARS;
 
 /**
  * Pages kept in memory. A full page is 1 000–1 500 `WebCandle`s. Heap per 1 500-row page of
@@ -54,7 +55,7 @@ export function pageSpanMs(market: WebMarket, tf: WebTimeframe): number {
 export function pagesFor(market: WebMarket, tf: WebTimeframe, fromMs: number, toMs: number): number[] {
   const span = pageSpanMs(market, tf);
   const out: number[] = [];
-  for (let start = Math.floor(fromMs / span) * span; start < toMs; start += span) out.push(start);
+  for (let start = floorToGrid(fromMs, tf, span); start < toMs; start += span) out.push(start);
   return out;
 }
 
@@ -74,8 +75,7 @@ export function maxDaysFor(tf: WebTimeframe): number {
  * change; rows from it on are the live edge and are not cached.
  */
 export function closedUntil(tf: WebTimeframe, pageStart: number, pageEnd: number, fetchedAt: number): number {
-  const tfMs = timeframeMs(tf);
-  const firstOpen = Math.floor((fetchedAt - SETTLE_MS) / tfMs) * tfMs;
+  const firstOpen = floorToGrid(fetchedAt - SETTLE_MS, tf);
   return Math.max(pageStart, Math.min(pageEnd, firstOpen));
 }
 

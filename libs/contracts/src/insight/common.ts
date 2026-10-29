@@ -44,8 +44,12 @@ export const WebErrorSchema = z.object({
 });
 export type WebError = z.infer<typeof WebErrorSchema>;
 
-/** The candle timeframes the dashboard serves: `candles_1m` plus IB-014's `candles_agg`. */
-export const WebTimeframeSchema = z.enum(['1m', '15m', '1h', '4h', '1d']);
+/**
+ * The candle timeframes the dashboard serves. Since IB-063 they are read from Binance on demand, so
+ * each id is also the venue's kline `interval` verbatim — which is why the week is `'1w'`, lower
+ * case, while the button reads 1W (IB-065). A Binance week opens Monday 00:00 UTC.
+ */
+export const WebTimeframeSchema = z.enum(['1m', '3m', '5m', '15m', '1h', '4h', '1d', '1w']);
 export type WebTimeframe = z.infer<typeof WebTimeframeSchema>;
 
 /**
@@ -64,3 +68,11 @@ export type WebTimeframe = z.infer<typeof WebTimeframeSchema>;
  */
 export const WEB_MAX_POINTS = 5_000;
 export const WEB_MAX_1M_RANGE_DAYS = 90;
+
+/**
+ * IB-063: the most candles one `/series/candles` read may span, at any timeframe; wider is refused
+ * (`RANGE_TOO_WIDE`). Candles come from Binance page by page, so thinning would only start after
+ * every page was bought — the bot's `candle-pages.ts` has the arithmetic. Here so the dashboard
+ * can check its own windows against it (IB-065).
+ */
+export const WEB_MAX_CANDLE_BARS = 10_080;

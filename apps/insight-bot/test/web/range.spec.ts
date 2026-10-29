@@ -1,5 +1,5 @@
 import { WEB_MAX_1M_RANGE_DAYS, WEB_MAX_POINTS } from '@trade-automation/contracts';
-import { checkRange, DAY_MS, strideFor, thin, timeframeMs } from '../../src/web/series/range';
+import { checkRange, DAY_MS, floorToGrid, strideFor, thin, timeframeMs } from '../../src/web/series/range';
 
 /**
  * IB-031 §4 — the caps. The box runs Postgres and Node in 1 GB, so these are real; and the
@@ -81,5 +81,26 @@ describe('thin', () => {
     const rows = Array.from({ length: 10 }, (_, i) => i);
     const out = thin(rows, 5);
     expect(out.rows.filter((r) => r === 9)).toHaveLength(1);
+  });
+});
+
+describe('IB-065: the new widths and the Monday grid', () => {
+  it('3m, 5m and 1w are their Binance widths', () => {
+    expect(timeframeMs('3m')).toBe(180_000);
+    expect(timeframeMs('5m')).toBe(300_000);
+    expect(timeframeMs('1w')).toBe(7 * DAY_MS);
+  });
+
+  it('every width up to a day keeps the epoch grid', () => {
+    const t = Date.UTC(2026, 9, 29, 14, 37, 12);
+    expect(floorToGrid(t, '3m')).toBe(Date.UTC(2026, 9, 29, 14, 36));
+    expect(floorToGrid(t, '5m')).toBe(Date.UTC(2026, 9, 29, 14, 35));
+    expect(floorToGrid(t, '1d')).toBe(Date.UTC(2026, 9, 29));
+  });
+
+  it('a week floors to its Monday 00:00 UTC, from any day of it', () => {
+    const monday = Date.UTC(2026, 9, 26); // Mon 26 Oct 2026
+    for (let d = 0; d < 7; d++) expect(floorToGrid(monday + d * DAY_MS + 5 * 3_600_000, '1w')).toBe(monday);
+    expect(floorToGrid(monday - 1, '1w')).toBe(monday - 7 * DAY_MS);
   });
 });

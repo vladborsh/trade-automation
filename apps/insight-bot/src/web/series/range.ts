@@ -18,12 +18,33 @@ import { WEB_MAX_1M_RANGE_DAYS, WEB_MAX_POINTS, type WebTimeframe } from '@trade
  * `unavailable`: a consumer must be able to tell "there is no data" from "we did not send it".
  */
 
-const MS = { '1m': 60_000, '15m': 900_000, '1h': 3_600_000, '4h': 14_400_000, '1d': 86_400_000 } as const;
+const MS = {
+  '1m': 60_000, '3m': 180_000, '5m': 300_000, '15m': 900_000,
+  '1h': 3_600_000, '4h': 14_400_000, '1d': 86_400_000, '1w': 604_800_000,
+} as const satisfies Record<WebTimeframe, number>;
 
 export const DAY_MS = 86_400_000;
 
 export function timeframeMs(tf: WebTimeframe): number {
   return MS[tf];
+}
+
+/**
+ * IB-065: where a timeframe's bar grid starts, as an offset from the epoch. Every width up to a day
+ * divides the epoch evenly, so their bars open on multiples of the width; a Binance WEEK opens on
+ * Monday 00:00 UTC and the epoch (1970-01-01) was a Thursday, so 1w bars sit 4 days off the
+ * epoch's multiples. Pinned against real weekly klines in `test/fixtures/binance/*-klines-1w.json`.
+ */
+export const WEEK_OFFSET_MS = 4 * DAY_MS;
+
+export function gridOffsetMs(tf: WebTimeframe): number {
+  return tf === '1w' ? WEEK_OFFSET_MS : 0;
+}
+
+/** The open time of the `tf` bar (or of a `span`-wide block of them) that contains `ms`. */
+export function floorToGrid(ms: number, tf: WebTimeframe, span = timeframeMs(tf)): number {
+  const offset = gridOffsetMs(tf);
+  return Math.floor((ms - offset) / span) * span + offset;
 }
 
 export type RangeCheck =

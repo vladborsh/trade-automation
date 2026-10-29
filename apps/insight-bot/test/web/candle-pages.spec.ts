@@ -84,3 +84,26 @@ describe('LruCache', () => {
     expect(lru.get('a')).toBe(2);
   });
 });
+
+describe('IB-065: weekly pages', () => {
+  const WEEK = 7 * DAY;
+  const MONDAY = Date.UTC(2026, 9, 26);
+
+  it('a 1w page starts on a Monday, not on the epoch\'s Thursday grid', () => {
+    for (const start of pagesFor('perp', '1w', Date.UTC(2019, 8, 8), Date.UTC(2026, 9, 30))) {
+      expect(new Date(start).getUTCDay()).toBe(1);
+    }
+  });
+
+  it('the live edge of a 1w page is the forming week\'s Monday', () => {
+    const [pageStart] = pagesFor('perp', '1w', MONDAY, MONDAY + WEEK);
+    const end = pageStart + pageSpanMs('perp', '1w');
+    expect(closedUntil('1w', pageStart, end, MONDAY + 3 * DAY)).toBe(MONDAY);
+    expect(closedUntil('1w', pageStart, end, MONDAY + WEEK + SETTLE_MS)).toBe(MONDAY + WEEK);
+  });
+
+  it('3m and 5m keep the 1500-bar perp page', () => {
+    expect(pageSpanMs('perp', '3m')).toBe(1500 * 180_000);
+    expect(pageSpanMs('spot', '5m')).toBe(1000 * 300_000);
+  });
+});

@@ -1,8 +1,6 @@
 import { HttpException, Logger } from '@nestjs/common';
-import {
-  BinanceAdapter, BinanceHttpError, mapRestKline, type BinanceRestKline,
-} from '@trade-automation/binance-client';
-import type { Candle, WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contracts';
+import { BinanceHttpError, type BinanceRestKline } from '@trade-automation/binance-client';
+import type { WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contracts';
 import { BinanceWeightTracker } from '../../collectors/binance-perp/binance-weight.tracker';
 import {
   CACHE_MAX_PAGES, LruCache, MAX_BARS_PER_REQUEST, PAGE_LIMIT, barsIn, closedUntil, maxDaysFor, pageKey,
@@ -16,11 +14,16 @@ import { WEIGHT_CEILING_1M } from './universe-summary.service';
  * took that for the start of the coin's history. This is WD-008 step 2's `CandlesService`, built
  * early and for candles only: OI, funding and liquidations still come from the database.
  *
- * perp: `BinanceAdapter.fetchCandles` (`/fapi/v1/klines`, 1 500 rows a page). spot:
- * `/api/v3/klines` (1 000 rows a page). Both are asked for one aligned page at a time
+ * perp: `/fapi/v1/klines` (1 500 rows a page). spot: `/api/v3/klines` (1 000 rows a page), the same
+ * 12-column row on both. Each is asked for one aligned page at a time
  * (`candle-pages.ts`), and the closed part of every page is remembered: a bar that has closed never
  * changes, so scrolling back over it, or switching timeframe and back, costs the venue nothing.
  * The live edge — the bar still forming — is never cached.
+ *
+ * IB-065: perp no longer goes through `BinanceAdapter.fetchCandles`. That method is typed by the
+ * backtest's `Timeframe` (no 3m, no 1w) and pages by `TIMEFRAME_MS`, which has neither; widening
+ * that shared enum reaches signal-server and the backtest app for a chart's sake. One page request
+ * is all this service ever makes, so both markets share `fetchKlinePage` below.
  *
  * **Weight**, Binance's documented costs, not measured by us. `/fapi/v1/klines` costs 5 for
  * `limit` 500–1000 and 10 above 1000, so a perp page is 10 against the USD-M 2 400/min budget.
@@ -30,18 +33,23 @@ import { WEIGHT_CEILING_1M } from './universe-summary.service';
  * | tf | dashboard window | page span | uncached pages per window | perp weight per window |
  * |---|---|---|---|---|
  * | 1m | 1 d | 25 h | 1–2 | 10–20 |
+ * | 3m | 3 d | 3.1 d | 1–2 | 10–20 |
+ * | 5m | 5 d | 5.2 d | 1–2 | 10–20 |
  * | 15m | 7 d | 15.6 d | 0–2 | 0–20 |
  * | 1h | 30 d | 62.5 d | 0–2 | 0–20 |
  * | 4h | 90 d | 250 d | 0–2 | 0–20 |
  * | 1d | 90 d | 4.1 y | 0–1 | 0–10 |
+ * | 1w | 728 d (104 weeks) | 28.8 y | 0–1 | 0–10 |
  *
  * Every window also reads 1d for the day/week levels: one page that covers four years, so it is
  * bought once at page open (the live edge) and is a cache hit on every scroll after that.
  *
  * Per minute: opening the page is 20–30. Scrolling back, a window costs on average
- * window ÷ page span pages: about 10 weight at 1m and under 5 at 15m/1h/4h. The client reads one
- * window at a time; at a window every 2 s (faster than a reader scrolls) that is ≤ 300/min at 1m,
- * 12.5 % of 2 400, and ≤ 150/min on the other frames. Above `WEIGHT_CEILING_1M` (1 800) a read
+ * window ÷ page span pages: about 10 weight at 1m, 3m and 5m (each window is ~0.96 of a page) and
+ * under 5 at 15m/1h/4h. 1w is one page for the whole of a coin's history, so scrolling back on 1w
+ * costs nothing after the first read. The client reads one window at a time; at a window every 2 s
+ * (faster than a reader scrolls) that is ≤ 300/min at 1m/3m/5m, 12.5 % of 2 400, and ≤ 150/min on
+ * the other frames. Above `WEIGHT_CEILING_1M` (1 800) a read
  * that needs the venue answers 503 rather than adding to it; a cached read still answers.
  */
 
@@ -69,7 +77,6 @@ export interface CandlesServiceOptions {
 
 export class CandlesService {
   private readonly logger = new Logger(CandlesService.name);
-  private readonly adapter: BinanceAdapter;
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => number;
   private readonly cache: LruCache<CachedPage>;
@@ -77,11 +84,6 @@ export class CandlesService {
   private readonly inFlight = new Map<string, Promise<WebCandle[]>>();
 
   constructor(private readonly options: CandlesServiceOptions) {
-    // the adapter's socket half is never used here: no stream is opened, so no WS URL is needed
-    this.adapter = new BinanceAdapter(options.futuresBaseUrl, '', {
-      log: (m) => this.logger.log(m),
-      warn: (m) => this.logger.warn(m),
-    });
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.now = options.now ?? Date.now;
     this.cache = new LruCache(options.maxPages ?? CACHE_MAX_PAGES);
@@ -141,17 +143,8 @@ export class CandlesService {
     }
     const pageEnd = pageStart + pageSpanMs(market, tf) - 1; // endTime is inclusive on Binance
     try {
-      const candles = market === 'perp'
-        ? await this.adapter.fetchCandles({ id: `binance:${symbol}`, symbol }, tf, pageStart, pageEnd, {
-          fetchImpl: this.fetchImpl,
-          signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
-          onResponse: (res) => {
-            this.options.weight.recordCall(PERP_PAGE_WEIGHT, this.now());
-            this.options.weight.recordFromHeaders(res.headers, this.now());
-          },
-        })
-        : await this.fetchSpotPage(symbol, tf, pageStart, pageEnd);
-      return candles.map(toWebCandle);
+      const rows = await this.fetchKlinePage(market, symbol, tf, pageStart, pageEnd);
+      return rows.map(toWebCandle);
     } catch (error) {
       const wire = this.toWireError(error, market, symbol, tf);
       if (wire === null) return []; // cached like any page: an unknown symbol stays unknown
@@ -159,23 +152,36 @@ export class CandlesService {
     }
   }
 
-  /** One spot page: `/api/v3/klines` returns the same array-of-arrays row as fapi. */
-  private async fetchSpotPage(symbol: string, tf: WebTimeframe, from: number, to: number): Promise<Candle[]> {
-    const url = new URL('/api/v3/klines', this.options.spotBaseUrl);
+  /**
+   * One page of klines. `interval` is the timeframe id verbatim (`WebTimeframeSchema` is spelled as
+   * Binance spells it). Weight goes where each market's budget is kept: perp into the shared
+   * tracker (documented cost + the venue's header), spot to its own gauge.
+   */
+  private async fetchKlinePage(
+    market: WebMarket, symbol: string, tf: WebTimeframe, from: number, to: number,
+  ): Promise<BinanceRestKline[]> {
+    const perp = market === 'perp';
+    const url = perp
+      ? new URL('/fapi/v1/klines', this.options.futuresBaseUrl)
+      : new URL('/api/v3/klines', this.options.spotBaseUrl);
     url.searchParams.set('symbol', symbol);
     url.searchParams.set('interval', tf);
     url.searchParams.set('startTime', String(from));
     url.searchParams.set('endTime', String(to));
-    url.searchParams.set('limit', String(PAGE_LIMIT.spot));
+    url.searchParams.set('limit', String(PAGE_LIMIT[market]));
     const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) });
-    const used = Number(res.headers.get('x-mbx-used-weight-1m'));
-    if (Number.isFinite(used) && used > 0) this.options.onSpotWeight?.(used);
+    if (perp) {
+      this.options.weight.recordCall(PERP_PAGE_WEIGHT, this.now());
+      this.options.weight.recordFromHeaders(res.headers, this.now());
+    } else {
+      const used = Number(res.headers.get('x-mbx-used-weight-1m'));
+      if (Number.isFinite(used) && used > 0) this.options.onSpotWeight?.(used);
+    }
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
       throw new BinanceHttpError(res.status, res.statusText, typeof body?.code === 'number' ? body.code : null);
     }
-    const rows = (await res.json()) as BinanceRestKline[];
-    return rows.map((row) => mapRestKline(`binance:${symbol}`, row, tf));
+    return (await res.json()) as BinanceRestKline[];
   }
 
   /**
@@ -200,11 +206,13 @@ export class CandlesService {
   }
 }
 
-function toWebCandle(c: Candle): WebCandle {
+/** A kline row onto the wire: columns 0–5 and 9 (taker-buy base volume), as `mapRestKline` reads them. */
+function toWebCandle(row: BinanceRestKline): WebCandle {
+  const [openTime, open, high, low, close, volume, , , , takerBuyVolume] = row;
   return {
-    time: Math.floor(c.openTime / 1000),
-    open: c.open, high: c.high, low: c.low, close: c.close,
-    volume: c.volume,
-    takerBuyVolume: c.takerBuyVolume ?? null,
+    time: Math.floor(openTime / 1000),
+    open: Number(open), high: Number(high), low: Number(low), close: Number(close),
+    volume: Number(volume),
+    takerBuyVolume: takerBuyVolume === undefined ? null : Number(takerBuyVolume),
   };
 }

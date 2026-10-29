@@ -6,23 +6,29 @@ import { WebCandleSchema, type WebMarket, type WebTimeframe } from '@trade-autom
 import { BinanceWeightTracker } from '../../src/collectors/binance-perp/binance-weight.tracker';
 import { pageSpanMs } from '../../src/web/market/candle-pages';
 import { CandlesService, PERP_PAGE_WEIGHT } from '../../src/web/market/candles.service';
-import { timeframeMs } from '../../src/web/series/range';
+import { floorToGrid, timeframeMs } from '../../src/web/series/range';
 
 /**
  * IB-063 — the chart's candles from Binance on demand.
  *
- * The venue is a fake `fetch`, but every row it serves is a copy of a REAL row: the fixture is
- * `GET /api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1748736000000&limit=3`, captured
- * 2026-10-29 from `data-api.binance.vision` (Binance's spot market-data host, same path and shape
- * as api.binance.com, which answers 451 from the capturing machine's US egress). USD-M's
- * `/fapi/v1/klines` row is the same 12-column array (`BinanceRestKline`); it could not be captured
- * from that network, which is why the shape spec below is spot's.
+ * The venue is a fake `fetch`, but every row it serves is a copy of a REAL row. Fixtures, all
+ * `symbol=BTCUSDT&startTime=1748736000000&limit=3`, captured 2026-10-29:
+ * - `spot-klines-1h.json` from `data-api.binance.vision` (spot's market-data host, same path and
+ *   shape as api.binance.com, which then answered 451 to the capturing machine's US egress);
+ * - `fapi-klines-1h.json`, `fapi-klines-1w.json`, `spot-klines-1w.json` from fapi/api directly,
+ *   once that egress was gone (IB-065);
+ * - `*-klines-invalid-symbol.json`: both hosts' answer to `symbol=NOPEUSDT`.
  */
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'binance', name), 'utf8'));
 
 const SPOT_1H = fixture('spot-klines-1h.json') as BinanceRestKline[];
+const FAPI_1H = fixture('fapi-klines-1h.json') as BinanceRestKline[];
+const FAPI_1W = fixture('fapi-klines-1w.json') as BinanceRestKline[];
+const SPOT_1W = fixture('spot-klines-1w.json') as BinanceRestKline[];
 const INVALID_SYMBOL = fixture('spot-klines-invalid-symbol.json');
+const FAPI_INVALID_SYMBOL = fixture('fapi-klines-invalid-symbol.json');
+const WEEK = 7 * 86_400_000;
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -32,19 +38,32 @@ const NOW = Date.UTC(2026, 9, 29, 12, 30);
 const LISTED = Date.UTC(2019, 8, 8); // BTCUSDT perp's first bar
 
 describe('the kline payload (fixture)', () => {
-  it('is an array of 12-column rows in the order BinanceRestKline names', () => {
-    expect(SPOT_1H).toHaveLength(3);
-    for (const row of SPOT_1H) {
+  it.each<[string, BinanceRestKline[], number]>([
+    ['spot 1h', SPOT_1H, HOUR], ['fapi 1h', FAPI_1H, HOUR], ['fapi 1w', FAPI_1W, WEEK], ['spot 1w', SPOT_1W, WEEK],
+  ])('%s is an array of 12-column rows in the order BinanceRestKline names', (_name, rows, width) => {
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
       expect(row).toHaveLength(12);
       const [openTime, open, high, low, close, volume, closeTime, quote, trades, takerBase, takerQuote] = row;
       expect(typeof openTime).toBe('number');
-      expect(closeTime).toBe(openTime + HOUR - 1);
+      expect(closeTime).toBe(openTime + width - 1);
       for (const s of [open, high, low, close, volume, quote, takerBase, takerQuote]) expect(typeof s).toBe('string');
       expect(Number.isInteger(trades)).toBe(true);
       expect(Number(high)).toBeGreaterThanOrEqual(Math.max(Number(open), Number(close), Number(low)));
       expect(Number(takerBase)).toBeLessThanOrEqual(Number(volume));
     }
-    expect(SPOT_1H[0][0]).toBe(JUNE_2025);
+  });
+
+  it('IB-065: a Binance week opens Monday 00:00 UTC, on perp and spot alike', () => {
+    for (const row of [...FAPI_1W, ...SPOT_1W]) {
+      const open = new Date(row[0]);
+      expect(open.getUTCDay()).toBe(1); // Monday
+      expect(open.getUTCHours() + open.getUTCMinutes() + open.getUTCSeconds()).toBe(0);
+      expect(floorToGrid(row[0], '1w')).toBe(row[0]); // on our grid
+      expect(floorToGrid(row[0] + WEEK - 1, '1w')).toBe(row[0]); // the whole week maps to its Monday
+    }
+    // the epoch's own multiples of a week are Thursdays: the reason the grid is shifted
+    expect(new Date(Math.floor(FAPI_1W[0][0] / WEEK) * WEEK).getUTCDay()).toBe(4);
   });
 
   it('maps onto the wire contract', () => {
@@ -52,8 +71,9 @@ describe('the kline payload (fixture)', () => {
     expect(c).toMatchObject({ openTime: JUNE_2025, open: 104591.88, volume: 293.78295, takerBuyVolume: 131.48518 });
   });
 
-  it('an unknown symbol is 400 with code -1121', () => {
+  it('an unknown symbol is 400 with code -1121, on both hosts', () => {
     expect(INVALID_SYMBOL).toEqual({ code: -1121, msg: 'Invalid symbol.' });
+    expect(FAPI_INVALID_SYMBOL).toEqual({ code: -1121, msg: 'Invalid symbol.' });
   });
 });
 
@@ -81,8 +101,10 @@ function fakeVenue(opts: { now: () => number; status?: (call: Call) => { status:
     const end = Math.min(Number(url.searchParams.get('endTime')), opts.now());
     const limit = Number(url.searchParams.get('limit'));
     const rows: BinanceRestKline[] = [];
-    for (let t = Math.ceil(start / step) * step; t <= end && rows.length < limit; t += step) {
-      const row = [...SPOT_1H[0]] as BinanceRestKline;
+    // the first bar opening at or after startTime, on the venue's grid (weeks open on Mondays)
+    const first = floorToGrid(start, tf) === start ? start : floorToGrid(start, tf) + step;
+    for (let t = first; t <= end && rows.length < limit; t += step) {
+      const row = [...(tf === '1w' ? FAPI_1W : SPOT_1H)[0]] as BinanceRestKline;
       row[0] = t;
       row[6] = t + step - 1;
       rows.push(row);
@@ -131,13 +153,14 @@ describe('CandlesService — reading the venue', () => {
     expect(venue.calls.map((c) => Number(c.params.get('startTime')) % span)).toEqual([0, 0]);
   });
 
-  it.each<[WebTimeframe]>([['1m'], ['15m'], ['1h'], ['4h'], ['1d']])(
+  it.each<[WebTimeframe]>([['1m'], ['3m'], ['5m'], ['15m'], ['1h'], ['4h'], ['1d'], ['1w']])(
     '%s: interval is the timeframe, one page of 1500 bars per request, on fapi',
     async (tf) => {
       const { service, venue } = setup();
       const step = timeframeMs(tf);
       const span = pageSpanMs('perp', tf);
-      const from = Math.floor(JUNE_2025 / span) * span; // one whole page
+      // one page; for 1w the page holds every week ever listed, so start after the listing
+      const from = tf === '1w' ? floorToGrid(JUNE_2025, '1w') - 100 * step : floorToGrid(JUNE_2025, tf, span);
       const candles = await service.candles('perp', 'BTCUSDT', tf, from, from + 100 * step);
 
       expect(candles).toHaveLength(100);
@@ -149,6 +172,32 @@ describe('CandlesService — reading the venue', () => {
       expect(Number(p.get('endTime')) - Number(p.get('startTime'))).toBe(span - 1);
     },
   );
+
+  it('IB-065: 1w pages and bars sit on Mondays, perp and spot, and give 100+ weeks', async () => {
+    const { service, venue } = setup();
+    const to = NOW + WEEK;
+    const from = to - 728 * 86_400_000; // the dashboard's 1W window: 104 weeks
+    for (const market of ['perp', 'spot'] as WebMarket[]) {
+      const weeks = await service.candles(market, 'BTCUSDT', '1w', from, to);
+      expect(weeks.length).toBeGreaterThanOrEqual(100);
+      expect(weeks.every((w) => new Date(w.time * 1000).getUTCDay() === 1)).toBe(true);
+      expect(weeks.every((w, i) => i === 0 || w.time - weeks[i - 1].time === WEEK / 1000)).toBe(true);
+    }
+    for (const call of venue.calls) {
+      expect(call.params.get('interval')).toBe('1w');
+      expect(new Date(Number(call.params.get('startTime'))).getUTCDay()).toBe(1); // a page opens on a Monday
+    }
+  });
+
+  it('IB-065: the forming week is served but not cached; the closed weeks are', async () => {
+    const { service, venue } = setup();
+    await service.candles('perp', 'BTCUSDT', '1w', NOW - 52 * WEEK, NOW + WEEK);
+    const n = venue.calls.length;
+    await service.candles('perp', 'BTCUSDT', '1w', NOW - 104 * WEEK, NOW - 60 * WEEK); // closed: a hit
+    expect(venue.calls).toHaveLength(n);
+    await service.candles('perp', 'BTCUSDT', '1w', NOW - 52 * WEEK, NOW + WEEK); // live edge: back to the venue
+    expect(venue.calls.length).toBeGreaterThan(n);
+  });
 
   it('1m for one day in 2024 crosses page boundaries and returns every minute', async () => {
     const { service, venue } = setup();
@@ -338,7 +387,8 @@ describe('CandlesService — errors', () => {
   });
 
   it.each<[WebMarket]>([['perp'], ['spot']])('%s: Invalid symbol is an empty chart, remembered', async (market) => {
-    const { service, venue } = setup({ status: (c) => (c.params.get('symbol') === 'NOPEUSDT' ? { status: 400, body: INVALID_SYMBOL } : null) });
+    const body = market === 'perp' ? FAPI_INVALID_SYMBOL : INVALID_SYMBOL;
+    const { service, venue } = setup({ status: (c) => (c.params.get('symbol') === 'NOPEUSDT' ? { status: 400, body } : null) });
     expect(await service.candles(market, 'NOPEUSDT', '1h', JUNE_2025, JUNE_2025 + DAY)).toEqual([]);
     expect(await service.candles(market, 'NOPEUSDT', '1h', JUNE_2025, JUNE_2025 + DAY)).toEqual([]);
     expect(venue.calls).toHaveLength(1);
