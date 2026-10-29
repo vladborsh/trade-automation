@@ -10,16 +10,27 @@
  * in a bar winning, leaves one slot per bar however many series there are.
  */
 
-const TIMEFRAME_SECONDS: Record<string, number> = { '1m': 60, '15m': 900, '1h': 3_600, '4h': 14_400, '1d': 86_400 };
+const TIMEFRAME_SECONDS: Record<string, number> = {
+  '1m': 60, '3m': 180, '5m': 300, '15m': 900, '1h': 3_600, '4h': 14_400, '1d': 86_400, '1w': 604_800,
+};
+
+const WEEK_SEC = 604_800;
+/**
+ * IB-065: a Binance week opens Monday 00:00 UTC, and the epoch was a Thursday, so week bars sit
+ * 4 days off the epoch's multiples of a week. Every narrower bar divides a day and keeps the
+ * epoch grid. The server pins the same rule against real weekly klines.
+ */
+const WEEK_OFFSET_SEC = 4 * 86_400;
 
 /** A timeframe's bar length in seconds; 60 for anything unknown, the finest the page offers. */
 export function barSeconds(timeframe: string): number {
   return TIMEFRAME_SECONDS[timeframe] ?? 60;
 }
 
-/** The start of the bar `timeSec` falls in. */
+/** The start of the bar `timeSec` falls in; a week's bar starts on its Monday. */
 export function snapTime(timeSec: number, stepSec: number): number {
-  return Math.floor(timeSec / stepSec) * stepSec;
+  const offset = stepSec === WEEK_SEC ? WEEK_OFFSET_SEC : 0;
+  return Math.floor((timeSec - offset) / stepSec) * stepSec + offset;
 }
 
 /**

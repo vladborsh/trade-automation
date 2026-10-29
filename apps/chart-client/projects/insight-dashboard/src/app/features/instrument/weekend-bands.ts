@@ -18,8 +18,9 @@ export const CLOSED_BAND_SWATCH = '#8b949e';
 
 const DAY_SEC = 86_400;
 
+/** Off on 1d and 1w: a weekend is one or two whole bars there, or part of one (IB-065). */
 export function showsClosedBands(timeframe: string): boolean {
-  return timeframe !== '1d';
+  return timeframe !== '1d' && timeframe !== '1w';
 }
 
 /** Saturday 00:00 UTC to Monday 00:00 UTC, for every weekend the candles touch. */

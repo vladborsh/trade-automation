@@ -64,6 +64,8 @@ function drawLevels(chart: IChartApi, data: PaneData, pane: number): void {
   const times = candleTimes(data);
   const periods = { day: previousDayLevels(data.dailyCandles), week: previousWeekLevels(data.dailyCandles) };
   for (const line of LEVEL_LINES) {
+    // IB-065: on 1w a day is inside a bar; its levels would land on Mondays only, as fragments
+    if (line.period === 'day' && data.timeframe === '1w') continue;
     const points = levelSteps(periods[line.period], times, line.pick);
     if (points.length === 0) continue;
     chart.addSeries(LineSeries, {

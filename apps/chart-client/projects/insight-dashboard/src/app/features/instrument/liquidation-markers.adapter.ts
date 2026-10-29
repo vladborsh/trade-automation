@@ -1,4 +1,5 @@
 import type { WebLiquidationEvent } from '@trade-automation/contracts';
+import { snapTime } from './time-grid';
 
 /**
  * IB-039 — liquidation events → bubbles on the price chart (design §12.5).
@@ -46,8 +47,9 @@ export const MAX_RADIUS_PX = 14;
 /** $10M fills the scale: above that the bubble stops growing and says so. */
 export const DEFAULT_SCALE_CEILING_USD = 10_000_000;
 
+/** The bar an event falls in: the candles' own grid, so a week's bubble lands on its Monday (IB-065). */
 export function floorToBar(timeSec: number, barSeconds: number): number {
-  return Math.floor(timeSec / barSeconds) * barSeconds;
+  return snapTime(timeSec, barSeconds);
 }
 
 /**

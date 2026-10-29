@@ -48,7 +48,8 @@ describe('closedBands', () => {
 
   it('is off on 1d and empty without candles', () => {
     expect(showsClosedBands('1d')).toBe(false);
-    expect(['1m', '15m', '1h', '4h'].every(showsClosedBands)).toBe(true);
+    expect(showsClosedBands('1w')).toBe(false);
+    expect(['1m', '3m', '5m', '15m', '1h', '4h'].every(showsClosedBands)).toBe(true);
     expect(closedBands(hourly(FRI, 96), '1d', [])).toEqual([]);
     expect(closedBands([], '1h', [])).toEqual([]);
   });

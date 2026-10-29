@@ -10,9 +10,9 @@ import { barsWithin } from './time-grid';
 
 const DAY_SEC = 86_400;
 
-/** Off on 1d, where every bar is a day and a line per bar is noise. */
+/** Off on 1d, where every bar is a day and a line per bar is noise, and on 1w, where a day is inside a bar. */
 export function showsDaySeparators(timeframe: string): boolean {
-  return timeframe !== '1d';
+  return timeframe !== '1d' && timeframe !== '1w';
 }
 
 /**

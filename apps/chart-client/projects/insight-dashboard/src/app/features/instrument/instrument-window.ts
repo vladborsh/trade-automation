@@ -1,6 +1,7 @@
 import type { EconomicEvent, WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
 import type { PaneData } from './pane-data';
+import { sideWindow } from './time-range';
 
 export interface WindowRequest {
   symbol: string;
@@ -11,7 +12,8 @@ export interface WindowRequest {
 }
 
 /** How far before the window the daily candles reach: the first ISO week on screen needs the whole week before it. */
-const LEVELS_LOOKBACK_MS = 14 * 86_400_000;
+export const LEVELS_LOOKBACK_DAYS = 14;
+const LEVELS_LOOKBACK_MS = LEVELS_LOOKBACK_DAYS * 86_400_000;
 
 /**
  * Everything the chart draws for one time window, in one round of parallel reads. Used for the
@@ -25,15 +27,17 @@ const LEVELS_LOOKBACK_MS = 14 * 86_400_000;
  */
 export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Promise<PaneData> {
   const { symbol, fromMs, toMs, timeframe, bucket } = req;
+  // IB-065: every read but the candles covers at most the window's last 90 days (`sideWindow`)
+  const side = sideWindow(fromMs, toMs);
   const [candles, daily, oi, funding, longShort, liquidations, events, calendar] = await Promise.all([
     api.candles(symbol, fromMs, toMs, timeframe, 'perp'),
     fetchDaily(api, symbol, fromMs - LEVELS_LOOKBACK_MS, toMs),
-    api.openInterest(symbol, fromMs, toMs),
-    api.funding(symbol, fromMs, toMs),
-    api.longShort(symbol, fromMs, toMs, 'global_account'),
-    api.liquidations(symbol, fromMs, toMs, bucket),
-    fetchLiquidationEvents(api, symbol, fromMs, toMs),
-    fetchCalendar(api, fromMs, toMs),
+    api.openInterest(symbol, side.fromMs, side.toMs),
+    api.funding(symbol, side.fromMs, side.toMs),
+    api.longShort(symbol, side.fromMs, side.toMs, 'global_account'),
+    api.liquidations(symbol, side.fromMs, side.toMs, bucket),
+    fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs),
+    fetchCalendar(api, side.fromMs, side.toMs),
   ]);
   return {
     instrument: `binance:${symbol}`,

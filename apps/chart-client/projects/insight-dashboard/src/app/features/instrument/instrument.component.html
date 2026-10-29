@@ -12,7 +12,7 @@
     <div class="switches">
       <div class="group" role="group" [attr.aria-label]="t('instrument.timeframe')">
         @for (tf of timeframes; track tf) {
-          <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ tf }}</button>
+          <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ timeframeLabel(tf) }}</button>
         }
       </div>
     </div>

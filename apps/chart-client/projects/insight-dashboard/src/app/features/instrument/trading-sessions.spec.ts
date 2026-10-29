@@ -70,4 +70,9 @@ describe('showsSessions', () => {
     expect(showsSessions('4h')).toBe(false);
     expect(showsSessions('1d')).toBe(false);
   });
+
+  it('IB-065: on 3m and 5m too, not on 1w', () => {
+    expect(['3m', '5m'].every(showsSessions)).toBe(true);
+    expect(showsSessions('1w')).toBe(false);
+  });
 });

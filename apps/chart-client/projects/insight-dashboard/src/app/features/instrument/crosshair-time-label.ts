@@ -17,7 +17,7 @@ export function crosshairTimeLabel(timeSec: number, lang: Lang, timeframe: strin
   // ru's abbreviated months carry a full stop (`окт.`), which reads as clutter in a one-line label
   const month = names.month.formatToParts(date).find((p) => p.type === 'month')?.value.replace(/\.$/, '') ?? '';
   const day = `${weekday} ${date.getUTCDate()} ${month} ${date.getUTCFullYear()}`;
-  if (timeframe === '1d') return day;
+  if (timeframe === '1d' || timeframe === '1w') return day; // a week's label is its Monday
   return `${day} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 

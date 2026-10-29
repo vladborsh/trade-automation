@@ -1,0 +1,50 @@
+/**
+ * IB-065: three REAL weekly klines, verbatim — `GET https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1w&startTime=1748736000000&limit=3`,
+ * captured 2026-10-29 (the same rows the bot's `test/fixtures/binance/fapi-klines-1w.json` holds). Column 0 is the
+ * open time in ms, column 6 the close time; Binance opens a week on Monday 00:00 UTC.
+ */
+export const BINANCE_KLINES_1W: ReadonlyArray<readonly [number, string, string, string, string, string, number, string, number, string, string, string]> =
+[
+  [
+    1748822400000,
+    '105583.30',
+    '106775.00',
+    '100305.10',
+    '105676.50',
+    '991480.907',
+    1749427199999,
+    '103590435152.74930',
+    17768477,
+    '491153.839',
+    '51330474534.41910',
+    '0'
+  ],
+  [
+    1749427200000,
+    '105676.50',
+    '110653.60',
+    '102614.00',
+    '105534.60',
+    '1070052.276',
+    1750031999999,
+    '114452122298.97920',
+    19861178,
+    '535679.290',
+    '57304035282.60750',
+    '0'
+  ],
+  [
+    1750032000000,
+    '105534.70',
+    '108900.00',
+    '98115.40',
+    '100904.70',
+    '1266718.207',
+    1750636799999,
+    '131635759540.91590',
+    21949532,
+    '629569.548',
+    '65431845764.38820',
+    '0'
+  ]
+];

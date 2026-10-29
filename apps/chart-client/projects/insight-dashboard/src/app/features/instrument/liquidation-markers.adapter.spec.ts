@@ -13,6 +13,11 @@ describe('floorToBar', () => {
     expect(floorToBar(1_000_123, 60)).toBe(1_000_080);
     expect(floorToBar(1_000_080, 60)).toBe(1_000_080);
   });
+
+  it('IB-065: a weekly bubble lands on the candle\'s Monday, not on the epoch\'s Thursday', () => {
+    const monday = Date.UTC(2026, 9, 26) / 1000;
+    expect(floorToBar(monday + 4 * 86_400 + 77, 604_800)).toBe(monday);
+  });
 });
 
 describe('radiusFor', () => {

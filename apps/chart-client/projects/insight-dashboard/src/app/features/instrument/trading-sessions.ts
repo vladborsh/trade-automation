@@ -32,9 +32,9 @@ export const SESSIONS: readonly SessionDef[] = [
   { key: 'newYork', labelKey: 'instrument.legend.newYork', timeZone: 'America/New_York', openMin: 9 * 60 + 30, closeMin: 16 * 60, colour: 'rgba(210, 153, 34, 0.08)', swatch: '#d29922' },
 ];
 
-/** Off on 4h and 1d: a session is narrower than one bar there. */
+/** Off on 4h, 1d and 1w: a session is narrower than one bar there. */
 export function showsSessions(timeframe: string): boolean {
-  return timeframe === '1m' || timeframe === '15m' || timeframe === '1h';
+  return ['1m', '3m', '5m', '15m', '1h'].includes(timeframe);
 }
 
 const DAY_SEC = 86_400;

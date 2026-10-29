@@ -16,6 +16,10 @@ describe('crosshairTimeLabel', () => {
     expect(crosshairTimeLabel(at(2026, 10, 29), 'en', '1d')).toBe('Thu 29 Oct 2026');
   });
 
+  it('IB-065: 1w shows its Monday\'s date without a time', () => {
+    expect(crosshairTimeLabel(at(2026, 10, 26), 'en', '1w')).toBe('Mon 26 Oct 2026');
+  });
+
   // Either side of a UTC midnight: any non-UTC zone in the browser running this puts one of the
   // two on the wrong day, so a label built from local time fails here wherever it runs.
   it('the weekday is the UTC one on both sides of midnight', () => {

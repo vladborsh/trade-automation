@@ -34,4 +34,9 @@ describe('showsDaySeparators', () => {
     for (const tf of ['1m', '15m', '1h', '4h']) expect(showsDaySeparators(tf)).toBe(true);
     expect(showsDaySeparators('1d')).toBe(false);
   });
+
+  it('IB-065: on 3m and 5m, not on 1w', () => {
+    expect(showsDaySeparators('3m') && showsDaySeparators('5m')).toBe(true);
+    expect(showsDaySeparators('1w')).toBe(false);
+  });
 });

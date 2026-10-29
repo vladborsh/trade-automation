@@ -14,7 +14,7 @@ import { fetchWindow } from './instrument-window';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
 import { LoaderComponent } from '../../ui/loader.component';
 import { SymbolPickerComponent } from './symbol-picker.component';
-import { bucketFor, TIMEFRAMES, windowFor } from './time-range';
+import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './time-range';
 
 /**
  * architecture/insight-bot-web-dashboard.md §2 and §13 — one time-aligned screen for a symbol:
@@ -76,6 +76,7 @@ export class InstrumentComponent {
 
   /** No range buttons since 2026-10-24: the window follows the timeframe (`time-range.ts`). */
   readonly timeframes = TIMEFRAMES;
+  readonly timeframeLabel = timeframeLabel;
   /** The context column's tiles: the window's latest points plus the live summary's row. */
   readonly now = computed(() =>
     nowTiles(this.panes(), this.summary()?.find((r) => r.id === this.symbol()) ?? null, this.symbol()));
@@ -147,7 +148,7 @@ export class InstrumentComponent {
     try {
       const [panes, top] = await Promise.all([
         fetchWindow(this.api, { symbol, fromMs, toMs, timeframe: tf, bucket }),
-        this.api.topLiquidations(symbol, fromMs, toMs, 50),
+        this.api.topLiquidations(symbol, sideWindow(fromMs, toMs).fromMs, toMs, 50),
       ]);
       if (generation !== this.generation) return; // a newer choice was made while this was loading
       this.loadedFromMs = fromMs;
