@@ -1,0 +1,57 @@
+# Insight dashboard CI — unit tests and a production build of the second Angular project in the
+# chart-client workspace (apps/chart-client/projects/insight-dashboard). The dashboard imports only
+# @trade-automation/contracts, so that is the one lib built first; the production build is the
+# same command the insight-bot Dockerfile runs for its `dashboard` stage.
+name: insight-dashboard CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/chart-client/projects/insight-dashboard/**'
+      - 'apps/chart-client/angular.json'
+      - 'apps/chart-client/package.json'
+      - 'libs/contracts/**'
+      - 'package-lock.json'
+      - '.github/workflows/insight-dashboard-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/chart-client/projects/insight-dashboard/**'
+      - 'apps/chart-client/angular.json'
+      - 'apps/chart-client/package.json'
+      - 'libs/contracts/**'
+      - 'package-lock.json'
+      - '.github/workflows/insight-dashboard-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: insight-dashboard-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --workspace=@trade-automation/chart-client --workspace=@trade-automation/contracts --include-workspace-root
+
+      - name: Build contracts
+        run: npm run build --workspace=@trade-automation/contracts
+
+      - name: Unit tests
+        working-directory: apps/chart-client
+        run: npm run test:insight-dashboard
+
+      - name: Production build
+        working-directory: apps/chart-client
+        run: npm run build:insight-dashboard -- --configuration production
