@@ -105,7 +105,7 @@ export const ru: Strings = {
   'instrument.historyStart': 'Раньше истории нет: здесь начинаются данные биржи.',
   'instrument.picker.open': 'Инструмент {symbol}: выбрать другой',
   'instrument.picker.search': 'Найти тикер',
-  'instrument.picker.topList': 'Крипто: топ-30 по объёму, затем золото, нефть, индексы',
+  'instrument.picker.topList': 'Крипта топ-30 · сырьё · индексы',
   'instrument.picker.change': '24 ч, %',
   'instrument.picker.funding': 'Фандинг, %',
   'instrument.picker.oi': 'ОИ 24 ч, %',
