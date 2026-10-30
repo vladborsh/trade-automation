@@ -1,4 +1,5 @@
 import type { EconomicEvent } from '@trade-automation/contracts';
+import type { StringKey } from '../../i18n/keys';
 import { barsWithin, snapTime } from './time-grid';
 
 /**
@@ -45,6 +46,38 @@ export function calendarMarks(events: readonly EconomicEvent[], times: readonly 
 export function markAt(marks: readonly CalendarMark[], time: number | null): CalendarMark | null {
   if (time === null) return null;
   return marks.find((m) => m.time === time) ?? null;
+}
+
+/**
+ * IB-067 — how long until an upcoming event, for its tooltip: «через 45 мин», «через 2 ч 15 мин»,
+ * «через 2 д 3 ч». Null once it is due: a past event's tooltip has its actual figure instead.
+ * Minutes round up, so «через 1 мин» shows until the minute it is due, never «через 0 мин».
+ */
+export function untilLabel(
+  eventMs: number, nowMs: number, t: (key: StringKey, params?: Record<string, string | number>) => string,
+): string | null {
+  if (eventMs <= nowMs) return null;
+  const minutes = Math.ceil((eventMs - nowMs) / 60_000);
+  if (minutes < 60) return t('calendar.until.minutes', { m: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours >= 24) return t('calendar.until.daysHours', { d: Math.floor(hours / 24), h: hours % 24 });
+  return minutes % 60 === 0 ? t('calendar.until.hours', { h: hours }) : t('calendar.until.hoursMinutes', { h: hours, m: minutes % 60 });
+}
+
+/** The tooltip's widest (its `max-width`), and its gap from the crosshair. */
+export const TOOLTIP_MAX_WIDTH = 280;
+const TOOLTIP_GAP = 12;
+
+/**
+ * IB-067 — where the tooltip sits beside the crosshair at `x` in a container `width` wide: to the
+ * right, unless its widest would run past the edge — then to the left, hugging the crosshair from
+ * that side (`right`). Upcoming events are at the right edge by construction, where a tooltip
+ * opening rightwards covered the price scale and the context column. A width of 0 is unknown (not
+ * laid out): right, as before.
+ */
+export function tooltipSide(x: number, width: number): { left: number | null; right: number | null } {
+  if (width > 0 && x + TOOLTIP_GAP + TOOLTIP_MAX_WIDTH > width) return { left: null, right: width - x + TOOLTIP_GAP };
+  return { left: x + TOOLTIP_GAP, right: null };
 }
 
 /** `2026-10-28 12:30 UTC` — the tooltip's time: the feed's own clock, the same in both languages. */

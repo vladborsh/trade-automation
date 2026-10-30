@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal,
   untracked, viewChild, type OnDestroy,
 } from '@angular/core';
-import { createChart, type IChartApi, type LogicalRange, type MouseEventParams, type Time } from 'lightweight-charts';
+import { createChart, type IChartApi, type LogicalRange, type MouseEventParams } from 'lightweight-charts';
 import { I18nService } from '../../i18n/i18n.service';
 import { LoaderComponent } from '../../ui/loader.component';
 import { CalendarTooltipComponent } from './calendar-tooltip.component';
@@ -16,10 +16,11 @@ import {
 } from './pane-heights';
 import { legendEntries } from './pane-legend';
 import {
-  PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, panelHeading, windowBounds,
+  PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, panelHeading, showWholeWindow,
 } from './panels.model';
 import { TimeAxisStrip } from './time-axis-strip';
 import { keepView } from './carried-view';
+import { futureSlots } from './future-bars';
 
 export type { PaneData } from './pane-data';
 
@@ -173,7 +174,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const current = this.chart;
     if (current && (data.extendsPrevious || data.extendsLater)) {
       keepView(current, data, () => (this.renderers = redrawPanels(current, data, this.renderers, PANELS.map((p) => p.key))));
-      return this.axis?.refresh();
+      return this.axis?.refresh(futureSlots(data));
     }
     this.teardown();
     this.renderers = createPanelRenderers();
@@ -184,13 +185,12 @@ export class InstrumentChartComponent implements OnDestroy {
     for (const panel of PANELS) drawPanel(panel.key, chart, data, this.renderers);
     for (const pane of chart.panes()) pane.priceScale('right').applyOptions(PANEL_PRICE_SCALE);
     this.applyHeights();
-    const bounds = windowBounds(data);
-    if (bounds) chart.timeScale().setVisibleRange({ from: bounds.from as Time, to: bounds.to as Time });
+    showWholeWindow(chart, data);
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
     chart.subscribeCrosshairMove((p: MouseEventParams) =>
       this.hover.set(p.time !== undefined && p.point ? { time: p.time as number, x: p.point.x } : null));
     this.axis = new TimeAxisStrip(this.axisHost().nativeElement, this.i18n.lang);
-    this.axis.attach(chart, { background: '#0d1117', text: '#c9d1d9' }, data.timeframe);
+    this.axis.attach(chart, { background: '#0d1117', text: '#c9d1d9' }, data.timeframe, futureSlots(data));
     this.observer = new ResizeObserver(() => this.schedule());
     this.observer.observe(host);
     this.schedule();

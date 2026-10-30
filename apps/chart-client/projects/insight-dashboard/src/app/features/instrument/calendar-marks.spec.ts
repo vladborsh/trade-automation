@@ -1,5 +1,5 @@
 import type { EconomicEvent } from '@trade-automation/contracts';
-import { calendarMarks, eventTimeLabel, isMarkedEvent, markAt } from './calendar-marks';
+import { TOOLTIP_MAX_WIDTH, calendarMarks, eventTimeLabel, isMarkedEvent, markAt, tooltipSide, untilLabel } from './calendar-marks';
 
 const D0 = Date.UTC(2026, 9, 28) / 1000; // Wednesday 2026-10-28 00:00 UTC
 const M15 = 900;
@@ -60,5 +60,45 @@ describe('calendarMarks', () => {
 describe('eventTimeLabel', () => {
   it('is UTC to the minute, whatever the browser zone', () => {
     expect(eventTimeLabel(Date.UTC(2026, 9, 28, 12, 30, 59))).toBe('2026-10-28 12:30 UTC');
+  });
+});
+
+describe('untilLabel (IB-067)', () => {
+  const t = (key: string, p: Record<string, string | number> = {}) => `${key}:${JSON.stringify(p)}`;
+  const NOW = Date.UTC(2026, 9, 29, 12, 0);
+  const at = (min: number) => NOW + min * 60_000;
+
+  it('null for an event that is due or past', () => {
+    expect(untilLabel(NOW, NOW, t as never)).toBeNull();
+    expect(untilLabel(at(-5), NOW, t as never)).toBeNull();
+  });
+
+  it('minutes under an hour, rounded up so it never reads «0 min»', () => {
+    expect(untilLabel(NOW + 1_000, NOW, t as never)).toBe('calendar.until.minutes:{"m":1}');
+    expect(untilLabel(at(45), NOW, t as never)).toBe('calendar.until.minutes:{"m":45}');
+  });
+
+  it('hours, with minutes when there are any', () => {
+    expect(untilLabel(at(120), NOW, t as never)).toBe('calendar.until.hours:{"h":2}');
+    expect(untilLabel(at(135), NOW, t as never)).toBe('calendar.until.hoursMinutes:{"h":2,"m":15}');
+  });
+
+  it('days and hours from a day on', () => {
+    expect(untilLabel(at(51 * 60 + 10), NOW, t as never)).toBe('calendar.until.daysHours:{"d":2,"h":3}');
+  });
+});
+
+describe('tooltipSide (IB-067)', () => {
+  it('right of the crosshair where the widest tooltip fits', () => {
+    expect(tooltipSide(100, 1000)).toEqual({ left: 112, right: null });
+    expect(tooltipSide(1000 - 12 - TOOLTIP_MAX_WIDTH, 1000)).toEqual({ left: 1000 - TOOLTIP_MAX_WIDTH, right: null });
+  });
+
+  it('left of it near the right edge, where upcoming events are, hugging the crosshair', () => {
+    expect(tooltipSide(1050, 1100)).toEqual({ left: null, right: 62 });
+  });
+
+  it('an unknown width (not laid out) keeps it on the right', () => {
+    expect(tooltipSide(1050, 0)).toEqual({ left: 1062, right: null });
   });
 });

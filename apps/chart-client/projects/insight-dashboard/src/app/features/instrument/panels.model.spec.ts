@@ -161,6 +161,16 @@ describe('windowBounds (IB-BUG-009)', () => {
     expect(windowBounds(data())).toEqual({ from: 500, to: 3000 });
   });
 
+  it('IB-067: reaches the future bars of an upcoming event, so its line is on screen at once', () => {
+    // the last candle opens at 1000 s; future 1m slots step from it, the last one at or before
+    // the event's bar (3960): 3940
+    const event = { id: 'e', country: 'USD', impact: 'high', status: 'scheduled', scheduledAt: 4_000_000 } as never;
+    expect(windowBounds(data({ calendarEvents: [event] }))).toEqual({ from: 500, to: 3940 });
+    // an event inside the other series' span changes nothing
+    const near = { ...(event as object), scheduledAt: 1_600_000 } as never;
+    expect(windowBounds(data({ calendarEvents: [near] }))).toEqual({ from: 500, to: 3000 });
+  });
+
   it('returns null for an empty window rather than inventing a range', () => {
     expect(windowBounds(data({
       candles: { candles: [] } as never,

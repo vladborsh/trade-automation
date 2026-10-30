@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, input } from '@angular/core';
 import { I18nService } from '../../i18n/i18n.service';
-import { eventTimeLabel, type CalendarMark } from './calendar-marks';
+import { eventTimeLabel, tooltipSide, untilLabel, type CalendarMark } from './calendar-marks';
 
 /**
  * IB-060 — the economic events on the bar under the crosshair, over the price pane: title, time
@@ -22,7 +22,12 @@ export class CalendarTooltipComponent {
   /** The crosshair's x in px within the chart; the tooltip sits just right of it. */
   readonly x = input(0);
 
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly i18n = inject(I18nService);
   readonly t = this.i18n.t.bind(this.i18n);
   readonly when = eventTimeLabel;
+  /** IB-067: «через N ч/мин» for an upcoming event; read at render, which every hover move is. */
+  readonly until = (ms: number): string | null => untilLabel(ms, Date.now(), this.t);
+  /** IB-067: right of the crosshair, or left of it near the right edge (`tooltipSide`). */
+  readonly side = (x: number) => tooltipSide(x, this.host.nativeElement.parentElement?.clientWidth ?? 0);
 }

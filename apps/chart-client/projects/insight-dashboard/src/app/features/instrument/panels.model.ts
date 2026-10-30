@@ -1,4 +1,6 @@
+import type { IChartApi, Time } from 'lightweight-charts';
 import type { StringKey } from '../../i18n/keys';
+import { futureSlots } from './future-bars';
 import type { PaneData } from './pane-data';
 import { LIQUIDATION_COLORS } from './liquidation-scope';
 
@@ -207,6 +209,8 @@ export function windowBounds(data: PaneData): { from: number; to: number } | nul
     ...data.longShort.points.map((p) => p.time),
     ...data.funding.predicted.map((p) => p.time),
     ...data.funding.settled.flatMap((v) => v.points.map((p) => p.time)),
+    // IB-067: and the bars ahead holding the week's upcoming events, so they are on screen at once
+    ...futureSlots(data),
   ];
   if (times.length === 0) return null;
   // reduce, not Math.min(...times): a window extended by scrolling left can pass the engine's
@@ -216,6 +220,12 @@ export function windowBounds(data: PaneData): { from: number; to: number } | nul
   // A single-point window has zero width, which lightweight-charts cannot display; widen it by
   // one minute so the point is visible rather than the panel going blank.
   return from === to ? { from: from - 30, to: to + 30 } : { from, to };
+}
+
+/** A fresh chart's first view: the whole window (`windowBounds`), the bars ahead included. */
+export function showWholeWindow(chart: IChartApi, data: PaneData): void {
+  const bounds = windowBounds(data);
+  if (bounds) chart.timeScale().setVisibleRange({ from: bounds.from as Time, to: bounds.to as Time });
 }
 
 /**

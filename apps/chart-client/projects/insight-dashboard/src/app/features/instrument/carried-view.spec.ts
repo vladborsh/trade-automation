@@ -25,6 +25,18 @@ describe('carriedOffset (IB-066)', () => {
   });
 });
 
+describe('carriedOffset with future whitespace (IB-067)', () => {
+  // the library counts the offset from the last REAL candle and chartTimes leaves whitespace out,
+  // so with 162 future slots the whole view sits at +162; a candle taking a slot is one slot added
+  it('the current candle with the week\'s events to its right is following', () => {
+    expect(carriedOffset({ extendsLater: true }, 162, minutes(0, 100), minutes(0, 101))).toBe(162);
+  });
+
+  it('scrolled back, a candle taking a whitespace slot moves the view by nothing', () => {
+    expect(carriedOffset({ extendsLater: true }, -60, minutes(0, 100), minutes(0, 101))).toBe(-61);
+  });
+});
+
 describe('atRightEdge', () => {
   it('up to a bar and a half back from the newest bar counts; further back does not', () => {
     expect(atRightEdge(3)).toBe(true);

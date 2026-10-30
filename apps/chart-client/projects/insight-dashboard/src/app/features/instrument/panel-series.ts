@@ -4,6 +4,7 @@ import {
 import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
 import { calendarMarks, EVENT_LINE_COLOUR, type CalendarMark } from './calendar-marks';
 import { daySeparatorTimes, showsDaySeparators } from './day-separators';
+import { futureSlots } from './future-bars';
 import { toLiquidationMarkers } from './liquidation-markers.adapter';
 import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
 import type { PaneData } from './pane-data';
@@ -63,7 +64,8 @@ function drawPrice(chart: IChartApi, data: PaneData, renderers: PanelRenderers, 
     upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
     wickUpColor: '#26a69a', wickDownColor: '#ef5350',
   }, pane);
-  price.setData(toCandleData(data.candles.candles) as never);
+  // IB-067: whitespace bars past the last candle, so the week's upcoming events have slots to sit on
+  price.setData([...toCandleData(data.candles.candles), ...futureSlots(data).map((time) => ({ time }))] as never);
   drawLevels(chart, data, pane);
 
   // IB-039 §12.5 — liquidations as bubbles ON the price, bucketed to the bar on screen so a
@@ -98,9 +100,16 @@ function drawLevels(chart: IChartApi, data: PaneData, pane: number): void {
 /** The candle times every overlay is placed on: one time-scale slot per bar (time-grid.ts). */
 const candleTimes = (data: PaneData): number[] => toCandleData(data.candles.candles).map((c) => c.time);
 
+/**
+ * IB-067: the candles' slots and the future ones after them (`future-bars.ts`). Event lines, day
+ * separators and the closed and session bands go on these, so they carry on right of the current
+ * bar; the previous day/week levels stay on the candles, being about what has traded.
+ */
+const slotTimes = (data: PaneData): number[] => [...candleTimes(data), ...futureSlots(data)];
+
 /** IB-060: the event lines on the price pane — one definition for the lines and their tooltip. */
 export const eventMarks = (data: PaneData): CalendarMark[] =>
-  calendarMarks(data.calendarEvents, candleTimes(data), barSeconds(data.timeframe));
+  calendarMarks(data.calendarEvents, slotTimes(data), barSeconds(data.timeframe));
 
 /**
  * Day separators and the US-closed bands (weekends, US holidays: IB-060) on every pane up to 4h;
@@ -110,7 +119,7 @@ export const eventMarks = (data: PaneData): CalendarMark[] =>
 function drawTimeMarks(chart: IChartApi, data: PaneData, renderers: PanelRenderers, key: PanelDef['key'], pane: number): void {
   const target = chart.panes()[pane];
   if (!target) return;
-  const times = candleTimes(data);
+  const times = slotTimes(data);
   const step = barSeconds(data.timeframe);
   const lines = showsDaySeparators(data.timeframe) ? daySeparatorTimes(times) : [];
   const sessions = key === 'price' && showsSessions(data.timeframe) ? sessionBands(times, step) : [];

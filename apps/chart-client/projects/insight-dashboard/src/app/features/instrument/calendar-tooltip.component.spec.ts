@@ -44,4 +44,13 @@ describe('CalendarTooltipComponent (IB-060)', () => {
       ['Core CPI m/m', '2026-10-28 12:30 UTC', 'forecast 0.3%', 'previous 0.2%', 'actual 0.4%'],
     ]);
   });
+
+  it('IB-067: an upcoming event says how long until it; a past one does not', async () => {
+    const soon = { ...CPI, id: 'soon', title: 'NFP', scheduledAt: Date.now() + 2 * 3_600_000 + 15 * 60_000 + 30_000 };
+    ref.setInput('mark', { time: 0, events: [CPI, soon] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const until = [...el().querySelectorAll('.event')].map((e) => e.querySelector('.until')?.textContent?.trim() ?? null);
+    expect(until).toEqual([null, 'in 2 h 16 min']);
+  });
 });

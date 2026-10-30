@@ -66,7 +66,12 @@ export class TimeAxisStrip {
 
   constructor(private readonly host: HTMLElement, private readonly lang: () => Lang) {}
 
-  attach(main: IChartApi, colours: { background: string; text: string }, timeframe: string): void {
+  /**
+   * `future` (IB-067): the whitespace slots after the last candle. `chartTimes` cannot see them
+   * (`series.data()` leaves whitespace out), and without them the strip's axis ended at the last
+   * candle while the panes ran on into the week ahead.
+   */
+  attach(main: IChartApi, colours: { background: string; text: string }, timeframe: string, future: readonly number[] = []): void {
     this.destroy();
     this.main = main;
     const chart = createChart(this.host, {
@@ -85,7 +90,7 @@ export class TimeAxisStrip {
     });
     this.chart = chart;
     this.series = series;
-    this.refresh();
+    this.refresh(future);
 
     main.timeScale().subscribeVisibleLogicalRangeChange(this.followMain);
     chart.timeScale().subscribeVisibleLogicalRangeChange(this.followStrip);
@@ -96,11 +101,12 @@ export class TimeAxisStrip {
     this.followMain(main.timeScale().getVisibleLogicalRange());
   }
 
-  /** IB-066: the main chart's slots again, after its series were redrawn in place. */
-  refresh(): void {
+  /** IB-066: the main chart's slots again, after its series were redrawn in place; and the future ones. */
+  refresh(future: readonly number[] = []): void {
     if (!this.main || !this.series) return;
     const main = this.main;
-    this.series.setData(chartTimes(main).map((time) => ({ time: time as Time, value: 0 })));
+    const times = unionTimes([chartTimes(main).map((time) => ({ time })), future.map((time) => ({ time }))]);
+    this.series.setData(times.map((time) => ({ time: time as Time, value: 0 })));
     this.followMain(main.timeScale().getVisibleLogicalRange());
     // and once more after the strip has applied its new times, which can move its range itself
     requestAnimationFrame(() => this.main === main && this.followMain(main.timeScale().getVisibleLogicalRange()));

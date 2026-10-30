@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 280px;
+  max-width: 280px; /* = TOOLTIP_MAX_WIDTH in calendar-marks.ts, which decides when it opens to the left */
   padding: 6px 8px;
   border: 1px solid #30363d;
   border-radius: 4px;
@@ -18,6 +18,10 @@
 
 .title {
   color: #d2a8ff;
+}
+
+.until {
+  color: #c9d1d9;
 }
 
 .time,

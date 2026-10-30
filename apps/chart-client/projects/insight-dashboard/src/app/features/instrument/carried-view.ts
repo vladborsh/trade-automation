@@ -30,7 +30,12 @@ export function atRightEdge(rightOffset: number): boolean {
  * - **Earlier history** (`extendsPrevious`) arrives on the left: the offset from the last bar is
  *   unchanged, so the same bars stay on screen.
  * - **The live tail** (`extendsLater`): a reader at the right edge is FOLLOWING — the same offset
- *   from the newest bar brings each new bar into view. A reader who scrolled back keeps exactly
+ *   from the newest bar brings each new bar into view.
+ * - **IB-067's future whitespace changes none of this.** The library counts `scrollPosition` from
+ *   the last bar WITH DATA, and `series.data()` (so `chartTimes`) leaves whitespace out: checked in
+ *   the browser on 15m with 162 future slots — 672 data items, the last a real candle, and
+ *   `scrollPosition()` 162 with the whole window and the future on screen. So "the right edge" is
+ *   already the last real candle, and a candle taking a whitespace slot is one slot added after it. A reader who scrolled back keeps exactly
  *   what they were looking at: the offset moves back by the slots added after the old last one.
  *
  * `before` and `after` are the chart's slot times (`chartTimes`) before and after the redraw.

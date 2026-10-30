@@ -1,5 +1,6 @@
 import type { EconomicEvent, WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
+import { calendarWindow } from './future-bars';
 import type { PaneData } from './pane-data';
 import type { LaterTail } from './pane-merge';
 import { sideWindow } from './time-range';
@@ -38,7 +39,7 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     api.longShort(symbol, side.fromMs, side.toMs, 'global_account'),
     api.liquidations(symbol, side.fromMs, side.toMs, bucket),
     fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs, timeframe),
-    fetchCalendar(api, side.fromMs, side.toMs),
+    fetchCalendar(api, calendarWindow(side.fromMs, side.toMs)),
   ]);
   return {
     instrument: `binance:${symbol}`,
@@ -116,13 +117,14 @@ async function fetchLiquidationEvents(api: InsightApiClient, symbol: string, fro
 }
 
 /**
- * IB-060 — the USD events and holidays for the event lines and the holiday bands. A failed read
+ * IB-060 — the USD events and holidays for the event lines and the holiday bands; since IB-067
+ * also the week ahead (`calendarWindow`), for the lines right of the current bar. A failed read
  * (the bot's calendar is off, or a window wider than the server's 90 days) costs the marks, not
  * the chart: they are context, like the levels.
  */
-async function fetchCalendar(api: InsightApiClient, fromMs: number, toMs: number): Promise<readonly EconomicEvent[]> {
+async function fetchCalendar(api: InsightApiClient, range: { fromMs: number; toMs: number }): Promise<readonly EconomicEvent[]> {
   try {
-    return (await api.calendarEvents(fromMs, toMs)).events;
+    return (await api.calendarEvents(range.fromMs, range.toMs)).events;
   } catch {
     return [];
   }
