@@ -4,7 +4,7 @@ import type {
   WebCandlesResponse, WebDbHealthResponse, WebExchangeRequest, WebMarketCardsResponse,
   WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
-  WebCalendarEventsResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
+  WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -170,6 +170,32 @@ export class InsightApiClient {
       throw toWebApiError('POST', '/auth/exchange', response.status, await this.safeJson(response));
     }
     return (await response.json()) as WebExchangeResponse;
+  }
+
+  // ------------------------------------------------------ IB-069, browser push
+
+  /** `publicKey: null` — push is off on this server; the in-tab alerts still work. */
+  async pushVapidKey(): Promise<WebPushVapidKeyResponse> {
+    return this.get<WebPushVapidKeyResponse>('/push/vapid-key');
+  }
+
+  async pushSubscribe(subscription: WebPushSubscription): Promise<void> {
+    await this.send('POST', '/push/subscription', subscription);
+  }
+
+  async pushUnsubscribe(endpoint: string): Promise<void> {
+    await this.send('DELETE', '/push/subscription', { endpoint });
+  }
+
+  private async send(method: 'POST' | 'DELETE', path: string, body: unknown): Promise<void> {
+    const url = buildUrl(this.config.get().apiBaseUrl, path, window.location.origin);
+    const response = await fetch(url, {
+      method,
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw toWebApiError(method, path, response.status, await this.safeJson(response));
   }
 
   private async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {

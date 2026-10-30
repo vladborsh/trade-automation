@@ -87,6 +87,24 @@ export const EnvSchema = z.object({
   // `Secure` on the ib_session cookie. Off only for local http development; IB-032 serves the
   // dashboard through a Cloudflare Tunnel (HTTPS), where this must be on.
   WEB_COOKIE_SECURE: booleanFlag(false),
+
+  // IB-069 — browser Web Push for the calendar reminder (VAPID). Generate a pair with
+  // `npx web-push generate-vapid-keys`; the keys live only in the slot's .env / SSM, never in git.
+  // All three or none: without them the push channel is off (logged at boot), the bot still runs.
+  // SUBJECT is the contact the push services see: `mailto:…` or an `https://` URL.
+  WEB_PUSH_VAPID_PUBLIC: z.string().optional(),
+  WEB_PUSH_VAPID_PRIVATE: z.string().optional(),
+  WEB_PUSH_VAPID_SUBJECT: z.string().regex(/^$|^(mailto:|https:\/\/)/, 'mailto:… or https://…').optional(),
+}).superRefine((env, ctx) => {
+  const vapid = [env.WEB_PUSH_VAPID_PUBLIC, env.WEB_PUSH_VAPID_PRIVATE, env.WEB_PUSH_VAPID_SUBJECT];
+  const set = vapid.filter((v) => typeof v === 'string' && v.length > 0).length;
+  if (set !== 0 && set !== 3) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['WEB_PUSH_VAPID_PUBLIC'],
+      message: 'WEB_PUSH_VAPID_PUBLIC, WEB_PUSH_VAPID_PRIVATE and WEB_PUSH_VAPID_SUBJECT are set together or not at all',
+    });
+  }
 });
 export type Env = z.infer<typeof EnvSchema>;
 

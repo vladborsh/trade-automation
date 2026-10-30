@@ -71,7 +71,7 @@ describe('CalendarNotifierService (IB-062)', () => {
     const { service, sent } = build(store);
 
     const results = await service.tick(CPI_AT - 13 * MIN); // two minutes late
-    expect(results).toEqual([{ userId: 3, key: `due:${CPI_AT}`, delivered: true }]);
+    expect(results).toEqual([{ channel: 'telegram', userId: 3, key: `due:${CPI_AT}`, delivered: true }]);
     expect(sent[0].text.split('\n')[0]).toBe('In 13 min, 12:30 UTC / 14:30 Kyiv — high-impact USD:');
   });
 

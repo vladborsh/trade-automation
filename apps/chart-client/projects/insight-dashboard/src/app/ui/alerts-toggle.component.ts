@@ -4,8 +4,8 @@ import { I18nService } from '../i18n/i18n.service';
 
 /**
  * IB-061 — the header switch for browser notifications before high-impact USD events. Turning it
- * on asks the browser's permission; the hint says the one limit that matters: it works only while
- * a dashboard tab is open.
+ * on asks the browser's permission and (IB-069) subscribes this browser to push; the hint says the
+ * one limit that matters — with push, the browser must be running; without it, a tab must be open.
  */
 @Component({
   selector: 'app-alerts-toggle',
@@ -27,7 +27,7 @@ export class AlertsToggleComponent {
     const permission = this.alerts.permission();
     if (permission === 'denied') return this.t('alerts.toggle.denied');
     if (permission === 'unsupported') return this.t('alerts.toggle.unsupported');
-    return this.t('alerts.toggle.hint');
+    return this.t(this.alerts.pushActive() ? 'alerts.toggle.hintPush' : 'alerts.toggle.hint');
   });
 
   toggle(): void {

@@ -44,4 +44,14 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ WATCHDOG_SILENCE_MIN: '0' })).toThrow(/Invalid environment configuration/);
     expect(() => validateEnv({ NODE_ENV: 'staging' })).toThrow(/Invalid environment configuration/);
   });
+
+  it('IB-069: the VAPID keys are all three or none — a partial set is a boot failure', () => {
+    expect(validateEnv({}).WEB_PUSH_VAPID_PUBLIC).toBeUndefined();
+    const all = { WEB_PUSH_VAPID_PUBLIC: 'pub', WEB_PUSH_VAPID_PRIVATE: 'priv', WEB_PUSH_VAPID_SUBJECT: 'mailto:ops@example.com' };
+    expect(validateEnv(all).WEB_PUSH_VAPID_SUBJECT).toBe('mailto:ops@example.com');
+    expect(() => validateEnv({ WEB_PUSH_VAPID_PUBLIC: 'pub' })).toThrow(/set together or not at all/);
+    expect(() => validateEnv({ ...all, WEB_PUSH_VAPID_SUBJECT: 'ops@example.com' })).toThrow(/mailto/);
+    // an empty line in .env (`WEB_PUSH_VAPID_SUBJECT=`) is "not set", not a malformed subject
+    expect(validateEnv({ WEB_PUSH_VAPID_SUBJECT: '' }).WEB_PUSH_VAPID_PUBLIC).toBeUndefined();
+  });
 });

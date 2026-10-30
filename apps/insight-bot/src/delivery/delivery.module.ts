@@ -5,6 +5,7 @@ import { UsersService } from '../users/users.service';
 import { CalendarNotifierService } from './calendar-notifier.service';
 import { TelegramSender } from './telegram-sender';
 import { TelegramBotService } from './telegram-bot.service';
+import { WebPushSender } from './web-push-sender';
 import { WebModule } from '../web/web.module';
 
 /**
@@ -27,7 +28,8 @@ export class DeliveryModule {
       module: DeliveryModule,
       imports: [AppConfigModule, DbModule, WebModule.register()],
       // IB-062: the calendar DMs live here, beside the bot, because they need the sender and users
-      providers: [UsersService, TelegramSender, TelegramBotService, CalendarNotifierService],
+      // IB-069: the browser push channel sits beside Telegram in the same notifier
+      providers: [UsersService, TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService],
       exports: [UsersService, TelegramSender],
     };
   }

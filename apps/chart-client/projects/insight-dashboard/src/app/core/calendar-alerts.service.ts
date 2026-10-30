@@ -6,6 +6,7 @@ import {
   writeOptIn,
 } from './calendar-alerts';
 import { InsightApiClient } from './insight-api.client';
+import { WebPushService } from './web-push.service';
 
 /** How often the upcoming events are read; one cheap DB read per minute per open tab. */
 export const ALERTS_POLL_MS = 60_000;
@@ -16,9 +17,10 @@ export type AlertPermission = NotificationPermission | 'unsupported';
 /**
  * IB-061 — a browser notification 15 minutes before each high-impact USD event, app-wide.
  *
- * **Only while a dashboard tab is open.** There is no service worker and no web push, so a closed
- * tab hears nothing; the toggle's hint says so. The Telegram reminder (IB-062) is the channel that
- * works with the browser shut.
+ * IB-069: switching on also subscribes this browser to the bot's Web Push (`WebPushService`), so the
+ * reminder arrives with every tab closed while the browser runs; the in-tab poll stays, for browsers
+ * or servers without push. Both use the tag `alert:<scheduledAt>` and the tab shows through the
+ * service worker, so when both fire for one event the second replaces the first — one notification.
  *
  * Polls `/api/web/calendar/upcoming` once a minute while switched on and permitted. Shown keys go
  * to `localStorage`, so a reload inside the lead window does not ring the same event twice.
@@ -28,6 +30,7 @@ export class CalendarAlertsService {
   private readonly api = inject(InsightApiClient);
   private readonly i18n = inject(I18nService);
   private readonly document = inject(DOCUMENT);
+  private readonly push = inject(WebPushService);
   private readonly store = browserAlertStore();
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -35,9 +38,13 @@ export class CalendarAlertsService {
   readonly permission = signal<AlertPermission>(currentPermission());
   /** On only when the member chose it AND the browser allows it. */
   readonly active = computed(() => this.optedIn() && this.permission() === 'granted');
+  /** This browser also gets the reminder by push, with the tab closed (IB-069). */
+  readonly pushActive = computed(() => this.active() && this.push.subscribed());
 
   start(): void {
     if (this.timer) return;
+    // re-send the subscription each load: the bot upserts it, and may have dropped it on a 410
+    if (this.active() && this.document.location.pathname !== '/login') void this.push.enable();
     this.timer = setInterval(() => void this.check(Date.now()), ALERTS_POLL_MS);
     void this.check(Date.now());
   }
@@ -51,13 +58,16 @@ export class CalendarAlertsService {
   async toggle(): Promise<void> {
     if (this.active()) {
       this.set(false);
+      await this.push.disable();
       return;
     }
     if (this.permission() === 'unsupported') return;
     const answer = this.permission() === 'granted' ? 'granted' : await Notification.requestPermission();
     this.permission.set(answer);
     this.set(answer === 'granted');
-    if (answer === 'granted') await this.check(Date.now());
+    if (answer !== 'granted') return;
+    await this.push.enable();
+    await this.check(Date.now());
   }
 
   /** One poll: read the next hour, show whatever is due and not yet shown. Never throws. */
@@ -70,7 +80,7 @@ export class CalendarAlertsService {
       for (const alert of due) {
         const { title, body } = notificationFor(alert, now, (minutes, time) =>
           this.i18n.t('alerts.notification.title', { minutes, time }));
-        new Notification(title, { tag: alert.key, body });
+        await this.push.show(title, { tag: alert.key, body });
         fired[alert.key] = now;
       }
       writeFired(this.store, fired);

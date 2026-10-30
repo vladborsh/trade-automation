@@ -88,6 +88,7 @@ export const en: Strings = {
   'alerts.toggle.on': 'Event alerts: on',
   'alerts.toggle.off': 'Event alerts: off',
   'alerts.toggle.hint': 'A browser notification 15 minutes before each high-impact USD event. Works only while a dashboard tab is open.',
+  'alerts.toggle.hintPush': 'A notification 15 minutes before each high-impact USD event, also with the dashboard closed, as long as the browser is running.',
   'alerts.toggle.denied': 'Notifications are blocked for this site in the browser settings.',
   'alerts.toggle.unsupported': 'This browser does not support notifications.',
   'alerts.notification.title': 'USD in {minutes} min, {time}',

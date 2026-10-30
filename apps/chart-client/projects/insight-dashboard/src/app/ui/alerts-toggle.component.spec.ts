@@ -5,8 +5,8 @@ import { I18nService } from '../i18n/i18n.service';
 import { AlertsToggleComponent } from './alerts-toggle.component';
 
 describe('AlertsToggleComponent (IB-061)', () => {
-  function render(active: boolean, permission: AlertPermission) {
-    const fake = { active: signal(active), permission: signal(permission), toggle: async () => undefined };
+  function render(active: boolean, permission: AlertPermission, pushActive = false) {
+    const fake = { active: signal(active), permission: signal(permission), pushActive: signal(pushActive), toggle: async () => undefined };
     TestBed.configureTestingModule({
       imports: [AlertsToggleComponent],
       providers: [{ provide: CalendarAlertsService, useValue: fake }],
@@ -22,6 +22,11 @@ describe('AlertsToggleComponent (IB-061)', () => {
     expect(off.textContent?.trim()).toBe('Event alerts: off');
     expect(off.title).toContain('only while a dashboard tab is open');
     expect(off.disabled).toBe(false);
+  });
+
+  it('IB-069: with push subscribed, the hint says it works with the dashboard closed', () => {
+    const button = render(true, 'granted', true);
+    expect(button.title).toContain('also with the dashboard closed, as long as the browser is running');
   });
 
   it('shows on when active', () => {

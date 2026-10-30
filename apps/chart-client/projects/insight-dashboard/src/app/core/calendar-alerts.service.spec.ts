@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import type { EconomicEvent, WebCalendarEventsResponse } from '@trade-automation/contracts';
 import { vi } from 'vitest';
@@ -5,6 +6,7 @@ import { I18nService } from '../i18n/i18n.service';
 import { OPT_IN_KEY } from './calendar-alerts';
 import { CalendarAlertsService } from './calendar-alerts.service';
 import { InsightApiClient } from './insight-api.client';
+import { WebPushService } from './web-push.service';
 
 /**
  * IB-061 — the service against a fake API and a fake `Notification`: it rings once inside the
@@ -28,7 +30,7 @@ class FakeNotification {
   }
 }
 
-function setup(permission: NotificationPermission, optedIn: boolean) {
+function setup(permission: NotificationPermission, optedIn: boolean, push?: object) {
   FakeNotification.permission = permission;
   FakeNotification.shown = [];
   FakeNotification.requestPermission.mockClear();
@@ -36,7 +38,12 @@ function setup(permission: NotificationPermission, optedIn: boolean) {
   localStorage.clear();
   if (optedIn) localStorage.setItem(OPT_IN_KEY, '1');
   const upcoming = vi.fn(async (): Promise<WebCalendarEventsResponse> => ({ events: [CPI], lastFetchedAt: null }));
-  TestBed.configureTestingModule({ providers: [{ provide: InsightApiClient, useValue: { calendarUpcoming: upcoming } }] });
+  TestBed.configureTestingModule({
+    providers: [
+      { provide: InsightApiClient, useValue: { calendarUpcoming: upcoming } },
+      ...(push ? [{ provide: WebPushService, useValue: push }] : []),
+    ],
+  });
   TestBed.inject(I18nService).setLangFromUser('en');
   return { service: TestBed.inject(CalendarAlertsService), upcoming };
 }
@@ -89,5 +96,53 @@ describe('CalendarAlertsService (IB-061)', () => {
     await service.toggle();
     expect(service.active()).toBe(false);
     expect(localStorage.getItem(OPT_IN_KEY)).toBe('0');
+  });
+
+  describe('IB-069 — with browser push', () => {
+    const fakePush = () => {
+      const subscribed = signal(false);
+      return {
+        subscribed,
+        enable: vi.fn(async () => { subscribed.set(true); return true; }),
+        disable: vi.fn(async () => { subscribed.set(false); }),
+        show: vi.fn(async () => undefined),
+      };
+    };
+
+    it('switching on subscribes this browser to push; off unsubscribes it', async () => {
+      const push = fakePush();
+      const { service } = setup('granted', false, push);
+      await service.toggle();
+      expect(push.enable).toHaveBeenCalledTimes(1);
+      expect(service.pushActive()).toBe(true);
+      await service.toggle();
+      expect(push.disable).toHaveBeenCalledTimes(1);
+      expect(service.pushActive()).toBe(false);
+    });
+
+    it('a refused permission subscribes nothing', async () => {
+      const push = fakePush();
+      FakeNotification.answer = 'denied';
+      const { service } = setup('default', false, push);
+      await service.toggle();
+      expect(push.enable).not.toHaveBeenCalled();
+      FakeNotification.answer = 'granted';
+    });
+
+    it('the tab shows through the service worker, with the tag the push uses', async () => {
+      const push = fakePush();
+      const { service } = setup('granted', true, push);
+      await service.check(AT - 15 * 60_000);
+      expect(push.show).toHaveBeenCalledWith('USD in 15 min, 12:30 UTC', { tag: `alert:${AT}`, body: 'CPI m/m' });
+      expect(FakeNotification.shown).toEqual([]);
+    });
+
+    it('on load, an opted-in browser re-sends its subscription (the bot may have dropped it)', () => {
+      const push = fakePush();
+      const { service } = setup('granted', true, push);
+      service.start();
+      service.stop();
+      expect(push.enable).toHaveBeenCalledTimes(1);
+    });
   });
 });

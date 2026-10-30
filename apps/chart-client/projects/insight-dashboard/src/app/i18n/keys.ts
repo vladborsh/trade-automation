@@ -98,6 +98,7 @@ export type StringKey =
   | 'alerts.toggle.on'
   | 'alerts.toggle.off'
   | 'alerts.toggle.hint'
+  | 'alerts.toggle.hintPush'
   | 'alerts.toggle.denied'
   | 'alerts.toggle.unsupported'
   | 'alerts.notification.title'

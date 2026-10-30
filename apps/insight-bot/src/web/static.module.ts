@@ -46,9 +46,10 @@ export class DashboardStaticModule {
           // without running that spec.
           exclude: DASHBOARD_EXCLUDE,
           serveStaticOptions: {
-            // hashed assets are immutable; index.html must not be, or a deploy would not be seen
+            // hashed assets are immutable; index.html must not be, or a deploy would not be seen —
+            // nor the IB-069 service worker, whose fixed name is how the browser finds an update
             setHeaders: (res, path) => {
-              if (!path.endsWith('index.html')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+              if (!path.endsWith('index.html') && !path.endsWith('sw.js')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
             },
           },
         }),

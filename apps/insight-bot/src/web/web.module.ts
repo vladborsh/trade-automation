@@ -20,6 +20,7 @@ import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.
 import { MetricsService } from '../ops/metrics.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
 import { UniverseController } from './universe.controller';
+import { WebPushController } from './push/push.controller';
 
 /**
  * IB-029 — the dashboard's server surface (architecture/insight-bot-web-dashboard.md §4).
@@ -54,7 +55,7 @@ export class WebModule {
       controllers: [
         WebAuthController, WebHealthController, WebCoverageController,
         SeriesController, UniverseController, LiquidationsController, WebContextController,
-        CalendarController,
+        CalendarController, WebPushController,
       ],
       providers: [
         WebAuthService,
