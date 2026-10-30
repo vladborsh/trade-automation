@@ -99,7 +99,7 @@ export const en: Strings = {
   'instrument.historyStart': 'No earlier history: this is where the venue\'s data starts.',
   'instrument.picker.open': 'Instrument {symbol}: choose another',
   'instrument.picker.search': 'Find a symbol',
-  'instrument.picker.topList': 'Top 20 by volume',
+  'instrument.picker.topList': 'Crypto top 30 by volume, then gold, oil, indices',
   'instrument.picker.change': '24h, %',
   'instrument.picker.funding': 'Funding, %',
   'instrument.picker.oi': 'OI 24h, %',

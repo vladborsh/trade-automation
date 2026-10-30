@@ -16,6 +16,7 @@ import { LiveTail } from './live-tail';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
 import { LoaderComponent } from '../../ui/loader.component';
 import { SymbolPickerComponent } from './symbol-picker.component';
+import { PICKER_SIZE } from './symbol-picker.rows';
 import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './time-range';
 
 /**
@@ -120,7 +121,7 @@ export class InstrumentComponent {
    */
   async loadFigures(): Promise<void> {
     try {
-      this.summary.set((await this.api.universeSummary(20)).rows);
+      this.summary.set((await this.api.universeSummary(PICKER_SIZE)).rows);
       this.summaryFailed.set(false);
     } catch {
       this.summaryFailed.set(true); // the list still works from /universe/top; only the figures go
@@ -129,7 +130,7 @@ export class InstrumentComponent {
 
   async loadUniverse(): Promise<void> {
     try {
-      this.universe.set((await this.api.universeTop(20)).symbols);
+      this.universe.set((await this.api.universeTop(PICKER_SIZE)).symbols);
     } catch {
       this.universe.set([]); // the picker degrades to free typing; the page still works
     } finally {

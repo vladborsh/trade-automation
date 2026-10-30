@@ -12,6 +12,13 @@ import { fractionSigned, signed } from '../market/market.format';
  */
 export type Sign = -1 | 0 | 1;
 
+/**
+ * How many symbols the dropdown asks for — the whole universe, not a top 20. IB-070 added ten TradFi
+ * perps (gold, oil, SPY, ...) after the crypto top 30 (ranks 31-40), and a top-20 list could never
+ * show them. The server caps the summary at the same 60 (`SUMMARY_MAX`), one venue call per symbol.
+ */
+export const PICKER_SIZE = 60;
+
 export interface PickerRow {
   id: string;
   base: string;
