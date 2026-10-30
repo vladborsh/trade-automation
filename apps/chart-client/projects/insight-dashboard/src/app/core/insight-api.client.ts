@@ -98,10 +98,16 @@ export class InsightApiClient {
    * The server REFUSES a window holding more than 2 000 events rather than truncating it, and
    * the `RANGE_TOO_WIDE` it answers with carries the `minUsd` that would fit. A silently
    * truncated list would draw a chart that goes calm halfway through a cascade.
+   *
+   * IB-068: with `tf`, the server groups the events per `tf` bar (one row per bar, side and venue,
+   * carrying `count` and `maxUsd`) and the 2 000 cap no longer applies, so a dense window still
+   * draws its bubbles. Without it, the individual events as before.
    */
-  async liquidationEvents(symbol: string, fromMs: number, toMs: number, minUsd = 0): Promise<WebLiquidationEventsResponse> {
+  async liquidationEvents(
+    symbol: string, fromMs: number, toMs: number, minUsd = 0, tf?: WebTimeframe,
+  ): Promise<WebLiquidationEventsResponse> {
     return this.get<WebLiquidationEventsResponse>('/series/liquidations/events', {
-      symbol, from: fromMs, to: toMs, min_usd: minUsd,
+      symbol, from: fromMs, to: toMs, min_usd: minUsd, ...(tf ? { tf } : {}),
     });
   }
 

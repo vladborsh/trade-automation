@@ -34,8 +34,13 @@ export interface LiquidationMarker {
   usd: number;
   /** The side holding more USD in this bar. Ties go to longs, which is the down case. */
   side: 'long' | 'short';
-  /** How many events this bubble stands for; 1 unless it is a bucket. */
+  /**
+   * How many liquidations this bubble stands for. IB-068: a server-grouped row carries its own
+   * `count`, so this is the sum of those (a raw event counts 1) — not the number of rows.
+   */
   events: number;
+  /** The single largest liquidation in the bar, for the tooltip (IB-068). */
+  largestUsd: number;
   radius: number;
   /** True when `usd` exceeded the scale ceiling, so the radius understates it. */
   clamped: boolean;
@@ -66,7 +71,9 @@ export function radiusFor(usd: number, ceiling = DEFAULT_SCALE_CEILING_USD): { r
 }
 
 /**
- * Events → one marker per occupied bar, in time order.
+ * Events → one marker per occupied bar, in time order. The events may be single liquidations or,
+ * since IB-068, rows the server already grouped per bar and side and venue; both sum the same way,
+ * and a USD-weighted mean of VWAPs weighted by their own USD is the VWAP of the whole bar.
  *
  * The price is **volume weighted** rather than the last event's: a bar holding a $10 000 fill at
  * 100 and a $1M fill at 95 happened at 95 for every purpose a reader cares about, and taking the
@@ -78,17 +85,19 @@ export function toLiquidationMarkers(
 ): LiquidationMarker[] {
   const ceiling = options.scaleCeilingUsd ?? DEFAULT_SCALE_CEILING_USD;
   const buckets = new Map<number, {
-    long: number; short: number; notional: number; weighted: number; events: number; venues: Set<string>;
+    long: number; short: number; notional: number; weighted: number; events: number; largest: number; venues: Set<string>;
   }>();
 
   for (const event of events) {
     const bar = floorToBar(event.time, options.barSeconds);
     const bucket = buckets.get(bar)
-      ?? { long: 0, short: 0, notional: 0, weighted: 0, events: 0, venues: new Set<string>() };
+      ?? { long: 0, short: 0, notional: 0, weighted: 0, events: 0, largest: 0, venues: new Set<string>() };
     bucket[event.side] += event.usd;
     bucket.notional += event.usd;
     bucket.weighted += event.usd * event.price;
-    bucket.events += 1;
+    // a grouped row (IB-068) stands for `count` liquidations, its largest being `maxUsd`
+    bucket.events += event.count ?? 1;
+    bucket.largest = Math.max(bucket.largest, event.maxUsd ?? event.usd);
     bucket.venues.add(event.venue);
     buckets.set(bar, bucket);
   }
@@ -104,6 +113,7 @@ export function toLiquidationMarkers(
         usd: b.notional,
         side: b.long >= b.short ? ('long' as const) : ('short' as const),
         events: b.events,
+        largestUsd: b.largest,
         radius,
         clamped,
         venues: [...b.venues].sort(),

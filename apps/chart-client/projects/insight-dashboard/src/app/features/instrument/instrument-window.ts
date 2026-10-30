@@ -36,7 +36,7 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     api.funding(symbol, side.fromMs, side.toMs),
     api.longShort(symbol, side.fromMs, side.toMs, 'global_account'),
     api.liquidations(symbol, side.fromMs, side.toMs, bucket),
-    fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs),
+    fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs, timeframe),
     fetchCalendar(api, side.fromMs, side.toMs),
   ]);
   return {
@@ -74,9 +74,9 @@ async function fetchDaily(api: InsightApiClient, symbol: string, fromMs: number,
  * refusing to truncate. That is not a reason to show no chart: the candles are still worth
  * looking at, so the markers drop out and the rest of the page loads.
  */
-async function fetchLiquidationEvents(api: InsightApiClient, symbol: string, fromMs: number, toMs: number): Promise<WebLiquidationEventsResponse> {
+async function fetchLiquidationEvents(api: InsightApiClient, symbol: string, fromMs: number, toMs: number, tf: WebTimeframe): Promise<WebLiquidationEventsResponse> {
   try {
-    return await api.liquidationEvents(symbol, fromMs, toMs);
+    return await api.liquidationEvents(symbol, fromMs, toMs, 0, tf);
   } catch {
     return { symbol, minUsd: 0, events: [], venuesPresent: [], undercounted: true };
   }

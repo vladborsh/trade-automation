@@ -113,3 +113,46 @@ describe('toLiquidationMarkers', () => {
     expect(toLiquidationMarkers([], opts)).toEqual([]);
   });
 });
+
+describe('IB-068: rows the server already grouped per bar', () => {
+  const opts = { barSeconds: 3_600 };
+  const bar = 3_600 * 500_000;
+
+  it('sums COUNT, not rows: three grouped rows can stand for 180 liquidations', () => {
+    const markers = toLiquidationMarkers([
+      ev({ time: bar, side: 'long', venue: 'binance', usd: 100_000, count: 120, maxUsd: 9_000 }),
+      ev({ time: bar, side: 'short', venue: 'binance', usd: 20_000, count: 50, maxUsd: 4_000 }),
+      ev({ time: bar, side: 'long', venue: 'okx', usd: 30_000, count: 10, maxUsd: 25_000 }),
+    ], opts);
+    expect(markers).toHaveLength(1);
+    expect(markers[0].events).toBe(180);
+    expect(markers[0].usd).toBe(150_000);
+    expect(markers[0].venues).toEqual(['binance', 'okx']);
+  });
+
+  it('keeps the largest single liquidation across the rows, not the largest row', () => {
+    const markers = toLiquidationMarkers([
+      ev({ time: bar, usd: 100_000, count: 120, maxUsd: 9_000 }),
+      ev({ time: bar, venue: 'okx', usd: 30_000, count: 10, maxUsd: 25_000 }),
+    ], opts);
+    expect(markers[0].largestUsd).toBe(25_000);
+  });
+
+  it('the VWAP of grouped VWAPs, weighted by their USD, is the whole bar\'s VWAP', () => {
+    // binance: $1 000 @ 100 and $3 000 @ 110 → $4 000 @ 107.5; okx: $4 000 @ 102.5
+    const markers = toLiquidationMarkers([
+      ev({ time: bar, usd: 4_000, price: 107.5, count: 2, maxUsd: 3_000 }),
+      ev({ time: bar, venue: 'okx', usd: 4_000, price: 102.5, count: 1, maxUsd: 4_000 }),
+    ], opts);
+    expect(markers[0].price).toBeCloseTo((1_000 * 100 + 3_000 * 110 + 4_000 * 102.5) / 8_000, 10);
+  });
+
+  it('a raw event still counts one and is its own largest, so a live tail mixes in unchanged', () => {
+    const markers = toLiquidationMarkers([
+      ev({ time: bar, usd: 50_000, count: 7, maxUsd: 20_000 }),
+      ev({ time: bar + 60, usd: 30_000 }),
+    ], opts);
+    expect(markers[0].events).toBe(8);
+    expect(markers[0].largestUsd).toBe(30_000);
+  });
+});
