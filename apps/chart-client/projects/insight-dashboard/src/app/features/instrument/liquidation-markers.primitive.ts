@@ -3,7 +3,7 @@ import type {
 } from 'lightweight-charts';
 import { LIQUIDATION_COLORS } from './liquidation-scope';
 import type { LiquidationMarker } from './liquidation-markers.adapter';
-import { markerUnder, tooltipLines, type PlacedMarker } from './liquidation-tooltip';
+import { labelLeft, markerUnder, tooltipLines, type PlacedMarker } from './liquidation-tooltip';
 
 /**
  * IB-039 — the liquidation bubbles drawn over the price series (design §12.5).
@@ -38,10 +38,11 @@ class LiquidationMarkersRenderer implements IPrimitivePaneRenderer {
 
   draw(target: {
     useBitmapCoordinateSpace: (cb: (scope: {
-      context: CanvasRenderingContext2D; horizontalPixelRatio: number; verticalPixelRatio: number;
+      context: CanvasRenderingContext2D; bitmapSize: { width: number; height: number };
+      horizontalPixelRatio: number; verticalPixelRatio: number;
     }) => void) => void;
   }): void {
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio }) => {
+    target.useBitmapCoordinateSpace(({ context: ctx, bitmapSize, horizontalPixelRatio, verticalPixelRatio }) => {
       for (const { x, y, m } of this.points) {
         const colour = m.side === 'long' ? LIQUIDATION_COLORS.long : LIQUIDATION_COLORS.short;
         const px = x * horizontalPixelRatio;
@@ -64,7 +65,7 @@ class LiquidationMarkersRenderer implements IPrimitivePaneRenderer {
           ctx.stroke();
         }
       }
-      if (this.hovered) drawLabel(ctx, this.hovered, horizontalPixelRatio, verticalPixelRatio);
+      if (this.hovered) drawLabel(ctx, this.hovered, bitmapSize, horizontalPixelRatio, verticalPixelRatio);
     });
   }
 }
@@ -72,9 +73,12 @@ class LiquidationMarkersRenderer implements IPrimitivePaneRenderer {
 /**
  * IB-068: the hover label, painted beside the bubble on the chart's own canvas. Drawn here rather
  * than as a component so the hover needs no wiring in the chart component: the primitive follows
- * the crosshair itself. Flips to the left of the bubble when it would run off the right edge.
+ * the crosshair itself. Placement is `labelLeft`'s, in CSS pixels.
  */
-function drawLabel(ctx: CanvasRenderingContext2D, hovered: PlacedMarker, hRatio: number, vRatio: number): void {
+function drawLabel(
+  ctx: CanvasRenderingContext2D, hovered: PlacedMarker, bitmap: { width: number; height: number },
+  hRatio: number, vRatio: number,
+): void {
   const lines = tooltipLines(hovered.m);
   ctx.save();
   ctx.font = `${LABEL.fontPx * vRatio}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
@@ -83,11 +87,8 @@ function drawLabel(ctx: CanvasRenderingContext2D, hovered: PlacedMarker, hRatio:
   const lineH = LABEL.fontPx * LABEL.lineHeight * vRatio;
   const width = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 2 * pad;
   const height = lines.length * lineH + 2 * pad;
-  const gap = (hovered.m.radius + 6) * hRatio;
-
-  let left = hovered.x * hRatio + gap;
-  if (left + width > ctx.canvas.width) left = hovered.x * hRatio - gap - width;
-  const top = Math.min(Math.max(0, hovered.y * vRatio - height / 2), Math.max(0, ctx.canvas.height - height));
+  const left = labelLeft(hovered.x, hovered.m.radius + 6, width / hRatio, bitmap.width / hRatio) * hRatio;
+  const top = Math.min(Math.max(0, hovered.y * vRatio - height / 2), Math.max(0, bitmap.height - height));
 
   ctx.fillStyle = LABEL.background;
   ctx.strokeStyle = LABEL.border;

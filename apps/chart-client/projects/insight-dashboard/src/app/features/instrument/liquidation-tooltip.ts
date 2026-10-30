@@ -42,3 +42,19 @@ export function tooltipLines(m: LiquidationMarker): string[] {
     m.venues.join(', '),
   ];
 }
+
+/**
+ * Pixels kept clear at the pane's right edge: the price lines' tags (PDH, PWL, the last price) are
+ * drawn there over the series, and would cover the label's end.
+ */
+export const RIGHT_RESERVE_PX = 110;
+
+/**
+ * Where the label's left edge goes, in CSS pixels: right of the bubble, or left of it when that
+ * would run into the right edge's tags; never off the left edge.
+ */
+export function labelLeft(anchorX: number, gap: number, width: number, paneWidth: number): number {
+  const right = anchorX + gap;
+  if (right + width <= paneWidth - RIGHT_RESERVE_PX) return right;
+  return Math.max(0, anchorX - gap - width);
+}

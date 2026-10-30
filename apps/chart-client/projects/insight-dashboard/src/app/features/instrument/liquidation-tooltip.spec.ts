@@ -1,5 +1,5 @@
 import type { LiquidationMarker } from './liquidation-markers.adapter';
-import { HIT_SLACK_PX, markerUnder, tooltipLines } from './liquidation-tooltip';
+import { HIT_SLACK_PX, labelLeft, markerUnder, RIGHT_RESERVE_PX, tooltipLines } from './liquidation-tooltip';
 
 const marker = (over: Partial<LiquidationMarker> = {}): LiquidationMarker => ({
   time: 0, price: 100, usd: 1_000, side: 'long', events: 1, largestUsd: 1_000,
@@ -44,5 +44,21 @@ describe('tooltipLines', () => {
 
   it('a clamped bubble still states its real sum', () => {
     expect(tooltipLines(marker({ usd: 400_000_000, clamped: true, radius: 14 }))[0]).toContain('$400M');
+  });
+});
+
+describe('labelLeft', () => {
+  it('sits right of the bubble when there is room', () => {
+    expect(labelLeft(100, 10, 200, 1_200)).toBe(110);
+  });
+
+  it('flips left before reaching the price-line tags at the right edge', () => {
+    // 1 000 + 10 + 200 = 1 210 > 1 200 − reserve: it would be under PDH/PWL
+    expect(labelLeft(1_000, 10, 200, 1_200)).toBe(790);
+    expect(labelLeft(1_200 - RIGHT_RESERVE_PX - 210, 10, 200, 1_200)).toBe(1_200 - RIGHT_RESERVE_PX - 200);
+  });
+
+  it('never goes off the left edge', () => {
+    expect(labelLeft(50, 10, 200, 240)).toBe(0);
   });
 });
