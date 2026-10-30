@@ -11,7 +11,7 @@ import { assembleSummary, numberOrNull, oiChangePct } from '../../src/web/market
 import {
   CACHE_TTL_MS, UniverseSummaryService, VenueUnavailableError,
 } from '../../src/web/market/universe-summary.service';
-import { UniverseController } from '../../src/web/universe.controller';
+import { SUMMARY_MAX, UniverseController } from '../../src/web/universe.controller';
 import type { Db } from '../../src/db/db.port';
 
 /**
@@ -226,5 +226,16 @@ describe('GET /api/web/universe/summary', () => {
     const controller = new UniverseController(db, new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
     const result = await controller.summary('20');
     expect(result.rows.map((r) => r.id)).toEqual(['BTCUSDT']);
+  });
+
+  it('reads the whole universe the picker asks for (IB-070: 40 symbols), capped at SUMMARY_MAX', async () => {
+    const limits: unknown[] = [];
+    const spy: Db = { ...db, query: async (sql, params) => { limits.push(params?.[0]); return db.query(sql, params); } };
+    const { impl } = fakeFetch(venueRoutes());
+    const controller = new UniverseController(spy, new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
+    await controller.summary('40');
+    await controller.summary('100000');
+    expect(limits).toEqual([40, SUMMARY_MAX]);
+    expect(SUMMARY_MAX).toBeGreaterThanOrEqual(40);
   });
 });

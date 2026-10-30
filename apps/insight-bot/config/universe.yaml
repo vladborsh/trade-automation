@@ -3,9 +3,26 @@
 #
 # Measured 2026-09-28 (IB-003): fapi/v1/klines 1d, the 30 closed UTC days before that
 # date, summed on quote volume. Tokenised equity and commodity perps (XAUUSDT, CLUSDT,
-# SOXLUSDT, MSTRUSDT, NVDAUSDT, ...) rank inside the raw top 30 but are excluded: they have
-# no Binance spot market, so no spot CVD and none of the crypto regime this bot reads.
-# The filter is exactly that — a perp qualifies only if its base has a Binance spot USDT pair.
+# SOXLUSDT, MSTRUSDT, NVDAUSDT, ...) rank inside the raw top 30 but are not part of it: they
+# have no Binance spot market, so no spot CVD and none of the crypto regime this bot reads.
+# The volume ranking is exactly that — the top 30 perps whose base has a Binance spot USDT pair.
+#
+# TradFi perps are no longer excluded as a rule (IB-070, 2026-10-30): they are ADDED BY HAND, by
+# the user's decision, and listed AFTER the crypto top 30 with ranks 31+, whatever their volume
+# (XAUUSDT 50.0bn and CLUSDT 25.6bn over 2026-09-30..10-29 would rank ~4th and ~7th). Putting
+# them at the end keeps every "top 20" that means "top 20 crypto" — market-cap shares, the
+# liquidation overview, the market context coins — exactly as it was. Binance's commodity perps
+# and the two index perps (SPY, QQQ) are in; single stocks are not. They carry no binance_spot
+# (no spot CVD; those features are null for them, §2.3, and /health lists them under noSpot) and
+# no coingecko_id (no market-cap series). Their Bybit/OKX mapping was checked by price like
+# IB-036's ids, see the block below.
+#
+# Binance REST weight of the ten TradFi entries (documented weights, not measured): the OI/LS
+# poller's 5 calls per symbol per 5 min = +10 weight/min averaged (+50 inside a pass's minute);
+# fundingRate at each settlement ≈ +0.05/min; gap repair as for any symbol. Degraded mode only:
+# klines?limit=2 every 15 s = +40 weight/min. The picker's /universe/summary reads one
+# openInterestHist per listed symbol per cached minute: +10/min while a dashboard tab is open.
+# Steady state ≈ +10 of 2400 weight/min (0.4 %), +20 with a dashboard open.
 #
 # listed_perp is the first bar in the data.binance.vision USD-M archive, which is what the
 # backfill (§5) can actually start from; for the 2020-01 symbols the perp itself is older
@@ -324,3 +341,92 @@ symbols:
     okx_swap: QNT-USDT-SWAP
     listed_perp: 2022-10-20
     # 30d quote volume 3.0bn USD
+  # --- TradFi perps, added by hand (IB-070); see the header. Binance: contractType
+  # TRADIFI_PERPETUAL, underlyingType COMMODITY (SPY, QQQ: EQUITY). listed_perp = first 1d bar in
+  # the data.binance.vision USD-M archive (= onboardDate for all ten).
+  # Mapping checked by mark price, Binance vs Bybit vs OKX, 5 rounds a minute apart 2026-10-30
+  # 09:37-09:41 UTC (XAU/XAG also 09:31-09:35): every mapped pair within 0.12 %; worst is OKX
+  # XCU-USDT-SWAP, a steady +0.08..+0.11 % above COPPERUSDT. Bybit's GASUSDT is NOT natural gas
+  # (1.14 vs 2.92, the NEO GAS token) — so NATGASUSDT has no Bybit mapping. Bybit lists no
+  # copper, platinum or palladium linear perp (2026-10-30). OKX contract sizes are read from the
+  # venue at boot like every other instId (okx/contract-size.ts).
+  - id: XAUUSDT
+    base: XAU
+    quote: USDT
+    binance_perp: XAUUSDT
+    bybit_linear: XAUUSDT
+    okx_swap: XAU-USDT-SWAP
+    listed_perp: 2025-12-11
+    # 30d quote volume 50.0bn USD (2026-09-30..10-29)
+  - id: XAGUSDT
+    base: XAG
+    quote: USDT
+    binance_perp: XAGUSDT
+    bybit_linear: XAGUSDT
+    okx_swap: XAG-USDT-SWAP
+    listed_perp: 2026-01-07
+    # 30d quote volume 19.8bn USD
+  - id: CLUSDT
+    base: CL
+    quote: USDT
+    binance_perp: CLUSDT
+    bybit_linear: CLUSDT
+    okx_swap: CL-USDT-SWAP
+    listed_perp: 2026-04-01
+    # WTI crude; 30d quote volume 25.6bn USD
+  - id: BZUSDT
+    base: BZ
+    quote: USDT
+    binance_perp: BZUSDT
+    bybit_linear: BZUSDT
+    okx_swap: BZ-USDT-SWAP
+    listed_perp: 2026-04-01
+    # Brent crude; 30d quote volume 13.7bn USD
+  - id: NATGASUSDT
+    base: NATGAS
+    quote: USDT
+    binance_perp: NATGASUSDT
+    # bybit_linear: none — Bybit's GASUSDT is the NEO GAS token, not natural gas (checked by price)
+    okx_swap: NG-USDT-SWAP
+    listed_perp: 2026-04-01
+    # 30d quote volume 1.7bn USD
+  - id: COPPERUSDT
+    base: COPPER
+    quote: USDT
+    binance_perp: COPPERUSDT
+    # bybit_linear: not listed on Bybit linear (2026-10-30)
+    okx_swap: XCU-USDT-SWAP
+    listed_perp: 2026-03-06
+    # 30d quote volume 0.4bn USD
+  - id: XPTUSDT
+    base: XPT
+    quote: USDT
+    binance_perp: XPTUSDT
+    # bybit_linear: not listed on Bybit linear (2026-10-30)
+    okx_swap: XPT-USDT-SWAP
+    listed_perp: 2026-01-30
+    # platinum; 30d quote volume 0.2bn USD
+  - id: XPDUSDT
+    base: XPD
+    quote: USDT
+    binance_perp: XPDUSDT
+    # bybit_linear: not listed on Bybit linear (2026-10-30)
+    okx_swap: XPD-USDT-SWAP
+    listed_perp: 2026-01-30
+    # palladium; 30d quote volume 0.2bn USD
+  - id: SPYUSDT
+    base: SPY
+    quote: USDT
+    binance_perp: SPYUSDT
+    bybit_linear: SPYUSDT
+    okx_swap: SPY-USDT-SWAP
+    listed_perp: 2026-04-06
+    # S&P 500 ETF; 30d quote volume 2.6bn USD
+  - id: QQQUSDT
+    base: QQQ
+    quote: USDT
+    binance_perp: QQQUSDT
+    bybit_linear: QQQUSDT
+    okx_swap: QQQ-USDT-SWAP
+    listed_perp: 2026-04-06
+    # Nasdaq-100 ETF; 30d quote volume 3.9bn USD

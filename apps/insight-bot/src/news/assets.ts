@@ -89,6 +89,8 @@ export const AMBIGUOUS_TERMS: ReadonlySet<string> = new Set([
   // NEAR's coingecko id is literally `near`, and ONE's is `harmony`. Treating a name as always
   // trustworthy tagged "the fund closed near its high" — found by the spec, not by reasoning.
   'harmony', 'polygon', 'compound', 'curve', 'balancer', 'immutable', 'injective', 'render',
+  // IB-070's TradFi bases: a word, a word that is also a crypto firm, two short abbreviations
+  'spy', 'copper', 'cl', 'bz',
 ]);
 
 /** Ordinary word or proper noun, so it needs a cashtag rather than a bare mention. */

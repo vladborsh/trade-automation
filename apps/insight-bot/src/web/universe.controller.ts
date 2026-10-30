@@ -9,6 +9,13 @@ import * as repo from './series/pg/series.repo';
  *
  * Authenticated by `WebModule`'s module-wide guard, like every other controller here.
  */
+/**
+ * The most symbols one summary reads: the universe (30 crypto + 10 hand-added TradFi since IB-070)
+ * with room for the next hand additions. 60 openInterestHist calls per cached minute is 2.5 % of
+ * the 2,400/min budget.
+ */
+export const SUMMARY_MAX = 60;
+
 @Controller('api/web/universe')
 export class UniverseController {
   constructor(
@@ -41,7 +48,9 @@ export class UniverseController {
   async summary(@Query('n') n = '20'): Promise<WebUniverseSummaryResponse> {
     if (!this.db) throw new HttpException({ code: 'NOT_FOUND', message: 'no database' }, 503);
     if (!this.summaryService) throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'summary not configured' }, 503);
-    const count = Math.min(Math.max(1, Number(n) || 20), 20); // 20, not 100: each symbol costs a venue call
+    // SUMMARY_MAX, not 100: each symbol costs a venue call (one openInterestHist, weight 1, per
+    // cached minute). IB-070 raised it from 20 so the picker's whole universe (40) has figures.
+    const count = Math.min(Math.max(1, Number(n) || 20), SUMMARY_MAX);
     const rows = await repo.topSymbols(this.db, count);
     try {
       return await this.summaryService.summary(rows.map((r) => ({ id: r.id, base: r.base, volumeRank: r.volumeRank })));
