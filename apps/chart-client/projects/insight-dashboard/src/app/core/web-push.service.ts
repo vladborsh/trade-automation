@@ -38,7 +38,8 @@ export class WebPushService {
       if (!body) return this.settle(false);
       await this.api.pushSubscribe(body);
       return this.settle(true);
-    } catch {
+    } catch (error) {
+      console.warn('web push: subscribing failed, in-tab alerts only', error);
       return this.settle(false);
     }
   }
