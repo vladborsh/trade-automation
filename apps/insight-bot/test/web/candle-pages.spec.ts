@@ -1,5 +1,6 @@
 import {
-  LruCache, MAX_BARS_PER_REQUEST, SETTLE_MS, barsIn, closedUntil, maxDaysFor, pageSpanMs, pagesFor,
+  LruCache, MAX_BARS_PER_REQUEST, SETTLE_MS, TAIL_LIMIT, barsIn, closedUntil, isTail, maxDaysFor, pageSpanMs, pagesFor,
+  reachesFormingBar,
 } from '../../src/web/market/candle-pages';
 
 /** IB-063 — how a window is cut into venue pages and which part of a page may be remembered. */
@@ -105,5 +106,30 @@ describe('IB-065: weekly pages', () => {
   it('3m and 5m keep the 1500-bar perp page', () => {
     expect(pageSpanMs('perp', '3m')).toBe(1500 * 180_000);
     expect(pageSpanMs('spot', '5m')).toBe(1000 * 300_000);
+  });
+});
+
+describe('IB-066: the live tail', () => {
+  const now = 100 * HOUR + 30 * 60_000; // half way through the 100th hour
+
+  it('TAIL_LIMIT is the largest limit Binance documents at weight 1 ([1, 100))', () => {
+    expect(TAIL_LIMIT).toBe(99);
+  });
+
+  it('is a short window reaching the forming bar', () => {
+    expect(isTail('1h', 99 * HOUR, now + 1, now)).toBe(true);
+    expect(isTail('1h', now - 97 * HOUR, now + 1, now)).toBe(true); // 98 bars
+    expect(isTail('1h', now - 98 * HOUR, now + 1, now)).toBe(false); // 99 bars: a page
+  });
+
+  it('is not a short window that ended before the forming bar', () => {
+    expect(isTail('1h', 90 * HOUR, 99 * HOUR, now)).toBe(false);
+    expect(reachesFormingBar('1h', 90 * HOUR, 99 * HOUR, now)).toBe(false);
+  });
+
+  it('the bar that closed under SETTLE_MS ago still counts as forming', () => {
+    const justClosed = 100 * HOUR + SETTLE_MS - 1;
+    expect(reachesFormingBar('1h', 98 * HOUR, 100 * HOUR, justClosed)).toBe(true);
+    expect(reachesFormingBar('1h', 98 * HOUR, 100 * HOUR, 100 * HOUR + SETTLE_MS)).toBe(false);
   });
 });

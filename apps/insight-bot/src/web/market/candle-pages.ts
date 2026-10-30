@@ -59,6 +59,26 @@ export function pagesFor(market: WebMarket, tf: WebTimeframe, fromMs: number, to
   return out;
 }
 
+/**
+ * IB-066 — the live tail's `limit`: the largest Binance documents at weight 1 on `/fapi/v1/klines`
+ * ([1, 100)). A window of fewer bars than this is a tail (`isTail`).
+ */
+export const TAIL_LIMIT = 99;
+
+/**
+ * A window to ask the venue for as itself, at `TAIL_LIMIT`, rather than as pages: fewer bars than
+ * that, and reaching a bar that had not closed at `now` — so no cache could have answered it. A
+ * short window in the past still goes through the pages and their cache.
+ */
+export function isTail(tf: WebTimeframe, fromMs: number, toMs: number, now: number): boolean {
+  return barsIn(tf, fromMs, toMs) < TAIL_LIMIT && reachesFormingBar(tf, fromMs, toMs, now);
+}
+
+/** True when `[fromMs, toMs)` holds a bar that had not closed (and settled) at `now`. */
+export function reachesFormingBar(tf: WebTimeframe, fromMs: number, toMs: number, now: number): boolean {
+  return closedUntil(tf, fromMs, toMs, now) < toMs;
+}
+
 /** Bars a window spans, rounded up: the figure `MAX_BARS_PER_REQUEST` is compared with. */
 export function barsIn(tf: WebTimeframe, fromMs: number, toMs: number): number {
   return Math.ceil((toMs - fromMs) / timeframeMs(tf));

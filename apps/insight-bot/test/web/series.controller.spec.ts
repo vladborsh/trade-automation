@@ -129,6 +129,19 @@ describe('IB-063 candles route', () => {
     expect(candles.calls).toEqual([]);
   });
 
+  it('IB-066: a window holding the forming bar is answered no-store; a closed one is not', async () => {
+    const { db } = fakeDb();
+    const headers = (from: number, to: number) => {
+      const set: Record<string, string> = {};
+      const res = { setHeader: (k: string, v: string) => { set[k] = v; } } as never;
+      return new SeriesController(db, fakeCandles().service)
+        .candles('BTCUSDT', String(from), String(to), '1m', 'binance', 'perp', res).then(() => set);
+    };
+    const now = Date.now();
+    expect(await headers(now - 120_000, now + 1)).toEqual({ 'Cache-Control': 'no-store' });
+    expect(await headers(T0, T0 + DAY)).toEqual({});
+  });
+
   it('without the service the route says so with a 503, not a 500', async () => {
     const { db } = fakeDb();
     const error = await new SeriesController(db).candles('BTCUSDT', String(T0), String(T0 + DAY), '1h').catch((e: unknown) => e);

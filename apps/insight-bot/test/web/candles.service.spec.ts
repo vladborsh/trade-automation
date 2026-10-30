@@ -191,11 +191,12 @@ describe('CandlesService — reading the venue', () => {
 
   it('IB-065: the forming week is served but not cached; the closed weeks are', async () => {
     const { service, venue } = setup();
-    await service.candles('perp', 'BTCUSDT', '1w', NOW - 52 * WEEK, NOW + WEEK);
+    // 105 weeks, as the dashboard's window: under 99 bars at the live edge is IB-066's uncached tail
+    await service.candles('perp', 'BTCUSDT', '1w', NOW - 104 * WEEK, NOW + WEEK);
     const n = venue.calls.length;
     await service.candles('perp', 'BTCUSDT', '1w', NOW - 104 * WEEK, NOW - 60 * WEEK); // closed: a hit
     expect(venue.calls).toHaveLength(n);
-    await service.candles('perp', 'BTCUSDT', '1w', NOW - 52 * WEEK, NOW + WEEK); // live edge: back to the venue
+    await service.candles('perp', 'BTCUSDT', '1w', NOW - 104 * WEEK, NOW + WEEK); // live edge: back to the venue
     expect(venue.calls.length).toBeGreaterThan(n);
   });
 
@@ -273,7 +274,8 @@ describe('CandlesService — the cache', () => {
 
   it('...but the closed part of that page is cached: an earlier window on it is a hit', async () => {
     const { service, venue } = setup();
-    await service.candles('perp', 'BTCUSDT', '1d', NOW - 90 * DAY, NOW + DAY);
+    // 121 bars: a page read (under 99 at the live edge would be IB-066's uncached tail)
+    await service.candles('perp', 'BTCUSDT', '1d', NOW - 120 * DAY, NOW + DAY);
     const n = venue.calls.length;
 
     const earlier = await service.candles('perp', 'BTCUSDT', '1d', NOW - 200 * DAY, NOW - 100 * DAY);
@@ -415,5 +417,66 @@ describe('CandlesService — errors', () => {
     expect(wireError(error)).toEqual({ status: 400, body: expect.objectContaining({ code: 'RANGE_TOO_WIDE', maxDays: 7 }) });
     expect(venue.calls).toHaveLength(0);
     await expect(service.candles('perp', 'BTCUSDT', '1m', JUNE_2025, JUNE_2025 + 7 * DAY)).resolves.toHaveLength(7 * 1440);
+  });
+});
+
+describe('CandlesService — IB-066 live tail', () => {
+  const MIN = 60_000;
+  const forming = Math.floor(NOW / MIN) * MIN; // 12:30, the 1m bar forming at NOW
+
+  it('a few bars up to now go to the venue as themselves: limit 99, weight 1, not a page', async () => {
+    const { service, venue, weight } = setup();
+    const tail = await service.candles('perp', 'BTCUSDT', '1m', forming - MIN, NOW + 1);
+    expect(tail.map((c) => c.time * 1000)).toEqual([forming - MIN, forming]);
+    expect(venue.calls).toHaveLength(1);
+    const p = venue.calls[0].params;
+    expect(p.get('limit')).toBe('99');
+    expect(Number(p.get('startTime'))).toBe(forming - MIN);
+    expect(Number(p.get('endTime'))).toBe(NOW);
+    expect(weight.used1m(NOW)).toBe(1);
+  });
+
+  it('12 polls a minute cost 12 weight, where pages would cost 120', async () => {
+    const { service, weight, advance } = setup();
+    for (let i = 0; i < 12; i++) {
+      const now = NOW + i * 5_000;
+      await service.candles('perp', 'BTCUSDT', '1m', Math.floor(now / MIN) * MIN - MIN, now + 1);
+      advance(5_000);
+    }
+    expect(weight.used1m(NOW + 55_000)).toBe(12);
+  });
+
+  it('the tail is never cached: every poll asks again and sees the forming bar move', async () => {
+    const { service, venue } = setup();
+    await service.candles('perp', 'BTCUSDT', '1m', forming - MIN, NOW + 1);
+    await service.candles('perp', 'BTCUSDT', '1m', forming - MIN, NOW + 1);
+    expect(venue.calls).toHaveLength(2);
+    // ...nor does it seed the page cache: the full window after it still reads its pages
+    await service.candles('perp', 'BTCUSDT', '1m', NOW - DAY, NOW + 1);
+    expect(venue.calls.slice(2).every((c) => c.params.get('limit') === '1500')).toBe(true);
+  });
+
+  it('a short window in the past is not a tail: it goes through the cached pages', async () => {
+    const { service, venue } = setup();
+    await service.candles('perp', 'BTCUSDT', '1h', JUNE_2025, JUNE_2025 + DAY);
+    await service.candles('perp', 'BTCUSDT', '1h', JUNE_2025, JUNE_2025 + DAY);
+    expect(venue.calls).toHaveLength(1);
+    expect(venue.calls[0].params.get('limit')).toBe('1500');
+  });
+
+  it('a tail is refused above the weight ceiling like any venue read', async () => {
+    const { service, venue, weight } = setup();
+    weight.recordCall(1_801, NOW);
+    const error = await service.candles('perp', 'BTCUSDT', '1m', forming - MIN, NOW + 1).catch((e) => e);
+    expect(wireError(error)).toEqual({ status: 503, body: expect.objectContaining({ code: 'VENUE_UNAVAILABLE' }) });
+    expect(venue.calls).toHaveLength(0);
+  });
+
+  it('1w: the tail is the forming week, asked from its Monday', async () => {
+    const { service, venue } = setup();
+    const monday = floorToGrid(NOW, '1w');
+    const weeks = await service.candles('perp', 'BTCUSDT', '1w', monday, NOW + 1);
+    expect(weeks.map((w) => w.time * 1000)).toEqual([monday]);
+    expect(venue.calls[0].params.get('limit')).toBe('99');
   });
 });

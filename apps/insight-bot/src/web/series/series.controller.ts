@@ -1,4 +1,5 @@
-import { Controller, Get, HttpException, Inject, Optional, Query } from '@nestjs/common';
+import { Controller, Get, HttpException, Inject, Optional, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   WEB_MAX_CANDLE_BARS, WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
   WebTimeframeSchema, WebVenueFilterSchema, type WebTimeframe,
@@ -58,6 +59,7 @@ export class SeriesController {
     @Query('tf') tf = '1m',
     @Query('venue') venue = 'binance',
     @Query('market') market = 'perp',
+    @Res({ passthrough: true }) res?: Response,
   ): Promise<WebCandlesResponse> {
     const parsedMarket = WebMarketSchema.safeParse(market);
     if (!parsedMarket.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'unknown market' }, 400);
@@ -71,6 +73,9 @@ export class SeriesController {
     }
     if (venue !== 'binance') return { venue, market: parsedMarket.data, symbol, timeframe, candles: [], downsampled: false };
     const rows = await this.candlesService.candles(parsedMarket.data, symbol, timeframe, fromMs, toMs);
+    // IB-066: a window holding the forming bar is a different answer five seconds later (the live
+    // tail polls it); no cache between here and the chart may hand back the old one.
+    if (this.candlesService.reachesFormingBar(timeframe, fromMs, toMs)) res?.setHeader('Cache-Control', 'no-store');
     const { rows: candles, downsampled } = thin(rows);
     return { venue, market: parsedMarket.data, symbol, timeframe, candles, downsampled };
   }

@@ -3,8 +3,8 @@ import { BinanceHttpError, type BinanceRestKline } from '@trade-automation/binan
 import type { WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contracts';
 import { BinanceWeightTracker } from '../../collectors/binance-perp/binance-weight.tracker';
 import {
-  CACHE_MAX_PAGES, LruCache, MAX_BARS_PER_REQUEST, PAGE_LIMIT, barsIn, closedUntil, maxDaysFor, pageKey,
-  pageSpanMs, pagesFor, type CachedPage,
+  CACHE_MAX_PAGES, LruCache, MAX_BARS_PER_REQUEST, PAGE_LIMIT, TAIL_LIMIT, barsIn, closedUntil, isTail, maxDaysFor,
+  pageKey, pageSpanMs, pagesFor, reachesFormingBar, type CachedPage,
 } from './candle-pages';
 import { WEIGHT_CEILING_1M } from './universe-summary.service';
 
@@ -51,6 +51,18 @@ import { WEIGHT_CEILING_1M } from './universe-summary.service';
  * (faster than a reader scrolls) that is ≤ 300/min at 1m/3m/5m, 12.5 % of 2 400, and ≤ 150/min on
  * the other frames. Above `WEIGHT_CEILING_1M` (1 800) a read
  * that needs the venue answers 503 rather than adding to it; a cached read still answers.
+ *
+ * **IB-066, the live tail.** An open instrument page asks every 5 s for the bars from its last
+ * candle's open to now: one or two bars. Through the page path that is a whole 1 500-row page each
+ * time, because the forming bar is never cached: 10 weight, 120/min per tab. A window of fewer than
+ * `TAIL_LIMIT` bars that reaches the forming bar is therefore asked for as itself, `limit=99`, which
+ * Binance documents at weight 1 for `limit` in [1, 100) (USD-M "Kline/Candlestick Data" weight
+ * table, as carried in Binance's own `binance-connector-js`
+ * `derivatives-trading-usds-futures/src/rest-api/modules/market-data-api.ts`, read 2026-10-29).
+ * 12 polls a minute × 1 = **~12 weight/min per open tab**; the other panes are read from the
+ * bot's database and cost the venue nothing. Against 2 400/min with ~1 % (~25) already used and
+ * `WEIGHT_CEILING_1M` at 1 800, about 140 tabs fit before reads are refused. A tail is never
+ * cached: it is mostly the forming bar, and its closed bars arrive through the page path anyway.
  */
 
 /** A hung page must not hold a chart request open: the venue answers in well under a second. */
@@ -58,6 +70,8 @@ export const PAGE_TIMEOUT_MS = 10_000;
 
 /** `/fapi/v1/klines` at `limit` 1500 (Binance docs: 10 above 1000). */
 export const PERP_PAGE_WEIGHT = 10;
+/** `/fapi/v1/klines` at `limit` < 100 (Binance docs: 1 for [1, 100)) — the live tail (IB-066). */
+export const PERP_TAIL_WEIGHT = 1;
 /** `/api/v3/klines` (Binance docs: 2 at any `limit`). */
 export const SPOT_PAGE_WEIGHT = 2;
 
@@ -98,6 +112,9 @@ export class CandlesService {
         maxDays: maxDaysFor(tf),
       }, 400);
     }
+    if (isTail(tf, fromMs, toMs, this.now())) {
+      return this.tail(market, symbol, tf, fromMs, toMs);
+    }
     const out: WebCandle[] = [];
     for (const pageStart of pagesFor(market, tf, fromMs, toMs)) {
       const rows = await this.page(market, symbol, tf, pageStart, toMs);
@@ -107,6 +124,24 @@ export class CandlesService {
       }
     }
     return out;
+  }
+
+  /** IB-066: true when `[fromMs, toMs)` holds the bar still forming, by this service's clock. */
+  reachesFormingBar(tf: WebTimeframe, fromMs: number, toMs: number): boolean {
+    return reachesFormingBar(tf, fromMs, toMs, this.now());
+  }
+
+  /** IB-066: a few bars at weight 1, straight from the venue and not cached (see the class comment). */
+  private async tail(market: WebMarket, symbol: string, tf: WebTimeframe, fromMs: number, toMs: number): Promise<WebCandle[]> {
+    this.refuseAboveCeiling(market);
+    try {
+      const rows = await this.fetchKlinePage(market, symbol, tf, fromMs, toMs - 1, TAIL_LIMIT, PERP_TAIL_WEIGHT);
+      return rows.map(toWebCandle).filter((c) => c.time * 1000 >= fromMs && c.time * 1000 < toMs);
+    } catch (error) {
+      const wire = this.toWireError(error, market, symbol, tf);
+      if (wire === null) return [];
+      throw wire;
+    }
   }
 
   /** One aligned page, from cache when the cached part reaches `toMs`. */
@@ -134,16 +169,20 @@ export class CandlesService {
     return promise;
   }
 
-  private async fetchPage(market: WebMarket, symbol: string, tf: WebTimeframe, pageStart: number): Promise<WebCandle[]> {
+  private refuseAboveCeiling(market: WebMarket): void {
     if (market === 'perp' && this.options.weight.used1m(this.now()) > WEIGHT_CEILING_1M) {
       throw new HttpException(
         { code: 'VENUE_UNAVAILABLE', message: `Binance weight above ${WEIGHT_CEILING_1M}/min; not adding to it` },
         503,
       );
     }
+  }
+
+  private async fetchPage(market: WebMarket, symbol: string, tf: WebTimeframe, pageStart: number): Promise<WebCandle[]> {
+    this.refuseAboveCeiling(market);
     const pageEnd = pageStart + pageSpanMs(market, tf) - 1; // endTime is inclusive on Binance
     try {
-      const rows = await this.fetchKlinePage(market, symbol, tf, pageStart, pageEnd);
+      const rows = await this.fetchKlinePage(market, symbol, tf, pageStart, pageEnd, PAGE_LIMIT[market], PERP_PAGE_WEIGHT);
       return rows.map(toWebCandle);
     } catch (error) {
       const wire = this.toWireError(error, market, symbol, tf);
@@ -153,12 +192,12 @@ export class CandlesService {
   }
 
   /**
-   * One page of klines. `interval` is the timeframe id verbatim (`WebTimeframeSchema` is spelled as
+   * One request for klines, at `limit` rows and the perp weight that limit is documented at. `interval` is the timeframe id verbatim (`WebTimeframeSchema` is spelled as
    * Binance spells it). Weight goes where each market's budget is kept: perp into the shared
    * tracker (documented cost + the venue's header), spot to its own gauge.
    */
   private async fetchKlinePage(
-    market: WebMarket, symbol: string, tf: WebTimeframe, from: number, to: number,
+    market: WebMarket, symbol: string, tf: WebTimeframe, from: number, to: number, limit: number, perpWeight: number,
   ): Promise<BinanceRestKline[]> {
     const perp = market === 'perp';
     const url = perp
@@ -168,10 +207,10 @@ export class CandlesService {
     url.searchParams.set('interval', tf);
     url.searchParams.set('startTime', String(from));
     url.searchParams.set('endTime', String(to));
-    url.searchParams.set('limit', String(PAGE_LIMIT[market]));
+    url.searchParams.set('limit', String(limit));
     const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) });
     if (perp) {
-      this.options.weight.recordCall(PERP_PAGE_WEIGHT, this.now());
+      this.options.weight.recordCall(perpWeight, this.now());
       this.options.weight.recordFromHeaders(res.headers, this.now());
     } else {
       const used = Number(res.headers.get('x-mbx-used-weight-1m'));
