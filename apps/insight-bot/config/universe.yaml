@@ -344,9 +344,9 @@ symbols:
   # --- TradFi perps, added by hand (IB-070); see the header. Binance: contractType
   # TRADIFI_PERPETUAL, underlyingType COMMODITY (SPY, QQQ: EQUITY). listed_perp = first 1d bar in
   # the data.binance.vision USD-M archive (= onboardDate for all ten).
-  # Mapping checked by mark price, Binance vs Bybit vs OKX, 5 rounds a minute apart 2026-10-30
-  # 09:37-09:41 UTC (XAU/XAG also 09:31-09:35): every mapped pair within 0.12 %; worst is OKX
-  # XCU-USDT-SWAP, a steady +0.08..+0.11 % above COPPERUSDT. Bybit's GASUSDT is NOT natural gas
+  # Mapping checked by mark price, Binance vs Bybit vs OKX, on two occasions of 5 rounds a minute
+  # apart, 2026-10-30 09:37-09:41 and 10:15-10:19 UTC (XAU/XAG also 09:31-09:35): every mapped
+  # pair within 0.12 %; worst is OKX XCU-USDT-SWAP, a steady +0.08..+0.11 % above COPPERUSDT. Bybit's GASUSDT is NOT natural gas
   # (1.14 vs 2.92, the NEO GAS token) — so NATGASUSDT has no Bybit mapping. Bybit lists no
   # copper, platinum or palladium linear perp (2026-10-30). OKX contract sizes are read from the
   # venue at boot like every other instId (okx/contract-size.ts).
