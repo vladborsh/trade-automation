@@ -1,3 +1,6 @@
+import type {
+  WebCandle, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse, WebLongShortResponse,
+} from '@trade-automation/contracts';
 import type { PaneData } from './pane-data';
 
 /**
@@ -38,7 +41,63 @@ export function prependEarlier(current: PaneData, earlier: PaneData): PaneData {
     // id, the current read winning (it may carry a later revision).
     calendarEvents: byId([...earlier.calendarEvents, ...current.calendarEvents]),
     extendsPrevious: true,
+    extendsLater: false,
   };
+}
+
+/**
+ * IB-066 — what one live-tail poll brought back. Every part is optional: the 5 s poll reads the
+ * candles alone, the minute's poll the panes that come from the bot's database.
+ */
+export interface LaterTail {
+  candles?: readonly WebCandle[];
+  openInterest?: PaneData['openInterest'];
+  funding?: WebFundingResponse;
+  longShort?: WebLongShortResponse;
+  liquidations?: WebLiquidationsResponse;
+  liquidationEvents?: readonly WebLiquidationEvent[];
+  liquidationVenues?: readonly string[];
+  dailyCandles?: readonly WebCandle[];
+}
+
+/**
+ * IB-066 — the live tail joined onto the window on screen, the mirror of `prependEarlier`.
+ *
+ * A tail overlaps the window by design: it is read from the last bar's open, because that bar is
+ * still forming. So every series is merged BY TIME with the tail winning — the forming candle and
+ * the liquidation bucket still filling are replaced, newer points are appended. Liquidation events
+ * have no time of their own to key on (several can share a second), so they are one per
+ * time + venue + side + size + price. A part the tail does not carry is left as it was.
+ */
+export function appendLater(current: PaneData, tail: LaterTail): PaneData {
+  const out: PaneData = { ...current, extendsPrevious: false, extendsLater: true };
+  if (tail.candles) {
+    out.candles = { ...current.candles, candles: byTime([...current.candles.candles, ...tail.candles]) };
+  }
+  if (tail.openInterest) out.openInterest = byTime([...current.openInterest, ...tail.openInterest]);
+  if (tail.funding) {
+    out.funding = {
+      ...current.funding,
+      settled: mergeVenues(current.funding.settled, tail.funding.settled, (points) => byTime(points)),
+      predicted: byTime([...current.funding.predicted, ...tail.funding.predicted]),
+      downsampled: current.funding.downsampled || tail.funding.downsampled,
+    };
+  }
+  if (tail.longShort) {
+    out.longShort = { ...current.longShort, points: byTime([...current.longShort.points, ...tail.longShort.points]) };
+  }
+  if (tail.liquidations) {
+    out.liquidations = {
+      ...current.liquidations,
+      bars: byTime([...current.liquidations.bars, ...tail.liquidations.bars]),
+      venuesPresent: [...new Set([...current.liquidations.venuesPresent, ...tail.liquidations.venuesPresent])],
+      undercounted: current.liquidations.undercounted || tail.liquidations.undercounted,
+    };
+  }
+  if (tail.liquidationEvents) out.liquidationEvents = byEvent([...current.liquidationEvents, ...tail.liquidationEvents]);
+  if (tail.liquidationVenues) out.liquidationVenues = [...new Set([...current.liquidationVenues, ...tail.liquidationVenues])];
+  if (tail.dailyCandles) out.dailyCandles = byTime([...current.dailyCandles, ...tail.dailyCandles]);
+  return out;
 }
 
 /** True when an earlier read found no candles at all: the venue's history starts after it. */
@@ -58,12 +117,21 @@ function byId<T extends { id: string; scheduledAt: number }>(events: readonly T[
   return [...m.values()].sort((a, b) => a.scheduledAt - b.scheduledAt);
 }
 
-function mergeVenues<T extends { venue: string; points: unknown[] }>(earlier: readonly T[], current: readonly T[]): T[] {
-  const venues = [...new Set([...current.map((v) => v.venue), ...earlier.map((v) => v.venue)])];
+function byEvent(events: readonly WebLiquidationEvent[]): WebLiquidationEvent[] {
+  const m = new Map<string, WebLiquidationEvent>();
+  for (const e of events) m.set(`${e.time}|${e.venue}|${e.side}|${e.usd}|${e.price}`, e);
+  return [...m.values()].sort((a, b) => a.time - b.time);
+}
+
+/** Per venue, `earlier` points then `later` ones, through `join` (plain concatenation by default). */
+function mergeVenues<T extends { venue: string; points: Array<{ time: number }> }>(
+  earlier: readonly T[], later: readonly T[], join: (points: T['points']) => T['points'] = (points) => points,
+): T[] {
+  const venues = [...new Set([...later.map((v) => v.venue), ...earlier.map((v) => v.venue)])];
   return venues.map((venue) => {
     const before = earlier.find((v) => v.venue === venue);
-    const now = current.find((v) => v.venue === venue);
-    const base = (now ?? before) as T;
-    return { ...base, points: [...(before?.points ?? []), ...(now?.points ?? [])] };
+    const after = later.find((v) => v.venue === venue);
+    const base = (after ?? before) as T;
+    return { ...base, points: join([...(before?.points ?? []), ...(after?.points ?? [])]) };
   });
 }

@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal,
   untracked, viewChild, type OnDestroy,
 } from '@angular/core';
-import { createChart, type IChartApi, type LogicalRange, type MouseEventParams, type Time } from 'lightweight-charts';
+import { createChart, type IChartApi, type LogicalRange, type MouseEventParams } from 'lightweight-charts';
 import { I18nService } from '../../i18n/i18n.service';
 import { LoaderComponent } from '../../ui/loader.component';
 import { CalendarTooltipComponent } from './calendar-tooltip.component';
@@ -16,9 +16,10 @@ import {
 } from './pane-heights';
 import { legendEntries } from './pane-legend';
 import {
-  CHART_PANES_OPTIONS, PANELS, PANEL_PRICE_SCALE, PANEL_TIME_SCALE, panelHeading, windowBounds,
+  CHART_PANES_OPTIONS, PANELS, PANEL_PRICE_SCALE, PANEL_TIME_SCALE, panelHeading,
 } from './panels.model';
-import { TimeAxisStrip, chartTimes, shiftedView } from './time-axis-strip';
+import { TimeAxisStrip, chartTimes } from './time-axis-strip';
+import { showView } from './carried-view';
 
 export type { PaneData } from './pane-data';
 
@@ -165,12 +166,12 @@ export class InstrumentChartComponent implements OnDestroy {
 
   /**
    * Redraws from scratch: a fresh chart cannot stack series from the previous window. When the
-   * new data only extends the previous window to the left, the reader's view is carried over
-   * rather than reset to the whole window, which would yank them away from where they scrolled.
+   * new data only extends the previous window (left by scrolling, right by the live tail), the
+   * reader's view is carried over, or follows the new bar from the right edge (`carried-view.ts`).
    */
   private redraw(data: PaneData): void {
-    const view = data.extendsPrevious ? this.chart?.timeScale().getVisibleLogicalRange() ?? null : null;
-    const first = view && this.chart ? chartTimes(this.chart)[0] : undefined;
+    const view = this.chart?.timeScale().getVisibleLogicalRange() ?? null;
+    const before = this.chart ? chartTimes(this.chart) : [];
     this.teardown();
     this.renderers = createPanelRenderers();
     const host = this.host().nativeElement;
@@ -187,9 +188,7 @@ export class InstrumentChartComponent implements OnDestroy {
     for (const panel of PANELS) drawPanel(panel.key, chart, data, this.renderers);
     for (const pane of chart.panes()) pane.priceScale('right').applyOptions(PANEL_PRICE_SCALE);
     this.applyHeights();
-    const bounds = windowBounds(data);
-    if (view && first !== undefined) chart.timeScale().setVisibleLogicalRange(shiftedView(view, first, chartTimes(chart)));
-    else if (bounds) chart.timeScale().setVisibleRange({ from: bounds.from as Time, to: bounds.to as Time });
+    showView(chart, data, view, before);
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
     chart.subscribeCrosshairMove((p: MouseEventParams) =>
       this.hover.set(p.time !== undefined && p.point ? { time: p.time as number, x: p.point.x } : null));

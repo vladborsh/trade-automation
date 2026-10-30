@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DOCUMENT, DatePipe, DecimalPipe } from '@angular/common';
 import type {
   WebLiquidationCoin, WebLiquidationsOverviewResponse, WebTimeframe, WebTopLiquidation,
   WebUniverseSummaryRow, WebUniverseSymbol,
@@ -10,7 +10,9 @@ import { I18nService } from '../../i18n/i18n.service';
 import { InstrumentChartComponent, type PaneData } from './instrument-chart.component';
 import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
+import { instrumentTailJobs } from './instrument-tail';
 import { fetchWindow } from './instrument-window';
+import { LiveTail } from './live-tail';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
 import { LoaderComponent } from '../../ui/loader.component';
 import { SymbolPickerComponent } from './symbol-picker.component';
@@ -74,6 +76,19 @@ export class InstrumentComponent {
   private generation = 0;
   readonly error = signal<string | null>(null);
 
+  /** IB-066 — the live tail: candles every 5 s, the rest every minute. The rules are `live-tail.ts`'s. */
+  private readonly tail = new LiveTail({
+    jobs: instrumentTailJobs(this.api, {
+      panes: this.panes, top: this.top, symbol: this.symbol, timeframe: this.timeframe,
+      refreshSummary: (symbol) => void this.loadSummary(symbol),
+    }),
+    generation: () => this.generation,
+    busy: () => this.loading() || this.loadingEarlier() || this.panes() === null,
+    maxGapMs: () => { const w = windowFor(this.timeframe(), 0); return w.toMs - w.fromMs; },
+    reload: () => void this.load(),
+    visibility: inject(DOCUMENT),
+  });
+
   /** No range buttons since 2026-10-24: the window follows the timeframe (`time-range.ts`). */
   readonly timeframes = TIMEFRAMES;
   readonly timeframeLabel = timeframeLabel;
@@ -95,6 +110,8 @@ export class InstrumentComponent {
     void this.loadUniverse();
     void this.loadFigures();
     void this.load();
+    this.tail.start();
+    inject(DestroyRef).onDestroy(() => this.tail.stop());
   }
 
   /**
@@ -154,6 +171,7 @@ export class InstrumentComponent {
       this.loadedFromMs = fromMs;
       this.panes.set(panes);
       this.top.set(top.rows);
+      this.tail.reset(toMs);
       void this.loadSummary(symbol);
     } catch (error) {
       if (generation !== this.generation) return;
@@ -189,7 +207,8 @@ export class InstrumentComponent {
         return;
       }
       this.loadedFromMs = fromMs;
-      this.panes.set(prependEarlier(current, earlier));
+      // the window as it is NOW: a live-tail poll may have joined bars on while this was in flight
+      this.panes.set(prependEarlier(this.panes() ?? current, earlier));
     } catch {
       // a failed earlier read leaves the window as it was; the next scroll to the edge retries
     } finally {

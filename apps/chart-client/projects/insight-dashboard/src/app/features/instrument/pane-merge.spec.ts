@@ -1,5 +1,5 @@
 import type { PaneData } from './pane-data';
-import { isBeforeHistory, prependEarlier } from './pane-merge';
+import { appendLater, isBeforeHistory, prependEarlier } from './pane-merge';
 
 const candle = (time: number, close = 1) => ({ time, open: 1, high: 1, low: 1, close, volume: 1, takerBuyVolume: 1 });
 
@@ -83,5 +83,67 @@ describe('prependEarlier — calendar events (IB-060)', () => {
     const revised = { id: 'ev:seam', scheduledAt: 5_000_000, revision: 2 } as never;
     const out = prependEarlier(window(7_200, { calendarEvents: [revised] }), window(3_600, { calendarEvents: [{ id: 'ev:a', scheduledAt: 1_000, revision: 1 } as never, seam] }));
     expect(out.calendarEvents.map((e) => [e.id, e.revision])).toEqual([['ev:a', 1], ['ev:seam', 2]]);
+  });
+});
+
+describe('appendLater (IB-066)', () => {
+  const current = window(7_200, { candles: { ...window(0).candles, candles: [candle(3_600), candle(7_200, 10)] } });
+
+  it('replaces the forming candle and appends the new one, in order', () => {
+    const out = appendLater(current, { candles: [candle(7_200, 11), candle(10_800, 12)] });
+    expect(out.candles.candles.map((c) => [c.time, c.close])).toEqual([[3_600, 1], [7_200, 11], [10_800, 12]]);
+  });
+
+  it('a duplicate at the seam is one bar, the tail winning', () => {
+    const out = appendLater(current, { candles: [candle(7_200, 99)] });
+    expect(out.candles.candles).toHaveLength(2);
+    expect(out.candles.candles[1].close).toBe(99);
+  });
+
+  it('an empty tail changes no series', () => {
+    const out = appendLater(current, { candles: [], openInterest: [], liquidationEvents: [] });
+    expect(out.candles.candles).toEqual(current.candles.candles);
+    expect(out.openInterest).toEqual(current.openInterest);
+    expect(out.liquidationEvents).toEqual(current.liquidationEvents);
+    expect(appendLater(current, {}).funding).toBe(current.funding);
+  });
+
+  it('marks the result as a later extension, not an earlier one', () => {
+    const scrolled = prependEarlier(current, window(0));
+    const out = appendLater(scrolled, {});
+    expect(out.extendsLater).toBe(true);
+    expect(out.extendsPrevious).toBe(false);
+    expect(prependEarlier(out, window(-3_600)).extendsLater).toBe(false);
+  });
+
+  it('the minute\'s panes merge by time too: the filling bucket replaced, new points appended', () => {
+    const tail = window(10_800);
+    const out = appendLater(current, {
+      openInterest: [{ time: 7_200, value: 5, notional: null }, ...tail.openInterest],
+      funding: tail.funding,
+      longShort: tail.longShort,
+      liquidations: { ...tail.liquidations, bars: [{ time: 7_200, long: 9, short: 9 }, ...tail.liquidations.bars], venuesPresent: ['okx'] } as never,
+      liquidationEvents: tail.liquidationEvents,
+    });
+    expect(out.openInterest.map((p) => [p.time, p.value])).toEqual([[7_200, 5], [10_800, 10_800]]);
+    expect(out.funding.settled[0].points.map((p) => p.time)).toEqual([7_200, 10_800]);
+    expect(out.funding.predicted.map((p) => p.time)).toEqual([7_200, 10_800]);
+    expect(out.longShort.points.map((p) => p.time)).toEqual([7_200, 10_800]);
+    expect(out.liquidations.bars.map((b) => [b.time, b.long])).toEqual([[7_200, 9], [10_800, 1]]);
+    expect(out.liquidations.venuesPresent).toEqual(['okx']);
+    expect(out.liquidationEvents.map((e) => e.time)).toEqual([7_200, 10_800]);
+  });
+
+  it('a liquidation read twice is drawn once; two in the same second are both kept', () => {
+    const a = { time: 7_200, side: 'long', usd: 1_000, price: 1, venue: 'binance' } as const;
+    const b = { ...a, usd: 2_000 };
+    const base = window(7_200, { liquidationEvents: [a] });
+    expect(appendLater(base, { liquidationEvents: [a, b] }).liquidationEvents).toEqual([a, b]);
+  });
+
+  it('daily candles: the forming day replaced, the new day appended', () => {
+    const base = window(7_200, { dailyCandles: [candle(0, 1), candle(86_400, 2)] });
+    const out = appendLater(base, { dailyCandles: [candle(86_400, 3), candle(172_800, 4)] });
+    expect(out.dailyCandles.map((c) => [c.time, c.close])).toEqual([[0, 1], [86_400, 3], [172_800, 4]]);
   });
 });

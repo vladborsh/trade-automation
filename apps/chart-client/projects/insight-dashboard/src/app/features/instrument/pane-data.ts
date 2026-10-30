@@ -39,4 +39,9 @@ export interface PaneData {
    * chart keeps the reader's view instead of jumping to the whole window. Absent on a fresh load.
    */
   extendsPrevious?: boolean;
+  /**
+   * IB-066 — true when this is the window on screen with the live tail joined on (`appendLater`):
+   * the chart keeps the reader's view, and follows the new bar only if they were at the right edge.
+   */
+  extendsLater?: boolean;
 }

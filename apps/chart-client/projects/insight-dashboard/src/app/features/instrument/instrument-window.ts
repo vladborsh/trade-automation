@@ -1,6 +1,7 @@
 import type { EconomicEvent, WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
 import type { PaneData } from './pane-data';
+import type { LaterTail } from './pane-merge';
 import { sideWindow } from './time-range';
 
 export interface WindowRequest {
@@ -52,6 +53,38 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     liquidationVenues: events.venuesPresent,
     dailyCandles: daily,
     calendarEvents: calendar,
+  };
+}
+
+/**
+ * IB-066 — the candle poll: the bars from the last one on screen up to now. One or two bars, so
+ * the bot asks Binance for them at weight 1 (`candles.service.ts`). Failing is the poll's own
+ * business: the scheduler skips the tick and asks again in five seconds.
+ */
+export async function fetchCandleTail(api: InsightApiClient, req: WindowRequest): Promise<LaterTail> {
+  return { candles: (await api.candles(req.symbol, req.fromMs, req.toMs, req.timeframe, 'perp')).candles };
+}
+
+/**
+ * IB-066 — the minute's poll: every pane that comes from the bot's database, from where the last
+ * read ended, plus the daily candles when a new day has begun (`dailyFromMs`, else null). The
+ * markers and the daily candles degrade as they do in `fetchWindow`.
+ */
+export async function fetchSideTail(api: InsightApiClient, req: WindowRequest, dailyFromMs: number | null): Promise<LaterTail> {
+  const { symbol, toMs, bucket } = req;
+  const side = sideWindow(req.fromMs, toMs);
+  const [oi, funding, longShort, liquidations, events, daily] = await Promise.all([
+    api.openInterest(symbol, side.fromMs, side.toMs),
+    api.funding(symbol, side.fromMs, side.toMs),
+    api.longShort(symbol, side.fromMs, side.toMs, 'global_account'),
+    api.liquidations(symbol, side.fromMs, side.toMs, bucket),
+    fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs),
+    dailyFromMs === null ? null : fetchDaily(api, symbol, dailyFromMs, toMs),
+  ]);
+  return {
+    openInterest: oi.points, funding, longShort, liquidations,
+    liquidationEvents: events.events, liquidationVenues: events.venuesPresent,
+    ...(daily ? { dailyCandles: daily } : {}),
   };
 }
 
