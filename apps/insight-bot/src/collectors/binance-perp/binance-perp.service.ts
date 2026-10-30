@@ -10,6 +10,7 @@ import { BinanceWeightTracker } from './binance-weight.tracker';
 import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collector';
 import { BinanceSocket } from '../binance-common/socket';
 import { PerpRest } from './rest';
+import { perpMarketWsBaseUrl } from './streams';
 
 /** One tick per second drives the mode policy, the minute boundary and the degraded pollers. */
 export const TICK_MS = 1_000;
@@ -43,6 +44,9 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
 
     const restBaseUrl = this.config.env.get('BINANCE_FUTURES_REST_BASE_URL');
     const wsBaseUrl = this.config.env.get('BINANCE_FUTURES_WS_BASE_URL');
+    // IB-BUG-012: kline/markPrice/forceOrder are `/market` streams; the bare host's legacy
+    // `/stream` path has carried none of them since 2026-04-23.
+    const marketWsBaseUrl = perpMarketWsBaseUrl(wsBaseUrl);
     // IB-007: both Binance loops share one IP budget, so they share one tracker rather than each
     // pushing its own number at the gauge. This one is the authoritative half — /fapi/* answers
     // carry `x-mbx-used-weight-1m`, and a header always beats the poller's local estimate (the
@@ -61,7 +65,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
       metrics: this.metrics,
       rest,
       candles: adapter,
-      socketFactory: (handlers, streams) => new BinanceSocket({ wsBaseUrl, streams, handlers }),
+      socketFactory: (handlers, streams) => new BinanceSocket({ wsBaseUrl: marketWsBaseUrl, streams, handlers }),
       lastOpenTimes: this.db ? () => lastCandleOpenTimes(this.db as Db, 'binance', MARKET) : undefined,
       logger: { log: (m) => this.logger.log(m), warn: (m) => this.logger.warn(m) },
     });
@@ -69,7 +73,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     await this.collector.start();
     this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
     this.timer.unref?.();
-    this.logger.log(`binance-perp collector started for ${symbols.length} symbols`);
+    this.logger.log(`binance-perp collector started for ${symbols.length} symbols on ${marketWsBaseUrl}`);
   }
 
   async onModuleDestroy(): Promise<void> {

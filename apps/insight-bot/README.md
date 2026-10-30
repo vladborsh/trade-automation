@@ -191,9 +191,11 @@ repaired range) plus one `fundingRate` per symbol per 8 h settlement.
 
 ### Degraded mode (§16.1)
 
-`fstream.binance.com` accepts the handshake from some networks and then sends nothing (the
-IB-013 probe found exactly that from the dev network). The collector treats that as a first-class
-state, not an error:
+A socket can accept the handshake and then send nothing. The IB-013 probe saw that from
+`fstream.binance.com` and took it for a network block; IB-BUG-012 traced it to the legacy `/stream`
+path, which Binance stopped feeding `/market` streams (kline, markPrice, forceOrder) on 2026-04-23 —
+the collector now connects to `wss://fstream.binance.com/market/stream`. A mute socket remains a
+first-class state, not an error:
 
 - **no data 30 s after the socket opens**, or **90 s of silence** once it was flowing → `degraded`;
 - degraded polling: `klines?limit=2` every **3 s for the signal set**, **15 s for the rest**, and

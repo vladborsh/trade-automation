@@ -275,7 +275,8 @@ this app's own (brief §1).
 
 ### 4.1 Binance USD-M perp (`collectors/binance-perp`)
 
-One combined-stream socket to `wss://fstream.binance.com/stream?streams=…`
+One combined-stream socket to `wss://fstream.binance.com/market/stream?streams=…`
+(the `/market` route since Binance's 2026-04-23 URL split — IB-BUG-012)
 carrying, for the whole universe:
 
 - `<sym>@kline_1m` × 30 — mapped by the lifted mapper (now with taker fields),
@@ -889,6 +890,12 @@ build task.
 ## 16. Rulings after dispatch
 
 ### 16.1 Binance USD-M WS mute from the local network (IB-013 probe, 2026-09-28)
+
+> **Superseded by IB-BUG-012 (2026-10-29):** the mute was not the network. The probe used
+> the legacy `fstream.binance.com/stream` path, which since 2026-04-23 carries only
+> Binance's `/public` streams; on `/market` the same machine receives kline, markPrice
+> and forceOrder (10 rounds in two sessions). The degraded mode below stays as the
+> response to a genuinely silent socket.
 
 **Finding** (`reports/dev3-IB-013-probe-escalation.md`): from the developers'
 local network `fstream.binance.com` accepts the WS handshake and sends nothing

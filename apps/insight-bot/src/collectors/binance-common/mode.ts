@@ -1,9 +1,12 @@
 /**
  * IB-005 — the WS ⇄ degraded decision, as a pure state machine (design §16.1, ruling 2026-09-28).
  *
- * Why it exists: `fstream.binance.com` accepts the handshake from some networks and then sends
- * nothing (the IB-013 probe found exactly that locally). A socket that is open but mute is not a
- * socket failure — nothing throws, nothing closes — so the collector times it instead:
+ * Why it exists: a socket can complete the handshake and then send nothing. The IB-013 probe saw
+ * exactly that from `fstream.binance.com` and read it as a network block; IB-BUG-012 found the real
+ * cause — the legacy `/stream` path, which since 2026-04-23 carries only Binance's `/public` streams
+ * (the perp collector now connects to `/market`, `binance-perp/streams.ts`). The lesson stands: a
+ * socket that is open but mute is not a socket failure — nothing throws, nothing closes — so the
+ * collector times it instead:
  *
  * - **open but no data within `silentAfterOpenMs` (30 s)** → degraded;
  * - **no data for `silenceMs` (90 s)** once it had been flowing → degraded (this is the case

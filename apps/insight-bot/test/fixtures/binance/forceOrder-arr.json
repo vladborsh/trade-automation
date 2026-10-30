@@ -1,0 +1,8 @@
+[
+  {"stream":"!forceOrder@arr","data":{"e":"forceOrder","E":1793317726228,"o":{"s":"KGENUSDT","S":"SELL","o":"LIMIT","f":"IOC","q":"9179","p":"0.0779000","ap":"0.0790000","X":"FILLED","l":"5356","z":"9179","T":1793317725224,"ps":"KGENUSDT","st":1}}},
+  {"stream":"!forceOrder@arr","data":{"e":"forceOrder","E":1793317728135,"o":{"s":"KGENUSDT","S":"SELL","o":"LIMIT","f":"IOC","q":"442","p":"0.0778000","ap":"0.0789000","X":"FILLED","l":"442","z":"442","T":1793317727130,"ps":"KGENUSDT","st":1}}},
+  {"stream":"!forceOrder@arr","data":{"e":"forceOrder","E":1793317731386,"o":{"s":"XAUTUSDT","S":"SELL","o":"LIMIT","f":"IOC","q":"0.015","p":"3965.32","ap":"4005.00","X":"FILLED","l":"0.015","z":"0.015","T":1793317730383,"ps":"XAUTUSDT","st":1}}},
+  {"stream":"!forceOrder@arr","data":{"e":"forceOrder","E":1793317726174,"o":{"s":"TRXUSDT","S":"BUY","o":"LIMIT","f":"IOC","q":"458","p":"0.35802","ap":"0.35576","X":"FILLED","l":"402","z":"458","T":1793317725168,"ps":"TRXUSDT","st":1}}},
+  {"stream":"!forceOrder@arr","data":{"e":"forceOrder","E":1793317730176,"o":{"s":"TRXUSDT","S":"BUY","o":"LIMIT","f":"IOC","q":"123","p":"0.35822","ap":"0.35612","X":"FILLED","l":"67","z":"123","T":1793317729172,"ps":"TRXUSDT","st":1}}},
+  {"stream":"!forceOrder@arr","data":{"e":"forceOrder","E":1793317734148,"o":{"s":"ZAMAUSDT","S":"BUY","o":"LIMIT","f":"IOC","q":"3423","p":"0.0681800","ap":"0.0672437","X":"FILLED","l":"1284","z":"3423","T":1793317733142,"ps":"ZAMAUSDT","st":1}}}
+]

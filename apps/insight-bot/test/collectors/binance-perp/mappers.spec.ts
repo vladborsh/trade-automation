@@ -1,5 +1,8 @@
 import { fundingSettlementRow, liquidationRowFromEvent, markRowFromEvent, markRowFromPremiumIndex } from '../../../src/collectors/binance-perp/mappers';
-import type { ForceOrderEvent, MarkPriceEvent, PremiumIndexRow } from '../../../src/collectors/binance-perp/payloads';
+import * as fs from 'fs';
+import * as path from 'path';
+import { demultiplex } from '../../../src/collectors/binance-common/socket';
+import { isForceOrderEvent, type ForceOrderEvent, type MarkPriceEvent, type PremiumIndexRow } from '../../../src/collectors/binance-perp/payloads';
 
 /**
  * IB-005 — recorded Binance USD-M payload shapes → §3.3 rows. Fixtures keep the venue's field
@@ -11,9 +14,11 @@ const MARK: MarkPriceEvent = {
   p: '65044.70000000', i: '65040.12345678', P: '65050.00000000', r: '0.00012345', T: 1727510400000,
 };
 
+// IB-BUG-012: the limit `p` is the bankruptcy price, BELOW the fill for an engine SELL. This
+// hand-written event had it above (an impossible fill) until the mapper started asserting it.
 const FORCE_SELL: ForceOrderEvent = {
   e: 'forceOrder', E: 1727481660123,
-  o: { s: 'ETHUSDT', S: 'SELL', o: 'LIMIT', f: 'IOC', q: '3.150', p: '2510.10', ap: '2509.84', X: 'FILLED', l: '3.150', z: '3.150', T: 1727481660100 },
+  o: { s: 'ETHUSDT', S: 'SELL', o: 'LIMIT', f: 'IOC', q: '3.150', p: '2496.50', ap: '2509.84', X: 'FILLED', l: '3.150', z: '3.150', T: 1727481660100 },
 };
 
 describe('IB-005 mark price mapping (design §4.1, D5)', () => {
@@ -63,14 +68,14 @@ describe('IB-005 liquidation mapping (§3.3, D6: the side LIQUIDATED)', () => {
   });
 
   it('BUY liquidates a short', () => {
-    const buy: ForceOrderEvent = { ...FORCE_SELL, o: { ...FORCE_SELL.o, S: 'BUY' } };
+    const buy: ForceOrderEvent = { ...FORCE_SELL, o: { ...FORCE_SELL.o, S: 'BUY', p: '2523.10' } };
     expect(liquidationRowFromEvent(buy).side).toBe('short');
   });
 
   it('falls back to the order price and quantity when the fill fields are still zero', () => {
     const unfilled: ForceOrderEvent = { ...FORCE_SELL, o: { ...FORCE_SELL.o, ap: '0', z: '0', X: 'NEW' } };
     const row = liquidationRowFromEvent(unfilled);
-    expect([row.price, row.qty, row.orderStatus]).toEqual([2510.1, 3.15, 'NEW']);
+    expect([row.price, row.qty, row.orderStatus]).toEqual([2496.5, 3.15, 'NEW']);
   });
 
   it('the timestamp is the venue trade time, not the event time', () => {
@@ -95,5 +100,63 @@ describe('IB-005 funding settlement mapping (§4.1)', () => {
     expect(() => fundingSettlementRow({ symbol: 'BTCUSDT', fundingTime: 1, fundingRate: 'n/a' })).toThrow(RangeError);
     // Number('') is 0: an empty field must be refused, not stored as a zero rate
     expect(() => fundingSettlementRow({ symbol: 'BTCUSDT', fundingTime: 1, fundingRate: '' })).toThrow(RangeError);
+  });
+});
+
+/**
+ * IB-BUG-012 — six `!forceOrder@arr` envelopes captured live from `fstream.binance.com/market` on
+ * 2026-10-29, byte for byte. They pin the payload SHAPE (field names, string numbers, the combined
+ * envelope); a venue change fails here, at build time.
+ */
+describe('IB-BUG-012 live forceOrder fixture (shape and side invariant)', () => {
+  const envelopes = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'binance', 'forceOrder-arr.json'), 'utf8'),
+  ) as unknown[];
+  const events = envelopes.map((raw) => {
+    const message = demultiplex(raw);
+    expect(message?.stream).toBe('!forceOrder@arr');
+    expect(isForceOrderEvent(message?.data)).toBe(true);
+    return message?.data as ForceOrderEvent;
+  });
+
+  it('carries the fields the mapper reads, as strings where the venue sends strings', () => {
+    for (const event of events) {
+      expect(Object.keys(event.o).sort()).toEqual(['S', 'T', 'X', 'ap', 'f', 'l', 'o', 'p', 'ps', 'q', 's', 'st', 'z']);
+      for (const field of ['q', 'p', 'ap', 'l', 'z'] as const) expect(typeof event.o[field]).toBe('string');
+      expect(typeof event.o.T).toBe('number');
+    }
+  });
+
+  it('maps every captured event: SELL → long, BUY → short, priced at the average fill', () => {
+    const rows = events.map(liquidationRowFromEvent);
+    expect(rows.map((r) => `${r.symbol}:${r.side}`)).toEqual([
+      'KGENUSDT:long', 'KGENUSDT:long', 'XAUTUSDT:long', 'TRXUSDT:short', 'TRXUSDT:short', 'ZAMAUSDT:short',
+    ]);
+    expect(rows[2]).toMatchObject({ price: 4005, qty: 0.015, ts: new Date(1793317730383), orderStatus: 'FILLED' });
+  });
+
+  it('the engine SELL fills at or above its limit, the BUY at or below — in every captured event', () => {
+    for (const { o } of events) {
+      if (o.S === 'SELL') expect(Number(o.ap)).toBeGreaterThanOrEqual(Number(o.p));
+      else expect(Number(o.ap)).toBeLessThanOrEqual(Number(o.p));
+    }
+  });
+
+  it('refuses an event whose side contradicts its fill rather than writing a mirror-image row', () => {
+    for (const event of events) {
+      const flipped: ForceOrderEvent = { ...event, o: { ...event.o, S: event.o.S === 'SELL' ? 'BUY' : 'SELL' } };
+      expect(() => liquidationRowFromEvent(flipped)).toThrow(/cannot fill there/);
+    }
+  });
+
+  it('refuses a side that is neither BUY nor SELL', () => {
+    const odd = { ...events[0], o: { ...events[0].o, S: 'LONG' } } as unknown as ForceOrderEvent;
+    expect(() => liquidationRowFromEvent(odd)).toThrow(/neither BUY nor SELL/);
+  });
+
+  it('an equal fill and limit is consistent for either side', () => {
+    const at = { ...events[0], o: { ...events[0].o, ap: events[0].o.p } };
+    expect(liquidationRowFromEvent(at).side).toBe('long');
+    expect(liquidationRowFromEvent({ ...at, o: { ...at.o, S: 'BUY' } }).side).toBe('short');
   });
 });

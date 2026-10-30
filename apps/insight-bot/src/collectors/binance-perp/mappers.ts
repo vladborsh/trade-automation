@@ -64,11 +64,22 @@ export function markRowFromPremiumIndex(row: PremiumIndexRow, ts: Date): MarkFun
  * submits a SELL to close a long, so `S = SELL` is a `long` liquidation and `BUY` a `short` one
  * (§3.3, D6). Binance publishes at most one such event per second per symbol, so these rows
  * undercount — documented on the table and repeated here where the mapping happens.
+ *
+ * IB-BUG-012 — the side is asserted, not assumed. `S` is the ENGINE's order side, and the engine
+ * sends an IOC LIMIT at the bankruptcy price `p`, which can only fill on the far side of it: a SELL
+ * fills at `ap >= p`, a BUY at `ap <= p`. Live sample 2026-10-29: 66/66 then 92/92 events in two
+ * captures minutes apart (SELL with ap > p, BUY with ap < p, none equal). If Binance ever made `S`
+ * the side liquidated, that relation would invert and the row would be a silent mirror image, so
+ * an inverted pair throws instead. An `S` that is neither BUY nor SELL throws for the same reason.
  */
 export function liquidationRowFromEvent(event: ForceOrderEvent): LiquidationRow {
   const o = event.o;
+  if (o.S !== 'SELL' && o.S !== 'BUY') {
+    throw new RangeError(`forceOrder ${o.s}: side '${String(o.S)}' is neither BUY nor SELL`);
+  }
   const price = requiredNum(o.ap && o.ap !== '0' ? o.ap : o.p, 'forceOrder price');
   const qty = requiredNum(o.z && o.z !== '0' ? o.z : o.q, 'forceOrder qty');
+  assertEngineOrderSide(o);
   return {
     venue: VENUE,
     symbol: o.s,
@@ -80,6 +91,23 @@ export function liquidationRowFromEvent(event: ForceOrderEvent): LiquidationRow 
     orderStatus: o.X ?? null,
     source: 'ws',
   };
+}
+
+/**
+ * The fill must sit on the side of the limit that `S` allows (see `liquidationRowFromEvent`).
+ * Checked only when both prices are real: an unfilled event carries `ap = '0'`, which says nothing.
+ */
+function assertEngineOrderSide(o: ForceOrderEvent['o']): void {
+  const limit = num(o.p);
+  const fill = num(o.ap);
+  if (limit === null || fill === null || limit === 0 || fill === 0) return;
+  const consistent = o.S === 'SELL' ? fill >= limit : fill <= limit;
+  if (!consistent) {
+    throw new RangeError(
+      `forceOrder ${o.s}: S='${o.S}' filled at ap=${o.ap} against limit p=${o.p} — an engine ${o.S} ` +
+        `cannot fill there, so S may no longer be the engine's order side; refusing rather than invert the row`,
+    );
+  }
 }
 
 /** `GET /fapi/v1/fundingRate` row → a `funding_settlements` row (§4.1). */

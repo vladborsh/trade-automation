@@ -41,6 +41,9 @@ export interface ForceOrderEvent {
     l: string; // last filled quantity
     z: string; // filled accumulated quantity
     T: number; // trade time
+    // Present on every live event captured 2026-10-29 (fixture `forceOrder-arr.json`), unused here:
+    ps?: string; // pair, equal to `s` on every captured event
+    st?: number; // not in the documented payload; 1 on every captured event
   };
 }
 

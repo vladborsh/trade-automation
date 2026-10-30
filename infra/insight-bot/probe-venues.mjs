@@ -21,7 +21,9 @@ const VENUES = [
   {
     id: 'binance-perp',
     what: 'USD-M perp kline_1m + markPrice',
-    url: 'wss://fstream.binance.com/stream?streams=btcusdt@kline_1m/!markPrice@arr@1s',
+    // IB-BUG-012: `/market` — the bare `/stream` path has carried only `/public` streams since
+    // 2026-04-23, which is what this probe once reported as "mute from the dev network".
+    url: 'wss://fstream.binance.com/market/stream?streams=btcusdt@kline_1m/!markPrice@arr@1s',
   },
   {
     id: 'binance-spot',

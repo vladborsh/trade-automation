@@ -38,6 +38,7 @@ export const EnvSchema = z.object({
 
   // §4.1–§4.3 — venue endpoints, overridable so a spec or a probe can point at a stand-in.
   BINANCE_FUTURES_REST_BASE_URL: z.string().default('https://fapi.binance.com'),
+  // A HOST: the perp collector appends Binance's `/market` route itself (IB-BUG-012) and refuses a path.
   BINANCE_FUTURES_WS_BASE_URL: z.string().default('wss://fstream.binance.com'),
   BINANCE_SPOT_REST_BASE_URL: z.string().default('https://api.binance.com'),
   BINANCE_SPOT_WS_BASE_URL: z.string().default('wss://stream.binance.com:9443'),

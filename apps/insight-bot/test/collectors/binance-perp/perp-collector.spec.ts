@@ -26,9 +26,10 @@ const markEvent = (symbol: string, at: number, over: Record<string, unknown> = {
   e: 'markPriceUpdate', E: at, s: symbol, p: '100', i: '99.9', r: '0.0001', T: Date.UTC(2026, 8, 28, 16), ...over,
 });
 
+// The limit sits on the far side of the fill, as the engine's IOC order requires (IB-BUG-012).
 const forceOrder = (symbol: string, at: number, side: 'BUY' | 'SELL' = 'SELL') => ({
   e: 'forceOrder', E: at,
-  o: { s: symbol, S: side, o: 'LIMIT', f: 'IOC', q: '2', p: '100', ap: '99.5', X: 'FILLED', l: '2', z: '2', T: at },
+  o: { s: symbol, S: side, o: 'LIMIT', f: 'IOC', q: '2', p: side === 'SELL' ? '99' : '100', ap: '99.5', X: 'FILLED', l: '2', z: '2', T: at },
 });
 
 function harness(over: Partial<PerpCollectorPorts> = {}) {
