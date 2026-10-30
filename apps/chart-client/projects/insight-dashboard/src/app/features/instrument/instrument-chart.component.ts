@@ -19,7 +19,7 @@ import {
   CHART_PANES_OPTIONS, PANELS, PANEL_PRICE_SCALE, PANEL_TIME_SCALE, panelHeading,
 } from './panels.model';
 import { TimeAxisStrip, chartTimes } from './time-axis-strip';
-import { showView } from './carried-view';
+import { readView, showView } from './carried-view';
 
 export type { PaneData } from './pane-data';
 
@@ -170,7 +170,7 @@ export class InstrumentChartComponent implements OnDestroy {
    * reader's view is carried over, or follows the new bar from the right edge (`carried-view.ts`).
    */
   private redraw(data: PaneData): void {
-    const view = this.chart?.timeScale().getVisibleLogicalRange() ?? null;
+    const view = this.chart ? readView(this.chart) : null;
     const before = this.chart ? chartTimes(this.chart) : [];
     this.teardown();
     this.renderers = createPanelRenderers();

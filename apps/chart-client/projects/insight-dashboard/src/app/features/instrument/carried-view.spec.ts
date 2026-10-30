@@ -1,45 +1,41 @@
-import type { LogicalRange } from 'lightweight-charts';
-import { atRightEdge, carriedView } from './carried-view';
+import { atRightEdge, carriedView, type ChartView } from './carried-view';
 
-const range = (from: number, to: number) => ({ from, to }) as LogicalRange;
+const view = (rightOffset: number, barSpacing = 2): ChartView => ({ barSpacing, rightOffset });
 const minutes = (from: number, n: number) => Array.from({ length: n }, (_, i) => (from + i) * 60);
 
 describe('carriedView', () => {
-  const before = minutes(0, 100); // slots 0..99
+  const before = minutes(0, 100);
 
   it('a fresh load shows the whole window: no view to carry', () => {
-    expect(carriedView({}, range(80, 99), before, minutes(0, 101))).toBeNull();
+    expect(carriedView({}, view(0), before, minutes(0, 101))).toBeNull();
     expect(carriedView({ extendsLater: true }, null, before, minutes(0, 101))).toBeNull();
   });
 
-  it('IB-066: at the right edge, a new bar moves the view right by one, keeping the zoom', () => {
-    expect(carriedView({ extendsLater: true }, range(80, 99), before, minutes(0, 101))).toEqual(range(81, 100));
-    // the library's right offset leaves empty space past the last bar: still the right edge
-    expect(carriedView({ extendsLater: true }, range(85, 104), before, minutes(0, 101))).toEqual(range(86, 105));
+  it('IB-066: at the right edge the reader follows — same zoom, same offset from the newest bar', () => {
+    expect(carriedView({ extendsLater: true }, view(0, 3), before, minutes(0, 101))).toEqual(view(0, 3));
+    // the library's own right offset (empty space past the last bar) is still the right edge
+    expect(carriedView({ extendsLater: true }, view(5), before, minutes(0, 101))).toEqual(view(5));
+    expect(carriedView({ extendsLater: true }, view(-1.5), before, minutes(0, 101))).toEqual(view(-1.5));
   });
 
-  it('IB-066: the forming bar updated in place adds no slot, and the view stays put', () => {
-    expect(carriedView({ extendsLater: true }, range(80, 99), before, minutes(0, 100))).toEqual(range(80, 99));
+  it('IB-066: a reader who scrolled back keeps the same bars: the offset moves back by the bars added', () => {
+    expect(carriedView({ extendsLater: true }, view(-40, 3), before, minutes(0, 103))).toEqual(view(-43, 3));
   });
 
-  it('IB-066: a reader who scrolled back keeps exactly what they look at', () => {
-    expect(carriedView({ extendsLater: true }, range(20, 60), before, minutes(0, 103))).toEqual(range(20, 60));
+  it('IB-066: the forming bar updated in place adds no slot, so nothing moves', () => {
+    expect(carriedView({ extendsLater: true }, view(-40), before, minutes(0, 100))).toEqual(view(-40));
   });
 
-  it('IB-066: a catch-up of many bars follows by all of them', () => {
-    expect(carriedView({ extendsLater: true }, range(50, 99), before, minutes(0, 160))).toEqual(range(110, 159));
-  });
-
-  it('earlier history still shifts by the slots prepended (shiftedView)', () => {
+  it('earlier history keeps the view: bars arriving on the left do not move the right edge', () => {
     const after = [...minutes(-30, 30), ...before];
-    expect(carriedView({ extendsPrevious: true }, range(-5, 40), before, after)).toEqual(range(25, 70));
+    expect(carriedView({ extendsPrevious: true }, view(-20, 4), before, after)).toEqual(view(-20, 4));
   });
 });
 
 describe('atRightEdge', () => {
-  it('within a bar and a half of the last slot counts; further back does not', () => {
-    expect(atRightEdge(range(0, 99), 100)).toBe(true);
-    expect(atRightEdge(range(0, 97.5), 100)).toBe(true);
-    expect(atRightEdge(range(0, 97.4), 100)).toBe(false);
+  it('up to a bar and a half back from the newest bar counts; further back does not', () => {
+    expect(atRightEdge(view(3))).toBe(true);
+    expect(atRightEdge(view(-1.5))).toBe(true);
+    expect(atRightEdge(view(-1.6))).toBe(false);
   });
 });

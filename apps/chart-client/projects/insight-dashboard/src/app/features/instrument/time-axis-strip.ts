@@ -24,18 +24,6 @@ export function chartTimes(chart: IChartApi): number[] {
   return unionTimes(chart.panes().flatMap((pane) => pane.getSeries().map((s) => s.data())));
 }
 
-/**
- * The reader's view carried across a redraw that prepended earlier history. Logical, not by time:
- * a reader who dragged past the oldest bar is looking at empty space, which a time range cannot
- * express (the library clips it to the data), so restoring by time zoomed them into the data
- * instead (2026-10-24). Every slot that now precedes the old first slot shifts the view right by one.
- */
-export function shiftedView(view: LogicalRange, oldFirst: number, times: readonly number[]): LogicalRange {
-  let added = 0;
-  while (added < times.length && times[added] < oldFirst) added++;
-  return { from: (view.from + added) as LogicalRange['from'], to: (view.to + added) as LogicalRange['to'] };
-}
-
 const sameRange = (a: LogicalRange | null, b: LogicalRange | null): boolean =>
   a !== null && b !== null && Math.abs(a.from - b.from) < 1e-6 && Math.abs(a.to - b.to) < 1e-6;
 
