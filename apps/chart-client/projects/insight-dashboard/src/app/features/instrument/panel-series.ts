@@ -1,4 +1,6 @@
-import { CandlestickSeries, LineSeries, LineStyle, LineType, type IChartApi, type Time } from 'lightweight-charts';
+import {
+  CandlestickSeries, LineSeries, LineStyle, LineType, type IChartApi, type IPaneApi, type Time,
+} from 'lightweight-charts';
 import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
 import { calendarMarks, EVENT_LINE_COLOUR, type CalendarMark } from './calendar-marks';
 import { daySeparatorTimes, showsDaySeparators } from './day-separators';
@@ -30,10 +32,27 @@ export interface PanelRenderers {
   oi: MetricSeriesRenderer;
   /** IB-039: the liquidation bubbles over the price series (§12.5). */
   markers: LiquidationMarkersPrimitive;
+  /** IB-066: the pane primitives drawn, so a redraw in place can take them off again. */
+  paneMarks: Array<{ pane: IPaneApi<Time>; primitive: TimeMarksPrimitive }>;
 }
 
 export function createPanelRenderers(): PanelRenderers {
-  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive() };
+  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive(), paneMarks: [] };
+}
+
+/**
+ * IB-066 — every panel drawn again on the SAME chart, for data that extends what is on screen (the
+ * live tail, an earlier window): the new series go on first and the old ones come off after, so no
+ * pane is ever empty and the time scale — the reader's zoom and scroll — is never rebuilt.
+ * Returns the new renderers.
+ */
+export function redrawPanels(chart: IChartApi, data: PaneData, old: PanelRenderers, keys: ReadonlyArray<PanelDef['key']>): PanelRenderers {
+  const stale = chart.panes().flatMap((pane) => pane.getSeries());
+  const renderers = createPanelRenderers();
+  for (const key of keys) drawPanel(key, chart, data, renderers);
+  for (const { pane, primitive } of old.paneMarks) pane.detachPrimitive(primitive);
+  for (const series of stale) chart.removeSeries(series);
+  return renderers;
 }
 
 const asLine = (points: ReadonlyArray<{ time: number; value: number }>): Array<{ time: Time; value: number }> =>
@@ -88,7 +107,7 @@ export const eventMarks = (data: PaneData): CalendarMark[] =>
  * on the price pane also the London and New York session bands up to 1h and a line on each bar
  * holding a high-impact USD event. One pane primitive under the series (time-marks.primitive.ts).
  */
-function drawTimeMarks(chart: IChartApi, data: PaneData, key: PanelDef['key'], pane: number): void {
+function drawTimeMarks(chart: IChartApi, data: PaneData, renderers: PanelRenderers, key: PanelDef['key'], pane: number): void {
   const target = chart.panes()[pane];
   if (!target) return;
   const times = candleTimes(data);
@@ -98,7 +117,9 @@ function drawTimeMarks(chart: IChartApi, data: PaneData, key: PanelDef['key'], p
   const bands = [...closedBands(times, data.timeframe, data.calendarEvents), ...sessions];
   const eventLines = key === 'price' ? eventMarks(data).map((m) => m.time) : [];
   if (lines.length > 0 || bands.length > 0 || eventLines.length > 0) {
-    target.attachPrimitive(new TimeMarksPrimitive({ lines, bands, eventLines, eventColour: EVENT_LINE_COLOUR }));
+    const primitive = new TimeMarksPrimitive({ lines, bands, eventLines, eventColour: EVENT_LINE_COLOUR });
+    target.attachPrimitive(primitive);
+    renderers.paneMarks.push({ pane: target, primitive });
   }
 }
 
@@ -154,5 +175,5 @@ const DRAW: Record<PanelDef['key'], Draw> = {
 export function drawPanel(key: PanelDef['key'], chart: IChartApi, data: PaneData, renderers: PanelRenderers): void {
   const pane = paneIndexOf(key);
   DRAW[key](chart, data, renderers, pane);
-  drawTimeMarks(chart, data, key, pane);
+  drawTimeMarks(chart, data, renderers, key, pane);
 }

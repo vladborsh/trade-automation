@@ -232,6 +232,21 @@ export const CHART_PANES_OPTIONS = {
   separatorHoverColor: '#58a6ff',
 } as const;
 
+/**
+ * The instrument chart's options at a given size: the dark-terminal palette, the panes above, each
+ * pane's price scale, and the library's own time axis hidden (the sticky strip draws it).
+ */
+export function instrumentChartOptions(width: number, height: number) {
+  return {
+    layout: { background: { color: '#0d1117' }, textColor: '#c9d1d9', panes: CHART_PANES_OPTIONS },
+    grid: { vertLines: { color: '#161b22' }, horzLines: { color: '#161b22' } },
+    rightPriceScale: PANEL_PRICE_SCALE,
+    timeScale: { ...PANEL_TIME_SCALE, visible: false },
+    width,
+    height,
+  };
+}
+
 /** The pane a panel is drawn in: its position in `PANELS`. */
 export function paneIndexOf(key: PanelDef['key']): number {
   return PANELS.findIndex((p) => p.key === key);

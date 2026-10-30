@@ -48,6 +48,21 @@ export class TimeAxisStrip {
   private chart: IChartApi | null = null;
   private series: ISeriesApi<'Line'> | null = null;
   private main: IChartApi | null = null;
+  /**
+   * IB-066 — the strip drives the panes only while the reader is dragging or wheeling IT. Any
+   * other change of the strip's range is its own echo — of new times (`refresh`), of its price
+   * scale widening a frame late — and was fed back into the panes: after an earlier window was
+   * joined on, the view jumped 353 bars; after each new bar, one more.
+   */
+  private readerOnStrip = false;
+  private wheelTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly onPointerDown = (): void => { this.readerOnStrip = true; };
+  private readonly onPointerUp = (): void => { this.readerOnStrip = false; };
+  private readonly onWheel = (): void => {
+    this.readerOnStrip = true;
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = setTimeout(() => { this.readerOnStrip = false; }, 300);
+  };
 
   constructor(private readonly host: HTMLElement, private readonly lang: () => Lang) {}
 
@@ -68,15 +83,27 @@ export class TimeAxisStrip {
       color: 'transparent', lineVisible: false, pointMarkersVisible: false, crosshairMarkerVisible: false,
       lastValueVisible: false, priceLineVisible: false,
     });
-    const times = chartTimes(main);
-    series.setData(times.map((time) => ({ time: time as Time, value: 0 })));
     this.chart = chart;
     this.series = series;
+    this.refresh();
 
     main.timeScale().subscribeVisibleLogicalRangeChange(this.followMain);
     chart.timeScale().subscribeVisibleLogicalRangeChange(this.followStrip);
+    this.host.addEventListener('pointerdown', this.onPointerDown);
+    this.host.addEventListener('wheel', this.onWheel, { passive: true });
+    window.addEventListener('pointerup', this.onPointerUp);
     main.subscribeCrosshairMove(this.followCrosshair);
     this.followMain(main.timeScale().getVisibleLogicalRange());
+  }
+
+  /** IB-066: the main chart's slots again, after its series were redrawn in place. */
+  refresh(): void {
+    if (!this.main || !this.series) return;
+    const main = this.main;
+    this.series.setData(chartTimes(main).map((time) => ({ time: time as Time, value: 0 })));
+    this.followMain(main.timeScale().getVisibleLogicalRange());
+    // and once more after the strip has applied its new times, which can move its range itself
+    requestAnimationFrame(() => this.main === main && this.followMain(main.timeScale().getVisibleLogicalRange()));
   }
 
   /** The container's width, and the main chart's price-scale width so the plot areas match. */
@@ -91,6 +118,11 @@ export class TimeAxisStrip {
   }
 
   destroy(): void {
+    this.host.removeEventListener('pointerdown', this.onPointerDown);
+    this.host.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    clearTimeout(this.wheelTimer);
+    this.readerOnStrip = false;
     if (this.main && this.chart) {
       // the main chart may already be removed by its owner; unsubscribing from it is then moot
       try {
@@ -114,7 +146,7 @@ export class TimeAxisStrip {
 
   private readonly followStrip = (range: LogicalRange | null): void => {
     const main = this.main?.timeScale();
-    if (!main || range === null || sameRange(main.getVisibleLogicalRange(), range)) return;
+    if (!main || !this.readerOnStrip || range === null || sameRange(main.getVisibleLogicalRange(), range)) return;
     main.setVisibleLogicalRange(range);
   };
 

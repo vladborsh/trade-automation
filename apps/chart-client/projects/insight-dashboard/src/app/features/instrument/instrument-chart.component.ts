@@ -2,13 +2,13 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal,
   untracked, viewChild, type OnDestroy,
 } from '@angular/core';
-import { createChart, type IChartApi, type LogicalRange, type MouseEventParams } from 'lightweight-charts';
+import { createChart, type IChartApi, type LogicalRange, type MouseEventParams, type Time } from 'lightweight-charts';
 import { I18nService } from '../../i18n/i18n.service';
 import { LoaderComponent } from '../../ui/loader.component';
 import { CalendarTooltipComponent } from './calendar-tooltip.component';
 import { markAt } from './calendar-marks';
 import { liquidationScopeLabel } from './liquidation-scope';
-import { createPanelRenderers, drawPanel, eventMarks, type PanelRenderers } from './panel-series';
+import { createPanelRenderers, drawPanel, eventMarks, redrawPanels, type PanelRenderers } from './panel-series';
 import type { PaneData } from './pane-data';
 import {
   DEFAULT_PANE_HEIGHTS, browserStore, loadPaneHeights, paneEdges, resizePane, savePaneHeights, totalPaneHeight,
@@ -16,10 +16,10 @@ import {
 } from './pane-heights';
 import { legendEntries } from './pane-legend';
 import {
-  CHART_PANES_OPTIONS, PANELS, PANEL_PRICE_SCALE, PANEL_TIME_SCALE, panelHeading,
+  PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, panelHeading, windowBounds,
 } from './panels.model';
-import { TimeAxisStrip, chartTimes } from './time-axis-strip';
-import { readView, showView } from './carried-view';
+import { TimeAxisStrip } from './time-axis-strip';
+import { keepView } from './carried-view';
 
 export type { PaneData } from './pane-data';
 
@@ -165,30 +165,27 @@ export class InstrumentChartComponent implements OnDestroy {
   }
 
   /**
-   * Redraws from scratch: a fresh chart cannot stack series from the previous window. When the
-   * new data only extends the previous window (left by scrolling, right by the live tail), the
-   * reader's view is carried over, or follows the new bar from the right edge (`carried-view.ts`).
+   * Data that only extends what is on screen (left by scrolling, right by the live tail) is drawn
+   * again on the same chart, which keeps the reader's zoom, and the scroll follows the new bar from
+   * the right edge or stays put (`carried-view.ts`). Anything else is a fresh chart on the whole window.
    */
   private redraw(data: PaneData): void {
-    const view = this.chart ? readView(this.chart) : null;
-    const before = this.chart ? chartTimes(this.chart) : [];
+    const current = this.chart;
+    if (current && (data.extendsPrevious || data.extendsLater)) {
+      keepView(current, data, () => (this.renderers = redrawPanels(current, data, this.renderers, PANELS.map((p) => p.key))));
+      return this.axis?.refresh();
+    }
     this.teardown();
     this.renderers = createPanelRenderers();
     const host = this.host().nativeElement;
-    const chart = createChart(host, {
-      layout: { background: { color: '#0d1117' }, textColor: '#c9d1d9', panes: CHART_PANES_OPTIONS },
-      grid: { vertLines: { color: '#161b22' }, horzLines: { color: '#161b22' } },
-      rightPriceScale: PANEL_PRICE_SCALE,
-      timeScale: { ...PANEL_TIME_SCALE, visible: false },
-      // Sized here and by `sync`, not `autoSize`: see the class comment on ResizeObserver.
-      width: host.clientWidth,
-      height: this.chartHeight(),
-    });
+    // Sized here and by `sync`, not `autoSize`: see the class comment on ResizeObserver.
+    const chart = createChart(host, instrumentChartOptions(host.clientWidth, this.chartHeight()));
     this.chart = chart;
     for (const panel of PANELS) drawPanel(panel.key, chart, data, this.renderers);
     for (const pane of chart.panes()) pane.priceScale('right').applyOptions(PANEL_PRICE_SCALE);
     this.applyHeights();
-    showView(chart, data, view, before);
+    const bounds = windowBounds(data);
+    if (bounds) chart.timeScale().setVisibleRange({ from: bounds.from as Time, to: bounds.to as Time });
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
     chart.subscribeCrosshairMove((p: MouseEventParams) =>
       this.hover.set(p.time !== undefined && p.point ? { time: p.time as number, x: p.point.x } : null));
