@@ -69,17 +69,18 @@ export async function fetchCandleTail(api: InsightApiClient, req: WindowRequest)
 /**
  * IB-066 — the minute's poll: every pane that comes from the bot's database, from where the last
  * read ended, plus the daily candles when a new day has begun (`dailyFromMs`, else null). The
- * markers and the daily candles degrade as they do in `fetchWindow`.
+ * markers and the daily candles degrade as they do in `fetchWindow`. The markers are grouped per
+ * bar as at load (IB-068), so the forming bar's row replaces the one on screen (`appendLater`).
  */
 export async function fetchSideTail(api: InsightApiClient, req: WindowRequest, dailyFromMs: number | null): Promise<LaterTail> {
-  const { symbol, toMs, bucket } = req;
+  const { symbol, toMs, timeframe, bucket } = req;
   const side = sideWindow(req.fromMs, toMs);
   const [oi, funding, longShort, liquidations, events, daily] = await Promise.all([
     api.openInterest(symbol, side.fromMs, side.toMs),
     api.funding(symbol, side.fromMs, side.toMs),
     api.longShort(symbol, side.fromMs, side.toMs, 'global_account'),
     api.liquidations(symbol, side.fromMs, side.toMs, bucket),
-    fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs),
+    fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs, timeframe),
     dailyFromMs === null ? null : fetchDaily(api, symbol, dailyFromMs, toMs),
   ]);
   return {

@@ -67,7 +67,9 @@ export interface LaterTail {
  * still forming. So every series is merged BY TIME with the tail winning — the forming candle and
  * the liquidation bucket still filling are replaced, newer points are appended. Liquidation events
  * have no time of their own to key on (several can share a second), so they are one per
- * time + venue + side + size + price. A part the tail does not carry is left as it was.
+ * time + venue + side + size + price. A grouped row (IB-068, `count` present) is the whole bar's
+ * events for one side and venue, so it is one per time + venue + side, the tail winning: the
+ * forming bar's sum grows between reads. A part the tail does not carry is left as it was.
  */
 export function appendLater(current: PaneData, tail: LaterTail): PaneData {
   const out: PaneData = { ...current, extendsPrevious: false, extendsLater: true };
@@ -119,7 +121,9 @@ function byId<T extends { id: string; scheduledAt: number }>(events: readonly T[
 
 function byEvent(events: readonly WebLiquidationEvent[]): WebLiquidationEvent[] {
   const m = new Map<string, WebLiquidationEvent>();
-  for (const e of events) m.set(`${e.time}|${e.venue}|${e.side}|${e.usd}|${e.price}`, e);
+  for (const e of events) {
+    m.set(e.count === undefined ? `${e.time}|${e.venue}|${e.side}|${e.usd}|${e.price}` : `bar|${e.time}|${e.venue}|${e.side}`, e);
+  }
   return [...m.values()].sort((a, b) => a.time - b.time);
 }
 

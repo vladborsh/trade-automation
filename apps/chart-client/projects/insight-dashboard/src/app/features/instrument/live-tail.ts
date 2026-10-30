@@ -1,4 +1,5 @@
 import type { PaneData } from './pane-data';
+import { barSeconds, snapTime } from './time-grid';
 
 /**
  * IB-066 — the instrument page's live tail (user, 2026-10-29: "the last candle does not update and
@@ -144,12 +145,17 @@ export function candleTailFrom(panes: PaneData, sinceMs: number): number {
 }
 
 /**
- * Where the minute's poll starts: the start of the liquidation bucket the last read ended in, so
- * the bucket that was still filling is read whole again and replaced (`appendLater`).
+ * Where the minute's poll starts: the start of the liquidation bucket the last read ended in, or
+ * of the chart's bar (a week from its Monday) if that is earlier, so both the bucket and the bar
+ * that were still filling are read whole again and replaced (`appendLater`). Since IB-068 the
+ * markers come grouped per bar; a read starting mid-bar would bring back a part-sum for it.
+ * Every bucket edge lies on the bar grid or the other way round, so the earlier one is on both.
  */
-export function sideTailFrom(sinceMs: number, bucket: string): number {
+export function sideTailFrom(sinceMs: number, timeframe: string, bucket: string): number {
   const width = BUCKET_MS[bucket] ?? 60_000;
-  return Math.floor(sinceMs / width) * width;
+  const bucketStart = Math.floor(sinceMs / width) * width;
+  const barStart = snapTime(Math.floor(sinceMs / 1000), barSeconds(timeframe)) * 1000;
+  return Math.min(bucketStart, barStart);
 }
 
 /**

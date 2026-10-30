@@ -226,11 +226,15 @@ describe('the tail ranges', () => {
     expect(candleTailFrom(panes([]), 999_000)).toBe(999_000);
   });
 
-  it('the minute\'s panes: from the start of the bucket the last read ended in', () => {
-    const since = Date.UTC(2026, 9, 29, 12, 7, 30);
-    expect(sideTailFrom(since, '1m')).toBe(Date.UTC(2026, 9, 29, 12, 7));
-    expect(sideTailFrom(since, '15m')).toBe(Date.UTC(2026, 9, 29, 12, 0));
-    expect(sideTailFrom(since, '1h')).toBe(Date.UTC(2026, 9, 29, 12, 0));
+  it('the minute\'s panes: from the start of the bar or the bucket the last read ended in, whichever is earlier', () => {
+    const since = Date.UTC(2026, 9, 29, 13, 7, 30);
+    expect(sideTailFrom(since, '1m', '1m')).toBe(Date.UTC(2026, 9, 29, 13, 7));
+    expect(sideTailFrom(since, '3m', '1m')).toBe(Date.UTC(2026, 9, 29, 13, 6));
+    expect(sideTailFrom(since, '5m', '15m')).toBe(Date.UTC(2026, 9, 29, 13, 0));
+    expect(sideTailFrom(since, '1h', '1h')).toBe(Date.UTC(2026, 9, 29, 13, 0));
+    expect(sideTailFrom(since, '4h', '1h')).toBe(Date.UTC(2026, 9, 29, 12, 0));
+    expect(sideTailFrom(since, '1d', '1h')).toBe(Date.UTC(2026, 9, 29));
+    expect(sideTailFrom(since, '1w', '1h')).toBe(Date.UTC(2026, 9, 26)); // the Monday
   });
 
   it('daily candles: only once a new UTC day has begun, from the day that was forming', () => {

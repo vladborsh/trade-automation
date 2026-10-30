@@ -141,6 +141,36 @@ describe('appendLater (IB-066)', () => {
     expect(appendLater(base, { liquidationEvents: [a, b] }).liquidationEvents).toEqual([a, b]);
   });
 
+  // IB-066 × IB-068: the load and the tail both read grouped rows (`tf`), one per bar, side and
+  // venue. The forming bar's row grows between reads, so its sum differs and the raw-event key
+  // (which includes `usd`) kept both: that bar's liquidations were drawn twice.
+  describe('grouped liquidation rows', () => {
+    const row = { time: 7_200, side: 'long', usd: 1_000, price: 100, venue: 'binance', count: 2, maxUsd: 600 } as const;
+
+    it('the forming bar\'s row is replaced by the tail\'s, its larger sum winning', () => {
+      const base = window(7_200, { liquidationEvents: [row] });
+      const grown = { ...row, usd: 1_500, price: 101, count: 3 };
+      const out = appendLater(base, { liquidationEvents: [grown] }).liquidationEvents;
+      expect(out).toHaveLength(1);
+      expect(out[0]).toEqual(grown);
+    });
+
+    it('a new bar is appended, the forming one still replaced', () => {
+      const base = window(7_200, { liquidationEvents: [row] });
+      const grown = { ...row, usd: 1_800, count: 4 };
+      const next = { ...row, time: 10_800, usd: 50, count: 1, maxUsd: 50 };
+      const out = appendLater(base, { liquidationEvents: [grown, next] }).liquidationEvents;
+      expect(out.map((e) => [e.time, e.usd, e.count])).toEqual([[7_200, 1_800, 4], [10_800, 50, 1]]);
+    });
+
+    it('another side or venue in the same bar is its own row', () => {
+      const base = window(7_200, { liquidationEvents: [row] });
+      const short = { ...row, side: 'short' as const, usd: 10 };
+      const okx = { ...row, venue: 'okx', usd: 20 };
+      expect(appendLater(base, { liquidationEvents: [short, okx] }).liquidationEvents).toHaveLength(3);
+    });
+  });
+
   it('daily candles: the forming day replaced, the new day appended', () => {
     const base = window(7_200, { dailyCandles: [candle(0, 1), candle(86_400, 2)] });
     const out = appendLater(base, { dailyCandles: [candle(86_400, 3), candle(172_800, 4)] });

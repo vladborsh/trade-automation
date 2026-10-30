@@ -49,7 +49,7 @@ export function instrumentTailJobs(api: InsightApiClient, page: TailPage): TailJ
       const symbol = page.symbol();
       const opening = sideWindow(windowFor(page.timeframe(), nowMs).fromMs, nowMs);
       const [tail, top] = await Promise.all([
-        fetchSideTail(api, request(sideTailFrom(sinceMs, panes.bucket), nowMs), dailyTailFrom(panes, nowMs)),
+        fetchSideTail(api, request(sideTailFrom(sinceMs, panes.timeframe, panes.bucket), nowMs), dailyTailFrom(panes, nowMs)),
         api.topLiquidations(symbol, opening.fromMs, nowMs, 50),
       ]);
       return () => {
