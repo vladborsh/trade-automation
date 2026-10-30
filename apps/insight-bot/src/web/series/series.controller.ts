@@ -1,15 +1,18 @@
 import { Controller, Get, HttpException, Inject, Optional, Query } from '@nestjs/common';
 import {
-  WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
-  WebTimeframeSchema, WebVenueFilterSchema,
+  WEB_MAX_CANDLE_BARS, WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
+  WebTimeframeSchema, WebVenueFilterSchema, type WebTimeframe,
   type WebCandlesResponse, type WebFundingResponse, type WebLiquidationEventsResponse,
   type WebLiquidationsResponse, type WebLongShortResponse, type WebTopLiquidation,
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
 import { CandlesService } from '../market/candles.service';
 import { bucketLiquidations, topLiquidations } from './liquidation-buckets';
-import { checkRange, strideFor, thin } from './range';
+import { barsTouched, checkRange, gridOffsetMs, strideFor, thin, timeframeMs } from './range';
 import * as repo from './pg/series.repo';
+
+/** The venues whose liquidations a symbol can have: one per spelling `venueSpellings` resolves. */
+const LIQUIDATION_VENUES = WebVenueFilterSchema.options.filter((v) => v !== 'all').length;
 
 /**
  * IB-031 — the instrument view's series (architecture/insight-bot-web-dashboard.md §4).
@@ -184,7 +187,9 @@ export class SeriesController {
     @Query('from') from: string,
     @Query('to') to: string,
     @Query('min_usd') minUsd = '0',
+    @Query('tf') tf?: string,
   ): Promise<WebLiquidationEventsResponse> {
+    if (tf) return this.liquidationEventBuckets(symbol, from, to, minUsd, tf);
     const { fromMs, toMs } = this.range(from, to, '1m');
     const threshold = Math.max(0, Number(minUsd) || 0);
 
@@ -216,6 +221,47 @@ export class SeriesController {
     };
   }
 
+  /**
+   * IB-068 — `/liquidations/events?tf=…`: the same events grouped per `tf` bar on the server, one
+   * row per (bar start, side, venue), so a window of any density draws its bubbles.
+   *
+   * **The bound replaces the 2 000 cap.** Rows ≤ bars × 2 sides × 3 venues, and the window may
+   * touch at most `WEB_MAX_CANDLE_BARS` bars — the most candles the chart can ask for in one read,
+   * so a window the chart draws always fits. That makes the ceiling 10 080 × 2 × 3 = 60 480 rows
+   * (≈ 6 MB of JSON), reached only by a window where every bar has both sides liquidated on every
+   * venue. A wider window is refused up front, before the query; a result over the bound (a venue
+   * the count above does not know) is refused too. Neither is ever truncated.
+   */
+  private async liquidationEventBuckets(
+    symbol: string, from: string, to: string, minUsd: string, tf: string,
+  ): Promise<WebLiquidationEventsResponse> {
+    const { fromMs, toMs, tf: timeframe } = this.range(from, to, tf);
+    const threshold = Math.max(0, Number(minUsd) || 0);
+
+    const bars = barsTouched(fromMs, toMs, timeframe);
+    if (bars > WEB_MAX_CANDLE_BARS) {
+      throw new HttpException({
+        code: 'RANGE_TOO_WIDE',
+        message: `this window spans ${bars} ${timeframe} bars; grouped liquidations serve at most ${WEB_MAX_CANDLE_BARS}`,
+      }, 400);
+    }
+    const bound = bars * 2 * LIQUIDATION_VENUES;
+
+    const rows = await repo.liquidationEventBuckets(this.required, {
+      symbol, fromMs, toMs, minUsd: threshold,
+      spanMs: timeframeMs(timeframe), offsetMs: gridOffsetMs(timeframe), limit: bound,
+    });
+    if (rows.length > bound) throw tooManyBuckets(bound, timeframe);
+
+    return {
+      symbol,
+      minUsd: threshold,
+      events: rows,
+      venuesPresent: [...new Set(rows.map((r) => r.venue))].sort(),
+      undercounted: true,
+    };
+  }
+
   @Get('liquidations/top')
   async liquidationsTop(
     @Query('symbol') symbol: string,
@@ -240,4 +286,12 @@ export class SeriesController {
       })),
     };
   }
+}
+
+/** More rows than bars × sides × venues: a venue the bound does not know. Refused, not cut. */
+function tooManyBuckets(bound: number, tf: WebTimeframe): HttpException {
+  return new HttpException({
+    code: 'RANGE_TOO_WIDE',
+    message: `more than ${bound} grouped ${tf} liquidation rows in this window; narrow the range`,
+  }, 400);
 }

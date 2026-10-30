@@ -258,6 +258,52 @@ export async function liquidationEvents(
   }));
 }
 
+export interface LiquidationEventBucketRow {
+  time: number; side: 'long' | 'short'; usd: number; price: number; venue: string; count: number; maxUsd: number;
+}
+
+/**
+ * IB-068 — the markers' events grouped per chart bar, one row per (bar start, side, venue).
+ *
+ * The bar start is `floorToGrid` done in SQL: the caller passes the bar width and the grid offset
+ * (`timeframeMs` / `gridOffsetMs`, so a week opens on Monday) and the database floors with the
+ * same arithmetic. Price is the USD-weighted mean; a bucket of zero-USD events falls back to the
+ * plain mean rather than dividing by zero. `limit` is the caller's bound plus one, so a window over
+ * it is seen and refused, never cut.
+ */
+export async function liquidationEventBuckets(
+  db: Db,
+  q: Omit<RangeQuery, 'stride'> & { minUsd: number; spanMs: number; offsetMs: number; limit: number },
+): Promise<LiquidationEventBucketRow[]> {
+  const spellings = await venueSpellings(db, q.symbol);
+  if (spellings.length === 0) return [];
+  const rows = await db.query<{
+    bar_ms: string; side: 'long' | 'short'; usd: string; price: string; venue: string; n: string; max_usd: string;
+  }>(
+    `select floor((extract(epoch from ts) * 1000 - $5::bigint) / $6::bigint)::bigint * $6::bigint + $5::bigint as bar_ms,
+            side, venue,
+            sum(notional) as usd,
+            coalesce(sum(price * notional) / nullif(sum(notional), 0), avg(price)) as price,
+            count(*) as n,
+            max(notional) as max_usd
+       from liquidations
+      where symbol = any($1::text[]) and ts >= $2 and ts < $3 and notional >= $4
+      group by 1, side, venue
+      order by 1, side, venue
+      limit $7`,
+    [spellings, asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.offsetMs, q.spanMs, q.limit + 1],
+  );
+  return rows.map((r) => ({
+    time: Math.floor(Number(r.bar_ms) / 1000),
+    side: r.side,
+    usd: Number(r.usd),
+    price: Number(r.price),
+    venue: r.venue,
+    count: Number(r.n),
+    maxUsd: Number(r.max_usd),
+  }));
+}
+
 export interface UniverseRow {
   id: string; base: string; quote: string; volumeRank: number | null; inSignalSet: boolean;
   binancePerp: boolean; binanceSpot: boolean; bybitLinear: boolean; okxSwap: boolean;

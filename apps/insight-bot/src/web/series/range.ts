@@ -47,6 +47,16 @@ export function floorToGrid(ms: number, tf: WebTimeframe, span = timeframeMs(tf)
   return Math.floor((ms - offset) / span) * span + offset;
 }
 
+/**
+ * IB-068: how many `tf` bars the window `[fromMs, toMs)` touches, counting a bar it only partly
+ * covers at either edge. Zero for an empty window.
+ */
+export function barsTouched(fromMs: number, toMs: number, tf: WebTimeframe): number {
+  if (toMs <= fromMs) return 0;
+  const span = timeframeMs(tf);
+  return (floorToGrid(toMs - 1, tf) - floorToGrid(fromMs, tf)) / span + 1;
+}
+
 export type RangeCheck =
   | { ok: true; fromMs: number; toMs: number }
   | { ok: false; code: 'BAD_REQUEST'; message: string }

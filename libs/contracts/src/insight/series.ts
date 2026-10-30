@@ -135,8 +135,9 @@ export type WebLiquidationsResponse = z.infer<typeof WebLiquidationsResponseSche
  * IB-039 — one liquidation event for the price chart's markers (§12.5).
  *
  * Deliberately NOT `WebLiquidationBar`: a bar is a bucket of money over time, a marker is one
- * event at a price. The marker needs `price`, which a bucket cannot have, and the bucketing to
- * the chart's bar happens on the client at whatever timeframe is on screen.
+ * event at a price. The marker needs `price`, which a bucket cannot have. Since IB-068 the server
+ * can group events per chart bar (VWAP price), keeping this shape so a consumer merging events by
+ * time needs no change.
  */
 export const WebLiquidationEventSchema = z.object({
   time: TimeSec,
@@ -145,6 +146,13 @@ export const WebLiquidationEventSchema = z.object({
   usd: z.number().nonnegative(),
   price: z.number(),
   venue: z.string(),
+  /**
+   * IB-068: present when the server grouped the window per bar (`tf` given). The row is then
+   * one (bar start, side, venue): `time` is the bar's open, `usd` the sum, `price` the VWAP,
+   * `count` how many events it stands for and `maxUsd` the largest of them. Absent means one event.
+   */
+  count: z.number().int().positive().optional(),
+  maxUsd: z.number().nonnegative().optional(),
 });
 export type WebLiquidationEvent = z.infer<typeof WebLiquidationEventSchema>;
 

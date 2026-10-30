@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { WEB_MAX_LIQUIDATION_EVENTS } from '@trade-automation/contracts';
+import { WEB_MAX_CANDLE_BARS, WEB_MAX_LIQUIDATION_EVENTS } from '@trade-automation/contracts';
 import { SeriesController } from '../../src/web/series/series.controller';
 import type { Db } from '../../src/db/db.port';
 
@@ -102,5 +102,87 @@ describe('liquidation events', () => {
     await expect(new SeriesController(db).liquidationEvents('BTCUSDT', 'banana', String(T0)))
       .rejects.toThrow(HttpException);
     expect(queries).toEqual([]);
+  });
+});
+
+/**
+ * IB-068 — with `tf`, the server groups per bar. The SQL itself is pinned against a real database
+ * in `test/db/liquidation-event-buckets.integration.spec.ts`; here, the routing and the bound.
+ */
+describe('liquidation events grouped per bar (tf)', () => {
+  /** Answers the symbol lookup, then `count` grouped rows as the repo's query returns them. */
+  const groupedDb = (count: number) => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const db: Db = {
+      query: async (sql: string, params: unknown[] = []) => {
+        queries.push({ sql, params });
+        if (sql.includes('from symbols')) {
+          return [{ binance_perp: 'BTCUSDT', bybit_linear: 'BTCUSDT', okx_swap: 'BTC-USDT-SWAP' }] as never;
+        }
+        return Array.from({ length: count }, (_, i) => ({
+          bar_ms: String(T0 + i * 60_000), side: 'long', venue: 'bybit',
+          usd: '500', price: '100', n: '5', max_usd: '200',
+        })) as never;
+      },
+      transaction: async (fn) => fn(db),
+    };
+    return { db, queries };
+  };
+
+  it('does NOT apply the 2 000 cap: a dense window comes back whole', async () => {
+    const { db } = groupedDb(WEB_MAX_LIQUIDATION_EVENTS + 500);
+    const result = await new SeriesController(db)
+      .liquidationEvents('BTCUSDT', String(T0), String(T0 + 7 * DAY), '0', '1m');
+    expect(result.events).toHaveLength(WEB_MAX_LIQUIDATION_EVENTS + 500);
+    expect(result.events[0]).toEqual({
+      time: T0 / 1000, side: 'long', usd: 500, price: 100, venue: 'bybit', count: 5, maxUsd: 200,
+    });
+  });
+
+  it('passes the week grid to the query: 1w buckets open on Monday', async () => {
+    const { db, queries } = groupedDb(0);
+    await new SeriesController(db).liquidationEvents('BTCUSDT', String(T0), String(T0 + 90 * DAY), '0', '1w');
+    const grouped = queries.find((q) => q.sql.includes('group by'));
+    // [spellings, from, to, minUsd, offset, span, limit]
+    expect(grouped?.params[4]).toBe(4 * DAY);
+    expect(grouped?.params[5]).toBe(7 * DAY);
+  });
+
+  it('asks the database for one row over the bound, so an overflow is seen', async () => {
+    const { db, queries } = groupedDb(0);
+    await new SeriesController(db).liquidationEvents('BTCUSDT', String(T0), String(T0 + DAY), '0', '1h');
+    const grouped = queries.find((q) => q.sql.includes('group by'));
+    expect(grouped?.params[6]).toBe(24 * 2 * 3 + 1);
+  });
+
+  it('REFUSES a result over bars × sides × venues rather than cutting it', async () => {
+    const { db } = groupedDb(24 * 2 * 3 + 1);
+    await expect(new SeriesController(db).liquidationEvents('BTCUSDT', String(T0), String(T0 + DAY), '0', '1h'))
+      .rejects.toThrow(/narrow the range/);
+  });
+
+  it('REFUSES a window wider than the candle cap, before touching the database', async () => {
+    const { db, queries } = groupedDb(0);
+    const tooWide = String(T0 + (WEB_MAX_CANDLE_BARS + 1) * 3_600_000);
+    try {
+      await new SeriesController(db).liquidationEvents('BTCUSDT', String(T0), tooWide, '0', '1h');
+      throw new Error('expected a refusal');
+    } catch (error) {
+      expect((error as HttpException).getStatus()).toBe(400);
+      expect(body(error).code).toBe('RANGE_TOO_WIDE');
+    }
+    expect(queries).toEqual([]);
+  });
+
+  it('rejects an unknown timeframe', async () => {
+    const { db } = groupedDb(0);
+    await expect(new SeriesController(db).liquidationEvents('BTCUSDT', String(T0), String(T0 + DAY), '0', '2h'))
+      .rejects.toThrow(HttpException);
+  });
+
+  it('without tf, nothing changes: the ungrouped query and its cap', async () => {
+    const { db } = dbWith(WEB_MAX_LIQUIDATION_EVENTS + 1);
+    await expect(new SeriesController(db).liquidationEvents('BTCUSDT', String(T0), String(T0 + DAY)))
+      .rejects.toThrow(/min_usd/);
   });
 });

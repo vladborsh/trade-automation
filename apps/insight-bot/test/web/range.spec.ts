@@ -1,5 +1,5 @@
 import { WEB_MAX_1M_RANGE_DAYS, WEB_MAX_POINTS } from '@trade-automation/contracts';
-import { checkRange, DAY_MS, floorToGrid, strideFor, thin, timeframeMs } from '../../src/web/series/range';
+import { barsTouched, checkRange, DAY_MS, floorToGrid, strideFor, thin, timeframeMs } from '../../src/web/series/range';
 
 /**
  * IB-031 §4 — the caps. The box runs Postgres and Node in 1 GB, so these are real; and the
@@ -102,5 +102,23 @@ describe('IB-065: the new widths and the Monday grid', () => {
     const monday = Date.UTC(2026, 9, 26); // Mon 26 Oct 2026
     for (let d = 0; d < 7; d++) expect(floorToGrid(monday + d * DAY_MS + 5 * 3_600_000, '1w')).toBe(monday);
     expect(floorToGrid(monday - 1, '1w')).toBe(monday - 7 * DAY_MS);
+  });
+});
+
+describe('IB-068: barsTouched', () => {
+  it('counts a bar only partly covered at either edge', () => {
+    const h = 3_600_000;
+    const t = Date.UTC(2026, 9, 29);
+    expect(barsTouched(t, t + h, '1h')).toBe(1);
+    expect(barsTouched(t + 1, t + h + 1, '1h')).toBe(2);
+    expect(barsTouched(t, t + 24 * h, '1h')).toBe(24);
+    expect(barsTouched(t, t, '1h')).toBe(0);
+  });
+
+  it('counts weeks on the Monday grid, not the epoch one', () => {
+    const monday = Date.UTC(2026, 9, 26);
+    // Sunday to Tuesday crosses one Monday: two weeks touched
+    expect(barsTouched(monday - DAY_MS, monday + DAY_MS, '1w')).toBe(2);
+    expect(barsTouched(monday, monday + 7 * DAY_MS, '1w')).toBe(1);
   });
 });
