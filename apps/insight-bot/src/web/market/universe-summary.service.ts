@@ -19,11 +19,11 @@ import {
  * |---|---|---|
  * | `GET /fapi/v1/ticker/24hr` (all symbols) | 40 | 1 |
  * | `GET /fapi/v1/premiumIndex` (all symbols) | 10 | 1 |
- * | `GET /futures/data/openInterestHist?period=1h&limit=25` | 1 | one per symbol (20) |
+ * | `GET /futures/data/openInterestHist?period=1h&limit=25` | 1 | one per symbol (up to 60, `SUMMARY_MAX`) |
  *
- * So about 50 `fapi` weight plus 20 `/futures/data` calls per refresh. The answer is cached for
+ * So about 50 `fapi` weight plus one `/futures/data` call per listed symbol (40 since IB-070) per refresh. The answer is cached for
  * `CACHE_TTL_MS`, so however many tabs are open the venue sees at most one refresh a minute:
- * about 2 % of the 2,400/min ceiling, plus 20 calls against the separate `/futures/data` limit.
+ * about 2 % of the 2,400/min ceiling, plus 40 calls against the separate `/futures/data` limit.
  */
 export const CACHE_TTL_MS = 60_000;
 /** WD-008's ceiling: above this much of the 2,400/min budget, live reads answer 503. */

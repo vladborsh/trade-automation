@@ -48,6 +48,13 @@ export const TERM_CLASSIFICATION: Readonly<Record<string, Classification>> = {
   solana: 'distinct', bittensor: 'distinct', ethena: 'distinct', filecoin: 'distinct',
   'hyperliquid': 'distinct', 'official trump': 'distinct', 'pump fun': 'distinct',
   'uniswap': 'distinct', 'near protocol': 'distinct',
+  // IB-070: the TradFi perps' bases (no coingecko_id, so tickers only). The ISO 4217 metal codes
+  // and the ETF/futures tickers are what a headline writes when it means the asset.
+  xau: 'distinct', xag: 'distinct', xpt: 'distinct', xpd: 'distinct', natgas: 'distinct',
+  qqq: 'distinct',
+  // ...but `spy` is a word, `copper` is a word AND a crypto custody firm, and `cl`/`bz` are
+  // two-letter abbreviations that turn up in any headline.
+  spy: 'ambiguous', copper: 'ambiguous', cl: 'ambiguous', bz: 'ambiguous',
 };
 
 export interface UniverseTerm {
