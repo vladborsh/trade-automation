@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpException, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
-  WebExchangeRequestSchema, type WebAuthContext, type WebExchangeResponse, type WebMeResponse,
-  type WebUser,
+  WebExchangeRequestSchema, WebTelegramLoginRequestSchema, type WebAuthContext, type WebExchangeResponse,
+  type WebMeResponse, type WebTelegramLoginResponse, type WebUser,
 } from '@trade-automation/contracts';
 import type { User } from '../../users/user.model';
 import { WebAuthService } from './web-auth.service';
@@ -28,6 +28,26 @@ export class WebAuthController {
     if (!parsed.success) throw new HttpException({ code: 'TOKEN_INVALID' }, 401);
 
     const result = await this.auth.exchange(parsed.data.token);
+    if (!result.ok) throw new HttpException({ code: result.code }, result.status);
+
+    res.setHeader('Set-Cookie', serializeSessionCookie(result.token, result.expiresAtMs, { secure: this.auth.cookieSecure }));
+    return { user: toWebUser(result.user) };
+  }
+
+  /**
+   * IB-072 — "Log in with Telegram": the widget's signed payload, as the browser received it.
+   * Same cookie, same session row as `exchange` (both go through `WebAuthService.openSession`).
+   * The 503 comes first so a server without `TELEGRAM_BOT_TOKEN` says so rather than "invalid".
+   */
+  @Public()
+  @Post('telegram')
+  @HttpCode(200)
+  async telegram(@Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<WebTelegramLoginResponse> {
+    if (!this.auth.telegramLoginAvailable) throw new HttpException({ code: 'TELEGRAM_LOGIN_UNAVAILABLE' }, 503);
+    const parsed = WebTelegramLoginRequestSchema.safeParse(body);
+    if (!parsed.success) throw new HttpException({ code: 'TOKEN_INVALID' }, 401);
+
+    const result = await this.auth.loginWithTelegram(parsed.data);
     if (!result.ok) throw new HttpException({ code: result.code }, result.status);
 
     res.setHeader('Set-Cookie', serializeSessionCookie(result.token, result.expiresAtMs, { secure: this.auth.cookieSecure }));

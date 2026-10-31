@@ -43,7 +43,41 @@ export type WebMeResponse = z.infer<typeof WebMeResponseSchema>;
 export const WebAuthContextSchema = z.object({ botUsername: z.string() });
 export type WebAuthContext = z.infer<typeof WebAuthContextSchema>;
 
-export const WEB_AUTH_ERROR_CODES = ['TOKEN_INVALID', 'TOKEN_USED', 'TOKEN_EXPIRED', 'UNAUTHENTICATED', 'FORBIDDEN'] as const;
+/**
+ * IB-072 — the payload the Telegram Login Widget hands to `data-onauth`, posted as-is to
+ * `POST /api/web/auth/telegram` (architecture/member-access-design-2026-10-31.md M1–M3).
+ *
+ * **Unknown fields are kept, not stripped** (`catchall`): Telegram signs every field it sends, so a
+ * field it adds tomorrow is part of `data_check_string`, and dropping it here would turn every
+ * genuine login into a hash mismatch. Their values are restricted to string | number — the only
+ * shapes the widget sends; anything else cannot be put into `key=value` unambiguously.
+ */
+export const WebTelegramLoginRequestSchema = z
+  .object({
+    id: z.number().int().positive(),
+    first_name: z.string().max(256),
+    last_name: z.string().max(256).optional(),
+    username: z.string().max(64).optional(),
+    photo_url: z.string().max(2048).optional(),
+    auth_date: z.number().int().positive(),
+    hash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .catchall(z.union([z.string().max(2048), z.number()]));
+export type WebTelegramLoginRequest = z.infer<typeof WebTelegramLoginRequestSchema>;
+
+export const WebTelegramLoginResponseSchema = z.object({ user: WebUserSchema });
+export type WebTelegramLoginResponse = z.infer<typeof WebTelegramLoginResponseSchema>;
+
+/**
+ * `NOT_A_MEMBER` (403): a correctly signed Telegram identity with no `users` row. The widget never
+ * creates one (M1) — membership comes only from `/invite` + `/start` in the bot — so the page says
+ * "by invitation". A *disabled* member gets `TOKEN_INVALID` instead, like the link path.
+ * `TELEGRAM_LOGIN_UNAVAILABLE` (503): the server has no `TELEGRAM_BOT_TOKEN`, so it cannot verify.
+ */
+export const WEB_AUTH_ERROR_CODES = [
+  'TOKEN_INVALID', 'TOKEN_USED', 'TOKEN_EXPIRED', 'UNAUTHENTICATED', 'FORBIDDEN',
+  'NOT_A_MEMBER', 'TELEGRAM_LOGIN_UNAVAILABLE',
+] as const;
 export type WebAuthErrorCode = (typeof WEB_AUTH_ERROR_CODES)[number];
 
 /**
