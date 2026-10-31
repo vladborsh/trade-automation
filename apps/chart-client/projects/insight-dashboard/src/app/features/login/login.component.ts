@@ -1,12 +1,20 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, input, signal, viewChild,
+} from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Router } from '@angular/router';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
 import { LANDING_ROUTE } from '../../app.routes';
+import { createTelegramWidgetScript, TELEGRAM_AUTH_CALLBACK, telegramLoginFailure } from './telegram-widget';
 
 /**
  * architecture/insight-bot-web-dashboard.md §4 W3 — the bot's `/web` command sends a single-use
  * link; this page exchanges its `?t=` for the `ib_session` cookie and goes to /health.
+ *
+ * IB-072 adds the second way in: the Telegram Login Widget, whose signed payload goes to
+ * `POST /api/web/auth/telegram` and ends in the same cookie. A `?t=` link keeps working as before;
+ * the widget is not shown while one is waiting to be exchanged.
  *
  * §11: there is no user here yet, so the page starts in the stored language (`ru` by default) and
  * carries its own switch. Once the exchange succeeds, `/auth/me` decides the language everywhere.
@@ -21,6 +29,7 @@ import { LANDING_ROUTE } from '../../app.routes';
 export class LoginComponent {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
+  private readonly document = inject(DOCUMENT);
   readonly t = this.i18n.t.bind(this.i18n);
 
   /** Bound from the query string by `withComponentInputBinding()`. */
@@ -36,8 +45,39 @@ export class LoginComponent {
    */
   readonly botUsername = signal<string | null>(null);
 
+  /** Set when the widget login is refused as NOT_A_MEMBER: the template then links to the bot. */
+  readonly notMember = signal(false);
+
+  /** Where the widget's button goes; exists only while the template shows it. */
+  private readonly widgetHost = viewChild<ElementRef<HTMLElement>>('telegramWidget');
+
   constructor() {
     void this.loadContext();
+    this.registerTelegramCallback();
+    // the host element comes and goes with the state; mount the widget into whichever one is there
+    effect(() => {
+      const host = this.widgetHost()?.nativeElement;
+      const bot = this.botUsername();
+      if (host && bot && host.childElementCount === 0) {
+        host.appendChild(createTelegramWidgetScript(this.document, bot));
+      }
+    });
+  }
+
+  /** The widget calls a global by name (`data-onauth`); it lives exactly as long as this page. */
+  private registerTelegramCallback(): void {
+    const win = this.document.defaultView as (Window & Record<string, unknown>) | null;
+    if (!win) return;
+    const callback = (user: unknown) => void this.telegramLogin(user);
+    win[TELEGRAM_AUTH_CALLBACK] = callback;
+    inject(DestroyRef).onDestroy(() => {
+      if (win[TELEGRAM_AUTH_CALLBACK] === callback) delete win[TELEGRAM_AUTH_CALLBACK];
+    });
+  }
+
+  /** Whether the widget is offered: not mid-exchange, and not while a `?t=` link waits for its click. */
+  showWidget(): boolean {
+    return this.state() === 'failed' || (this.state() === 'idle' && !this.t_());
   }
 
   private async loadContext(): Promise<void> {
@@ -81,6 +121,31 @@ export class LoginComponent {
       this.i18n.setLangFromUser(body.user?.lang);
       // the same destination as the default route, from the one place that decides it: a member who
       // taps the bot's link must arrive where a member who types the bare host arrives
+      await this.router.navigateByUrl(LANDING_ROUTE);
+    } catch {
+      this.fail('login.unreachable');
+    }
+  }
+
+  /** The widget's payload, posted untouched: the server checks Telegram's signature over all of it. */
+  async telegramLogin(payload: unknown): Promise<void> {
+    this.notMember.set(false);
+    this.state.set('exchanging');
+    try {
+      const response = await fetch('/api/web/auth/telegram', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const { key, params } = telegramLoginFailure(response.status);
+        this.notMember.set(response.status === 403);
+        this.fail(key, params);
+        return;
+      }
+      const body = (await response.json()) as { user?: { lang?: unknown } };
+      this.i18n.setLangFromUser(body.user?.lang);
       await this.router.navigateByUrl(LANDING_ROUTE);
     } catch {
       this.fail('login.unreachable');

@@ -32,6 +32,11 @@ export type StringKey =
   | 'login.failed'
   | 'login.unreachable'
   | 'login.switchLang'
+  | 'login.or'
+  | 'login.notMember'
+  | 'login.openBot'
+  | 'login.telegramInvalid'
+  | 'login.telegramUnavailable'
   // health
   | 'health.title'
   | 'health.streams'

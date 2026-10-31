@@ -28,6 +28,11 @@ export const ru: Strings = {
   'login.failed': 'Не удалось войти (HTTP {status}).',
   'login.unreachable': 'Сервер не отвечает. Попробуйте ещё раз через минуту.',
   'login.switchLang': 'English',
+  'login.or': 'или',
+  'login.notMember': 'Доступ по приглашению: откройте ссылку-приглашение в Telegram.',
+  'login.openBot': 'Открыть @{bot} в Telegram',
+  'login.telegramInvalid': 'Вход через Telegram не удался или занял слишком долго. Попробуйте ещё раз.',
+  'login.telegramUnavailable': 'Вход через Telegram на этом сервере не настроен. Отправьте /web боту, чтобы получить ссылку.',
 
   'health.title': 'Состояние',
   'health.streams': 'Потоки',

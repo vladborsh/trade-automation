@@ -22,6 +22,11 @@ export const en: Strings = {
   'login.failed': 'Sign-in failed (HTTP {status}).',
   'login.unreachable': 'Could not reach the server. Try again in a moment.',
   'login.switchLang': 'Русский',
+  'login.or': 'or',
+  'login.notMember': 'Access is by invitation: open your invitation link in Telegram.',
+  'login.openBot': 'Open @{bot} in Telegram',
+  'login.telegramInvalid': 'Telegram sign-in failed or took too long. Try again.',
+  'login.telegramUnavailable': 'Telegram sign-in is not set up on this server. Send /web to the bot for a link.',
 
   'health.title': 'Health',
   'health.streams': 'Streams',
