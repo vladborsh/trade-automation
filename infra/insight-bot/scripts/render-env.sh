@@ -4,25 +4,43 @@
 #
 #   render-env.sh            # uses the defaults baked in by user_data
 #
+# Every /insight-bot/* parameter goes into the app's .env EXCEPT the Cloudflare tunnel token
+# (member-access design M4, IB-074): /insight-bot/CF_TUNNEL_TOKEN is written to a separate
+# root-only cloudflared.env as TUNNEL_TOKEN, which only the cloudflared container reads. The Node
+# process has no reason to know it. cloudflared.env is always written (empty of a token when the
+# parameter does not exist yet) so `docker compose up` works before the owner creates the tunnel;
+# cloudflared then restarts until the token is in SSM and deploy.sh is re-run.
+#
 # Values are never echoed: the script prints parameter NAMES and a count, nothing else.
 set -euo pipefail
 
 REGION="${AWS_REGION:-ap-northeast-1}"
 PREFIX="${SSM_PREFIX:-/insight-bot}"
 TARGET="${ENV_FILE:-/opt/insight-bot/.env}"
+CF_TARGET="${CF_ENV_FILE:-/opt/insight-bot/cloudflared.env}"
 
 umask 077
 tmp="$(mktemp "${TARGET}.XXXXXX")"
-trap 'rm -f "$tmp"' EXIT
+cf_tmp="$(mktemp "${CF_TARGET}.XXXXXX")"
+trap 'rm -f "$tmp" "$cf_tmp"' EXIT
 
 echo "# rendered from SSM ${PREFIX} at $(date -u +%FT%TZ) — do not edit by hand" >"$tmp"
+echo "# rendered from SSM ${PREFIX}/CF_TUNNEL_TOKEN at $(date -u +%FT%TZ) — do not edit by hand" >"$cf_tmp"
 
 count=0
+cf_count=0
 while read -r name value; do
   [ -z "$name" ] && continue
   key="${name##*/}"
   # Values can contain anything; single-quote and escape embedded quotes.
   escaped=${value//\'/\'\\\'\'}
+  if [ "$key" = "CF_TUNNEL_TOKEN" ]; then
+    # cloudflared reads its token from TUNNEL_TOKEN; never into the app's .env.
+    printf "TUNNEL_TOKEN='%s'\n" "$escaped" >>"$cf_tmp"
+    cf_count=$((cf_count + 1))
+    echo "  ${key} -> $(basename "$CF_TARGET")" >&2
+    continue
+  fi
   printf "%s='%s'\n" "$key" "$escaped" >>"$tmp"
   count=$((count + 1))
   echo "  ${key}" >&2
@@ -39,7 +57,13 @@ if [ "$count" -eq 0 ]; then
   exit 1
 fi
 
-chmod 600 "$tmp"
+chmod 600 "$tmp" "$cf_tmp"
 mv "$tmp" "$TARGET"
+mv "$cf_tmp" "$CF_TARGET"
 trap - EXIT
 echo "render-env.sh: wrote ${count} keys to ${TARGET}" >&2
+if [ "$cf_count" -eq 0 ]; then
+  echo "render-env.sh: no ${PREFIX}/CF_TUNNEL_TOKEN — ${CF_TARGET} has no token, cloudflared will not connect" >&2
+else
+  echo "render-env.sh: wrote the tunnel token to ${CF_TARGET}" >&2
+fi

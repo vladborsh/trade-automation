@@ -14,13 +14,15 @@
 | Что | Где | Зачем |
 |---|---|---|
 | Сервер | EC2 `t4g.micro` (1 ГБ + 2 ГБ swap), регион `ap-northeast-1` (Токио), диск gp3 20 ГБ | на нём круглосуточно работает бот; размеры выбраны под потолок 20 $/мес — см. `COST-PLAN.md` |
-| Контейнеры | `postgres:16-alpine` + `insight-bot`, запускает `docker compose` | база данных и само приложение |
+| Контейнеры | `postgres:16-alpine` + `insight-bot` + `cloudflared`, запускает `docker compose` | база данных, само приложение и туннель, через который сайт виден из интернета (§11) |
 | Секреты | AWS SSM Parameter Store, префикс `/insight-bot` | токены и пароли; в репозитории их нет |
 | Резервные копии | S3 `vb-insight-bot-backups-apne1`, папка `pg_dump/`, хранение 35 дней | ежедневный дамп базы в 01:00 UTC |
 | Образ приложения | **GHCR** (`ghcr.io/<owner>/insight-bot`) | собирается в GitHub Actions под arm64; ECR не используется — он платный за хранение |
 | Доступ на сервер | **только** AWS SSM Session Manager | входящих портов нет вообще, SSH-ключей нет |
+| Адрес сайта | домен владельца → Cloudflare Tunnel → `insight-bot:3005` | участники открывают `https://<домен>`; туннель сам звонит наружу в Cloudflare, поэтому входящие порты по-прежнему закрыты |
 
 Файлы на сервере лежат в `/opt/insight-bot/`: `docker-compose.yml`, `.env` (только для root),
+`cloudflared.env` (только для root: в нём один токен туннеля, приложение его не видит),
 `deploy.sh`, `backup.sh`, `restore.sh`, папка с данными базы `pgdata/`.
 
 ---
@@ -81,6 +83,14 @@ aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite \
 | `/insight-bot/TELEGRAM_BOT_TOKEN` | токен бота, выдаёт @BotFather |
 | `/insight-bot/TELEGRAM_SERVICE_CHAT_ID` | id служебного чата: туда идут тревоги и утренний отчёт |
 | `/insight-bot/ADMIN_TG_USER_ID` | Telegram id администратора |
+| `/insight-bot/TELEGRAM_BOT_USERNAME` | имя продового бота без `@` — по нему кнопка «Log in with Telegram» понимает, какой бот её подписывает |
+| `/insight-bot/WEB_BASE_URL` | адрес сайта: `https://<домен>` (без `/` в конце). Без него бот не выдаёт ссылки для входа |
+| `/insight-bot/WEB_COOKIE_SECURE` | `true` — cookie входа ходит только по https |
+| `/insight-bot/CF_TUNNEL_TOKEN` | токен туннеля Cloudflare (§11, шаг 2). **В `.env` приложения не попадает:** `render-env.sh` кладёт его отдельно в `cloudflared.env` |
+| `/insight-bot/WEB_PUSH_VAPID_PUBLIC`, `…_PRIVATE`, `…_SUBJECT` | ключи для push-уведомлений в браузере (§11, шаг 5). Все три вместе или ни одного — иначе приложение не запустится |
+
+`WEB_BASE_URL` и `WEB_COOKIE_SECURE` — не секреты, но лежат там же, чтобы у сервера был один
+источник настроек.
 
 Посмотреть, какие параметры есть (**значения не печатаются**):
 
@@ -252,6 +262,9 @@ _(заполняется после первого запуска на серв�
 | Трафик наружу | 0 $ (в пределах бесплатных 100 ГБ) |
 | **Итого** | **≈ 13.6 $** |
 
+Сверх этого — домен, ≈ 10 $ в год (≈ 0.85 $ в месяц), платится регистратору, не AWS. Туннель
+Cloudflare на бесплатном тарифе ничего не стоит.
+
 Построчно и с альтернативами — `COST-PLAN.md`. Включено предупреждение AWS Budgets: письмо при
 расходе выше **18 $** за месяц (и отдельно — по прогнозу, чтобы узнать заранее).
 
@@ -265,3 +278,127 @@ _(заполняется после первого запуска на серв�
 - Не править `/opt/insight-bot/.env` руками: файл собирается из SSM и будет перезаписан.
 - Не удалять папку `/opt/insight-bot/pgdata` — это и есть база.
 - Не «чинить» молчащую биржу обходными путями: это вопрос к Tech Lead и Архитектору.
+- Не ставить `cloudflare/cloudflared:latest` и не убирать `--no-autoupdate`: версия туннеля
+  закреплена в `compose/docker-compose.yml` и меняется только правкой этого файла.
+
+---
+
+## 11. Адрес сайта: домен и туннель Cloudflare (делает владелец)
+
+Зачем это: чтобы участник открыл с телефона `https://<домен>` и вошёл, не зная ничего про
+сервер. Сервер наружу не открывается: маленькая программа `cloudflared` на нём сама
+подключается к Cloudflare и забирает оттуда запросы к вашему домену. Замок https и сертификат
+даёт Cloudflare бесплатно.
+
+Ниже `<домен>` — ваш домен, например `example.com`. После каждого шага написано, **как понять,
+что шаг получился**. Если признака нет — дальше не идти, а написать Tech Lead, на каком шаге
+остановились.
+
+### Шаг 1. Купить домен и подключить его к Cloudflare
+
+1. Зарегистрироваться на `dash.cloudflare.com` (бесплатный тариф Free подходит).
+2. Проще всего купить домен прямо там: **Domain Registration → Register Domains** (≈ 10 $ в год).
+   Тогда подключать ничего не нужно.
+3. Если домен куплен у другого регистратора: в Cloudflare **Add a site** → ввести домен →
+   тариф Free. Cloudflare покажет **два адреса name server** (вида `xxx.ns.cloudflare.com`).
+   Зайти к своему регистратору и заменить там name servers на эти два. Это и есть «смена NS».
+   Изменение расходится от нескольких минут до суток.
+
+**Признак успеха:** в Cloudflare на странице домена статус **Active** (зелёная галочка), а не
+«Pending Nameserver Update».
+
+### Шаг 2. Создать туннель и положить его токен в SSM
+
+1. В Cloudflare: **Zero Trust → Networks → Tunnels → Create a tunnel**, тип **Cloudflared**.
+2. Имя — `insight-bot`. Нажать **Save tunnel**.
+3. На следующем экране Cloudflare предлагает команду установки с длинной строкой после
+   `--token` (начинается на `eyJ`). Ничего не устанавливать — нужна только эта строка.
+   Скопировать её **целиком**.
+4. Положить токен в SSM (с компьютера, где настроен AWS CLI):
+
+   ```bash
+   aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite \
+     --name /insight-bot/CF_TUNNEL_TOKEN --value '<токен>'
+   ```
+
+5. Выкатить заново, чтобы сервер забрал токен: на сервере `/opt/insight-bot/deploy.sh latest`
+   (§3). В выводе должна быть строка `render-env.sh: wrote the tunnel token to /opt/insight-bot/cloudflared.env`.
+
+**Признак успеха:** в Cloudflare у туннеля `insight-bot` статус **Healthy** (не «Inactive» и не
+«Down»). На сервере `docker compose logs cloudflared` показывает строки `Registered tunnel
+connection`. Если там `no token` или `Unauthorized` — токен скопирован не целиком: повторить
+пункты 3–5.
+
+### Шаг 3. Направить домен в туннель
+
+1. В туннеле `insight-bot`: вкладка **Public Hostname → Add a public hostname**.
+2. **Subdomain** — оставить пустым (сайт будет на самом домене). **Domain** — выбрать `<домен>`.
+   Если хочется адрес вида `insight.<домен>` — вписать `insight` в Subdomain; тогда и
+   в шагах 4–5 везде писать `insight.<домен>`.
+3. **Service:** тип `HTTP`, URL `insight-bot:3005`. (Это имя контейнера внутри сервера, а не
+   адрес в интернете — так и должно быть.)
+4. **Save hostname**.
+5. В SSM записать адрес сайта и включить защищённый cookie, затем выкатить заново:
+
+   ```bash
+   aws ssm put-parameter --region ap-northeast-1 --type String --overwrite \
+     --name /insight-bot/WEB_BASE_URL --value 'https://<домен>'
+   aws ssm put-parameter --region ap-northeast-1 --type String --overwrite \
+     --name /insight-bot/WEB_COOKIE_SECURE --value 'true'
+   ```
+
+   и на сервере `/opt/insight-bot/deploy.sh latest`.
+
+**Признак успеха:** в браузере `https://<домен>` открывается страница входа дашборда, слева
+от адреса замок. `https://<домен>/health` отвечает текстом JSON. Если вместо сайта ошибка
+Cloudflare **1033** — туннель не подключён (вернуться к шагу 2); **502** — туннель есть, но
+приложение не отвечает (`docker compose ps` на сервере).
+
+### Шаг 4. Сказать Telegram, на каком домене кнопка входа
+
+Без этого кнопка «Log in with Telegram» на странице входа пишет «Bot domain invalid».
+
+1. В Telegram открыть **@BotFather** → `/setdomain` → выбрать **продового** бота (не тестового).
+2. Отправить `<домен>` — **без** `https://` и без `/` в конце.
+3. Убедиться, что в SSM есть `/insight-bot/TELEGRAM_BOT_USERNAME` с именем этого бота (без `@`).
+
+**Признак успеха:** BotFather отвечает «Success! Domain updated». На `https://<домен>` видна
+синяя кнопка «Log in with Telegram», и после нажатия Telegram спрашивает подтверждение входа.
+
+### Шаг 5. Ключи для push-уведомлений (VAPID)
+
+Push в браузере работает только по https, поэтому делается после шагов 1–3.
+
+1. На любом компьютере с Node.js:
+
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+
+   Выведет две строки: **Public Key** и **Private Key**.
+2. Положить в SSM все три параметра (третий — ваш контактный адрес, его видит служба push):
+
+   ```bash
+   aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite \
+     --name /insight-bot/WEB_PUSH_VAPID_PUBLIC --value '<Public Key>'
+   aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite \
+     --name /insight-bot/WEB_PUSH_VAPID_PRIVATE --value '<Private Key>'
+   aws ssm put-parameter --region ap-northeast-1 --type String --overwrite \
+     --name /insight-bot/WEB_PUSH_VAPID_SUBJECT --value 'mailto:<ваш email>'
+   ```
+
+3. Выкатить заново: `/opt/insight-bot/deploy.sh latest`.
+4. Записать здесь, кто сгенерировал ключи: владелец сам или агент с его разрешения
+   (дата, кто): `____________________`. Менять ключи без нужды нельзя: после смены все
+   подписки на уведомления пропадают, и участникам придётся подписаться заново.
+
+**Признак успеха:** `deploy.sh` заканчивается строкой `healthy on …` (если задать не все три
+ключа, приложение не запустится и `deploy.sh` скажет, что `/health` не ответил). На сайте
+кнопка «Event alerts: off» после нажатия спрашивает разрешение браузера и становится
+«Event alerts: on»; подсказка при наведении говорит «also with the dashboard closed» (это и
+значит, что работает push, а не только открытая вкладка). Само уведомление приходит за 15 минут
+до ближайшего важного события по USD — отдельной «тестовой» кнопки нет.
+
+### Что после этого
+
+Приёмку «участник с телефона вне домашней сети» проводит Тестер вместе с владельцем (IB-077).
