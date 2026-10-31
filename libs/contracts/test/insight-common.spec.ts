@@ -37,7 +37,7 @@ describe('WebError', () => {
 
 describe('WebTimeframe', () => {
   it('is the set the dashboard actually serves', () => {
-    expect(WebTimeframeSchema.options).toEqual(['1m', '15m', '1h', '4h', '1d']);
+    expect(WebTimeframeSchema.options).toEqual(['1m', '3m', '5m', '15m', '1h', '4h', '1d', '1w']); // IB-065 added 3m, 5m, 1w
     expect(WebTimeframeSchema.safeParse('3s').success).toBe(false);
   });
 });
