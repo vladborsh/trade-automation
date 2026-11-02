@@ -13,6 +13,12 @@ export const WebUserSchema = z.object({
   tgUserId: z.number().int().positive(),
   role: z.enum(['admin', 'member']),
   lang: z.enum(['ru', 'en']),
+  /**
+   * IB-078 — the site login (architecture/password-login-design-2026-11-02.md P4). `null` for a
+   * member who has not set credentials yet: a session opened through the old `/web` link before the
+   * deploy still resolves, and its `/me` must parse.
+   */
+  login: z.string().nullable(),
 });
 export type WebUser = z.infer<typeof WebUserSchema>;
 
@@ -77,6 +83,8 @@ export type WebTelegramLoginResponse = z.infer<typeof WebTelegramLoginResponseSc
 export const WEB_AUTH_ERROR_CODES = [
   'TOKEN_INVALID', 'TOKEN_USED', 'TOKEN_EXPIRED', 'UNAUTHENTICATED', 'FORBIDDEN',
   'NOT_A_MEMBER', 'TELEGRAM_LOGIN_UNAVAILABLE',
+  // IB-078 (design §3)
+  'INVALID_CREDENTIALS', 'TOO_MANY_ATTEMPTS', 'LOGIN_TAKEN', 'BAD_LOGIN', 'WEAK_PASSWORD',
 ] as const;
 export type WebAuthErrorCode = (typeof WEB_AUTH_ERROR_CODES)[number];
 
@@ -87,3 +95,76 @@ export type WebAuthErrorCode = (typeof WEB_AUTH_ERROR_CODES)[number];
  * site. Found the hard way: `MeResponse` compiled against the backtest app's
  * `{ id, email, role }` until the prefix went on.
  */
+
+// ---------------------------------------------------------------------------------------------
+// IB-078 — login + password (architecture/password-login-design-2026-11-02.md §3).
+//
+// The RULES (P4, P6) are exported so the dashboard validates with the same numbers, but the server
+// decides: it normalises the login (lower case) and checks the cross-field rule (password ≠ login)
+// itself. Request schemas therefore bound only the input SIZE; a rule violation is a 422 with a
+// code, not a 400 from the schema.
+
+/** P4 — stored lower-cased; ASCII only, so look-alike Cyrillic logins cannot exist. */
+export const WEB_LOGIN_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
+/** P6 — length is the whole rule; the upper bound stops a huge "password" becoming CPU work. */
+export const WEB_PASSWORD_MIN = 10;
+export const WEB_PASSWORD_MAX = 128;
+/** How much of a field the server reads at all. Larger than any valid value, so a too-long one is a
+ * rule error (or a plain failed login), never a parse error that hints at the rule. */
+const INPUT_MAX = 1024;
+
+export const WebLoginRequestSchema = z.object({
+  login: z.string().max(INPUT_MAX),
+  password: z.string().max(INPUT_MAX),
+});
+export type WebLoginRequest = z.infer<typeof WebLoginRequestSchema>;
+
+export const WebLoginResponseSchema = z.object({ user: WebUserSchema });
+export type WebLoginResponse = z.infer<typeof WebLoginResponseSchema>;
+
+/** `GET /auth/credentials?t=` — whether the page asks for a login. Does NOT consume the token. */
+export const WebCredentialsInfoResponseSchema = z.object({
+  hasLogin: z.boolean(),
+  /** Present when `hasLogin`: shown, not editable (a reset keeps the login). */
+  login: z.string().optional(),
+});
+export type WebCredentialsInfoResponse = z.infer<typeof WebCredentialsInfoResponseSchema>;
+
+/** `POST /auth/credentials` — `login` is required only when the account has none, ignored otherwise. */
+export const WebSetCredentialsRequestSchema = z.object({
+  token: z.string().min(1).max(256),
+  login: z.string().max(INPUT_MAX).optional(),
+  password: z.string().max(INPUT_MAX),
+});
+export type WebSetCredentialsRequest = z.infer<typeof WebSetCredentialsRequestSchema>;
+
+/** `POST /auth/password` — change while signed in; ends every OTHER session (P9). */
+export const WebChangePasswordRequestSchema = z.object({
+  current: z.string().max(INPUT_MAX),
+  next: z.string().max(INPUT_MAX),
+});
+export type WebChangePasswordRequest = z.infer<typeof WebChangePasswordRequestSchema>;
+
+/** P10 — the journal's outcomes; the migration's CHECK constraint lists the same words. */
+export const WEB_LOGIN_OUTCOMES = [
+  'success', 'bad_credentials', 'throttled', 'password_set', 'password_reset', 'password_changed', 'logout_all',
+] as const;
+export type WebLoginOutcome = (typeof WEB_LOGIN_OUTCOMES)[number];
+
+/** `GET /api/web/admin/login-events?limit=` (admin only), newest first. Never carries a password. */
+export const WebLoginEventSchema = z.object({
+  id: z.number().int().positive(),
+  /** epoch ms */
+  at: z.number().int(),
+  userId: z.number().int().positive().nullable(),
+  /** What was typed into the login field, truncated to 64 — may be a mistyped password, hence admin-only. */
+  loginAttempted: z.string().nullable(),
+  outcome: z.enum(WEB_LOGIN_OUTCOMES),
+  ip: z.string().nullable(),
+  userAgent: z.string().nullable(),
+});
+export type WebLoginEvent = z.infer<typeof WebLoginEventSchema>;
+
+export const WEB_LOGIN_EVENTS_MAX_LIMIT = 500;
+export const WebLoginEventsResponseSchema = z.object({ events: z.array(WebLoginEventSchema) });
+export type WebLoginEventsResponse = z.infer<typeof WebLoginEventsResponseSchema>;

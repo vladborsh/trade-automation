@@ -1,11 +1,11 @@
 import { isAdmin, sessionUser } from './session-user';
 
 /** IB-075 — reading the member from `/auth/me`, and the one question the gate asks of it. */
-const me = (role: string) => ({ user: { id: 1, tgUserId: 111, role, lang: 'en' } });
+const me = (role: string) => ({ user: { id: 1, tgUserId: 111, role, lang: 'en', login: null } });
 
 describe('sessionUser', () => {
   it('returns the member from a well-formed /auth/me body', () => {
-    expect(sessionUser(me('admin'))).toEqual({ id: 1, tgUserId: 111, role: 'admin', lang: 'en' });
+    expect(sessionUser(me('admin'))).toEqual({ id: 1, tgUserId: 111, role: 'admin', lang: 'en', login: null });
   });
 
   it('is null for anything that is not the contract — never a guessed member', () => {

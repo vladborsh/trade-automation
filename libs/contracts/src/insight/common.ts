@@ -33,6 +33,13 @@ export const WEB_ERROR_CODES = [
   'FORBIDDEN',
   /** The exchange did not answer a live read (or our weight budget is spent): retry later. */
   'VENUE_UNAVAILABLE',
+  // IB-078 — login + password (auth.ts). Listed here too, because the dashboard parses every error
+  // body with WebErrorSchema; a code missing here would reach it as `null`.
+  'INVALID_CREDENTIALS',
+  'TOO_MANY_ATTEMPTS',
+  'LOGIN_TAKEN',
+  'BAD_LOGIN',
+  'WEAK_PASSWORD',
 ] as const;
 export type WebErrorCode = (typeof WEB_ERROR_CODES)[number];
 

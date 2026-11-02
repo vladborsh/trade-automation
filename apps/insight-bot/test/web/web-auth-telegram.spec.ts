@@ -139,7 +139,7 @@ describe('POST /api/web/auth/telegram (controller)', () => {
       const r = res();
       const body = await new WebAuthController(service({ TELEGRAM_BOT_TOKEN: TOKEN, WEB_COOKIE_SECURE: true }))
         .telegram(signedPayload(777, { username: 'ann', photo_url: 'https://t.me/i/a.jpg' }), r as never);
-      expect(body).toEqual({ user: { id: 7, tgUserId: 777, role: 'member', lang: 'en' } });
+      expect(body).toEqual({ user: { id: 7, tgUserId: 777, role: 'member', lang: 'en', login: null } });
       const cookie = r.setHeader.mock.calls[0][1] as string;
       expect(cookie).toMatch(new RegExp(`^${SESSION_COOKIE_NAME}=[^;]+;`));
       expect(cookie).toContain('HttpOnly');

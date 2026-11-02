@@ -10,7 +10,8 @@ import { CurrentUser, Public } from './web-auth.guard';
 import { serializeClearedSessionCookie, serializeSessionCookie, sessionTokenFromCookies } from './session-cookie';
 
 /** Only what the browser needs — never the deposit, the chat id or the invite chain. */
-const toWebUser = (u: User): WebUser => ({ id: u.id, tgUserId: u.tgUserId, role: u.role, lang: u.lang });
+// IB-078 step 1 (contracts): `login: null` until web_credentials exists; the credentials commit fills it.
+const toWebUser = (u: User): WebUser => ({ id: u.id, tgUserId: u.tgUserId, role: u.role, lang: u.lang, login: null });
 
 /**
  * IB-029 — `/api/web/auth` (architecture/insight-bot-web-dashboard.md §4).

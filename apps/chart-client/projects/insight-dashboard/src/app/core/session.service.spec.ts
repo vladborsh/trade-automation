@@ -4,7 +4,7 @@ import { InsightApiClient } from './insight-api.client';
 import { SessionService } from './session.service';
 
 /** IB-075 — one `/auth/me` per known member; an unknown one is asked again (login happens elsewhere). */
-const body = (role: 'admin' | 'member') => ({ user: { id: 1, tgUserId: 111, role, lang: 'en' } });
+const body = (role: 'admin' | 'member') => ({ user: { id: 1, tgUserId: 111, role, lang: 'en', login: null } });
 
 function setup(me: () => Promise<unknown>) {
   const spy = vi.fn(me);

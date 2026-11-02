@@ -13,7 +13,7 @@ async function run(user: WebUser | null): Promise<boolean | UrlTree> {
   )) as boolean | UrlTree;
 }
 
-const user = (role: 'admin' | 'member'): WebUser => ({ id: 1, tgUserId: 111, role, lang: 'en' });
+const user = (role: 'admin' | 'member'): WebUser => ({ id: 1, tgUserId: 111, role, lang: 'en', login: null });
 
 describe('adminGuard', () => {
   it('lets an admin in', async () => {
