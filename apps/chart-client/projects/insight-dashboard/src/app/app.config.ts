@@ -2,7 +2,7 @@ import { ApplicationConfig, inject, provideAppInitializer, provideBrowserGlobalE
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { routes } from './app.routes';
-import { InsightApiClient } from './core/insight-api.client';
+import { SessionService } from './core/session.service';
 import { I18nService } from './i18n/i18n.service';
 
 /**
@@ -21,7 +21,7 @@ export const appConfig: ApplicationConfig = {
     // leaves the stored language, and `ru` is the default.
     provideAppInitializer(async () => {
       const i18n = inject(I18nService);
-      const api = inject(InsightApiClient);
+      const session = inject(SessionService);
       const config = inject(AppConfigService);
       try {
         // Angular runs initializers CONCURRENTLY, not in sequence: without awaiting the config load
@@ -30,8 +30,9 @@ export const appConfig: ApplicationConfig = {
         // promise, so this awaits the one already in flight. (Found by the two-language screenshots:
         // an `en` member's page rendered in Russian.)
         await config.load();
-        const me = await api.me();
-        i18n.setLangFromUser(me.user?.lang);
+        // IB-075: through SessionService, so the nav and the /health guard reuse this one /auth/me
+        const user = await session.ensure();
+        if (user !== null) i18n.setLangFromUser(user.lang);
       } catch {
         // unauthenticated or offline: keep the stored/default language
       }

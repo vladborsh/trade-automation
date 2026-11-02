@@ -5,6 +5,7 @@ import { databaseHealth, recentGapReports, toGapCells } from '../db/pg/web-reads
 import { BINANCE_WEIGHT_BUDGET } from '../ops/gap-report';
 import { MetricsService } from '../ops/metrics.service';
 import { StreamRegistry } from '../ops/stream-registry';
+import { AdminOnly } from './auth/web-auth.guard';
 
 /** Spot has its own 6000/min ceiling on `api.binance.com` (design §4.5) — never the futures one. */
 const BINANCE_SPOT_WEIGHT_BUDGET = 6000;
@@ -14,10 +15,14 @@ const BINANCE_SPOT_WEIGHT_BUDGET = 6000;
  *
  * **Not the ops `GET /health`.** That one is the unauthenticated liveness probe (and what the SPA
  * fallback excludes); this one exposes per-stream detail, gap history and database internals, and
- * is behind IB-029's `APP_GUARD` on `/api/web` — which is why no guard decorator appears here: one
- * place decides who may read the dashboard, not two. Keep the two apart; converging them would
- * make the detailed one public.
+ * is behind IB-029's `APP_GUARD` on `/api/web`: one place decides who may read the dashboard, not
+ * two. Keep the two apart; converging them would make the detailed one public.
+ *
+ * IB-075 (member-access design M8): the whole controller is `@AdminOnly` — a member gets 403
+ * FORBIDDEN on every route here, including ones added later. The same guard enforces it; the
+ * decorator only marks the class. Pinned by test/web/health-admin-only.spec.ts.
  */
+@AdminOnly()
 @Controller('api/web/health')
 export class WebHealthController {
   constructor(

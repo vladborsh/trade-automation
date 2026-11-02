@@ -4,7 +4,9 @@
        pages stay, but last (see app.routes.ts). -->
   <a routerLink="/market" routerLinkActive="active">{{ t('nav.market') }}</a>
   <a routerLink="/instrument/BTCUSDT" routerLinkActive="active">{{ t('nav.instrument') }}</a>
-  <a routerLink="/health" routerLinkActive="active">{{ t('nav.health') }}</a>
+  @if (isAdmin()) {
+    <a routerLink="/health" routerLinkActive="active">{{ t('nav.health') }}</a>
+  }
   <app-alerts-toggle class="nav-end" />
 </nav>
 <main class="page">

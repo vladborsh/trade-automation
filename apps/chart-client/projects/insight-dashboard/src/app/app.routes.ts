@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './core/admin.guard';
 
 /**
  * architecture/insight-bot-web-dashboard.md §3.
@@ -24,7 +25,9 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login.component').then((m) => m.LoginComponent),
   },
   {
+    // IB-075 (member-access design M8): the operator page is admin-only; a member lands on the market.
     path: 'health',
+    canActivate: [adminGuard(LANDING_ROUTE)],
     loadComponent: () => import('./features/health/health.component').then((m) => m.HealthComponent),
   },
   {
