@@ -48,7 +48,9 @@ const contextFor = (route: (typeof routes)[number], cookie: boolean): ExecutionC
 describe('IB-075: /api/web/health/* is admin-only', () => {
   it('finds the controller routes (an empty list would make every case below vacuous)', () => {
     expect(base).toBe('api/web/health');
-    expect(routes.length).toBeGreaterThanOrEqual(3);
+    // WD-009 removed gap-reports with the candle tape it reported on: exactly these two remain.
+    // Pinned as a set, not a minimum, so a route added later is noticed here as well as guarded.
+    expect(routes.map((r) => r.path).sort()).toEqual(['/api/web/health/db', '/api/web/health/streams']);
     for (const r of routes) expect(r.path.startsWith('/api/web/health/')).toBe(true);
   });
 
