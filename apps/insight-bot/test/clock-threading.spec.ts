@@ -150,20 +150,6 @@ const ALLOWED: readonly Allowance[] = [
     category: 'origin',
     why: 'defaults the report to yesterday when no --day is given; the explicit argument is the injected path',
   },
-  {
-    file: 'web/context/context.controller.ts',
-    line: 'const now = Date.now();',
-    count: 1,
-    category: 'origin',
-    why: 'a request handler: the cards it returns are relative to the moment of the request, and nothing is injected',
-  },
-  {
-    file: 'web/context/context.controller.ts',
-    line: 'const toMs = to === undefined ? Date.now() : Number(to);',
-    count: 1,
-    category: 'origin',
-    why: 'the window default when a caller sends no `to`; an explicit `to` is the injected path',
-  },
 
   // ---- elapsed: wall-time DURATIONS. A domain clock here would be the bug.
   {

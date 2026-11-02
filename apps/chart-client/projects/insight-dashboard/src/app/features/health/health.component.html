@@ -54,31 +54,48 @@
   </section>
 
   <section>
-    <h2>{{ t('health.gapReports') }}</h2>
-    @if (worst().length > 0) {
-      <!-- the separator is a comma rather than a collapsing space: "(400)BTCUSDT" ran together -->
-      <p class="warn">{{ t('health.gapReportsWorst') }} @for (c of worst(); track c.symbol + c.day; let last = $last) {<span>{{ c.symbol }} {{ c.day }} ({{ c.missing }})</span>@if (!last) {<span>,&nbsp;</span>}}</p>
-    } @else {
-      <p class="muted">{{ t('health.gapReportsClean') }}</p>
+    <h2>{{ t('health.uptime') }}</h2>
+    @if (uptimeMissing()) {
+      <p class="warn">{{ t('health.uptime.missing') }}</p>
     }
-    <table class="grid">
+    <table>
       <thead>
         <tr>
-          <th>{{ t('health.col.symbol') }}</th>
-          @for (day of grid()?.days ?? []; track day) { <th class="day">{{ day.slice(5) }}</th> }
+          <th>{{ t('health.col.stream') }}</th>
+          <th>{{ t('health.col.venue') }}</th>
+          <th>{{ t('health.uptime.col.lastRow') }}</th>
+          <th>{{ t('health.uptime.col.lastSeen') }}</th>
+          <th>{{ t('health.uptime.col.day') }}</th>
+          <th>{{ t('health.uptime.col.week') }}</th>
         </tr>
       </thead>
       <tbody>
-        @for (row of grid()?.rows ?? []; track row.symbol) {
+        @for (u of uptime(); track u.stream) {
           <tr>
-            <td>{{ row.symbol }}</td>
-            @for (cell of row.cells; track cell.day) {
-              <td class="cell" [class]="severity(cell)" [title]="cell.missing + ' / ' + cell.expected">{{ label(cell) }}</td>
+            <td>{{ u.stream }}</td>
+            <td>{{ u.venue }}</td>
+            <td>{{ since(u.lastRowAt) }}</td>
+            <td>
+              @if (u.instrumented) {
+                {{ since(u.lastSeen) }}
+              } @else {
+                <span class="warn">{{ t('health.uptime.notInstrumented') }}</span>
+              }
+            </td>
+            @for (hours of [24, 168]; track hours) {
+              @if (windowOf(u, hours); as w) {
+                <td [class]="stateClass(w.state)" [title]="t('health.uptime.coverage', { covered: w.coveredHours, elapsed: w.elapsedHours, outages: w.outages, rows: w.rows })">{{ t(stateKey(w.state)) }}</td>
+              } @else {
+                <td class="muted">—</td>
+              }
             }
           </tr>
+        } @empty {
+          <tr><td colspan="6" class="muted">{{ t('health.uptime.none') }}</td></tr>
         }
       </tbody>
     </table>
+    <p class="muted">{{ t('health.uptime.hint') }}</p>
   </section>
 
   <section>

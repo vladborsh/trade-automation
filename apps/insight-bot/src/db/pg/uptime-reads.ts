@@ -3,7 +3,9 @@ import type { Market } from '../../collectors/writers/tables';
 import type { Heartbeat } from '../../collectors/uptime/uptime-gap';
 
 /**
- * IB-BUG-010 — the reads and writes behind collector coverage. SQL lives in `src/db/pg/` (IB-004).
+ * IB-BUG-010 — the reads and writes behind collector uptime. SQL lives in `src/db/pg/` (IB-004).
+ * WD-009: was `coverage-reads.ts`; the coverage page is gone and these now feed the liquidation
+ * uptime block of `/api/web/health/streams` (and, as before, `UptimeRecorder`).
  *
  * Kept in its own file rather than added to `collector-reads.ts` deliberately: that file is read by
  * the daily gap report and by three collectors, and dev-1 and dev-2 are both in this app this week.
@@ -75,38 +77,23 @@ export async function gapsOverlapping(
 }
 
 /**
- * IB-BUG-010, second half — liquidation rows whose `(venue, symbol)` matches no spelling in
- * `symbols`.
- *
- * `liquidations.symbol` holds the **venue's own** spelling (`BTCUSDT` on binance and bybit,
- * `BTC-USDT-SWAP` on okx), not the canonical `symbols.id`. A row whose spelling is in no column is
- * therefore unreachable from any canonical id: it sits in the table, is counted by nothing, and
- * reaches no page. dev-2 measured 0 of these on 2026-10-07 and I measured 0 again on 2026-10-12 —
- * two observations, both zero, which is a note and not a guarantee. The point of surfacing it is
- * the day it stops being zero, which is the day a venue renames a contract.
- *
- * Grouped by `(venue, symbol)` so the answer names the spellings rather than only counting them;
- * a bare total tells you something is wrong without telling you what to fix.
+ * WD-009 — what each venue's liquidation collector WROTE in the last 7 days: the newest row, and how
+ * many rows fell in the last 24 h and the last 7 days. Bounded by `from7d` on purpose: `liquidations`
+ * is partitioned by time, and an unbounded `max(ts)` would touch every partition there is.
  */
-export async function unmappedLiquidations(
+export async function liquidationActivity(
   db: Db,
-  limit = 20,
-): Promise<{ total: number; rows: Array<{ venue: string; symbol: string; rows: number }> }> {
-  const sql = `
-      from liquidations l
-     where not exists (
-       select 1 from symbols s
-        where (l.venue = 'binance' and l.symbol in (s.binance_perp, s.binance_spot))
-           or (l.venue = 'bybit'   and l.symbol = s.bybit_linear)
-           or (l.venue = 'okx'     and l.symbol = s.okx_swap))`;
-
-  const [total] = await db.query<{ n: string }>(`select count(*) as n ${sql}`, []);
-  const rows = await db.query<{ venue: string; symbol: string; n: string }>(
-    `select l.venue, l.symbol, count(*) as n ${sql} group by l.venue, l.symbol order by count(*) desc limit $1`,
-    [limit],
+  from7d: Date,
+  from24h: Date,
+): Promise<Map<string, { lastRowAt: Date; rows24h: number; rows7d: number }>> {
+  const rows = await db.query<{ venue: string; last_ts: Date; n24: string; n7: string }>(
+    `select venue, max(ts) as last_ts,
+            count(*) filter (where ts >= $2) as n24,
+            count(*) as n7
+       from liquidations
+      where ts >= $1
+      group by venue`,
+    [from7d, from24h],
   );
-  return {
-    total: Number(total?.n ?? 0),
-    rows: rows.map((r) => ({ venue: r.venue, symbol: r.symbol, rows: Number(r.n) })),
-  };
+  return new Map(rows.map((r) => [r.venue, { lastRowAt: new Date(r.last_ts), rows24h: Number(r.n24), rows7d: Number(r.n7) }]));
 }

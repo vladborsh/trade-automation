@@ -11,6 +11,8 @@ import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collecto
 import { BinanceSocket } from '../binance-common/socket';
 import { PerpRest } from '../../venues/binance/perp.rest';
 import { perpMarketWsBaseUrl } from './streams';
+import { UptimeRecorder } from '../uptime/uptime.recorder';
+import { BINANCE_LIQUIDATION_STREAM } from '../uptime/liquidation-streams';
 
 /** One tick per second drives the mode policy, the minute boundary and the degraded pollers. */
 export const TICK_MS = 1_000;
@@ -32,6 +34,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     private readonly registry: StreamRegistry,
     private readonly metrics: MetricsService,
     private readonly weight: BinanceWeightTracker,
+    private readonly uptime: UptimeRecorder,
     @Inject(DB) private readonly db: Db | null,
   ) {}
 
@@ -71,6 +74,9 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     });
 
     await this.collector.start();
+    // WD-009: the liquidation stream's liveness, like Bybit's and OKX's (IB-BUG-010) — without it a
+    // Binance outage leaves no gap row and "no liquidations" reads as a quiet market.
+    await this.uptime.begin([{ stream: BINANCE_LIQUIDATION_STREAM, venue: 'binance', market: 'perp' }]);
     this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
     this.timer.unref?.();
     this.logger.log(`binance-perp collector started for ${symbols.length} symbols on ${marketWsBaseUrl}`);
@@ -81,5 +87,6 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     this.timer = null;
     await this.collector?.stop();
     this.collector = null;
+    await this.uptime.end();
   }
 }

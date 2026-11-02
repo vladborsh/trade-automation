@@ -9,7 +9,6 @@ import { WebAuthController } from './auth/web-auth.controller';
 import { WebAuthGuard } from './auth/web-auth.guard';
 import { WebAuthService } from './auth/web-auth.service';
 import { WebContextController } from './context/context.controller';
-import { WebCoverageController } from './coverage.controller';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
@@ -60,7 +59,7 @@ export class WebModule {
       // No guard decorator on any of these — they are authenticated by the APP_GUARD above,
       // which is the whole point of it being module-wide.
       controllers: [
-        WebAuthController, WebHealthController, WebCoverageController,
+        WebAuthController, WebHealthController,
         SeriesController, UniverseController, LiquidationsController, WebContextController,
         CalendarController, WebPushController,
       ],

@@ -27,9 +27,7 @@ th { color: var(--muted); }
 .error { color: var(--down); }
 .degraded { color: var(--down); }
 
-.grid .day { font-size: 11px; color: var(--muted); }
-.grid .cell { text-align: center; padding: 1px 4px; }
-.cell.clean { color: var(--muted); }
-.cell.minor { color: #d29922; }
-.cell.bad { color: var(--down); }
-.cell.unknown { color: var(--border); }
+/* WD-009 liquidation uptime: only "not recorded" warns — "no events" is a quiet market, not a fault */
+.ok { color: var(--up); }
+.quiet { color: var(--muted); }
+.missing { color: #d29922; }

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { DB, type Db } from '../../db/db.port';
-import { heartbeats, touchHeartbeat } from '../../db/pg/coverage-reads';
+import { heartbeats, touchHeartbeat } from '../../db/pg/uptime-reads';
 import { Writers } from '../writers/batch-writer';
 import type { Market } from '../writers/tables';
 import { uptimeGap } from './uptime-gap';

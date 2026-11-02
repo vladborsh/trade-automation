@@ -6,8 +6,8 @@ import { uptimeGap } from '../../src/collectors/uptime/uptime-gap';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
-import { gapsOverlapping, heartbeats, touchHeartbeat, unmappedLiquidations } from '../../src/db/pg/coverage-reads';
-import { collectorCoverage } from '../../src/web/collector-coverage';
+import { gapsOverlapping, heartbeats, liquidationActivity, touchHeartbeat } from '../../src/db/pg/uptime-reads';
+import { liquidationUptime } from '../../src/web/liquidation-uptime';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
@@ -16,14 +16,14 @@ import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scr
  *
  * Why this needs a real database rather than a fake: migration 010's `on conflict (stream)` upsert
  * with `greatest(...)` is the thing that stops liveness walking backwards, the `gap_from < $2 and
- * gap_to > $1` overlap is the thing that catches an outage spanning the window edge, and the
- * unmapped-spelling query is a `not exists` over four nullable columns. All three are SQL, and a
+ * gap_to > $1` overlap is the thing that catches an outage spanning the window edge, and WD-009's
+ * `liquidationActivity` is a filtered aggregate over a partitioned table. All three are SQL, and a
  * fake would only re-assert what I believe the SQL does.
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   // eslint-disable-next-line no-console
-  console.warn('collector-coverage.integration.spec.ts: DATABASE_URL not set — skipping.');
+  console.warn('uptime-reads.integration.spec.ts: DATABASE_URL not set — skipping.');
 }
 const maybeDescribe = DATABASE_URL ? describe : describe.skip;
 
@@ -79,18 +79,18 @@ maybeDescribe('IB-BUG-010 collector coverage against a real database', () => {
     expect(stored[0].gapTo.toISOString()).toBe(restart.toISOString());
     expect(stored[0].error).toContain('collector not running');
 
-    // Through the real SQL and the real arithmetic. Note the denominator: this stream's first
-    // liveness is 08:00, so only 16 of the day's 24 hours are hours it was responsible for, and
-    // 8.5 of those were uncovered → 7.5 covered of 16 elapsed.
-    //
-    // I expected 15.5 of 24 when I wrote this test and the spec corrected me, which is the point of
-    // it: "elapsed" is not wall-clock, it is the time since the collector existed. Asserting 24
-    // here would have been asserting that we failed to cover a morning we had not been born for.
-    const coverage = collectorCoverage(found, stored, { from: new Date(DAY0), to: new Date(DAY0 + 86_400_000) });
-    expect(coverage).toHaveLength(1);
-    expect(coverage[0].coveredHours).toBe(7.5);
-    expect(coverage[0].elapsedHours).toBe(16);
-    expect(coverage[0].outages).toBe(1);
+    // Through the real SQL and WD-009's arithmetic. The stream first heartbeat at 08:00 and was down
+    // 10:00–18:30, so 7.5 h of the 24 h window were covered. WD-009 reports the WALL-CLOCK window as
+    // elapsed (the coverage page used "since first seen", 16 h): the morning before the collector
+    // existed is a morning whose liquidations were not recorded, and a no-rows window that includes
+    // it must say `not_recorded`, not `no_events`.
+    // "now" is the end of the day, and the heartbeat is refreshed so the stretch since 18:30 is live
+    const now = new Date(DAY0 + 86_400_000);
+    await touchHeartbeat(db, { stream: STREAM, venue: 'bybit', market: 'perp' }, now);
+    const [uptime] = liquidationUptime([{ stream: STREAM, venue: 'bybit' }], await heartbeats(db), stored, new Map(), now);
+    const day = uptime.windows[0];
+    expect(day).toMatchObject({ hours: 24, coveredHours: 7.5, elapsedHours: 24, outages: 1, rows: 0, state: 'not_recorded' });
+    expect(uptime.instrumented).toBe(true);
   });
 
   it('first_seen_at is never moved by a later heartbeat', async () => {
@@ -129,31 +129,18 @@ maybeDescribe('IB-BUG-010 collector coverage against a real database', () => {
     expect(stored[0].gapFrom.getTime()).toBe(DAY0 - 6 * HOUR);
   });
 
-  it('counts a liquidation whose spelling is in no symbols column, and ignores ones that map', async () => {
-    await db.query(
-      `insert into symbols (id, base, quote, binance_perp, bybit_linear, okx_swap, listed_perp)
-            values ('BTCUSDT','BTC','USDT','BTCUSDT','BTCUSDT','BTC-USDT-SWAP','2020-01-01')`,
-      [],
-    );
+  it('liquidationActivity: newest row and counts per venue, 24 h inside 7 d, nothing older counted', async () => {
+    const now = DAY0 + 2 * 86_400_000;
     const liq = new BatchWriter<t.LiquidationRow>(db, t.LIQUIDATIONS, t.liquidationTuple);
+    const row = (venue: string, ms: number) => ({ venue, symbol: 'BTCUSDT', ts: new Date(ms), side: 'long' as const, price: 1, qty: 1, notional: 1, source: 'ws' as const });
     await liq.write([
-      // maps: bybit spelling is in bybit_linear
-      { venue: 'bybit', symbol: 'BTCUSDT', ts: new Date(DAY0 + HOUR), side: 'long', price: 1, qty: 1, notional: 1, source: 'ws' },
-      // maps: okx's own spelling
-      { venue: 'okx', symbol: 'BTC-USDT-SWAP', ts: new Date(DAY0 + HOUR), side: 'long', price: 1, qty: 1, notional: 1, source: 'ws' },
-      // does NOT map: a renamed contract nobody added to the universe
-      { venue: 'bybit', symbol: 'RENAMED1000PEPEUSDT', ts: new Date(DAY0 + HOUR), side: 'short', price: 1, qty: 2, notional: 2, source: 'ws' },
-      { venue: 'bybit', symbol: 'RENAMED1000PEPEUSDT', ts: new Date(DAY0 + 2 * HOUR), side: 'long', price: 1, qty: 3, notional: 3, source: 'ws' },
-      // does NOT map: right spelling, wrong venue — okx's id under bybit reaches nothing
-      { venue: 'bybit', symbol: 'BTC-USDT-SWAP', ts: new Date(DAY0 + 3 * HOUR), side: 'long', price: 1, qty: 1, notional: 1, source: 'ws' },
+      row('bybit', now - 2 * HOUR), // in 24 h and 7 d
+      row('bybit', now - 30 * HOUR), // 7 d only
+      row('okx', now - 40 * HOUR), // 7 d only
     ]);
-
-    const unmapped = await unmappedLiquidations(db);
-    expect(unmapped.total).toBe(3);
-    // named, not just counted: a bare total says something is wrong without saying what to fix
-    expect(unmapped.rows).toEqual([
-      { venue: 'bybit', symbol: 'RENAMED1000PEPEUSDT', rows: 2 },
-      { venue: 'bybit', symbol: 'BTC-USDT-SWAP', rows: 1 },
-    ]);
+    const activity = await liquidationActivity(db, new Date(now - 7 * 86_400_000), new Date(now - 86_400_000));
+    expect(activity.get('bybit')).toEqual({ lastRowAt: new Date(now - 2 * HOUR), rows24h: 1, rows7d: 2 });
+    expect(activity.get('okx')).toEqual({ lastRowAt: new Date(now - 40 * HOUR), rows24h: 0, rows7d: 1 });
+    expect(activity.has('binance')).toBe(false);
   });
 });

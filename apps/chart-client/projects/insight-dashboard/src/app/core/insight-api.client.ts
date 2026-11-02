@@ -2,7 +2,7 @@ import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
   WebCandlesResponse, WebDbHealthResponse, WebExchangeRequest, WebMarketCardsResponse,
-  WebExchangeResponse, WebFundingResponse, WebGapReportsResponse, WebLiquidationsResponse,
+  WebExchangeResponse, WebFundingResponse, WebLiquidationsResponse,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
@@ -33,10 +33,6 @@ export class InsightApiClient {
 
   async streams(): Promise<WebStreamsResponse> {
     return this.get<WebStreamsResponse>('/health/streams');
-  }
-
-  async gapReports(days = 14): Promise<WebGapReportsResponse> {
-    return this.get<WebGapReportsResponse>('/health/gap-reports', { days });
   }
 
   async dbHealth(): Promise<WebDbHealthResponse> {

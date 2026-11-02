@@ -6,7 +6,7 @@ import { z } from 'zod';
  *
  * **This is not the ops `GET /health`.** insight-bot serves two different things called health and
  * they must stay apart: `/health` is the unauthenticated liveness probe (§6.1, and what the SPA
- * fallback excludes), while these endpoints expose per-stream detail, gap history and database
+ * fallback excludes), while these endpoints expose per-stream detail, liquidation-collector uptime and database
  * internals that only a logged-in member may read. Anyone tempted to "unify" them would be turning
  * the detailed one public — keep both.
  */
@@ -35,27 +35,53 @@ export const WebWeightGaugeSchema = z.object({
 });
 export type WebWeightGauge = z.infer<typeof WebWeightGaugeSchema>;
 
+/**
+ * WD-009 — one liquidation collector's record over a window, in three states, because "no rows"
+ * means two different things and a page must not show them alike (IB-BUG-010):
+ * - `recorded` — the collector wrote liquidations in the window;
+ * - `no_events` — it was listening the WHOLE window and the venue liquidated nothing;
+ * - `not_recorded` — no rows, and for some of the window nobody was listening (an outage, a stream
+ *   not yet instrumented, or a collector younger than the window). Rows from that window may be
+ *   missing; the tape cannot say.
+ */
+export const WebUptimeStateSchema = z.enum(['recorded', 'no_events', 'not_recorded']);
+export type WebUptimeState = z.infer<typeof WebUptimeStateSchema>;
+
+export const WebUptimeWindowSchema = z.object({
+  hours: z.number().int().positive(),
+  state: WebUptimeStateSchema,
+  /** Hours of the window the collector was listening, to 0.1 h. */
+  coveredHours: z.number().nonnegative(),
+  /** The window's length in hours — wall clock, not "since the collector existed". */
+  elapsedHours: z.number().nonnegative(),
+  /** Outage rows (`collector_gaps`) overlapping the window. */
+  outages: z.number().int().nonnegative(),
+  /** Liquidation rows written in the window. */
+  rows: z.number().int().nonnegative(),
+});
+export type WebUptimeWindow = z.infer<typeof WebUptimeWindowSchema>;
+
+export const WebLiquidationUptimeSchema = z.object({
+  stream: z.string(),
+  venue: z.string(),
+  /** Whether this stream has ever written a heartbeat; false means its outages are not recorded at all. */
+  instrumented: z.boolean(),
+  /** Newest liquidation row from this venue in the last 7 days, epoch ms; null when none. */
+  lastRowAt: z.number().nullable(),
+  /** Last heartbeat, epoch ms; null when never instrumented. */
+  lastSeen: z.number().nullable(),
+  /** 24 h, then 7 days. */
+  windows: z.array(WebUptimeWindowSchema),
+});
+export type WebLiquidationUptime = z.infer<typeof WebLiquidationUptimeSchema>;
+
 export const WebStreamsResponseSchema = z.object({
   streams: z.array(WebStreamHealthRowSchema),
   weights: z.array(WebWeightGaugeSchema).default([]),
+  /** WD-009: the three liquidation collectors' record (was the coverage page's collector block). */
+  liquidationUptime: z.array(WebLiquidationUptimeSchema).default([]),
 });
 export type WebStreamsResponse = z.infer<typeof WebStreamsResponseSchema>;
-
-/** One cell of the symbol × day grid: what a day's report said about one series. */
-export const WebGapReportCellSchema = z.object({
-  day: z.string(), // YYYY-MM-DD (UTC)
-  symbol: z.string(),
-  series: z.string(), // 'candles_1m' | 'open_interest_5m' | …
-  missing: z.number().int().nonnegative(),
-  expected: z.number().int().nonnegative(),
-});
-export type WebGapReportCell = z.infer<typeof WebGapReportCellSchema>;
-
-export const WebGapReportsResponseSchema = z.object({
-  days: z.array(z.string()),
-  cells: z.array(WebGapReportCellSchema),
-});
-export type WebGapReportsResponse = z.infer<typeof WebGapReportsResponseSchema>;
 
 export const WebDbHealthResponseSchema = z.object({
   sizeBytes: z.number().nonnegative(),
