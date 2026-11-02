@@ -1,4 +1,4 @@
-import type { BybitFundingHistoryRow } from '../../collectors/bybit/payloads';
+import type { BybitFundingHistoryRow } from './payloads';
 
 /**
  * IB-008 — the one REST endpoint this collector needs: settled funding history (§4.3).

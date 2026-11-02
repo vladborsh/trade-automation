@@ -47,26 +47,6 @@ export interface ForceOrderEvent {
   };
 }
 
-/** One element of `GET /fapi/v1/premiumIndex` with no symbol. */
-export interface PremiumIndexRow {
-  symbol: string;
-  markPrice: string;
-  indexPrice: string;
-  estimatedSettlePrice?: string;
-  lastFundingRate: string; // the predicted rate for the current interval
-  interestRate?: string;
-  nextFundingTime: number;
-  time: number;
-}
-
-/** One element of `GET /fapi/v1/fundingRate`. */
-export interface FundingRateRow {
-  symbol: string;
-  fundingTime: number;
-  fundingRate: string;
-  markPrice?: string; // documented as present but empty on some rows
-}
-
 /** Narrowing helpers for the combined-stream payloads, which arrive as `{ stream, data }`. */
 export function isMarkPriceEvent(value: unknown): value is MarkPriceEvent {
   return (value as MarkPriceEvent)?.e === 'markPriceUpdate';

@@ -1,5 +1,6 @@
 import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
-import type { ForceOrderEvent, FundingRateRow, MarkPriceEvent, PremiumIndexRow } from './payloads';
+import type { ForceOrderEvent, MarkPriceEvent } from './payloads';
+import type { FundingRateRow, PremiumIndexRow } from '../../venues/binance/payloads';
 import { VENUE } from '../binance-common/venue';
 
 /**

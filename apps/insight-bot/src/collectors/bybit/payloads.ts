@@ -56,13 +56,6 @@ export interface BybitLiquidationEvent {
   p: string; // bankruptcy price
 }
 
-/** `GET /v5/market/funding/history` row. */
-export interface BybitFundingHistoryRow {
-  symbol: string;
-  fundingRate: string;
-  fundingRateTimestamp: string; // epoch ms, as a string
-}
-
 /** Any `{op: …}` acknowledgement: subscribe, ping/pong, auth. */
 export interface BybitOpAck {
   op: string;

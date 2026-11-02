@@ -2,7 +2,8 @@ import { fundingSettlementRow, liquidationRowFromEvent, markRowFromEvent, markRo
 import * as fs from 'fs';
 import * as path from 'path';
 import { demultiplex } from '../../../src/collectors/binance-common/socket';
-import { isForceOrderEvent, type ForceOrderEvent, type MarkPriceEvent, type PremiumIndexRow } from '../../../src/collectors/binance-perp/payloads';
+import { isForceOrderEvent, type ForceOrderEvent, type MarkPriceEvent } from '../../../src/collectors/binance-perp/payloads';
+import type { PremiumIndexRow } from '../../../src/venues/binance/payloads';
 
 /**
  * IB-005 — recorded Binance USD-M payload shapes → §3.3 rows. Fixtures keep the venue's field

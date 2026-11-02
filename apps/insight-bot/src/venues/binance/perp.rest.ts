@@ -1,5 +1,5 @@
 import type { BinanceRestKline } from '@trade-automation/binance-client';
-import type { FundingRateRow, PremiumIndexRow } from '../../collectors/binance-perp/payloads';
+import type { FundingRateRow, PremiumIndexRow } from './payloads';
 
 /**
  * IB-005 — the REST calls this collector makes itself, beside the lifted kline paginator.

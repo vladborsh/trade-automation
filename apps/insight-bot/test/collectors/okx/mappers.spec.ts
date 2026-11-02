@@ -11,11 +11,11 @@ import {
 } from '../../../src/collectors/okx/mappers';
 import {
   OkxFundingRate,
-  OkxInstrument,
   OkxLiquidation,
   OkxMarkPrice,
   OkxMessage,
 } from '../../../src/collectors/okx/payloads';
+import { OkxInstrument } from '../../../src/venues/okx/payloads';
 
 /** Captured live from ws.okx.com / www.okx.com on 2026-09-28. */
 const fixture = <T>(name: string): T =>

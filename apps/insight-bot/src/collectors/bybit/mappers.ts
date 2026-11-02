@@ -1,5 +1,6 @@
 import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
-import type { BybitFundingHistoryRow, BybitLiquidationEvent, BybitTickerData } from './payloads';
+import type { BybitLiquidationEvent, BybitTickerData } from './payloads';
+import type { BybitFundingHistoryRow } from '../../venues/bybit/payloads';
 
 /** IB-008 — Bybit payload → §3.3 rows. Pure: every timestamp comes from the payload. */
 
