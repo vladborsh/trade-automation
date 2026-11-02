@@ -8,7 +8,7 @@ import { Writers } from '../writers/batch-writer';
 import { BybitCollector, STREAM_LIQUIDATION } from './bybit-collector';
 import { BybitSocket } from './bybit-socket';
 import { VENUE } from './mappers';
-import { BybitRest } from './rest';
+import { BybitRest } from '../../venues/bybit/bybit.rest';
 
 /** One tick a second: the silence watchdog and the minute boundary. */
 export const TICK_MS = 1_000;

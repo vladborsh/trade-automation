@@ -1,7 +1,7 @@
 import { BinancePerpCollector, type PerpCollectorPorts } from '../../src/collectors/binance-perp/perp-collector';
-import type { PerpRest } from '../../src/collectors/binance-perp/rest';
+import type { PerpRest } from '../../src/venues/binance/perp.rest';
 import { BinanceSpotCollector, type SpotCollectorPorts } from '../../src/collectors/binance-spot/spot-collector';
-import type { SpotRest } from '../../src/collectors/binance-spot/rest';
+import type { SpotRest } from '../../src/venues/binance/spot.rest';
 import type { Candle1mRow } from '../../src/collectors/writers/tables';
 
 /**

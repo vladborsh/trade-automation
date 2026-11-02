@@ -1,4 +1,4 @@
-import { OkxInstrument } from './payloads';
+import { OkxInstrument } from '../../collectors/okx/payloads';
 
 /**
  * OKX sizes are denominated in **contracts**, not base units, and the contract size differs by

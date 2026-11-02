@@ -8,11 +8,11 @@ import {
   mapTakerRatio,
   OpenInterestHistRow,
   TakerRatioRow,
-} from '../src/collectors/binance-perp/oi-ls.mapper';
+} from '../../../src/venues/binance/oi-ls.mapper';
 
 /** Payloads captured live from fapi.binance.com on 2026-09-28 (BTCUSDT, period=5m, limit=2). */
 const fixture = <T>(name: string): T[] =>
-  JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'binance', `${name}.json`), 'utf8')) as T[];
+  JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'binance', `${name}.json`), 'utf8')) as T[];
 
 describe('mapOpenInterestHist (real payload)', () => {
   const rows = fixture<OpenInterestHistRow>('openInterestHist');

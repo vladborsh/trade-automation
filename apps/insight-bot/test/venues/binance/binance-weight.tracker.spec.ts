@@ -1,4 +1,4 @@
-import { BinanceWeightTracker } from '../src/collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../../../src/venues/binance/binance-weight.tracker';
 
 describe('BinanceWeightTracker', () => {
   it('sums this app\'s own calls over the trailing minute', () => {

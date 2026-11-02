@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { contractSpecs, contractsToBase, parseContractSpec } from '../../../src/collectors/okx/contract-size';
+import { contractSpecs, contractsToBase, parseContractSpec } from '../../../src/venues/okx/contract-size';
 import {
   fundingTimeOf,
   liquidationRows,

@@ -1,5 +1,5 @@
 import type { BinanceRestKline } from '@trade-automation/binance-client';
-import type { FundingRateRow, PremiumIndexRow } from './payloads';
+import type { FundingRateRow, PremiumIndexRow } from '../../collectors/binance-perp/payloads';
 
 /**
  * IB-005 — the REST calls this collector makes itself, beside the lifted kline paginator.
@@ -15,9 +15,9 @@ import type { FundingRateRow, PremiumIndexRow } from './payloads';
  * collector forwards to `MetricsService.setBinanceWeightUsed1m` (§6.1's `ib_binance_weight_used_1m`).
  */
 
-import { BinanceRest, type BinanceRestOptions } from '../binance-common/rest';
+import { BinanceRest, type BinanceRestOptions } from './rest.base';
 
-/** IB-006: the shared mechanics moved to `binance-common/rest.ts`; these three paths are perp's. */
+/** IB-006: the shared mechanics moved to `rest.base.ts`; these three paths are perp's. */
 export type PerpRestOptions = BinanceRestOptions;
 
 export class PerpRest extends BinanceRest {

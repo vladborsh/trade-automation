@@ -4,7 +4,7 @@ import type { CandleSource } from '@trade-automation/market-data-core';
 import { KlineIngest, type KlineIngestMetrics, type KlineIngestWriters } from '../binance-common/kline-ingest';
 import { ModePolicy, type CollectorMode, type ModePolicyOptions } from '../binance-common/mode';
 import { VENUE } from '../binance-common/venue';
-import type { SpotRest } from './rest';
+import type { SpotRest } from '../../venues/binance/spot.rest';
 import { spotStreamNames } from './streams';
 
 /**

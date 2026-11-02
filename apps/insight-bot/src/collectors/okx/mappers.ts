@@ -1,5 +1,5 @@
 import { FundingSettlementRow, LiquidationRow, MarkFundingRow, Source } from '../writers/tables';
-import { ContractSpec, contractsToBase } from './contract-size';
+import { ContractSpec, contractsToBase } from '../../venues/okx/contract-size';
 import { OkxFundingHistoryRow, OkxFundingRate, OkxLiquidation, OkxMarkPrice } from './payloads';
 
 /** The venue key stored in every row (§3.1). */

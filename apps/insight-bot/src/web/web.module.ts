@@ -16,7 +16,7 @@ import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
 import { MarketCardsService } from './market/market-cards.service';
 import { CandlesService } from './market/candles.service';
-import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { MetricsService } from '../ops/metrics.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
 import { UniverseController } from './universe.controller';

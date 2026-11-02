@@ -4,8 +4,8 @@ import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { Db, DB } from '../../db/db.port';
 import { Writers } from '../writers/batch-writer';
-import { CoingeckoGate } from './coingecko.gate';
-import { COIN_CHART_DAYS, ContextClient } from './context.client';
+import { CoingeckoGate } from '../../venues/context/coingecko.gate';
+import { COIN_CHART_DAYS, ContextClient } from '../../venues/context/context.client';
 import { fearGreedRows, marketCapCoinRows, marketCapGlobalRow } from './mappers';
 import { COIN_REQUEST_SPACING_MS, dueDailyTasks, globalDueAfter, GLOBAL_POLL_MS } from './schedule';
 

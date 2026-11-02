@@ -1,4 +1,4 @@
-import { FUNDING_PAGE_LIMIT, MAX_FUNDING_PAGES, OkxRest } from '../../../src/collectors/okx/okx-rest';
+import { FUNDING_PAGE_LIMIT, MAX_FUNDING_PAGES, OkxRest } from '../../../src/venues/okx/okx-rest';
 
 const BASE = 'https://www.okx.test';
 const EIGHT_HOURS = 8 * 60 * 60 * 1000;

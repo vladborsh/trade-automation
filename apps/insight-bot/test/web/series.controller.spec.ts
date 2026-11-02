@@ -2,7 +2,7 @@ import { HttpException } from '@nestjs/common';
 import { SeriesController } from '../../src/web/series/series.controller';
 import { UniverseController } from '../../src/web/universe.controller';
 import type { Db } from '../../src/db/db.port';
-import { BinanceWeightTracker } from '../../src/collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
 import { CandlesService } from '../../src/web/market/candles.service';
 
 /**

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { WebMarketCardsResponseSchema } from '@trade-automation/contracts';
-import type { FetchLike } from '../../src/collectors/binance-common/rest';
+import type { FetchLike } from '../../src/venues/binance/rest.base';
 import { liveDominance, liveMarketCards } from '../../src/web/market/live-market-cards';
 import { CoinMarketRowSchema, FngPayloadSchema, GlobalPayloadSchema } from '../../src/web/market/market-cards.payloads';
 import { COINGECKO_TTL_MS, MarketCardsService } from '../../src/web/market/market-cards.service';

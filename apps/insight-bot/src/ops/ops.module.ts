@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
-import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { HealthController } from './health.controller';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';

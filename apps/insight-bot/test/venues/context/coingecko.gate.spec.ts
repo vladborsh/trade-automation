@@ -1,4 +1,4 @@
-import { CoingeckoGate } from '../../../src/collectors/context/coingecko.gate';
+import { CoingeckoGate } from '../../../src/venues/context/coingecko.gate';
 
 /**
  * A controllable clock, because the scheduling RULE is what is under test here. The brief is

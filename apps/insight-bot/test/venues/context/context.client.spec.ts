@@ -1,4 +1,4 @@
-import { ContextClient, MAX_RETRIES, RETRY_AFTER_MS } from '../../../src/collectors/context/context.client';
+import { ContextClient, MAX_RETRIES, RETRY_AFTER_MS } from '../../../src/venues/context/context.client';
 
 function fakeFetch(responses: Array<{ status?: number; body: unknown }>) {
   const urls: string[] = [];

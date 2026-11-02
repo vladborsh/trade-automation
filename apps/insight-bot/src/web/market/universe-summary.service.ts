@@ -1,7 +1,7 @@
 import type { WebUniverseSummaryResponse } from '@trade-automation/contracts';
-import type { FetchLike } from '../../collectors/binance-common/rest';
-import { BinanceWeightTracker } from '../../collectors/binance-perp/binance-weight.tracker';
-import { FuturesDataClient } from '../../collectors/binance-perp/futures-data.client';
+import type { FetchLike } from '../../venues/binance/rest.base';
+import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
+import { FuturesDataClient } from '../../venues/binance/futures-data.client';
 import { assembleSummary, type SummarySymbol } from './universe-summary';
 import {
   OiHistRowSchema, PremiumIndexSummaryRowSchema, Ticker24hRowSchema,

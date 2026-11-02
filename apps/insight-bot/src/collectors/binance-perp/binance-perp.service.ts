@@ -6,10 +6,10 @@ import { lastCandleOpenTimes } from '../../db/pg/collector-reads';
 import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { Writers } from '../writers/batch-writer';
-import { BinanceWeightTracker } from './binance-weight.tracker';
+import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
 import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collector';
 import { BinanceSocket } from '../binance-common/socket';
-import { PerpRest } from './rest';
+import { PerpRest } from '../../venues/binance/perp.rest';
 import { perpMarketWsBaseUrl } from './streams';
 
 /** One tick per second drives the mode policy, the minute boundary and the degraded pollers. */

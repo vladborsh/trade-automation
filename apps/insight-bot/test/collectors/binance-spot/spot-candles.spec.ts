@@ -1,6 +1,6 @@
 import type { Instrument } from '@trade-automation/contracts';
 import { SpotCandleSource } from '../../../src/collectors/binance-spot/spot-candles';
-import { SPOT_REST_PAGE_LIMIT, type SpotRest } from '../../../src/collectors/binance-spot/rest';
+import { SPOT_REST_PAGE_LIMIT, type SpotRest } from '../../../src/venues/binance/spot.rest';
 
 const MINUTE = 60_000;
 const T0 = Date.UTC(2026, 8, 28, 12, 0, 0);

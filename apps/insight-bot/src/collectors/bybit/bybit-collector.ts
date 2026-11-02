@@ -1,8 +1,8 @@
 import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
 import { fundingSettlementRow, liquidationRows, VENUE } from './mappers';
 import { isLiquidationMessage, isTickerMessage } from './payloads';
-import type { BybitRest } from './rest';
-import { shouldPageFurther } from './rest';
+import type { BybitRest } from '../../venues/bybit/bybit.rest';
+import { shouldPageFurther } from '../../venues/bybit/bybit.rest';
 import { TickerState } from './ticker-state';
 
 /**

@@ -8,7 +8,7 @@ import { Writers } from '../writers/batch-writer';
 import { BinanceSocket } from '../binance-common/socket';
 import { BinanceSpotCollector, MARKET, VENUE_LOGGER_NAME } from './spot-collector';
 import { SpotCandleSource } from './spot-candles';
-import { SpotRest } from './rest';
+import { SpotRest } from '../../venues/binance/spot.rest';
 
 /** One tick per second drives the mode policy and the degraded poller. */
 export const TICK_MS = 1_000;

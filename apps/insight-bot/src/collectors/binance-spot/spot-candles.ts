@@ -1,7 +1,7 @@
 import type { Candle, Instrument, Timeframe } from '@trade-automation/contracts';
 import { mapRestKline } from '@trade-automation/binance-client';
 import type { CandleSource } from '@trade-automation/market-data-core';
-import { SPOT_REST_PAGE_LIMIT, type SpotRest } from './rest';
+import { SPOT_REST_PAGE_LIMIT, type SpotRest } from '../../venues/binance/spot.rest';
 
 /** 1m in ms — the only timeframe a collector repairs (§4.1: everything else is resampled). */
 const MINUTE_MS = 60_000;

@@ -2,8 +2,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { HttpException } from '@nestjs/common';
 import { WebUniverseSummaryResponseSchema } from '@trade-automation/contracts';
-import type { FetchLike } from '../../src/collectors/binance-common/rest';
-import { BinanceWeightTracker } from '../../src/collectors/binance-perp/binance-weight.tracker';
+import type { FetchLike } from '../../src/venues/binance/rest.base';
+import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
 import {
   OiHistRowSchema, PremiumIndexSummaryRowSchema, Ticker24hRowSchema,
 } from '../../src/web/market/summary.payloads';

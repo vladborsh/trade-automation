@@ -1,7 +1,7 @@
 import { HttpException, Logger } from '@nestjs/common';
 import { BinanceHttpError, type BinanceRestKline } from '@trade-automation/binance-client';
 import type { WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contracts';
-import { BinanceWeightTracker } from '../../collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
 import {
   CACHE_MAX_PAGES, LruCache, MAX_BARS_PER_REQUEST, PAGE_LIMIT, TAIL_LIMIT, barsIn, closedUntil, isTail, maxDaysFor,
   pageKey, pageSpanMs, pagesFor, reachesFormingBar, type CachedPage,

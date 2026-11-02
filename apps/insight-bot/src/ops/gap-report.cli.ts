@@ -10,7 +10,7 @@
  */
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { GapReportService } from './gap-report.service';

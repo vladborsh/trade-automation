@@ -1,5 +1,5 @@
-import { BinanceWeightTracker } from '../src/collectors/binance-perp/binance-weight.tracker';
-import { FuturesDataClient } from '../src/collectors/binance-perp/futures-data.client';
+import { BinanceWeightTracker } from '../src/venues/binance/binance-weight.tracker';
+import { FuturesDataClient } from '../src/venues/binance/futures-data.client';
 import { OiLsPoller, POLL_LIMIT, STREAM_ID } from '../src/collectors/binance-perp/oi-ls.poller';
 import { BatchWriter } from '../src/collectors/writers/batch-writer';
 import * as t from '../src/collectors/writers/tables';

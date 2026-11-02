@@ -27,9 +27,9 @@ import {
   daysBetween, daysInMonth, lastCompleteMonth, monthOf, monthsBetween, type Day, type Month,
 } from './calendar-range';
 import { fetchFundingMonth, fetchKlineDay, fetchKlineMonth, fetchMetricsDay, BINANCE } from './archive-sources';
-import { BybitRest } from '../collectors/bybit/rest';
+import { BybitRest } from '../venues/bybit/bybit.rest';
 import { settlementRowsFromHistory } from '../collectors/okx/mappers';
-import { OkxRest } from '../collectors/okx/okx-rest';
+import { OkxRest } from '../venues/okx/okx-rest';
 import { binanceFundingRange, binanceKlineRange, okxFundingFloor, OKX_REST_BASE_URL, type FetchLike } from './rest-tail';
 
 export const ARCHIVE_PARALLEL = 4;

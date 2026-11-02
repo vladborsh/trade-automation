@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { AppConfigService } from '../config/config.service';
-import { BinanceWeightTracker } from '../collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { DB, type Db } from '../db/db.port';
 import { candleCoverage, gapsForDay, saveGapReport, slotCoverage } from '../db/pg/collector-reads';
 import { buildGapReport, renderGapReport, type GapReport } from './gap-report';

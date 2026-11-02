@@ -1,5 +1,5 @@
 import type { WebFearGreedPoint, WebMarketCardsResponse } from '@trade-automation/contracts';
-import type { FetchLike } from '../../collectors/binance-common/rest';
+import type { FetchLike } from '../../venues/binance/rest.base';
 import { fearGreedRows } from '../../collectors/context/mappers';
 import { liveMarketCards } from './live-market-cards';
 import {
@@ -20,7 +20,7 @@ import {
  * | CoinGecko `/api/v3/coins/markets?ids=<top 20>` | 2 min | 0.5/min |
  *
  * So at most one CoinGecko call a minute against its keyless allowance (~5–15/min, the figure
- * `collectors/context/payloads.ts` records; not measured here). No Binance weight.
+ * `venues/context/payloads.ts` records; not measured here). No Binance weight.
  *
  * **No retry and no back-off sleep**, unlike the collectors' `ContextClient`: a page is waiting.
  * A failed read serves the last good answer if there is one, else that card is null and the

@@ -1,11 +1,11 @@
-import { BinanceWeightTracker } from '../src/collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../../../src/venues/binance/binance-weight.tracker';
 import {
   CALL_WEIGHT,
   FuturesDataClient,
   PAGE_LIMIT,
   RetentionEdgeError,
   RETENTION_MS,
-} from '../src/collectors/binance-perp/futures-data.client';
+} from '../../../src/venues/binance/futures-data.client';
 
 const BASE = 'https://fapi.binance.com';
 

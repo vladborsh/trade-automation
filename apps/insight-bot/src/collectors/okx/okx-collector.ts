@@ -1,4 +1,4 @@
-import { ContractSpec } from './contract-size';
+import { ContractSpec } from '../../venues/okx/contract-size';
 import { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
 import {
   fundingTimeOf,

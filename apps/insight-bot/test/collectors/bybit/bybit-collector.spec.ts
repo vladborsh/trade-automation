@@ -1,7 +1,7 @@
 import {
   BybitCollector, STREAM_LIQUIDATION, STREAM_TICKERS, type BybitCollectorPorts, type BybitSocketLike,
 } from '../../../src/collectors/bybit/bybit-collector';
-import type { BybitRest } from '../../../src/collectors/bybit/rest';
+import type { BybitRest } from '../../../src/venues/bybit/bybit.rest';
 import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../../../src/collectors/writers/tables';
 import { LIQUIDATIONS, TICKER_DELTA, TICKER_SNAPSHOT } from './fixtures';
 

@@ -1,4 +1,4 @@
-import { OkxFundingHistoryRow, OkxInstrument } from './payloads';
+import { OkxFundingHistoryRow, OkxInstrument } from '../../collectors/okx/payloads';
 
 /**
  * IB-009 — the two OKX REST endpoints this collector needs (design §4.3).

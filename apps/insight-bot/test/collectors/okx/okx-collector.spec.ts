@@ -1,4 +1,4 @@
-import { contractSpecs } from '../../../src/collectors/okx/contract-size';
+import { contractSpecs } from '../../../src/venues/okx/contract-size';
 import { OkxCollector } from '../../../src/collectors/okx/okx-collector';
 import { OkxFundingRate, OkxLiquidation, OkxMarkPrice } from '../../../src/collectors/okx/payloads';
 

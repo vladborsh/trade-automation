@@ -3,7 +3,7 @@ import { join } from 'path';
 import { HttpException, Logger } from '@nestjs/common';
 import { mapRestKline, type BinanceRestKline } from '@trade-automation/binance-client';
 import { WebCandleSchema, type WebMarket, type WebTimeframe } from '@trade-automation/contracts';
-import { BinanceWeightTracker } from '../../src/collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
 import { pageSpanMs } from '../../src/web/market/candle-pages';
 import { CandlesService, PERP_PAGE_WEIGHT } from '../../src/web/market/candles.service';
 import { floorToGrid, timeframeMs } from '../../src/web/series/range';

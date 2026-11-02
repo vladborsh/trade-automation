@@ -1,4 +1,4 @@
-import { BinanceWeightTracker } from '../../../src/collectors/binance-perp/binance-weight.tracker';
+import { BinanceWeightTracker } from '../../../src/venues/binance/binance-weight.tracker';
 
 /**
  * IB-011 — the daily report's "Binance weight high-water mark" (§6.2). Added to IB-007's tracker:

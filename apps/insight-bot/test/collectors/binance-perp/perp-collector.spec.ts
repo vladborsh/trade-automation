@@ -3,7 +3,7 @@ import {
   BinancePerpCollector, MARKET, STREAM_KLINE, STREAM_LIQUIDATION, STREAM_MARK,
   type CollectorSocket, type PerpCollectorPorts,
 } from '../../../src/collectors/binance-perp/perp-collector';
-import type { PerpRest } from '../../../src/collectors/binance-perp/rest';
+import type { PerpRest } from '../../../src/venues/binance/perp.rest';
 import type { Candle1mRow, CollectorGapRow, FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../../../src/collectors/writers/tables';
 
 /**

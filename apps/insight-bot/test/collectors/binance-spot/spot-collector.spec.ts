@@ -3,7 +3,7 @@ import {
   BinanceSpotCollector, MARKET, STREAM_KLINE_SPOT,
   type SpotCollectorPorts, type SpotCollectorSocket,
 } from '../../../src/collectors/binance-spot/spot-collector';
-import type { SpotRest } from '../../../src/collectors/binance-spot/rest';
+import type { SpotRest } from '../../../src/venues/binance/spot.rest';
 import type { Candle1mRow, CollectorGapRow } from '../../../src/collectors/writers/tables';
 
 /**

@@ -1,4 +1,4 @@
-import { LongShortKind, LongShortRow, OpenInterestRow, Source } from '../writers/tables';
+import { LongShortKind, LongShortRow, OpenInterestRow, Source } from '../../collectors/writers/tables';
 
 /**
  * architecture/insight-bot-system-design.md §4.1 — the `/futures/data` payloads, mapped to the

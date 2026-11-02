@@ -6,8 +6,8 @@ import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { Writers } from '../writers/batch-writer';
 import { CollectorGapRow, LongShortRow, OpenInterestRow } from '../writers/tables';
-import { BinanceWeightTracker } from './binance-weight.tracker';
-import { FuturesDataClient, PAGE_LIMIT, RETENTION_MS } from './futures-data.client';
+import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
+import { FuturesDataClient, PAGE_LIMIT, RETENTION_MS } from '../../venues/binance/futures-data.client';
 import {
   ACCOUNT_RATIO_ENDPOINTS,
   LongShortAccountRow,
@@ -17,7 +17,7 @@ import {
   OpenInterestHistRow,
   TakerRatioRow,
   VENUE,
-} from './oi-ls.mapper';
+} from '../../venues/binance/oi-ls.mapper';
 import { missingRanges, nextPollAt, SLOT_MS, slotForPoll } from './slot-grid';
 
 export const STREAM_ID = 'binance-perp:oi-ls-5m';

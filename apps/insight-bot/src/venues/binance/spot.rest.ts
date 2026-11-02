@@ -1,5 +1,5 @@
 import type { BinanceRestKline } from '@trade-automation/binance-client';
-import { BinanceRest, type BinanceRestOptions } from '../binance-common/rest';
+import { BinanceRest, type BinanceRestOptions } from './rest.base';
 
 /**
  * IB-006 §4.2 — spot's one REST path, on `api.binance.com`.

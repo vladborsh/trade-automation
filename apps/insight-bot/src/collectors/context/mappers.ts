@@ -1,4 +1,4 @@
-import { FngPayload, GlobalPayload, MarketChartPayload } from './payloads';
+import { FngPayload, GlobalPayload, MarketChartPayload } from '../../venues/context/payloads';
 
 /** One `fear_greed` row. */
 export interface FearGreedRow {

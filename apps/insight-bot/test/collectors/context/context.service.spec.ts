@@ -1,4 +1,4 @@
-import { ContextClient } from '../../../src/collectors/context/context.client';
+import { ContextClient } from '../../../src/venues/context/context.client';
 import { ContextService, STREAM_COINS } from '../../../src/collectors/context/context.service';
 import { BatchWriter } from '../../../src/collectors/writers/batch-writer';
 import { Db, DbHandle } from '../../../src/db/db.port';

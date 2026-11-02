@@ -9,7 +9,7 @@ import { KlineIngest } from '../binance-common/kline-ingest';
 import { ModePolicy, type CollectorMode, type ModePolicyOptions } from '../binance-common/mode';
 import { isForceOrderEvent, isMarkPriceEvent, type MarkPriceEvent } from './payloads';
 import { gapRow } from '../binance-common/rows';
-import type { PerpRest } from './rest';
+import type { PerpRest } from '../../venues/binance/perp.rest';
 import { perpStreamNames } from './streams';
 
 /**

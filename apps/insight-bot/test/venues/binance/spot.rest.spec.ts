@@ -1,4 +1,4 @@
-import { SpotRest, SPOT_REST_PAGE_LIMIT } from '../../../src/collectors/binance-spot/rest';
+import { SpotRest, SPOT_REST_PAGE_LIMIT } from '../../../src/venues/binance/spot.rest';
 
 /** A `FetchLike` that records the URLs it is asked for and answers with `rows`. */
 function fakeFetch(rows: unknown = [], headers: Record<string, string> = {}) {
