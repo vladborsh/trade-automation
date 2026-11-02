@@ -4,13 +4,15 @@ import {
   WEB_MAX_CANDLE_BARS, WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
   WebTimeframeSchema, WebVenueFilterSchema, type WebTimeframe,
   type WebCandlesResponse, type WebFundingResponse, type WebLiquidationEventsResponse,
-  type WebLiquidationsResponse, type WebLongShortResponse, type WebTopLiquidation,
+  type WebLiquidationsResponse, type WebLongShortResponse, type WebOpenInterestResponse, type WebTopLiquidation,
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
 import { CandlesService } from '../market/candles.service';
 import { bucketLiquidations, topLiquidations } from './liquidation-buckets';
-import { barsTouched, checkRange, gridOffsetMs, strideFor, thin, timeframeMs } from './range';
-import * as repo from './pg/series.repo';
+import { barsTouched, checkRange, gridOffsetMs, thin, timeframeMs } from './range';
+import * as repo from './pg/liquidations.repo';
+import { FundingService } from '../market/funding.service';
+import { OiLsService } from '../market/oi-ls.service';
 
 /** The venues whose liquidations a symbol can have: one per spelling `venueSpellings` resolves. */
 const LIQUIDATION_VENUES = WebVenueFilterSchema.options.filter((v) => v !== 'all').length;
@@ -29,6 +31,8 @@ export class SeriesController {
   constructor(
     @Inject(DB) private readonly db: Db | null,
     @Optional() private readonly candlesService?: CandlesService,
+    @Optional() private readonly fundingService?: FundingService,
+    @Optional() private readonly oiLsService?: OiLsService,
   ) {}
 
   private get required(): Db {
@@ -65,9 +69,8 @@ export class SeriesController {
     if (!parsedMarket.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'unknown market' }, 400);
     const { fromMs, toMs, tf: timeframe } = this.range(from, to, tf);
 
-    // IB-063: read from Binance on demand, not from the tape (which starts 2026-09-28). The tape's
-    // `repo.candles` stays until WD-009 removes the reads together. Only Binance is served, as the
-    // tape only ever held Binance candles.
+    // IB-063: read from Binance on demand, not from the tape (which starts 2026-09-28); WD-009
+    // removed the tape's candle read. Only Binance is served, as the tape only ever held Binance candles.
     if (!this.candlesService) {
       throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'candles not configured' }, 503);
     }
@@ -80,6 +83,12 @@ export class SeriesController {
     return { venue, market: parsedMarket.data, symbol, timeframe, candles, downsampled };
   }
 
+  /**
+   * WD-009: settled funding per venue and Binance's predicted rate, from the venues on demand
+   * (`market/funding.service.ts`) — the tape held only what the collectors had seen since the
+   * process first started, so a fresh box showed none. Predicted is now one point (the venue keeps
+   * no history of predictions). A venue that failed is named in `unavailable`, never sent as empty.
+   */
   @Get('funding')
   async funding(
     @Query('symbol') symbol: string,
@@ -87,43 +96,35 @@ export class SeriesController {
     @Query('to') to: string,
   ): Promise<WebFundingResponse> {
     const { fromMs, toMs } = this.range(from, to, '1m');
-    const stride = strideFor(fromMs, toMs, '1m');
-
-    const [settledRows, predictedRows] = await Promise.all([
-      repo.settledFunding(this.required, { symbol, fromMs, toMs }),
-      repo.predictedFunding(this.required, { symbol, fromMs, toMs, stride, venue: 'binance' }),
-    ]);
-
-    // settled is a step per venue; predicted is one line. Never merged: they mean different things.
-    const byVenue = new Map<string, Array<{ time: number; rate: number }>>();
-    for (const row of settledRows) {
-      const list = byVenue.get(row.venue) ?? [];
-      list.push({ time: row.time, rate: row.rate });
-      byVenue.set(row.venue, list);
-    }
-    const predicted = thin(predictedRows);
-    return {
-      symbol,
-      settled: [...byVenue.entries()].map(([venue, points]) => ({ venue, points })).sort((a, b) => a.venue.localeCompare(b.venue)),
-      predicted: predicted.rows,
-      downsampled: predicted.downsampled || stride > 1,
-    };
+    if (!this.fundingService) throw notConfigured('funding');
+    const answer = await this.fundingService.funding(symbol, fromMs, toMs);
+    // settled is a step per venue; predicted is one point. Never merged: they mean different things.
+    let downsampled = false;
+    const settled = answer.settled.map(({ venue, points }) => {
+      const thinned = thin(points);
+      downsampled ||= thinned.downsampled;
+      return { venue, points: thinned.rows };
+    });
+    return { symbol, settled, predicted: answer.predicted, downsampled, unavailable: answer.unavailable };
   }
 
+  /** WD-009: Binance open interest from `/futures/data` on demand; ~30 days back (`coverageFrom`/`truncated`). */
   @Get('oi')
   async oi(
     @Query('symbol') symbol: string,
     @Query('from') from: string,
     @Query('to') to: string,
     @Query('venue') venue = 'binance',
-  ) {
+  ): Promise<WebOpenInterestResponse> {
     const { fromMs, toMs } = this.range(from, to, '15m');
-    const stride = strideFor(fromMs, toMs, '15m');
-    const rows = await repo.openInterest(this.required, { symbol, fromMs, toMs, stride, venue });
-    const { rows: points, downsampled } = thin(rows);
-    return { symbol, venue, points, downsampled: downsampled || stride > 1 };
+    onlyBinance(venue);
+    if (!this.oiLsService) throw notConfigured('open interest');
+    const answer = await this.oiLsService.openInterest(symbol, fromMs, toMs);
+    const { rows: points, downsampled } = thin(answer.points);
+    return { ...answer, points, downsampled };
   }
 
+  /** WD-009: Binance long-short ratios from `/futures/data` on demand; ~30 days back. */
   @Get('ls')
   async ls(
     @Query('symbol') symbol: string,
@@ -137,10 +138,11 @@ export class SeriesController {
       throw new HttpException({ code: 'BAD_REQUEST', message: 'unknown kind' }, 400);
     }
     const { fromMs, toMs } = this.range(from, to, '15m');
-    const stride = strideFor(fromMs, toMs, '15m');
-    const rows = await repo.longShort(this.required, { symbol, fromMs, toMs, stride, venue, kind });
-    const { rows: points, downsampled } = thin(rows);
-    return { symbol, kind: kind as WebLongShortResponse['kind'], points, downsampled: downsampled || stride > 1 };
+    onlyBinance(venue);
+    if (!this.oiLsService) throw notConfigured('long-short');
+    const answer = await this.oiLsService.longShort(symbol, kind as WebLongShortResponse['kind'], fromMs, toMs);
+    const { rows: points, downsampled } = thin(answer.points);
+    return { ...answer, points, downsampled };
   }
 
   @Get('liquidations')
@@ -299,4 +301,19 @@ function tooManyBuckets(bound: number, tf: WebTimeframe): HttpException {
     code: 'RANGE_TOO_WIDE',
     message: `more than ${bound} grouped ${tf} liquidation rows in this window; narrow the range`,
   }, 400);
+}
+
+/**
+ * WD-009: OI and long-short come from Binance's `/futures/data` only. Bybit and OKX OI used to be
+ * read from the tape; asking for them now is refused rather than answered with an empty series,
+ * which a chart would read as "no open interest".
+ */
+function onlyBinance(venue: string): void {
+  if (venue !== 'binance') {
+    throw new HttpException({ code: 'BAD_REQUEST', message: `only venue=binance is served on demand, not ${venue}` }, 400);
+  }
+}
+
+function notConfigured(what: string): HttpException {
+  return new HttpException({ code: 'VENUE_UNAVAILABLE', message: `${what} not configured` }, 503);
 }

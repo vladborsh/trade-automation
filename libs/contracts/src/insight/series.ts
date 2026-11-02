@@ -80,6 +80,12 @@ export const WebFundingResponseSchema = z.object({
   settled: z.array(z.object({ venue: z.string(), points: z.array(WebFundingPointSchema) })),
   predicted: z.array(WebFundingPointSchema),
   downsampled: z.boolean(),
+  /**
+   * WD-009 — read from the venues on demand, a venue that failed (or Binance, above the weight
+   * ceiling) is left out of `settled` and NAMED here, so the panel can say "no data from okx"
+   * instead of drawing a quiet market. Optional: absent means every venue answered.
+   */
+  unavailable: z.array(z.string()).optional(),
 });
 export type WebFundingResponse = z.infer<typeof WebFundingResponseSchema>;
 

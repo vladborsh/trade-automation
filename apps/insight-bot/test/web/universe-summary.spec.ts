@@ -12,7 +12,7 @@ import {
   CACHE_TTL_MS, UniverseSummaryService, VenueUnavailableError,
 } from '../../src/web/market/universe-summary.service';
 import { SUMMARY_MAX, UniverseController } from '../../src/web/universe.controller';
-import type { Db } from '../../src/db/db.port';
+import type { AppConfigService } from '../../src/config/config.service';
 
 /**
  * The symbol dropdown's live summary. The fixtures are real Binance answers captured 2026-10-24,
@@ -202,16 +202,13 @@ describe('UniverseSummaryService', () => {
 });
 
 describe('GET /api/web/universe/summary', () => {
-  const db: Db = {
-    query: async () => [
-      { id: 'BTCUSDT', base: 'BTC', quote: 'USDT', volume_rank: 1, in_signal_set: true, binance_perp: 'BTCUSDT', binance_spot: 'BTCUSDT', bybit_linear: 'BTCUSDT', okx_swap: 'BTC-USDT-SWAP' },
-    ] as never,
-    transaction: async (fn) => fn(db),
-  };
+  // WD-009: the list comes from config/universe.yaml (AppConfigService), not the symbols table
+  const symbol = (id: string, rank: number) => ({ id, base: id.replace('USDT', ''), quote: 'USDT', binance_perp: id, volume_rank: rank });
+  const config = (n: number) => ({ symbols: Array.from({ length: n }, (_, i) => symbol(i === 0 ? 'BTCUSDT' : `C${i}USDT`, i + 1)), signalSet: ['BTCUSDT'] }) as unknown as AppConfigService;
 
   it('maps a venue failure to 503 VENUE_UNAVAILABLE', async () => {
     const { impl } = fakeFetch(venueRoutes({ '/fapi/v1/premiumIndex': { status: 503, body: {} } }));
-    const controller = new UniverseController(db, new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
+    const controller = new UniverseController(config(1), new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
     try {
       await controller.summary('20');
       throw new Error('expected a 503');
@@ -223,19 +220,18 @@ describe('GET /api/web/universe/summary', () => {
 
   it('answers the rows for the top list', async () => {
     const { impl } = fakeFetch(venueRoutes());
-    const controller = new UniverseController(db, new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
+    const controller = new UniverseController(config(1), new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
     const result = await controller.summary('20');
     expect(result.rows.map((r) => r.id)).toEqual(['BTCUSDT']);
   });
 
   it('reads the whole universe the picker asks for (IB-070: 40 symbols), capped at SUMMARY_MAX', async () => {
-    const limits: unknown[] = [];
-    const spy: Db = { ...db, query: async (sql, params) => { limits.push(params?.[0]); return db.query(sql, params); } };
-    const { impl } = fakeFetch(venueRoutes());
-    const controller = new UniverseController(spy, new UniverseSummaryService({ futuresBaseUrl: 'https://x.test', fetchImpl: impl }));
+    const asked: number[] = [];
+    const service = { summary: async (rows: unknown[]) => { asked.push(rows.length); return { rows: [] } as never; } } as unknown as UniverseSummaryService;
+    const controller = new UniverseController(config(100), service);
     await controller.summary('40');
     await controller.summary('100000');
-    expect(limits).toEqual([40, SUMMARY_MAX]);
+    expect(asked).toEqual([40, SUMMARY_MAX]);
     expect(SUMMARY_MAX).toBeGreaterThanOrEqual(40);
   });
 });

@@ -5,7 +5,7 @@ import * as t from '../../src/collectors/writers/tables';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
-import * as repo from '../../src/web/series/pg/series.repo';
+import * as repo from '../../src/web/series/pg/liquidations.repo';
 import { floorToGrid, gridOffsetMs, timeframeMs } from '../../src/web/series/range';
 import { SeriesController } from '../../src/web/series/series.controller';
 import { DB_HOOK_TIMEOUT_MS, dropOwn, dropLeftovers, scratchPrefix } from './scratch-db';

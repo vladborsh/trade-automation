@@ -7,7 +7,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { SeriesController } from '../../src/web/series/series.controller';
-import * as repo from '../../src/web/series/pg/series.repo';
+import * as repo from '../../src/web/series/pg/liquidations.repo';
 import { strideFor } from '../../src/web/series/range';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
@@ -97,30 +97,6 @@ maybeDescribe('IB-031 series reads against a real database', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
-  it('returns every bar when the window fits the cap', async () => {
-    const rows = await repo.candles(db, {
-      symbol: 'BTCUSDT', fromMs: DAY, toMs: DAY + 86_400_000, stride: 1,
-      venue: 'binance', market: 'perp', timeframe: '1m',
-    });
-    expect(rows).toHaveLength(1440);
-    expect(rows[0].time).toBe(DAY / 1000);
-    expect(rows[0].open).toBe(100);
-    expect(typeof rows[0].open).toBe('number'); // numeric must not arrive as a string
-  });
-
-  it('THINS IN POSTGRES: a stride returns ~n/stride rows and still spans the window', async () => {
-    const stride = 10;
-    const rows = await repo.candles(db, {
-      symbol: 'BTCUSDT', fromMs: DAY, toMs: DAY + 86_400_000, stride,
-      venue: 'binance', market: 'perp', timeframe: '1m',
-    });
-    expect(rows.length).toBeCloseTo(1440 / stride, -1);
-    expect(rows[0].time).toBe(DAY / 1000);
-    // the window is still covered: the last kept row is near the end, not near the start
-    expect(rows[rows.length - 1].time).toBeGreaterThan((DAY + 23 * 3_600_000) / 1000);
-    expect([...rows].sort((a, b) => a.time - b.time)).toEqual(rows);
-  });
-
   it('a 90-day 1m window asks for a stride that brings it under the cap', () => {
     const ninety = 90 * 86_400_000;
     const stride = strideFor(DAY, DAY + ninety, '1m');
@@ -153,11 +129,6 @@ maybeDescribe('IB-031 series reads against a real database', () => {
     // asking for one venue still means that venue, resolved through its own spelling
     const only = await repo.liquidations(db, { symbol: 'BTCUSDT', fromMs: DAY, toMs: DAY + 3 * MIN, venue: 'okx' });
     expect(only.map((r) => r.notional)).toEqual([90_000]);
-  });
-
-  it('IB-BUG-011: settled funding includes the venue with its own spelling', async () => {
-    const rows = await repo.settledFunding(db, { symbol: 'BTCUSDT', fromMs: DAY, toMs: DAY + 86_400_000 });
-    expect(rows.map((r) => r.venue)).toEqual(['binance', 'bybit', 'okx']);
   });
 
   it('IB-BUG-011: an unknown symbol returns nothing rather than falling back to the raw string', async () => {
@@ -204,31 +175,4 @@ maybeDescribe('IB-031 series reads against a real database', () => {
     expect(long?.venue).toBe('bybit');
   });
 
-  it('open interest thins on the same rule', async () => {
-    const rows = await repo.openInterest(db, { symbol: 'BTCUSDT', fromMs: DAY, toMs: DAY + 86_400_000, stride: 4, venue: 'binance' });
-    expect(rows.length).toBeCloseTo(288 / 4, -1);
-    expect(rows[0].value).toBe(1000);
-  });
-
-  it('settled funding is returned per venue and in time order', async () => {
-    const rows = await repo.settledFunding(db, { symbol: 'BTCUSDT', fromMs: DAY, toMs: DAY + 86_400_000 });
-    expect(rows.map((r) => r.venue)).toEqual(['binance', 'bybit', 'okx']);
-    expect(rows[1].rate).toBe(-0.0002); // the sign is the signal; it must survive the round trip
-  });
-
-  it('the picker lists ranked symbols first and reports which venues carry them', async () => {
-    // BTCUSDT is seeded in beforeAll (IB-BUG-011 needs the venue map for every read); this test
-    // adds only the unranked symbol it is actually about.
-    await db.query(
-      `insert into symbols (id, base, quote, binance_perp, binance_spot, bybit_linear, okx_swap, listed_perp, in_signal_set, active, volume_rank)
-       values ('ZZZUSDT','ZZZ','USDT','ZZZUSDT',null,null,null,'2024-01-01',false,true,null)`,
-    );
-    const rows = await repo.topSymbols(db, 20);
-    expect(rows[0].id).toBe('BTCUSDT');
-    expect(rows[0].volumeRank).toBe(1);
-    expect(rows[0].binanceSpot).toBe(true);
-    // unranked sorts last, and its missing venues are false rather than absent
-    expect(rows[rows.length - 1].id).toBe('ZZZUSDT');
-    expect(rows[rows.length - 1]).toMatchObject({ volumeRank: null, binanceSpot: false, okxSwap: false });
-  });
 });
