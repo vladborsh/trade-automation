@@ -101,8 +101,8 @@ data "aws_iam_policy_document" "deploy" {
   # The image is pushed to GHCR with GitHub's own token, so CI needs no AWS rights for the build.
   # Its AWS role exists for one verb: run the deploy script on this one instance.
   statement {
-    sid       = "RunDeployCommand"
-    actions   = ["ssm:SendCommand"]
+    sid     = "RunDeployCommand"
+    actions = ["ssm:SendCommand"]
     resources = [
       "arn:aws:ssm:${var.region}::document/AWS-RunShellScript",
       aws_instance.insight_bot.arn,

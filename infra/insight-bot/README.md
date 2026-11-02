@@ -17,7 +17,8 @@ terraform/                    the stack: EC2, security group, IAM, S3 backups, B
   versions.tf variables.tf main.tf iam.tf s3.tf budgets.tf outputs.tf
   user_data.sh.tftpl          first-boot script; inlines the files below so the box needs no repo
   terraform.tfvars.example    the two inputs a reviewer must set
-  backend.tf.example          S3 state backend, for after the first apply
+  backend.tf                  S3 state backend (IB-073), in the backups bucket under tofu/
+  imports.tf                  adopts the five resources IB-013 left live (IB-073)
 compose/docker-compose.yml    what runs on the box (NOT local dev — that is apps/insight-bot/)
 scripts/                      render-env.sh, deploy.sh, backup.sh, restore.sh
 systemd/                      insight-bot-backup.{service,timer} — 01:00 UTC

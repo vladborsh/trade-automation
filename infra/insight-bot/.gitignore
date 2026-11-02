@@ -8,4 +8,5 @@ terraform/.terraform/
 terraform/.terraform.lock.hcl
 terraform/*.tfstate
 terraform/*.tfstate.*
-terraform/backend.tf
+# backend.tf is committed since IB-073: the state bucket is already public knowledge in
+# LIVE-RESOURCES.md, and a backend only one laptop knows about is how the state got lost before.

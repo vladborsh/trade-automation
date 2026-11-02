@@ -66,17 +66,17 @@ resource "aws_instance" "insight_bot" {
 
   user_data_replace_on_change = false # changing the bootstrap must not recycle the database volume
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
-    region          = var.region
-    ssm_prefix      = var.ssm_parameter_prefix
-    backup_bucket   = aws_s3_bucket.backups.bucket
-    image_ref       = var.image_ref
-    compose_file    = file("${path.module}/../compose/docker-compose.yml")
-    render_env_sh   = file("${path.module}/../scripts/render-env.sh")
-    deploy_sh       = file("${path.module}/../scripts/deploy.sh")
-    backup_sh       = file("${path.module}/../scripts/backup.sh")
-    restore_sh      = file("${path.module}/../scripts/restore.sh")
-    backup_service  = file("${path.module}/../systemd/insight-bot-backup.service")
-    backup_timer    = file("${path.module}/../systemd/insight-bot-backup.timer")
+    region         = var.region
+    ssm_prefix     = var.ssm_parameter_prefix
+    backup_bucket  = aws_s3_bucket.backups.bucket
+    image_ref      = var.image_ref
+    compose_file   = file("${path.module}/../compose/docker-compose.yml")
+    render_env_sh  = file("${path.module}/../scripts/render-env.sh")
+    deploy_sh      = file("${path.module}/../scripts/deploy.sh")
+    backup_sh      = file("${path.module}/../scripts/backup.sh")
+    restore_sh     = file("${path.module}/../scripts/restore.sh")
+    backup_service = file("${path.module}/../systemd/insight-bot-backup.service")
+    backup_timer   = file("${path.module}/../systemd/insight-bot-backup.timer")
   })
 
   tags = { Name = "insight-bot" }
