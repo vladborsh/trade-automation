@@ -6,6 +6,10 @@
 "no domain" ruling); §5 there (tunnel with a domain) becomes the design again, with the deltas
 below.
 
+> **Amended 2026-11-02:** login is now login + password only (user ruling). M1–M3 and the
+> "two ways in" below are withdrawn: see `password-login-design-2026-11-02.md`. The `/web` link and
+> the Telegram widget are no longer ways into the site.
+
 ## 1. What is being built
 
 One box, one origin, two ways in:
