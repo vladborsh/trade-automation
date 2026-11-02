@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import type { WebDbHealthResponse, WebStreamsResponse } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
-import { ageSec, anyMissing, uptimeStateClass, uptimeStateKey, windowOf } from './liquidation-uptime.mapper';
+import { ageSec, anyMissing, isPartial, uptimeStateClass, uptimeStateKey, windowOf } from './liquidation-uptime.mapper';
 
 /**
  * architecture/insight-bot-web-dashboard.md §2 — streams (mode, last message age, reconnects),
@@ -39,6 +39,7 @@ export class HealthComponent {
   readonly stateKey = uptimeStateKey;
   readonly stateClass = uptimeStateClass;
   readonly windowOf = windowOf;
+  readonly isPartial = isPartial;
 
   constructor() {
     void this.load();

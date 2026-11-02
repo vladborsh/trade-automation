@@ -51,6 +51,7 @@ export const en: Strings = {
   'health.uptime.state.not_recorded': 'not recorded',
   'health.uptime.notInstrumented': 'no heartbeat — outages not recorded',
   'health.uptime.coverage': 'listened {covered} of {elapsed} h, {outages} outages, {rows} liquidations',
+  'health.uptime.partial': '(listened {covered} of {elapsed} h)',
   'health.uptime.missing': 'Some liquidations may be missing: a collector was not listening for part of a window.',
   'health.uptime.none': 'no record (no database)',
   'health.uptime.hint': '"No events" means the collector listened the whole window and nothing was liquidated. "Not recorded" means it was not listening for part of the window, so liquidations from then may be missing.',

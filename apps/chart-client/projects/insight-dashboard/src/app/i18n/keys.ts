@@ -61,6 +61,7 @@ export type StringKey =
   | 'health.uptime.state.not_recorded'
   | 'health.uptime.notInstrumented'
   | 'health.uptime.coverage'
+  | 'health.uptime.partial'
   | 'health.uptime.missing'
   | 'health.uptime.none'
   | 'health.uptime.hint'

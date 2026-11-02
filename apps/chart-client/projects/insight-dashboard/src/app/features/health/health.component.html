@@ -84,7 +84,12 @@
             </td>
             @for (hours of [24, 168]; track hours) {
               @if (windowOf(u, hours); as w) {
-                <td [class]="stateClass(w.state)" [title]="t('health.uptime.coverage', { covered: w.coveredHours, elapsed: w.elapsedHours, outages: w.outages, rows: w.rows })">{{ t(stateKey(w.state)) }}</td>
+                <td [class]="stateClass(w.state)" [title]="t('health.uptime.coverage', { covered: w.coveredHours, elapsed: w.elapsedHours, outages: w.outages, rows: w.rows })">
+                  {{ t(stateKey(w.state)) }}
+                  @if (isPartial(w)) {
+                    <span class="missing">{{ t('health.uptime.partial', { covered: w.coveredHours, elapsed: w.elapsedHours }) }}</span>
+                  }
+                </td>
               } @else {
                 <td class="muted">—</td>
               }

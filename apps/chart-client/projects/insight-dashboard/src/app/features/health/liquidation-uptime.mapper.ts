@@ -36,7 +36,16 @@ export function ageSec(epochMs: number | null, nowMs: number): number | null {
   return epochMs === null ? null : Math.max(0, Math.round((nowMs - epochMs) / 1000));
 }
 
+/**
+ * True when the collector was not listening for part of the window. Possible even when the state is
+ * `recorded`: rows exist, but a collector that has run for 4 minutes of a 7-day window has written
+ * 4 minutes' worth — "recorded" alone would read as the whole week.
+ */
+export function isPartial(w: WebUptimeWindow): boolean {
+  return w.coveredHours < w.elapsedHours;
+}
+
 /** True when any window may be missing liquidations — the block's one-line warning. */
 export function anyMissing(rows: readonly WebLiquidationUptime[]): boolean {
-  return rows.some((r) => r.windows.some((w) => w.state === 'not_recorded'));
+  return rows.some((r) => r.windows.some((w) => w.state === 'not_recorded' || isPartial(w)));
 }

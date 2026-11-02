@@ -57,6 +57,7 @@ export const ru: Strings = {
   'health.uptime.state.not_recorded': 'не записано',
   'health.uptime.notInstrumented': 'нет сигнала — простои не записываются',
   'health.uptime.coverage': 'слушал {covered} из {elapsed} ч, простоев: {outages}, ликвидаций: {rows}',
+  'health.uptime.partial': '(слушал {covered} из {elapsed} ч)',
   'health.uptime.missing': 'Часть ликвидаций может отсутствовать: сборщик не слушал часть времени.',
   'health.uptime.none': 'нет данных (нет базы)',
   'health.uptime.hint': '«Нет событий» — сборщик слушал всё время, и ликвидаций не было. «Не записано» — часть времени он не слушал, и ликвидации за это время могли потеряться.',

@@ -1,5 +1,5 @@
 import type { WebLiquidationUptime } from '@trade-automation/contracts';
-import { ageSec, anyMissing, uptimeStateClass, uptimeStateKey, windowOf } from './liquidation-uptime.mapper';
+import { ageSec, anyMissing, isPartial, uptimeStateClass, uptimeStateKey, windowOf } from './liquidation-uptime.mapper';
 
 const row = (states: Array<'recorded' | 'no_events' | 'not_recorded'>): WebLiquidationUptime => ({
   stream: 'okx:liquidation-orders', venue: 'okx', instrumented: true, lastRowAt: 1_000, lastSeen: 2_000,
@@ -32,5 +32,13 @@ describe('liquidation uptime mapper (WD-009)', () => {
     expect(anyMissing([row(['recorded', 'no_events'])])).toBe(false);
     expect(anyMissing([row(['recorded', 'no_events']), row(['no_events', 'not_recorded'])])).toBe(true);
     expect(anyMissing([])).toBe(false);
+  });
+
+  it('a recorded window the collector listened to only partly is partial, and warns', () => {
+    const young = row(['recorded', 'recorded']);
+    young.windows[1] = { ...young.windows[1], coveredHours: 0.1, elapsedHours: 168 };
+    expect(isPartial(young.windows[0])).toBe(false);
+    expect(isPartial(young.windows[1])).toBe(true);
+    expect(anyMissing([young])).toBe(true);
   });
 });
