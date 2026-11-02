@@ -35,3 +35,16 @@ import {
   to = aws_s3_bucket.backups
   id = "vb-insight-bot-backups-apne1"
 }
+
+# IB-073 step 2 — read-only checks (2026-11-02) found these two configured on the live bucket,
+# so they are adopted rather than "created" over themselves. Versioning was NOT enabled live (an
+# empty get-bucket-versioning) and no lifecycle rule existed: those two are honest creates.
+import {
+  to = aws_s3_bucket_public_access_block.backups
+  id = "vb-insight-bot-backups-apne1"
+}
+
+import {
+  to = aws_s3_bucket_server_side_encryption_configuration.backups
+  id = "vb-insight-bot-backups-apne1"
+}
