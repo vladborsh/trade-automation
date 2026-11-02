@@ -63,7 +63,7 @@ export class UniverseSummaryService {
     this.futuresData = new FuturesDataClient({
       baseUrl: options.futuresBaseUrl,
       weight: this.weight,
-      fetchImpl: this.fetchImpl as unknown as typeof fetch,
+      fetchImpl: this.fetchImpl,
     });
   }
 

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
-import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
+import { VenuesModule } from '../venues/venues.module';
 import { HealthController } from './health.controller';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
@@ -14,13 +14,14 @@ import { StreamRegistry } from './stream-registry';
  * the daily gap report (§6.2) join this module with IB-008.
  *
  * `StreamRegistry` and `MetricsService` are exported because the collectors write to them.
- * IB-063: `BinanceWeightTracker` lives here too, so the collectors and the web module's on-demand
- * candles record into ONE instance — the one `/health` reads. Two trackers would each report half
- * of what the IP spent.
+ * IB-063: the collectors and the web module's on-demand reads record into ONE `BinanceWeightTracker`
+ * — the one `/health` reads. WD-008 moved its provider to `VenuesModule`, which this module imports
+ * and re-exports, so every importer of OpsModule still gets that same instance.
  */
 @Module({
   imports: [
     AppConfigModule,
+    VenuesModule,
     LoggerModule.forRootAsync({
       imports: [AppConfigModule],
       inject: [AppConfigService],
@@ -34,7 +35,7 @@ import { StreamRegistry } from './stream-registry';
     }),
   ],
   controllers: [HealthController, MetricsController],
-  providers: [MetricsService, StreamRegistry, BinanceWeightTracker],
-  exports: [MetricsService, StreamRegistry, BinanceWeightTracker],
+  providers: [MetricsService, StreamRegistry],
+  exports: [MetricsService, StreamRegistry, VenuesModule],
 })
 export class OpsModule {}

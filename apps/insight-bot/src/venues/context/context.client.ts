@@ -1,3 +1,4 @@
+import { globalFetch, responseText, type FetchLike, type FetchLikeResponse } from '../fetch-like';
 import type { CoingeckoGate, CoingeckoPriority } from './coingecko.gate';
 import { FngPayload, GlobalPayload, MarketChartPayload } from './payloads';
 
@@ -10,7 +11,8 @@ export const COIN_CHART_DAYS = 365;
 export interface ContextClientOptions {
   fngBaseUrl: string;
   coingeckoBaseUrl: string;
-  fetchImpl?: typeof fetch;
+  /** WD-008: narrowed from `typeof fetch`, so one fake serves every venue client. */
+  fetchImpl?: FetchLike;
   /** Injected so the specs do not really wait 60 s. */
   sleep?: (ms: number) => Promise<void>;
   /**
@@ -37,11 +39,11 @@ export interface ContextClientOptions {
  * that is the mistake a future reader is most likely to make.
  */
 export class ContextClient {
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(private readonly options: ContextClientOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? globalFetch;
     this.sleep = options.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
@@ -61,7 +63,7 @@ export class ContextClient {
         await this.sleep(RETRY_AFTER_MS);
         continue;
       }
-      const body = (await response.text()).slice(0, 200);
+      const body = (await responseText(response)).slice(0, 200);
       if (response.status === 401) {
         throw new Error(
           `${url}: HTTP 401 — this endpoint needs a paid key. The free tier covers /global and ` +
@@ -74,7 +76,7 @@ export class ContextClient {
 
   /** Runs a single request in its gate slot; without a gate (the specs, and alternative.me) it is
    * the bare call. */
-  private run(priority: CoingeckoPriority | undefined, fn: () => Promise<Response>): Promise<Response> {
+  private run(priority: CoingeckoPriority | undefined, fn: () => Promise<FetchLikeResponse>): Promise<FetchLikeResponse> {
     const gate = this.options.gate;
     return priority === undefined || gate === undefined ? fn() : gate.run(priority, fn);
   }

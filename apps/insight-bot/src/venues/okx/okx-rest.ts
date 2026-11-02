@@ -1,3 +1,4 @@
+import { globalFetch, responseText, type FetchLike } from '../fetch-like';
 import { OkxFundingHistoryRow, OkxInstrument } from './payloads';
 
 /**
@@ -26,7 +27,8 @@ export const MAX_FUNDING_PAGES = 200;
 
 export interface OkxRestOptions {
   baseUrl: string;
-  fetchImpl?: typeof fetch;
+  /** WD-008: `FetchLike`, so the one venue fake serves this client too. */
+  fetchImpl?: FetchLike;
 }
 
 interface OkxEnvelope<T> {
@@ -36,17 +38,17 @@ interface OkxEnvelope<T> {
 }
 
 export class OkxRest {
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
 
   constructor(private readonly options: OkxRestOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? globalFetch;
   }
 
   private async get<T>(path: string, params: Record<string, string>): Promise<T[]> {
     const url = `${this.options.baseUrl.replace(/\/$/, '')}${path}?${new URLSearchParams(params).toString()}`;
     const response = await this.fetchImpl(url);
     if (!response.ok) {
-      throw new Error(`OKX ${path}: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`);
+      throw new Error(`OKX ${path}: HTTP ${response.status} ${(await responseText(response)).slice(0, 200)}`);
     }
     const body = (await response.json()) as OkxEnvelope<T>;
     // OKX signals application errors in the body with `code !== '0'`, not by HTTP status.

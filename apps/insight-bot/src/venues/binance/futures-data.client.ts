@@ -1,3 +1,4 @@
+import { globalFetch, responseText, type FetchLike } from '../fetch-like';
 import { BinanceWeightTracker } from './binance-weight.tracker';
 
 /** Binance's max `limit` for the `/futures/data` series endpoints. */
@@ -47,6 +48,20 @@ export interface FuturesDataQuery {
   endTime?: number;
 }
 
+/**
+ * The numeric `code` of a Binance error body, or null. WD-008: parsed, not substring-matched — the
+ * old `includes('"code":-1130')` missed the same body with a space after the colon. The refusal's
+ * shape is pinned by `test/fixtures/binance/futures-data-retention-1130.json`.
+ */
+export function venueErrorCode(body: string): number | null {
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown } | null;
+    return typeof parsed?.code === 'number' ? parsed.code : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Thrown when the venue says the requested window is past its retention (`-1130`). */
 export class RetentionEdgeError extends Error {
   constructor(readonly endpoint: string, readonly symbol: string) {
@@ -58,8 +73,8 @@ export class RetentionEdgeError extends Error {
 export interface FuturesDataClientOptions {
   baseUrl: string;
   weight: BinanceWeightTracker;
-  /** Injectable for the specs; defaults to the global fetch. */
-  fetchImpl?: typeof fetch;
+  /** Injectable for the specs; defaults to the global fetch. WD-008: `FetchLike`, not `typeof fetch`. */
+  fetchImpl?: FetchLike;
 }
 
 /**
@@ -68,10 +83,10 @@ export interface FuturesDataClientOptions {
  * socket; if a second app ever needs these endpoints, this file is the thing to lift.
  */
 export class FuturesDataClient {
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
 
   constructor(private readonly options: FuturesDataClientOptions) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? globalFetch;
   }
 
   buildUrl(query: FuturesDataQuery): string {
@@ -91,8 +106,8 @@ export class FuturesDataClient {
     this.options.weight.recordFromHeaders(response.headers);
 
     if (!response.ok) {
-      const body = await response.text();
-      if (body.includes(`"code":${RETENTION_ERROR_CODE}`)) {
+      const body = await responseText(response);
+      if (venueErrorCode(body) === RETENTION_ERROR_CODE) {
         throw new RetentionEdgeError(query.endpoint, query.symbol);
       }
       throw new Error(`Binance ${query.endpoint} ${query.symbol}: HTTP ${response.status} ${body.slice(0, 200)}`);

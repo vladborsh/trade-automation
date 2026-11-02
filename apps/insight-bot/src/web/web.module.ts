@@ -19,6 +19,13 @@ import { CandlesService } from './market/candles.service';
 import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { MetricsService } from '../ops/metrics.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
+import { FundingService } from './market/funding.service';
+import { OiLsService } from './market/oi-ls.service';
+import { TtlCache } from '../venues/ttl-cache';
+import { FuturesDataClient } from '../venues/binance/futures-data.client';
+import { PerpRest } from '../venues/binance/perp.rest';
+import { BybitRest } from '../venues/bybit/bybit.rest';
+import { OkxRest } from '../venues/okx/okx-rest';
 import { UniverseController } from './universe.controller';
 import { WebPushController } from './push/push.controller';
 
@@ -62,9 +69,11 @@ export class WebModule {
         LiquidationsOverviewService,
         {
           provide: UniverseSummaryService,
-          inject: [AppConfigService],
-          useFactory: (config: AppConfigService) =>
-            new UniverseSummaryService({ futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL') }),
+          // WD-008: the shared tracker — it used to build its own, so its ~50 weight a refresh was
+          // invisible to /health and to every other read's 1 800/min ceiling check
+          inject: [AppConfigService, BinanceWeightTracker],
+          useFactory: (config: AppConfigService, weight: BinanceWeightTracker) =>
+            new UniverseSummaryService({ futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL'), weight }),
         },
         {
           provide: MarketCardsService,
@@ -86,6 +95,25 @@ export class WebModule {
               weight,
               onSpotWeight: (w) => metrics.setBinanceSpotWeightUsed1m(w),
             }),
+        },
+        {
+          // WD-008 step 2: on-demand funding, OI and long-short — beside the tape reads, not yet routed
+          provide: FundingService,
+          inject: [AppConfigService, PerpRest, BybitRest, OkxRest, TtlCache, BinanceWeightTracker],
+          useFactory: (config: AppConfigService, perp: PerpRest, bybit: BybitRest, okx: OkxRest, cache: TtlCache, weight: BinanceWeightTracker) =>
+            new FundingService({
+              perp, bybit, okx, cache, weight,
+              spellings: (symbol) => {
+                const entry = config.symbols.find((s) => s.id === symbol);
+                return { bybit: entry?.bybit_linear, okx: entry?.okx_swap };
+              },
+            }),
+        },
+        {
+          provide: OiLsService,
+          inject: [FuturesDataClient, TtlCache, BinanceWeightTracker],
+          useFactory: (client: FuturesDataClient, cache: TtlCache, weight: BinanceWeightTracker) =>
+            new OiLsService({ client, cache, weight }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],

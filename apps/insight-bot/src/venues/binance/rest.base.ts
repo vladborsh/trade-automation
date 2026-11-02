@@ -10,13 +10,10 @@ import type { BinanceRestKline } from '@trade-automation/binance-client';
  * would give a dashboard a figure that cannot be compared with its own ceiling.
  */
 
-export type FetchLike = (url: string, init?: { signal?: AbortSignal }) => Promise<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: { get(name: string): string | null };
-  json(): Promise<unknown>;
-}>;
+import { globalFetch, type FetchLike } from '../fetch-like';
+
+/** WD-008: one `FetchLike` for every venue client (`venues/fetch-like.ts`); re-exported for old importers. */
+export type { FetchLike };
 
 export interface BinanceRestOptions {
   baseUrl: string;
@@ -34,7 +31,7 @@ export abstract class BinanceRest {
   private readonly timeoutMs: number;
 
   constructor(protected readonly options: BinanceRestOptions) {
-    this.fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as ReturnType<FetchLike>);
+    this.fetchImpl = options.fetchImpl ?? globalFetch;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_REST_TIMEOUT_MS;
   }
 

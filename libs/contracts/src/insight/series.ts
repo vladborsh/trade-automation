@@ -83,14 +83,40 @@ export const WebFundingResponseSchema = z.object({
 });
 export type WebFundingResponse = z.infer<typeof WebFundingResponseSchema>;
 
+/**
+ * WD-008 — read from the venue on demand, OI and long-short reach back only as far as the venue
+ * keeps them (Binance `/futures/data/*`: about 30 days). Both optional, so the tape-backed routes
+ * that never set them still parse:
+ * - `coverageFrom` — the earliest instant the answer covers (epoch seconds); before it the venue
+ *   has nothing, which is NOT the same as "nothing happened".
+ * - `truncated` — the series starts later than the window asked for.
+ */
+const VenueCoverage = {
+  coverageFrom: TimeSec.optional(),
+  truncated: z.boolean().optional(),
+};
+
 export const WebLongShortPointSchema = z.object({ time: TimeSec, ratio: z.number() });
 export const WebLongShortResponseSchema = z.object({
   symbol: z.string(),
   kind: z.enum(['global_account', 'top_account', 'top_position', 'taker']),
   points: z.array(WebLongShortPointSchema),
   downsampled: z.boolean(),
+  ...VenueCoverage,
 });
 export type WebLongShortResponse = z.infer<typeof WebLongShortResponseSchema>;
+
+/** Open interest: `value` in base units, `notional` in quote (null where the venue gives none). */
+export const WebOpenInterestPointSchema = z.object({ time: TimeSec, value: z.number(), notional: z.number().nullable() });
+export type WebOpenInterestPoint = z.infer<typeof WebOpenInterestPointSchema>;
+export const WebOpenInterestResponseSchema = z.object({
+  symbol: z.string(),
+  venue: z.string(),
+  points: z.array(WebOpenInterestPointSchema),
+  downsampled: z.boolean(),
+  ...VenueCoverage,
+});
+export type WebOpenInterestResponse = z.infer<typeof WebOpenInterestResponseSchema>;
 
 /**
  * One bucket of liquidations, split by the side that was LIQUIDATED (§3.3) — the histogram is

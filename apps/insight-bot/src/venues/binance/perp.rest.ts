@@ -20,6 +20,9 @@ import { BinanceRest, type BinanceRestOptions } from './rest.base';
 /** IB-006: the shared mechanics moved to `rest.base.ts`; these three paths are perp's. */
 export type PerpRestOptions = BinanceRestOptions;
 
+/** `/fapi/v1/fundingRate`'s `limit` ceiling (venue docs). */
+export const FUNDING_RANGE_LIMIT = 1000;
+
 export class PerpRest extends BinanceRest {
   /** The last `limit` 1m klines of one symbol — degraded mode's replacement for the kline stream. */
   async klines(symbol: string, limit = 2): Promise<BinanceRestKline[]> {
@@ -30,6 +33,25 @@ export class PerpRest extends BinanceRest {
   async premiumIndex(): Promise<PremiumIndexRow[]> {
     const body = await this.get<PremiumIndexRow[] | PremiumIndexRow>('/fapi/v1/premiumIndex');
     return Array.isArray(body) ? body : [body];
+  }
+
+  /**
+   * WD-008: one symbol's mark price and predicted funding (weight 1, against `premiumIndex()`'s 10
+   * for every symbol) — the on-demand funding panel's "predicted" point.
+   */
+  async premiumIndexOf(symbol: string): Promise<PremiumIndexRow> {
+    return this.get<PremiumIndexRow>(`/fapi/v1/premiumIndex?symbol=${symbol}`);
+  }
+
+  /**
+   * WD-008: settled funding in `[startTime, endTime]`, oldest first, up to `limit` (venue max 1000)
+   * rows — weight 1 by the WD-008 budget. 1000 settlements is 333 days at 8 h, so one call covers any
+   * window the funding panel asks for.
+   */
+  async fundingRateRange(symbol: string, startTime: number, endTime: number, limit = FUNDING_RANGE_LIMIT): Promise<FundingRateRow[]> {
+    return this.get<FundingRateRow[]>(
+      `/fapi/v1/fundingRate?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=${limit}`,
+    );
   }
 
   /** The settled funding rate of one symbol, newest first (§4.1: fetched when `nextFundingTime` rolls). */

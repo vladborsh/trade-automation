@@ -1,0 +1,41 @@
+import { RETENTION_MS } from '../../../src/venues/binance/futures-data.client';
+import { MAX_ROWS, clipToRetention, periodFor } from '../../../src/web/market/oi-ls-window';
+
+const H = 3_600_000;
+const D = 24 * H;
+
+describe('periodFor (WD-008)', () => {
+  it.each([
+    [D, '5m'], // 288 rows
+    [3 * D, '5m'], // 864
+    [7 * D, '15m'], // 672
+    [30 * D, '1h'], // 720
+    [90 * D, '4h'], // 540 — wider than the venue keeps, but the helper does not know that
+  ])('a %d ms window reads at %s', (span, period) => {
+    expect(periodFor(0, span).period).toBe(period);
+  });
+
+  it('never needs more than MAX_ROWS rows (two 500-row pages) up to a 1d period', () => {
+    for (const span of [H, D, 4 * D, 10 * D, 30 * D, 120 * D, 900 * D]) {
+      const { periodMs } = periodFor(0, span);
+      expect(Math.ceil(span / periodMs)).toBeLessThanOrEqual(MAX_ROWS);
+    }
+  });
+});
+
+describe('clipToRetention (WD-008)', () => {
+  const now = 100 * D;
+  const edge = now - RETENTION_MS;
+
+  it('leaves a window inside retention alone', () => {
+    expect(clipToRetention(now - D, now, now)).toEqual({ fromMs: now - D, toMs: now, clipped: false, empty: false });
+  });
+
+  it('moves an older `from` forward to the edge and says so', () => {
+    expect(clipToRetention(now - 45 * D, now, now)).toEqual({ fromMs: edge, toMs: now, clipped: true, empty: false });
+  });
+
+  it('marks a window wholly before the edge as empty — nothing to ask the venue for', () => {
+    expect(clipToRetention(now - 60 * D, now - 40 * D, now)).toMatchObject({ clipped: true, empty: true, fromMs: edge });
+  });
+});
