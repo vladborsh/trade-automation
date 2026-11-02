@@ -23,9 +23,8 @@ standing rulings are in [`PROJECT.md`](PROJECT.md); system designs are in
   tests; `apps/chart-client`'s test scripts pass `--no-experimental-webstorage` so they stay
   green on either, but build and run on 24.
 - **A fresh machine:** [`docs/RESTORE-NEW-MACHINE.md`](docs/RESTORE-NEW-MACHINE.md) — Postgres,
-  roles and databases, build, migrations, env files, running both apps. Being revised under
-  WD-005: where it says the liquidation collectors were removed, that was reversed on
-  2026-10-31 (they stay).
+  roles and databases, build, migrations, env files, running both apps, and the checklist that
+  says the machine is up. Every step was run on this machine on 2026-11-02 (WD-005).
 - **Environment variables:** each app has a committed template, `apps/insight-bot/.env.example`
   and `apps/signal-server/.env.example`. Copy it to `.env` next to it and uncomment what you set.
   Names and safe defaults only — the secrets (Telegram bot token, Capital.com key, admin
