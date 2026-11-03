@@ -17,6 +17,12 @@ export class SessionService {
   private readonly api = inject(InsightApiClient);
   private readonly current = signal<WebUser | null>(null);
   private inflight: Promise<WebUser | null> | null = null;
+  /**
+   * Bumped by every signedIn/signedOut. A `/auth/me` already in flight when the member changes
+   * would otherwise land afterwards and put the OLD member back; it applies only if no change
+   * happened meanwhile.
+   */
+  private generation = 0;
 
   readonly user = this.current.asReadonly();
   readonly isAdmin = computed(() => isAdmin(this.current()));
@@ -26,12 +32,14 @@ export class SessionService {
    * logout followed by a login as someone else kept the first member (and their nav) until reload.
    */
   signedIn(user: WebUser): void {
+    this.generation++;
     this.inflight = null;
     this.current.set(user);
   }
 
   /** IB-079: logout / logout everywhere — nobody is known; the next `ensure()` asks the server again. */
   signedOut(): void {
+    this.generation++;
     this.inflight = null;
     this.current.set(null);
   }
@@ -40,11 +48,13 @@ export class SessionService {
   ensure(): Promise<WebUser | null> {
     const known = this.current();
     if (known !== null) return Promise.resolve(known);
+    const asked = this.generation;
     this.inflight ??= this.api
       .me()
       .then((body) => sessionUser(body))
       .catch(() => null)
       .then((user) => {
+        if (asked !== this.generation) return this.current(); // superseded by a login/logout
         this.current.set(user);
         this.inflight = null;
         return user;

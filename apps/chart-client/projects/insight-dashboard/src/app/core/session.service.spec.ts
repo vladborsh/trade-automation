@@ -67,3 +67,16 @@ describe('IB-079: the session follows login and logout without a reload', () => 
     expect(me).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('IB-079: a /auth/me in flight across a logout does not bring the old member back', () => {
+  it('signedOut while ensure() is pending: the late answer is dropped', async () => {
+    let answer!: (v: unknown) => void;
+    const { service } = setup(() => new Promise((r) => { answer = r; }));
+    const pending = service.ensure();
+    service.signedOut();
+    answer(body('admin'));
+    await pending;
+    expect(service.user()).toBeNull();
+    expect(service.isAdmin()).toBe(false);
+  });
+});
