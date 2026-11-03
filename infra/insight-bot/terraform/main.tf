@@ -80,4 +80,12 @@ resource "aws_instance" "insight_bot" {
   })
 
   tags = { Name = "insight-bot" }
+
+  # The AMI data source is most_recent: every new AL2023 release changes its id, and `ami` forces
+  # replacement — the next plan would destroy the box and its root volume, which holds pgdata (the
+  # liquidation tape a venue never serves again). OS updates happen on the box (dnf), not by
+  # recreating it; a deliberate rebuild is `tofu apply -replace=aws_instance.insight_bot`.
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }
