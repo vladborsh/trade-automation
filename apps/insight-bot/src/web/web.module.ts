@@ -27,6 +27,8 @@ import { MetricsService } from '../ops/metrics.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
 import { FundingService } from './market/funding.service';
 import { OiLsService } from './market/oi-ls.service';
+import { DB, type Db } from '../db/db.port';
+import { oiLsStoredReader } from './series/pg/oi-ls-stored.repo';
 import { TtlCache } from '../venues/ttl-cache';
 import { FuturesDataClient } from '../venues/binance/futures-data.client';
 import { PerpRest } from '../venues/binance/perp.rest';
@@ -140,9 +142,10 @@ export class WebModule {
         },
         {
           provide: OiLsService,
-          inject: [FuturesDataClient, TtlCache, BinanceWeightTracker],
-          useFactory: (client: FuturesDataClient, cache: TtlCache, weight: BinanceWeightTracker) =>
-            new OiLsService({ client, cache, weight }),
+          // IB-080: plus the poller's tables, for windows older than the venue keeps
+          inject: [FuturesDataClient, TtlCache, BinanceWeightTracker, DB],
+          useFactory: (client: FuturesDataClient, cache: TtlCache, weight: BinanceWeightTracker, db: Db | null) =>
+            new OiLsService({ client, cache, weight, stored: db ? oiLsStoredReader(db) : null }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],

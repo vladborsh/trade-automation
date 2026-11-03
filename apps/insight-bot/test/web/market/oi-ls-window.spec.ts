@@ -39,3 +39,18 @@ describe('clipToRetention (WD-008)', () => {
     expect(clipToRetention(now - 60 * D, now - 40 * D, now)).toMatchObject({ clipped: true, empty: true, fromMs: edge });
   });
 });
+
+describe('IB-080 joinAtBoundary', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { joinAtBoundary } = require('../../../src/web/market/oi-ls-window');
+  const p = (time: number, v: number) => ({ time, value: v });
+
+  it('keeps stored points strictly before the boundary, then the venue — no duplicate at the boundary', () => {
+    const out = joinAtBoundary([p(1, 5), p(2, 5), p(3, 5)], [p(3, 1000), p(4, 1000)], 3_000);
+    expect(out).toEqual([p(1, 5), p(2, 5), p(3, 1000), p(4, 1000)]);
+  });
+
+  it('drops stored points inside the venue range even when they disagree — the venue wins', () => {
+    expect(joinAtBoundary([p(5, 9)], [p(3, 1000), p(6, 1000)], 3_000)).toEqual([p(3, 1000), p(6, 1000)]);
+  });
+});

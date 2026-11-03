@@ -42,3 +42,13 @@ export function clipToRetention(fromMs: number, toMs: number, nowMs: number): Re
   if (fromMs < edge) return { fromMs: edge, toMs, clipped: true, empty: false };
   return { fromMs, toMs, clipped: false, empty: false };
 }
+
+/**
+ * IB-080 (storage ruling S3) — the venue answers wherever it still has data; stored rows answer only
+ * for the part BEFORE the venue's first returned point. Pure: `stored` points at or after `boundaryMs`
+ * are dropped (the venue wins inside its retention, even where the two disagree), so the joined line
+ * has no duplicate and no overlap at the boundary. Both inputs are oldest-first; so is the output.
+ */
+export function joinAtBoundary<P extends { time: number }>(stored: readonly P[], venue: readonly P[], boundaryMs: number): P[] {
+  return [...stored.filter((p) => p.time * 1000 < boundaryMs), ...venue];
+}

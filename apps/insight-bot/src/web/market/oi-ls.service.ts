@@ -7,13 +7,27 @@ import {
   type LongShortAccountRow, type OpenInterestHistRow, type TakerRatioRow,
 } from '../../venues/binance/oi-ls.mapper';
 import { OI_LS_TTL_MS, windowKey, type TtlCache } from '../../venues/ttl-cache';
-import { clipToRetention, periodFor } from './oi-ls-window';
+import { clipToRetention, joinAtBoundary, periodFor } from './oi-ls-window';
 import { WEIGHT_CEILING_1M } from './universe-summary.service';
 
 /**
  * WD-008 step 2 — Binance open interest and the four long-short ratios, read from
- * `/futures/data/*` on demand. Nothing is written to Postgres. Additive: `/series/oi` and
- * `/series/ls` still read the tape until WD-009 switches them.
+ * `/futures/data/*` on demand. Nothing is written to Postgres here.
+ *
+ * **IB-080 (storage ruling 2026-11-03 S3–S6): the venue first, stored rows only for what it forgot.**
+ * The OI/LS poller keeps writing `open_interest_5m` / `long_short_5m`, so a box that has run for
+ * months holds more than the venue's ~30 days. A window reaching past retention is answered as:
+ *   1. one period P = `periodFor(from, min(to, now))` over the WHOLE window (S4);
+ *   2. the venue part exactly as before, asked at P (clipped, cached, refused above the ceiling);
+ *   3. the boundary B = the venue's FIRST RETURNED point — not `now − RETENTION_MS`, so the venue's
+ *      drifting -1130 edge cannot open a hole; with no venue point, B = min(to, now);
+ *   4. the stored part: rows in [from, B), the last per `date_bin(P)` bucket (`oi-ls-stored.repo.ts`);
+ *   5. joined without overlap (`joinAtBoundary`); `coverageFrom` / `truncated` keep their meaning over
+ *      the joined series (S5). No extra venue call: the venue weight is unchanged.
+ * **Without a database, or with no stored row in the window, the answer is exactly WD-009's** —
+ * same period, same fields — so a fresh box answers as before.
+ * **Known limit (S6, not fixed):** an outage longer than the venue's retention leaves a hole in the
+ * stored part that the line bridges; the outage itself is in `collector_gaps`.
  *
  * **Retention.** Binance keeps about 30 days of these series and REFUSES an older window with
  * -1130 rather than returning less (`futures-data.client.ts`). So `from` is clipped to
@@ -36,7 +50,27 @@ export interface OiLsServiceOptions {
   client: FuturesDataClient;
   cache: TtlCache;
   weight: BinanceWeightTracker;
+  /**
+   * IB-080: a READ-ONLY port onto the poller's tables, for the part of a window older than the venue
+   * keeps (built from `web/series/pg/oi-ls-stored.repo.ts`). Null = venue only. A port rather than a
+   * database handle, so this on-demand service still cannot write Postgres (WD-008's guard).
+   */
+  stored?: OiLsStoredReader | null;
   now?: () => number;
+}
+
+/** IB-080: what the service may ask of the stored OI/LS rows — reads only. */
+export interface OiLsStoredReader {
+  hasOi(symbol: string, fromMs: number, toMs: number): Promise<boolean>;
+  oi(symbol: string, fromMs: number, toMs: number, periodMs: number): Promise<Array<{ timeMs: number; oiBase: number; oiQuote: number | null }>>;
+  hasLs(symbol: string, kind: string, fromMs: number, toMs: number): Promise<boolean>;
+  ls(symbol: string, kind: string, fromMs: number, toMs: number, periodMs: number): Promise<Array<{ timeMs: number; ratio: number }>>;
+}
+
+/** The stored half of one series: whether any row exists, and the sampled rows. */
+interface StoredSource<P> {
+  has(fromMs: number, toMs: number): Promise<boolean>;
+  load(fromMs: number, toMs: number, periodMs: number): Promise<P[]>;
 }
 
 interface Series<P> {
@@ -56,33 +90,83 @@ export class OiLsService {
   }
 
   async openInterest(symbol: string, fromMs: number, toMs: number): Promise<WebOpenInterestResponse> {
+    const reader = this.options.stored ?? null;
+    const source: StoredSource<WebOpenInterestPoint> | null = reader === null ? null : {
+      has: (from, to) => reader.hasOi(symbol, from, to),
+      load: async (from, to, periodMs) => (await reader.oi(symbol, from, to, periodMs))
+        .map((r) => ({ time: sec(r.timeMs), value: r.oiBase, notional: r.oiQuote })),
+    };
     const series = await this.series<OpenInterestHistRow, WebOpenInterestPoint>('openInterestHist', symbol, fromMs, toMs, (rows) =>
       mapOpenInterestHist(rows, symbol, 'rest').map((r) => ({
         time: Math.floor(r.ts.getTime() / 1000), value: r.oiBase, notional: r.oiQuote ?? null,
-      })),
-    );
+      })), source);
     return { symbol, venue: 'binance', downsampled: false, ...series };
   }
 
   async longShort(symbol: string, kind: LongShortKind, fromMs: number, toMs: number): Promise<WebLongShortResponse> {
+    const reader = this.options.stored ?? null;
+    const source: StoredSource<{ time: number; ratio: number }> | null = reader === null ? null : {
+      has: (from, to) => reader.hasLs(symbol, kind, from, to),
+      load: async (from, to, periodMs) => (await reader.ls(symbol, kind, from, to, periodMs))
+        .map((r) => ({ time: sec(r.timeMs), ratio: r.ratio })),
+    };
     const series = kind === 'taker'
       ? await this.series<TakerRatioRow, { time: number; ratio: number }>(TAKER_ENDPOINT, symbol, fromMs, toMs, (rows) =>
-        ratioPoints(mapTakerRatio(rows, symbol, 'rest')))
+        ratioPoints(mapTakerRatio(rows, symbol, 'rest')), source)
       : await this.series<LongShortAccountRow, { time: number; ratio: number }>(accountEndpoint(kind), symbol, fromMs, toMs, (rows) =>
-        ratioPoints(mapLongShortAccount(rows, symbol, kind, 'rest')));
+        ratioPoints(mapLongShortAccount(rows, symbol, kind, 'rest')), source);
     return { symbol, kind, downsampled: false, ...series };
   }
 
   private async series<Row extends { timestamp: number }, P extends { time: number }>(
     endpoint: string, symbol: string, fromMs: number, toMs: number, toPoints: (rows: Row[]) => P[],
+    source: StoredSource<P> | null,
   ): Promise<Series<P>> {
     const now = this.now();
-    const window = clipToRetention(fromMs, Math.min(toMs, now), now);
+    const endMs = Math.min(toMs, now);
+    // IB-080: the joined path only when the poller has something in the window; otherwise WD-009's
+    // answer exactly (same period, same fields) — a fresh box answers as it did before.
+    if (source !== null && endMs > fromMs && await source.has(fromMs, endMs)) {
+      return this.joined(endpoint, symbol, fromMs, endMs, now, toPoints, source);
+    }
+    const window = clipToRetention(fromMs, endMs, now);
     if (window.empty) return { points: [], coverageFrom: sec(window.fromMs), truncated: true };
 
     const { period, periodMs } = periodFor(window.fromMs, window.toMs);
+    const points = await this.venuePoints(endpoint, symbol, window, period, periodMs, toPoints);
+
+    // The series starts later than asked when we clipped it, or when the venue had nothing older
+    // (its drifting -1130 edge, or a recently listed symbol). Either way: say where it starts.
+    const firstMs = points.length > 0 ? points[0].time * 1000 : null;
+    const late = firstMs === null || firstMs > window.fromMs + periodMs;
+    if (!window.clipped && !late) return { points };
+    return { points, coverageFrom: sec(firstMs ?? window.fromMs), truncated: true };
+  }
+
+  /** IB-080: venue for what it still has, stored rows before its first point, one period P throughout. */
+  private async joined<Row extends { timestamp: number }, P extends { time: number }>(
+    endpoint: string, symbol: string, fromMs: number, endMs: number, now: number,
+    toPoints: (rows: Row[]) => P[], source: StoredSource<P>,
+  ): Promise<Series<P>> {
+    const { period, periodMs } = periodFor(fromMs, endMs);
+    const window = clipToRetention(fromMs, endMs, now);
+    const venue = window.empty ? [] : await this.venuePoints(endpoint, symbol, window, period, periodMs, toPoints);
+    const boundaryMs = venue.length > 0 ? venue[0].time * 1000 : endMs;
+    const older = boundaryMs > fromMs ? await source.load(fromMs, boundaryMs, periodMs) : [];
+    const points = joinAtBoundary(older, venue, boundaryMs);
+
+    const firstMs = points.length > 0 ? points[0].time * 1000 : null;
+    const late = firstMs === null || firstMs > fromMs + periodMs;
+    return late ? { points, coverageFrom: sec(firstMs ?? fromMs), truncated: true } : { points };
+  }
+
+  /** The venue part: clipped window, cached per (symbol, endpoint, period, window), ceiling-guarded. */
+  private async venuePoints<Row extends { timestamp: number }, P extends { time: number }>(
+    endpoint: string, symbol: string, window: { fromMs: number; toMs: number }, period: string, periodMs: number,
+    toPoints: (rows: Row[]) => P[],
+  ): Promise<P[]> {
     const key = windowKey({ venue: 'binance', market: 'perp', symbol, tf: `${endpoint}.${period}`, fromMs: window.fromMs, toMs: window.toMs }, periodMs);
-    const points = await this.options.cache.getOrLoad(key, OI_LS_TTL_MS, async () => {
+    return this.options.cache.getOrLoad(key, OI_LS_TTL_MS, async () => {
       this.refuseAboveCeiling();
       try {
         const rows = await this.options.client.fetchBackward<Row>({ endpoint, symbol, period }, window.fromMs, window.toMs);
@@ -95,13 +179,6 @@ export class OiLsService {
         );
       }
     });
-
-    // The series starts later than asked when we clipped it, or when the venue had nothing older
-    // (its drifting -1130 edge, or a recently listed symbol). Either way: say where it starts.
-    const firstMs = points.length > 0 ? points[0].time * 1000 : null;
-    const late = firstMs === null || firstMs > window.fromMs + periodMs;
-    if (!window.clipped && !late) return { points };
-    return { points, coverageFrom: sec(firstMs ?? window.fromMs), truncated: true };
   }
 
   private refuseAboveCeiling(): void {
