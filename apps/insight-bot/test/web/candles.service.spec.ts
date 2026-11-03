@@ -243,6 +243,16 @@ describe('CandlesService — the cache', () => {
     expect(weight.used1m(NOW)).toBe(weightAfterFirst);
   });
 
+  it('IB-096: a cached page answers the same candles the venue did, field for field (packed in between)', async () => {
+    const { service, venue } = setup();
+    const first = await service.candles('perp', 'BTCUSDT', '1h', JUNE_2025, JULY_2025);
+    const n = venue.calls.length;
+    const again = await service.candles('perp', 'BTCUSDT', '1h', JUNE_2025, JULY_2025);
+    expect(venue.calls).toHaveLength(n); // from the packed page, not the venue
+    expect(again).toEqual(first);
+    expect(again).not.toBe(first);
+  });
+
   it('a different window inside cached pages is a hit too (aligned pages)', async () => {
     const { service, venue } = setup();
     await service.candles('perp', 'BTCUSDT', '1h', JUNE_2025, JULY_2025);

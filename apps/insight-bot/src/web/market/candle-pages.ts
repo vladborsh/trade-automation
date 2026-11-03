@@ -28,9 +28,11 @@ export const PAGE_LIMIT: Readonly<Record<WebMarket, number>> = { perp: 1500, spo
 export const MAX_BARS_PER_REQUEST = WEB_MAX_CANDLE_BARS;
 
 /**
- * Pages kept in memory. A full page is 1 000–1 500 `WebCandle`s. Heap per 1 500-row page of
- * synthetic candles, `heapUsed` after `gc()`, 200 pages: 0.28 MB, three runs on 2026-10-29, one
- * occasion (a note, not a rule). So the cap is ~42 MB on a 1 GB box that also runs Postgres.
+ * Pages kept in memory. A full page is 1 000–1 500 candles. Per 1 500-row page of synthetic
+ * candles, after `gc()`, 200 pages: as `WebCandle` objects 0.26–0.28 MB of heap (2026-10-29 and
+ * 2026-11-04); packed (`packCandles`, IB-096) 0.08 MB of array buffer — three runs each, two
+ * occasions, still a note. So the cap is ~12 MB, not ~42 MB. 60 of the slots are the positioning
+ * baselines' 1 h pages (30 coins × 2), held so the hourly rebuild does not buy them again.
  */
 export const CACHE_MAX_PAGES = 150;
 
@@ -104,11 +106,45 @@ export function pageKey(k: PageKey): string {
   return `${k.market}:${k.symbol}:${k.tf}:${k.pageStart}`;
 }
 
-/** What the cache holds for a page: its closed rows, and how far they are final. */
+/** What the cache holds for a page: its closed rows, packed, and how far they are final. */
 export interface CachedPage {
-  rows: readonly WebCandle[];
-  /** Exclusive: a window ending at or before this is answered from `rows` alone. */
+  /** `packCandles` of the closed rows. */
+  packed: Float64Array;
+  /** Exclusive: a window ending at or before this is answered from the page alone. */
   closedUntilMs: number;
+}
+
+/** Numbers per candle in a packed page: time, open, high, low, close, volume, takerBuyVolume. */
+export const CANDLE_FIELDS = 7;
+
+/**
+ * IB-096 — a cached page as one `Float64Array` instead of an array of `WebCandle` objects. Each
+ * object costs a header, seven slots and a boxed heap number for every non-integer price; packed,
+ * a candle is 56 bytes. The owner's ruling (2026-11-03) is memory over latency, and these pages
+ * are the one cache that cannot be shrunk by count or TTL without buying the page from Binance
+ * again (10 weight each) — so they are shrunk by representation. Reads unpack into fresh objects,
+ * which live only as long as the request.
+ * A null `takerBuyVolume` is stored as NaN and read back as null.
+ */
+export function packCandles(rows: readonly WebCandle[]): Float64Array {
+  const out = new Float64Array(rows.length * CANDLE_FIELDS);
+  rows.forEach((r, i) => {
+    out.set([r.time, r.open, r.high, r.low, r.close, r.volume, r.takerBuyVolume ?? Number.NaN], i * CANDLE_FIELDS);
+  });
+  return out;
+}
+
+export function unpackCandles(packed: Float64Array): WebCandle[] {
+  const out: WebCandle[] = [];
+  for (let o = 0; o < packed.length; o += CANDLE_FIELDS) {
+    const taker = packed[o + 6] as number;
+    out.push({
+      time: packed[o] as number, open: packed[o + 1] as number, high: packed[o + 2] as number,
+      low: packed[o + 3] as number, close: packed[o + 4] as number, volume: packed[o + 5] as number,
+      takerBuyVolume: Number.isNaN(taker) ? null : taker,
+    });
+  }
+  return out;
 }
 
 /** A small least-recently-used map: a `Map` keeps insertion order, so the first key is the oldest. */

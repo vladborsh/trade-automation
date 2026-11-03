@@ -1,6 +1,6 @@
 import {
   LruCache, MAX_BARS_PER_REQUEST, SETTLE_MS, TAIL_LIMIT, barsIn, closedUntil, isTail, maxDaysFor, pageSpanMs, pagesFor,
-  reachesFormingBar,
+  CANDLE_FIELDS, packCandles, reachesFormingBar, unpackCandles,
 } from '../../src/web/market/candle-pages';
 
 /** IB-063 — how a window is cut into venue pages and which part of a page may be remembered. */
@@ -131,5 +131,24 @@ describe('IB-066: the live tail', () => {
     const justClosed = 100 * HOUR + SETTLE_MS - 1;
     expect(reachesFormingBar('1h', 98 * HOUR, 100 * HOUR, justClosed)).toBe(true);
     expect(reachesFormingBar('1h', 98 * HOUR, 100 * HOUR, 100 * HOUR + SETTLE_MS)).toBe(false);
+  });
+});
+
+describe('packCandles / unpackCandles (IB-096)', () => {
+  const rows = [
+    { time: 1_750_000_000, open: 104_321.17, high: 104_400.5, low: 104_100.03, close: 104_222.9, volume: 1_234.567, takerBuyVolume: 611.2 },
+    { time: 1_750_003_600, open: 0.000_012_34, high: 0.000_013, low: 0.000_012, close: 0.000_012_5, volume: 9e12, takerBuyVolume: null },
+    { time: 1_750_007_200, open: 1, high: 1, low: 1, close: 1, volume: 0, takerBuyVolume: 0 },
+  ];
+
+  it('round-trips every field exactly, a null taker volume included (stored as NaN, read back as null)', () => {
+    expect(unpackCandles(packCandles(rows))).toEqual(rows);
+    expect(unpackCandles(packCandles([]))).toEqual([]);
+  });
+
+  it('is 56 bytes a candle: one Float64Array, no objects', () => {
+    const packed = packCandles(rows);
+    expect(packed).toBeInstanceOf(Float64Array);
+    expect(packed.byteLength).toBe(rows.length * CANDLE_FIELDS * 8);
   });
 });

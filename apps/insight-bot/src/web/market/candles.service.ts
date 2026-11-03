@@ -6,7 +6,7 @@ import type { WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contr
 import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
 import {
   CACHE_MAX_PAGES, LruCache, MAX_BARS_PER_REQUEST, PAGE_LIMIT, TAIL_LIMIT, barsIn, closedUntil, isTail, maxDaysFor,
-  pageKey, pageSpanMs, pagesFor, reachesFormingBar, type CachedPage,
+  packCandles, pageKey, pageSpanMs, pagesFor, reachesFormingBar, unpackCandles, type CachedPage,
 } from './candle-pages';
 import { WEIGHT_CEILING_1M } from './universe-summary.service';
 
@@ -156,7 +156,7 @@ export class CandlesService {
     const cached = this.cache.get(key);
     // the part of the window on THIS page: a window running on into the next page is still
     // fully answered here once this page is final
-    if (cached && Math.min(toMs, pageEnd) <= cached.closedUntilMs) return cached.rows;
+    if (cached && Math.min(toMs, pageEnd) <= cached.closedUntilMs) return unpackCandles(cached.packed);
 
     const pending = this.inFlight.get(key);
     if (pending) return pending;
@@ -165,7 +165,7 @@ export class CandlesService {
       const until = closedUntil(tf, pageStart, pageEnd, this.now());
       const closed = rows.filter((r) => r.time * 1000 < until);
       // a page that has not started closing yet is not worth a slot
-      if (until > pageStart) this.cache.set(key, { rows: closed, closedUntilMs: until });
+      if (until > pageStart) this.cache.set(key, { packed: packCandles(closed), closedUntilMs: until });
       return rows;
     }).finally(() => this.inFlight.delete(key));
     this.inFlight.set(key, promise);
