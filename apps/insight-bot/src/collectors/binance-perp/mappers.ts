@@ -72,7 +72,11 @@ export function markRowFromPremiumIndex(row: PremiumIndexRow, ts: Date): MarkFun
  * the universe is USDT-M, so anything not shaped `<BASE>USDT` is skipped AND COUNTED by the
  * collector — never silently converted with a guessed contract size.
  */
-export const USDT_LINEAR_PERP = /^[A-Z0-9]+USDT$/;
+// Not `[A-Z0-9]+`: Binance lists USDT-linear perps whose base is not ASCII (`币安人生USDT`,
+// `我踏马来了USDT`, `牛来USDT` — seen live 2026-11-03 in the first run of this rule, which wrongly
+// skipped them). What marks the other classes is the `_` (COIN-M `…USD_PERP`, quarterlies
+// `…_YYMMDD`) or a quote that is not USDT (`…USDC`, `…BTC`, `…USD1`, `…U`).
+export const USDT_LINEAR_PERP = /^[^_\s]+USDT$/u;
 
 export function isUsdtLinearPerp(symbol: string): boolean {
   return USDT_LINEAR_PERP.test(symbol);

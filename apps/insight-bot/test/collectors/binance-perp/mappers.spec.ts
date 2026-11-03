@@ -169,6 +169,8 @@ describe('IB-BUG-012 live forceOrder fixture (shape and side invariant)', () => 
 describe('IB-BUG-018 isUsdtLinearPerp and the mapper backstop', () => {
   it('accepts <BASE>USDT, including numeric bases', () => {
     for (const ok of ['BTCUSDT', '1000PEPEUSDT', 'XAUTUSDT', 'KGENUSDT']) expect(isUsdtLinearPerp(ok)).toBe(true);
+    // non-ASCII bases are real USDT-linear perps (seen live 2026-11-03); the first rule dropped them
+    for (const ok of ['币安人生USDT', '我踏马来了USDT', '牛来USDT']) expect(isUsdtLinearPerp(ok)).toBe(true);
   });
 
   it('refuses COIN-M perps and quarterlies, USDT quarterlies, BTC-quoted, and stablecoin-margined shapes', () => {
@@ -184,5 +186,28 @@ describe('IB-BUG-018 isUsdtLinearPerp and the mapper backstop', () => {
     };
     // the coordinator's row: 897 contracts × $100 ≈ $89.7k, stored as 897 × 76 427 = $68.6M
     expect(() => liquidationRowFromEvent(coinm)).toThrow(/not a USDT-linear perpetual/);
+  });
+});
+
+/**
+ * IB-BUG-018 — a real COIN-M `forceOrder`, captured from `fstream.binance.com/market`
+ * `!forceOrder@arr` on 2026-11-03 14:02:44 UTC (one event in 787 over 28 min: 775 USDT, 11 USDC,
+ * 1 COIN-M). Same envelope and fields as a USDT-M event — nothing in the SHAPE says "inverse"
+ * except the symbol, which is why the symbol rule is the guard.
+ */
+describe('IB-BUG-018 live COIN-M forceOrder fixture', () => {
+  const [raw] = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'binance', 'forceOrder-coinm.json'), 'utf8')) as unknown[];
+  const message = demultiplex(raw);
+  const event = message?.data as ForceOrderEvent;
+
+  it('arrives on the same stream, in the same shape, as a USDT-M liquidation', () => {
+    expect(message?.stream).toBe('!forceOrder@arr');
+    expect(isForceOrderEvent(event)).toBe(true);
+    expect(event.o.s).toBe('BTCUSD_PERP');
+  });
+
+  it('is refused by the rule, and the mapper throws rather than store 250 contracts × 77 090 as $19.3M', () => {
+    expect(isUsdtLinearPerp(event.o.s)).toBe(false);
+    expect(() => liquidationRowFromEvent(event)).toThrow(/not a USDT-linear perpetual/);
   });
 });

@@ -1,0 +1,24 @@
+[
+  {
+    "stream": "!forceOrder@arr",
+    "data": {
+      "e": "forceOrder",
+      "E": 1793714572085,
+      "o": {
+        "s": "BTCUSD_PERP",
+        "S": "SELL",
+        "o": "LIMIT",
+        "f": "IOC",
+        "q": "250",
+        "p": "76809.5",
+        "ap": "77090.6",
+        "X": "FILLED",
+        "l": "212",
+        "z": "250",
+        "T": 1793714571081,
+        "ps": "BTCUSD",
+        "st": 2
+      }
+    }
+  }
+]
