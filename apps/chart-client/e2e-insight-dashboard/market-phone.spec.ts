@@ -141,6 +141,29 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(height);
   });
 
+  test('IB-101 phone: «where» folds to the top 8 with «12 more coins · $X»; the button is ≥ 40 px; show all, then a new period folds it again', async ({ page }, info) => {
+    await openMarket(page);
+    const where = page.locator('app-liq-where');
+    const rows = where.locator('li.row');
+    const active = overview.block.perCoin.filter((c) => c.totals.usd > 0).length;
+    expect(active).toBe(20); // the recording: 20 coins, so 12 fold away
+    await expect(rows).toHaveCount(8);
+    await expect(where).toContainText('12 more coins · $');
+    const toggle = where.getByRole('button', { name: 'Show all (12)' });
+    expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    // folded, the block needs no scrolling of its own and the page none sideways
+    expect(await where.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await info.attach('phone-390-where-folded.png', { body: await where.screenshot(), contentType: 'image/png' });
+    await toggle.click();
+    await page.clock.runFor(100);
+    await expect(rows).toHaveCount(20);
+    await expect(where.getByRole('button', { name: 'Show fewer' })).toBeVisible();
+    await page.getByRole('group', { name: 'Period' }).getByRole('button', { name: '4h', exact: true }).click();
+    await page.clock.runFor(2_000);
+    await expect(rows).toHaveCount(8); // a new period starts folded
+  });
+
   test('IB-090 heat table: scrolls in its own box with the ticker column pinned; every cell readable', async ({ page }) => {
     await openMarket(page);
     const box = page.locator('app-pos-heat .scroll');
@@ -205,6 +228,17 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
 
 test.describe('market page — desktop 1440×900 (IB-088)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('IB-101 desktop: «where» folds to the top 8 and unfolds to all 20', async ({ page }, info) => {
+    await openMarket(page);
+    const where = page.locator('app-liq-where');
+    await expect(where.locator('li.row')).toHaveCount(8);
+    await expect(where).toContainText('12 more coins · $');
+    await info.attach('desktop-where-folded.png', { body: await where.screenshot(), contentType: 'image/png' });
+    await where.getByRole('button', { name: 'Show all (12)' }).click();
+    await page.clock.runFor(100);
+    await expect(where.locator('li.row')).toHaveCount(20);
+  });
 
   test('no horizontal scroll, and the screenshot', async ({ page }, info) => {
     await openMarket(page, withNormBlock);

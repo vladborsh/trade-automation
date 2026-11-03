@@ -124,6 +124,8 @@ export function tickLabel(time: number, bucketSec: number, timeZone?: string): s
 export interface WhereRow {
   symbol: string;
   base: string;
+  /** The coin's liquidation total for the period: the ranking key, and what «ещё K · $X» sums (IB-101). */
+  usd: number;
   long: number;
   short: number;
   /** Bar lengths as % of the widest side of any row: one scale, so rows compare. */
@@ -145,6 +147,7 @@ export function whereRows(perCoin: readonly WebLiquidationCoinPeriod[]): { rows:
     rows: active.map((c) => ({
       symbol: c.symbol,
       base: c.base,
+      usd: c.totals.usd,
       long: c.totals.long,
       short: c.totals.short,
       longPct: pct(c.totals.long),

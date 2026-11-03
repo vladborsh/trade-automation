@@ -4,7 +4,7 @@
 } @else {
   <p class="legend">{{ t('liq.where.legend') }}</p>
   <ul class="rows">
-    @for (row of view().rows; track row.symbol) {
+    @for (row of visibleRows(); track row.symbol) {
       <li class="row">
         <a class="coin" [routerLink]="['/instrument', row.symbol]">{{ row.base }}</a>
         <div class="track left"><span class="bar long" [style.width.%]="row.longPct"></span></div>
@@ -18,6 +18,16 @@
       </li>
     }
   </ul>
+  @if (collapsed().hiddenCount > 0) {
+    <div class="fold">
+      @if (!expanded()) {
+        <p class="muted">{{ t('liq.where.more', { count: collapsed().hiddenCount, usd: usd(collapsed().hiddenUsd) }) }}</p>
+      }
+      <button type="button" class="fold-toggle" [attr.aria-expanded]="expanded()" (click)="toggle()">
+        {{ expanded() ? t('liq.where.collapse') : t('liq.where.showAll', { count: collapsed().hiddenCount }) }}
+      </button>
+    </div>
+  }
 }
 @if (view().quiet > 0) {
   <p class="muted">{{ t('liq.where.quiet', { count: view().quiet }) }}</p>

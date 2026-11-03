@@ -25,7 +25,23 @@ p { margin: 0; font-size: 12px; }
 .short-text { color: #26a69a; }
 .verdict { margin-left: 6px; font-weight: 600; }
 
+/* IB-101: the fold line and its button, centred under the bars */
+.fold { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; margin-top: 6px; }
+.fold-toggle {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: #0d1117;
+  color: #c9d1d9;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fold-toggle:hover { border-color: #8b949e; }
+
 /* D16 phone: the coin link is a ≥ 40 px touch target. */
 @media (max-width: 767px) {
   .coin { display: inline-flex; align-items: center; min-height: 40px; min-width: 40px; }
+  .fold-toggle { min-height: 40px; }
 }

@@ -16,7 +16,7 @@
       <app-liq-hourly [hourly]="block.hourly" [note]="say(v.hourlyNote)" />
     </div>
     <div class="panel">
-      <app-liq-where [perCoin]="block.perCoin" [note]="say(v.whereNote)" />
+      <app-liq-where [perCoin]="block.perCoin" [note]="say(v.whereNote)" [period]="period()" />
       @if (say(v.tradfi); as tradfi) {
         <p class="outside">{{ tradfi }}</p>
       }
