@@ -4,7 +4,7 @@
 master b86d100), the coordinator's source survey
 (`reports/coordinator-market-data-sources-2026-11-03.md`), and the mockup the brief links. **Gate:**
 IB-BUG-018 (COIN-M liquidations stored ~760× inflated) lands first; nothing here ships on top of it.
-· **Output:** IB-084 … IB-093 in `tasks/insight-bot.jsonl`.
+· **Output:** IB-084 … IB-093 and IB-100 in `tasks/insight-bot.jsonl`. **Amended 2026-11-03 late (owner, `reports/coordinator-ib091-scope-2026-11-03.md`):** IB-091 drops max pain and 25Δ skew; IB-093 is split into a dev/tester pre-check and a short owner look-through (IB-100).
 
 ## 1. The shape
 
@@ -16,7 +16,7 @@ period switch 1ч · 4ч · 24ч · 7д        live · updated 6 s ago      (no 
 │               bubble timeline + context cards   │ TradFi in its own line             │         │
 ├ Positioning ─ price×OI quadrant │ per-coin heat table (price, OI, funding, L/S, liq) + signal ┤
 ├ Market cap ─ treemap (area cap, colour 24h) │ dominance bar BTC/ETH/stables/alts           ┤
-└ Derivatives & flows (phase 2) ─ DVOL · P/C · max pain · skew · stablecoin Δ · CB premium     ┘
+└ Derivatives & flows (phase 2) ─ DVOL · P/C (OKX) · stablecoin Δ · CB premium                  ┘
 each block ends with one conclusion line
 ```
 
@@ -62,7 +62,8 @@ hidden tab.
 | Klines 1h × 720 for price baselines, 40 coins, hourly | Binance fapi | 40 × 5 / 60 ≈ 3.3 / min |
 | OI/LS baselines (IB-080 joined read, 1h period), 40 coins × 3 series, hourly | Binance `/futures/data` (separate limit) | ≈ 2 calls / min |
 | `/coins/markets` + `/global` | CoinGecko (existing gate) | ≤ 1 call / min |
-| Phase 2: Deribit DVOL (15 min) + book summary BTC, ETH (5 min) | Deribit public | < 1 / min |
+| Phase 2: Deribit DVOL (15 min) — book summary dropped with max pain/skew (owner, 2026-11-03) | Deribit public | < 0.1 / min |
+| Phase 2: put/call by OI, daily series (60 min) | OKX rubik (public) | < 0.1 / min |
 | Phase 2: DefiLlama stablecoins (60 min); Coinbase candles 1m (1 / min) | keyless | ≈ 1 / min |
 
 Binance fapi total ≈ **54 / 2400 per minute (2.2 %)**. That is arithmetic from documented weights; the
@@ -83,9 +84,10 @@ fixtures. Every task runs whole on its slot before merge.
 | IB-088 | Client shell: period switch, `BlockScheduler`, live indicator, KPI strip, insights block, phone layout; Refresh button removed | IB-085, IB-086 (contracts) |
 | IB-089 | Client liquidation charts: mirrored bars, diverging "where" + TradFi line, bubble timeline + context cards; old lists deleted | IB-084, IB-088 |
 | IB-090 | Client positioning (quadrant, heat table) and caps (treemap, dominance bar) | IB-085, IB-087, IB-088 |
-| IB-091 | Phase 2 sources: Deribit (DVOL, P/C, max pain, 25Δ skew), DefiLlama stablecoins, Coinbase premium; "Derivatives & flows" block; rules R8 (DVOL spike), R9 (stablecoin supply Δ), R10 (Coinbase premium) | IB-086, IB-088 |
+| IB-091 | Phase 2 sources (scope cut by the owner 2026-11-03: no max pain, no 25Δ skew): Deribit DVOL, put/call by OI from OKX rubik, DefiLlama stablecoins, Coinbase premium; "Derivatives & flows" block; rules R8 (DVOL spike), R9 (stablecoin supply Δ), R10 (Coinbase premium) | IB-086, IB-088 |
 | IB-092 | Phase 2: cross-venue OI and funding (Bybit `tickers`, Hyperliquid `metaAndAssetCtxs`) as heat-table columns; rule R11 (funding spread across venues) | IB-085, IB-090 |
-| IB-093 | Live acceptance on the box with the owner: the page on a phone, a screenshot per block, the first-week refusals shown honestly | IB-089, IB-090 (IB-091/092 if merged) |
+| IB-093 | Pre-check on the box by dev/tester (split 2026-11-03, owner ruling): hidden tab, weight with two tabs, 10 s liquidations, TradFi out of totals, every insight vs the charts, screenshots at 390 px and desktop, plain-Russian report | IB-089, IB-090, IB-096, IB-098 |
+| IB-100 | Owner look-through (~15 min): phone on mobile data + laptop, the coordinator's checklist | IB-093 |
 
 The critical path is IB-BUG-018 → IB-084 → IB-086 → IB-088 → IB-089. IB-085 and IB-087 can run in
 parallel with IB-084 within the WIP cap of 2.
