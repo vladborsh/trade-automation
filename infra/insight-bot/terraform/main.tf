@@ -28,9 +28,10 @@ data "aws_subnets" "default" {
   }
 }
 
-# Inbound: only TCP 80 and 443 for Caddy, from IPv4 anywhere, and only once var.open_web_ports is
-# true (H3, H8: applied last, after the https name and the 404s are proven on the box). Never SSH
-# (access is SSM Session Manager), never the app's 3005 (it stays on the compose network).
+# Inbound: only TCP 80 and/or 443 for Caddy, from IPv4 anywhere, as listed in var.open_web_ports
+# (H3, H8: 80 first so Caddy can complete the ACME HTTP-01 challenge, 443 — the site — last, after
+# the routes are proven on the box over https). Never SSH (access is SSM Session Manager), never
+# the app's 3005 (it stays on the compose network).
 # The description is the group's original one: changing it would force a replacement.
 resource "aws_security_group" "insight_bot" {
   name        = "insight-bot"
@@ -38,9 +39,9 @@ resource "aws_security_group" "insight_bot" {
   vpc_id      = data.aws_vpc.default.id
 
   dynamic "ingress" {
-    for_each = var.open_web_ports ? { http = 80, https = 443 } : {}
+    for_each = toset(var.open_web_ports)
     content {
-      description = ingress.key == "http" ? "Caddy: ACME HTTP-01 and the redirect to https" : "Caddy: the site"
+      description = ingress.value == 80 ? "Caddy: ACME HTTP-01 and the redirect to https" : "Caddy: the site"
       from_port   = ingress.value
       to_port     = ingress.value
       protocol    = "tcp"
@@ -86,7 +87,9 @@ resource "aws_instance" "insight_bot" {
   }
 
   user_data_replace_on_change = false # changing the bootstrap must not recycle the database volume
-  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+  # gzip + base64: inlined, the bootstrap passed EC2's 16 KiB user-data limit (IB-082 added the
+  # Caddyfile); cloud-init recognises gzip and unpacks it. First boot only, see lifecycle below.
+  user_data_base64 = base64gzip(templatefile("${path.module}/user_data.sh.tftpl", {
     region         = var.region
     ssm_prefix     = var.ssm_parameter_prefix
     backup_bucket  = aws_s3_bucket.backups.bucket
@@ -98,7 +101,7 @@ resource "aws_instance" "insight_bot" {
     restore_sh     = file("${path.module}/../scripts/restore.sh")
     backup_service = file("${path.module}/../systemd/insight-bot-backup.service")
     backup_timer   = file("${path.module}/../systemd/insight-bot-backup.timer")
-  })
+  }))
 
   tags = { Name = "insight-bot" }
 
@@ -107,12 +110,13 @@ resource "aws_instance" "insight_bot" {
   # liquidation tape a venue never serves again). OS updates happen on the box (dnf), not by
   # recreating it; a deliberate rebuild is `tofu apply -replace=aws_instance.insight_bot`.
   #
-  # user_data is first-boot only: cloud-init runs it once per instance, and an in-place change is a
+  # user_data (and user_data_base64, which carries it since IB-082) is first-boot only: cloud-init
+  # runs it once per instance, and an in-place change is a
   # stop + ModifyInstanceAttribute + start, which takes the box down and changes its public IP for
   # nothing. So a later edit to any file inlined below (compose, scripts, systemd units) does not
   # reach a running box through tofu: scripts/sync-box.sh copies them over SSM (RUNBOOK §3). The
   # image tag never lived here after IB-083: it is in SSM /insight-bot/IMAGE_TAG (ECR design E10).
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes = [ami, user_data, user_data_base64]
   }
 }

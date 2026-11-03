@@ -66,10 +66,15 @@ variable "deploy_role_github_sub" {
 
 variable "open_web_ports" {
   description = <<-EOT
-    TCP 80 and 443 open to the internet for Caddy (https-without-domain H3). Turned on in the LAST
-    apply of IB-082, after the image with Caddy is up and /metrics 404 + /health -> SPA are proven
-    on the box through the https name (H8'). False closes them again.
+    Inbound TCP ports open to the internet for Caddy (https-without-domain H3). Opened in two steps
+    (H8): [80] first, so Caddy can obtain the certificate (ACME HTTP-01) while the routes are
+    proven on the box; then [80, 443], the site, last. [] closes them again.
   EOT
-  type        = bool
-  default     = false
+  type        = list(number)
+  default     = []
+
+  validation {
+    condition     = alltrue([for p in var.open_web_ports : contains([80, 443], p)])
+    error_message = "Only 80 and 443 may be opened: never SSH, never the app's 3005."
+  }
 }
