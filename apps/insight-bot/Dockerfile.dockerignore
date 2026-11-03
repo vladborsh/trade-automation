@@ -1,0 +1,13 @@
+# BuildKit reads <Dockerfile>.dockerignore next to the Dockerfile, so this applies to the insight-bot
+# image only (signal-server's build is untouched). The context is the repo root.
+# A CI checkout has none of these; a developer's worktree has all of them, and without this file a
+# local build would ship every node_modules and the slot's .env (bot token, DB url) into the build
+# stage and the local build cache.
+**/.env
+**/.env.*
+**/node_modules
+**/dist
+**/.angular
+**/*.tsbuildinfo
+apps/insight-bot/public
+.git
