@@ -13,6 +13,9 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   // liquidations, Binance OI and long/short, and the collectors' gap rows. The candle, funding,
   // feature-frame and playbook tables keep their existing partitions until WD-006 drops them;
   // nothing writes to them any more, so no new month is needed.
+  // Kept while the news hold lasts (owner, 2026-11-03): the news reaction reads read candles_1m.
+  // Nothing writes it since WD-010; an empty monthly partition costs nothing.
+  { table: 'candles_1m', column: 'open_time' },
   { table: 'open_interest_5m', column: 'ts' },
   { table: 'long_short_5m', column: 'ts' },
   { table: 'liquidations', column: 'ts' },
