@@ -245,7 +245,22 @@ node infra/insight-bot/probe-venues.mjs --json     # то же в JSON
 
 ### Результат с сервера в Токио
 
-_(заполняется после первого запуска на сервере)_
+Сервер `i-002c057dfb439ca24`, 2026-11-03 11:47 UTC, сразу после создания. Выход в интернет —
+Япония (`ipinfo.io/country` = `JP`). Проба запускалась дважды подряд (в таблице первый прогон);
+оба раза — все четыре биржи прислали данные.
+
+| Биржа | Поток | Рукопожатие | Первые данные | Итог |
+|---|---|---|---|---|
+| Binance USD-M (фьючерсы) | `fstream.binance.com/market` | 90 мс | 201 мс | норма |
+| Binance spot | `stream.binance.com:9443` | 35 мс | 2086 мс | норма |
+| Bybit linear | `stream.bybit.com` | 229 мс | 301 мс | норма |
+| OKX swap | `ws.okx.com:8443` | 57 мс | 67 мс | норма |
+
+REST с сервера: `fapi.binance.com/fapi/v1/time`, `api.binance.com/api/v3/time`,
+`fapi.binance.com/futures/data/openInterestHist`, `api.bybit.com/v5/market/time`,
+`www.okx.com/api/v5/public/time` — все `200` (не `451`), 22–98 мс.
+
+Это два прогона в один день, а не правило: задержки здесь — заметка, а не норма.
 
 ---
 
