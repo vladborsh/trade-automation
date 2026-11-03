@@ -27,3 +27,5 @@ export * from './push';
 export * from './market';
 // IB-085 — positioning table + KPI strip (design D9, D10).
 export * from './market-positioning';
+// IB-086 — «Главное сейчас»: rule-based statements (design D1–D5, D15).
+export * from './market-insights';

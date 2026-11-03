@@ -1,0 +1,190 @@
+{
+ "period": "24h",
+ "asOf": 1793719530,
+ "top": [
+  {
+   "ruleId": "R4",
+   "block": "positioning",
+   "key": "insight.oi_vs_price",
+   "params": {
+    "symbol": "SOLUSDT",
+    "quadrant": "new_longs",
+    "oiPct": 26.0,
+    "pricePct": 0.1
+   },
+   "rarity": 0.99,
+   "magnitude": 26.0,
+   "basis": {
+    "window": "24h",
+    "venues": [
+     "binance"
+    ],
+    "sampleWindows": 696,
+    "observedWindows": 696,
+    "from": 1791127530
+   },
+   "link": {
+    "route": "instrument",
+    "symbol": "SOLUSDT",
+    "timeSec": null
+   }
+  },
+  {
+   "ruleId": "R5",
+   "block": "positioning",
+   "key": "insight.funding_extremes",
+   "params": {
+    "count": 4,
+    "total": 30,
+    "symbol": "PEPEUSDT",
+    "rate": 0.0011
+   },
+   "rarity": 0.98,
+   "magnitude": 0.0011,
+   "basis": {
+    "window": "24h",
+    "venues": [
+     "binance"
+    ],
+    "sampleWindows": 90,
+    "observedWindows": 90,
+    "from": 1791127530
+   },
+   "link": {
+    "anchor": "positioning"
+   }
+  },
+  {
+   "ruleId": "R3",
+   "block": "liquidations",
+   "key": "insight.liq_cascade",
+   "params": {
+    "side": "short",
+    "count": 4,
+    "minutes": 9,
+    "usd": 3100000.0,
+    "symbol": "ETHUSDT"
+   },
+   "rarity": 0.96,
+   "magnitude": 3100000.0,
+   "basis": {
+    "window": "24h",
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "sampleWindows": 720,
+    "observedWindows": 690,
+    "from": 1791127530
+   },
+   "link": {
+    "route": "instrument",
+    "symbol": "ETHUSDT",
+    "timeSec": 1793712533
+   }
+  }
+ ],
+ "blocks": [
+  {
+   "block": "liquidations",
+   "statement": {
+    "ruleId": "R3",
+    "block": "liquidations",
+    "key": "insight.liq_cascade",
+    "params": {
+     "side": "short",
+     "count": 4,
+     "minutes": 9,
+     "usd": 3100000.0,
+     "symbol": "ETHUSDT"
+    },
+    "rarity": 0.96,
+    "magnitude": 3100000.0,
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "sampleWindows": 720,
+     "observedWindows": 690,
+     "from": 1791127530
+    },
+    "link": {
+     "route": "instrument",
+     "symbol": "ETHUSDT",
+     "timeSec": 1793712533
+    }
+   },
+   "neutral": null
+  },
+  {
+   "block": "positioning",
+   "statement": {
+    "ruleId": "R4",
+    "block": "positioning",
+    "key": "insight.oi_vs_price",
+    "params": {
+     "symbol": "SOLUSDT",
+     "quadrant": "new_longs",
+     "oiPct": 26.0,
+     "pricePct": 0.1
+    },
+    "rarity": 0.99,
+    "magnitude": 26.0,
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance"
+     ],
+     "sampleWindows": 696,
+     "observedWindows": 696,
+     "from": 1791127530
+    },
+    "link": {
+     "route": "instrument",
+     "symbol": "SOLUSDT",
+     "timeSec": null
+    }
+   },
+   "neutral": null
+  },
+  {
+   "block": "caps",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "no_rules",
+    "basis": null
+   }
+  },
+  {
+   "block": "flows",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "no_rules",
+    "basis": null
+   }
+  },
+  {
+   "block": "sentiment",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "nothing_unusual",
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance"
+     ],
+     "sampleWindows": 696,
+     "observedWindows": 696,
+     "from": 1791127530
+    }
+   }
+  }
+ ]
+}

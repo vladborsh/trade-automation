@@ -1,0 +1,120 @@
+{
+ "period": "24h",
+ "asOf": 1793719530,
+ "top": [
+  {
+   "ruleId": "R4",
+   "block": "positioning",
+   "key": "insight.oi_vs_price",
+   "params": {
+    "symbol": "SOLUSDT",
+    "quadrant": "new_longs",
+    "oiPct": 26.0,
+    "pricePct": 0.1
+   },
+   "rarity": 0.99,
+   "magnitude": 26.0,
+   "basis": {
+    "window": "24h",
+    "venues": [
+     "binance"
+    ],
+    "sampleWindows": 696,
+    "observedWindows": 696,
+    "from": 1791127530
+   },
+   "link": {
+    "route": "instrument",
+    "symbol": "SOLUSDT",
+    "timeSec": null
+   }
+  }
+ ],
+ "blocks": [
+  {
+   "block": "liquidations",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "insufficient_history",
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "sampleWindows": 0,
+     "observedWindows": 0,
+     "from": null
+    }
+   }
+  },
+  {
+   "block": "positioning",
+   "statement": {
+    "ruleId": "R4",
+    "block": "positioning",
+    "key": "insight.oi_vs_price",
+    "params": {
+     "symbol": "SOLUSDT",
+     "quadrant": "new_longs",
+     "oiPct": 26.0,
+     "pricePct": 0.1
+    },
+    "rarity": 0.99,
+    "magnitude": 26.0,
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance"
+     ],
+     "sampleWindows": 696,
+     "observedWindows": 696,
+     "from": 1791127530
+    },
+    "link": {
+     "route": "instrument",
+     "symbol": "SOLUSDT",
+     "timeSec": null
+    }
+   },
+   "neutral": null
+  },
+  {
+   "block": "caps",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "no_rules",
+    "basis": null
+   }
+  },
+  {
+   "block": "flows",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "no_rules",
+    "basis": null
+   }
+  },
+  {
+   "block": "sentiment",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "nothing_unusual",
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance"
+     ],
+     "sampleWindows": 696,
+     "observedWindows": 696,
+     "from": 1791127530
+    }
+   }
+  }
+ ]
+}
