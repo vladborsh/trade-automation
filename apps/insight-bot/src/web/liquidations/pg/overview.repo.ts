@@ -23,6 +23,38 @@ const SYMBOL_MAP = `
 
 const asDate = (ms: number) => new Date(ms);
 
+/**
+ * IB-084 (design D6): restricts a read to one asset class, given as the `venue:symbol` keys the
+ * classifier assigned to it. Omitted = every row (the IB-038 behaviour). An EMPTY list matches
+ * nothing — a class with no symbols has no rows, it does not fall back to all of them.
+ */
+function keysFilter(keys: readonly string[] | undefined, param: number): string {
+  return keys === undefined ? '' : `and (l.venue || ':' || l.symbol) = any($${param}::text[])`;
+}
+function keysParams(params: unknown[], keys: readonly string[] | undefined): unknown[] {
+  return keys === undefined ? params : [...params, [...keys]];
+}
+
+/** IB-084: every `venue:symbol` that wrote a row in the range — what the classifier must class. */
+export async function distinctKeys(db: Db, q: { fromMs: number; toMs: number }): Promise<Array<{ venue: string; symbol: string }>> {
+  return db.query<{ venue: string; symbol: string }>(
+    'select distinct venue, symbol from liquidations where ts >= $1 and ts < $2',
+    [asDate(q.fromMs), asDate(q.toMs)],
+  );
+}
+
+/** IB-084 D8(c): the median single-event USD over the range, for one class's keys; null when none. */
+export async function medianEventUsd(db: Db, q: { fromMs: number; toMs: number; keys: readonly string[] }): Promise<number | null> {
+  const rows = await db.query<{ median: string | null }>(
+    `select percentile_cont(0.5) within group (order by l.notional) as median
+       from liquidations l
+      where l.ts >= $1 and l.ts < $2 ${keysFilter(q.keys, 3)}`,
+    keysParams([asDate(q.fromMs), asDate(q.toMs)], q.keys),
+  );
+  const m = rows[0]?.median;
+  return m === null || m === undefined ? null : Number(m);
+}
+
 export interface BucketRow {
   /** Canonical symbol, or null when the venue's symbol is in no `symbols` row. */
   symbolId: string | null;
@@ -45,7 +77,7 @@ export interface BucketRow {
  */
 export async function alignedBuckets(
   db: Db,
-  q: { windowSec: number; fromMs: number; toMs: number },
+  q: { windowSec: number; fromMs: number; toMs: number; keys?: readonly string[] },
 ): Promise<BucketRow[]> {
   const rows = await db.query<{ symbol_id: string | null; side: 'long' | 'short'; bucket: string; usd: string }>(
     `with ${SYMBOL_MAP}
@@ -55,9 +87,9 @@ export async function alignedBuckets(
             sum(l.notional) as usd
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
-      where l.ts >= $2 and l.ts < $3
+      where l.ts >= $2 and l.ts < $3 ${keysFilter(q.keys, 4)}
       group by 1, 2, 3`,
-    [q.windowSec, asDate(q.fromMs), asDate(q.toMs)],
+    keysParams([q.windowSec, asDate(q.fromMs), asDate(q.toMs)], q.keys),
   );
   return rows.map((r) => ({
     symbolId: r.symbol_id,
@@ -84,7 +116,7 @@ export interface TrailingRow {
  */
 export async function trailingSums(
   db: Db,
-  q: { nowMs: number; windowsSec: readonly number[] },
+  q: { nowMs: number; windowsSec: readonly number[]; keys?: readonly string[] },
 ): Promise<TrailingRow[]> {
   const widest = Math.max(...q.windowsSec);
   const params: unknown[] = [asDate(q.nowMs - widest * 1000), asDate(q.nowMs)];
@@ -95,14 +127,15 @@ export async function trailingSums(
             count(*) filter (where l.ts >= ${p}) as events_${sec}`;
   });
 
+  const keyFilter = keysFilter(q.keys, params.length + 1);
   const rows = await db.query<Record<string, string | null>>(
     `with ${SYMBOL_MAP}
      select m.id as symbol_id, l.side, ${sums.join(', ')}
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
-      where l.ts >= $1 and l.ts < $2
+      where l.ts >= $1 and l.ts < $2 ${keyFilter}
       group by 1, 2`,
-    params,
+    keysParams(params, q.keys),
   );
 
   return rows.map((r) => {
@@ -125,16 +158,16 @@ export async function trailingSums(
  */
 export async function venueFirstSeen(
   db: Db,
-  q: { fromMs: number; toMs: number },
+  q: { fromMs: number; toMs: number; keys?: readonly string[] },
 ): Promise<Array<{ symbolId: string | null; venue: string; firstSeenMs: number }>> {
   const rows = await db.query<{ symbol_id: string | null; venue: string; first_seen: Date }>(
     `with ${SYMBOL_MAP}
      select m.id as symbol_id, l.venue, min(l.ts) as first_seen
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
-      where l.ts >= $1 and l.ts < $2
+      where l.ts >= $1 and l.ts < $2 ${keysFilter(q.keys, 3)}
       group by 1, 2`,
-    [asDate(q.fromMs), asDate(q.toMs)],
+    keysParams([asDate(q.fromMs), asDate(q.toMs)], q.keys),
   );
   return rows.map((r) => ({
     symbolId: r.symbol_id,
@@ -158,7 +191,7 @@ export interface FeedRow {
 /** The newest events above the threshold, biggest-first order being the feed's job, not SQL's. */
 export async function feed(
   db: Db,
-  q: { fromMs: number; toMs: number; minUsd: number; limit: number },
+  q: { fromMs: number; toMs: number; minUsd: number; limit: number; keys?: readonly string[]; order?: 'newest' | 'oldest' },
 ): Promise<FeedRow[]> {
   const rows = await db.query<{
     ts: Date; symbol_id: string | null; venue_symbol: string; base: string | null;
@@ -168,10 +201,10 @@ export async function feed(
      select l.ts, m.id as symbol_id, l.symbol as venue_symbol, m.base, l.side, l.notional, l.price, l.venue
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
-      where l.ts >= $1 and l.ts < $2 and l.notional >= $3
-      order by l.ts desc
+      where l.ts >= $1 and l.ts < $2 and l.notional >= $3 ${keysFilter(q.keys, 5)}
+      order by l.ts ${q.order === 'oldest' ? 'asc' : 'desc'}
       limit $4`,
-    [asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.limit],
+    keysParams([asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.limit], q.keys),
   );
   return rows.map((r) => ({
     timeSec: Math.floor(new Date(r.ts).getTime() / 1000),
@@ -186,10 +219,10 @@ export async function feed(
 }
 
 /** The venues that wrote anything in the window. Evidence, not configuration. */
-export async function venuesWithRows(db: Db, q: { fromMs: number; toMs: number }): Promise<string[]> {
+export async function venuesWithRows(db: Db, q: { fromMs: number; toMs: number; keys?: readonly string[] }): Promise<string[]> {
   const rows = await db.query<{ venue: string }>(
-    `select distinct venue from liquidations where ts >= $1 and ts < $2 order by venue`,
-    [asDate(q.fromMs), asDate(q.toMs)],
+    `select distinct l.venue from liquidations l where l.ts >= $1 and l.ts < $2 ${keysFilter(q.keys, 3)} order by l.venue`,
+    keysParams([asDate(q.fromMs), asDate(q.toMs)], q.keys),
   );
   return rows.map((r) => r.venue);
 }

@@ -7,6 +7,7 @@ signal_set: [BTCUSDT]
 symbols:
   - id: BTCUSDT
     base: BTC
+    asset_class: crypto
     quote: USDT
     binance_perp: BTCUSDT
     binance_spot: BTCUSDT
@@ -15,6 +16,7 @@ symbols:
     listed_perp: 2020-01-01
   - id: ETHUSDT
     base: ETH
+    asset_class: crypto
     quote: USDT
     binance_perp: ETHUSDT
     listed_perp: 2020-01-01

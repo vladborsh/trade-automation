@@ -13,6 +13,9 @@ export const UniverseSymbolSchema = z
   .object({
     id: z.string().regex(/^[A-Z0-9]+$/, 'id must be the Binance USD-M symbol, e.g. BTCUSDT'),
     base: z.string().min(1),
+    // IB-084 (market-page design D6): required, no default — a symbol without a class would
+    // otherwise be counted as crypto by omission, which is how XAU ranked in the top-10 "where".
+    asset_class: z.enum(['crypto', 'tradfi']),
     quote: z.string().min(1),
     binance_perp: z.string().min(1),
     binance_spot: z.string().min(1).optional(),

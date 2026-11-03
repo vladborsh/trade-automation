@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { LiquidationsController } from '../../src/web/liquidations/liquidations.controller';
 import { LiquidationsOverviewService, OVERVIEW_CACHE_MS } from '../../src/web/liquidations/overview.service';
+import { stubClassifier } from '../web/liquidations-test-classifier';
 import type { Db } from '../../src/db/db.port';
 
 /**
@@ -20,32 +21,33 @@ const countingDb = () => {
 
 const body = (error: unknown) => (error as HttpException).getResponse() as { code: string };
 
-describe('the 15 s cache', () => {
+describe('the 5 s cache (IB-084, was 15 s)', () => {
   it('serves a second caller from the cache instead of querying again', async () => {
     const { db, queries } = countingDb();
     let clock = 1_000_000;
-    const service = new LiquidationsOverviewService(db, () => clock);
+    const service = new LiquidationsOverviewService(db, stubClassifier(), () => clock);
 
-    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
+    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
     const afterFirst = queries.length;
     expect(afterFirst).toBeGreaterThan(0);
 
     clock += OVERVIEW_CACHE_MS - 1;
-    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
+    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
     expect(queries.length).toBe(afterFirst);
   });
 
   it('queries again once the entry is stale', async () => {
     const { db, queries } = countingDb();
     let clock = 1_000_000;
-    const service = new LiquidationsOverviewService(db, () => clock);
+    const service = new LiquidationsOverviewService(db, stubClassifier(), () => clock);
 
-    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
+    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
     const afterFirst = queries.length;
 
     clock += OVERVIEW_CACHE_MS;
-    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
-    expect(queries.length).toBe(afterFirst * 2);
+    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
+    // the answer is re-read; only the slower-moving class keys (CLASS_KEYS_CACHE_MS) are reused
+    expect(queries.length).toBe(afterFirst * 2 - 1);
   });
 
   it('SHARES ONE QUERY between callers that arrive together', async () => {
@@ -53,26 +55,26 @@ describe('the 15 s cache', () => {
     // arriving in the same 50 ms both miss and both query — the exact multiplication §12.3
     // exists to prevent, and the one that only shows up under load.
     const { db, queries } = countingDb();
-    const service = new LiquidationsOverviewService(db, () => 1_000_000);
+    const service = new LiquidationsOverviewService(db, stubClassifier(), () => 1_000_000);
 
     await Promise.all([
-      service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 }),
-      service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 }),
-      service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 }),
+      service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const }),
+      service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const }),
+      service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const }),
     ]);
     const once = queries.length;
 
     const fresh = countingDb();
-    await new LiquidationsOverviewService(fresh.db, () => 1).overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
+    await new LiquidationsOverviewService(fresh.db, stubClassifier(), () => 1).overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
     expect(once).toBe(fresh.queries.length);
   });
 
   it('a different threshold is a different answer, so it is a different entry', async () => {
     const { db, queries } = countingDb();
-    const service = new LiquidationsOverviewService(db, () => 1_000_000);
-    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
+    const service = new LiquidationsOverviewService(db, stubClassifier(), () => 1_000_000);
+    await service.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
     const afterFirst = queries.length;
-    await service.overview({ topN: 20, feedMinUsd: 1_000_000, feedLimit: 30 });
+    await service.overview({ topN: 20, feedMinUsd: 1_000_000, feedLimit: 30, period: '24h' as const });
     expect(queries.length).toBeGreaterThan(afterFirst);
   });
 
@@ -83,20 +85,20 @@ describe('the 15 s cache', () => {
       query: async () => { if (fail) throw new Error('connection reset'); return [] as never; },
       transaction: async (fn) => fn(db),
     };
-    const service = new LiquidationsOverviewService(db, () => 1_000_000);
+    const service = new LiquidationsOverviewService(db, stubClassifier(), () => 1_000_000);
 
-    await expect(service.overview({ topN: 20, feedMinUsd: 1, feedLimit: 1 })).rejects.toThrow('connection reset');
+    await expect(service.overview({ topN: 20, feedMinUsd: 1, feedLimit: 1, period: '24h' as const })).rejects.toThrow('connection reset');
     fail = false;
-    await expect(service.overview({ topN: 20, feedMinUsd: 1, feedLimit: 1 })).resolves.toBeDefined();
+    await expect(service.overview({ topN: 20, feedMinUsd: 1, feedLimit: 1, period: '24h' as const })).resolves.toBeDefined();
   });
 });
 
 describe('the overview endpoint', () => {
-  const service = (db: Db) => new LiquidationsOverviewService(db, () => 1_000_000);
+  const service = (db: Db) => new LiquidationsOverviewService(db, stubClassifier(), () => 1_000_000);
 
   it('reports every known venue as missing when nothing has been collected', async () => {
     const { db } = countingDb();
-    const result = await service(db).overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30 });
+    const result = await service(db).overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period: '24h' as const });
     // §12.4: Bybit + OKX are never presented as the whole market, and neither is nothing at all.
     expect(result.venues.present).toEqual([]);
     expect(result.venues.missing).toEqual(['binance', 'bybit', 'okx']);
@@ -104,6 +106,26 @@ describe('the overview endpoint', () => {
     // no history, so no ratio — and the reason is stated rather than left to a bare null
     expect(result.windows.every((w) => w.total.ratio === null)).toBe(true);
     expect(result.windows.every((w) => w.basis.unavailable === 'insufficient_history')).toBe(true);
+  });
+
+  it('IB-084: an empty database gives honest refusals in the block, never zeros dressed as norms', async () => {
+    const { db } = countingDb();
+    for (const period of ['1h', '4h', '24h', '7d'] as const) {
+      const { block } = await service(db).overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 30, period });
+      expect(block.period).toBe(period);
+      expect(block.basis.unavailable).toBe('insufficient_history');
+      expect(block.hourly.norm).toEqual({ long: null, short: null, total: null });
+      expect(block.hourly.buckets.every((b) => b.rarity === null && !b.outlier)).toBe(true);
+      expect(block.large).toEqual([]);
+      expect(block.availableFrom[period]).not.toBeNull(); // no tape yet: not available
+    }
+  });
+
+  it('IB-084: an unknown period is a 400, not a silent 24h', async () => {
+    const { db } = countingDb();
+    const controller = new LiquidationsController(service(db));
+    await expect(controller.overview('top20', '100000', '30', '3d')).rejects.toMatchObject({ status: 400 });
+    await expect(controller.overview('top20', '100000', '30', '7d')).resolves.toMatchObject({ block: { period: '7d' } });
   });
 
   it('refuses a symbols selection it does not serve rather than quietly substituting one', async () => {
@@ -125,7 +147,7 @@ describe('the overview endpoint', () => {
   });
 
   it('answers 503 rather than 500 when there is no database', async () => {
-    const controller = new LiquidationsController(new LiquidationsOverviewService(null, () => 1));
+    const controller = new LiquidationsController(new LiquidationsOverviewService(null, stubClassifier(), () => 1));
     try {
       await controller.overview();
       throw new Error('expected a throw');

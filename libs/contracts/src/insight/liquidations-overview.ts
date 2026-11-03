@@ -280,11 +280,7 @@ export const WebLiquidationsOverviewResponseSchema = z.object({
    * dropping them — looks exactly like a quieter market.
    */
   unmappedRows: z.number().int().nonnegative(),
-  /**
-   * IB-084: the market page's block for the requested `?period=` (default 24h). Optional ONLY in
-   * this contracts-first commit, so the server keeps compiling until its half lands in the next
-   * commit of the same branch, which makes it required.
-   */
-  block: WebLiquidationBlockSchema.optional(),
+  /** IB-084: the market page's block for the requested `?period=` (default 24h). */
+  block: WebLiquidationBlockSchema,
 });
 export type WebLiquidationsOverviewResponse = z.infer<typeof WebLiquidationsOverviewResponseSchema>;

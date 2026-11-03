@@ -1,9 +1,14 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
-  WEB_LIQUIDATION_WINDOWS, WEB_LIQUIDATION_WINDOW_SECONDS, WEB_LIQUIDATION_NORM_DAYS,
-  type WebLiquidationCoin, type WebLiquidationsOverviewResponse,
+  WEB_LIQUIDATION_BUCKET_SECONDS, WEB_LIQUIDATION_MIN_HISTORY_DAYS, WEB_LIQUIDATION_WINDOWS, WEB_LIQUIDATION_WINDOW_SECONDS,
+  WEB_LIQUIDATION_NORM_DAYS, WEB_MARKET_PERIOD_SECONDS,
+  type WebLiquidationBlock, type WebLiquidationCoin, type WebLiquidationsOverviewResponse, type WebMarketPeriod,
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
+import { LARGE_LIMIT, LARGE_MIN_USD, LIQUIDATION_BLOCK_CACHE_MS, SERIES_MIN_USD } from '../../insights/thresholds';
+import { TtlCache } from '../../venues/ttl-cache';
+import { AssetClassifier } from './asset-classes';
+import { availableFrom, hourly, largeEvents, periodNorm, periodTotals, verdict } from './block.assemble';
 import { normPeriodStart } from './norm';
 import { windowStats } from './overview.assemble';
 import * as repo from './pg/overview.repo';
@@ -18,8 +23,28 @@ import * as repo from './pg/overview.repo';
  */
 export const LIQUIDATION_VENUES = ['binance', 'bybit', 'okx'] as const;
 
-/** §12.3. Several members polling the landing page must not multiply the query. */
-export const OVERVIEW_CACHE_MS = 15_000;
+/**
+ * §12.3: several members polling must not multiply the query. IB-084 (D8) lowers it from 15 s to
+ * the block's 5 s, keyed per period: the market page polls liquidations every 10 s (D13).
+ */
+export const OVERVIEW_CACHE_MS = LIQUIDATION_BLOCK_CACHE_MS;
+
+/** The `venue:symbol` classification of what is in the norm period changes slowly: a minute. */
+export const CLASS_KEYS_CACHE_MS = 60_000;
+
+export interface OverviewQuery {
+  topN: number;
+  feedMinUsd: number;
+  feedLimit: number;
+  /** IB-084: the block's period (D14); 24h keeps the IB-038 fields exactly as before. */
+  period: WebMarketPeriod;
+}
+
+interface ClassKeys {
+  crypto: string[];
+  tradfi: string[];
+  unknown: string[];
+}
 
 @Injectable()
 export class LiquidationsOverviewService {
@@ -28,35 +53,40 @@ export class LiquidationsOverviewService {
    * value: two members arriving in the same 50 ms should share one query, not start two and race
    * to fill the slot.
    */
-  private readonly cache = new Map<string, { at: number; value: Promise<WebLiquidationsOverviewResponse> }>();
+  private readonly cache: TtlCache;
 
   constructor(
     @Inject(DB) private readonly db: Db | null,
+    private readonly classifier: AssetClassifier,
     /** Injected so the cache's expiry is spec'able without sleeping. `@Optional()` or Nest fails to resolve it. */
     @Optional() private readonly now: () => number = () => Date.now(),
-  ) {}
-
-  async overview(q: { topN: number; feedMinUsd: number; feedLimit: number }): Promise<WebLiquidationsOverviewResponse> {
-    const key = `${q.topN}:${q.feedMinUsd}:${q.feedLimit}`;
-    const hit = this.cache.get(key);
-    const nowMs = this.now();
-    if (hit && nowMs - hit.at < OVERVIEW_CACHE_MS) return hit.value;
-
-    const value = this.compute(q, nowMs).catch((error: unknown) => {
-      // a failed read must not be cached for 15 s, or one blip becomes a quarter-minute outage
-      this.cache.delete(key);
-      throw error;
-    });
-    this.cache.set(key, { at: nowMs, value });
-    return value;
+  ) {
+    this.cache = new TtlCache({ now: () => this.now() });
   }
 
-  private async compute(
-    q: { topN: number; feedMinUsd: number; feedLimit: number },
-    nowMs: number,
-  ): Promise<WebLiquidationsOverviewResponse> {
+  async overview(q: OverviewQuery): Promise<WebLiquidationsOverviewResponse> {
+    const key = `${q.period}:${q.topN}:${q.feedMinUsd}:${q.feedLimit}`;
+    // the promise is shared by everyone asking in the same 5 s; a failure is not cached
+    return this.cache.getOrLoad(key, OVERVIEW_CACHE_MS, () => this.compute(q, this.now()));
+  }
+
+  /** IB-084 D6: every `venue:symbol` in the norm period, split by class (cached a minute). */
+  private classKeys(db: Db, nowMs: number): Promise<ClassKeys> {
+    return this.cache.getOrLoad('class-keys', CLASS_KEYS_CACHE_MS, async () => {
+      await this.classifier.ready();
+      const present = await repo.distinctKeys(db, { fromMs: nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000, toMs: nowMs + 60_000 });
+      const out: ClassKeys = { crypto: [], tradfi: [], unknown: [] };
+      for (const { venue, symbol } of present) out[this.classifier.classify(venue, symbol)].push(`${venue}:${symbol}`);
+      return out;
+    });
+  }
+
+  private async compute(q: OverviewQuery, nowMs: number): Promise<WebLiquidationsOverviewResponse> {
     const db = this.db;
     if (!db) throw new Error('no database');
+    // D6: every total, norm and rank below is CRYPTO only
+    const keys = await this.classKeys(db, nowMs);
+    const crypto = keys.crypto;
 
     const widestSec = Math.max(...Object.values(WEB_LIQUIDATION_WINDOW_SECONDS));
     const capMs = nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000;
@@ -64,10 +94,11 @@ export class LiquidationsOverviewService {
     // `venueFirstSeen` is bounded to the cap, so a venue older than the period reports the cap
     // and `normPeriodStart` leaves the period at its full length.
     const [firstSeen, feedRows, present, ranked] = await Promise.all([
-      repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs }),
-      repo.feed(db, { fromMs: nowMs - widestSec * 1000, toMs: nowMs, minUsd: q.feedMinUsd, limit: q.feedLimit }),
+      repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: crypto }),
+      repo.feed(db, { fromMs: nowMs - widestSec * 1000, toMs: nowMs, minUsd: q.feedMinUsd, limit: q.feedLimit, keys: crypto }),
       repo.venuesWithRows(db, { fromMs: nowMs - widestSec * 1000, toMs: nowMs }),
-      repo.rankedSymbols(db, q.topN),
+      // D6: ranks are crypto only — TradFi ids are dropped before the top N is cut
+      repo.rankedSymbols(db, q.topN + 50).then((rows) => rows.filter((r) => this.classifier.classOfId(r.id) === 'crypto').slice(0, q.topN)),
     ]);
 
     /**
@@ -94,17 +125,24 @@ export class LiquidationsOverviewService {
       ...ranked.map((c) => scopeOf(c.id).periodStartMs),
     );
 
-    const trailing = await repo.trailingSums(db, {
-      nowMs,
-      windowsSec: WEB_LIQUIDATION_WINDOWS.map((w) => WEB_LIQUIDATION_WINDOW_SECONDS[w]),
-    });
-    // one pass per window size, as §12.3 budgets
-    const bucketsByWindow = new Map(await Promise.all(
-      WEB_LIQUIDATION_WINDOWS.map(async (w) => {
-        const windowSec = WEB_LIQUIDATION_WINDOW_SECONDS[w];
-        return [w, await repo.alignedBuckets(db, { windowSec, fromMs: periodStartMs, toMs: nowMs })] as const;
-      }),
+    const periodSec = WEB_MARKET_PERIOD_SECONDS[q.period];
+    const bucketSec = WEB_LIQUIDATION_BUCKET_SECONDS[q.period];
+    const trailingWindows = [...new Set([...WEB_LIQUIDATION_WINDOWS.map((w) => WEB_LIQUIDATION_WINDOW_SECONDS[w]), periodSec])];
+    const [trailing, tradfiTrailing, unknownTrailing] = await Promise.all([
+      repo.trailingSums(db, { nowMs, windowsSec: trailingWindows, keys: crypto }),
+      repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.tradfi }),
+      repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.unknown }),
+    ]);
+    // one pass per window size, as §12.3 budgets — plus the block's bar length and period length
+    const sizes = [...new Set([...WEB_LIQUIDATION_WINDOWS.map((w) => WEB_LIQUIDATION_WINDOW_SECONDS[w]), bucketSec, ...(q.period === '7d' ? [] : [periodSec])])];
+    const barsFromMs = Math.min(periodStartMs, nowMs - (periodSec + bucketSec) * 1000);
+    const bucketsBySize = new Map(await Promise.all(
+      sizes.map(async (windowSec) => [
+        windowSec,
+        await repo.alignedBuckets(db, { windowSec, fromMs: windowSec === bucketSec ? barsFromMs : periodStartMs, toMs: nowMs, keys: crypto }),
+      ] as const),
     ));
+    const bucketsByWindow = new Map(WEB_LIQUIDATION_WINDOWS.map((w) => [w, bucketsBySize.get(WEB_LIQUIDATION_WINDOW_SECONDS[w]) ?? []] as const));
 
     const statsFor = (symbolId: string | null) => {
       const scope = scopeOf(symbolId);
@@ -127,8 +165,51 @@ export class LiquidationsOverviewService {
       windows: statsFor(coin.id),
     }));
 
+    // ---- IB-084: the block for `period` ------------------------------------------------------
+    const market = scopeOf(null);
+    const periodBuckets = bucketsBySize.get(periodSec) ?? [];
+    const scopedNorm = (symbolId: string | null) => {
+      const scope = scopeOf(symbolId);
+      const totals = periodTotals(trailing, periodSec, symbolId);
+      const norm = periodNorm({
+        period: q.period, totals, nowMs, periodStartMs: scope.periodStartMs, venues: scope.venues,
+        buckets: symbolId === null ? periodBuckets : periodBuckets.filter((b) => b.symbolId === symbolId),
+      });
+      return { totals, norm };
+    };
+    const marketNorm = scopedNorm(null);
+    const candidates = await repo.feed(db, {
+      fromMs: nowMs - periodSec * 1000, toMs: nowMs, minUsd: Math.min(LARGE_MIN_USD, SERIES_MIN_USD), limit: 5_000, keys: crypto, order: 'oldest',
+    });
+    const medianEvent = await repo.medianEventUsd(db, { fromMs: market.periodStartMs, toMs: nowMs, keys: crypto });
+    const marketPeriodDays = (nowMs - market.periodStartMs) / 86_400_000;
+    const firstSeenMs = firstSeen.length === 0 ? null : Math.min(...firstSeen.map((r) => r.firstSeenMs));
+
+    const block: WebLiquidationBlock = {
+      period: q.period,
+      totals: marketNorm.totals,
+      basis: marketNorm.norm.basis,
+      hourly: hourly({
+        periodSec, bucketSec, nowMs, buckets: bucketsBySize.get(bucketSec) ?? [], periodStartMs: market.periodStartMs, venues: market.venues,
+      }),
+      perCoin: ranked.map((coin) => {
+        const { totals, norm } = scopedNorm(coin.id);
+        return { symbol: coin.id, base: coin.base, totals, verdict: verdict(norm), basis: norm.basis };
+      }),
+      large: largeEvents({
+        events: candidates, minUsd: LARGE_MIN_USD, limit: LARGE_LIMIT, medianEventUsd: medianEvent,
+        normPeriodDays: marketPeriodDays, minHistoryDays: WEB_LIQUIDATION_MIN_HISTORY_DAYS,
+      }),
+      largeMinUsd: LARGE_MIN_USD,
+      tradfi: periodTotals(tradfiTrailing, periodSec),
+      unknown: periodTotals(unknownTrailing, periodSec),
+      // the 30-day cap bounds `firstSeen`; a box older than that is long past every period anyway
+      availableFrom: availableFrom(firstSeenMs, nowMs),
+    };
+
     return {
       asOf: Math.floor(nowMs / 1000),
+      block,
       windows: statsFor(null),
       perCoin,
       feed: feedRows.map((r) => ({

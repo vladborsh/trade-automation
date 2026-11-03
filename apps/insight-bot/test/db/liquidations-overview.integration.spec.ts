@@ -6,6 +6,7 @@ import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { LiquidationsOverviewService } from '../../src/web/liquidations/overview.service';
+import { stubClassifier } from '../web/liquidations-test-classifier';
 import * as repo from '../../src/web/liquidations/pg/overview.repo';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
@@ -51,7 +52,9 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
       `insert into symbols (id, base, quote, binance_perp, binance_spot, bybit_linear, okx_swap, listed_perp, in_signal_set, active, volume_rank)
        values ('BTCUSDT','BTC','USDT','BTCUSDT','BTCUSDT','BTCUSDT','BTC-USDT-SWAP','2020-01-01',true,true,1),
               ('ETHUSDT','ETH','USDT','ETHUSDT','ETHUSDT','ETHUSDT','ETH-USDT-SWAP','2020-01-01',true,true,2),
-              ('SOLUSDT','SOL','USDT','SOLUSDT','SOLUSDT','SOLUSDT','SOL-USDT-SWAP','2020-09-14',false,true,3)`,
+              ('SOLUSDT','SOL','USDT','SOLUSDT','SOLUSDT','SOLUSDT','SOL-USDT-SWAP','2020-09-14',false,true,3),
+              -- IB-084 (D6): a TradFi perp, ranked high on purpose — it must stay out of every crypto rank
+              ('XAUUSDT','XAU','USDT','XAUUSDT',null,'XAUUSDT','XAU-USDT-SWAP','2025-12-11',false,true,0)`,
     );
 
     const liq = new BatchWriter<t.LiquidationRow>(db, t.LIQUIDATIONS, t.liquidationTuple);
@@ -93,6 +96,11 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
       venue: 'bybit', symbol: 'NEWCOINUSDT', ts: new Date(NOW - 20 * 60_000),
       side: 'short', price: 1, qty: 7_000, notional: 7_000, source: 'ws',
     });
+    // IB-084 (D6): gold liquidations — bigger than everything else, and in no crypto total or norm
+    rows.push({
+      venue: 'bybit', symbol: 'XAUUSDT', ts: new Date(NOW - 10 * 60_000),
+      side: 'long', price: 4000, qty: 10, notional: 40_000, source: 'ws',
+    });
     await liq.write(rows);
   }, DB_HOOK_TIMEOUT_MS);
 
@@ -101,7 +109,11 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
-  const service = () => new LiquidationsOverviewService(db, () => NOW);
+  const universe = (['BTC', 'ETH', 'SOL', 'XAU'] as const).map((base) => ({
+    id: `${base}USDT`, base, asset_class: base === 'XAU' ? 'tradfi' as const : 'crypto' as const, quote: 'USDT',
+    binance_perp: `${base}USDT`, bybit_linear: `${base}USDT`, okx_swap: `${base}-USDT-SWAP`, listed_perp: '2020-01-01',
+  }));
+  const service = () => new LiquidationsOverviewService(db, stubClassifier(universe), () => NOW);
 
   it('aligns buckets to the epoch and returns numbers, not numeric strings', async () => {
     const buckets = await repo.alignedBuckets(db, { windowSec: 3_600, fromMs: NOW - 3 * HOUR, toMs: NOW });
@@ -127,19 +139,28 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
     expect(buckets.find((b) => b.usd === 7_000)?.symbolId).toBeNull();
   });
 
-  it('the market total includes the unmapped row; the coin row does not', async () => {
-    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30 });
+  it('IB-084 D6: the market total is CRYPTO — an unclassified symbol and TradFi are beside it, not in it', async () => {
+    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30, period: '24h' as const });
     const market1h = result.windows.find((w) => w.window === '1h');
     const btc1h = result.perCoin.find((c) => c.symbol === 'BTCUSDT')?.windows.find((w) => w.window === '1h');
 
-    // BTC: 5 000 OKX burst + 100 Bybit. ETH: 1 000 OKX + 200 Bybit. Plus 7 000 unmapped.
+    // BTC: 5 000 OKX burst + 100 Bybit. ETH: 1 000 OKX + 200 Bybit. NEWCOIN (Bybit, no universe
+    // row, so no class — D6: never crypto by default) and XAU (TradFi) are NOT in it.
     expect(btc1h?.total.usd).toBe(5_100);
-    expect(market1h?.total.usd).toBe(5_100 + 1_200 + 7_000);
-    expect(result.unmappedRows).toBe(1);
+    expect(market1h?.total.usd).toBe(5_100 + 1_200);
+    expect(result.unmappedRows).toBe(0);
+    expect(result.block.unknown).toEqual({ usd: 7_000, long: 0, short: 7_000, events: 1 });
+    expect(result.block.tradfi).toEqual({ usd: 40_000, long: 40_000, short: 0, events: 1 });
+    // ranks are crypto only, though XAU's volume_rank (0) is the best
+    expect(result.perCoin.map((c) => c.symbol)).toEqual(['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
+    expect(result.block.perCoin.map((c) => c.symbol)).toEqual(['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
+    // and the block's 24h total is the same crypto sum: the last 24 h of the hourly 100s/200s plus the bursts
+    expect(result.block.totals.usd).toBe(24 * 100 + 5_000 + 24 * 200 + 1_000);
+    expect(result.block.hourly.buckets.reduce((s, b) => s + b.long + b.short, 0)).toBe(result.block.totals.usd);
   });
 
   it('computes «× от нормы» against the hourly median and states its basis', async () => {
-    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30 });
+    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30, period: '24h' as const });
     const btc1h = result.perCoin.find((c) => c.symbol === 'BTCUSDT')?.windows.find((w) => w.window === '1h');
 
     // Bybit's steady 100/hour is the norm; the trailing hour adds OKX's 5 000 burst.
@@ -152,18 +173,16 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
   });
 
   it('names Binance as missing because it wrote nothing, not because it is hard-coded', async () => {
-    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30 });
+    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30, period: '24h' as const });
     expect(result.venues.present).toEqual(['bybit', 'okx']);
     expect(result.venues.missing).toEqual(['binance']);
   });
 
-  it('the feed is newest-first, above the threshold, and keeps an unmapped event nameable', async () => {
-    const result = await service().overview({ topN: 20, feedMinUsd: 1_000, feedLimit: 10 });
-    // Above 1 000: the unmapped 7 000 (newest), then the two at -30 min. The hourly 100s and
-    // ETH's 200s are below the threshold and must not appear.
-    expect(result.feed).toHaveLength(3);
-    expect(result.feed[0]).toMatchObject({ symbol: 'NEWCOINUSDT', venue: 'bybit', side: 'short', usd: 7_000 });
-    expect(result.feed.map((e) => e.usd).slice(1).sort((a, b) => b - a)).toEqual([5_000, 1_000]);
+  it('the feed is newest-first, above the threshold, crypto only (IB-084 D6)', async () => {
+    const result = await service().overview({ topN: 20, feedMinUsd: 1_000, feedLimit: 10, period: '24h' as const });
+    // Above 1 000: the two at -30 min. The unclassified 7 000 and gold's 40 000 are not crypto;
+    // the hourly 100s and ETH's 200s are below the threshold.
+    expect(result.feed.map((e) => e.usd).sort((a, b) => b - a)).toEqual([5_000, 1_000]);
     expect(result.feed.every((e) => e.usd >= 1_000)).toBe(true);
   });
 
@@ -172,7 +191,7 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
     // against a Bybit-only median would read as a surge that is really just a second venue
     // arriving. The period is the span the whole venue set covers, so it collapses and the
     // ratio is refused — with the amounts still reported.
-    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30 });
+    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30, period: '24h' as const });
     const eth1h = result.perCoin.find((c) => c.symbol === 'ETHUSDT')?.windows.find((w) => w.window === '1h');
 
     expect(eth1h?.total.usd).toBe(1_200);
@@ -182,7 +201,7 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
   });
 
   it('a coin with no liquidations at all reports amounts of zero and no ratio', async () => {
-    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30 });
+    const result = await service().overview({ topN: 20, feedMinUsd: 0, feedLimit: 30, period: '24h' as const });
     const sol = result.perCoin.find((c) => c.symbol === 'SOLUSDT');
     expect(sol).toBeDefined();
     for (const w of sol?.windows ?? []) {
@@ -193,9 +212,9 @@ maybeDescribe('IB-038 liquidations overview against a real database', () => {
   });
 
   it('answers within the §12.3 budget on this tape', async () => {
-    const fresh = new LiquidationsOverviewService(db, () => NOW + 1);
+    const fresh = new LiquidationsOverviewService(db, stubClassifier(universe), () => NOW + 1);
     const started = Date.now();
-    await fresh.overview({ topN: 20, feedMinUsd: 0, feedLimit: 30 });
+    await fresh.overview({ topN: 20, feedMinUsd: 0, feedLimit: 30, period: '24h' as const });
     const elapsed = Date.now() - started;
     // §12.3 budgets 50 ms on a day of data; this is twelve days and a cold cache. The assertion
     // is loose on purpose — it is a canary for an accidental per-coin query, not a benchmark.

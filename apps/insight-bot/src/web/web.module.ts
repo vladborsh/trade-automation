@@ -12,6 +12,7 @@ import { CredentialsService } from './auth/credentials.service';
 import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
+import { AssetClassifier } from './liquidations/asset-classes';
 import { WebContextController } from './context/context.controller';
 import { WebMarketController } from './market/market.controller';
 import { CapsService } from './market/caps.service';
@@ -77,6 +78,17 @@ export class WebModule {
         { provide: LoginGuard, useFactory: () => new LoginGuard() },
         CredentialsService,
         LiquidationsOverviewService,
+        {
+          // IB-084 (D6): universe classes + Binance exchangeInfo (weight 1, once a day) into the shared tracker
+          provide: AssetClassifier,
+          inject: [AppConfigService, BinanceWeightTracker],
+          useFactory: (config: AppConfigService, weight: BinanceWeightTracker) =>
+            new AssetClassifier({
+              symbols: config.symbols,
+              futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL'),
+              onWeight: (header) => (header === null ? weight.recordCall(1) : weight.recordHeader(header)),
+            }),
+        },
         {
           provide: UniverseSummaryService,
           // WD-008: the shared tracker — it used to build its own, so its ~50 weight a refresh was

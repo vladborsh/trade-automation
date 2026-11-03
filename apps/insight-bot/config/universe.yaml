@@ -37,12 +37,19 @@
 # the 1000x prefix on 1000PEPEUSDT. All 30 agree within 1 % on 2026-09-28 except ONE, which
 # agrees with harmony (0.0025139 vs 0.00260048) and is off by 60x against cross-2.
 # Re-run that check when this list is revised.
+#
+# asset_class (IB-084, market-page design D6) is REQUIRED on every symbol, with no default: the
+# loader refuses a symbol without it. crypto = the coin top 30; tradfi = the hand-added block below
+# (Binance contractType TRADIFI_PERPETUAL). Crypto totals, norms, ranks and insights count crypto
+# only; TradFi is reported beside them. A spec cross-checks every value against Binance
+# exchangeInfo (test/fixtures/binance/exchangeInfo-classes.json, captured 2026-11-03).
 
 signal_set: [BTCUSDT, ETHUSDT, SOLUSDT]        # stage-1 playbooks evaluate only these
 
 symbols:
   - id: BTCUSDT
     base: BTC
+    asset_class: crypto
     quote: USDT
     coingecko_id: bitcoin
     binance_perp: BTCUSDT
@@ -53,6 +60,7 @@ symbols:
     # 30d quote volume 326.2bn USD
   - id: ETHUSDT
     base: ETH
+    asset_class: crypto
     quote: USDT
     coingecko_id: ethereum
     binance_perp: ETHUSDT
@@ -63,6 +71,7 @@ symbols:
     # 30d quote volume 260.4bn USD
   - id: ZECUSDT
     base: ZEC
+    asset_class: crypto
     quote: USDT
     coingecko_id: zcash
     binance_perp: ZECUSDT
@@ -73,6 +82,7 @@ symbols:
     # 30d quote volume 68.5bn USD
   - id: SOLUSDT
     base: SOL
+    asset_class: crypto
     quote: USDT
     coingecko_id: solana
     binance_perp: SOLUSDT
@@ -83,6 +93,7 @@ symbols:
     # 30d quote volume 60.8bn USD
   - id: XRPUSDT
     base: XRP
+    asset_class: crypto
     quote: USDT
     coingecko_id: ripple
     binance_perp: XRPUSDT
@@ -93,6 +104,7 @@ symbols:
     # 30d quote volume 36.5bn USD
   - id: HYPEUSDT
     base: HYPE
+    asset_class: crypto
     quote: USDT
     coingecko_id: hyperliquid
     binance_perp: HYPEUSDT
@@ -103,6 +115,7 @@ symbols:
     # 30d quote volume 20.5bn USD
   - id: DOGEUSDT
     base: DOGE
+    asset_class: crypto
     quote: USDT
     coingecko_id: dogecoin
     binance_perp: DOGEUSDT
@@ -113,6 +126,7 @@ symbols:
     # 30d quote volume 16.1bn USD
   - id: NEARUSDT
     base: NEAR
+    asset_class: crypto
     quote: USDT
     coingecko_id: near
     binance_perp: NEARUSDT
@@ -123,6 +137,7 @@ symbols:
     # 30d quote volume 14.8bn USD
   - id: UNIUSDT
     base: UNI
+    asset_class: crypto
     quote: USDT
     coingecko_id: uniswap
     binance_perp: UNIUSDT
@@ -133,6 +148,7 @@ symbols:
     # 30d quote volume 12.9bn USD
   - id: BNBUSDT
     base: BNB
+    asset_class: crypto
     quote: USDT
     coingecko_id: binancecoin
     binance_perp: BNBUSDT
@@ -143,6 +159,7 @@ symbols:
     # 30d quote volume 11.9bn USD
   - id: SUIUSDT
     base: SUI
+    asset_class: crypto
     quote: USDT
     coingecko_id: sui
     binance_perp: SUIUSDT
@@ -153,6 +170,7 @@ symbols:
     # 30d quote volume 11.0bn USD
   - id: ENAUSDT
     base: ENA
+    asset_class: crypto
     quote: USDT
     coingecko_id: ethena
     binance_perp: ENAUSDT
@@ -163,6 +181,7 @@ symbols:
     # 30d quote volume 9.3bn USD
   - id: 1000PEPEUSDT
     base: PEPE
+    asset_class: crypto
     quote: USDT
     coingecko_id: pepe
     binance_perp: 1000PEPEUSDT
@@ -173,6 +192,7 @@ symbols:
     # 30d quote volume 8.8bn USD
   - id: ARBUSDT
     base: ARB
+    asset_class: crypto
     quote: USDT
     coingecko_id: arbitrum
     binance_perp: ARBUSDT
@@ -183,6 +203,7 @@ symbols:
     # 30d quote volume 7.5bn USD
   - id: WLDUSDT
     base: WLD
+    asset_class: crypto
     quote: USDT
     coingecko_id: worldcoin-wld
     binance_perp: WLDUSDT
@@ -193,6 +214,7 @@ symbols:
     # 30d quote volume 6.2bn USD
   - id: ADAUSDT
     base: ADA
+    asset_class: crypto
     quote: USDT
     coingecko_id: cardano
     binance_perp: ADAUSDT
@@ -203,6 +225,7 @@ symbols:
     # 30d quote volume 6.1bn USD
   - id: PUMPUSDT
     base: PUMP
+    asset_class: crypto
     quote: USDT
     coingecko_id: pump-fun
     binance_perp: PUMPUSDT
@@ -213,6 +236,7 @@ symbols:
     # 30d quote volume 5.6bn USD
   - id: LINKUSDT
     base: LINK
+    asset_class: crypto
     quote: USDT
     coingecko_id: chainlink
     binance_perp: LINKUSDT
@@ -223,6 +247,7 @@ symbols:
     # 30d quote volume 5.5bn USD
   - id: TAOUSDT
     base: TAO
+    asset_class: crypto
     quote: USDT
     coingecko_id: bittensor
     binance_perp: TAOUSDT
@@ -233,6 +258,7 @@ symbols:
     # 30d quote volume 5.5bn USD
   - id: TRUMPUSDT
     base: TRUMP
+    asset_class: crypto
     quote: USDT
     coingecko_id: official-trump
     binance_perp: TRUMPUSDT
@@ -243,6 +269,7 @@ symbols:
     # 30d quote volume 5.5bn USD
   - id: AVAXUSDT
     base: AVAX
+    asset_class: crypto
     quote: USDT
     coingecko_id: avalanche-2
     binance_perp: AVAXUSDT
@@ -253,6 +280,7 @@ symbols:
     # 30d quote volume 5.0bn USD
   - id: MARSCOINUSDT
     base: MARSCOIN
+    asset_class: crypto
     quote: USDT
     coingecko_id: marscoin-4
     binance_perp: MARSCOINUSDT
@@ -263,6 +291,7 @@ symbols:
     # 30d quote volume 4.8bn USD over 27 days — listed mid-window
   - id: BCHUSDT
     base: BCH
+    asset_class: crypto
     quote: USDT
     coingecko_id: bitcoin-cash
     binance_perp: BCHUSDT
@@ -273,6 +302,7 @@ symbols:
     # 30d quote volume 4.8bn USD
   - id: FILUSDT
     base: FIL
+    asset_class: crypto
     quote: USDT
     coingecko_id: filecoin
     binance_perp: FILUSDT
@@ -283,6 +313,7 @@ symbols:
     # 30d quote volume 4.4bn USD
   - id: ONDOUSDT
     base: ONDO
+    asset_class: crypto
     quote: USDT
     coingecko_id: ondo-finance
     binance_perp: ONDOUSDT
@@ -293,6 +324,7 @@ symbols:
     # 30d quote volume 4.3bn USD
   - id: LTCUSDT
     base: LTC
+    asset_class: crypto
     quote: USDT
     coingecko_id: litecoin
     binance_perp: LTCUSDT
@@ -303,6 +335,7 @@ symbols:
     # 30d quote volume 3.9bn USD
   - id: DASHUSDT
     base: DASH
+    asset_class: crypto
     quote: USDT
     coingecko_id: dash
     binance_perp: DASHUSDT
@@ -313,6 +346,7 @@ symbols:
     # 30d quote volume 3.8bn USD
   - id: ONEUSDT
     base: ONE
+    asset_class: crypto
     quote: USDT
     coingecko_id: harmony
     binance_perp: ONEUSDT
@@ -323,6 +357,7 @@ symbols:
     # 30d quote volume 3.6bn USD
   - id: AAVEUSDT
     base: AAVE
+    asset_class: crypto
     quote: USDT
     coingecko_id: aave
     binance_perp: AAVEUSDT
@@ -333,6 +368,7 @@ symbols:
     # 30d quote volume 3.3bn USD
   - id: QNTUSDT
     base: QNT
+    asset_class: crypto
     quote: USDT
     coingecko_id: quant-network
     binance_perp: QNTUSDT
@@ -352,6 +388,7 @@ symbols:
   # venue at boot like every other instId (okx/contract-size.ts).
   - id: XAUUSDT
     base: XAU
+    asset_class: tradfi
     quote: USDT
     binance_perp: XAUUSDT
     bybit_linear: XAUUSDT
@@ -360,6 +397,7 @@ symbols:
     # 30d quote volume 50.0bn USD (2026-09-30..10-29)
   - id: XAGUSDT
     base: XAG
+    asset_class: tradfi
     quote: USDT
     binance_perp: XAGUSDT
     bybit_linear: XAGUSDT
@@ -368,6 +406,7 @@ symbols:
     # 30d quote volume 19.8bn USD
   - id: CLUSDT
     base: CL
+    asset_class: tradfi
     quote: USDT
     binance_perp: CLUSDT
     bybit_linear: CLUSDT
@@ -376,6 +415,7 @@ symbols:
     # WTI crude; 30d quote volume 25.6bn USD
   - id: BZUSDT
     base: BZ
+    asset_class: tradfi
     quote: USDT
     binance_perp: BZUSDT
     bybit_linear: BZUSDT
@@ -384,6 +424,7 @@ symbols:
     # Brent crude; 30d quote volume 13.7bn USD
   - id: NATGASUSDT
     base: NATGAS
+    asset_class: tradfi
     quote: USDT
     binance_perp: NATGASUSDT
     # bybit_linear: none — Bybit's GASUSDT is the NEO GAS token, not natural gas (checked by price)
@@ -392,6 +433,7 @@ symbols:
     # 30d quote volume 1.7bn USD
   - id: COPPERUSDT
     base: COPPER
+    asset_class: tradfi
     quote: USDT
     binance_perp: COPPERUSDT
     # bybit_linear: not listed on Bybit linear (2026-10-30)
@@ -400,6 +442,7 @@ symbols:
     # 30d quote volume 0.4bn USD
   - id: XPTUSDT
     base: XPT
+    asset_class: tradfi
     quote: USDT
     binance_perp: XPTUSDT
     # bybit_linear: not listed on Bybit linear (2026-10-30)
@@ -408,6 +451,7 @@ symbols:
     # platinum; 30d quote volume 0.2bn USD
   - id: XPDUSDT
     base: XPD
+    asset_class: tradfi
     quote: USDT
     binance_perp: XPDUSDT
     # bybit_linear: not listed on Bybit linear (2026-10-30)
@@ -416,6 +460,7 @@ symbols:
     # palladium; 30d quote volume 0.2bn USD
   - id: SPYUSDT
     base: SPY
+    asset_class: tradfi
     quote: USDT
     binance_perp: SPYUSDT
     bybit_linear: SPYUSDT
@@ -424,6 +469,7 @@ symbols:
     # S&P 500 ETF; 30d quote volume 2.6bn USD
   - id: QQQUSDT
     base: QQQ
+    asset_class: tradfi
     quote: USDT
     binance_perp: QQQUSDT
     bybit_linear: QQQUSDT

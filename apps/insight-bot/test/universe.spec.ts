@@ -7,6 +7,7 @@ signal_set: [BTCUSDT, ETHUSDT]
 symbols:
   - id: BTCUSDT
     base: BTC
+    asset_class: crypto
     quote: USDT
     binance_perp: BTCUSDT
     binance_spot: BTCUSDT
@@ -15,6 +16,7 @@ symbols:
     listed_perp: 2020-01-01
   - id: ETHUSDT
     base: ETH
+    asset_class: crypto
     quote: USDT
     binance_perp: ETHUSDT
     listed_perp: '2020-01-01'
@@ -71,6 +73,19 @@ describe('parseUniverse', () => {
   });
 });
 
+describe('IB-084 D6: asset_class is required, with no default', () => {
+  it('a symbol without asset_class fails the load, naming the field', () => {
+    const missing = VALID.replace('    asset_class: crypto\n    quote: USDT\n    binance_perp: ETHUSDT', '    quote: USDT\n    binance_perp: ETHUSDT');
+    expect(missing).not.toBe(VALID);
+    expect(() => parseUniverse(missing)).toThrow(/asset_class/);
+  });
+
+  it('accepts only crypto or tradfi — "unknown" is a runtime verdict, never a configured one', () => {
+    expect(() => parseUniverse(VALID.replace('asset_class: crypto', 'asset_class: unknown'))).toThrow(/asset_class/);
+    expect(() => parseUniverse(VALID.replace('asset_class: crypto', 'asset_class: tradfi'))).not.toThrow();
+  });
+});
+
 describe('config/universe.yaml (the shipped file)', () => {
   const file = path.join(__dirname, '..', 'config', 'universe.yaml');
   const universe = parseUniverse(fs.readFileSync(file, 'utf8'), file);
@@ -109,5 +124,22 @@ describe('config/universe.yaml (the shipped file)', () => {
     for (const s of universe.symbols.filter((x) => TRADFI.includes(x.id))) {
       expect(s.coingecko_id).toBeUndefined();
     }
+  });
+});
+
+describe('IB-084 D6: the shipped classes agree with Binance', () => {
+  const file = path.join(__dirname, '..', 'config', 'universe.yaml');
+  const universe = parseUniverse(fs.readFileSync(file, 'utf8'), file);
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'binance', 'exchangeInfo-classes.json'), 'utf8')) as { symbols: Array<{ symbol: string; contractType: string; underlyingType: string }> };
+
+  it('every universe asset_class matches exchangeInfo (captured 2026-11-03): 30 crypto, 10 tradfi', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { classOf } = require('../src/venues/binance/exchange-info');
+    const mismatch = universe.symbols
+      .map((s) => ({ id: s.id, yaml: s.asset_class, binance: classOf(fixture.symbols.find((f) => f.symbol === s.binance_perp)) }))
+      .filter((x) => x.yaml !== x.binance);
+    expect(mismatch).toEqual([]);
+    expect(universe.symbols.filter((s) => s.asset_class === 'crypto')).toHaveLength(30);
+    expect(universe.symbols.filter((s) => s.asset_class === 'tradfi')).toHaveLength(10);
   });
 });
