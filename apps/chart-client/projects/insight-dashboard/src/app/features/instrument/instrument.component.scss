@@ -147,3 +147,9 @@
 /* IB-099 item 3: the full-screen button sits on the chart's top-right corner, inside the element
    it expands — a toolbar button would be off screen once the chart column fills it. */
 .fs-button { position: absolute; top: 4px; right: 4px; z-index: 6; }
+
+/* 390 px (IB-099 acceptance): the top-50 table is raw data six columns wide (448 px), and pushed
+   the whole page to 465 px on a phone. Under 768 px it scrolls inside its own box instead. */
+@media (max-width: 767px) {
+  .top { display: block; overflow-x: auto; max-width: 100%; }
+}
