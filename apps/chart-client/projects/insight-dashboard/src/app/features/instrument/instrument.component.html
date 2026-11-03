@@ -15,6 +15,11 @@
           <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ timeframeLabel(tf) }}</button>
         }
       </div>
+      <div class="group" role="group" [attr.aria-label]="t('instrument.view')">
+        <button type="button" class="legend-toggle" [attr.aria-pressed]="!legendsHidden()" (click)="toggleLegends()">
+          {{ legendsHidden() ? t('instrument.legends.show') : t('instrument.legends.hide') }}
+        </button>
+      </div>
     </div>
   </header>
   @if (downsampled()) {
@@ -24,7 +29,7 @@
     <p class="error">{{ t('instrument.loadFailed', { message }) }}</p>
   }
   <div class="body">
-    <div class="chart-column">
+    <div class="chart-column" [class.legends-hidden]="legendsHidden()">
       @if (panes(); as data) {
         <app-instrument-chart
           [data]="data"

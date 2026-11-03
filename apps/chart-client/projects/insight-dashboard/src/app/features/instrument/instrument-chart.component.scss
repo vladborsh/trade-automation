@@ -134,3 +134,7 @@
     outline: var(--focus-ring);
   }
 }
+
+/* IB-099 item 2: the page's one switch hides every pane legend (the class is on the page's chart
+   column, outside this component — hence :host-context). */
+:host-context(.legends-hidden) .pane-legend { display: none; }
