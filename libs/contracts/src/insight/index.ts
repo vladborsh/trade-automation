@@ -23,3 +23,5 @@ export * from './context';
 export * from './calendar';
 // IB-069 — browser Web Push for the calendar reminder.
 export * from './push';
+// IB-087 — the market page redesign: the shared period enum and the caps block (treemap + dominance).
+export * from './market';
