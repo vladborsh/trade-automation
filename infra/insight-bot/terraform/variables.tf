@@ -63,3 +63,13 @@ variable "deploy_role_github_sub" {
   type        = string
   default     = "repo:vladborsh/trade-automation:ref:refs/heads/master"
 }
+
+variable "open_web_ports" {
+  description = <<-EOT
+    TCP 80 and 443 open to the internet for Caddy (https-without-domain H3). Turned on in the LAST
+    apply of IB-082, after the image with Caddy is up and /metrics 404 + /health -> SPA are proven
+    on the box through the https name (H8'). False closes them again.
+  EOT
+  type        = bool
+  default     = false
+}

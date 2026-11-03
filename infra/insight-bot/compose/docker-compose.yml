@@ -1,11 +1,12 @@
 # The box's compose file (design §7). Lives at /opt/insight-bot/docker-compose.yml, written by
-# user_data and updated by the deploy step. Local development does NOT use this file — it uses
+# user_data at first boot and updated by scripts/sync-box.sh (tofu ignores user_data changes). Local development does NOT use this file — it uses
 # apps/insight-bot/docker-compose.yml against the single local Postgres (IB-003).
 #
 # postgres and insight-bot read /opt/insight-bot/.env, which the deploy step renders from SSM
 # SecureStrings (root-only, 0600). cloudflared reads only /opt/insight-bot/cloudflared.env (the
 # tunnel token, rendered by the same script and kept out of the app's .env — member-access design
-# M4, IB-074). No secret is baked into the image or this file.
+# M4, IB-074). caddy reads only /opt/insight-bot/caddy.env (SITE_ADDRESS, IB-082). No secret is
+# baked into the image or this file.
 
 services:
   postgres:
@@ -64,12 +65,37 @@ services:
       driver: json-file
       options: { max-size: '10m', max-file: '5' }
 
+  # The only service with published ports (https-without-domain H1, H3): https on
+  # <a-b-c-d>.sslip.io in front of the app, which itself publishes nothing. Pinned by tag AND digest
+  # (multi-arch index incl. linux/arm64); bump both together. caddy_data holds the certificate and
+  # the ACME account (H5): it MUST persist, or every restart re-issues and walks into rate limits.
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    restart: unless-stopped
+    depends_on:
+      - insight-bot
+    ports:
+      - '80:80'
+      - '443:443'
+    env_file:
+      - /opt/insight-bot/caddy.env
+    volumes:
+      - /opt/insight-bot/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+  # DORMANT (https-without-domain H9): runs only with `--profile tunnel`, i.e. once there is a domain
+  # and a tunnel token again (RUNBOOK §11, "later"). The 80/443 rules would then be closed.
   # Cloudflare named tunnel, remotely managed (token mode): https://<domain> -> http://insight-bot:3005.
   # The public hostname and its target are set in the Cloudflare dashboard, not here (RUNBOOK §11).
   # Outbound-only connection to Cloudflare: no published ports, the security group is unchanged.
   # Pinned by tag AND digest (multi-arch index, includes linux/arm64 for the t4g box); bump both
   # together, never to `latest` — and --no-autoupdate so the binary never replaces itself.
   cloudflared:
+    profiles: [tunnel]
     image: cloudflare/cloudflared:2026.10.0@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
     restart: unless-stopped
     command: tunnel --no-autoupdate run
@@ -80,3 +106,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: '10m', max-file: '3' }
+
+volumes:
+  caddy_data:
+  caddy_config:

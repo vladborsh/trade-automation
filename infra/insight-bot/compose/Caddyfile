@@ -1,0 +1,30 @@
+# The only door into the box (architecture/https-without-domain-2026-11-03.md H1, H3, H7, H8').
+# SITE_ADDRESS is <a-b-c-d>.sslip.io, from SSM via caddy.env; Caddy gets and renews the certificate
+# for it itself (state on the caddy_data volume, H5) and redirects http to https.
+# UPSTREAM is only overridden by the local rehearsal; on the box the app is insight-bot:3005 on the
+# compose network and publishes no port.
+
+{$SITE_ADDRESS} {
+	# H7: the Prometheus endpoint never answers from outside (the app adds its own 404 in WD-011).
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+
+	# H8': the ops /health (collector internals, unauthenticated) is never reachable from outside.
+	# The exact path is the dashboard's admin Health page too, so it is REWRITTEN to / and the SPA
+	# answers — a reload of that page keeps working. The app's router is case-insensitive and
+	# accepts a trailing slash (Express defaults), and Caddy's path matcher is case-insensitive, so
+	# /health/ is listed explicitly. /healthz (WD-011, {status} only) passes through.
+	@opsHealth path /health /health/
+	rewrite @opsHealth /
+
+	reverse_proxy {$UPSTREAM:insight-bot:3005} {
+		# H6: overwrite, never append — a client-sent X-Real-IP must not reach the app's throttle
+		# or journal (the app reads CLIENT_IP_HEADER=x-real-ip).
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

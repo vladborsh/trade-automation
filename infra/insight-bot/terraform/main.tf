@@ -28,11 +28,25 @@ data "aws_subnets" "default" {
   }
 }
 
-# No ingress at all: venue websockets, Telegram long polling, ECR and SSM are outbound (D11).
+# Inbound: only TCP 80 and 443 for Caddy, from IPv4 anywhere, and only once var.open_web_ports is
+# true (H3, H8: applied last, after the https name and the 404s are proven on the box). Never SSH
+# (access is SSM Session Manager), never the app's 3005 (it stays on the compose network).
+# The description is the group's original one: changing it would force a replacement.
 resource "aws_security_group" "insight_bot" {
   name        = "insight-bot"
   description = "insight-bot: egress only, no inbound ports (SSM Session Manager for access)"
   vpc_id      = data.aws_vpc.default.id
+
+  dynamic "ingress" {
+    for_each = var.open_web_ports ? { http = 80, https = 443 } : {}
+    content {
+      description = ingress.key == "http" ? "Caddy: ACME HTTP-01 and the redirect to https" : "Caddy: the site"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
 
   egress {
     description = "All outbound: venue WS/REST, Telegram, ECR, SSM, S3"
@@ -77,6 +91,7 @@ resource "aws_instance" "insight_bot" {
     ssm_prefix     = var.ssm_parameter_prefix
     backup_bucket  = aws_s3_bucket.backups.bucket
     compose_file   = file("${path.module}/../compose/docker-compose.yml")
+    caddyfile      = file("${path.module}/../compose/Caddyfile")
     render_env_sh  = file("${path.module}/../scripts/render-env.sh")
     deploy_sh      = file("${path.module}/../scripts/deploy.sh")
     backup_sh      = file("${path.module}/../scripts/backup.sh")

@@ -50,16 +50,21 @@ echo "==> pulling ${IMAGE}"
 grep -q '^IMAGE=' "$DIR/.env" && sed -i '/^IMAGE=/d' "$DIR/.env"
 printf "IMAGE='%s'\n" "$IMAGE" >>"$DIR/.env"
 
-# The Cloudflare tunnel runs only once its token exists (RUNBOOK §11). Without it, cloudflared
-# would exit and restart for ever, so it is not started at all.
+# Caddy (https-without-domain H1) runs once tofu has written /insight-bot/SITE_ADDRESS; before that
+# it would have no site to serve. cloudflared is dormant behind the `tunnel` profile (H9).
 SERVICES=(postgres insight-bot)
+PROFILES=()
+if grep -q '^SITE_ADDRESS=' "$DIR/caddy.env" 2>/dev/null; then
+  SERVICES+=(caddy)
+fi
 if grep -q '^TUNNEL_TOKEN=' "$DIR/cloudflared.env" 2>/dev/null; then
   SERVICES+=(cloudflared)
+  PROFILES=(--profile tunnel)
 fi
-docker compose pull "${SERVICES[@]}"
+docker compose "${PROFILES[@]}" pull "${SERVICES[@]}"
 
 echo "==> starting: ${SERVICES[*]}"
-docker compose up -d "${SERVICES[@]}"
+docker compose "${PROFILES[@]}" up -d "${SERVICES[@]}"
 
 echo "==> waiting for /health"
 for _ in $(seq 1 30); do

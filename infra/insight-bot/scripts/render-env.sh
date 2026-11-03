@@ -11,6 +11,10 @@
 # parameter does not exist yet) so `docker compose up` works before the owner creates the tunnel;
 # cloudflared then restarts until the token is in SSM and deploy.sh is re-run.
 #
+# /insight-bot/SITE_ADDRESS (https-without-domain H4, written by tofu) goes only to caddy.env, the
+# file the caddy container reads: Caddy needs the site name, the app does not. caddy.env is always
+# written too, empty when the parameter does not exist.
+#
 # Values are never echoed: the script prints parameter NAMES and a count, nothing else.
 set -euo pipefail
 
@@ -18,17 +22,21 @@ REGION="${AWS_REGION:-ap-northeast-1}"
 PREFIX="${SSM_PREFIX:-/insight-bot}"
 TARGET="${ENV_FILE:-/opt/insight-bot/.env}"
 CF_TARGET="${CF_ENV_FILE:-/opt/insight-bot/cloudflared.env}"
+CADDY_TARGET="${CADDY_ENV_FILE:-/opt/insight-bot/caddy.env}"
 
 umask 077
 tmp="$(mktemp "${TARGET}.XXXXXX")"
 cf_tmp="$(mktemp "${CF_TARGET}.XXXXXX")"
-trap 'rm -f "$tmp" "$cf_tmp"' EXIT
+caddy_tmp="$(mktemp "${CADDY_TARGET}.XXXXXX")"
+trap 'rm -f "$tmp" "$cf_tmp" "$caddy_tmp"' EXIT
 
 echo "# rendered from SSM ${PREFIX} at $(date -u +%FT%TZ) — do not edit by hand" >"$tmp"
 echo "# rendered from SSM ${PREFIX}/CF_TUNNEL_TOKEN at $(date -u +%FT%TZ) — do not edit by hand" >"$cf_tmp"
+echo "# rendered from SSM ${PREFIX}/SITE_ADDRESS at $(date -u +%FT%TZ) — do not edit by hand" >"$caddy_tmp"
 
 count=0
 cf_count=0
+caddy_count=0
 while read -r name value; do
   [ -z "$name" ] && continue
   key="${name##*/}"
@@ -39,6 +47,13 @@ while read -r name value; do
     printf "TUNNEL_TOKEN='%s'\n" "$escaped" >>"$cf_tmp"
     cf_count=$((cf_count + 1))
     echo "  ${key} -> $(basename "$CF_TARGET")" >&2
+    continue
+  fi
+  if [ "$key" = "SITE_ADDRESS" ]; then
+    # Caddy's site name; the app has no use for it.
+    printf "SITE_ADDRESS='%s'\n" "$escaped" >>"$caddy_tmp"
+    caddy_count=$((caddy_count + 1))
+    echo "  ${key} -> $(basename "$CADDY_TARGET")" >&2
     continue
   fi
   printf "%s='%s'\n" "$key" "$escaped" >>"$tmp"
@@ -57,13 +72,17 @@ if [ "$count" -eq 0 ]; then
   exit 1
 fi
 
-chmod 600 "$tmp" "$cf_tmp"
+chmod 600 "$tmp" "$cf_tmp" "$caddy_tmp"
 mv "$tmp" "$TARGET"
 mv "$cf_tmp" "$CF_TARGET"
+mv "$caddy_tmp" "$CADDY_TARGET"
 trap - EXIT
 echo "render-env.sh: wrote ${count} keys to ${TARGET}" >&2
 if [ "$cf_count" -eq 0 ]; then
   echo "render-env.sh: no ${PREFIX}/CF_TUNNEL_TOKEN — ${CF_TARGET} has no token, cloudflared will not connect" >&2
 else
   echo "render-env.sh: wrote the tunnel token to ${CF_TARGET}" >&2
+fi
+if [ "$caddy_count" -eq 0 ]; then
+  echo "render-env.sh: no ${PREFIX}/SITE_ADDRESS — ${CADDY_TARGET} is empty, caddy has no site to serve" >&2
 fi

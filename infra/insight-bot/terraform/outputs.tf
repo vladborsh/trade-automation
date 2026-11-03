@@ -17,3 +17,13 @@ output "deploy_role_arn" {
   description = "Role GitHub Actions assumes (repo variable AWS_DEPLOY_ROLE_ARN)."
   value       = aws_iam_role.deploy.arn
 }
+
+output "site_url" {
+  description = "The site: https://<a-b-c-d>.sslip.io, derived from the Elastic IP (https-without-domain H4)."
+  value       = "https://${local.site_hostname}"
+}
+
+output "elastic_ip" {
+  description = "The box's stable public IPv4 (H2)."
+  value       = aws_eip.insight_bot.public_ip
+}

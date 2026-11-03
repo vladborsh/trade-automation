@@ -42,6 +42,10 @@ cat >/opt/insight-bot/docker-compose.yml <<'COMPOSE_EOF'
 ${compose_file}
 COMPOSE_EOF
 
+cat >/opt/insight-bot/Caddyfile <<'CADDY_EOF'
+${caddyfile}
+CADDY_EOF
+
 cat >/opt/insight-bot/render-env.sh <<'RENDER_EOF'
 ${render_env_sh}
 RENDER_EOF

@@ -30,6 +30,7 @@ case "$INSTANCE" in i-*) ;; *) echo "sync-box.sh: no running insight-bot instanc
 # source path (relative to infra/insight-bot) -> destination on the box, mode
 FILES=(
   "compose/docker-compose.yml:/opt/insight-bot/docker-compose.yml:0644"
+  "compose/Caddyfile:/opt/insight-bot/Caddyfile:0644"
   "scripts/render-env.sh:/opt/insight-bot/render-env.sh:0755"
   "scripts/deploy.sh:/opt/insight-bot/deploy.sh:0755"
   "scripts/backup.sh:/opt/insight-bot/backup.sh:0755"
