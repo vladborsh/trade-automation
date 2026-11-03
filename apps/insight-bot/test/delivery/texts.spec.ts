@@ -47,10 +47,8 @@ describe('every template has both languages and neither is empty', () => {
     ADMIN_ONLY: T.ADMIN_ONLY,
     UNKNOWN_COMMAND: T.UNKNOWN_COMMAND,
     welcome: T.welcome('Vlad'),
-    settings: T.settings({ deposit: 1000, riskPct: 1, dailyLossLimitPct: 3, dexAlerts: false, lang: 'ru' }),
-    saved: T.saved('deposit', '1000'),
-    badNumber: T.badNumber('risk', 0.1, 10, '/risk 1'),
-    missingArgument: T.missingArgument('/deposit 1000'),
+    settings: T.settings({ lang: 'ru', calendarAlerts: true }),
+    saved: T.saved('lang', 'en'),
     inviteCreated: T.inviteCreated('https://t.me/b?start=x', new Date('2026-10-05T12:00:00Z')),
     userList: T.userList([{ tgUserId: 1, role: 'admin', disabled: false, createdAt: new Date('2026-09-01') }]),
     calendarDigest: T.calendarDigest('2026-10-29', [{ title: 'CPI m/m', scheduledAt: Date.UTC(2026, 9, 29, 12, 30), forecast: '0.3%', previous: null }], [], 15),
@@ -70,36 +68,55 @@ describe('every template has both languages and neither is empty', () => {
 });
 
 describe('commands, codes and tickers stay English in both languages (§8.6)', () => {
-  it('the Russian settings text still says /deposit, not a translated command', () => {
-    const ru = T.pick(T.settings({ deposit: null, riskPct: 1, dailyLossLimitPct: null, dexAlerts: true, lang: 'ru' }), 'ru');
-    expect(ru).toContain('/deposit');
-    expect(ru).toContain('/risk');
+  it('the Russian settings text still says /calendar and /lang, not translated commands', () => {
+    const ru = T.pick(T.settings({ lang: 'ru', calendarAlerts: true }), 'ru');
+    expect(ru).toContain('/calendar');
     expect(ru).toContain('/lang');
   });
 });
 
-describe('settings text', () => {
-  it('says "not set" rather than inventing a deposit', () => {
-    const ru = T.pick(T.settings({ deposit: null, riskPct: 1, dailyLossLimitPct: null, dexAlerts: false, lang: 'ru' }), 'ru');
-    expect(ru).toContain('не задан');
-    expect(ru).not.toContain('0 USDT'); // a null deposit is not a zero deposit
+/**
+ * WD-013: /deposit, /risk, /limit and /dex are gone with the signal pipeline. No text a member reads
+ * may still offer them, or promise signals that never come.
+ */
+describe('no text offers a removed command or promises signals (WD-013)', () => {
+  const REMOVED = ['/deposit', '/risk', '/limit', '/dex'];
+  const memberTexts: Record<string, T.Texts> = {
+    welcome: T.welcome('Vlad'),
+    ALREADY_MEMBER: T.ALREADY_MEMBER,
+    settingsWithCalendar: T.settings({ lang: 'ru', calendarAlerts: false }),
+    settingsWithoutCalendar: T.settings({ lang: 'en' }),
+    BAD_ON_OFF: T.BAD_ON_OFF,
+    UNKNOWN_COMMAND: T.UNKNOWN_COMMAND,
+  };
+
+  it.each(Object.keys(memberTexts))('%s names none of /deposit /risk /limit /dex', (name) => {
+    for (const lang of LANGS) {
+      for (const command of REMOVED) expect(T.pick(memberTexts[name], lang)).not.toContain(command);
+    }
   });
 
-  it('shows the values it does have', () => {
-    const en = T.pick(T.settings({ deposit: 12500.5, riskPct: 1.5, dailyLossLimitPct: 3, dexAlerts: true, lang: 'en' }), 'en');
-    expect(en).toContain('12,500.5 USDT');
-    expect(en).toContain('1.50%');
-    expect(en).toContain('3%');
-    expect(en).toContain('on');
+  it('the welcome does not promise signals, and points at what the bot does now', () => {
+    for (const lang of LANGS) {
+      const text = T.pick(T.welcome(null), lang);
+      expect(text.toLowerCase()).not.toMatch(/signal|сигнал|deposit|депозит/);
+      for (const command of ['/password', '/web', '/calendar', '/settings']) expect(text).toContain(command);
+    }
   });
 });
 
-describe('badNumber', () => {
-  it('names the accepted range and an example, not just "invalid"', () => {
-    const ru = T.pick(T.badNumber('Риск', 0.1, 10, '/risk 1'), 'ru');
-    expect(ru).toContain('0.1');
-    expect(ru).toContain('10');
-    expect(ru).toContain('/risk 1');
+describe('settings text', () => {
+  it('shows the calendar state and the language', () => {
+    const en = T.pick(T.settings({ lang: 'en', calendarAlerts: true }), 'en');
+    expect(en).toContain('US calendar: on');
+    expect(en).toContain('Language: en');
+    expect(T.pick(T.settings({ lang: 'ru', calendarAlerts: false }), 'ru')).toContain('Календарь США: выключен');
+  });
+
+  it('without a calendar flag it omits the line rather than inventing a state', () => {
+    const en = T.pick(T.settings({ lang: 'en' }), 'en');
+    expect(en).not.toContain('calendar');
+    expect(en).toContain('Change with: /lang ru');
   });
 });
 

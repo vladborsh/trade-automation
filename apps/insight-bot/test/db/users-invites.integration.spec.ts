@@ -94,16 +94,22 @@ maybeDescribe('IB-021 users and invites against a real database', () => {
     expect((await repo.findByTgUserId(db, 222))?.chatId).toBe(9999);
   });
 
-  it('settings round-trip through the real column types', async () => {
+  it('settings round-trip through the real column types (WD-013: lang and calendar only)', async () => {
     const user = await repo.findByTgUserId(db, 222);
-    const updated = await repo.updateSettings(db, user!.id, {
-      deposit: 12500.5, riskPct: 1.5, dailyLossLimitPct: 3, dexAlerts: true, lang: 'en',
-    });
-    expect(updated).toMatchObject({ deposit: 12500.5, riskPct: 1.5, dailyLossLimitPct: 3, dexAlerts: true, lang: 'en' });
-
-    // numeric comes back from pg as a string; the mapper must not hand a string to sizing
-    expect(typeof updated!.deposit).toBe('number');
+    const updated = await repo.updateSettings(db, user!.id, { lang: 'en', calendarAlerts: false });
+    expect(updated).toMatchObject({ lang: 'en', calendarAlerts: false });
     expect(typeof updated!.tgUserId).toBe('number');
+  });
+
+  it('WD-013: a patch cannot write the retired columns, which are still read and mapped', async () => {
+    const user = await repo.findByTgUserId(db, 222);
+    await db.query('update users set deposit = 12500.5, risk_pct = 1.5 where id = $1', [user!.id]);
+    // a caller passing an old field (cast past the narrowed type) gets nothing written for it
+    await repo.updateSettings(db, user!.id, { deposit: 1, riskPct: 9, lang: 'ru' } as never);
+    const after = await repo.findByTgUserId(db, 222);
+    expect(after).toMatchObject({ deposit: 12500.5, riskPct: 1.5, lang: 'ru' });
+    // numeric comes back from pg as a string; the mapper still turns it into a number
+    expect(typeof after!.deposit).toBe('number');
   });
 
   it('the schema refuses a role or language it does not know', async () => {

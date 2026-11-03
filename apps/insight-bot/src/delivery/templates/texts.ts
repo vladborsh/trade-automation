@@ -19,8 +19,6 @@ import type { Lang } from '../../users/user.model';
 
 export type Texts = Record<Lang, string>;
 
-const pct = (n: number): string => `${Number.isInteger(n) ? n : n.toFixed(2)}%`;
-const money = (n: number): string => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 export function pick(texts: Texts, lang: Lang): string {
   return texts[lang];
@@ -38,21 +36,27 @@ export const INVITE_REFUSED: Texts = {
   en: 'That link did not work. Ask the administrator for a new one.',
 };
 
+/**
+ * WD-013: the welcome no longer mentions /deposit or /risk, and no longer promises signals. The
+ * signal pipeline is gone, and a member told "signals arrive on their own" waits for nothing. It
+ * points at what the bot does now: the site (the credentials link follows this message), the US
+ * calendar in the DM, and the settings.
+ */
 export function welcome(name: string | null): Texts {
   const who = name ? `, ${name}` : '';
   return {
     ru: `Готово${who} — доступ открыт.\n\n`
       + 'Что дальше:\n'
-      + '• /settings — посмотреть свои настройки\n'
-      + '• /deposit 1000 — размер депозита в USDT, нужен для расчёта позиции\n'
-      + '• /risk 1 — риск на сделку в процентах от депозита\n\n'
-      + 'Сигналы приходят сами. Пока идёт сбор данных, их может не быть несколько дней.',
+      + '• /password — ссылка, чтобы задать логин и пароль для сайта\n'
+      + '• /web — адрес сайта\n'
+      + '• /calendar — утренняя сводка по календарю США и напоминания перед важными событиями\n'
+      + '• /settings — ваши настройки',
     en: `You are in${who}.\n\n`
       + 'Next:\n'
-      + '• /settings — see your settings\n'
-      + '• /deposit 1000 — deposit size in USDT, needed to size positions\n'
-      + '• /risk 1 — risk per trade, in percent of the deposit\n\n'
-      + 'Signals arrive on their own. While data is still being collected there may be none for days.',
+      + '• /password — a link to set your login and password for the site\n'
+      + '• /web — the site address\n'
+      + '• /calendar — a morning US calendar digest and reminders before high-impact events\n'
+      + '• /settings — your settings',
   };
 }
 
@@ -61,34 +65,22 @@ export const ALREADY_MEMBER: Texts = {
   en: 'You are already connected. /settings shows your settings.',
 };
 
+/** WD-013: deposit, risk, daily loss limit and DEX alerts left with their commands. */
 export function settings(user: {
-  deposit: number | null;
-  riskPct: number;
-  dailyLossLimitPct: number | null;
-  dexAlerts: boolean;
   lang: Lang;
   /** IB-062; optional so callers from before the calendar still render. */
   calendarAlerts?: boolean;
 }): Texts {
-  const deposit = user.deposit === null ? { ru: 'не задан', en: 'not set' } : { ru: `${money(user.deposit)} USDT`, en: `${money(user.deposit)} USDT` };
-  const limit = user.dailyLossLimitPct === null ? { ru: 'не задан', en: 'not set' } : { ru: pct(user.dailyLossLimitPct), en: pct(user.dailyLossLimitPct) };
+  const hasCalendar = user.calendarAlerts !== undefined;
   return {
     ru: 'Ваши настройки\n'
-      + `• Депозит: ${deposit.ru}\n`
-      + `• Риск на сделку: ${pct(user.riskPct)}\n`
-      + `• Дневной лимит убытка: ${limit.ru}\n`
-      + `• Алерты по DEX: ${user.dexAlerts ? 'включены' : 'выключены'}\n`
-      + (user.calendarAlerts === undefined ? '' : `• Календарь США: ${user.calendarAlerts ? 'включён' : 'выключен'}\n`)
+      + (hasCalendar ? `• Календарь США: ${user.calendarAlerts ? 'включён' : 'выключен'}\n` : '')
       + `• Язык: ${user.lang}\n\n`
-      + `Изменить: /deposit 1000, /risk 1, /limit 3, /dex on, ${user.calendarAlerts === undefined ? '' : '/calendar, '}/lang en`,
+      + `Изменить: ${hasCalendar ? '/calendar, ' : ''}/lang en`,
     en: 'Your settings\n'
-      + `• Deposit: ${deposit.en}\n`
-      + `• Risk per trade: ${pct(user.riskPct)}\n`
-      + `• Daily loss limit: ${limit.en}\n`
-      + `• DEX alerts: ${user.dexAlerts ? 'on' : 'off'}\n`
-      + (user.calendarAlerts === undefined ? '' : `• US calendar: ${user.calendarAlerts ? 'on' : 'off'}\n`)
+      + (hasCalendar ? `• US calendar: ${user.calendarAlerts ? 'on' : 'off'}\n` : '')
       + `• Language: ${user.lang}\n\n`
-      + `Change with: /deposit 1000, /risk 1, /limit 3, /dex on, ${user.calendarAlerts === undefined ? '' : '/calendar, '}/lang ru`,
+      + `Change with: ${hasCalendar ? '/calendar, ' : ''}/lang ru`,
   };
 }
 
@@ -99,32 +91,14 @@ export function saved(field: string, value: string): Texts {
   };
 }
 
-/**
- * A rejected value says what is accepted. "Неверное значение" tells the person nothing, and they
- * are usually on a phone with one hand.
- */
-export function badNumber(field: string, min: number, max: number, example: string): Texts {
-  return {
-    ru: `${field}: нужно число от ${min} до ${max}. Например: ${example}`,
-    en: `${field}: expected a number between ${min} and ${max}. For example: ${example}`,
-  };
-}
-
-export function missingArgument(usage: string): Texts {
-  return {
-    ru: `Не хватает значения. Например: ${usage}`,
-    en: `A value is missing. For example: ${usage}`,
-  };
-}
-
 export const BAD_LANG: Texts = {
   ru: 'Язык: ru или en. Например: /lang en',
   en: 'Language: ru or en. For example: /lang ru',
 };
 
 export const BAD_ON_OFF: Texts = {
-  ru: 'Нужно on или off. Например: /dex on',
-  en: 'Expected on or off. For example: /dex on',
+  ru: 'Нужно on или off. Например: /calendar on',
+  en: 'Expected on or off. For example: /calendar on',
 };
 
 export const ADMIN_ONLY: Texts = {

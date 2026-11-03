@@ -148,42 +148,25 @@ describe('member settings', () => {
     const h = harness({}, { 222: member });
     await h.bot.handleUpdate(text(222, '/settings') as never);
     expect(h.sent[0]).toContain('Ваши настройки');
-    expect(h.sent[0]).toContain('не задан'); // deposit
+    expect(h.sent[0]).toContain('Календарь США: включён');
+    expect(h.sent[0]).not.toContain('/deposit');
   });
 
-  it('/deposit 1000 is stored', async () => {
-    const h = harness({}, { 222: member });
-    await h.bot.handleUpdate(text(222, '/deposit 1000') as never);
-    expect(h.patches).toEqual([{ userId: 2, patch: { deposit: 1000 } }]);
-    expect(h.sent[0]).toContain('1000 USDT');
-  });
-
-  it('/risk 100 is refused with the accepted range, and nothing is written', async () => {
-    const h = harness({}, { 222: member });
-    await h.bot.handleUpdate(text(222, '/risk 100') as never);
-    expect(h.patches).toEqual([]);
-    expect(h.sent[0]).toContain('0.1');
-    expect(h.sent[0]).toContain('10');
-  });
-
-  it('/deposit with no value explains instead of erroring', async () => {
-    const h = harness({}, { 222: member });
-    await h.bot.handleUpdate(text(222, '/deposit') as never);
-    expect(h.patches).toEqual([]);
-    expect(h.sent[0]).toContain('/deposit 1000');
-  });
+  it.each(['/deposit 1000', '/deposit', '/risk 1', '/limit 3', '/dex on'])(
+    'WD-013: %s is gone — a member gets UNKNOWN_COMMAND and NOTHING is written',
+    async (body) => {
+      const h = harness({}, { 222: member });
+      await h.bot.handleUpdate(text(222, body) as never);
+      expect(h.patches).toEqual([]);
+      expect(h.sent).toEqual([T.UNKNOWN_COMMAND.ru]);
+    },
+  );
 
   it('/lang en is confirmed IN ENGLISH — the reply is the proof it took', async () => {
     const h = harness({}, { 222: member });
     await h.bot.handleUpdate(text(222, '/lang en') as never);
     expect(h.patches).toEqual([{ userId: 2, patch: { lang: 'en' } }]);
     expect(h.sent[0]).toBe(T.saved('lang', 'en').en);
-  });
-
-  it('/dex on stores a boolean, not the string', async () => {
-    const h = harness({}, { 222: member });
-    await h.bot.handleUpdate(text(222, '/dex вкл') as never);
-    expect(h.patches).toEqual([{ userId: 2, patch: { dexAlerts: true } }]);
   });
 
   it('/calendar (IB-062) toggles, and /calendar on|off sets', async () => {

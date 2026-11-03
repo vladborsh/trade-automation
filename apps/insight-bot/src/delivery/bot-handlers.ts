@@ -14,10 +14,7 @@ import type { Bot, Context } from 'grammy';
 import type { Invite, Lang, User } from '../users/user.model';
 import { INVITE_TTL_MS } from '../users/user.model';
 import { generateInviteCode, inviteLink, isWellFormedCode } from '../users/invite-code';
-import {
-  parseCommand, parseDeposit, parseLang, parseLimitPct, parseOnOff, parseRiskPct,
-  DEPOSIT_MAX, DEPOSIT_MIN, LIMIT_MAX, LIMIT_MIN, RISK_MAX, RISK_MIN, type ParseResult,
-} from '../users/settings';
+import { parseCommand, parseLang, parseOnOff } from '../users/settings';
 import type { ConsumeResult, SettingsPatch } from '../users/pg/users.repo';
 import * as T from './templates/texts';
 
@@ -159,46 +156,20 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
   async function handleMemberCommand(ctx: Context, command: string, args: string[], user: User): Promise<void> {
     const lang = user.lang;
 
-    const applyNumber = async (
-      parsed: ParseResult<number>, field: string, patch: (v: number) => SettingsPatch,
-      min: number, max: number, usage: string, format: (v: number) => string,
-    ): Promise<void> => {
-      if (!parsed.ok) {
-        await reply(ctx, parsed.reason === 'missing' ? T.missingArgument(usage) : T.badNumber(field, min, max, usage), lang);
-        return;
-      }
-      const updated = await deps.users.updateSettings(user.id, patch(parsed.value));
-      await reply(ctx, T.saved(field, format(parsed.value)), updated?.lang ?? lang);
-    };
-
     switch (command) {
       case 'start':
         return;
       case 'settings':
         await reply(ctx, T.settings(user), lang);
         return;
-      case 'deposit':
-        await applyNumber(parseDeposit(args[0]), 'deposit', (v) => ({ deposit: v }), DEPOSIT_MIN, DEPOSIT_MAX, '/deposit 1000', (v) => `${v} USDT`);
-        return;
-      case 'risk':
-        await applyNumber(parseRiskPct(args[0]), 'risk', (v) => ({ riskPct: v }), RISK_MIN, RISK_MAX, '/risk 1', (v) => `${v}%`);
-        return;
-      case 'limit':
-        await applyNumber(parseLimitPct(args[0]), 'limit', (v) => ({ dailyLossLimitPct: v }), LIMIT_MIN, LIMIT_MAX, '/limit 3', (v) => `${v}%`);
-        return;
+      // WD-013: /deposit, /risk, /limit and /dex are gone with the signal pipeline they configured
+      // (nothing read those settings after the wind-down). Typed now, they get UNKNOWN_COMMAND below.
       case 'lang': {
         const parsed = parseLang(args[0]);
         if (!parsed.ok) { await reply(ctx, T.BAD_LANG, lang); return; }
         await deps.users.updateSettings(user.id, { lang: parsed.value });
         // answered in the NEW language: the confirmation is the first proof it took effect
         await reply(ctx, T.saved('lang', parsed.value), parsed.value);
-        return;
-      }
-      case 'dex': {
-        const parsed = parseOnOff(args[0]);
-        if (!parsed.ok) { await reply(ctx, T.BAD_ON_OFF, lang); return; }
-        await deps.users.updateSettings(user.id, { dexAlerts: parsed.value });
-        await reply(ctx, T.saved('dex', parsed.value ? 'on' : 'off'), lang);
         return;
       }
       case 'calendar': {

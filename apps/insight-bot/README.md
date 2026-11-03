@@ -305,14 +305,16 @@ rule IB-011's sender follows. An agent never registers a bot. Set, per slot, in 
 | `TELEGRAM_BOT_TOKEN` | the slot's **test** bot (there is one production bot) |
 | `TELEGRAM_BOT_USERNAME` | shapes the `t.me/<bot>?start=<code>` link |
 | `ADMIN_TG_USER_ID` | bootstrapped as admin on every boot, idempotently |
-| `TELEGRAM_SERVICE_CHAT_ID` | IB-011's operator chat (watchdog, gap report) |
+| `TELEGRAM_SERVICE_CHAT_ID` | IB-011's operator chat (watchdog alerts, only with `OPS_TELEGRAM_ALERTS=true`) |
 
 Long polling (D11), so the instance opens no inbound port.
 
 ### Commands
 
-Member: `/start <code>`, `/settings`, `/deposit <n>`, `/risk <pct>`, `/limit <pct>`,
-`/lang ru|en`, `/dex on|off`. Admin: `/invite`, `/users`.
+Member: `/start <code>`, `/settings`, `/lang ru|en`, `/calendar [on|off]`, `/password`, `/web`.
+Admin: `/invite`, `/users`. WD-013 removed `/deposit`, `/risk`, `/limit` and `/dex` with the signal
+pipeline they configured; typed now, they get the unknown-command reply. Their `users` columns stay
+until a migration drops them, and nothing writes them.
 
 Three behaviours that are deliberate rather than incidental:
 

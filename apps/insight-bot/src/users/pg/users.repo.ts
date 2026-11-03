@@ -75,19 +75,23 @@ export async function setChatId(db: DbHandle, userId: number, chatId: number): P
   await db.query('update users set chat_id = $2 where id = $1', [userId, chatId]);
 }
 
-export type SettingsPatch = Partial<Pick<User, 'deposit' | 'riskPct' | 'dailyLossLimitPct' | 'dexAlerts' | 'calendarAlerts' | 'lang'>>;
+/**
+ * What a member can change. WD-013 removed deposit, risk, daily loss limit and DEX alerts with their
+ * commands. Their columns stay (dropping them is a migration of its own) and are still READ into
+ * `User`, but nothing writes them any more.
+ */
+export type SettingsPatch = Partial<Pick<User, 'calendarAlerts' | 'lang'>>;
 
 const SETTING_COLUMN: Record<keyof SettingsPatch, string> = {
-  deposit: 'deposit',
-  riskPct: 'risk_pct',
-  dailyLossLimitPct: 'daily_loss_limit_pct',
-  dexAlerts: 'dex_alerts',
   calendarAlerts: 'calendar_alerts',
   lang: 'lang',
 };
 
 export async function updateSettings(db: DbHandle, userId: number, patch: SettingsPatch): Promise<User | null> {
-  const entries = Object.entries(patch).filter(([, v]) => v !== undefined) as Array<[keyof SettingsPatch, unknown]>;
+  // only keys with a column: a caller that slips a retired field past the type writes nothing for it,
+  // rather than building `undefined = $n` into the SQL
+  const entries = Object.entries(patch)
+    .filter(([key, v]) => v !== undefined && Object.hasOwn(SETTING_COLUMN, key)) as Array<[keyof SettingsPatch, unknown]>;
   if (entries.length === 0) return findByTgUserIdById(db, userId);
 
   const sets = entries.map(([key], i) => `${SETTING_COLUMN[key]} = $${i + 2}`);
