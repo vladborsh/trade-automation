@@ -8,6 +8,7 @@ import { CalendarController } from './calendar/calendar.controller';
 import { WebAuthController } from './auth/web-auth.controller';
 import { WebAuthGuard } from './auth/web-auth.guard';
 import { WebAuthService } from './auth/web-auth.service';
+import { SessionSweeperService } from './auth/session-sweeper.service';
 import { CredentialsService } from './auth/credentials.service';
 import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
@@ -77,6 +78,8 @@ export class WebModule {
       ],
       providers: [
         WebAuthService,
+        // IB-BUG-017: expired sessions, spent login tokens and the 90-day login journal are purged hourly
+        SessionSweeperService,
         // IB-078: one hasher (its ScryptGate is the process-wide cap of 2 concurrent scrypt) and one
         // throttle (in-memory, per process — P7)
         { provide: PasswordHasher, useFactory: () => new PasswordHasher() },
