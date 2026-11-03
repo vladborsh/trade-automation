@@ -15,6 +15,8 @@ import { familyStats, registerCache, type CacheStats, type InspectableCache } fr
  * polling with a drifting `to = now` keeps hitting one entry until its TTL runs out.
  */
 export const DEFAULT_MAX_ENTRIES = 2_000;
+/** IB-096: expired entries are swept on insert, at most this often. */
+export const SWEEP_EVERY_MS = 10_000;
 
 /** TTLs from the WD-008 task row. OI and long-short: the venue's own period is 5 minutes. */
 export const FUNDING_TTL_MS = 60_000;
@@ -37,6 +39,7 @@ export class TtlCache implements InspectableCache {
   private readonly inFlight = new Map<string, Promise<unknown>>();
   private readonly maxEntries: number;
   private readonly now: () => number;
+  private lastSweep = Number.NEGATIVE_INFINITY;
 
   constructor(options: TtlCacheOptions = {}) {
     this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
@@ -73,11 +76,25 @@ export class TtlCache implements InspectableCache {
   set<V>(key: string, value: V, ttlMs: number): void {
     if (!(ttlMs > 0)) throw new Error(`ttlMs must be positive, got ${ttlMs}`);
     this.entries.delete(key);
+    this.sweep();
     this.entries.set(key, { value, expiresAt: this.now() + ttlMs });
     while (this.entries.size > this.maxEntries) {
       const oldest = this.entries.keys().next().value as string;
       this.entries.delete(oldest);
     }
+  }
+
+  /**
+   * IB-096 — drops every expired entry. An expired entry used to leave only when its key was read
+   * again, and most never are (a window key moves with `now`): measured on slot dev-3, 270 of 450
+   * held OI/LS windows were expired, ~60 % of the cache's ~20 MB. Run on insert, at most once per
+   * `SWEEP_EVERY_MS`, so a burst of inserts costs one pass, not one per insert.
+   */
+  sweep(): void {
+    const now = this.now();
+    if (now - this.lastSweep < SWEEP_EVERY_MS) return;
+    this.lastSweep = now;
+    for (const [key, entry] of this.entries) if (entry.expiresAt <= now) this.entries.delete(key);
   }
 
   /**

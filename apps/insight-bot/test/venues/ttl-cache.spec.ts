@@ -1,4 +1,4 @@
-import { TtlCache, windowKey } from '../../src/venues/ttl-cache';
+import { SWEEP_EVERY_MS, TtlCache, windowKey } from '../../src/venues/ttl-cache';
 
 describe('TtlCache (WD-008)', () => {
   let t = 0;
@@ -52,6 +52,30 @@ describe('TtlCache (WD-008)', () => {
     await c.getOrLoad('k', 100, load, (v) => v.unavailable.length === 0);
     await c.getOrLoad('k', 100, load, (v) => v.unavailable.length === 0);
     expect(loads).toBe(2);
+  });
+});
+
+describe('TtlCache sweep (IB-096): an expired entry is not held until someone reads its key', () => {
+  it('inserting drops every expired entry, so dead windows stop holding memory', () => {
+    let now = 0;
+    const cache = new TtlCache({ now: () => now });
+    for (let i = 0; i < 50; i++) cache.set(`old-${i}`, i, 1_000);
+    now = 20_000; // all 50 expired; none read again (a window key moves with now)
+    cache.set('new', 1, 60_000);
+    expect(cache.size).toBe(1);
+    expect(cache.stats()).toEqual([{ family: 'new', entries: 1, expired: 0 }]);
+  });
+
+  it('at most one pass per SWEEP_EVERY_MS: a burst of inserts does not rescan the map each time', () => {
+    let now = 0;
+    const cache = new TtlCache({ now: () => now });
+    cache.set('a', 1, 5); // first insert sweeps an empty map and arms the timer
+    now = 10; // 'a' expired, but the last sweep was 10 ms ago
+    cache.set('b', 1, 60_000);
+    expect(cache.size).toBe(2);
+    now = SWEEP_EVERY_MS + 10;
+    cache.set('c', 1, 60_000);
+    expect(cache.size).toBe(2); // 'a' swept, 'b' and 'c' live
   });
 });
 
