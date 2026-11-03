@@ -1,6 +1,7 @@
 import { Logger, Module, type DynamicModule } from '@nestjs/common';
 import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
+import { VenuesModule } from '../venues/venues.module';
 import { NewsService } from './news.service';
 import { ReactionService } from './reaction.service';
 
@@ -25,6 +26,8 @@ export class NewsModule {
       new Logger(NewsModule.name).log('DATABASE_URL is not set — news ingest disabled');
       return { module: NewsModule };
     }
-    return { module: NewsModule, imports: [AppConfigModule, DbModule], providers: [NewsService, ReactionService] };
+    // VenuesModule (IB-097): the reactions read Binance klines through the shared PerpRest and record
+    // their weight on the ONE BinanceWeightTracker the on-demand reads check their ceiling against
+    return { module: NewsModule, imports: [AppConfigModule, DbModule, VenuesModule], providers: [NewsService, ReactionService] };
   }
 }

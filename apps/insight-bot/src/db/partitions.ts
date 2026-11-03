@@ -13,9 +13,7 @@ export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }
   // liquidations, Binance OI and long/short, and the collectors' gap rows. The candle, funding,
   // feature-frame and playbook tables keep their existing partitions until WD-006 drops them;
   // nothing writes to them any more, so no new month is needed.
-  // Kept while the news hold lasts (owner, 2026-11-03): the news reaction reads read candles_1m.
-  // Nothing writes it since WD-010; an empty monthly partition costs nothing.
-  { table: 'candles_1m', column: 'open_time' },
+  // IB-097: the 1m candle table left this list too: news reactions read Binance klines on demand.
   { table: 'open_interest_5m', column: 'ts' },
   { table: 'long_short_5m', column: 'ts' },
   { table: 'liquidations', column: 'ts' },
@@ -78,7 +76,7 @@ export function monthsAhead(now: Date, ahead: number): string[] {
   return months;
 }
 
-/** `candles_1m` + `2026-09` → `candles_1m_2026_09`. */
+/** `liquidations` + `2026-09` → `liquidations_2026_09`. */
 export function partitionName(table: string, month: string): string {
   assertMonth(month);
   return `${table}_${month.replace('-', '_')}`;

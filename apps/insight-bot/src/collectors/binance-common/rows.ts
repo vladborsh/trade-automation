@@ -2,12 +2,11 @@ import type { CollectorGapRow, Market } from '../writers/tables';
 import { VENUE } from './venue';
 
 /**
- * IB-005 — the last pure step before the writers: a `Candle` from the lifted Binance mappers (with
- * IB-002's taker fields) becomes a `candles_1m` row, and a `GapRepair` gap becomes a
- * `collector_gaps` row.
+ * IB-005 — the last pure step before the writers: a `GapRepair` gap becomes a `collector_gaps` row.
+ * (The 1m candle row went with the candle tape in WD-010.)
  *
- * `Candle.instrument` is the signal-server's `venue:SYMBOL` id; the insight-bot schema keys on
- * `(venue, market, symbol, open_time)` instead, so the symbol is taken from the id's tail.
+ * The signal-server's ids are `venue:SYMBOL`; the insight-bot schema keys on venue, market and
+ * symbol instead, so the symbol is taken from the id's tail.
  */
 
 /** What `GapRepair` reports about one hole, as a `collector_gaps` row (§3.3, §6.2). */

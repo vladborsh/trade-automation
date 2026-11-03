@@ -74,14 +74,13 @@ describe('partitionsFor', () => {
     // An "and nothing else" pin, deliberately: a table joining this list silently means its
     // partitions start being created by a maintenance job nobody reviewed, and a table LEAVING
     // it silently means writes start failing at the next month boundary.
-    // WD-010 (storage ruling 2026-11-03): only what the box still WRITES — plus candles_1m while
-    // the news hold lasts (owner, 2026-11-03), because the news reaction reads read it. The other
-    // candle, mark, feature-frame and playbook tables stay in the schema until WD-006 drops them,
-    // with no new months — nothing writes there any more.
+    // WD-010 (storage ruling 2026-11-03): only what the box still WRITES. IB-097 took candles_1m off
+    // as well: the news reactions read Binance klines on demand now. The candle, mark, feature-frame
+    // and playbook tables stay in the schema until WD-006 drops them, with no new months.
     expect(PARTITIONED_TABLES.map((t) => t.table)).toEqual([
-      'candles_1m', 'open_interest_5m', 'long_short_5m', 'liquidations', 'collector_gaps',
+      'open_interest_5m', 'long_short_5m', 'liquidations', 'collector_gaps',
     ]);
-    for (const retired of ['candles_agg', 'mark_funding_1m', 'feature_frames', 'playbook_evaluations', 'playbook_frame_pins']) {
+    for (const retired of ['candles_1m', 'candles_agg', 'mark_funding_1m', 'feature_frames', 'playbook_evaluations', 'playbook_frame_pins']) {
       expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain(retired);
     }
     // The two unpartitioned tables of §3.3 must not appear.

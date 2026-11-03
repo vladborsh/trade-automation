@@ -1,25 +1,53 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
+import { othersInWindow, pendingReactions, saveReaction, type PriceScope } from '../db/pg/reaction-reads';
+import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
+import { PerpRest } from '../venues/binance/perp.rest';
+import { WEIGHT_CEILING_1M } from '../web/market/universe-summary.service';
+import { computeReaction, HORIZONS, reactionWindow, type Horizon, type Reaction } from './reaction';
 import {
-  closeAtOrBefore, othersInWindow, pendingReactions, saveReaction, windowCoverage, type PriceScope,
-} from '../db/pg/reaction-reads';
-import { computeReaction, HORIZONS, reactionWindow, type Horizon } from './reaction';
+  barsFromKlines, closeAtOrBefore, closedBars, klinesRequest, klinesWeight, MAX_VENUE_CALLS_PER_PASS,
+  windowCoverage, type ReactionBar,
+} from './reaction-prices';
 
 /** Every five minutes: the shortest horizon is 15m, so nothing waits long for its window to close. */
 export const REACTION_TICK_MS = 5 * 60_000;
 
+/** What one pass spent and left behind. Logged, and returned so a spec or a live check can read it. */
+export interface ReactionPass {
+  /** `/fapi/v1/klines` requests made. Never more than `MAX_VENUE_CALLS_PER_PASS`. */
+  venueCalls: number;
+  /** Their documented weight (`klinesWeight`), recorded on the shared tracker as each call is made. */
+  venueWeight: number;
+  measured: number;
+  refused: number;
+  /** Left pending with NO row written, for the next pass: over the call cap, over the weight ceiling, or a venue error. */
+  deferred: { callCap: number; weightCeiling: number; venueError: number };
+}
+
 /**
  * IB-027 — computes `news_reactions` for tagged articles (§10).
  *
- * A shell, like the poll: the arithmetic and every refusal rule are in `reaction.ts`, the SQL in
- * `db/pg/reaction-reads.ts`. What is decided here is only **where the price comes from**.
+ * A shell, like the poll: the arithmetic and every refusal rule are in `reaction.ts`, the price
+ * rules in `reaction-prices.ts`, the SQL in `db/pg/reaction-reads.ts`. What is decided here is
+ * **where the price comes from**, and when not to ask.
+ *
+ * **IB-097 (storage ruling S8): the price comes from Binance 1m klines, fetched on demand.**
+ * Nothing writes the 1m candle tape since WD-010. One request per measurement, made only once every
+ * refusal that needs no price has been ruled out (stale story, no spelling, open window), so an
+ * article that refuses anyway costs nothing. Weight and call shape are in `reaction-prices.ts`.
+ *
+ * **A failure to ask is not a refusal.** A venue error, the per-pass cap or the shared weight ceiling
+ * (`WEIGHT_CEILING_1M`, the same one the on-demand reads respect) writes NO row. A stored refusal is
+ * permanent (`pendingReactions` re-offers only `window_not_closed`), so saving one here would turn
+ * a network blip into a reaction that is never measured. With no row the article stays pending and
+ * the next pass asks again.
  *
  * **One venue and market per reaction, stated in the row.** The measurement is taken on the
- * symbol's Binance perp series, because that is the venue whose candles we hold for every universe
- * symbol; the row records `venue`, `market` and the spelling queried so nothing downstream has to
- * assume it. A move measured on one venue and presented as "the asset's reaction" is the «все
- * биржи» error, and the cure is saying which venue rather than averaging.
+ * symbol's Binance perp series; the row records `venue`, `market` and the spelling queried so
+ * nothing downstream has to assume it. A move measured on one venue and presented as "the asset's
+ * reaction" is the «все биржи» error, and the cure is saying which venue rather than averaging.
  */
 @Injectable()
 export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -29,6 +57,8 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
 
   constructor(
     @Inject(DB) private readonly db: Db | null,
+    private readonly perp: PerpRest,
+    private readonly weight: BinanceWeightTracker,
     @Optional() private readonly config?: AppConfigService,
   ) {}
 
@@ -48,57 +78,97 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** One pass over everything pending. Public so a spec can drive it without timers. */
-  async tick(now = Date.now()): Promise<void> {
+  async tick(now = Date.now()): Promise<ReactionPass | null> {
     const db = this.db;
-    if (!db || this.running) return;
+    if (!db || this.running) return null;
     this.running = true;
+    const pass: ReactionPass = {
+      venueCalls: 0, venueWeight: 0, measured: 0, refused: 0,
+      deferred: { callCap: 0, weightCeiling: 0, venueError: 0 },
+    };
     try {
       for (const horizon of HORIZONS) {
-        await this.computeHorizon(db, horizon, now);
+        await this.computeHorizon(db, horizon, now, pass);
       }
+      const { callCap, weightCeiling, venueError } = pass.deferred;
+      if (pass.venueCalls + pass.measured + pass.refused + callCap + weightCeiling + venueError > 0) {
+        this.logger.log(
+          `pass: ${pass.measured} measured, ${pass.refused} refused; ${pass.venueCalls} klines calls, ` +
+            `weight ${pass.venueWeight}; left for the next pass: ${callCap} over the call cap, ` +
+            `${weightCeiling} over the weight ceiling, ${venueError} venue errors`,
+        );
+      }
+      return pass;
     } catch (error) {
       this.logger.error(`reaction pass failed — ${(error as Error).message}`);
+      return pass;
     } finally {
       this.running = false;
     }
   }
 
-  private async computeHorizon(db: Db, horizon: Horizon, now: number): Promise<void> {
+  private async computeHorizon(db: Db, horizon: Horizon, now: number, pass: ReactionPass): Promise<void> {
     const pending = await pendingReactions(db, horizon);
-    let measured = 0;
-    let refused = 0;
 
     for (const item of pending) {
       const scope = this.scopeFor(item.symbol);
       // the anchor is our first-seen instant by default; `computeReaction` owns that choice, and
       // the window must agree with it, so it is derived from the same place
-      const anchorAt = item.firstSeenAt;
-      const window = reactionWindow(anchorAt, horizon);
-      const windowClosed = now >= window.to.getTime();
-
-      const reaction = computeReaction({
+      const window = reactionWindow(item.firstSeenAt, horizon);
+      const base = {
         horizon,
         publishedAt: item.publishedAt,
         firstSeenAt: item.firstSeenAt,
         symbolSpelling: scope?.spelling ?? null,
-        windowClosed,
-        // only asked once the window has closed: coverage of a window still being collected is not
-        // a meaningful question, and asking would make an open window look like a holed one
-        windowCovered: scope !== null && windowClosed
-          ? (await windowCoverage(db, scope, window.from, window.to)).covered
-          : false,
-        priceAtAnchor: scope !== null && windowClosed ? await closeAtOrBefore(db, scope, window.from) : null,
-        priceAtHorizon: scope !== null && windowClosed ? await closeAtOrBefore(db, scope, window.to) : null,
+        windowClosed: now >= window.to.getTime(),
         othersInWindow: await othersInWindow(db, item.symbol, item.newsId, window.from, window.to),
-      });
+      };
+
+      // First without prices. Every refusal that needs none (stale, no spelling, open window) comes
+      // before `window_not_covered` in computeReaction's order, so reaching that one means "only the
+      // price is missing", and only then is the venue asked.
+      let reaction: Reaction = computeReaction({ ...base, windowCovered: false, priceAtAnchor: null, priceAtHorizon: null });
+      if (reaction.refused === 'window_not_covered' && scope !== null) {
+        const bars = await this.fetchBars(scope, window, now, pass);
+        if (bars === null) continue; // no row: still pending, asked again next pass
+        reaction = computeReaction({
+          ...base,
+          windowCovered: windowCoverage(bars, window.from, window.to).covered,
+          priceAtAnchor: closeAtOrBefore(bars, window.from),
+          priceAtHorizon: closeAtOrBefore(bars, window.to),
+        });
+      }
 
       await saveReaction(db, item.newsId, item.symbol, scope ?? this.unknownScope(item.symbol), reaction);
-      if (reaction.returnPct === null) refused += 1;
-      else measured += 1;
+      if (reaction.returnPct === null) pass.refused += 1;
+      else pass.measured += 1;
     }
+  }
 
-    if (pending.length > 0) {
-      this.logger.log(`${horizon}: ${measured} measured, ${refused} refused of ${pending.length} pending`);
+  /** The window's closed 1m bars from the venue, or null when the pass must not or could not ask. */
+  private async fetchBars(
+    scope: PriceScope, window: { from: Date; to: Date }, now: number, pass: ReactionPass,
+  ): Promise<ReactionBar[] | null> {
+    if (pass.venueCalls >= MAX_VENUE_CALLS_PER_PASS) {
+      pass.deferred.callCap += 1;
+      return null;
+    }
+    if (this.weight.used1m() > WEIGHT_CEILING_1M) {
+      pass.deferred.weightCeiling += 1;
+      return null;
+    }
+    const request = klinesRequest(window);
+    const weight = klinesWeight(request.limit);
+    pass.venueCalls += 1;
+    pass.venueWeight += weight;
+    this.weight.recordCall(weight);
+    try {
+      const rows = await this.perp.klinesRange(scope.spelling, request.startTime, request.endTime, request.limit);
+      return closedBars(barsFromKlines(rows), now);
+    } catch (error) {
+      pass.deferred.venueError += 1;
+      this.logger.warn(`klines for ${scope.spelling} failed, no row written, retried next pass — ${(error as Error).message}`);
+      return null;
     }
   }
 

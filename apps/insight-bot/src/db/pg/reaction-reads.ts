@@ -5,9 +5,9 @@ import type { Horizon } from '../../news/reaction';
 /**
  * IB-027 — the reads behind `news_reactions`. SQL lives in `src/db/pg/` (IB-004).
  *
- * Every function here is scoped to **one venue, one market and that venue's own spelling**. The
- * asset tag is a canonical symbol and the price tables hold each venue's spelling, so a read
- * matching the canonical string is IB-BUG-011 for a third time.
+ * IB-097: the PRICE reads are gone from here. Reactions take their prices from Binance 1m klines on
+ * demand (`news/reaction-prices.ts`); what stays is news-only SQL. `PriceScope` stays as the
+ * venue / market / spelling stamp the stored row carries.
  */
 
 export interface PriceScope {
@@ -15,63 +15,6 @@ export interface PriceScope {
   spelling: string;
   venue: string;
   market: Market;
-}
-
-/**
- * The last close at or before `at`, in that venue's own series.
- *
- * At-or-before rather than nearest: a reaction anchored at 12:00:30 must use the 12:00 bar, not the
- * 12:01 one, or the "before" price already contains part of the move being measured.
- */
-export async function closeAtOrBefore(db: Db, scope: PriceScope, at: Date): Promise<number | null> {
-  const rows = await db.query<{ close: string }>(
-    `select close
-       from candles_1m
-      where venue = $1 and market = $2 and symbol = $3 and open_time <= $4
-      order by open_time desc
-      limit 1`,
-    [scope.venue, scope.market, scope.spelling, at],
-  );
-  return rows.length === 0 ? null : Number(rows[0].close);
-}
-
-export interface WindowCoverage {
-  /** Bars actually stored inside the window, for this venue and market. */
-  present: number;
-  /** Bars the window should contain: one per minute. */
-  expected: number;
-  covered: boolean;
-}
-
-/**
- * Whether the price series itself is whole across the window, **for this venue and market**.
- *
- * This counts the bars the reaction will actually read rather than consulting a global coverage
- * figure, which makes it per-venue by construction: a window covered on Bybit cannot vouch for one
- * measured on OKX. It also subsumes the collector's own gap records — a recorded gap means missing
- * bars, and an unrecorded hole still shows up here — so the check cannot pass on the strength of
- * bookkeeping that happens to be clean.
- *
- * Binance publishes a kline per minute whether or not anything traded, so `expected` is simply the
- * window's minutes; a venue that omits empty minutes would need its own rule, and none of the three
- * we collect does.
- */
-export async function windowCoverage(
-  db: Db,
-  scope: PriceScope,
-  from: Date,
-  to: Date,
-): Promise<WindowCoverage> {
-  const expected = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60_000));
-  const rows = await db.query<{ n: string }>(
-    `select count(*) n
-       from candles_1m
-      where venue = $1 and market = $2 and symbol = $3
-        and open_time >= $4 and open_time < $5`,
-    [scope.venue, scope.market, scope.spelling, from, to],
-  );
-  const present = Number(rows[0]?.n ?? 0);
-  return { present, expected, covered: expected > 0 && present >= expected };
 }
 
 /**

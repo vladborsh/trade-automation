@@ -29,6 +29,16 @@ export class PerpRest extends BinanceRest {
     return this.get<BinanceRestKline[]>(`/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=${limit}`);
   }
 
+  /**
+   * IB-097: 1m klines with open time in `[startTime, endTime]`, at most `limit` rows, oldest first.
+   * Weight by `limit` per the Binance docs (`news/reaction-prices.ts` `klinesWeight`).
+   */
+  async klinesRange(symbol: string, startTime: number, endTime: number, limit: number): Promise<BinanceRestKline[]> {
+    return this.get<BinanceRestKline[]>(
+      `/fapi/v1/klines?symbol=${symbol}&interval=1m&startTime=${startTime}&endTime=${endTime}&limit=${limit}`,
+    );
+  }
+
   /** Mark price, index price and predicted funding for EVERY symbol in one call (weight 10). */
   async premiumIndex(): Promise<PremiumIndexRow[]> {
     const body = await this.get<PremiumIndexRow[] | PremiumIndexRow>('/fapi/v1/premiumIndex');

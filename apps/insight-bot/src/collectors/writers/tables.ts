@@ -13,48 +13,6 @@ export type LongShortKind = 'global_account' | 'top_account' | 'top_position' | 
 /** The side LIQUIDATED — normalised at the mapper, never the venue's raw order side (§3.3). */
 export type LiquidationSide = 'long' | 'short';
 
-/**
- * `candles_1m` — NO collector writes it since WD-010 (the kline streams went with the storage
- * ruling). The spec stays because the news hold (owner, 2026-11-03) keeps the news reaction reads,
- * which read this table, and their specs seed it. Remove together with news (WD-006/owner decision).
- */
-export interface Candle1mRow {
-  venue: string;
-  market: Market;
-  symbol: string;
-  openTime: Date;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  quoteVolume?: number | null;
-  trades?: number | null;
-  takerBuyVolume?: number | null;
-  takerBuyQuoteVolume?: number | null;
-  source: Source;
-}
-
-export const CANDLES_1M: TableSpec = {
-  table: 'candles_1m',
-  columns: [
-    'venue', 'market', 'symbol', 'open_time',
-    'open', 'high', 'low', 'close', 'volume',
-    'quote_volume', 'trades', 'taker_buy_volume', 'taker_buy_quote_volume', 'source',
-  ],
-  conflict: ['venue', 'market', 'symbol', 'open_time'],
-};
-
-export function candle1mTuple(row: Candle1mRow): unknown[] {
-  return [
-    row.venue, row.market, row.symbol, row.openTime,
-    row.open, row.high, row.low, row.close, row.volume,
-    row.quoteVolume ?? null, row.trades ?? null, row.takerBuyVolume ?? null, row.takerBuyQuoteVolume ?? null,
-    row.source,
-  ];
-}
-
-
 export interface OpenInterestRow {
   venue: string;
   symbol: string;

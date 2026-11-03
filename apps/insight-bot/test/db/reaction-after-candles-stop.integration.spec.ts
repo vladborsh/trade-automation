@@ -1,23 +1,26 @@
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
+import type { BinanceRestKline } from '@trade-automation/binance-client';
 import { BatchWriter } from '../../src/collectors/writers/batch-writer';
-import * as t from '../../src/collectors/writers/tables';
 import type { AppConfigService } from '../../src/config/config.service';
-import { closeAtOrBefore } from '../../src/db/pg/reaction-reads';
 import { runMigrations } from '../../src/db/migration-runner';
-import { PartitionMaintenanceService } from '../../src/db/partitions.service';
+import { buildCreatePartition, monthsBetween, partitionsFor } from '../../src/db/partitions';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { ReactionService } from '../../src/news/reaction.service';
+import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
+import type { PerpRest } from '../../src/venues/binance/perp.rest';
+import * as retired from './retired-tables';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
- * WD-010 + the news hold (Tech Lead decision (c), 2026-11-03). WD-010 stops writing `candles_1m`;
- * news stays, and its reactions read `candles_1m`. The condition: a story AFTER the last stored
- * candle must get an explicit refusal for every horizon — never a number computed from the old
- * rows (an older close IS still there, which is exactly the trap), and never 0.
+ * WD-010 stopped writing `candles_1m`; under the news hold every reaction after that refused
+ * `window_not_covered` (this file pinned it). IB-097 (storage ruling S8) moves the price to on-demand
+ * Binance klines, so this file now pins the NEW path:
  *
- * Positive control in the same database: a story inside the candles is still measured, so a job
- * that refuses everything cannot pass this file.
+ * - a story AFTER the tape stopped is measured, from the venue;
+ * - the old tape is not read at all. Its rows are still in the table (WD-006 drops it, not IB-097)
+ *   and are priced FLAT at 1, while the venue rises 0.1 % a minute, so a reaction that read even one
+ *   tape row would come out different, and one read wholly from it would be 0.
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -28,11 +31,23 @@ const maybeDescribe = DATABASE_URL ? describe : describe.skip;
 
 const DAY = Date.UTC(2026, 5, 1);
 const MIN = 60_000;
-/** The tape stops here, as it will on the box at the WD-010 deploy. */
+/** The tape stopped here, as it did on the box at the WD-010 deploy. */
 const LAST_CANDLE = DAY + 299 * MIN;
 const config = { symbols: [{ id: 'BTCUSDT', binance_perp: 'BTCUSDT' }] } as unknown as AppConfigService;
+const venuePrice = (t: number) => 100 * 1.001 ** ((t - DAY) / MIN);
 
-maybeDescribe('news reactions after candles_1m stops (WD-010, news hold)', () => {
+const venue = {
+  klinesRange: async (_symbol: string, startTime: number, endTime: number, limit: number): Promise<BinanceRestKline[]> => {
+    const rows: BinanceRestKline[] = [];
+    for (let t = startTime; t <= endTime && rows.length < limit; t += MIN) {
+      const c = String(venuePrice(t));
+      rows.push([t, c, c, c, c, '1', t + MIN - 1, '1', 1, '0.5', '0.5', '0']);
+    }
+    return rows;
+  },
+} as unknown as PerpRest;
+
+maybeDescribe('IB-097: news reactions after candles_1m stopped are measured from the venue, never the tape', () => {
   let name: string;
   let admin: Client;
   let db: PgDatabase;
@@ -48,17 +63,17 @@ maybeDescribe('news reactions after candles_1m stops (WD-010, news hold)', () =>
     await admin.query(`create database ${name}`);
     await runMigrations({ connectionString: url.toString() });
     db = new PgDatabase(url.toString());
-    await new PartitionMaintenanceService(db).ensureRange(new Date(DAY), new Date(DAY + 2 * 86_400_000));
 
-    // five hours of 1m bars (00:00 … 04:59), then nothing — the collector is gone
-    const candles = new BatchWriter<t.Candle1mRow>(db, t.CANDLES_1M, t.candle1mTuple);
-    await candles.write(Array.from({ length: 300 }, (_, i) => {
-      const close = 100 * 1.001 ** i;
-      return {
+    // the old tape: five hours of FLAT bars (close 1). The app no longer maintains this table's
+    // partitions, so the spec creates the month itself.
+    const tape = [{ table: 'candles_1m', column: 'open_time' }];
+    for (const p of partitionsFor(monthsBetween(new Date(DAY), new Date(DAY)), tape)) await db.query(buildCreatePartition(p, tape));
+    await new BatchWriter<retired.Candle1mRow>(db, retired.CANDLES_1M, retired.candle1mTuple).write(
+      Array.from({ length: 300 }, (_, i) => ({
         venue: 'binance', market: 'perp' as const, symbol: 'BTCUSDT', openTime: new Date(DAY + i * MIN),
-        open: close, high: close, low: close, close, volume: 1, source: 'archive' as const,
-      };
-    }));
+        open: 1, high: 1, low: 1, close: 1, volume: 1, source: 'archive' as const,
+      })),
+    );
 
     const story = async (id: string, at: number) => {
       await db.query(
@@ -68,11 +83,10 @@ maybeDescribe('news reactions after candles_1m stops (WD-010, news hold)', () =>
       );
       await db.query(`insert into news_assets (news_id, symbol, via, matched) values ($1,'BTCUSDT','ticker','BTC')`, [id]);
     };
-    await story('before', DAY + 10 * MIN); // inside the tape: the positive control
-    await story('after', LAST_CANDLE + 61 * MIN); // an hour after the last candle
+    await story('inside', DAY + 10 * MIN); // inside the old tape's hours
+    await story('after', LAST_CANDLE + 61 * MIN); // an hour after the last stored candle
 
-    // "now" is well past every horizon of both stories
-    await new ReactionService(db, config).tick(DAY + 12 * 3_600_000);
+    await new ReactionService(db, venue, new BinanceWeightTracker(), config).tick(DAY + 12 * 3_600_000);
   }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -84,25 +98,26 @@ maybeDescribe('news reactions after candles_1m stops (WD-010, news hold)', () =>
     db.query<{ horizon: string; return_pct: string | null; refused: string | null }>(
       `select horizon, return_pct, refused from news_reactions where news_id = $1 order by horizon`, [id],
     );
+  const minutes: Record<string, number> = { '15m': 15, '1h': 60, '4h': 240 };
 
-  it('the trap is real: an older close IS available for a time after the last candle', async () => {
-    const stale = await closeAtOrBefore(db, { venue: 'binance', market: 'perp', spelling: 'BTCUSDT' } as never, new Date(LAST_CANDLE + 61 * MIN));
-    expect(stale).not.toBeNull(); // a naive "close at or before" would happily price the story from it
+  it('the trap is set: the old tape is still there, flat, under both stories', async () => {
+    const [n] = await db.query<{ n: number }>(`select count(*)::int n from candles_1m where close = 1`, []);
+    expect(n.n).toBe(300);
   });
 
-  it('a story after the last candle: every horizon is an explicit refusal — no number, never 0', async () => {
+  it('a story after the last candle: every horizon is MEASURED from the venue (it used to refuse)', async () => {
     const r = await rows('after');
     expect(r.map((x) => x.horizon).sort()).toEqual(['15m', '1h', '4h']);
     for (const reaction of r) {
-      expect(reaction.refused).toBe('window_not_covered');
-      expect(reaction.return_pct).toBeNull();
+      expect(reaction.refused).toBeNull();
+      expect(Number(reaction.return_pct)).toBeCloseTo((1.001 ** minutes[reaction.horizon] - 1) * 100, 6);
     }
   });
 
-  it('the positive control: a story inside the tape is still measured', async () => {
-    const r = await rows('before');
-    const m15 = r.find((x) => x.horizon === '15m')!;
-    expect(m15.refused).toBeNull();
-    expect(Number(m15.return_pct)).toBeCloseTo((1.001 ** 15 - 1) * 100, 6);
+  it('a story inside the old tape is priced from the venue too: never 0, which is what the flat tape would give', async () => {
+    for (const reaction of await rows('inside')) {
+      expect(reaction.refused).toBeNull();
+      expect(Number(reaction.return_pct)).toBeCloseTo((1.001 ** minutes[reaction.horizon] - 1) * 100, 6);
+    }
   });
 });

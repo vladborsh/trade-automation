@@ -147,8 +147,8 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
     expect(await partitionNames('liquidations')).toEqual(before);
     // WD-010: a table the app no longer writes gets no new months …
     expect(await partitionNames('candles_agg')).not.toContain('candles_agg_2031_02');
-    // … except candles_1m, kept maintained while the news hold lasts (its reaction reads read it)
-    expect(await partitionNames('candles_1m')).toContain('candles_1m_2031_02');
+    // … and since IB-097 neither does candles_1m (news reactions read Binance klines on demand)
+    expect(await partitionNames('candles_1m')).not.toContain('candles_1m_2031_02');
   });
 
   /** Creates `from..to`'s months for EVERY partitioned table in the schema (see SCHEMA_PARTITIONED_TABLES). */
