@@ -74,11 +74,11 @@ export class LiquidationsOverviewService {
     /** Injected so the cache's expiry is spec'able without sleeping. `@Optional()` or Nest fails to resolve it. */
     @Optional() private readonly now: () => number = () => Date.now(),
   ) {
-    this.cache = new TtlCache({ now: () => this.now() });
+    this.cache = new TtlCache({ now: () => this.now(), name: 'liquidations' });
   }
 
   async overview(q: OverviewQuery): Promise<WebLiquidationsOverviewResponse> {
-    const key = `${q.period}:${q.topN}:${q.feedMinUsd}:${q.feedLimit}`;
+    const key = `overview:${q.period}:${q.topN}:${q.feedMinUsd}:${q.feedLimit}`;
     // the promise is shared by everyone asking in the same 5 s; a failure is not cached
     return this.cache.getOrLoad(key, OVERVIEW_CACHE_MS, () => this.compute(q, this.now()));
   }

@@ -23,7 +23,7 @@ import { TtlCache } from './ttl-cache';
   imports: [AppConfigModule],
   providers: [
     BinanceWeightTracker,
-    { provide: TtlCache, useFactory: () => new TtlCache() },
+    { provide: TtlCache, useFactory: () => new TtlCache({ name: 'venues' }) },
     {
       provide: FuturesDataClient,
       inject: [AppConfigService, BinanceWeightTracker],

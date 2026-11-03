@@ -1,3 +1,4 @@
+import { registerCache } from '../../ops/cache-registry';
 import { HttpException, Logger } from '@nestjs/common';
 import { BINANCE_INVALID_SYMBOL } from '../../venues/binance/rest.base';
 import { BinanceHttpError, type BinanceRestKline } from '@trade-automation/binance-client';
@@ -102,6 +103,7 @@ export class CandlesService {
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.now = options.now ?? Date.now;
     this.cache = new LruCache(options.maxPages ?? CACHE_MAX_PAGES);
+    registerCache('candles', this.cache);
   }
 
   /** The candles in `[fromMs, toMs)`, oldest first. Throws the wire error the route should answer. */

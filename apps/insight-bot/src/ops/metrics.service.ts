@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as client from 'prom-client';
+import { cacheSnapshot } from './cache-registry';
 import { StreamRegistry } from './stream-registry';
 
 /**
@@ -90,6 +91,35 @@ export class MetricsService {
       registers: [this.registry],
       collect() {
         this.set(self.getBinanceWeightUsed1m());
+      },
+    });
+
+    // IB-096: where the memory is — the process split and each cache's entries, read at scrape time
+    new client.Gauge({
+      name: 'ib_process_memory_bytes',
+      help: 'process.memoryUsage(): rss, heap_total, heap_used, external, array_buffers',
+      labelNames: ['kind'],
+      registers: [this.registry],
+      collect() {
+        const m = process.memoryUsage();
+        this.set({ kind: 'rss' }, m.rss);
+        this.set({ kind: 'heap_total' }, m.heapTotal);
+        this.set({ kind: 'heap_used' }, m.heapUsed);
+        this.set({ kind: 'external' }, m.external);
+        this.set({ kind: 'array_buffers' }, m.arrayBuffers);
+      },
+    });
+    new client.Gauge({
+      name: 'ib_cache_entries',
+      help: 'Entries held per in-memory cache and key family; state=expired are past their TTL but not yet dropped',
+      labelNames: ['cache', 'family', 'state'],
+      registers: [this.registry],
+      collect() {
+        this.reset();
+        for (const s of cacheSnapshot()) {
+          this.set({ cache: s.cache, family: s.family, state: 'live' }, s.entries - s.expired);
+          this.set({ cache: s.cache, family: s.family, state: 'expired' }, s.expired);
+        }
       },
     });
 

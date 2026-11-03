@@ -1,3 +1,4 @@
+import { familyStats, type CacheStats, type InspectableCache } from '../../ops/cache-registry';
 import { WEB_MAX_CANDLE_BARS, type WebCandle, type WebMarket, type WebTimeframe } from '@trade-automation/contracts';
 import { floorToGrid, timeframeMs } from '../series/range';
 
@@ -111,7 +112,7 @@ export interface CachedPage {
 }
 
 /** A small least-recently-used map: a `Map` keeps insertion order, so the first key is the oldest. */
-export class LruCache<V> {
+export class LruCache<V> implements InspectableCache {
   private readonly map = new Map<string, V>();
 
   constructor(private readonly maxEntries: number) {}
@@ -135,5 +136,10 @@ export class LruCache<V> {
 
   get size(): number {
     return this.map.size;
+  }
+
+  /** IB-096: entries per key family, for `/metrics`. */
+  stats(): CacheStats[] {
+    return familyStats(this.map.entries());
   }
 }

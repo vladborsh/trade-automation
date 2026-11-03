@@ -1,3 +1,5 @@
+import { familyStats, registerCache, type CacheStats, type InspectableCache } from '../ops/cache-registry';
+
 /**
  * WD-008 — the on-demand layer's one cache: bounded, in memory, per process. Nothing it holds is
  * written anywhere; a restart starts cold, which is fine because every entry is a venue answer that
@@ -26,9 +28,11 @@ interface Entry<V> {
 export interface TtlCacheOptions {
   maxEntries?: number;
   now?: () => number;
+  /** IB-096: registered under this name for `/metrics` (entries per key family). */
+  name?: string;
 }
 
-export class TtlCache {
+export class TtlCache implements InspectableCache {
   private readonly entries = new Map<string, Entry<unknown>>();
   private readonly inFlight = new Map<string, Promise<unknown>>();
   private readonly maxEntries: number;
@@ -40,6 +44,13 @@ export class TtlCache {
     if (!Number.isInteger(this.maxEntries) || this.maxEntries < 1) {
       throw new Error(`maxEntries must be a positive integer, got ${this.maxEntries}`);
     }
+    if (options.name) registerCache(options.name, this);
+  }
+
+  /** IB-096: entries per key family, and how many are expired but still held (dropped only on read). */
+  stats(): CacheStats[] {
+    const now = this.now();
+    return familyStats(this.entries.entries(), (e) => e.expiresAt <= now);
   }
 
   get size(): number {
