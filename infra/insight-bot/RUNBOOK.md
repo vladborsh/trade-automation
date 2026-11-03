@@ -98,13 +98,14 @@ aws ssm put-parameter --region ap-northeast-1 --type SecureString --overwrite \
 | `/insight-bot/TELEGRAM_BOT_TOKEN` | токен бота, выдаёт @BotFather |
 | `/insight-bot/TELEGRAM_SERVICE_CHAT_ID` | id служебного чата: туда идут тревоги и утренний отчёт |
 | `/insight-bot/ADMIN_TG_USER_ID` | Telegram id администратора |
-| `/insight-bot/TELEGRAM_BOT_USERNAME` | имя продового бота без `@` — по нему кнопка «Log in with Telegram» понимает, какой бот её подписывает |
-| `/insight-bot/WEB_BASE_URL` | адрес сайта: `https://<домен>` (без `/` в конце). Без него бот не выдаёт ссылки для входа |
+| `/insight-bot/TELEGRAM_BOT_USERNAME` | имя продового бота без `@` — страница входа подсказывает, какому боту написать `/password` |
+| `/insight-bot/WEB_BASE_URL` | адрес сайта: `https://<домен>` (без `/` в конце). Без него бот не выдаёт ссылки для установки пароля (`/password`) |
 | `/insight-bot/WEB_COOKIE_SECURE` | `true` — cookie входа ходит только по https |
+| `/insight-bot/CLIENT_IP_HEADER` | `x-real-ip` — из какого заголовка брать адрес посетителя для защиты от подбора пароля и журнала входов. Caddy этот заголовок **перезаписывает**, поэтому посетитель не может его подделать. Без параметра берётся адрес соединения (на сервере это был бы адрес Caddy — все посетители выглядели бы одним) |
 | `/insight-bot/CF_TUNNEL_TOKEN` | токен туннеля Cloudflare (§11, шаг 2). **В `.env` приложения не попадает:** `render-env.sh` кладёт его отдельно в `cloudflared.env` |
 | `/insight-bot/WEB_PUSH_VAPID_PUBLIC`, `…_PRIVATE`, `…_SUBJECT` | ключи для push-уведомлений в браузере (§11, шаг 5). Все три вместе или ни одного — иначе приложение не запустится |
 
-`WEB_BASE_URL` и `WEB_COOKIE_SECURE` — не секреты, но лежат там же, чтобы у сервера был один
+`WEB_BASE_URL`, `WEB_COOKIE_SECURE` и `CLIENT_IP_HEADER` — не секреты, но лежат там же, чтобы у сервера был один
 источник настроек.
 
 Посмотреть, какие параметры есть (**значения не печатаются**):
@@ -393,16 +394,14 @@ connection`. Если там `no token` или `Unauthorized` — токен с�
 Cloudflare **1033** — туннель не подключён (вернуться к шагу 2); **502** — туннель есть, но
 приложение не отвечает (`docker compose ps` на сервере).
 
-### Шаг 4. Сказать Telegram, на каком домене кнопка входа
+### Шаг 4. (Больше не нужен) Домен для кнопки Telegram
 
-Без этого кнопка «Log in with Telegram» на странице входа пишет «Bot domain invalid».
+С IB-078 на сайт входят по **логину и паролю**, кнопки «Log in with Telegram» больше нет, поэтому
+`/setdomain` в @BotFather делать не нужно. Пароль участник задаёт по ссылке из бота: она приходит
+сразу после `/start` по приглашению, а позже — по команде `/password` (она же сбрасывает пароль).
+Администратору после первого выката тоже нужно один раз написать боту `/password`.
 
-1. В Telegram открыть **@BotFather** → `/setdomain` → выбрать **продового** бота (не тестового).
-2. Отправить `<домен>` — **без** `https://` и без `/` в конце.
-3. Убедиться, что в SSM есть `/insight-bot/TELEGRAM_BOT_USERNAME` с именем этого бота (без `@`).
-
-**Признак успеха:** BotFather отвечает «Success! Domain updated». На `https://<домен>` видна
-синяя кнопка «Log in with Telegram», и после нажатия Telegram спрашивает подтверждение входа.
+**Признак успеха:** `/password` в боте присылает ссылку `https://<домен>/set-password?t=…`.
 
 ### Шаг 5. Ключи для push-уведомлений (VAPID)
 

@@ -31,12 +31,16 @@ export interface UsersPort {
 }
 
 /**
- * IB-029 — issuing a dashboard login link. Optional so the bot still works with no web
- * surface configured, and so IB-021's specs need not know about the dashboard.
+ * IB-078 — the site's credentials links (password-login design P1, P2). Optional so the bot still
+ * works with no web surface configured, and so IB-021's specs need not know about the dashboard.
  */
 export interface WebAuthPort {
-  /** The full login URL, or null when WEB_BASE_URL is unset. */
-  createLoginLink(userId: number): Promise<string | null>;
+  /** A one-time set-up / reset link (deleting the member's unused ones), or null when WEB_BASE_URL is unset. */
+  createCredentialsLink(userId: number): Promise<string | null>;
+  /** Whether the member already has a login: decides "set" vs "reset" wording. */
+  hasCredentials(userId: number): Promise<boolean>;
+  /** The site address `/web` answers with; null when the dashboard is not configured. */
+  siteUrl: string | null;
   loginTokenTtlMs: number;
 }
 
@@ -120,6 +124,36 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
       return;
     }
     await reply(ctx, T.welcome(ctx.from?.first_name ?? null), result.user.lang);
+    // P2: a new member gets the set-up link straight away (when the site is configured at all)
+    await sendCredentialsLink(ctx, result.user, { quietWhenUnconfigured: true });
+  }
+
+  /**
+   * IB-078 P1/P2 — the one link the bot sends. As HTML with an inline button and a bare URL
+   * underneath (IB-BUG-008); if Telegram refuses the rich message the plain text goes instead, so the
+   * person always ends up with something they can copy.
+   */
+  async function sendCredentialsLink(ctx: Context, user: User, opts: { quietWhenUnconfigured: boolean }): Promise<void> {
+    const lang = user.lang;
+    const link = deps.web ? await deps.web.createCredentialsLink(user.id) : null;
+    if (!link) {
+      if (!opts.quietWhenUnconfigured) await reply(ctx, T.WEB_NOT_CONFIGURED, lang);
+      return;
+    }
+    const web = deps.web as WebAuthPort;
+    const reset = await web.hasCredentials(user.id);
+    const minutes = Math.round(web.loginTokenTtlMs / 60_000);
+    try {
+      await ctx.reply(T.pick(T.credentialsLink(link, minutes, reset), lang), {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+        reply_markup: { inline_keyboard: [[{ text: T.pick(T.credentialsButton(reset), lang), url: link }]] },
+      });
+    } catch (error) {
+      // Telegram rejects some URLs in buttons (BUTTON_URL_INVALID); logged, because it should be fixed
+      deps.logger?.warn(`credentials link: Telegram refused the rich message, falling back to plain text: ${(error as Error).message}`);
+      await reply(ctx, T.credentialsLinkPlain(link, minutes, reset), lang);
+    }
   }
 
   async function handleMemberCommand(ctx: Context, command: string, args: string[], user: User): Promise<void> {
@@ -188,36 +222,15 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         return;
       }
       case 'web': {
-        // §4: refuse rather than send a link to nowhere
-        const link = deps.web ? await deps.web.createLoginLink(user.id) : null;
-        if (!link) { await reply(ctx, T.WEB_NOT_CONFIGURED, lang); return; }
-
-        // IB-BUG-008: sent as HTML with an inline button, because Telegram does not auto-link a
-        // URL with no TLD and the user could not tap it. Three routes to the same ONE token —
-        // button, anchor, bare URL — so a client that renders none of the first two still
-        // works, and single use is unaffected.
-        //
-        // Measured 2026-10-07: Telegram REJECTS `localhost` in a button ("Wrong HTTP URL") and
-        // accepts `127.0.0.1` in both forms, which is why WEB_BASE_URL uses the latter. One
-        // probe per variant — a note, not a rule.
-        const minutes = Math.round((deps.web as WebAuthPort).loginTokenTtlMs / 60_000);
-        const text = T.pick(T.webLink(link, minutes), lang);
-        try {
-          await ctx.reply(text, {
-            parse_mode: 'HTML',
-            link_preview_options: { is_disabled: true },
-            reply_markup: { inline_keyboard: [[{ text: T.pick(T.WEB_BUTTON, lang), url: link }]] },
-          });
-        } catch (error) {
-          // Telegram rejects some URLs in buttons (BUTTON_URL_INVALID) and may refuse a
-          // host it does not consider a URL at all. Falling back to the plain text keeps the
-          // person able to copy the link rather than getting nothing; the failure is logged
-          // because it is the kind of thing that should be fixed, not silently absorbed.
-          deps.logger?.warn(`/web: Telegram refused the rich message, falling back to plain text: ${(error as Error).message}`);
-          await reply(ctx, T.webLinkPlain(link, minutes), lang);
-        }
+        // P2: no longer a way in — the site address and how to get a password
+        const site = deps.web?.siteUrl ?? null;
+        await reply(ctx, site ? T.webHint(site) : T.WEB_NOT_CONFIGURED, lang);
         return;
       }
+      case 'password':
+        // P2: any member, any time — set up or reset; the newest link is the only one that works
+        await sendCredentialsLink(ctx, user, { quietWhenUnconfigured: false });
+        return;
       case 'users': {
         if (user.role !== 'admin') { await reply(ctx, T.ADMIN_ONLY, lang); return; }
         const rows = await deps.users.listUsers();

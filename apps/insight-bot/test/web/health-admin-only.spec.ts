@@ -4,6 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { WebAuthGuard, type RequestWithUser } from '../../src/web/auth/web-auth.guard';
 import { SESSION_COOKIE_NAME } from '../../src/web/auth/session-cookie';
 import { WebHealthController } from '../../src/web/health.controller';
+import { WebAdminController } from '../../src/web/admin/login-events.controller';
 import type { User } from '../../src/users/user.model';
 
 /**
@@ -72,6 +73,38 @@ describe('IB-075: /api/web/health/* is admin-only', () => {
     for (const route of routes) {
       await expect(guardFor(null).canActivate(contextFor(route, false))).rejects.toThrow(UnauthorizedException);
       await expect(guardFor(null).canActivate(contextFor(route, true))).rejects.toThrow(UnauthorizedException);
+    }
+  });
+});
+
+/**
+ * IB-078 P10 — the login journal is admin-only as a whole controller: `login_attempted` can be a
+ * password typed into the login box. Same construction as above: the REAL guard reads the REAL
+ * controller's metadata for every route Nest knows on it.
+ */
+describe('IB-078: /api/web/admin/* is admin-only', () => {
+  const adminBase = Reflect.getMetadata(PATH_METADATA, WebAdminController) as string;
+  const adminRoutes = Object.getOwnPropertyNames(WebAdminController.prototype)
+    .map((name) => (WebAdminController.prototype as unknown as Record<string, unknown>)[name])
+    .filter((h): h is () => unknown => typeof h === 'function' && Reflect.getMetadata(METHOD_METADATA, h) !== undefined)
+    .map((handler) => ({ handler, path: `/${adminBase}/${Reflect.getMetadata(PATH_METADATA, handler) as string}` }));
+  const ctxFor = (route: (typeof adminRoutes)[number]): ExecutionContext => {
+    const request: RequestWithUser = { url: route.path, headers: { cookie: `${SESSION_COOKIE_NAME}=tok` } };
+    return {
+      getHandler: () => route.handler,
+      getClass: () => WebAdminController,
+      switchToHttp: () => ({ getRequest: () => request, getResponse: () => ({ setHeader: jest.fn() }) }),
+    } as unknown as ExecutionContext;
+  };
+
+  it('finds exactly the journal route', () => {
+    expect(adminRoutes.map((r) => r.path)).toEqual(['/api/web/admin/login-events']);
+  });
+
+  it('a member gets 403, an admin is let through', async () => {
+    for (const route of adminRoutes) {
+      await expect(guardFor(member).canActivate(ctxFor(route))).rejects.toThrow(ForbiddenException);
+      await expect(guardFor(admin).canActivate(ctxFor(route))).resolves.toBe(true);
     }
   });
 });

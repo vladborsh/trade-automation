@@ -152,55 +152,60 @@ export function userList(rows: ReadonlyArray<{ tgUserId: number; role: string; d
 }
 
 /**
- * IB-BUG-008 — the sign-in message, as **HTML** so the link is tappable.
+ * IB-078 (password-login design P1, P2) — the bot's one link: set up or reset the site password. It
+ * never signs anyone in; the person then logs in on the site with what they chose.
  *
- * Telegram auto-links bare URLs only when they look like URLs to it, and
- * `http://localhost:3005/...` has no TLD, so the user got plain text they could not tap. An
- * explicit `<a href>` works regardless of auto-linking.
- *
- * **Measured against the real API on 2026-10-07** (one probe per variant, so a note rather than
- * a rule — AGENTS.md's repetition bar is five, and this was four messages total):
+ * Sent as **HTML with an inline button** (IB-BUG-008): Telegram does not auto-link a URL with no
+ * TLD, so an explicit `<a href>` is what makes it tappable. **Measured against the real API on
+ * 2026-10-07** (one probe per variant, so a note rather than a rule):
  *
  * | variant | `localhost` | `127.0.0.1` |
  * |---|---|---|
  * | HTML anchor | accepted | accepted |
  * | inline button | **rejected**, "Wrong HTTP URL" | accepted |
  *
- * Hence `WEB_BASE_URL=http://127.0.0.1:3005`: it is the only host of the two that gets a real
- * tap target rather than a fallback. Both the try/catch and the plain-URL line stay anyway —
- * they cost nothing, and the next client or the next Telegram change is not ours to predict.
- *
- * The bare URL stays underneath on its own line: a client that renders neither the anchor nor
- * the button still leaves something copyable, and the whole point is that the person gets in.
- *
- * **The token appears twice** (anchor and fallback, plus the button the caller attaches) and
- * that is safe: it is ONE token, so the single-use rule is untouched — whichever copy is opened
- * spends the same row, and the second attempt gets `TOKEN_USED`.
+ * The bare URL stays underneath on its own line: a client that renders neither the anchor nor the
+ * button still leaves something copyable. The token appears more than once, and that is safe: it is
+ * ONE token, so whichever copy is opened spends the same row.
  */
-export function webLink(url: string, minutes: number): Texts {
+export function credentialsLink(url: string, minutes: number, reset: boolean): Texts {
   const a = `<a href="${escapeHtml(url)}">`;
   return {
-    ru: `Вход в панель (ссылка одноразовая, действует ${minutes} мин):\n${a}Открыть панель</a>\n\n${escapeHtml(url)}`,
-    en: `Dashboard sign-in (single-use link, valid for ${minutes} min):\n${a}Open the dashboard</a>\n\n${escapeHtml(url)}`,
+    ru: reset
+      ? `Сброс пароля для сайта (ссылка одноразовая, действует ${minutes} мин):\n${a}Задать новый пароль</a>\n\n${escapeHtml(url)}`
+      : `Пароль для сайта (ссылка одноразовая, действует ${minutes} мин). Придумайте логин и пароль — потом входите на сайт с ними:\n${a}Задать логин и пароль</a>\n\n${escapeHtml(url)}`,
+    en: reset
+      ? `Reset your site password (single-use link, valid for ${minutes} min):\n${a}Set a new password</a>\n\n${escapeHtml(url)}`
+      : `Your site password (single-use link, valid for ${minutes} min). Choose a login and a password, then sign in to the site with them:\n${a}Set login and password</a>\n\n${escapeHtml(url)}`,
   };
 }
 
-/**
- * The same message with no markup at all, for the fallback path: if Telegram refuses the HTML
- * or the button, the person must still end up with something they can copy.
- */
-export function webLinkPlain(url: string, minutes: number): Texts {
+/** The same message with no markup at all, for the fallback when Telegram refuses the rich one. */
+export function credentialsLinkPlain(url: string, minutes: number, reset: boolean): Texts {
   return {
-    ru: `Вход в панель (ссылка одноразовая, действует ${minutes} мин):\n${url}`,
-    en: `Dashboard sign-in (single-use link, valid for ${minutes} min):\n${url}`,
+    ru: reset
+      ? `Сброс пароля для сайта (ссылка одноразовая, действует ${minutes} мин):\n${url}`
+      : `Логин и пароль для сайта (ссылка одноразовая, действует ${minutes} мин):\n${url}`,
+    en: reset
+      ? `Reset your site password (single-use link, valid for ${minutes} min):\n${url}`
+      : `Your site login and password (single-use link, valid for ${minutes} min):\n${url}`,
   };
 }
 
 /** The label on the inline button, in the member's language. */
-export const WEB_BUTTON: Texts = {
-  ru: 'Открыть панель',
-  en: 'Open the dashboard',
-};
+export function credentialsButton(reset: boolean): Texts {
+  return reset
+    ? { ru: 'Задать новый пароль', en: 'Set a new password' }
+    : { ru: 'Задать логин и пароль', en: 'Set login and password' };
+}
+
+/** P2: `/web` no longer hands out a link — it says where the site is and how to get a password. */
+export function webHint(siteUrl: string): Texts {
+  return {
+    ru: `Сайт: ${siteUrl}\nВход по логину и паролю. Нет пароля или забыли — /password пришлёт ссылку.`,
+    en: `Site: ${siteUrl}\nSign in with your login and password. No password yet, or forgot it? /password sends a link.`,
+  };
+}
 
 /**
  * Telegram's HTML parse mode needs these three escaped, and only these three. Our URLs are
@@ -211,7 +216,7 @@ export function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** The dashboard is not deployed for this instance — §4: /web refuses rather than guessing. */
+/** The dashboard is not deployed for this instance — §4: /web and /password refuse rather than guess. */
 export const WEB_NOT_CONFIGURED: Texts = {
   ru: 'Веб-панель для этого бота не настроена.',
   en: 'The dashboard is not configured for this bot.',

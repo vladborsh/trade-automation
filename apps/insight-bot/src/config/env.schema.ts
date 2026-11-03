@@ -87,6 +87,11 @@ export const EnvSchema = z.object({
   // `Secure` on the ib_session cookie. Off only for local http development; IB-032 serves the
   // dashboard through a Cloudflare Tunnel (HTTPS), where this must be on.
   WEB_COOKIE_SECURE: booleanFlag(false),
+  // IB-078 H6 (architecture/https-without-domain-2026-11-03.md): the request header the client IP is
+  // read from for the login throttle and journal. Unset = the socket address, and any forwarding
+  // header is ignored (reached directly, anyone can send one). On the box: x-real-ip, which Caddy
+  // overwrites, so a client cannot forge it.
+  CLIENT_IP_HEADER: z.string().optional(),
 
   // IB-069 — browser Web Push for the calendar reminder (VAPID). Generate a pair with
   // `npx web-push generate-vapid-keys`; the keys live only in the slot's .env / SSM, never in git.

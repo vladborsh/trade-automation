@@ -111,7 +111,7 @@ export function sessionTokenFromCookies(header: string | undefined): string | nu
   return value !== undefined && value.length > 0 ? value : null;
 }
 
-/** The dashboard login URL the bot sends. */
-export function loginUrl(webBaseUrl: string, token: string): string {
-  return `${webBaseUrl.replace(/\/+$/, '')}/login?t=${encodeURIComponent(token)}`;
+/** IB-078 P1: the one link the bot sends — set up or reset the password, never a way in. */
+export function credentialsUrl(webBaseUrl: string, token: string): string {
+  return `${webBaseUrl.replace(/\/+$/, '')}/set-password?t=${encodeURIComponent(token)}`;
 }

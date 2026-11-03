@@ -22,6 +22,11 @@ export const WebUserSchema = z.object({
 });
 export type WebUser = z.infer<typeof WebUserSchema>;
 
+/**
+ * IB-029's link exchange. **The server endpoint is gone** (IB-078, password-login design P11); these
+ * two schemas stay exported only because the dashboard's current login page still compiles against
+ * them. IB-079 replaces that page and deletes them.
+ */
 export const WebExchangeRequestSchema = z.object({
   /** The 32 random bytes from the login link, base64url. */
   token: z.string().min(1).max(256),
@@ -50,35 +55,9 @@ export const WebAuthContextSchema = z.object({ botUsername: z.string() });
 export type WebAuthContext = z.infer<typeof WebAuthContextSchema>;
 
 /**
- * IB-072 — the payload the Telegram Login Widget hands to `data-onauth`, posted as-is to
- * `POST /api/web/auth/telegram` (architecture/member-access-design-2026-10-31.md M1–M3).
- *
- * **Unknown fields are kept, not stripped** (`catchall`): Telegram signs every field it sends, so a
- * field it adds tomorrow is part of `data_check_string`, and dropping it here would turn every
- * genuine login into a hash mismatch. Their values are restricted to string | number — the only
- * shapes the widget sends; anything else cannot be put into `key=value` unambiguously.
- */
-export const WebTelegramLoginRequestSchema = z
-  .object({
-    id: z.number().int().positive(),
-    first_name: z.string().max(256),
-    last_name: z.string().max(256).optional(),
-    username: z.string().max(64).optional(),
-    photo_url: z.string().max(2048).optional(),
-    auth_date: z.number().int().positive(),
-    hash: z.string().regex(/^[0-9a-f]{64}$/),
-  })
-  .catchall(z.union([z.string().max(2048), z.number()]));
-export type WebTelegramLoginRequest = z.infer<typeof WebTelegramLoginRequestSchema>;
-
-export const WebTelegramLoginResponseSchema = z.object({ user: WebUserSchema });
-export type WebTelegramLoginResponse = z.infer<typeof WebTelegramLoginResponseSchema>;
-
-/**
- * `NOT_A_MEMBER` (403): a correctly signed Telegram identity with no `users` row. The widget never
- * creates one (M1) — membership comes only from `/invite` + `/start` in the bot — so the page says
- * "by invitation". A *disabled* member gets `TOKEN_INVALID` instead, like the link path.
- * `TELEGRAM_LOGIN_UNAVAILABLE` (503): the server has no `TELEGRAM_BOT_TOKEN`, so it cannot verify.
+ * `NOT_A_MEMBER` and `TELEGRAM_LOGIN_UNAVAILABLE` belonged to IB-072's Telegram widget, which IB-078
+ * deleted from the server (P11); no server route sends them any more. They stay listed until IB-079
+ * removes the dashboard code that still names them.
  */
 export const WEB_AUTH_ERROR_CODES = [
   'TOKEN_INVALID', 'TOKEN_USED', 'TOKEN_EXPIRED', 'UNAUTHENTICATED', 'FORBIDDEN',

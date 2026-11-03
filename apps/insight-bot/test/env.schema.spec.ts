@@ -1,6 +1,11 @@
 import { validateEnv } from '../src/config/env.schema';
 
 describe('validateEnv', () => {
+  it('IB-078 H6: CLIENT_IP_HEADER has no default (socket address) and is kept as given when set', () => {
+    expect(validateEnv({}).CLIENT_IP_HEADER).toBeUndefined();
+    expect(validateEnv({ CLIENT_IP_HEADER: 'x-real-ip' }).CLIENT_IP_HEADER).toBe('x-real-ip');
+  });
+
   it('defaults PORT to the coordinator slot 3005 and coerces a slot port from its string', () => {
     expect(validateEnv({}).PORT).toBe(3005);
     expect(validateEnv({ PORT: '3025' }).PORT).toBe(3025);

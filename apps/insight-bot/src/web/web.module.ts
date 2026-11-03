@@ -8,6 +8,10 @@ import { CalendarController } from './calendar/calendar.controller';
 import { WebAuthController } from './auth/web-auth.controller';
 import { WebAuthGuard } from './auth/web-auth.guard';
 import { WebAuthService } from './auth/web-auth.service';
+import { CredentialsService } from './auth/credentials.service';
+import { LoginGuard } from './auth/login-throttle';
+import { PasswordHasher } from './auth/password';
+import { WebAdminController } from './admin/login-events.controller';
 import { WebContextController } from './context/context.controller';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
@@ -59,12 +63,17 @@ export class WebModule {
       // No guard decorator on any of these — they are authenticated by the APP_GUARD above,
       // which is the whole point of it being module-wide.
       controllers: [
-        WebAuthController, WebHealthController,
+        WebAuthController, WebHealthController, WebAdminController,
         SeriesController, UniverseController, LiquidationsController, WebContextController,
         CalendarController, WebPushController,
       ],
       providers: [
         WebAuthService,
+        // IB-078: one hasher (its ScryptGate is the process-wide cap of 2 concurrent scrypt) and one
+        // throttle (in-memory, per process — P7)
+        { provide: PasswordHasher, useFactory: () => new PasswordHasher() },
+        { provide: LoginGuard, useFactory: () => new LoginGuard() },
+        CredentialsService,
         LiquidationsOverviewService,
         {
           provide: UniverseSummaryService,
@@ -116,7 +125,7 @@ export class WebModule {
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
-      exports: [WebAuthService],
+      exports: [WebAuthService, CredentialsService],
     };
   }
 }

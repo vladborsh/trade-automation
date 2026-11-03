@@ -1,5 +1,5 @@
 import {
-  LOGIN_TOKEN_TTL_MS, loginUrl, newOpaqueToken, parseCookieHeader, SESSION_COOKIE_NAME,
+  LOGIN_TOKEN_TTL_MS, credentialsUrl, newOpaqueToken, parseCookieHeader, SESSION_COOKIE_NAME,
   SESSION_REFRESH_AFTER_MS, SESSION_TTL_MS, serializeClearedSessionCookie, serializeSessionCookie,
   sessionTokenFromCookies, sha256Hex, shouldRefreshSession, TOKEN_BYTES,
 } from '../../src/web/auth/session-cookie';
@@ -65,12 +65,12 @@ describe('tokens', () => {
   });
 
   it('builds the login URL without doubling the slash', () => {
-    expect(loginUrl('https://d.example.com', 'tok')).toBe('https://d.example.com/login?t=tok');
-    expect(loginUrl('https://d.example.com/', 'tok')).toBe('https://d.example.com/login?t=tok');
+    expect(credentialsUrl('https://d.example.com', 'tok')).toBe('https://d.example.com/set-password?t=tok');
+    expect(credentialsUrl('https://d.example.com/', 'tok')).toBe('https://d.example.com/set-password?t=tok');
   });
 
   it('URL-encodes the token so a base64url edge case cannot break the link', () => {
-    expect(loginUrl('https://d', 'a+b/c=')).toBe('https://d/login?t=a%2Bb%2Fc%3D');
+    expect(credentialsUrl('https://d', 'a+b/c=')).toBe('https://d/set-password?t=a%2Bb%2Fc%3D');
   });
 });
 

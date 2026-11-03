@@ -45,7 +45,7 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
     ...over,
   };
 
-  let web: { createLoginLink: (userId: number) => Promise<string | null>; loginTokenTtlMs: number } | undefined;
+  let web: { createCredentialsLink: (userId: number) => Promise<string | null>; hasCredentials?: boolean; siteUrl?: string | null; loginTokenTtlMs: number } | undefined;
   let failNext: string | null = null;
   const bot = new Bot('123:FAKE', { botInfo: BOT_INFO });
   bot.api.config.use(async (_prev, method, payload) => {
@@ -60,7 +60,12 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
   });
   registerHandlers(bot, {
     users: port, botUsername: 'insight_test_bot', now: () => new Date('2026-09-28T12:00:00Z'),
-    web: { createLoginLink: (id) => (web ? web.createLoginLink(id) : Promise.resolve(null)), get loginTokenTtlMs() { return web?.loginTokenTtlMs ?? 0; } },
+    web: {
+      createCredentialsLink: (id) => (web ? web.createCredentialsLink(id) : Promise.resolve(null)),
+      hasCredentials: async () => web?.hasCredentials ?? false,
+      get siteUrl() { return web?.siteUrl ?? null; },
+      get loginTokenTtlMs() { return web?.loginTokenTtlMs ?? 0; },
+    },
   });
   return {
     bot, sent, calls, patches, invites,
@@ -215,43 +220,50 @@ describe('member settings', () => {
   });
 });
 
-describe('/web — the dashboard login link (IB-029)', () => {
-  it('sends a single-use link and says how long it lasts', async () => {
+describe('/password — the credentials link (IB-078 P1, P2)', () => {
+  const LINK = 'https://dash.example.com/set-password?t=abc';
+
+  it('sends a single-use SET-UP link to a member with no login, and says how long it lasts', async () => {
     const h = harness({}, { 222: member });
-    h.setWeb({ createLoginLink: async () => 'https://dash.example.com/login?t=abc', loginTokenTtlMs: 600_000 });
-    await h.bot.handleUpdate(text(222, '/web') as never);
-    expect(h.sent[0]).toContain('https://dash.example.com/login?t=abc');
+    h.setWeb({ createCredentialsLink: async () => LINK, hasCredentials: false, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/password') as never);
+    expect(h.sent[0]).toContain(LINK);
     expect(h.sent[0]).toContain('10');
+    expect(h.sent[0]).toContain('Задать логин и пароль');
+    const markup = h.calls.find((c) => c.method === 'sendMessage')?.payload['reply_markup'] as { inline_keyboard: Array<Array<{ text: string; url: string }>> };
+    expect(markup.inline_keyboard[0][0]).toEqual({ text: T.credentialsButton(false).ru, url: LINK });
   });
 
-  it('IB-BUG-008: sends HTML with a tappable anchor AND an inline button, same token', async () => {
+  it('says RESET to a member who already has a login', async () => {
     const h = harness({}, { 222: member });
-    const url = 'http://localhost:3005/login?t=abc';
-    h.setWeb({ createLoginLink: async () => url, loginTokenTtlMs: 600_000 });
-    await h.bot.handleUpdate(text(222, '/web') as never);
+    h.setWeb({ createCredentialsLink: async () => LINK, hasCredentials: true, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/password') as never);
+    expect(h.sent[0]).toContain('Сброс пароля');
+    const markup = h.calls.find((c) => c.method === 'sendMessage')?.payload['reply_markup'] as { inline_keyboard: Array<Array<{ text: string }>> };
+    expect(markup.inline_keyboard[0][0].text).toBe(T.credentialsButton(true).ru);
+  });
+
+  it('IB-BUG-008: HTML with a tappable anchor AND an inline button, ONE token across them', async () => {
+    const h = harness({}, { 222: member });
+    const url = 'http://127.0.0.1:3005/set-password?t=abc';
+    h.setWeb({ createCredentialsLink: async () => url, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/password') as never);
 
     const call = h.calls.find((c) => c.method === 'sendMessage');
     expect(call?.payload['parse_mode']).toBe('HTML');
     expect(String(call?.payload['text'])).toContain(`<a href="${url}">`);
-
-    const markup = call?.payload['reply_markup'] as { inline_keyboard: Array<Array<{ url: string }>> };
-    expect(markup.inline_keyboard[0][0].url).toBe(url);
     expect(String(call?.payload['text'])).toContain(url); // bare URL still underneath
-
-    // ONE token across button, anchor and fallback: single use is untouched
     const tokens = String(call?.payload['text']).match(/t=([A-Za-z0-9_-]+)/g) ?? [];
     expect(new Set(tokens).size).toBe(1);
   });
 
   it('IB-BUG-008: falls back to plain text when Telegram refuses the rich message', async () => {
     const h = harness({}, { 222: member });
-    h.setWeb({ createLoginLink: async () => 'http://localhost:3005/login?t=abc', loginTokenTtlMs: 600_000 });
+    h.setWeb({ createCredentialsLink: async () => 'http://localhost:3005/set-password?t=abc', loginTokenTtlMs: 600_000 });
     h.failNextSendWith('Bad Request: BUTTON_URL_INVALID');
-
-    await h.bot.handleUpdate(text(222, '/web') as never);
-
+    await h.bot.handleUpdate(text(222, '/password') as never);
     const last = h.sent[h.sent.length - 1];
-    expect(last).toContain('http://localhost:3005/login?t=abc');
+    expect(last).toContain('http://localhost:3005/set-password?t=abc');
     expect(last).not.toContain('<a href');
   });
 
@@ -261,16 +273,55 @@ describe('/web — the dashboard login link (IB-029)', () => {
 
   it('refuses when the dashboard is not configured, rather than sending a link to nowhere', async () => {
     const h = harness({}, { 222: member });
-    h.setWeb({ createLoginLink: async () => null, loginTokenTtlMs: 600_000 });
-    await h.bot.handleUpdate(text(222, '/web') as never);
+    h.setWeb({ createCredentialsLink: async () => null, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/password') as never);
     expect(h.sent).toEqual([T.WEB_NOT_CONFIGURED.ru]);
   });
 
   it('is unavailable to a stranger, like everything else', async () => {
     const h = harness();
-    h.setWeb({ createLoginLink: async () => 'https://x/login?t=y', loginTokenTtlMs: 600_000 });
-    await h.bot.handleUpdate(text(999, '/web') as never);
+    let issued = 0;
+    h.setWeb({ createCredentialsLink: async () => { issued++; return 'https://x/set-password?t=y'; }, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(999, '/password') as never);
     expect(h.sent).toEqual([T.UNKNOWN_USER.ru]);
+    expect(issued).toBe(0);
+  });
+});
+
+describe('/start <code> — a new member gets the set-up link right away (IB-078 P2)', () => {
+  it('welcome, then the credentials link', async () => {
+    const h = harness({ consumeInvite: async () => ({ kind: 'joined', user: member }) });
+    h.setWeb({ createCredentialsLink: async () => 'https://d.example.com/set-password?t=abc', loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, `/start ${CODE}`) as never);
+    expect(h.sent).toHaveLength(2);
+    expect(h.sent[0]).toBe(T.pick(T.welcome('X'), member.lang));
+    expect(h.sent[1]).toContain('https://d.example.com/set-password?t=abc');
+  });
+
+  it('without a configured site: the welcome alone, as before', async () => {
+    const h = harness({ consumeInvite: async () => ({ kind: 'joined', user: member }) });
+    h.setWeb({ createCredentialsLink: async () => null, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, `/start ${CODE}`) as never);
+    expect(h.sent).toEqual([T.pick(T.welcome('X'), member.lang)]);
+  });
+});
+
+describe('/web — no longer a way in (IB-078 P2)', () => {
+  it('answers with the site address and the /password hint, and issues NO link', async () => {
+    const h = harness({}, { 222: member });
+    let issued = 0;
+    h.setWeb({ createCredentialsLink: async () => { issued++; return 'x'; }, siteUrl: 'https://dash.example.com', loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/web') as never);
+    expect(h.sent).toEqual([T.webHint('https://dash.example.com').ru]);
+    expect(h.sent[0]).toContain('/password');
+    expect(issued).toBe(0);
+  });
+
+  it('says the site is not configured when it is not', async () => {
+    const h = harness({}, { 222: member });
+    h.setWeb({ createCredentialsLink: async () => null, siteUrl: null, loginTokenTtlMs: 600_000 });
+    await h.bot.handleUpdate(text(222, '/web') as never);
+    expect(h.sent).toEqual([T.WEB_NOT_CONFIGURED.ru]);
   });
 });
 

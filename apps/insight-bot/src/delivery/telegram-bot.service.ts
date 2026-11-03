@@ -3,6 +3,7 @@ import { Bot } from 'grammy';
 import { AppConfigService } from '../config/config.service';
 import { UsersService } from '../users/users.service';
 import { WebAuthService } from '../web/auth/web-auth.service';
+import { CredentialsService } from '../web/auth/credentials.service';
 import { LOGIN_TOKEN_TTL_MS } from '../web/auth/session-cookie';
 import { registerHandlers } from './bot-handlers';
 
@@ -24,6 +25,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     private readonly config: AppConfigService,
     private readonly users: UsersService,
     private readonly webAuth: WebAuthService,
+    private readonly credentials: CredentialsService,
   ) {}
 
   get enabled(): boolean {
@@ -40,7 +42,12 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     const bot = new Bot(token);
     registerHandlers(bot, {
       users: this.users,
-      web: { createLoginLink: (userId) => this.webAuth.createLoginLink(userId), loginTokenTtlMs: LOGIN_TOKEN_TTL_MS },
+      web: {
+        createCredentialsLink: (userId) => this.credentials.createCredentialsLink(userId),
+        hasCredentials: (userId) => this.credentials.hasCredentials(userId),
+        siteUrl: this.webAuth.webBaseUrl,
+        loginTokenTtlMs: LOGIN_TOKEN_TTL_MS,
+      },
       botUsername: this.config.env.get('TELEGRAM_BOT_USERNAME'),
       logger: { warn: (m) => this.logger.warn(m) },
     });

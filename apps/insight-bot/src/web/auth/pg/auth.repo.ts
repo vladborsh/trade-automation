@@ -11,6 +11,7 @@
 
 import type { Db, DbHandle } from '../../../db/db.port';
 import type { User } from '../../../users/user.model';
+import { sweepLoginEvents } from './credentials.repo';
 
 export interface LoginTokenClaim {
   kind: 'ok' | 'used' | 'expired' | 'unknown';
@@ -109,8 +110,10 @@ export async function deleteSessionsForUser(db: DbHandle, userId: number): Promi
 }
 
 /** Housekeeping: neither table should grow forever on a 1 GB box. */
-export async function sweepExpired(db: Db, now: Date): Promise<{ sessions: number; tokens: number }> {
+export async function sweepExpired(db: Db, now: Date): Promise<{ sessions: number; tokens: number; loginEvents: number }> {
   const sessions = await db.query<{ id: string }>('delete from web_sessions where expires_at < $1 returning id', [now]);
   const tokens = await db.query<{ token_hash: string }>('delete from web_login_tokens where expires_at < $1 returning token_hash', [now]);
-  return { sessions: sessions.length, tokens: tokens.length };
+  // IB-078 P10: the login journal keeps 90 days
+  const loginEvents = await sweepLoginEvents(db, now);
+  return { sessions: sessions.length, tokens: tokens.length, loginEvents };
 }

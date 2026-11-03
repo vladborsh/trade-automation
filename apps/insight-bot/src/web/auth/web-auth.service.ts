@@ -1,33 +1,18 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { WebAuthErrorCode } from '@trade-automation/contracts';
 import { AppConfigService } from '../../config/config.service';
 import { DB, type Db } from '../../db/db.port';
 import type { User } from '../../users/user.model';
 import * as repo from './pg/auth.repo';
-import * as usersRepo from '../../users/pg/users.repo';
-import { verifyTelegramLogin, type TelegramLoginFields } from './telegram-login';
-import {
-  LOGIN_TOKEN_TTL_MS, newOpaqueToken, SESSION_TTL_MS, sha256Hex, shouldRefreshSession, loginUrl,
-} from './session-cookie';
+import { newOpaqueToken, SESSION_TTL_MS, sha256Hex, shouldRefreshSession } from './session-cookie';
 
-export type ExchangeOutcome =
-  | OpenedSession
-  | { ok: false; code: Extract<WebAuthErrorCode, 'TOKEN_INVALID' | 'TOKEN_USED' | 'TOKEN_EXPIRED'>; status: 401 | 410 };
-
-type OpenedSession = { ok: true; user: User; token: string; expiresAtMs: number };
-
-export type TelegramLoginOutcome =
-  | OpenedSession
-  | { ok: false; code: 'TOKEN_INVALID'; status: 401 }
-  | { ok: false; code: 'NOT_A_MEMBER'; status: 403 }
-  | { ok: false; code: 'TELEGRAM_LOGIN_UNAVAILABLE'; status: 503 };
+export type OpenedSession = { ok: true; user: User; token: string; expiresAtMs: number };
 
 /**
- * IB-029 — issuing login links and turning them into sessions
- * (architecture/insight-bot-web-dashboard.md §1 W3, §4).
+ * IB-029 — dashboard sessions (architecture/insight-bot-web-dashboard.md §4). Since IB-078 a session
+ * is opened only by a login + password (`CredentialsService.login`); the link exchange (IB-029) and
+ * the Telegram widget (IB-072) are gone (password-login design P11).
  *
- * The plaintext token exists in exactly two places and never in the database: the Telegram
- * message, and the browser's cookie. Everything stored is `sha256(token)`.
+ * The plaintext session token exists only in the browser's cookie; everything stored is its sha256.
  */
 @Injectable()
 export class WebAuthService {
@@ -54,78 +39,22 @@ export class WebAuthService {
     return this.config.env.get('TELEGRAM_BOT_USERNAME');
   }
 
+  /** IB-078 H6: the header the client IP is read from (`x-real-ip` on the box), or unset = the socket. */
+  get clientIpHeader(): string | undefined {
+    const name = this.config.env.get('CLIENT_IP_HEADER');
+    return typeof name === 'string' && name.trim().length > 0 ? name.trim() : undefined;
+  }
+
   get cookieSecure(): boolean {
     return this.config.env.get('WEB_COOKIE_SECURE') === true;
   }
 
   /**
-   * Creates a one-time login link for a member. Returns the full URL — the caller (the bot)
-   * sends it and then forgets it; we keep only the hash.
+   * The one place a session is minted (IB-078: only after a correct password). Re-reads the row
+   * through the same join `resolveSession` uses, so a member disabled between the check and the
+   * insert never walks away with a cookie. Null = refused (disabled).
    */
-  async createLoginLink(userId: number, now = new Date()): Promise<string | null> {
-    const base = this.webBaseUrl;
-    if (!base) return null;
-    const token = newOpaqueToken();
-    const expiresAt = new Date(now.getTime() + LOGIN_TOKEN_TTL_MS);
-    await repo.createLoginToken(this.required, sha256Hex(token), userId, expiresAt);
-    return loginUrl(base, token);
-  }
-
-  /**
-   * Spends a login token and opens a session.
-   *
-   * A disabled member is refused as `TOKEN_INVALID`, not as "disabled": the token is consumed
-   * either way, and someone whose access was revoked should not learn from the dashboard that
-   * their account still exists.
-   */
-  async exchange(token: string, now = new Date()): Promise<ExchangeOutcome> {
-    const claim = await repo.consumeLoginToken(this.required, sha256Hex(token), now);
-    if (claim.kind === 'unknown') return { ok: false, code: 'TOKEN_INVALID', status: 401 };
-    if (claim.kind === 'used') return { ok: false, code: 'TOKEN_USED', status: 410 };
-    if (claim.kind === 'expired') return { ok: false, code: 'TOKEN_EXPIRED', status: 410 };
-
-    return (await this.openSession(claim.userId as number, now)) ?? { ok: false, code: 'TOKEN_INVALID', status: 401 };
-  }
-
-  /** Whether `POST /auth/telegram` can verify anything: it needs the bot token (M2's key). */
-  get telegramLoginAvailable(): boolean {
-    return this.botToken !== null;
-  }
-
-  private get botToken(): string | null {
-    const token = this.config.env.get('TELEGRAM_BOT_TOKEN');
-    return typeof token === 'string' && token.length > 0 ? token : null;
-  }
-
-  /**
-   * IB-072 — "Log in with Telegram" (architecture/member-access-design-2026-10-31.md M1–M3).
-   *
-   * M1: the widget logs in **existing members only** and never creates a `users` row — membership
-   * comes from `/invite` + `/start` in the bot, which is also where `chat_id` comes from. A
-   * disabled member gets `TOKEN_INVALID`, exactly like the link path, so a revoked person does not
-   * learn the account exists. Expired and forged payloads are both `TOKEN_INVALID`. The payload
-   * is not stored (M3).
-   */
-  async loginWithTelegram(fields: TelegramLoginFields, now = new Date()): Promise<TelegramLoginOutcome> {
-    const botToken = this.botToken;
-    if (!botToken) return { ok: false, code: 'TELEGRAM_LOGIN_UNAVAILABLE', status: 503 };
-
-    const verdict = verifyTelegramLogin(fields, botToken, now.getTime());
-    if (!verdict.ok) return { ok: false, code: 'TOKEN_INVALID', status: 401 };
-
-    const user = await usersRepo.findByTgUserId(this.required, verdict.tgUserId);
-    if (!user) return { ok: false, code: 'NOT_A_MEMBER', status: 403 };
-    if (user.disabled) return { ok: false, code: 'TOKEN_INVALID', status: 401 };
-
-    return (await this.openSession(user.id, now)) ?? { ok: false, code: 'TOKEN_INVALID', status: 401 };
-  }
-
-  /**
-   * The one place a session is minted, for both login paths: the link exchange and the widget.
-   * Re-reads the row through the same join `resolveSession` uses, so a member disabled between
-   * the check and the insert never walks away with a cookie. Null = refused (disabled).
-   */
-  private async openSession(userId: number, now: Date): Promise<OpenedSession | null> {
+  async openSession(userId: number, now: Date): Promise<OpenedSession | null> {
     const sessionToken = newOpaqueToken();
     const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
     await repo.createSession(this.required, sha256Hex(sessionToken), userId, expiresAt);
