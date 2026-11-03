@@ -78,4 +78,6 @@ RUN chown -R insightbot:insightbot /workspace
 
 USER insightbot
 EXPOSE 3005
-CMD ["node", "dist/main.js"]
+# IB-096: an explicit V8 heap cap sized for the 1 GB box — the arithmetic is in
+# src/ops/memory-budget.ts, and test/ops/memory-budget.spec.ts fails if these flags drift from it.
+CMD ["node", "--max-old-space-size=128", "--max-semi-space-size=8", "dist/main.js"]
