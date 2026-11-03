@@ -1,0 +1,15 @@
+{
+  "now": { "day": "2026-11-03", "value": 26, "classification": "Fear" },
+  "previous": { "day": "2026-11-02", "value": 30, "classification": "Fear" },
+  "weekAgo": { "day": "2026-10-27", "value": 51, "classification": "Neutral" },
+  "history": [
+    { "day": "2026-10-27", "value": 51, "classification": "Neutral" },
+    { "day": "2026-10-28", "value": 48, "classification": "Neutral" },
+    { "day": "2026-10-29", "value": 44, "classification": "Fear" },
+    { "day": "2026-10-31", "value": 37, "classification": "Fear" },
+    { "day": "2026-11-01", "value": 33, "classification": "Fear" },
+    { "day": "2026-11-02", "value": 30, "classification": "Fear" },
+    { "day": "2026-11-03", "value": 26, "classification": "Fear" }
+  ],
+  "source": "alternative.me"
+}

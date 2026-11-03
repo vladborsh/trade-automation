@@ -130,12 +130,41 @@ export const WebFearGreedReadingSchema = z.object({
 });
 export type WebFearGreedReading = z.infer<typeof WebFearGreedReadingSchema>;
 
+/**
+ * IB-102 — alternative.me's five Fear & Greed zones, the ONE table both sides read: the bot's
+ * `fngBand` (KPI strip, rule R7) and the dashboard's colours, words and gauge. Before IB-102 the
+ * dashboard carried its own copy with neutral ≤ 54 and greed ≤ 74, so 55 and 75 were worded one zone
+ * higher on the card than in the bot's own statements.
+ */
+export const FEAR_GREED_ZONES = [
+  { band: 'extreme_fear', upTo: 24 },
+  { band: 'fear', upTo: 44 },
+  { band: 'neutral', upTo: 55 },
+  { band: 'greed', upTo: 75 },
+  { band: 'extreme_greed', upTo: 100 },
+] as const;
+export type FearGreedBand = (typeof FEAR_GREED_ZONES)[number]['band'];
+
+/** The zone a 0–100 reading falls in (clamped). */
+export function fearGreedZone(value: number): FearGreedBand {
+  const clamped = Math.max(0, Math.min(100, value));
+  return (FEAR_GREED_ZONES.find((zone) => clamped <= zone.upTo) ?? FEAR_GREED_ZONES[FEAR_GREED_ZONES.length - 1]).band;
+}
+
+/** IB-102: the 30-day line reads up to this many published days, the same fetch as the card. */
+export const FEAR_GREED_HISTORY_MAX = 31;
+
 export const WebFearGreedCardSchema = z.object({
   now: WebFearGreedReadingSchema,
   /** The previous published day, for the card's sentence. Null when only one day is held. */
   previous: WebFearGreedReadingSchema.nullable().default(null),
   /** Seven published days back, when held. */
   weekAgo: WebFearGreedReadingSchema.nullable().default(null),
+  /**
+   * IB-102: up to 31 PUBLISHED days, oldest first, ending with `now`. The venue's missed days are not
+   * filled: a gap stays a gap, so a line never draws a reading nobody published.
+   */
+  history: z.array(WebFearGreedReadingSchema).max(FEAR_GREED_HISTORY_MAX),
   source: WebCardSourceSchema,
 });
 export type WebFearGreedCard = z.infer<typeof WebFearGreedCardSchema>;
