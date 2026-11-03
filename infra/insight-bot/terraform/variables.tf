@@ -74,7 +74,7 @@ variable "open_web_ports" {
     proven on the box; then [80, 443], the site, last. [] closes them again.
   EOT
   type        = list(number)
-  default     = []
+  default     = [80, 443] # opened 2026-11-03 (IB-082 step D); [] closes both
 
   validation {
     condition     = alltrue([for p in var.open_web_ports : contains([80, 443], p)])
