@@ -1,26 +1,25 @@
 # Insight dashboard CI — unit tests and a production build of the second Angular project in the
-# chart-client workspace (apps/chart-client/projects/insight-dashboard). The dashboard imports only
-# @trade-automation/contracts, so that is the one lib built first; the production build is the
-# same command the insight-bot Dockerfile runs for its `dashboard` stage.
+# chart-client workspace (apps/chart-client/projects/insight-dashboard). The dashboard compiles
+# chart-client feature code through a path alias, so it needs every lib that code imports built
+# first: contracts, indicators, replay-core, calendar-core. The production build is the same
+# command the insight-bot Dockerfile runs.
 name: insight-dashboard CI
 
 on:
   push:
     branches: [master]
     paths:
-      - 'apps/chart-client/projects/insight-dashboard/**'
-      - 'apps/chart-client/angular.json'
-      - 'apps/chart-client/package.json'
-      - 'libs/contracts/**'
+      - 'apps/chart-client/**'
+      - 'libs/**'
       - 'package-lock.json'
+      - '.nvmrc'
       - '.github/workflows/insight-dashboard-ci.yml'
   pull_request:
     paths:
-      - 'apps/chart-client/projects/insight-dashboard/**'
-      - 'apps/chart-client/angular.json'
-      - 'apps/chart-client/package.json'
-      - 'libs/contracts/**'
+      - 'apps/chart-client/**'
+      - 'libs/**'
       - 'package-lock.json'
+      - '.nvmrc'
       - '.github/workflows/insight-dashboard-ci.yml'
   workflow_dispatch:
 
@@ -39,14 +38,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc # 24, as the repo and the chart-client test scripts assume
           cache: npm
 
+      # The whole workspace: chart-client's package is named `chart-client`, and an install filtered
+      # on a name that does not exist silently installs only the root — that was `ng: not found`.
       - name: Install
-        run: npm ci --workspace=@trade-automation/chart-client --workspace=@trade-automation/contracts --include-workspace-root
+        run: npm ci
 
-      - name: Build contracts
-        run: npm run build --workspace=@trade-automation/contracts
+      - name: Build the libs the dashboard compiles against
+        run: >-
+          npm run build -w libs/contracts -w libs/indicators -w libs/replay-core -w libs/calendar-core
 
       - name: Unit tests
         working-directory: apps/chart-client

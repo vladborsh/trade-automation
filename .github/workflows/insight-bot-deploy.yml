@@ -40,6 +40,12 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
 
+      # The commit actually checked out. With a `ref` input it differs from github.sha (the commit
+      # the dispatch ran from), and the image tag must name what was built.
+      - name: Resolve the built commit
+        id: rev
+        run: echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -65,7 +71,7 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ghcr.io/${{ github.repository_owner }}/insight-bot:sha-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/insight-bot:sha-${{ steps.rev.outputs.sha }}
             ghcr.io/${{ github.repository_owner }}/insight-bot:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -78,8 +84,8 @@ jobs:
           command_id=$(aws ssm send-command \
             --instance-ids "${{ vars.INSTANCE_ID }}" \
             --document-name AWS-RunShellScript \
-            --comment "deploy sha-${{ github.sha }}" \
-            --parameters "commands=['/opt/insight-bot/deploy.sh sha-${{ github.sha }}']" \
+            --comment "deploy sha-${{ steps.rev.outputs.sha }}" \
+            --parameters "commands=['/opt/insight-bot/deploy.sh sha-${{ steps.rev.outputs.sha }}']" \
             --query 'Command.CommandId' --output text)
           echo "command_id=$command_id" >>"$GITHUB_OUTPUT"
           aws ssm wait command-executed --command-id "$command_id" --instance-id "${{ vars.INSTANCE_ID }}" || true
