@@ -9,6 +9,11 @@ below.
 > **Amended 2026-11-02:** login is now login + password only (user ruling). M1–M3 and the
 > "two ways in" below are withdrawn: see `password-login-design-2026-11-02.md`. The `/web` link and
 > the Telegram widget are no longer ways into the site.
+>
+> **Amended 2026-11-03:** the owner ruled that the box stores what venues forget: liquidations,
+> **open interest + long/short (the OI/LS poller stays)** and the calendar. Funding stays on demand.
+> §3's "dropped" list no longer includes the OI/LS poller and its two tables. See
+> `storage-ruling-2026-11-03.md`.
 
 ## 1. What is being built
 
