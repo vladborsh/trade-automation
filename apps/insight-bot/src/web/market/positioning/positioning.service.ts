@@ -129,6 +129,40 @@ export class PositioningService {
     };
   }
 
+  /**
+   * IB-086 (R7): market breadth over the period — the share of crypto coins up, and the median alt
+   * change minus BTC's — now and at every past hour of the baselines (rolling, same length), from the
+   * hourly closes already held. `days` is the history behind the sample. Null without baselines.
+   */
+  async breadth(period: WebMarketPeriod): Promise<Breadth | null> {
+    const base = await this.baselines();
+    const coins = this.coins.filter((c) => base.has(c.id));
+    const btc = coins.find((c) => c.base === 'BTC');
+    if (!btc || coins.length < 3) return null;
+    const steps = WEB_MARKET_PERIOD_SECONDS[period] / 3_600;
+    const series = coins.map((c) => ({ id: c.id, changes: rollingChangesPct((base.get(c.id) as Baseline).closes, steps) }));
+    const n = Math.min(...series.map((x) => x.changes.length));
+    if (n < 1) return null;
+    const at = (k: number) => {
+      const idx = (x: { changes: number[] }) => x.changes.length - n + k;
+      const up = series.filter((x) => (x.changes[idx(x)] as number) > 0).length / series.length;
+      const alts = series.filter((x) => x.id !== btc.id).map((x) => x.changes[idx(x)] as number).sort((a, b) => a - b);
+      const median = alts.length % 2 ? (alts[alts.length >> 1] as number) : ((alts[alts.length / 2 - 1] as number) + (alts[alts.length / 2] as number)) / 2;
+      const b = series.find((x) => x.id === btc.id) as { changes: number[] };
+      return { upShare: up, altGapPct: median - (b.changes[idx(b)] as number) };
+    };
+    const history = Array.from({ length: n }, (_, k) => at(k));
+    const now = history[history.length - 1] as { upShare: number; altGapPct: number };
+    return {
+      upShare: now.upShare,
+      altGapPct: now.altGapPct,
+      upShareSample: history.slice(0, -1).map((h) => h.upShare),
+      altGapSample: history.slice(0, -1).map((h) => h.altGapPct),
+      days: (n + steps) / 24,
+      coins: series.length,
+    };
+  }
+
   /** The hourly baselines for every coin, rebuilt once an hour (D9). A coin whose reads fail is absent. */
   private async baselines(): Promise<Map<string, Baseline>> {
     return this.options.cache.getOrLoad('positioning:baselines', POSITIONING_BASELINE_CACHE_MS, async () => {
@@ -184,6 +218,16 @@ export class PositioningService {
       lsTop: lsT?.points.at(-1)?.ratio ?? null,
     };
   }
+}
+
+/** IB-086 (R7). */
+export interface Breadth {
+  upShare: number;
+  altGapPct: number;
+  upShareSample: number[];
+  altGapSample: number[];
+  days: number;
+  coins: number;
 }
 
 interface Current {

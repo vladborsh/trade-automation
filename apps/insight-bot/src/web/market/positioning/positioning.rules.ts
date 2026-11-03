@@ -1,7 +1,7 @@
 import type {
   WebPositioningCell, WebPositioningQuadrant, WebPositioningSignal,
 } from '@trade-automation/contracts';
-import { rarity } from '../../../insights/rarity';
+import { changeRarity, levelRarity } from '../../../insights/rarity';
 import { OI_FLAT_PCT, PRICE_FLAT_PCT, QUIET_MAX_RARITY, QUIET_MIN_CELLS, RARITY_SHOW } from '../../../insights/thresholds';
 
 /**
@@ -37,19 +37,7 @@ export function cell(
   return { value, rarity: r, unavailable: r === null ? 'insufficient_history' : null, sample: sample.length };
 }
 
-/** Two-sided rarity of a CHANGE: |current| within |past changes|. */
-export function changeRarity(current: number, pastChanges: readonly number[]): number | null {
-  return rarity(Math.abs(current), pastChanges.map(Math.abs));
-}
-
-/** Two-sided rarity of a LEVEL: |current − median| within |past − median|. */
-export function levelRarity(current: number, pastLevels: readonly number[]): number | null {
-  if (pastLevels.length === 0) return null;
-  const sorted = [...pastLevels].sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  const median = sorted.length % 2 ? (sorted[mid] as number) : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
-  return rarity(Math.abs(current - median), pastLevels.map((v) => Math.abs(v - median)));
-}
+export { changeRarity, levelRarity } from '../../../insights/rarity';
 
 /** Percent changes over `steps` positions, for every position that has a predecessor that far back. */
 export function rollingChangesPct(values: readonly number[], steps: number): number[] {

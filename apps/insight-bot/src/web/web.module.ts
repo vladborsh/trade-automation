@@ -31,6 +31,7 @@ import { DB, type Db } from '../db/db.port';
 import { oiLsStoredReader } from './series/pg/oi-ls-stored.repo';
 import { PositioningService } from './market/positioning/positioning.service';
 import { KpisService } from './market/positioning/kpis.service';
+import { InsightsService } from '../insights/insights.service';
 import { TtlCache } from '../venues/ttl-cache';
 import { FuturesDataClient } from '../venues/binance/futures-data.client';
 import { PerpRest } from '../venues/binance/perp.rest';
@@ -164,6 +165,27 @@ export class WebModule {
           useFactory: (config: AppConfigService, cache: TtlCache, cards: MarketCardsService, liquidations: LiquidationsOverviewService,
             oiLs: OiLsService, summary: UniverseSummaryService) =>
             new KpisService({ cache, cards, liquidations, oiLs, summary, btcSymbol: config.symbols.find((s) => s.base === 'BTC')?.id ?? 'BTCUSDT' }),
+        },
+        {
+          // IB-086 (D1): the insight engine lives in src/insights/; it reads these services through ports
+          provide: InsightsService,
+          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService],
+          useFactory: (cache: TtlCache, liquidations: LiquidationsOverviewService, positioning: PositioningService, cards: MarketCardsService) =>
+            new InsightsService({
+              cache,
+              ports: {
+                liquidations: async (period) => {
+                  const [m, coins, overview] = await Promise.all([
+                    liquidations.marketSamples(period), liquidations.coinPeriodSamples(period),
+                    liquidations.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 1, period }),
+                  ]);
+                  return { ...m, coins, large: overview.block.large };
+                },
+                positioning: async (period) => (await positioning.positioning(period)).rows,
+                breadth: (period) => positioning.breadth(period),
+                fng: async () => (await cards.cards([])).fearGreed?.now.value ?? null,
+              },
+            }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],

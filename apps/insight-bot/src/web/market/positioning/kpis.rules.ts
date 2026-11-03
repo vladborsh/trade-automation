@@ -3,13 +3,7 @@
  * which word. The F&G bands are alternative.me's own (0–24 extreme fear, 25–44 fear, 45–55 neutral,
  * 56–75 greed, 76–100 extreme greed — the classification its API returns beside the value).
  */
-export function fngBand(value: number): 'extreme_fear' | 'fear' | 'neutral' | 'greed' | 'extreme_greed' {
-  if (value <= 24) return 'extreme_fear';
-  if (value <= 44) return 'fear';
-  if (value <= 55) return 'neutral';
-  if (value <= 75) return 'greed';
-  return 'extreme_greed';
-}
+export { fngBand } from '../../../insights/sentiment';
 
 /** Which side dominated the liquidations, and its share in whole percent. */
 export function liqSide(long: number, short: number): { side: 'long' | 'short'; sharePct: number } {

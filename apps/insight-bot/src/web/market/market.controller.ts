@@ -1,5 +1,6 @@
 import { Controller, Get, HttpException, Optional, Query } from '@nestjs/common';
-import { WebMarketPeriodSchema, type WebCapsResponse, type WebKpisResponse, type WebPositioningResponse } from '@trade-automation/contracts';
+import { WebMarketPeriodSchema, type WebCapsResponse, type WebInsightsResponse, type WebKpisResponse, type WebPositioningResponse } from '@trade-automation/contracts';
+import { InsightsService } from '../../insights/insights.service';
 import { CapsService } from './caps.service';
 import { KpisService } from './positioning/kpis.service';
 import { PositioningService } from './positioning/positioning.service';
@@ -14,6 +15,7 @@ export class WebMarketController {
     @Optional() private readonly capsService?: CapsService,
     @Optional() private readonly positioningService?: PositioningService,
     @Optional() private readonly kpisService?: KpisService,
+    @Optional() private readonly insightsService?: InsightsService,
   ) {}
 
   /** `GET …/market/caps?period=1h|4h|24h|7d` (default 24h) — treemap + dominance bar (D11). */
@@ -39,5 +41,14 @@ export class WebMarketController {
   async kpis(): Promise<WebKpisResponse> {
     if (!this.kpisService) throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'kpis not configured' }, 503);
     return this.kpisService.kpis();
+  }
+
+  /** `GET …/market/insights?period=` — «Главное сейчас» (IB-086, D1–D5, D15). */
+  @Get('insights')
+  async insights(@Query('period') period = '24h'): Promise<WebInsightsResponse> {
+    const parsed = WebMarketPeriodSchema.safeParse(period);
+    if (!parsed.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'period must be 1h, 4h, 24h or 7d' }, 400);
+    if (!this.insightsService) throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'insights not configured' }, 503);
+    return this.insightsService.insights(parsed.data);
   }
 }

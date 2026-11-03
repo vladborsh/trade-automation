@@ -40,6 +40,19 @@ export interface OverviewQuery {
   period: WebMarketPeriod;
 }
 
+/** IB-086: what the liquidation rules read (see `marketSamples`). */
+export interface MarketSamples {
+  long: { usd: number; sample: number[] };
+  short: { usd: number; sample: number[] };
+  /** Length of the period sample in days (0 for 7d, D14). */
+  days: number;
+  /** Complete hourly totals over the norm period, empty hours 0. */
+  hourly: number[];
+  hourlyDays: number;
+  venues: string[];
+  fromMs: number | null;
+}
+
 interface ClassKeys {
   crypto: string[];
   tradfi: string[];
@@ -114,6 +127,42 @@ export class LiquidationsOverviewService {
         });
       }
       return out;
+    });
+  }
+
+  /**
+   * IB-086 (R1, R3): market-wide CRYPTO samples for one period — per side, the trailing USD and one
+   * sum per complete aligned window of the period's length (empty windows 0); plus the hourly totals
+   * over the same norm period, which R3 compares a cascade against. 7d gives no period sample (D14).
+   */
+  async marketSamples(period: WebMarketPeriod): Promise<MarketSamples> {
+    return this.cache.getOrLoad(`market-samples:${period}`, OVERVIEW_CACHE_MS, async () => {
+      const db = this.db;
+      if (!db) throw new Error('no database');
+      const nowMs = this.now();
+      const keys = await this.classKeys(db, nowMs);
+      const periodSec = WEB_MARKET_PERIOD_SECONDS[period];
+      const capMs = nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000;
+      const [firstSeen, trailing, periodBuckets, hourBuckets] = await Promise.all([
+        repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+        repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.crypto }),
+        period === '7d' ? Promise.resolve([]) : repo.alignedBuckets(db, { windowSec: periodSec, fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+        repo.alignedBuckets(db, { windowSec: 3_600, fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+      ]);
+      const venues = [...new Set(firstSeen.map((r) => r.venue))];
+      const start = normPeriodStart(venues.map((v) => Math.min(...firstSeen.filter((r) => r.venue === v).map((r) => r.firstSeenMs))), nowMs);
+      const starts = period === '7d' ? [] : completeWindowStarts(start, nowMs, periodSec);
+      const hourStarts = completeWindowStarts(start, nowMs, 3_600);
+      const totals = periodTotals(trailing, periodSec);
+      return {
+        long: { usd: totals.long, sample: sampleFor(periodBuckets, starts, 'long') },
+        short: { usd: totals.short, sample: sampleFor(periodBuckets, starts, 'short') },
+        days: (starts.length * periodSec) / 86_400,
+        hourly: sampleFor(hourBuckets, hourStarts, null),
+        hourlyDays: hourStarts.length / 24,
+        venues: venues.sort(),
+        fromMs: starts.length > 0 ? starts[0] : hourStarts[0] ?? null,
+      };
     });
   }
 

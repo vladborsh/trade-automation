@@ -39,3 +39,15 @@ export const KPI_CACHE_MS = 60_000;
 /** "quiet": every measured cell under this rarity, and at least this many measured. */
 export const QUIET_MAX_RARITY = 0.5;
 export const QUIET_MIN_CELLS = 3;
+
+// ---- IB-086 «Главное сейчас» (D1–D5, D15) -----------------------------------------------------
+
+/** D1: how many statements the page shows. */
+export const INSIGHTS_TOP_N = 5;
+/** D3: the liquidation rules need this many days of our own tape; OI/funding/price/L-S rules 20 days. */
+export const LIQ_RULE_MIN_DAYS = 7;
+export const VENUE_RULE_MIN_DAYS = 20;
+/** R2: a coin below this USD over the period cannot top "most unusual" (a $40k alt is not news). */
+export const R2_MIN_USD = 250_000;
+/** D13: the insights endpoint's cache. */
+export const INSIGHTS_CACHE_MS = 60_000;
