@@ -14,6 +14,10 @@ below.
 > **open interest + long/short (the OI/LS poller stays)** and the calendar. Funding stays on demand.
 > §3's "dropped" list no longer includes the OI/LS poller and its two tables. See
 > `storage-ruling-2026-11-03.md`.
+>
+> **Amended 2026-11-03 (no domain):** reached at `https://<ip>.sslip.io` through Caddy on an
+> Elastic IP with 80/443 open; the tunnel (M4) is dormant, VAPID (M9) later, IB-076 cancelled. See
+> `https-without-domain-2026-11-03.md`.
 
 ## 1. What is being built
 

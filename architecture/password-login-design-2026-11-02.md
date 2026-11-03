@@ -1,7 +1,8 @@
 # Site login by login + password — design and decomposition (2026-11-02)
 
 **Author:** Architect (insight-bot stream) · **Input:** `architecture/password-login-2026-11-02.md`
-(user rulings 2026-11-02) · **Amends:** `member-access-design-2026-10-31.md` M1–M3 (Telegram widget
+(user rulings 2026-11-02) · **Amended 2026-11-03:** P8's `TRUST_CF_CONNECTING_IP` → `CLIENT_IP_HEADER`
+(`https-without-domain-2026-11-03.md` H6) · **Amends:** `member-access-design-2026-10-31.md` M1–M3 (Telegram widget
 login, withdrawn) · **Output:** tasks IB-078, IB-079; IB-077 amended; IB-072's code removed by IB-078.
 
 ## 1. The shape
