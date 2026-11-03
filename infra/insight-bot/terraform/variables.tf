@@ -58,10 +58,13 @@ variable "ssm_parameter_prefix" {
 variable "deploy_role_github_sub" {
   description = <<-EOT
     The GitHub OIDC subject allowed to assume the deploy role (ECR design E6): workflows on master
-    of this repository only.
+    of this repository only. The repository uses GitHub's IMMUTABLE subject (owner and repo carry
+    their numeric ids: `gh api repos/<o>/<r>/actions/oidc/customization/sub`), so the plain
+    "repo:vladborsh/trade-automation:…" form never matches — found by the first CI deploy (IB-082).
+    The ids also mean a renamed or re-created repository is not trusted by accident.
   EOT
   type        = string
-  default     = "repo:vladborsh/trade-automation:ref:refs/heads/master"
+  default     = "repo:vladborsh@11244920/trade-automation@1376010429:ref:refs/heads/master"
 }
 
 variable "open_web_ports" {

@@ -8,5 +8,5 @@ budget_alert_email = ""                              # where the 18 USD alert go
 # region                = "ap-northeast-1"
 # instance_type         = "t4g.small"
 # root_volume_gb        = 50
-# deploy_role_github_sub = "repo:vladborsh/trade-automation:ref:refs/heads/master"
+# deploy_role_github_sub = "repo:vladborsh@11244920/trade-automation@1376010429:ref:refs/heads/master"
 # backup_retention_days = 35
