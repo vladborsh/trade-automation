@@ -3,9 +3,7 @@ import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { OpsModule } from '../ops/ops.module';
 import { BinancePerpService } from './binance-perp/binance-perp.service';
-import { BinanceSpotService } from './binance-spot/binance-spot.service';
 import { OiLsPoller } from './binance-perp/oi-ls.poller';
-import { ContextService } from './context/context.service';
 import { OkxService } from './okx/okx.service';
 import { BybitService } from './bybit/bybit.service';
 import { UptimeRecorder } from './uptime/uptime.recorder';
@@ -35,7 +33,7 @@ export class CollectorsModule {
       imports: [AppConfigModule, DbModule, OpsModule, WritersModule],
       providers: [
         // BinanceWeightTracker comes from OpsModule (IB-063): one instance shared with the web module
-        BinancePerpService, BinanceSpotService, OiLsPoller, BybitService, OkxService, ContextService,
+        BinancePerpService, OiLsPoller, BybitService, OkxService,
         // IB-BUG-010: one recorder shared by the ws liquidation collectors, so the heartbeat is a
         // single timer rather than one per venue.
         UptimeRecorder,

@@ -1,20 +1,15 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import { BinanceAdapter } from '@trade-automation/binance-client';
+import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { AppConfigService } from '../../config/config.service';
-import { DB, type Db } from '../../db/db.port';
-import { lastCandleOpenTimes } from '../../db/pg/collector-reads';
 import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { Writers } from '../writers/batch-writer';
-import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
-import { BinancePerpCollector, MARKET, VENUE_LOGGER_NAME } from './perp-collector';
+import { BinancePerpCollector, VENUE_LOGGER_NAME } from './perp-collector';
 import { BinanceSocket } from '../binance-common/socket';
-import { PerpRest } from '../../venues/binance/perp.rest';
 import { perpMarketWsBaseUrl } from './streams';
 import { UptimeRecorder } from '../uptime/uptime.recorder';
 import { BINANCE_LIQUIDATION_STREAM } from '../uptime/liquidation-streams';
 
-/** One tick per second drives the mode policy, the minute boundary and the degraded pollers. */
+/** One tick per second drives the dead-socket policy. */
 export const TICK_MS = 1_000;
 
 /**
@@ -33,9 +28,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     private readonly writers: Writers,
     private readonly registry: StreamRegistry,
     private readonly metrics: MetricsService,
-    private readonly weight: BinanceWeightTracker,
     private readonly uptime: UptimeRecorder,
-    @Inject(DB) private readonly db: Db | null,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -45,31 +38,18 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
       return;
     }
 
-    const restBaseUrl = this.config.env.get('BINANCE_FUTURES_REST_BASE_URL');
     const wsBaseUrl = this.config.env.get('BINANCE_FUTURES_WS_BASE_URL');
-    // IB-BUG-012: kline/markPrice/forceOrder are `/market` streams; the bare host's legacy
-    // `/stream` path has carried none of them since 2026-04-23.
+    // IB-BUG-012: markPrice/forceOrder are `/market` streams; the bare host's legacy `/stream` path
+    // has carried none of them since 2026-04-23.
     const marketWsBaseUrl = perpMarketWsBaseUrl(wsBaseUrl);
-    // IB-007: both Binance loops share one IP budget, so they share one tracker rather than each
-    // pushing its own number at the gauge. This one is the authoritative half — /fapi/* answers
-    // carry `x-mbx-used-weight-1m`, and a header always beats the poller's local estimate (the
-    // /futures/data/* endpoints send no header at all, measured 2026-09-28).
-    const rest = new PerpRest({ baseUrl: restBaseUrl, onWeight: (w) => this.weight.recordHeader(w) });
-    const adapter = new BinanceAdapter(restBaseUrl, wsBaseUrl, {
-      log: (m) => this.logger.log(m),
-      warn: (m) => this.logger.warn(m),
-    });
 
+    // WD-010: no REST client any more — nothing this collector keeps has a REST equivalent
     this.collector = new BinancePerpCollector({
       symbols,
-      signalSet: this.config.signalSet,
       writers: this.writers,
       registry: this.registry,
       metrics: this.metrics,
-      rest,
-      candles: adapter,
       socketFactory: (handlers, streams) => new BinanceSocket({ wsBaseUrl: marketWsBaseUrl, streams, handlers }),
-      lastOpenTimes: this.db ? () => lastCandleOpenTimes(this.db as Db, 'binance', MARKET) : undefined,
       logger: { log: (m) => this.logger.log(m), warn: (m) => this.logger.warn(m) },
     });
 
@@ -79,7 +59,7 @@ export class BinancePerpService implements OnApplicationBootstrap, OnModuleDestr
     await this.uptime.begin([{ stream: BINANCE_LIQUIDATION_STREAM, venue: 'binance', market: 'perp' }]);
     this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
     this.timer.unref?.();
-    this.logger.log(`binance-perp collector started for ${symbols.length} symbols on ${marketWsBaseUrl}`);
+    this.logger.log(`binance-perp liquidation collector started (all USD-M symbols; liveness on ${symbols[0]}) on ${marketWsBaseUrl}`);
   }
 
   async onModuleDestroy(): Promise<void> {

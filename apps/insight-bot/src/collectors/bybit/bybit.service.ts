@@ -1,16 +1,13 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { AppConfigService } from '../../config/config.service';
-import { DB, type Db } from '../../db/db.port';
-import { earliestFundingTimes } from '../../db/pg/collector-reads';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { UptimeRecorder } from '../uptime/uptime.recorder';
 import { Writers } from '../writers/batch-writer';
 import { BybitCollector, STREAM_LIQUIDATION } from './bybit-collector';
 import { BybitSocket } from './bybit-socket';
 import { VENUE } from './mappers';
-import { BybitRest } from '../../venues/bybit/bybit.rest';
 
-/** One tick a second: the silence watchdog and the minute boundary. */
+/** One tick a second: the silence watchdog. */
 export const TICK_MS = 1_000;
 
 /**
@@ -28,7 +25,6 @@ export class BybitService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly writers: Writers,
     private readonly registry: StreamRegistry,
     private readonly uptime: UptimeRecorder,
-    @Inject(DB) private readonly db: Db | null,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -39,26 +35,22 @@ export class BybitService implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
     const url = this.config.env.get('BYBIT_WS_URL');
-    const rest = new BybitRest();
 
     this.collector = new BybitCollector({
       symbols,
-      signalSet: this.config.signalSet,
       writers: this.writers,
       registry: this.registry,
-      rest,
       socketFactory: (handlers, topics) => new BybitSocket({ url, topics, handlers }),
-      earliestFundingTimes: this.db ? () => earliestFundingTimes(this.db as Db, VENUE) : undefined,
       logger: { log: (m) => this.logger.log(m), warn: (m) => this.logger.warn(m) },
     });
 
-    await this.collector.start();
+    this.collector.start();
     // IB-BUG-010: this writes a collector_gaps row for however long we were NOT running, then
     // starts the heartbeat. After start(), so the window closes when the socket is actually up.
     await this.uptime.begin([{ stream: STREAM_LIQUIDATION, venue: VENUE, market: 'perp' }]);
     this.timer = setInterval(() => void this.collector?.tick(), TICK_MS);
     this.timer.unref?.();
-    this.logger.log(`bybit collector started for ${symbols.length} symbols`);
+    this.logger.log(`bybit liquidation collector started for ${symbols.length} symbols (liveness on tickers.${symbols[0]})`);
   }
 
   async onModuleDestroy(): Promise<void> {

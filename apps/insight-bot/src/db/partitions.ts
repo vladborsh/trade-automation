@@ -9,22 +9,14 @@
 
 /** The partitioned tables and the column each is ranged on (migration 002). */
 export const PARTITIONED_TABLES: ReadonlyArray<{ table: string; column: string }> = [
-  { table: 'candles_1m', column: 'open_time' },
-  { table: 'candles_agg', column: 'open_time' },
-  { table: 'mark_funding_1m', column: 'ts' },
+  // WD-010 (storage ruling 2026-11-03): maintained only for what the box still writes —
+  // liquidations, Binance OI and long/short, and the collectors' gap rows. The candle, funding,
+  // feature-frame and playbook tables keep their existing partitions until WD-006 drops them;
+  // nothing writes to them any more, so no new month is needed.
   { table: 'open_interest_5m', column: 'ts' },
   { table: 'long_short_5m', column: 'ts' },
   { table: 'liquidations', column: 'ts' },
   { table: 'collector_gaps', column: 'detected_at' },
-  // IB-015 (migration 011). `feature_frame_versions` is deliberately NOT here: it holds one row
-  // per frame_version for the life of the product, not a time series.
-  { table: 'feature_frames', column: 'close_time' },
-  // IB-017. ~576 rows/day for P3 across 3 symbols and 2 arms; partitioned for the same reason
-  // as the rest, so a year's audit trail is droppable by month rather than by delete.
-  { table: 'playbook_evaluations', column: 'close_time' },
-  // IB-054. One pin per close per mode — about half the evaluations rate, since it does not
-  // multiply by arm. Partitioned with the rest so the audit trail drops by month.
-  { table: 'playbook_frame_pins', column: 'close_time' },
 ];
 
 export interface Partition {

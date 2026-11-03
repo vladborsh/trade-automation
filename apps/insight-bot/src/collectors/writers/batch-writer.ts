@@ -58,9 +58,11 @@ export class BatchWriter<TRow> {
  * IB-BUG-015 — one row per natural key, the LAST one in the batch winning (the same answer two
  * separate upserts in order would give). `ON CONFLICT DO UPDATE` refuses a statement that names
  * one key twice ("cannot affect row a second time"), and a collector buffer legitimately holds
- * repeats: OKX's `funding-rate` channel re-sends the settled rate for the same `prevFundingTime`
+ * repeats: OKX's `funding-rate` channel re-sent the settled rate for the same `prevFundingTime`
  * on every push, so a drain with two pushes for one instrument carried the key twice and the whole
- * batch was refused — 6 times in 14 h on the coordinator, every time `funding_settlements`.
+ * batch was refused — 6 times in 14 h on the coordinator, every time `funding_settlements` (that
+ * writer is gone since WD-010; the dedupe stays for any batch that can repeat a key, e.g. a poll
+ * overlapping a backfill).
  *
  * Deduped here, in the one writer every collector goes through, rather than in each collector:
  * a per-collector fix would leave the next buffer that repeats a key to rediscover the bug.
@@ -87,23 +89,17 @@ function keyPart(value: unknown): string {
 }
 
 /**
- * The nine §3.3 writers, built once per process. Injectable so a collector asks for the one
+ * The writers for what the box still stores (WD-010, storage ruling 2026-11-03): liquidations,
+ * Binance OI and long/short, the calendar, and collector gaps. Built once per process. Injectable so a collector asks for the one
  * table it writes; the writers themselves hold no state.
  */
 @Injectable()
 export class Writers {
-  readonly candles1m: BatchWriter<t.Candle1mRow>;
-  readonly candlesAgg: BatchWriter<t.CandleAggRow>;
-  readonly markFunding: BatchWriter<t.MarkFundingRow>;
-  readonly fundingSettlements: BatchWriter<t.FundingSettlementRow>;
   readonly openInterest: BatchWriter<t.OpenInterestRow>;
   readonly longShort: BatchWriter<t.LongShortRow>;
   readonly liquidations: BatchWriter<t.LiquidationRow>;
   readonly calendarEvents: BatchWriter<t.CalendarEventRow>;
   readonly collectorGaps: BatchWriter<t.CollectorGapRow>;
-  readonly fearGreed: BatchWriter<t.FearGreedWriteRow>;
-  readonly marketCapGlobal: BatchWriter<t.MarketCapGlobalWriteRow>;
-  readonly marketCapCoin: BatchWriter<t.MarketCapCoinWriteRow>;
 
   constructor(
     @Inject(DB) db: Db | null,
@@ -112,17 +108,10 @@ export class Writers {
     if (db === null) {
       throw new Error('Writers: no database. The collectors require DATABASE_URL; see README.md.');
     }
-    this.candles1m = new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple, metrics);
-    this.candlesAgg = new BatchWriter(db, t.CANDLES_AGG, t.candleAggTuple, metrics);
-    this.markFunding = new BatchWriter(db, t.MARK_FUNDING_1M, t.markFundingTuple, metrics);
-    this.fundingSettlements = new BatchWriter(db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple, metrics);
     this.openInterest = new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple, metrics);
     this.longShort = new BatchWriter(db, t.LONG_SHORT_5M, t.longShortTuple, metrics);
     this.liquidations = new BatchWriter(db, t.LIQUIDATIONS, t.liquidationTuple, metrics);
     this.calendarEvents = new BatchWriter(db, t.CALENDAR_EVENTS, t.calendarEventTuple, metrics);
     this.collectorGaps = new BatchWriter(db, t.COLLECTOR_GAPS, t.collectorGapTuple, metrics);
-    this.fearGreed = new BatchWriter(db, t.FEAR_GREED, t.fearGreedTuple, metrics);
-    this.marketCapGlobal = new BatchWriter(db, t.MARKET_CAP_GLOBAL, t.marketCapGlobalTuple, metrics);
-    this.marketCapCoin = new BatchWriter(db, t.MARKET_CAP_COIN, t.marketCapCoinTuple, metrics);
   }
 }

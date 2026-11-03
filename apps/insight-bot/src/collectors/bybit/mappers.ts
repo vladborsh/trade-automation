@@ -1,16 +1,9 @@
-import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
-import type { BybitLiquidationEvent, BybitTickerData } from './payloads';
-import type { BybitFundingHistoryRow } from '../../venues/bybit/payloads';
+import type { LiquidationRow } from '../writers/tables';
+import type { BybitLiquidationEvent } from './payloads';
 
 /** IB-008 — Bybit payload → §3.3 rows. Pure: every timestamp comes from the payload. */
 
 export const VENUE = 'bybit';
-
-function num(value: string | undefined): number | null {
-  if (value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
 
 function requiredNum(value: string, field: string): number {
   // `Number('')` is 0, so an empty string would slip through as a real zero price. A field the
@@ -18,24 +11,6 @@ function requiredNum(value: string, field: string): number {
   const n = value === '' ? NaN : Number(value);
   if (!Number.isFinite(n)) throw new RangeError(`${field}: expected a number, got ${JSON.stringify(value)}`);
   return n;
-}
-
-/**
- * A merged ticker state → one `mark_funding_1m` row, stamped by the caller (the minute boundary,
- * or the settlement second). `TickerState` does the snapshot+delta merge; this only maps.
- */
-export function markRowFromTicker(symbol: string, data: BybitTickerData, ts: Date): MarkFundingRow {
-  const next = num(data.nextFundingTime);
-  return {
-    venue: VENUE,
-    symbol,
-    ts,
-    markPrice: num(data.markPrice),
-    indexPrice: num(data.indexPrice),
-    predictedFundingRate: num(data.fundingRate),
-    nextFundingTime: next !== null && next > 0 ? new Date(next) : null,
-    source: 'ws',
-  };
 }
 
 /**
@@ -67,14 +42,3 @@ export function liquidationRows(events: readonly BybitLiquidationEvent[]): Liqui
   });
 }
 
-/** `GET /v5/market/funding/history` row → a `funding_settlements` row. */
-export function fundingSettlementRow(row: BybitFundingHistoryRow): FundingSettlementRow {
-  return {
-    venue: VENUE,
-    symbol: row.symbol,
-    fundingTime: new Date(requiredNum(row.fundingRateTimestamp, 'fundingRateTimestamp')),
-    rate: requiredNum(row.fundingRate, 'fundingRate'),
-    markPrice: null, // not in this payload; the mark row at the settlement second carries it
-    source: 'rest',
-  };
-}

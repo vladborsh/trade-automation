@@ -1,31 +1,7 @@
 import { liquidationRowFromEvent } from '../../../src/collectors/binance-perp/mappers';
-import { fundingSettlementRow, liquidationRows, markRowFromTicker } from '../../../src/collectors/bybit/mappers';
-import type { BybitLiquidationEvent, BybitTickerData } from '../../../src/collectors/bybit/payloads';
-import { LIQUIDATIONS, TICKER_SNAPSHOT } from './fixtures';
-
-/** IB-008 — Bybit payloads (recorded from the live venue) → §3.3 rows. */
-
-describe('Bybit mark/funding mapping (§4.3)', () => {
-  it('maps a recorded tickers snapshot, stamped by the caller', () => {
-    const ts = new Date(1_790_608_140_000);
-    const row = markRowFromTicker('BTCUSDT', TICKER_SNAPSHOT.data as BybitTickerData, ts);
-    expect(row).toEqual({
-      venue: 'bybit', symbol: 'BTCUSDT', ts,
-      markPrice: 82997.4, indexPrice: 83033, predictedFundingRate: 0.00005416,
-      nextFundingTime: new Date(1_790_611_200_000), source: 'ws',
-    });
-  });
-
-  it('missing fields are null, never 0, and an empty nextFundingTime is null', () => {
-    const row = markRowFromTicker('XRPUSDT', { symbol: 'XRPUSDT', markPrice: '2.13', nextFundingTime: '' }, new Date(0));
-    expect([row.indexPrice, row.predictedFundingRate, row.nextFundingTime]).toEqual([null, null, null]);
-    expect(row.markPrice).toBe(2.13);
-  });
-
-  it('a negative predicted funding rate survives', () => {
-    expect(markRowFromTicker('BTCUSDT', { symbol: 'BTCUSDT', fundingRate: '-0.00012500' }, new Date(0)).predictedFundingRate).toBe(-0.000125);
-  });
-});
+import { liquidationRows } from '../../../src/collectors/bybit/mappers';
+import type { BybitLiquidationEvent } from '../../../src/collectors/bybit/payloads';
+import { LIQUIDATIONS } from './fixtures';
 
 describe('Bybit liquidation mapping — the side LIQUIDATED (§3.3, D6)', () => {
   it('maps the recorded allLiquidation pushes', () => {
@@ -62,10 +38,3 @@ describe('Bybit liquidation mapping — the side LIQUIDATED (§3.3, D6)', () => 
   });
 });
 
-describe('Bybit funding history mapping', () => {
-  it('maps a /v5/market/funding/history row (timestamps arrive as strings)', () => {
-    expect(fundingSettlementRow({ symbol: 'BTCUSDT', fundingRate: '0.00005416', fundingRateTimestamp: '1790611200000' })).toEqual({
-      venue: 'bybit', symbol: 'BTCUSDT', fundingTime: new Date(1_790_611_200_000), rate: 0.00005416, markPrice: null, source: 'rest',
-    });
-  });
-});

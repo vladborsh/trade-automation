@@ -1,6 +1,6 @@
 import type { WebFearGreedPoint, WebMarketCardsResponse } from '@trade-automation/contracts';
 import type { FetchLike } from '../../venues/binance/rest.base';
-import { fearGreedRows } from '../../collectors/context/mappers';
+import { fearGreedRows } from './context-mappers';
 import { liveMarketCards } from './live-market-cards';
 import {
   CoinMarketRowSchema, FngPayloadSchema, GlobalPayloadSchema, type CoinMarketRow, type GlobalPayload,

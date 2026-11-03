@@ -1,4 +1,4 @@
-import { DEFAULT_MODE_POLICY, ModePolicy, degradedWeightPerMinute, klinePollIntervalMs } from '../../../src/collectors/binance-common/mode';
+import { DEFAULT_MODE_POLICY, ModePolicy } from '../../../src/collectors/binance-common/mode';
 
 /**
  * IB-005 / design §16.1 — the WS → degraded → WS transitions. Time is an argument, so every edge
@@ -116,19 +116,5 @@ describe('ModePolicy (§16.1)', () => {
     p.onOpen(T);
     expect(p.tick(T + 5_000)).toEqual({ kind: 'degrade', reason: 'silent-after-open' });
     expect(p.tick(T + 25_000)).toEqual({ kind: 'reconnect' });
-  });
-});
-
-describe('degraded polling cadence and its weight (§16.1)', () => {
-  it('signal set every 3 s, the rest every 15 s', () => {
-    expect(klinePollIntervalMs(true)).toBe(3_000);
-    expect(klinePollIntervalMs(false)).toBe(15_000);
-  });
-
-  it('a 30-symbol universe with 3 in the signal set costs ~178 weight/min — 7 % of the 2400 budget', () => {
-    const weight = degradedWeightPerMinute(3, 27);
-    expect(weight).toBe(3 * 20 + 27 * 4 + 10);
-    expect(weight).toBe(178);
-    expect(weight / 2400).toBeLessThan(0.1);
   });
 });

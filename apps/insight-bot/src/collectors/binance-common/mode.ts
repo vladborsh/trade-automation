@@ -148,17 +148,3 @@ export class ModePolicy {
   }
 }
 
-/**
- * Degraded polling cadence (§16.1): the signal set every 3 s, everything else every 15 s. Weight
- * per minute = 20 polls × 1 weight × |signal set| + 4 × 1 × |rest| ≈ 3×20 + 27×4 = 168, plus one
- * `premiumIndex` (weight 10) per minute ≈ **178 weight/min ≈ 7 % of the 2400 budget** — acceptable
- * only while degraded, and the reason degraded mode is not the steady state.
- */
-export function klinePollIntervalMs(isSignalSet: boolean): number {
-  return isSignalSet ? 3_000 : 15_000;
-}
-
-/** The weight/min a degraded run costs, for the module header and /health's budget line. */
-export function degradedWeightPerMinute(signalSetCount: number, otherCount: number): number {
-  return signalSetCount * (60_000 / klinePollIntervalMs(true)) + otherCount * (60_000 / klinePollIntervalMs(false)) + 10;
-}

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { fearGreedRows, marketCapCoinRows, marketCapGlobalRow, utcDay } from '../../../src/collectors/context/mappers';
+import { fearGreedRows, marketCapCoinRows, marketCapGlobalRow, utcDay } from '../../../src/web/market/context-mappers';
 import { FngPayload, GlobalPayload, MarketChartPayload } from '../../../src/venues/context/payloads';
 
 /** Recorded live from alternative.me and CoinGecko on 2026-09-28. */

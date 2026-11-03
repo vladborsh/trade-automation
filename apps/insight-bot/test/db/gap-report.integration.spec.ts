@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { BatchWriter } from '../../src/collectors/writers/batch-writer';
 import * as t from '../../src/collectors/writers/tables';
-import { candleCoverage, gapsForDay, saveGapReport, slotCoverage } from '../../src/db/pg/collector-reads';
+import { gapsForDay, saveGapReport, slotCoverage } from '../../src/db/pg/collector-reads';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
@@ -45,26 +45,19 @@ maybeDescribe('IB-011 gap report against a real database', () => {
     await runMigrations({ connectionString: url.toString() });
     await new PartitionMaintenanceService(db).ensureRange(DAY_START, DAY_END);
 
-    const candles = new BatchWriter<t.Candle1mRow>(db, t.CANDLES_1M, t.candle1mTuple);
     const oi = new BatchWriter<t.OpenInterestRow>(db, t.OPEN_INTEREST_5M, t.openInterestTuple);
     const gaps = new BatchWriter<t.CollectorGapRow>(db, t.COLLECTOR_GAPS, t.collectorGapTuple);
 
-    // BTCUSDT: complete from midnight (120 minutes into the day, then nothing more expected
-    // because the series simply has no later rows — the report counts to the day's end, so this
-    // one is deliberately short and should read as missing).
-    const btc: t.Candle1mRow[] = Array.from({ length: 120 }, (_, i) => ({
-      venue: 'binance', market: 'perp', symbol: 'BTCUSDT', openTime: new Date(DAY_START.getTime() + i * MIN),
-      open: 1, high: 1, low: 1, close: 1, volume: 1, source: 'ws',
-    }));
-    // ETHUSDT: the collector's first row ever is at 12:00, and every minute from then is present
-    const eth: t.Candle1mRow[] = Array.from({ length: 720 }, (_, i) => ({
-      venue: 'binance', market: 'perp', symbol: 'ETHUSDT', openTime: new Date(DAY_START.getTime() + (720 + i) * MIN),
-      open: 1, high: 1, low: 1, close: 1, volume: 1, source: 'ws',
-    }));
-    await candles.write([...btc, ...eth]);
-    await oi.write([{ venue: 'binance', symbol: 'BTCUSDT', ts: DAY_START, oiBase: 1, source: 'rest' }]);
+    // WD-010: the candle tape is gone, so the first-row rule is pinned on the OI grid instead.
+    // BTCUSDT: from midnight, but only the first 2 hours (24 slots) — the rest of the day is missing.
+    // ETHUSDT: the poller's first slot ever is at 12:00, and every slot from then is present.
+    const SLOT = 5 * MIN;
+    await oi.write([
+      ...Array.from({ length: 24 }, (_, i) => ({ venue: 'binance', symbol: 'BTCUSDT', ts: new Date(DAY_START.getTime() + i * SLOT), oiBase: 1, source: 'rest' as const })),
+      ...Array.from({ length: 144 }, (_, i) => ({ venue: 'binance', symbol: 'ETHUSDT', ts: new Date(DAY_START.getTime() + 720 * MIN + i * SLOT), oiBase: 1, source: 'rest' as const })),
+    ]);
     await gaps.write([
-      { stream: 'binance-perp:kline_1m', venue: 'binance', market: 'perp', symbol: 'BTCUSDT', gapFrom: new Date(DAY_START.getTime() + 5 * MIN), gapTo: new Date(DAY_START.getTime() + 7 * MIN), expected: 3, repaired: 3, detectedAt: new Date(DAY_START.getTime() + 8 * MIN) },
+      { stream: 'binance-perp:oi-ls-5m', venue: 'binance', market: 'perp', symbol: 'BTCUSDT', gapFrom: new Date(DAY_START.getTime() + 5 * MIN), gapTo: new Date(DAY_START.getTime() + 15 * MIN), expected: 3, repaired: 3, detectedAt: new Date(DAY_START.getTime() + 8 * MIN) },
       { stream: 'binance-perp:forceOrder', venue: 'binance', market: 'perp', symbol: null, gapFrom: new Date(DAY_START.getTime() + 10 * MIN), gapTo: new Date(DAY_START.getTime() + 20 * MIN), expected: 0, repaired: 0, error: 'degraded mode', detectedAt: new Date(DAY_START.getTime() + 20 * MIN) },
     ]);
   }, DB_HOOK_TIMEOUT_MS);
@@ -74,26 +67,21 @@ maybeDescribe('IB-011 gap report against a real database', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
-  it('candleCoverage counts expected from the series\' first row, not from midnight', async () => {
-    const rows = (await candleCoverage(db, DAY_START, DAY_END)).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  it('slotCoverage counts expected from the series\' first slot, not from midnight', async () => {
+    const rows = (await slotCoverage(db, 'open_interest_5m', DAY_START, DAY_END)).sort((a, b) => a.symbol.localeCompare(b.symbol));
     expect(rows).toEqual([
-      // first row at 00:00, so the whole day is expected and 1320 minutes are genuinely missing
-      { venue: 'binance', market: 'perp', symbol: 'BTCUSDT', present: 120, expected: 1440 },
-      // first row at 12:00: only the afternoon is expected, and it is complete
-      { venue: 'binance', market: 'perp', symbol: 'ETHUSDT', present: 720, expected: 720 },
+      // first slot at 00:00, so the whole day is expected and 264 slots are genuinely missing
+      { venue: 'binance', symbol: 'BTCUSDT', present: 24, expected: 288 },
+      // first slot at 12:00: only the afternoon is expected, and it is complete
+      { venue: 'binance', symbol: 'ETHUSDT', present: 144, expected: 144 },
     ]);
-  });
-
-  it('slotCoverage does the same on the 5-minute grid', async () => {
-    const rows = await slotCoverage(db, 'open_interest_5m', DAY_START, DAY_END);
-    expect(rows).toEqual([{ venue: 'binance', symbol: 'BTCUSDT', present: 1, expected: 288 }]);
     expect(await slotCoverage(db, 'long_short_5m', DAY_START, DAY_END)).toEqual([]); // nothing stored, nothing claimed
   });
 
   it('gapsForDay returns the day\'s rows with their repair counts', async () => {
     const rows = await gapsForDay(db, DAY_START, DAY_END);
     expect(rows.map((r) => [r.stream, r.expected, r.repaired])).toEqual([
-      ['binance-perp:kline_1m', 3, 3],
+      ['binance-perp:oi-ls-5m', 3, 3],
       ['binance-perp:forceOrder', 0, 0],
     ]);
   });
@@ -102,7 +90,6 @@ maybeDescribe('IB-011 gap report against a real database', () => {
     const report = buildGapReport(
       {
         day: DAY,
-        candles: await candleCoverage(db, DAY_START, DAY_END),
         openInterest: await slotCoverage(db, 'open_interest_5m', DAY_START, DAY_END),
         longShort: await slotCoverage(db, 'long_short_5m', DAY_START, DAY_END),
         gaps: await gapsForDay(db, DAY_START, DAY_END),
@@ -111,7 +98,7 @@ maybeDescribe('IB-011 gap report against a real database', () => {
       Date.now(),
     );
     expect(report.clean).toBe(false);
-    expect(report.candles.missing).toEqual([{ venue: 'binance', market: 'perp', symbol: 'BTCUSDT', missing: 1320, expected: 1440 }]);
+    expect(report.openInterest.missing).toEqual([{ venue: 'binance', symbol: 'BTCUSDT', missing: 264, expected: 288 }]);
     expect(report.unrepaired).toEqual([{ stream: 'binance-perp:forceOrder', symbol: null, minutes: 10, reason: 'degraded mode' }]);
   });
 

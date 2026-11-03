@@ -1,5 +1,5 @@
 import type { WebDominanceCard, WebFearGreedPoint, WebMarketCardsResponse } from '@trade-automation/contracts';
-import { utcDay } from '../../collectors/context/mappers';
+import { utcDay } from './context-mappers';
 import { btcVsTopCard, capsCard, fearGreedCard } from '../context/market-cards';
 import { marketCapCurrent, marketCapDays, type CoinCapRow } from '../context/market-shares';
 import type { CoinMarketRow, GlobalPayload } from './market-cards.payloads';

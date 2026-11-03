@@ -10,13 +10,7 @@
     "migrate": "node dist/db/migrate.js",
     "test": "jest",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "report": "node dist/ops/gap-report.cli.js",
-    "backfill": "node dist/backfill/backfill.cli.js",
-    "backfill:verify": "node dist/backfill/verify.cli.js",
-    "derive": "node dist/derive/derive.cli.js",
-    "audit:months": "node dist/ops/month-label-audit.cli.js",
-    "features": "node dist/features/features.cli.js",
-    "audit:frames": "node dist/ops/frame-audit.cli.js"
+    "report": "node dist/ops/gap-report.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",

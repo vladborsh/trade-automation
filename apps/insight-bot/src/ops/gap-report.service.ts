@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { AppConfigService } from '../config/config.service';
 import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { DB, type Db } from '../db/db.port';
-import { candleCoverage, gapsForDay, saveGapReport, slotCoverage } from '../db/pg/collector-reads';
+import { gapsForDay, saveGapReport, slotCoverage } from '../db/pg/collector-reads';
 import { buildGapReport, renderGapReport, type GapReport } from './gap-report';
 import { TelegramSender } from '../delivery/telegram-sender';
 
@@ -64,8 +64,7 @@ export class GapReportService implements OnApplicationBootstrap, OnModuleDestroy
     // and the clock.
     const dayEnd = new Date(Math.min(dayStart.getTime() + DAY_MS, generatedAtMs));
 
-    const [candles, openInterest, longShort, gaps] = await Promise.all([
-      candleCoverage(this.db, dayStart, dayEnd),
+    const [openInterest, longShort, gaps] = await Promise.all([
       slotCoverage(this.db, 'open_interest_5m', dayStart, dayEnd),
       slotCoverage(this.db, 'long_short_5m', dayStart, dayEnd),
       gapsForDay(this.db, dayStart, dayEnd),
@@ -73,7 +72,7 @@ export class GapReportService implements OnApplicationBootstrap, OnModuleDestroy
 
     const report = buildGapReport(
       {
-        day, candles, openInterest, longShort, gaps,
+        day, openInterest, longShort, gaps,
         binanceWeightPeak: this.weight.peak1m(),
         binanceWeightIsEstimate: this.weight.isEstimate(),
         silenceThresholdMin: this.silenceMin,

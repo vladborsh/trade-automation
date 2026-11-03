@@ -2,7 +2,8 @@ import { BINANCE_WEIGHT_BUDGET, buildGapReport, renderGapReport, type GapReportI
 
 /**
  * IB-011 — the stage-0 exit instrument (§6.2). `clean` is what fourteen consecutive days must be,
- * so the specs are mostly about what may and may not make a day dirty.
+ * so the specs are mostly about what may and may not make a day dirty. WD-010: the minute-candle
+ * section went with the candle tape; OI/LS slots and liquidation-stream silence remain.
  */
 
 const DAY = '2026-09-27';
@@ -11,10 +12,6 @@ const DAY_START = Date.UTC(2026, 8, 27);
 
 const input = (over: Partial<GapReportInput> = {}): GapReportInput => ({
   day: DAY,
-  candles: [
-    { venue: 'binance', market: 'perp', symbol: 'BTCUSDT', present: 1440, expected: 1440 },
-    { venue: 'binance', market: 'spot', symbol: 'BTCUSDT', present: 1440, expected: 1440 },
-  ],
   openInterest: [{ venue: 'binance', symbol: 'BTCUSDT', present: 288, expected: 288 }],
   longShort: [{ venue: 'binance', symbol: 'BTCUSDT', present: 288, expected: 288 }],
   gaps: [],
@@ -28,14 +25,15 @@ describe('buildGapReport — a clean day', () => {
   it('is clean when every series is complete and nothing was left unrepaired', () => {
     const report = buildGapReport(input(), GENERATED);
     expect(report.clean).toBe(true);
-    expect(report.candles).toMatchObject({ series: 2, expected: 2880, present: 2880, missing: [] });
+    expect(report.openInterest).toEqual({ symbols: 1, missing: [] });
+    expect(report).not.toHaveProperty('candles');
     expect(report.unrepaired).toEqual([]);
     expect(report.binanceWeight).toEqual({ peak1m: 178, isEstimate: false, budget: BINANCE_WEIGHT_BUDGET });
   });
 
   it('a gap that WAS repaired does not make the day dirty — that is the system working', () => {
     const report = buildGapReport(input({
-      gaps: [{ stream: 'binance-perp:kline_1m', venue: 'binance', symbol: 'BTCUSDT', gapFromMs: DAY_START, gapToMs: DAY_START + 3 * 60_000, expected: 4, repaired: 4, error: null }],
+      gaps: [{ stream: 'binance-perp:oi-ls-5m', venue: 'binance', symbol: 'BTCUSDT', gapFromMs: DAY_START, gapToMs: DAY_START + 15 * 60_000, expected: 3, repaired: 3, error: null }],
     }), GENERATED);
     expect(report.clean).toBe(true);
     expect(report.unrepaired).toEqual([]);
@@ -49,30 +47,38 @@ describe('buildGapReport — a clean day', () => {
     expect(report.openInterest.missing).toEqual([]);
   });
 
-  it('a collector that started mid-day is judged from its first row, not from midnight', () => {
-    // the reader (candleCoverage) computes `expected` from the first stored row; here that is
-    // half a day, and the collector has every minute since — a clean day, not a 720-bar hole
+  it('a poller that started mid-day is judged from its first slot, not from midnight', () => {
+    // the reader (slotCoverage) computes `expected` from the first stored slot; here that is
+    // half a day, and every slot since is present — a clean day, not a 144-slot hole
     const report = buildGapReport(input({
-      candles: [{ venue: 'bybit', market: 'perp', symbol: 'BTCUSDT', present: 720, expected: 720 }],
+      openInterest: [{ venue: 'binance', symbol: 'BTCUSDT', present: 144, expected: 144 }],
     }), GENERATED);
     expect(report.clean).toBe(true);
   });
 });
 
 describe('buildGapReport — a dirty day', () => {
-  it('lists missing candles per series, worst first, and is not clean', () => {
+  it('lists missing OI slots per symbol, worst first, and is not clean', () => {
     const report = buildGapReport(input({
-      candles: [
-        { venue: 'binance', market: 'perp', symbol: 'BTCUSDT', present: 1439, expected: 1440 },
-        { venue: 'binance', market: 'perp', symbol: 'ETHUSDT', present: 1400, expected: 1440 },
-        { venue: 'binance', market: 'spot', symbol: 'BTCUSDT', present: 1440, expected: 1440 },
+      openInterest: [
+        { venue: 'binance', symbol: 'BTCUSDT', present: 287, expected: 288 },
+        { venue: 'binance', symbol: 'ETHUSDT', present: 248, expected: 288 },
+        { venue: 'binance', symbol: 'SOLUSDT', present: 288, expected: 288 },
       ],
     }), GENERATED);
     expect(report.clean).toBe(false);
-    expect(report.candles.missing).toEqual([
-      { venue: 'binance', market: 'perp', symbol: 'ETHUSDT', missing: 40, expected: 1440 },
-      { venue: 'binance', market: 'perp', symbol: 'BTCUSDT', missing: 1, expected: 1440 },
+    expect(report.openInterest.missing).toEqual([
+      { venue: 'binance', symbol: 'ETHUSDT', missing: 40, expected: 288 },
+      { venue: 'binance', symbol: 'BTCUSDT', missing: 1, expected: 288 },
     ]);
+  });
+
+  it('OKX\'s liquidation channel is an event stream too: its silence is loss, listed like the others', () => {
+    const report = buildGapReport(input({
+      gaps: [{ stream: 'okx:liquidation-orders', venue: 'okx', symbol: null, gapFromMs: DAY_START, gapToMs: DAY_START + 5 * 60_000, expected: 0, repaired: 0, error: 'not running' }],
+    }), GENERATED);
+    expect(report.unrepaired).toEqual([{ stream: 'okx:liquidation-orders', symbol: null, minutes: 5, reason: 'not running' }]);
+    expect(report.clean).toBe(false);
   });
 
   it('missing OI or L/S slots make the day dirty', () => {
@@ -101,9 +107,9 @@ describe('buildGapReport — a dirty day', () => {
 
   it('a partially repaired gap counts as unrepaired', () => {
     const report = buildGapReport(input({
-      gaps: [{ stream: 'binance-perp:kline_1m', venue: 'binance', symbol: 'ETHUSDT', gapFromMs: DAY_START, gapToMs: DAY_START + 10 * 60_000, expected: 11, repaired: 5, error: null }],
+      gaps: [{ stream: 'binance-perp:oi-ls-5m', venue: 'binance', symbol: 'ETHUSDT', gapFromMs: DAY_START, gapToMs: DAY_START + 10 * 60_000, expected: 3, repaired: 1, error: null }],
     }), GENERATED);
-    expect(report.unrepaired[0]).toMatchObject({ stream: 'binance-perp:kline_1m', symbol: 'ETHUSDT', minutes: 10 });
+    expect(report.unrepaired[0]).toMatchObject({ stream: 'binance-perp:oi-ls-5m', symbol: 'ETHUSDT', minutes: 10 });
     expect(report.clean).toBe(false);
   });
 });
@@ -113,25 +119,27 @@ describe('renderGapReport — what the operator reads at 08:00', () => {
     const text = renderGapReport(buildGapReport(input(), GENERATED));
     expect(text).toContain('✅');
     expect(text).toContain(`за ${DAY}`);
-    expect(text).toContain('2880 из 2880');
-    expect(text).toContain('Пропущенных свечей нет');
+    expect(text).toContain('все пятиминутные слоты на месте (1 монет)');
+    expect(text).toContain('Незакрытых пропусков в потоках нет');
+    expect(text).not.toContain('свеч');
     expect(text.split('\n').length).toBeLessThan(12);
   });
 
   it('a dirty day names the symbols and the counts', () => {
     const text = renderGapReport(buildGapReport(input({
-      candles: [{ venue: 'binance', market: 'perp', symbol: 'ETHUSDT', present: 1400, expected: 1440 }],
+      openInterest: [{ venue: 'binance', symbol: 'ETHUSDT', present: 248, expected: 288 }],
       gaps: [{ stream: 'bybit:allLiquidation', venue: 'bybit', symbol: null, gapFromMs: DAY_START, gapToMs: DAY_START + 7 * 60_000, expected: 0, repaired: 0, error: 'socket down' }],
     }), GENERATED));
     expect(text).toContain('⚠️');
-    expect(text).toContain('ETHUSDT: нет 40 из 1440');
+    expect(text).toContain('ETHUSDT: нет 40 из 288');
     expect(text).toContain('bybit:allLiquidation: 7 мин — socket down');
   });
 
   it('caps the list so one bad night cannot produce a 300-line message', () => {
-    const many = Array.from({ length: 30 }, (_, i) => ({ venue: 'binance', market: 'perp', symbol: `SYM${i}USDT`, present: 0, expected: 1440 }));
-    const text = renderGapReport(buildGapReport(input({ candles: many }), GENERATED));
-    expect(text).toContain('…и ещё 22');
+    const many = Array.from({ length: 30 }, (_, i) => ({ venue: 'binance', symbol: `SYM${i}USDT`, present: 0, expected: 288 }));
+    const text = renderGapReport(buildGapReport(input({ openInterest: many }), GENERATED));
+    expect(text).toContain('не хватает слотов у 30 монет');
+    expect(text.split('\n').filter((l) => l.startsWith('  • SYM'))).toHaveLength(8);
     expect(text.split('\n').length).toBeLessThan(20);
   });
 

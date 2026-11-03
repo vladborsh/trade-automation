@@ -46,14 +46,6 @@ maybeDescribe('IB-031 series reads against a real database', () => {
     db = new PgDatabase(url.toString());
     await new PartitionMaintenanceService(db).ensureRange(new Date(DAY), new Date(DAY + 2 * 86_400_000));
 
-    // one full day of 1m bars, so the thinning has something real to thin
-    const candles = new BatchWriter<t.Candle1mRow>(db, t.CANDLES_1M, t.candle1mTuple);
-    await candles.write(Array.from({ length: 1440 }, (_, i) => ({
-      venue: 'binance', market: 'perp' as const, symbol: 'BTCUSDT', openTime: new Date(DAY + i * MIN),
-      open: 100 + i, high: 101 + i, low: 99 + i, close: 100.5 + i, volume: 1 + i,
-      takerBuyVolume: 0.5, source: 'archive' as const,
-    })));
-
     // IB-BUG-011: the reads resolve a canonical symbol to each venue's own spelling, so the map
     // has to exist here as it does in production. Without it the fixtures below would prove only
     // that a string matches itself, which is exactly how the bug survived.
@@ -82,14 +74,6 @@ maybeDescribe('IB-031 series reads against a real database', () => {
     await oi.write(Array.from({ length: 288 }, (_, i) => ({
       venue: 'binance', symbol: 'BTCUSDT', ts: new Date(DAY + i * 5 * MIN), oiBase: 1000 + i, oiQuote: null, source: 'archive' as const,
     })));
-
-    const funding = new BatchWriter<t.FundingSettlementRow>(db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple);
-    await funding.write([
-      { venue: 'binance', symbol: 'BTCUSDT', fundingTime: new Date(DAY), rate: 0.0001, source: 'archive' },
-      { venue: 'bybit', symbol: 'BTCUSDT', fundingTime: new Date(DAY + 8 * 3_600_000), rate: -0.0002, source: 'rest' },
-      // same trap as the liquidation row above, and the same 318 real OKX settlements it hid
-      { venue: 'okx', symbol: 'BTC-USDT-SWAP', fundingTime: new Date(DAY + 16 * 3_600_000), rate: 0.0003, source: 'rest' },
-    ]);
   }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {

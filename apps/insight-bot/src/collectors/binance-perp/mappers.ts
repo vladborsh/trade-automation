@@ -1,6 +1,5 @@
-import type { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
-import type { ForceOrderEvent, MarkPriceEvent } from './payloads';
-import type { FundingRateRow, PremiumIndexRow } from '../../venues/binance/payloads';
+import type { LiquidationRow } from '../writers/tables';
+import type { ForceOrderEvent } from './payloads';
 import { VENUE } from '../binance-common/venue';
 
 /**
@@ -26,38 +25,6 @@ function requiredNum(value: string, field: string): number {
   const n = value === '' ? NaN : Number(value);
   if (!Number.isFinite(n)) throw new RangeError(`${field}: expected a number, got ${JSON.stringify(value)}`);
   return n;
-}
-
-/**
- * `markPriceUpdate` → a `mark_funding_1m` row, stamped `ts`. The caller decides the stamp: the
- * minute boundary for the per-minute sample (D5), or the settlement second for the last prediction
- * before a funding settlement (§4.1) — the event's own `E` is never the row's time.
- */
-export function markRowFromEvent(event: MarkPriceEvent, ts: Date, source: MarkFundingRow['source'] = 'ws'): MarkFundingRow {
-  return {
-    venue: VENUE,
-    symbol: event.s,
-    ts,
-    markPrice: num(event.p),
-    indexPrice: num(event.i),
-    predictedFundingRate: num(event.r),
-    nextFundingTime: event.T > 0 ? new Date(event.T) : null,
-    source,
-  };
-}
-
-/** `GET /fapi/v1/premiumIndex` row → the same shape, for degraded mode (§16.1). */
-export function markRowFromPremiumIndex(row: PremiumIndexRow, ts: Date): MarkFundingRow {
-  return {
-    venue: VENUE,
-    symbol: row.symbol,
-    ts,
-    markPrice: num(row.markPrice),
-    indexPrice: num(row.indexPrice),
-    predictedFundingRate: num(row.lastFundingRate),
-    nextFundingTime: row.nextFundingTime > 0 ? new Date(row.nextFundingTime) : null,
-    source: 'rest',
-  };
 }
 
 /**
@@ -138,14 +105,3 @@ function assertEngineOrderSide(o: ForceOrderEvent['o']): void {
   }
 }
 
-/** `GET /fapi/v1/fundingRate` row → a `funding_settlements` row (§4.1). */
-export function fundingSettlementRow(row: FundingRateRow): FundingSettlementRow {
-  return {
-    venue: VENUE,
-    symbol: row.symbol,
-    fundingTime: new Date(row.fundingTime),
-    rate: requiredNum(row.fundingRate, 'fundingRate'),
-    markPrice: num(row.markPrice),
-    source: 'rest',
-  };
-}

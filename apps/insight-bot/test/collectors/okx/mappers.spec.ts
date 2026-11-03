@@ -1,20 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { contractSpecs, contractsToBase, parseContractSpec } from '../../../src/venues/okx/contract-size';
-import {
-  fundingTimeOf,
-  liquidationRows,
-  markRow,
-  predictedFundingRow,
-  settlementRowFromWs,
-  settlementRowsFromHistory,
-} from '../../../src/collectors/okx/mappers';
-import {
-  OkxFundingRate,
-  OkxLiquidation,
-  OkxMarkPrice,
-  OkxMessage,
-} from '../../../src/collectors/okx/payloads';
+import { liquidationRows } from '../../../src/collectors/okx/mappers';
+import { OkxLiquidation, OkxMessage } from '../../../src/collectors/okx/payloads';
 import { OkxInstrument } from '../../../src/venues/okx/payloads';
 
 /** Captured live from ws.okx.com / www.okx.com on 2026-09-28. */
@@ -51,77 +39,6 @@ describe('contract size (OKX quotes sizes in contracts)', () => {
       { instId: 'BAD-USDT-SWAP', ctVal: 'n/a', ctValCcy: 'B', ctMult: '1' },
     ] as OkxInstrument[]);
     expect([...specs.keys()]).toEqual(['GOOD-USDT-SWAP']);
-  });
-});
-
-describe('mark-price (real payload)', () => {
-  const message = fixture<OkxMessage<OkxMarkPrice>[]>('mark-price')[0];
-
-  it('maps the mark and leaves the index null — the channel carries no index price', () => {
-    const row = markRow(message.data[0]);
-    expect(row).toMatchObject({ venue: 'okx', symbol: 'BTC-USDT-SWAP', source: 'ws', indexPrice: null });
-    expect(row.markPrice).toBe(Number(message.data[0].markPx));
-    expect(row.ts).toEqual(new Date(Number(message.data[0].ts)));
-  });
-
-  it('never fabricates the index from the mark', () => {
-    expect(markRow(message.data[0]).indexPrice).not.toBe(markRow(message.data[0]).markPrice);
-  });
-});
-
-describe('funding-rate (real payload)', () => {
-  const message = fixture<OkxMessage<OkxFundingRate>>('funding-rate');
-  const event = message.data[0];
-
-  it('takes next_funding_time from fundingTime, NOT nextFundingTime', () => {
-    // The naming trap: fundingTime is the upcoming settlement; nextFundingTime is the one after.
-    expect(fundingTimeOf(event)).toEqual(new Date(Number(event.fundingTime)));
-    expect(Number(event.nextFundingTime)).toBeGreaterThan(Number(event.fundingTime));
-    expect(predictedFundingRow(event).nextFundingTime).toEqual(new Date(Number(event.fundingTime)));
-  });
-
-  it('the observed intervals are 8 h apart in both directions', () => {
-    const EIGHT_HOURS = 8 * 60 * 60 * 1000;
-    expect(Number(event.fundingTime) - Number(event.prevFundingTime)).toBe(EIGHT_HOURS);
-    expect(Number(event.nextFundingTime) - Number(event.fundingTime)).toBe(EIGHT_HOURS);
-  });
-
-  it('carries the prediction and no mark — the two channels are merged by the collector', () => {
-    const row = predictedFundingRow(event);
-    expect(row.predictedFundingRate).toBe(Number(event.fundingRate));
-    expect(row.markPrice).toBeNull();
-  });
-
-  it('emits a settlement row only when the venue says an interval settled', () => {
-    const settled = settlementRowFromWs(event);
-    if (event.settState === 'settled' && event.settFundingRate) {
-      expect(settled).toMatchObject({ venue: 'okx', symbol: event.instId, rate: Number(event.settFundingRate) });
-      expect(settled!.fundingTime).toEqual(new Date(Number(event.prevFundingTime)));
-    }
-    expect(settlementRowFromWs({ ...event, settState: 'ongoing' })).toBeNull();
-    expect(settlementRowFromWs({ ...event, settFundingRate: '' })).toBeNull();
-  });
-});
-
-describe('funding-rate-history (real payload)', () => {
-  const rows = fixture<{ data: Parameters<typeof settlementRowsFromHistory>[0] }>('funding-rate-history').data;
-
-  it('prefers realizedRate — what was actually charged', () => {
-    const mapped = settlementRowsFromHistory(rows);
-    expect(mapped).toHaveLength(rows.length);
-    expect(mapped[0]).toMatchObject({ venue: 'okx', symbol: 'BTC-USDT-SWAP', source: 'rest', markPrice: null });
-    expect(mapped[0].rate).toBe(Number(rows[0].realizedRate));
-  });
-
-  it('falls back to fundingRate when the venue omits realizedRate', () => {
-    const [row] = settlementRowsFromHistory([{ ...rows[0], realizedRate: '' }]);
-    expect(row.rate).toBe(Number(rows[0].fundingRate));
-  });
-
-  it('here fundingTime is a SETTLED interval, unlike the WS channel', () => {
-    const [row] = settlementRowsFromHistory(rows);
-    expect(row.fundingTime).toEqual(new Date(Number(rows[0].fundingTime)));
-    expect(row.fundingTime.getTime()).toBeLessThan(Date.now());
   });
 });
 

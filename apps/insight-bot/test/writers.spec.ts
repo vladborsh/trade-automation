@@ -18,16 +18,16 @@ describe('buildUpsert', () => {
   });
 
   it('enforces the 500-row cap and a sane row count', () => {
-    expect(() => buildUpsert(t.CANDLES_1M, MAX_ROWS_PER_STATEMENT + 1)).toThrow(/exceeds the 500-row cap/);
-    expect(() => buildUpsert(t.CANDLES_1M, 0)).toThrow(/positive integer/);
-    expect(buildUpsert(t.CANDLES_1M, MAX_ROWS_PER_STATEMENT)).toContain(`$${MAX_ROWS_PER_STATEMENT * t.CANDLES_1M.columns.length}`);
+    expect(() => buildUpsert(t.OPEN_INTEREST_5M, MAX_ROWS_PER_STATEMENT + 1)).toThrow(/exceeds the 500-row cap/);
+    expect(() => buildUpsert(t.OPEN_INTEREST_5M, 0)).toThrow(/positive integer/);
+    expect(buildUpsert(t.OPEN_INTEREST_5M, MAX_ROWS_PER_STATEMENT)).toContain(`$${MAX_ROWS_PER_STATEMENT * t.OPEN_INTEREST_5M.columns.length}`);
   });
 
   it('refuses a conflict column that is not being inserted, and a non-identifier name', () => {
-    expect(() => buildUpsert({ table: 'candles_1m', columns: ['venue'], conflict: ['symbol'] }, 1)).toThrow(
+    expect(() => buildUpsert({ table: 'open_interest_5m', columns: ['venue'], conflict: ['symbol'] }, 1)).toThrow(
       /Conflict column 'symbol' is not among/,
     );
-    expect(() => buildUpsert({ table: 'candles_1m; drop table symbols', columns: ['venue'], conflict: ['venue'] }, 1)).toThrow(
+    expect(() => buildUpsert({ table: 'open_interest_5m; drop table symbols', columns: ['venue'], conflict: ['venue'] }, 1)).toThrow(
       /Invalid table/,
     );
   });
@@ -43,10 +43,6 @@ describe('buildUpsert', () => {
 
 describe('the §3.3 table specs', () => {
   const specs: Array<[string, { table: string; columns: readonly string[]; conflict: readonly string[] }, (row: never) => unknown[], unknown]> = [
-    ['candles_1m', t.CANDLES_1M, t.candle1mTuple as never, { venue: 'binance', market: 'perp', symbol: 'BTCUSDT', openTime: new Date(0), open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, source: 'ws' }],
-    ['candles_agg', t.CANDLES_AGG, t.candleAggTuple as never, { venue: 'binance', market: 'perp', symbol: 'BTCUSDT', tf: '15m', openTime: new Date(0), open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, bars: 15, complete: true }],
-    ['mark_funding_1m', t.MARK_FUNDING_1M, t.markFundingTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), source: 'ws' }],
-    ['funding_settlements', t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple as never, { venue: 'binance', symbol: 'BTCUSDT', fundingTime: new Date(0), rate: 0.0001, source: 'rest' }],
     ['open_interest_5m', t.OPEN_INTEREST_5M, t.openInterestTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), oiBase: 100, source: 'rest' }],
     ['long_short_5m', t.LONG_SHORT_5M, t.longShortTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), kind: 'taker', source: 'rest' }],
     ['liquidations', t.LIQUIDATIONS, t.liquidationTuple as never, { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), side: 'long', price: 1, qty: 2, notional: 2, source: 'ws' }],
@@ -71,14 +67,9 @@ describe('the §3.3 table specs', () => {
   it('maps an omitted optional field to null, not to 0 or undefined', () => {
     // §2.3's rule for a missing spot market applies to every nullable column: a value the venue
     // did not send is null, never a silent zero.
-    const tuple = t.candle1mTuple({
-      venue: 'binance', market: 'spot', symbol: 'BTCUSDT', openTime: new Date(0),
-      open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, source: 'ws',
-    });
-    expect(tuple.slice(9, 13)).toEqual([null, null, null, null]);
-    expect(t.markFundingTuple({ venue: 'bybit', symbol: 'BTCUSDT', ts: new Date(0), source: 'ws' }).slice(3, 7)).toEqual([
-      null, null, null, null,
-    ]);
+    expect(t.openInterestTuple({ venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), oiBase: 100, source: 'rest' })[4]).toBeNull();
+    const ls = t.longShortTuple({ venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), kind: 'taker', source: 'rest' });
+    expect(ls.slice(4).filter((v) => v === undefined || v === 0)).toEqual([]);
   });
 
   it('defaults a gap row\'s repaired count to 0, since none of it is repaired yet', () => {
@@ -109,33 +100,31 @@ class FakeDb implements Db {
 }
 
 describe('BatchWriter', () => {
-  const row = (minute: number): t.Candle1mRow => ({
-    venue: 'binance', market: 'perp', symbol: 'BTCUSDT',
-    openTime: new Date(Date.UTC(2026, 8, 28, 0, minute)),
-    open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, source: 'ws',
+  const row = (slot: number): t.OpenInterestRow => ({
+    venue: 'binance', symbol: 'BTCUSDT', ts: new Date(Date.UTC(2026, 8, 28) + slot * 300_000), oiBase: 100 + slot, source: 'rest',
   });
 
   it('writes nothing, and runs no statement, for an empty batch', async () => {
     const db = new FakeDb();
-    expect(await new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple).write([])).toBe(0);
+    expect(await new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple).write([])).toBe(0);
     expect(db.calls).toHaveLength(0);
   });
 
   it('sends one statement per 500 rows and flattens the tuples in column order', async () => {
     const db = new FakeDb();
     const rows = Array.from({ length: 501 }, (_, i) => row(i));
-    expect(await new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple).write(rows)).toBe(501);
+    expect(await new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple).write(rows)).toBe(501);
 
     expect(db.calls).toHaveLength(2);
-    expect(db.calls[0].params).toHaveLength(500 * t.CANDLES_1M.columns.length);
-    expect(db.calls[1].params).toHaveLength(1 * t.CANDLES_1M.columns.length);
-    expect(db.calls[0].params.slice(0, 4)).toEqual(['binance', 'perp', 'BTCUSDT', rows[0].openTime]);
-    for (const call of db.calls) expect(call.sql).toContain('on conflict (venue, market, symbol, open_time) do update');
+    expect(db.calls[0].params).toHaveLength(500 * t.OPEN_INTEREST_5M.columns.length);
+    expect(db.calls[1].params).toHaveLength(1 * t.OPEN_INTEREST_5M.columns.length);
+    expect(db.calls[0].params.slice(0, 4)).toEqual(['binance', 'BTCUSDT', rows[0].ts, 100]);
+    for (const call of db.calls) expect(call.sql).toContain('on conflict (venue, symbol, ts) do update');
   });
 
   it('is idempotent by construction: the same batch twice issues the same upsert', async () => {
     const db = new FakeDb();
-    const writer = new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple);
+    const writer = new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple);
     await writer.write([row(0)]);
     await writer.write([row(0)]);
     expect(db.calls[0]).toEqual(db.calls[1]);
@@ -144,38 +133,39 @@ describe('BatchWriter', () => {
   it('counts the rows it wrote on ib_rows_written_total{table}', async () => {
     const inc = jest.fn();
     const metrics = { rowsWritten: { inc } } as never;
-    await new BatchWriter(new FakeDb(), t.CANDLES_1M, t.candle1mTuple, metrics).write([row(0), row(1)]);
-    expect(inc).toHaveBeenCalledWith({ table: 'candles_1m' }, 2);
+    await new BatchWriter(new FakeDb(), t.OPEN_INTEREST_5M, t.openInterestTuple, metrics).write([row(0), row(1)]);
+    expect(inc).toHaveBeenCalledWith({ table: 'open_interest_5m' }, 2);
   });
 
   it('runs on a caller-supplied handle, so a collector can write several tables in one transaction', async () => {
     const db = new FakeDb();
     await db.transaction(async (tx) => {
-      await new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple).writeOn(tx, [row(0)]);
+      await new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple).writeOn(tx, [row(0)]);
       await new BatchWriter(db, t.LIQUIDATIONS, t.liquidationTuple).writeOn(tx, [
         { venue: 'binance', symbol: 'BTCUSDT', ts: new Date(0), side: 'long', price: 1, qty: 2, notional: 2, source: 'ws' },
       ]);
     });
-    expect(db.calls.map((c) => c.sql.split(' ')[2])).toEqual(['candles_1m', 'liquidations']);
+    expect(db.calls.map((c) => c.sql.split(' ')[2])).toEqual(['open_interest_5m', 'liquidations']);
   });
 });
 
 describe('IB-BUG-015 — a batch naming one natural key twice', () => {
-  const settlement = (rate: number, symbol = 'BTC-USDT-SWAP'): t.FundingSettlementRow => ({
-    venue: 'okx', symbol, fundingTime: new Date(Date.UTC(2026, 10, 3, 8)), rate, markPrice: null, source: 'ws',
+  // since WD-010 the repeat-key batch is the OI poll overlapping the boot backfill: same slot twice
+  const oi = (oiBase: number, symbol = 'BTCUSDT'): t.OpenInterestRow => ({
+    venue: 'binance', symbol, ts: new Date(Date.UTC(2026, 10, 3, 8)), oiBase, source: 'rest',
   });
 
   it('sends one row per key, the last one winning, and counts what it sent', async () => {
     const db = new FakeDb();
     const inc = jest.fn();
-    const writer = new BatchWriter(db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple, { rowsWritten: { inc } } as never);
+    const writer = new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple, { rowsWritten: { inc } } as never);
     // a NEW Date per row, as the mapper makes them: equal instants, different objects
-    expect(await writer.write([settlement(0.0001), settlement(0.0002, 'ETH-USDT-SWAP'), settlement(0.0003)])).toBe(2);
+    expect(await writer.write([oi(1), oi(2, 'ETHUSDT'), oi(3)])).toBe(2);
 
     expect(db.calls).toHaveLength(1);
-    const rows = chunkParams(db.calls[0].params, t.FUNDING_SETTLEMENTS.columns.length);
-    expect(rows.map((r) => [r[1], r[3]])).toEqual([['ETH-USDT-SWAP', 0.0002], ['BTC-USDT-SWAP', 0.0003]]);
-    expect(inc).toHaveBeenCalledWith({ table: 'funding_settlements' }, 2);
+    const rows = chunkParams(db.calls[0].params, t.OPEN_INTEREST_5M.columns.length);
+    expect(rows.map((r) => [r[1], r[3]])).toEqual([['ETHUSDT', 2], ['BTCUSDT', 3]]);
+    expect(inc).toHaveBeenCalledWith({ table: 'open_interest_5m' }, 2);
   });
 
   it('leaves a DO NOTHING table and an append-only one exactly as given', () => {
@@ -186,10 +176,10 @@ describe('IB-BUG-015 — a batch naming one natural key twice', () => {
   });
 
   it('keeps rows whose keys differ only in a way Postgres also tells apart', () => {
-    const a = t.markFundingTuple({ venue: 'okx', symbol: 'X', ts: new Date(60_000), source: 'ws' });
-    const b = t.markFundingTuple({ venue: 'okx', symbol: 'X', ts: new Date(60_001), source: 'ws' });
-    const c = t.markFundingTuple({ venue: 'bybit', symbol: 'X', ts: new Date(60_000), source: 'ws' });
-    expect(lastPerConflictKey(t.MARK_FUNDING_1M, [a, b, c])).toHaveLength(3);
+    const a = t.openInterestTuple({ venue: 'binance', symbol: 'X', ts: new Date(300_000), oiBase: 1, source: 'rest' });
+    const b = t.openInterestTuple({ venue: 'binance', symbol: 'X', ts: new Date(300_001), oiBase: 1, source: 'rest' });
+    const c = t.openInterestTuple({ venue: 'bybit', symbol: 'X', ts: new Date(300_000), oiBase: 1, source: 'rest' });
+    expect(lastPerConflictKey(t.OPEN_INTEREST_5M, [a, b, c])).toHaveLength(3);
   });
 
   it('a refused statement names its table and the row count', async () => {
@@ -197,8 +187,8 @@ describe('IB-BUG-015 — a batch naming one natural key twice', () => {
       query: async () => { throw new Error('ON CONFLICT DO UPDATE command cannot affect row a second time'); },
       transaction: async (fn) => fn(db),
     };
-    await expect(new BatchWriter(db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple).write([settlement(0.0001)])).rejects.toThrow(
-      'funding_settlements: write of 1 of 1 row(s) failed: ON CONFLICT DO UPDATE command cannot affect row a second time',
+    await expect(new BatchWriter(db, t.OPEN_INTEREST_5M, t.openInterestTuple).write([oi(1)])).rejects.toThrow(
+      'open_interest_5m: write of 1 of 1 row(s) failed: ON CONFLICT DO UPDATE command cannot affect row a second time',
     );
   });
 });

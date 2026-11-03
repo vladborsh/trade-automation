@@ -1,9 +1,13 @@
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import { BatchWriter } from '../../src/collectors/writers/batch-writer';
-import * as t from '../../src/collectors/writers/tables';
+import * as live from '../../src/collectors/writers/tables';
+import * as retired from './retired-tables';
+
+// WD-010: candles and funding are no longer written by the app; their specs live in retired-tables.ts
+const t = { ...live, ...retired };
 import { runMigrations } from '../../src/db/migration-runner';
-import { PARTITIONED_TABLES } from '../../src/db/partitions';
+import { buildCreatePartition, monthsBetween, PARTITIONED_TABLES, partitionsFor } from '../../src/db/partitions';
 import { PartitionMaintenanceService } from '../../src/db/partitions.service';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
@@ -22,6 +26,24 @@ if (!DATABASE_URL) {
   console.warn('migration-002.integration.spec.ts: DATABASE_URL not set — skipping the time-series schema tests.');
 }
 const maybeDescribe = DATABASE_URL ? describe : describe.skip;
+
+/**
+ * WD-010: every RANGE-partitioned table the migrations create. The app maintains partitions only for
+ * the tables it still writes (`PARTITIONED_TABLES`, a subset); the schema still has the rest until
+ * WD-006 drops them, so this spec creates their months itself to exercise migration 002.
+ */
+const SCHEMA_PARTITIONED_TABLES = [
+  { table: 'candles_1m', column: 'open_time' },
+  { table: 'candles_agg', column: 'open_time' },
+  { table: 'mark_funding_1m', column: 'ts' },
+  { table: 'open_interest_5m', column: 'ts' },
+  { table: 'long_short_5m', column: 'ts' },
+  { table: 'liquidations', column: 'ts' },
+  { table: 'collector_gaps', column: 'detected_at' },
+  { table: 'feature_frames', column: 'close_time' },
+  { table: 'playbook_evaluations', column: 'close_time' },
+  { table: 'playbook_frame_pins', column: 'close_time' },
+];
 
 const TABLES_002 = [
   'candles_1m', 'candles_agg', 'mark_funding_1m', 'funding_settlements',
@@ -71,7 +93,9 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
           where c.relkind = 'p' order by c.relname`,
       )
     );
-    expect(partitioned.map((r) => r.relname).sort()).toEqual([...PARTITIONED_TABLES.map((t) => t.table)].sort());
+    expect(partitioned.map((r) => r.relname).sort()).toEqual([...SCHEMA_PARTITIONED_TABLES.map((t) => t.table)].sort());
+    // and the app maintains a subset of them — never a table the schema does not partition
+    for (const t of PARTITIONED_TABLES) expect(SCHEMA_PARTITIONED_TABLES.map((x) => x.table)).toContain(t.table);
     for (const row of partitioned) expect(row.strategy).toBe('r'); // RANGE
   });
 
@@ -85,7 +109,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
 
   describe('a write into a month with no partition', () => {
     const ts = new Date(Date.UTC(2031, 6, 15, 12, 0)); // 2031-07: far outside any month maintenance prepares
-    const row: t.Candle1mRow = {
+    const row: retired.Candle1mRow = {
       venue: 'binance', market: 'perp', symbol: 'BTCUSDT', openTime: ts,
       open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, source: 'ws',
     };
@@ -96,10 +120,9 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
       );
     });
 
-    it('succeeds once maintenance creates that month, and the row lands in that partition', async () => {
-      const service = new PartitionMaintenanceService(db);
-      const created = await service.ensureRange(ts, ts);
-      expect(created).toBe(PARTITIONED_TABLES.length);
+    it('succeeds once that month\'s partition exists, and the row lands in it', async () => {
+      const created = await ensureSchemaRange(ts, ts);
+      expect(created).toBe(SCHEMA_PARTITIONED_TABLES.length);
 
       expect(await new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple).write([row])).toBe(1);
       const [stored] = await db.query<{ tableoid: string; close: number }>(
@@ -115,14 +138,23 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
     const service = new PartitionMaintenanceService(db);
     const now = new Date(Date.UTC(2030, 10, 20)); // 2030-11 .. 2031-02
     await service.ensureAhead(now);
-    const before = await partitionNames('candles_1m');
+    const before = await partitionNames('liquidations');
     expect(before).toEqual(expect.arrayContaining([
-      'candles_1m_2030_11', 'candles_1m_2030_12', 'candles_1m_2031_01', 'candles_1m_2031_02',
+      'liquidations_2030_11', 'liquidations_2030_12', 'liquidations_2031_01', 'liquidations_2031_02',
     ]));
 
     await service.ensureAhead(now); // IF NOT EXISTS: same set, no error
-    expect(await partitionNames('candles_1m')).toEqual(before);
+    expect(await partitionNames('liquidations')).toEqual(before);
+    // WD-010: a table the app no longer writes gets no new months
+    expect(await partitionNames('candles_1m')).not.toContain('candles_1m_2031_02');
   });
+
+  /** Creates `from..to`'s months for EVERY partitioned table in the schema (see SCHEMA_PARTITIONED_TABLES). */
+  const ensureSchemaRange = async (from: Date, to: Date): Promise<number> => {
+    const partitions = partitionsFor(monthsBetween(from, to), SCHEMA_PARTITIONED_TABLES);
+    for (const p of partitions) await db.query(buildCreatePartition(p, SCHEMA_PARTITIONED_TABLES));
+    return partitions.length;
+  };
 
   const partitionNames = async (parent: string): Promise<string[]> =>
     (await db.query<{ relname: string }>(
@@ -135,12 +167,12 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
     const month = new Date(Date.UTC(2030, 0, 15, 0, 0));
 
     beforeAll(async () => {
-      await new PartitionMaintenanceService(db).ensureRange(month, month);
+      await ensureSchemaRange(month, month);
     }, DB_HOOK_TIMEOUT_MS);
 
     it('re-writing the same batch changes nothing (D12 idempotency on the natural key)', async () => {
       const writer = new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple);
-      const rows: t.Candle1mRow[] = Array.from({ length: 3 }, (_, i) => ({
+      const rows: retired.Candle1mRow[] = Array.from({ length: 3 }, (_, i) => ({
         venue: 'binance', market: 'perp', symbol: 'IDEMPUSDT',
         openTime: new Date(month.getTime() + i * 60_000),
         open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, source: 'ws',
@@ -156,7 +188,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
 
     it('a re-write with new values updates in place, and keeps one row per key', async () => {
       const writer = new BatchWriter(db, t.CANDLES_1M, t.candle1mTuple);
-      const base: t.Candle1mRow = {
+      const base: retired.Candle1mRow = {
         venue: 'binance', market: 'perp', symbol: 'UPDUSDT', openTime: month,
         open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, source: 'ws',
       };
@@ -172,7 +204,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
 
     it('keeps the first liquidation event on a replay (DO NOTHING), never a duplicate', async () => {
       const writer = new BatchWriter(db, t.LIQUIDATIONS, t.liquidationTuple);
-      const event: t.LiquidationRow = {
+      const event: live.LiquidationRow = {
         venue: 'binance', symbol: 'LIQUSDT', ts: month, side: 'long',
         price: 100, qty: 2, notional: 200, orderStatus: 'FILLED', source: 'ws',
       };
@@ -187,7 +219,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
 
     it('appends a collector_gaps row per observation, since it has no natural key', async () => {
       const writer = new BatchWriter(db, t.COLLECTOR_GAPS, t.collectorGapTuple);
-      const gap: t.CollectorGapRow = {
+      const gap: live.CollectorGapRow = {
         stream: 'binance-perp:kline_1m', venue: 'binance', market: 'perp', symbol: 'GAPUSDT',
         gapFrom: month, gapTo: new Date(month.getTime() + 180_000), expected: 3, detectedAt: month,
       };

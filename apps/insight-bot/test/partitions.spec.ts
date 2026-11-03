@@ -74,16 +74,15 @@ describe('partitionsFor', () => {
     // An "and nothing else" pin, deliberately: a table joining this list silently means its
     // partitions start being created by a maintenance job nobody reviewed, and a table LEAVING
     // it silently means writes start failing at the next month boundary.
+    // WD-010 (storage ruling 2026-11-03): only what the box still WRITES. The candle, mark,
+    // feature-frame and playbook tables stay in the schema until WD-006 drops them, with no new
+    // months — nothing writes there any more.
     expect(PARTITIONED_TABLES.map((t) => t.table)).toEqual([
-      // migration 002
-      'candles_1m', 'candles_agg', 'mark_funding_1m', 'open_interest_5m', 'long_short_5m', 'liquidations', 'collector_gaps',
-      // migration 011 (IB-015)
-      'feature_frames',
-      // migration 015 (IB-017) — the per-close audit row
-      'playbook_evaluations',
-      // migration 018 (IB-054) — one frame pin per close per mode, no arm dimension
-      'playbook_frame_pins',
+      'open_interest_5m', 'long_short_5m', 'liquidations', 'collector_gaps',
     ]);
+    for (const retired of ['candles_1m', 'candles_agg', 'mark_funding_1m', 'feature_frames', 'playbook_evaluations', 'playbook_frame_pins']) {
+      expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain(retired);
+    }
     // The two unpartitioned tables of §3.3 must not appear.
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('funding_settlements');
     expect(PARTITIONED_TABLES.map((t) => t.table)).not.toContain('calendar_events');
@@ -104,18 +103,18 @@ describe('buildCreatePartition — the bounds are explicitly UTC', () => {
     // A bare '2026-09-01' is resolved in the DATABASE SESSION's timezone, not the app's. Found
     // by IB-012: on a US/Pacific session every partition slid 7 hours, so the first 7 hours of
     // each month had no partition and the insert failed with "no partition of relation found".
-    const sql = buildCreatePartition({ table: 'candles_1m', month: '2026-09', name: 'candles_1m_2026_09', from: '2026-09-01', to: '2026-10-01' });
+    const sql = buildCreatePartition({ table: 'liquidations', month: '2026-09', name: 'liquidations_2026_09', from: '2026-09-01', to: '2026-10-01' });
     expect(sql).toContain("from ('2026-09-01 00:00:00+00')");
     expect(sql).toContain("to ('2026-10-01 00:00:00+00')");
   });
 });
 
 describe('buildCreatePartition', () => {
-  const partition = partitionsFor(['2026-09'], [{ table: 'candles_1m', column: 'open_time' }])[0];
+  const partition = partitionsFor(['2026-09'], [{ table: 'liquidations', column: 'ts' }])[0];
 
   it('builds an IF NOT EXISTS statement, so re-running maintenance is a no-op', () => {
     expect(buildCreatePartition(partition)).toBe(
-      "create table if not exists candles_1m_2026_09 partition of candles_1m for values from ('2026-09-01 00:00:00+00') to ('2026-10-01 00:00:00+00')",
+      "create table if not exists liquidations_2026_09 partition of liquidations for values from ('2026-09-01 00:00:00+00') to ('2026-10-01 00:00:00+00')",
     );
   });
 
@@ -127,7 +126,7 @@ describe('buildCreatePartition', () => {
 
   it('refuses a month or a name that did not come from this module', () => {
     // DDL takes no bind parameters, so both identifiers are interpolated; these are the guards.
-    expect(() => buildCreatePartition({ ...partition, month: "2026-09'; drop table candles_1m; --" })).toThrow(
+    expect(() => buildCreatePartition({ ...partition, month: "2026-09'; drop table liquidations; --" })).toThrow(
       /Not a YYYY-MM month/,
     );
     expect(() => buildCreatePartition({ ...partition, name: 'something_else' })).toThrow(/does not match/);

@@ -7,7 +7,11 @@ import { mapWsKline, type BinanceWsKlineMessage } from '@trade-automation/binanc
  * `wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m` on 2026-09-28. `PERP_SHAPED` is
  * the same frame with USD-M's values: the two are the same keys, the same types and the same
  * nesting, which is why `binance-client`'s one parser serves both markets and there is no spot
- * variant of it (`src/collectors/binance-spot/payloads.ts`).
+ * variant of it.
+ *
+ * WD-010 removed the spot collector (`src/collectors/binance-spot/`), but this spec tests
+ * `binance-client`'s parser, which stays — so the spec stays with it (a spec goes only with the
+ * code it tests).
  */
 
 const CAPTURED = {
