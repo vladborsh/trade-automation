@@ -1,0 +1,671 @@
+{
+ "_captured": "2026-11-03 ~14:45 UTC, GET fapi.binance.com/fapi/v1/exchangeInfo (weight 1, one probe; IB-084). Trimmed to the fields the classifier reads, every universe symbol, and one symbol of each (contractType, underlyingType) seen.",
+ "symbols": [
+  {
+   "symbol": "BTCUSDT",
+   "pair": "BTCUSDT",
+   "baseAsset": "BTC",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "PoW",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ETHUSDT",
+   "pair": "ETHUSDT",
+   "baseAsset": "ETH",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BCHUSDT",
+   "pair": "BCHUSDT",
+   "baseAsset": "BCH",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Payment",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "XRPUSDT",
+   "pair": "XRPUSDT",
+   "baseAsset": "XRP",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Payment",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "LTCUSDT",
+   "pair": "LTCUSDT",
+   "baseAsset": "LTC",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Payment",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "LINKUSDT",
+   "pair": "LINKUSDT",
+   "baseAsset": "LINK",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Infrastructure",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ADAUSDT",
+   "pair": "ADAUSDT",
+   "baseAsset": "ADA",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "DASHUSDT",
+   "pair": "DASHUSDT",
+   "baseAsset": "DASH",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "PoW",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ZECUSDT",
+   "pair": "ZECUSDT",
+   "baseAsset": "ZEC",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "PoW",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BNBUSDT",
+   "pair": "BNBUSDT",
+   "baseAsset": "BNB",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "pair": "DOGEUSDT",
+   "baseAsset": "DOGE",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Meme",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "DEFIUSDT",
+   "pair": "DEFIUSDT",
+   "baseAsset": "DEFI",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "INDEX",
+   "underlyingSubType": [
+    "Index"
+   ],
+   "status": "SETTLING"
+  },
+  {
+   "symbol": "SOLUSDT",
+   "pair": "SOLUSDT",
+   "baseAsset": "SOL",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "UNIUSDT",
+   "pair": "UNIUSDT",
+   "baseAsset": "UNI",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "DeFi",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "pair": "AVAXUSDT",
+   "baseAsset": "AVAX",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "NEARUSDT",
+   "pair": "NEARUSDT",
+   "baseAsset": "NEAR",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "AAVEUSDT",
+   "pair": "AAVEUSDT",
+   "baseAsset": "AAVE",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "DeFi",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "FILUSDT",
+   "pair": "FILUSDT",
+   "baseAsset": "FIL",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Storage",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ONEUSDT",
+   "pair": "ONEUSDT",
+   "baseAsset": "ONE",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-2",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "QNTUSDT",
+   "pair": "QNTUSDT",
+   "baseAsset": "QNT",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Infrastructure",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ARBUSDT",
+   "pair": "ARBUSDT",
+   "baseAsset": "ARB",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-2",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "SUIUSDT",
+   "pair": "SUIUSDT",
+   "baseAsset": "SUI",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Layer-1",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "1000PEPEUSDT",
+   "pair": "1000PEPEUSDT",
+   "baseAsset": "1000PEPE",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Meme",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "WLDUSDT",
+   "pair": "WLDUSDT",
+   "baseAsset": "WLD",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "AI",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BTCUSDC",
+   "pair": "BTCUSDC",
+   "baseAsset": "BTC",
+   "quoteAsset": "USDC",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "USDC",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ONDOUSDT",
+   "pair": "ONDOUSDT",
+   "baseAsset": "ONDO",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "DeFi",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ENAUSDT",
+   "pair": "ENAUSDT",
+   "baseAsset": "ENA",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "DeFi",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "TAOUSDT",
+   "pair": "TAOUSDT",
+   "baseAsset": "TAO",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "AI",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "pair": "TRUMPUSDT",
+   "baseAsset": "TRUMP",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Meme",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "HYPEUSDT",
+   "pair": "HYPEUSDT",
+   "baseAsset": "HYPE",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "DeFi",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "PUMPUSDT",
+   "pair": "PUMPUSDT",
+   "baseAsset": "PUMP",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Meme",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "币安人生USDT",
+   "pair": "币安人生USDT",
+   "baseAsset": "币安人生",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Chinese",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "XAUUSDT",
+   "pair": "XAUUSDT",
+   "baseAsset": "XAU",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "XAGUSDT",
+   "pair": "XAGUSDT",
+   "baseAsset": "XAG",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "TSLAUSDT",
+   "pair": "TSLAUSDT",
+   "baseAsset": "TSLA",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "EQUITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "XPTUSDT",
+   "pair": "XPTUSDT",
+   "baseAsset": "XPT",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "XPDUSDT",
+   "pair": "XPDUSDT",
+   "baseAsset": "XPD",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "COPPERUSDT",
+   "pair": "COPPERUSDT",
+   "baseAsset": "COPPER",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "龙虾USDT",
+   "pair": "龙虾USDT",
+   "baseAsset": "龙虾",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Chinese",
+    "Crypto",
+    "Alpha"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "CLUSDT",
+   "pair": "CLUSDT",
+   "baseAsset": "CL",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BZUSDT",
+   "pair": "BZUSDT",
+   "baseAsset": "BZ",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "NATGASUSDT",
+   "pair": "NATGASUSDT",
+   "baseAsset": "NATGAS",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "COMMODITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "QQQUSDT",
+   "pair": "QQQUSDT",
+   "baseAsset": "QQQ",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "EQUITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "SPYUSDT",
+   "pair": "SPYUSDT",
+   "baseAsset": "SPY",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "EQUITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "OPENAIUSDT",
+   "pair": "OPENAIUSDT",
+   "baseAsset": "OPENAI",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "PREMARKET",
+   "underlyingSubType": [
+    "Pre-IPO",
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "SKHYNIXUSDT",
+   "pair": "SKHYNIXUSDT",
+   "baseAsset": "SKHYNIX",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "KR_EQUITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BTCUSDT_261225",
+   "pair": "BTCUSDT",
+   "baseAsset": "BTC",
+   "quoteAsset": "USDT",
+   "contractType": "CURRENT_QUARTER",
+   "underlyingType": "COIN",
+   "underlyingSubType": [],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "MINIMAXUSDT",
+   "pair": "MINIMAXUSDT",
+   "baseAsset": "MINIMAX",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "HK_EQUITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "CXMTUSDT",
+   "pair": "CXMTUSDT",
+   "baseAsset": "CXMT",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "CN_EQUITY",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "MARSCOINUSDT",
+   "pair": "MARSCOINUSDT",
+   "baseAsset": "MARSCOIN",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "USDBRLUSDT",
+   "pair": "USDBRLUSDT",
+   "baseAsset": "USDBRL",
+   "quoteAsset": "USDT",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "FX",
+   "underlyingSubType": [
+    "TradFi"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BTCUSDT_270326",
+   "pair": "BTCUSDT",
+   "baseAsset": "BTC",
+   "quoteAsset": "USDT",
+   "contractType": "NEXT_QUARTER",
+   "underlyingType": "COIN",
+   "underlyingSubType": [],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "PREDICTUSDT",
+   "pair": "PREDICTUSDT",
+   "baseAsset": "PREDICT",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "PREMARKET",
+   "underlyingSubType": [
+    "Pre-Market"
+   ],
+   "status": "TRADING"
+  }
+ ]
+}

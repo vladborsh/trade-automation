@@ -1,0 +1,342 @@
+{
+ "period": "24h",
+ "totals": {
+  "usd": 41200000.0,
+  "long": 27900000.0,
+  "short": 13300000.0,
+  "events": 5120
+ },
+ "basis": {
+  "periodDays": 30,
+  "windowsInPeriod": 720,
+  "windowsObserved": 690,
+  "venues": [
+   "binance",
+   "bybit",
+   "okx"
+  ],
+  "unavailable": null
+ },
+ "hourly": {
+  "bucketSec": 3600,
+  "buckets": [
+   {
+    "time": 1793617200,
+    "long": 1200000.0,
+    "short": 600000.0,
+    "partial": false,
+    "rarity": 0.4,
+    "outlier": false
+   },
+   {
+    "time": 1793620800,
+    "long": 800000.0,
+    "short": 900000.0,
+    "partial": false,
+    "rarity": 0.42000000000000004,
+    "outlier": false
+   },
+   {
+    "time": 1793624400,
+    "long": 400000.0,
+    "short": 300000.0,
+    "partial": false,
+    "rarity": 0.44,
+    "outlier": false
+   },
+   {
+    "time": 1793628000,
+    "long": 2100000.0,
+    "short": 1000000.0,
+    "partial": false,
+    "rarity": 0.46,
+    "outlier": false
+   },
+   {
+    "time": 1793631600,
+    "long": 1200000.0,
+    "short": 600000.0,
+    "partial": false,
+    "rarity": 0.48000000000000004,
+    "outlier": false
+   },
+   {
+    "time": 1793635200,
+    "long": 800000.0,
+    "short": 900000.0,
+    "partial": false,
+    "rarity": 0.5,
+    "outlier": false
+   },
+   {
+    "time": 1793638800,
+    "long": 400000.0,
+    "short": 300000.0,
+    "partial": false,
+    "rarity": 0.52,
+    "outlier": false
+   },
+   {
+    "time": 1793642400,
+    "long": 2100000.0,
+    "short": 1000000.0,
+    "partial": false,
+    "rarity": 0.54,
+    "outlier": false
+   },
+   {
+    "time": 1793646000,
+    "long": 1200000.0,
+    "short": 600000.0,
+    "partial": false,
+    "rarity": 0.56,
+    "outlier": false
+   },
+   {
+    "time": 1793649600,
+    "long": 800000.0,
+    "short": 900000.0,
+    "partial": false,
+    "rarity": 0.5800000000000001,
+    "outlier": false
+   },
+   {
+    "time": 1793653200,
+    "long": 400000.0,
+    "short": 300000.0,
+    "partial": false,
+    "rarity": 0.4,
+    "outlier": false
+   },
+   {
+    "time": 1793656800,
+    "long": 2100000.0,
+    "short": 1000000.0,
+    "partial": false,
+    "rarity": 0.42000000000000004,
+    "outlier": false
+   },
+   {
+    "time": 1793660400,
+    "long": 1200000.0,
+    "short": 600000.0,
+    "partial": false,
+    "rarity": 0.44,
+    "outlier": false
+   },
+   {
+    "time": 1793664000,
+    "long": 800000.0,
+    "short": 900000.0,
+    "partial": false,
+    "rarity": 0.46,
+    "outlier": false
+   },
+   {
+    "time": 1793667600,
+    "long": 400000.0,
+    "short": 300000.0,
+    "partial": false,
+    "rarity": 0.48000000000000004,
+    "outlier": false
+   },
+   {
+    "time": 1793671200,
+    "long": 2100000.0,
+    "short": 1000000.0,
+    "partial": false,
+    "rarity": 0.5,
+    "outlier": false
+   },
+   {
+    "time": 1793674800,
+    "long": 1200000.0,
+    "short": 600000.0,
+    "partial": false,
+    "rarity": 0.52,
+    "outlier": false
+   },
+   {
+    "time": 1793678400,
+    "long": 800000.0,
+    "short": 900000.0,
+    "partial": false,
+    "rarity": 0.54,
+    "outlier": false
+   },
+   {
+    "time": 1793682000,
+    "long": 400000.0,
+    "short": 300000.0,
+    "partial": false,
+    "rarity": 0.56,
+    "outlier": false
+   },
+   {
+    "time": 1793685600,
+    "long": 2100000.0,
+    "short": 1000000.0,
+    "partial": false,
+    "rarity": 0.5800000000000001,
+    "outlier": false
+   },
+   {
+    "time": 1793689200,
+    "long": 3600000.0,
+    "short": 600000.0,
+    "partial": false,
+    "rarity": 0.97,
+    "outlier": true
+   },
+   {
+    "time": 1793692800,
+    "long": 800000.0,
+    "short": 900000.0,
+    "partial": false,
+    "rarity": 0.42000000000000004,
+    "outlier": false
+   },
+   {
+    "time": 1793696400,
+    "long": 400000.0,
+    "short": 300000.0,
+    "partial": false,
+    "rarity": 0.44,
+    "outlier": false
+   },
+   {
+    "time": 1793700000,
+    "long": 2100000.0,
+    "short": 1000000.0,
+    "partial": true,
+    "rarity": null,
+    "outlier": false
+   }
+  ],
+  "norm": {
+   "long": 900000.0,
+   "short": 550000.0,
+   "total": 1500000.0
+  },
+  "basis": {
+   "periodDays": 30,
+   "windowsInPeriod": 720,
+   "windowsObserved": 690,
+   "venues": [
+    "binance",
+    "bybit",
+    "okx"
+   ],
+   "unavailable": null
+  }
+ },
+ "perCoin": [
+  {
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "totals": {
+    "usd": 15100000.0,
+    "long": 11000000.0,
+    "short": 4100000.0,
+    "events": 820
+   },
+   "verdict": {
+    "side": "long",
+    "ratio": 2.4
+   },
+   "basis": {
+    "periodDays": 30,
+    "windowsInPeriod": 720,
+    "windowsObserved": 690,
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "unavailable": null
+   }
+  },
+  {
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "totals": {
+    "usd": 8300000.0,
+    "long": 4000000.0,
+    "short": 4300000.0,
+    "events": 610
+   },
+   "verdict": null,
+   "basis": {
+    "periodDays": 30,
+    "windowsInPeriod": 720,
+    "windowsObserved": 690,
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "unavailable": null
+   }
+  }
+ ],
+ "large": [
+  {
+   "time": 1793685720,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "long",
+   "usd": 2400000.0,
+   "price": 76420.5,
+   "venue": "binance",
+   "xMedian": 180.2,
+   "seriesId": "long-1793685720",
+   "seriesCount": 4,
+   "seriesSpanSec": 540
+  },
+  {
+   "time": 1793685660,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "long",
+   "usd": 900000.0,
+   "price": 76501.0,
+   "venue": "bybit",
+   "xMedian": 67.6,
+   "seriesId": "long-1793685720",
+   "seriesCount": 4,
+   "seriesSpanSec": 540
+  },
+  {
+   "time": 1793667600,
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "side": "short",
+   "usd": 310000.0,
+   "price": 182.4,
+   "venue": "okx",
+   "xMedian": 23.3,
+   "seriesId": null,
+   "seriesCount": 0,
+   "seriesSpanSec": 0
+  }
+ ],
+ "largeMinUsd": 100000,
+ "tradfi": {
+  "usd": 3200000.0,
+  "long": 2000000.0,
+  "short": 1200000.0,
+  "events": 96
+ },
+ "unknown": {
+  "usd": 12000,
+  "long": 12000,
+  "short": 0,
+  "events": 2
+ },
+ "availableFrom": {
+  "1h": null,
+  "4h": null,
+  "24h": null,
+  "7d": 1793900000
+ }
+}
