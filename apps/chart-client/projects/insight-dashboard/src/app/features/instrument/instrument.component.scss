@@ -153,3 +153,9 @@
 @media (max-width: 767px) {
   .top { display: block; overflow-x: auto; max-width: 100%; }
 }
+
+/* IB-099 item 2 (and the toolbar it sits in): on a phone every toolbar button — the legend switch,
+   the timeframes — is a ≥ 40 px touch target (IB-088's rule). */
+@media (max-width: 767px) {
+  .group button { min-height: 40px; min-width: 40px; }
+}
