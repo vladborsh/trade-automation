@@ -11,16 +11,10 @@
 
 header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 h1 { font-size: 1.1rem; margin: 0; }
-h2 { font-size: 0.85rem; margin: 0 0 0.5rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
+.live-age { margin: 0 0 0 auto; color: #8b949e; font-size: 12px; }
+.live-age.stale { color: #d29922; }
 
-button {
-  background: #0d1117;
-  color: #c9d1d9;
-  border: 1px solid #30363d;
-  padding: 0.15rem 0.5rem;
-  font: inherit;
-  cursor: pointer;
-}
+h2 { font-size: 0.85rem; margin: 0 0 0.5rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .cards {
   display: grid;
@@ -56,9 +50,18 @@ button {
   font-size: 13px;
 }
 
+/* D16: a wide table scrolls inside its own box; the page never scrolls sideways. */
+.table-scroll { overflow-x: auto; max-width: 100%; }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 0.15rem 0.6rem 0.15rem 0; white-space: nowrap; }
 th { color: #8b949e; font-weight: normal; }
 .num { text-align: right; }
 .up { color: #26a69a; }
 .down { color: #ef5350; }
+
+/* D16 phone: one column under 768 px, every card full width, nothing wider than the screen. */
+@media (max-width: 767px) {
+  :host { padding: 12px; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .live-age { margin-left: 0; flex-basis: 100%; }
+}

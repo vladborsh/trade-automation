@@ -1,0 +1,11 @@
+<div class="switch" role="group" [attr.aria-label]="t('market.period.label')">
+  @for (p of periods; track p) {
+    <button type="button" [class.active]="p === period()" [disabled]="!availability(p).available"
+            [attr.aria-pressed]="p === period()" [attr.title]="hint(p)" (click)="pick(p)">
+      {{ label(p) }}
+    </button>
+  }
+</div>
+@if (weekNote(); as note) {
+  <p class="muted note">{{ note }}</p>
+}

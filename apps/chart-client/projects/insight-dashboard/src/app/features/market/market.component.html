@@ -1,19 +1,32 @@
 <header>
   <h1>{{ t('market.title') }}</h1>
-  <button type="button" (click)="load()" [disabled]="loading()">{{ t('action.refresh') }}</button>
-  @if (loading() && !firstLoad()) {
-    <app-loader variant="inline" [label]="t('market.loading')" />
-  }
+  <app-period-switch
+    [period]="period()"
+    [availableFrom]="liquidations()?.block?.availableFrom ?? null"
+    [nowSec]="nowSec()"
+    (periodChange)="onPeriodChange($event)"
+  />
+  <!-- D13: the oldest block's age, amber when one block is more than two of its intervals behind -->
+  <p class="live-age" [class.stale]="age()?.stale" aria-live="off">
+    @if (age(); as a) { {{ t('market.liveAge', { seconds: a.seconds }) }} } @else { {{ t('market.liveWaiting') }} }
+  </p>
 </header>
 
-@if (error(); as message) {
-  <p class="error" role="alert">{{ message }}</p>
+<app-kpi-strip id="kpis" [kpis]="kpis()" />
+@if (blockError('kpis'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
+
+<app-insights-block [insights]="insights()" [period]="period()" />
+@if (blockError('insights'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+}
+
 @if (live()) {
   <p class="muted">{{ t('market.live') }}</p>
 }
 
-<div class="cards">
+<div class="cards" id="sentiment">
   <!-- Fear & Greed. The big figure is the index; the words under it are the band, and the venue's
        own classification stays beside it verbatim (§11) so the two can never disagree. -->
   <section class="card">
@@ -106,10 +119,11 @@
     <app-loader variant="block" [label]="t('market.loadingLiquidations')" />
   </section>
 }
-@if (liquidationsError(); as message) {
-  <p class="error" role="alert">{{ message }}</p>
+@if (blockError('liquidations'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 @if (liquidations(); as liq) {
+  <div id="liquidations"></div>
   <app-liquidations-where [coins]="liq.perCoin" [venues]="liq.venues" />
   <app-liquidations-feed
     [events]="liq.feed"
@@ -119,11 +133,16 @@
   />
 }
 
-<section class="card wide">
+@if (blockError('caps'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+}
+<section class="card wide" id="caps">
   <h2>{{ t('market.table.title') }}</h2>
   @if (capsDay(); as day) {
     <p class="muted">{{ t('market.asOf', { when: day }) }}</p>
   }
+  <!-- D16: the table scrolls inside its own box, never the page -->
+  <div class="table-scroll">
   <table>
     <thead>
       <!-- §11 English-by-rule: field names in a table of raw data (allow-listed with the reason) -->
@@ -151,6 +170,7 @@
       }
     </tbody>
   </table>
+  </div>
   @if (missingCaps() > 0) {
     <!-- the coins the collector has not reached today are counted, not listed: twenty rows of
          «нет данных» is not information, and the count is the fact a reader needs -->

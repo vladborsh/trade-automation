@@ -1,0 +1,27 @@
+<section class="insights" id="insights">
+  <h2>{{ t('insight.title') }}</h2>
+  @if (cards().length > 0) {
+    <ol class="cards">
+      @for (card of cards(); track card.id) {
+        <li class="card">
+          <p class="sentence">{{ sentence(card.view) }}</p>
+          <p class="basis">{{ basisText(card.view.basis) }}</p>
+          @if ('commands' in card.view.link) {
+            <a class="link" [routerLink]="card.view.link.commands" [queryParams]="card.view.link.queryParams">{{ t('insight.open') }}</a>
+          } @else {
+            <a class="link" [href]="'#' + card.view.link.anchor">{{ t('insight.open') }}</a>
+          }
+        </li>
+      }
+    </ol>
+  } @else if (insights()) {
+    <p class="neutral">
+      @if (neutral().history) {
+        {{ t('insight.neutral.insufficient_history') }}
+      } @else {
+        {{ t('insight.neutral.nothing_unusual', { period: periodLabel() }) }}
+      }
+    </p>
+    <p class="basis">{{ basisText(neutral().basis) }}</p>
+  }
+</section>

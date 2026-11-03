@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import type {
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
-  WebFundingResponse, WebLiquidationsResponse,
+  WebFundingResponse, WebLiquidationsResponse, WebInsightsResponse, WebKpisResponse, WebMarketPeriod,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
@@ -132,9 +132,9 @@ export class InsightApiClient {
    * caller choose them would invite a card labelled «сейчас» showing last Tuesday. The server
    * caches for 15 s, so the page may poll without multiplying the query.
    */
-  async liquidationsOverview(feedMinUsd = 100_000, feedLimit = 30): Promise<WebLiquidationsOverviewResponse> {
+  async liquidationsOverview(feedMinUsd = 100_000, feedLimit = 30, period: WebMarketPeriod = '24h'): Promise<WebLiquidationsOverviewResponse> {
     return this.get<WebLiquidationsOverviewResponse>('/liquidations/overview', {
-      symbols: 'top20', feed_min_usd: feedMinUsd, feed_limit: feedLimit,
+      symbols: 'top20', feed_min_usd: feedMinUsd, feed_limit: feedLimit, period,
     });
   }
 
@@ -150,6 +150,18 @@ export class InsightApiClient {
    */
   async marketCards(): Promise<WebMarketCardsResponse> {
     return this.get<WebMarketCardsResponse>('/context/cards');
+  }
+
+  // ------------------------------------------------------ IB-088, the market page shell
+
+  /** D10: the six KPI tiles (server cache 60 s). */
+  async marketKpis(): Promise<WebKpisResponse> {
+    return this.get<WebKpisResponse>('/market/kpis');
+  }
+
+  /** D1: «Главное сейчас» for the page's period (server cache 60 s). */
+  async marketInsights(period: WebMarketPeriod): Promise<WebInsightsResponse> {
+    return this.get<WebInsightsResponse>('/market/insights', { period });
   }
 
   // ------------------------------------------------------ IB-079, login + password (IB-078's server)

@@ -1,0 +1,23 @@
+<div class="strip">
+  @for (tile of tiles(); track tile.id) {
+    <section class="tile">
+      <h3>{{ t(tile.view.labelKey) }}</h3>
+      @if (tile.view.value; as value) {
+        <p class="value">{{ value }}</p>
+      } @else {
+        <p class="value muted">{{ t('kpi.unavailable') }}</p>
+      }
+      @if (tile.view.delta; as delta) {
+        <p class="delta" [class.up]="delta.tone === 'up'" [class.down]="delta.tone === 'down'">{{ delta.text }}</p>
+      }
+      @if (tile.view.context; as ctx) {
+        <p class="ctx">{{ t(ctx.key, ctx.params) }}</p>
+      }
+      @if (tile.view.source.url; as url) {
+        <a class="source" [href]="url" target="_blank" rel="noopener">{{ t('kpi.source', { name: tile.view.source.name }) }}</a>
+      } @else {
+        <p class="source">{{ t('kpi.source', { name: tile.view.source.name }) }}</p>
+      }
+    </section>
+  }
+</div>
