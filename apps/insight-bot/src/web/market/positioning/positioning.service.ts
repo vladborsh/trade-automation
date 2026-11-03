@@ -125,7 +125,7 @@ export class PositioningService {
     const cells: WebPositioningCell[] = [priceChangePct, oiChangePct, fundingRate, lsGlobal, lsTopPosition, liqUsd];
     return {
       symbol: coin.id, base: coin.base, priceChangePct, oiChangePct, fundingRate, lsGlobal, lsTopPosition, liqUsd,
-      quadrant, signal: signalOf({ quadrant, priceChangePct, fundingRate, lsGlobal, cells }),
+      oiUsd: current.oiUsd, quadrant, signal: signalOf({ quadrant, priceChangePct, fundingRate, lsGlobal, cells }),
     };
   }
 
@@ -212,8 +212,11 @@ export class PositioningService {
       const last = oi.points[oi.points.length - 1];
       if (start && last && start.value > 0 && last.time > start.time) oiChangePct = (last.value / start.value - 1) * 100;
     }
+    // IB-090: the OI level in USD for the quadrant's dot; Binance's notional, null if not sent
+    const notional = oi?.points.at(-1)?.notional;
     return {
       oiChangePct,
+      oiUsd: typeof notional === 'number' && Number.isFinite(notional) && notional >= 0 ? notional : null,
       lsGlobal: lsG?.points.at(-1)?.ratio ?? null,
       lsTop: lsT?.points.at(-1)?.ratio ?? null,
     };
@@ -232,6 +235,7 @@ export interface Breadth {
 
 interface Current {
   oiChangePct: number | null;
+  oiUsd: number | null;
   lsGlobal: number | null;
   lsTop: number | null;
 }

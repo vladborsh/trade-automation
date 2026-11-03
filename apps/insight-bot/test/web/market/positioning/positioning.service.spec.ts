@@ -53,6 +53,18 @@ describe('PositioningService', () => {
     expect(btc.quadrant).toBe('new_longs');
   });
 
+  it('IB-090: oiUsd is the LAST OI notional (the dot size); a venue that does not answer gives null, not 0', async () => {
+    const btc = (await service(30 * 24).positioning('1h')).rows[0];
+    expect(btc.oiUsd).toBe(1260 * 100);
+    const f = fakes(30 * 24);
+    const down = new PositioningService({
+      symbols: SYMBOLS as never, cache: new TtlCache({ now: () => NOW }), summary: f.summary as never, candles: f.candles as never,
+      funding: f.funding as never, liquidations: null, now: () => NOW,
+      oiLs: { ...f.oiLs, openInterest: async () => { throw new Error('418'); } } as never,
+    });
+    expect((await down.positioning('1h')).rows[0].oiUsd).toBeNull();
+  });
+
   it('UNDER 20 DAYS OF HISTORY: the value is there, the rarity is null with its reason — never 0', async () => {
     const btc = (await service(10 * 24).positioning('1h')).rows[0];
     expect(btc.oiChangePct.value).toBeCloseTo(26, 0);
