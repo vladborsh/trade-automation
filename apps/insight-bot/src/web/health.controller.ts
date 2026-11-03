@@ -5,10 +5,12 @@ import { DB, type Db } from '../db/db.port';
 import { gapsOverlapping, heartbeats, liquidationActivity } from '../db/pg/uptime-reads';
 import { databaseHealth } from '../db/pg/web-reads';
 import { liquidationUptime } from './liquidation-uptime';
-import { BINANCE_WEIGHT_BUDGET } from '../ops/gap-report';
 import { MetricsService } from '../ops/metrics.service';
 import { StreamRegistry } from '../ops/stream-registry';
 import { AdminOnly } from './auth/web-auth.guard';
+
+/** Binance's futures REST budget, 2400 weight/min (design §4.5, AGENTS.md). */
+const BINANCE_WEIGHT_BUDGET = 2400;
 
 /** Spot has its own 6000/min ceiling on `api.binance.com` (design §4.5) — never the futures one. */
 const BINANCE_SPOT_WEIGHT_BUDGET = 6000;
@@ -16,8 +18,8 @@ const BINANCE_SPOT_WEIGHT_BUDGET = 6000;
 /**
  * architecture/insight-bot-web-dashboard.md §4 — the dashboard's health detail, under `/api/web`.
  *
- * **Not the ops `GET /health`.** That one is the unauthenticated liveness probe (and what the SPA
- * fallback excludes); this one exposes per-stream detail, liquidation-collector uptime and database internals, and
+ * **Not the ops `GET /healthz`** (WD-011; it was `GET /health`). That one is the unauthenticated
+ * liveness probe, answers `{ status }` only, and is what the SPA fallback excludes. This one exposes per-stream detail, liquidation-collector uptime and database internals, and
  * is behind IB-029's `APP_GUARD` on `/api/web`: one place decides who may read the dashboard, not
  * two. Keep the two apart; converging them would make the detailed one public.
  *

@@ -5,15 +5,16 @@
 # compose network and publishes no port.
 
 {$SITE_ADDRESS} {
-	# H7: the Prometheus endpoint never answers from outside (the app adds its own 404 in WD-011).
+	# H7: the Prometheus endpoint never answers from outside. The app adds its own 404 too (WD-011): any
+	# request carrying CLIENT_IP_HEADER (x-real-ip, set below on every proxied request) gets 404.
 	@metrics path /metrics /metrics/*
 	respond @metrics 404
 
-	# H8': the ops /health (collector internals, unauthenticated) is never reachable from outside.
-	# The exact path is the dashboard's admin Health page too, so it is REWRITTEN to / and the SPA
-	# answers — a reload of that page keeps working. The app's router is case-insensitive and
+	# H8': before WD-011 the app's /health served collector internals unauthenticated; since WD-011 the
+	# app itself gives /health to the SPA. Kept as the outer layer: the exact path is the dashboard's
+	# admin Health page, so it is REWRITTEN to / and the SPA answers — a reload of that page keeps working. The app's router is case-insensitive and
 	# accepts a trailing slash (Express defaults), and Caddy's path matcher is case-insensitive, so
-	# /health/ is listed explicitly. /healthz (WD-011, {status} only) passes through.
+	# /health/ is listed explicitly. /healthz (the liveness probe, {status} only) passes through.
 	@opsHealth path /health /health/
 	rewrite @opsHealth /
 

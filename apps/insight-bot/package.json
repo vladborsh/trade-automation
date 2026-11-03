@@ -9,8 +9,7 @@
     "start:dev": "nest start --watch",
     "migrate": "node dist/db/migrate.js",
     "test": "jest",
-    "lint": "tsc -p tsconfig.json --noEmit",
-    "report": "node dist/ops/gap-report.cli.js"
+    "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",

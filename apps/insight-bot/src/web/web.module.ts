@@ -47,7 +47,7 @@ import { WebPushController } from './push/push.controller';
  * `APP_GUARD` and enforces on the `/api/web` prefix, so every controller added here later —
  * IB-030's `health.ts` and `coverage.ts`, and the pages after them — is authenticated by
  * default and nobody has to remember a decorator. Routes outside `/api/web`, including the
- * unauthenticated ops `/health` and `/metrics`, are untouched by it.
+ * unauthenticated ops `/healthz` and `/metrics`, are untouched by it.
  *
  * Opting a route out is explicit and rare: `@Public()` (the token exchange, which arrives
  * without a cookie, and logout, which must clear a dead cookie rather than 401).
@@ -65,7 +65,7 @@ export class WebModule {
     return {
       module: WebModule,
       // IB-030: the health page reads the live StreamRegistry and the weight gauges, which
-      // OpsModule owns and exports — the same instances /health and /metrics report, so the
+      // OpsModule owns and exports — the same instances the admin health page and /metrics report, so the
       // dashboard cannot drift from the ops view by reading a second copy.
       imports: [AppConfigModule, DbModule, OpsModule],
       // No guard decorator on any of these — they are authenticated by the APP_GUARD above,
@@ -97,7 +97,7 @@ export class WebModule {
         {
           provide: UniverseSummaryService,
           // WD-008: the shared tracker — it used to build its own, so its ~50 weight a refresh was
-          // invisible to /health and to every other read's 1 800/min ceiling check
+          // invisible to the admin health page and to every other read's 1 800/min ceiling check
           inject: [AppConfigService, BinanceWeightTracker],
           useFactory: (config: AppConfigService, weight: BinanceWeightTracker) =>
             new UniverseSummaryService({ futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL'), weight }),

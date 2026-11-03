@@ -103,7 +103,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
    * `onApplicationBootstrap`, not `onModuleInit`: the partitions must exist before anything
    * writes, and `DbModule.onModuleInit` is what creates them (§3.1). The backfill is
    * fire-and-forget — it takes minutes across 30 symbols and must not hold up the listener or
-   * `/health`, which is how its progress is watched.
+   * the admin health page (`/api/web/health/streams`), which is how its progress is watched.
    */
   onApplicationBootstrap(): void {
     this.start();
@@ -279,7 +279,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     await this.writeGaps(ranges, symbol, 'not returned by the venue inside its retention window');
   }
 
-  /** One `collector_gaps` row per range, counted on the metric and reflected in `/health`. */
+  /** One `collector_gaps` row per range, counted on the metric and reflected in the admin health page (`/api/web/health/streams`). */
   private async writeGaps(
     ranges: ReadonlyArray<{ from: number; to: number; expected: number }>,
     symbol: string,

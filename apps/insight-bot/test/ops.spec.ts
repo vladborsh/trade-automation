@@ -1,3 +1,5 @@
+import { NotFoundException } from '@nestjs/common';
+import { PATH_METADATA } from '@nestjs/common/constants';
 import type { AppConfigService } from '../src/config/config.service';
 import { HealthController } from '../src/ops/health.controller';
 import { MetricsController } from '../src/ops/metrics.controller';
@@ -61,48 +63,19 @@ describe('StreamRegistry', () => {
   });
 });
 
-/** Only `symbols` is read by /health (IB-006's `noSpot`). */
-const config = (symbols: { id: string; binance_spot?: string }[] = []) => ({ symbols }) as unknown as AppConfigService;
-
-describe('GET /health', () => {
-  it('answers the §6.1 shape, with no streams and no measurable db lag at this stage', () => {
-    const streams = new StreamRegistry();
-    const controller = new HealthController(streams, new MetricsService(streams), config());
-    expect(controller.get()).toEqual({
-      streams: [],
-      db: { lagSec: null },
-      budget: { binanceWeightUsed1m: 0, binanceSpotWeightUsed1m: 0 },
-      noSpot: [],
-    });
+describe('GET /healthz (WD-011: liveness only)', () => {
+  it('answers exactly { status } — no streams, db lag, Binance weight or noSpot', () => {
+    // toStrictEqual on the whole object: any field added here is a field served unauthenticated
+    expect(new HealthController().get()).toStrictEqual({ status: 'ok' });
   });
 
-  it('IB-006: a universe symbol with no binance_spot mapping is listed under noSpot, and spot weight is its own figure', () => {
-    const streams = new StreamRegistry();
-    const metrics = new MetricsService(streams);
-    metrics.setBinanceWeightUsed1m(240);
-    metrics.setBinanceSpotWeightUsed1m(12);
-    const health = new HealthController(
-      streams,
-      metrics,
-      config([{ id: 'BTCUSDT', binance_spot: 'BTCUSDT' }, { id: 'FOOUSDT' }]),
-    ).get();
-    expect(health.noSpot).toEqual(['FOOUSDT']);
-    // the two budgets are metered apart by the venue and never summed (§4.5, §6.1)
-    expect(health.budget).toEqual({ binanceWeightUsed1m: 240, binanceSpotWeightUsed1m: 12 });
+  it('is routed at /healthz, not /health (the dashboard owns /health)', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, HealthController)).toBe('healthz');
   });
 
-  it('reports each registered stream and the current Binance weight', () => {
-    const streams = new StreamRegistry();
-    const metrics = new MetricsService(streams);
-    streams.register('binance-perp:markPrice', 'binance');
-    streams.setGapsOpen('binance-perp:markPrice', 2);
-    metrics.setBinanceWeightUsed1m(240);
-
-    const health = new HealthController(streams, metrics, config()).get();
-    expect(health.streams).toEqual([
-      { id: 'binance-perp:markPrice', venue: 'binance', lastMessageAgeSec: null, reconnects24h: 0, gapsOpen: 2, mode: 'ws', degradedReason: null, expectedIntervalSec: null },
-    ]);
-    expect(health.budget.binanceWeightUsed1m).toBe(240);
+  it('takes no dependencies, so it cannot report on a collector', () => {
+    expect(HealthController.length).toBe(0);
+    expect(Reflect.getMetadata('design:paramtypes', HealthController) ?? []).toEqual([]);
   });
 });
 
@@ -117,7 +90,7 @@ describe('GET /metrics', () => {
     metrics.gapsUnrepaired.inc({ stream: 'binance-perp:kline_1m' });
     metrics.wsReconnects.inc({ stream: 'binance-perp:kline_1m' });
 
-    const body = await new MetricsController(metrics).get();
+    const body = await new MetricsController(metrics, envWith({})).get(request());
     for (const name of [
       'ib_stream_last_message_age_seconds',
       'ib_rows_written_total',
@@ -136,7 +109,58 @@ describe('GET /metrics', () => {
     const streams = new StreamRegistry();
     const metrics = new MetricsService(streams);
     streams.register('silent', 'binance');
-    const body = await new MetricsController(metrics).get();
+    const body = await new MetricsController(metrics, envWith({})).get(request());
     expect(body).not.toContain('ib_stream_last_message_age_seconds{stream="silent"}');
+  });
+});
+
+/** `env.get` over a plain object, the only part of AppConfigService the metrics route reads. */
+function envWith(values: Record<string, unknown>): AppConfigService {
+  return { env: { get: (key: string) => values[key] } } as unknown as AppConfigService;
+}
+function request(headers: Record<string, string> = {}): { headers: Record<string, string> } {
+  return { headers };
+}
+
+/**
+ * WD-011 H7 (architecture/https-without-domain-2026-11-03.md) — on the box Caddy sets x-real-ip on
+ * every request it proxies, so a request that carries CLIENT_IP_HEADER came from outside and gets
+ * 404. Unset (every slot), the endpoint stays open.
+ */
+describe('GET /metrics from outside (H7)', () => {
+  const metrics = () => new MetricsService(new StreamRegistry());
+
+  it('variable set + header present → 404, shaped like Nest\'s unrouted 404', async () => {
+    const controller = new MetricsController(metrics(), envWith({ CLIENT_IP_HEADER: 'x-real-ip' }));
+    const attempt = controller.get(request({ 'x-real-ip': '203.0.113.7' }));
+    await expect(attempt).rejects.toThrow(NotFoundException);
+    await expect(attempt).rejects.toMatchObject({
+      response: { statusCode: 404, message: 'Cannot GET /metrics', error: 'Not Found' },
+    });
+  });
+
+  it('variable set + header absent (a scrape from inside the box) → 200 with the metrics', async () => {
+    const controller = new MetricsController(metrics(), envWith({ CLIENT_IP_HEADER: 'x-real-ip' }));
+    await expect(controller.get(request())).resolves.toContain('ib_binance_weight_used_1m');
+  });
+
+  it('variable unset → 200 even WITH the header (a slot has no proxy; the header means nothing)', async () => {
+    const controller = new MetricsController(metrics(), envWith({}));
+    await expect(controller.get(request({ 'x-real-ip': '203.0.113.7' }))).resolves.toContain('ib_binance_weight_used_1m');
+  });
+
+  it('an empty header value still counts as carried — Caddy decides presence, not content', async () => {
+    const controller = new MetricsController(metrics(), envWith({ CLIENT_IP_HEADER: 'x-real-ip' }));
+    await expect(controller.get(request({ 'x-real-ip': '' }))).rejects.toThrow(NotFoundException);
+  });
+
+  it('the configured name is matched case-insensitively, as Node lower-cases incoming header names', async () => {
+    const controller = new MetricsController(metrics(), envWith({ CLIENT_IP_HEADER: ' X-Real-IP ' }));
+    await expect(controller.get(request({ 'x-real-ip': '203.0.113.7' }))).rejects.toThrow(NotFoundException);
+  });
+
+  it('a blank variable is unset, the same reading the login throttle uses', async () => {
+    const controller = new MetricsController(metrics(), envWith({ CLIENT_IP_HEADER: '   ' }));
+    await expect(controller.get(request({ 'x-real-ip': '203.0.113.7' }))).resolves.toContain('ib_binance_weight_used_1m');
   });
 });

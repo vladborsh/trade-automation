@@ -176,7 +176,7 @@ export class CalendarCollectorService implements OnApplicationBootstrap, OnModul
     return rows.length;
   }
 
-  /** Backs `/health`'s calendar field: how stale the feed is and how much of it we hold. */
+  /** Backs the admin health page (`/api/web/health/streams`)'s calendar field: how stale the feed is and how much of it we hold. */
   healthStatus(): { lastSuccessfulPollAge: number | null; eventsHeld: number } {
     return {
       lastSuccessfulPollAge: this.lastSuccessAt === null ? null : Date.now() - this.lastSuccessAt,

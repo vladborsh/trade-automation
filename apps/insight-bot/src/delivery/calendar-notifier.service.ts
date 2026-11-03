@@ -17,8 +17,8 @@ const DAY_MS = 86_400_000;
 
 /**
  * IB-062 — the economic calendar in members' DMs: a morning digest and a reminder
- * `CALENDAR_REMIND_LEAD_MIN` before each high-impact USD event. Shaped like `GapReportService`:
- * a 60 s check, the decision in a pure function (`calendar-notify.ts`).
+ * `CALENDAR_REMIND_LEAD_MIN` before each high-impact USD event. Shaped like the former daily
+ * gap report (deleted in WD-011): a 60 s check, the decision in a pure function (`calendar-notify.ts`).
  *
  * **Repeat protection is the journal, not memory.** Each message is claimed in
  * `calendar_notifications_sent` (insert … on conflict do nothing) before it is sent, so a restart,

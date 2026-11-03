@@ -1,13 +1,12 @@
 import { BinancePerpService } from '../../src/collectors/binance-perp/binance-perp.service';
 import { OiLsPoller } from '../../src/collectors/binance-perp/oi-ls.poller';
 import { BybitService } from '../../src/collectors/bybit/bybit.service';
-import { GapReportService } from '../../src/ops/gap-report.service';
 import { WatchdogService } from '../../src/ops/watchdog.service';
 import { CollectorsModule } from '../../src/collectors/collectors.module';
 
 /**
  * IB-005 — the collectors are registered only with a database to write into. Without
- * `DATABASE_URL` the app must still boot and serve /health and /metrics (IB-003, §2.1), and
+ * `DATABASE_URL` the app must still boot and serve /healthz and /metrics (IB-003, §2.1), and
  * `Writers` throws without a `Db` (IB-004) — so the module provides nothing in that case.
  */
 describe('CollectorsModule.register()', () => {
@@ -23,7 +22,7 @@ describe('CollectorsModule.register()', () => {
     // Named, not counted: every new collector joins this list (IB-007 added the OI/LS poller,
     // IB-008 the Bybit collector), and a bare count would fail each time without saying anything
     // about what is registered.
-    expect(module.providers ?? []).toEqual(expect.arrayContaining([BinancePerpService, OiLsPoller, BybitService, WatchdogService, GapReportService]));
+    expect(module.providers ?? []).toEqual(expect.arrayContaining([BinancePerpService, OiLsPoller, BybitService, WatchdogService]));
     expect((module.imports ?? []).length).toBeGreaterThan(0);
   });
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-/** One collector stream's liveness, as `/health` reports it (§6.1). */
+/** One collector stream's liveness, as the admin health page (`/api/web/health/streams`) reports it (§6.1). */
 export interface StreamHealth {
   id: string;
   venue: string;
@@ -36,10 +36,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * architecture/insight-bot-system-design.md §2.1 (`collectors/health`), §6.1, §6.2 — "a
- * `StreamRegistry` records every stream's last message time", and is what `/health`, the prom
+ * `StreamRegistry` records every stream's last message time", and is what the admin health page (`/api/web/health/streams`), the prom
  * gauges and the watchdog all read.
  *
- * IB-003 scaffolds it with no registered streams, so `/health` answers `streams: []`: no
+ * IB-003 scaffolds it with no registered streams, so the admin health page (`/api/web/health/streams`) answers `streams: []`: no
  * collector exists yet (IB-005 onwards register theirs). Every method is deliberately
  * synchronous and allocation-light — the collectors call `recordMessage` on every frame.
  */
@@ -71,7 +71,7 @@ export class StreamRegistry {
   }
 
   /**
-   * IB-005 / §16.1: a collector that fell back to REST (or came back) says so here, and `/health`
+   * IB-005 / §16.1: a collector that fell back to REST (or came back) says so here, and the admin health page (`/api/web/health/streams`)
    * shows it per stream — a degraded run must never look healthy.
    */
   setMode(id: string, mode: CollectorStreamMode, reason: string | null = null): void {

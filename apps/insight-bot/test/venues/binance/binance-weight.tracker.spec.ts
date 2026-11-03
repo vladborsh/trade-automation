@@ -18,6 +18,15 @@ describe('BinanceWeightTracker', () => {
     expect(tracker.used1m(120_000)).toBe(0);
   });
 
+  it('WD-011: keeps only the trailing minute even when nobody reads it', () => {
+    // until WD-011 the daily report's peak sampling pruned this on every record, as a side effect;
+    // without that, a box nobody scrapes would hold every call it ever made
+    const tracker = new BinanceWeightTracker();
+    for (let i = 0; i < 1_000; i++) tracker.recordCall(1, i * 30_000);
+    expect((tracker as unknown as { calls: unknown[] }).calls.length).toBeLessThanOrEqual(2);
+    expect(tracker.used1m(999 * 30_000)).toBe(2);
+  });
+
   it('prefers the venue header while it is fresh, and falls back to the estimate after a minute', () => {
     // The /futures/data endpoints send no header (measured 2026-09-28), so a poller-only process
     // always reads the estimate; a /fapi call from another collector makes it authoritative.

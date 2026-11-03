@@ -14,7 +14,7 @@ import { FEED_CLIENT } from './feed-client.token';
  * collector.
  *
  * **Dynamic, and that is the whole point (IB-BUG-001).** IB-003's rule is that `DATABASE_URL` has
- * no default and the app still boots and serves `/health` and `/metrics` without one. This module
+ * no default and the app still boots and serves `/healthz` and `/metrics` without one. This module
  * needs `WritersModule`, and `Writers` throws at construction when there is no database — so a
  * static `imports: [WritersModule]` turned a missing `DATABASE_URL` into a boot failure, exactly
  * the thing `writers.module.ts`'s docblock warns about. `register()` therefore provides **nothing**
@@ -34,7 +34,7 @@ export class CalendarModule {
     const connectionString = process.env.DATABASE_URL;
     if (typeof connectionString !== 'string' || connectionString.length === 0) {
       new Logger(CalendarModule.name).warn(
-        'DATABASE_URL is not set — calendar collector disabled (the app still serves /health and /metrics)',
+        'DATABASE_URL is not set — calendar collector disabled (the app still serves /healthz and /metrics)',
       );
       return { module: CalendarModule };
     }

@@ -101,13 +101,6 @@ const ALLOWED: readonly Allowance[] = [
     category: 'origin',
     why: 'the socket message handler and the silence clock: both are where time enters, with nothing injected in scope',
   },
-  {
-    file: 'ops/gap-report.cli.ts',
-    line: "const day = index === -1 ? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10) : process.argv[index + 1];",
-    count: 1,
-    category: 'origin',
-    why: 'defaults the report to yesterday when no --day is given; the explicit argument is the injected path',
-  },
 
   // ---- elapsed: wall-time DURATIONS. A domain clock here would be the bug.
   {

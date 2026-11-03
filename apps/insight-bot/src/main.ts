@@ -21,7 +21,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
 
-  // §7 — no inbound ports in production: /health and /metrics are read from the box itself
+  // §7 — no inbound ports in production: /healthz and /metrics are read from the box itself
   // (SSM Session Manager), so the listener stays on loopback there. A dev slot binds the same
   // way; AGENTS.md assigns the port per slot (:3005/:3015/:3025/:3035/:3045).
   const port = Number(process.env.PORT ?? 3005);

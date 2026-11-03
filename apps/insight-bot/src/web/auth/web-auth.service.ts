@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { clientIpHeaderName } from '../../config/client-ip-header';
 import { AppConfigService } from '../../config/config.service';
 import { DB, type Db } from '../../db/db.port';
 import type { User } from '../../users/user.model';
@@ -41,8 +42,7 @@ export class WebAuthService {
 
   /** IB-078 H6: the header the client IP is read from (`x-real-ip` on the box), or unset = the socket. */
   get clientIpHeader(): string | undefined {
-    const name = this.config.env.get('CLIENT_IP_HEADER');
-    return typeof name === 'string' && name.trim().length > 0 ? name.trim() : undefined;
+    return clientIpHeaderName(this.config.env.get('CLIENT_IP_HEADER'));
   }
 
   get cookieSecure(): boolean {

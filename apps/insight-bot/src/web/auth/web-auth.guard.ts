@@ -56,7 +56,7 @@ export class WebAuthGuard implements CanActivate {
 
     // Registered as an APP_GUARD so every /api/web controller inherits it without repeating a
     // decorator (Tech Lead's ruling for IB-030's controllers). Everything OUTSIDE /api/web —
-    // the unauthenticated ops /health and /metrics — is left alone.
+    // the unauthenticated ops /healthz and /metrics — is left alone.
     const path = (request.originalUrl ?? request.url ?? '').split('?')[0];
     if (!path.startsWith(WEB_API_PREFIX)) return true;
 

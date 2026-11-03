@@ -106,7 +106,7 @@ PORT=3025 DATABASE_URL=postgresql://backtest:backtest@localhost:5432/insight_dev
 # without one: DATABASE_URL has no default, so DbModule disables itself and the app still boots
 PORT=3025 npm start --workspace=@trade-automation/insight-bot
 
-curl -s localhost:3025/health | jq
+curl -s localhost:3025/healthz        # {"status":"ok"} — liveness only (WD-011)
 curl -s localhost:3025/metrics | head
 ```
 
@@ -184,7 +184,7 @@ per minute per symbol** (D5) plus one row at each settlement second; `forceOrder
 
 It registers three streams — `binance-perp:kline_1m`, `:markPrice`, `:forceOrder` — and is
 enabled only when `DATABASE_URL` is set (`CollectorsModule.register()`); without one the app
-still boots and serves `/health` and `/metrics`.
+still boots and serves `/healthz` and `/metrics`.
 
 **REST weight** (§4.5, D15): **≈ 0.1 weight/min** in steady state — gap repair only (5 per
 repaired range) plus one `fundingRate` per symbol per 8 h settlement.
@@ -205,7 +205,7 @@ first-class state, not an error:
   is written to `collector_gaps` with `repaired = 0` and an explaining `error`, cut at UTC
   midnight so every daily gap report (§6.2) sees its own row;
 - the socket is retried every 5 min; the first message returns the collector to `ws`;
-- `/health` shows `mode` and `degradedReason` **per stream**, so a degraded run never looks healthy.
+- the admin health page (`/api/web/health/streams`) shows `mode` and `degradedReason` **per stream**, so a degraded run never looks healthy.
 
 ## Binance USD-M OI and long/short, 5 m (IB-007)
 
@@ -296,7 +296,7 @@ Migration **005** adds `users` and `invites` — 004 was IB-011's `gap_reports`,
 numbers here are first-come.
 
 **The bot needs a token that only the user can issue, and it is disabled without one.** No token
-means the app still collects, still serves `/health`, and the bot simply does not start; the same
+means the app still collects, still serves `/healthz`, and the bot simply does not start; the same
 rule IB-011's sender follows. An agent never registers a bot. Set, per slot, in that slot's
 `.env`:
 
@@ -361,7 +361,7 @@ ten minutes because the link travels through a chat message.
 the `/api/web` prefix: every controller added to `WebModule` later is authenticated by default,
 with no decorator to forget. `@Public()` opts a route out (only the exchange and logout),
 `@AdminOnly()` adds the role check, `@CurrentUser()` gives the member. The unauthenticated ops
-`GET /health` and `/metrics` are outside the prefix and untouched — and
+`GET /healthz` and `/metrics` are outside the prefix and untouched — and
 `test/web/web-auth.guard.spec.ts` holds the list of fields that must never appear on the ops
 payload, so the two cannot quietly converge.
 
@@ -429,15 +429,17 @@ collectors already covered replaces their rows — the comparison must happen be
 after. `--against rest` compares with the REST API instead, which is the only option for a day
 that has not closed yet (a day gains its archive file only once it is over).
 
-## The watchdog, the daily gap report and the service chat (IB-011)
+## The watchdog and the service chat (IB-011)
 
-`src/ops/` — the operator's instruments (§6.2). This is the **stage-0 exit instrument**: fourteen
-consecutive clean reports are the acceptance criterion, so everything here is built around one
-rule — *a report that cries wolf is worse than no report*. What it refuses to alert on is as
+`src/ops/` — the operator's instrument (§6.2). WD-011 deleted the daily gap report (and
+`npm run report`): its candle grid went with the candle tape. Liquidation gaps stay visible in
+`collector_gaps`, the heartbeats and the admin page's uptime (`/api/web/health/streams`). Since IB-094
+the watchdog only logs unless `OPS_TELEGRAM_ALERTS=true`. It is built around one rule — *an alert
+that cries wolf is worse than no alert*. What it refuses to alert on is as
 load-bearing as what it does:
 
 - **A degraded stream is not a silent stream.** IB-005 records a message on every answered REST
-  poll for exactly this reason; `/health` and the stream's `collector_gaps` row already say it.
+  poll for exactly this reason; the admin health page and the stream's `collector_gaps` row already say it.
 - **A poller is judged against its own period, not the flat threshold.** `binance-perp:oi-ls-5m`
   speaks every 5 minutes and the calendar every 10; against the default 3-minute threshold both
   alerted forever on a healthy box (found on the live run, not in a spec). Streams now declare
@@ -448,20 +450,9 @@ load-bearing as what it does:
 - **The retention edge and a mid-day start are not gaps** (§16.8, IB-007): `expected` is counted
   from the series' first stored row.
 
-The report is **stored in `gap_reports` before it is sent** — the row is the Tester's evidence and
-a Telegram outage must not cost a day of it. Without `TELEGRAM_BOT_TOKEN` /
+Without `TELEGRAM_BOT_TOKEN` /
 `TELEGRAM_SERVICE_CHAT_ID` the sender is *disabled, not broken*: it logs each message at warn
 level, so a dev slot runs the whole path with no bot. Tokens are the user's to issue.
-
-Re-run a day by hand (it overwrites that day's row):
-
-```sh
-npm run report -- --day 2026-09-27
-```
-
-The CLI boots config + DB + sender only, never the collectors. Two honest limits: for the current
-day it counts only up to *now* (future minutes are not missing minutes), and the Binance weight
-peak reads "нет данных", because only the process that ran the day knows it.
 
 ## Market context (IB-036)
 
@@ -518,10 +509,9 @@ header.
 
 ## Endpoints
 
-- `GET /health` → `{ streams: [{ id, venue, lastMessageAgeSec, reconnects24h, gapsOpen, mode, degradedReason, expectedIntervalSec }], db: { lagSec }, budget: { binanceWeightUsed1m } }` (§6.1, with IB-005's `mode` and IB-011's `expectedIntervalSec`).
-  Streams registered today: `binance-perp:{kline_1m,markPrice,forceOrder,oi-ls-5m}`, `bybit:{tickers,allLiquidation}`.
-  `lagSec` is still `null` (IB-004's tables exist, but nothing measures lag yet).
-- `GET /metrics` → prom-client: `ib_stream_last_message_age_seconds{stream}`,
+- `GET /healthz` → exactly `{ "status": "ok" }` (WD-011). It was `GET /health` with streams, db lag, Binance weight and `noSpot`; that detail is admin-only at `/api/web/health/*` now, and `/health` is the dashboard's page.
+- `GET /metrics` → 404 when `CLIENT_IP_HEADER` is set and the request carries that header (H7: it
+  came through Caddy); otherwise prom-client: `ib_stream_last_message_age_seconds{stream}`,
   `ib_rows_written_total{table}`, `ib_gaps_detected_total{stream}`,
   `ib_gaps_unrepaired_total{stream}`, `ib_binance_weight_used_1m`, `ib_ws_reconnects_total{stream}`.
 

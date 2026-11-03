@@ -35,7 +35,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
   onApplicationBootstrap(): void {
     const token = this.config.env.get('TELEGRAM_BOT_TOKEN');
     if (typeof token !== 'string' || token.length === 0) {
-      this.logger.warn('TELEGRAM_BOT_TOKEN is not set — the member bot is disabled (the app still collects and serves /health)');
+      this.logger.warn('TELEGRAM_BOT_TOKEN is not set — the member bot is disabled (the app still collects and serves /healthz)');
       return;
     }
 

@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { AdminOnly, Public, WebAuthGuard, WEB_API_PREFIX, type RequestWithUser } from '../../src/web/auth/web-auth.guard';
 import { SESSION_COOKIE_NAME } from '../../src/web/auth/session-cookie';
 import type { User } from '../../src/users/user.model';
+import { HealthController } from '../../src/ops/health.controller';
 
 /**
  * IB-029 — the guard on `/api/web/*`.
@@ -12,7 +13,7 @@ import type { User } from '../../src/users/user.model';
  * than assuming:
  *
  * 1. it protects **everything** under `/api/web`, including routes that do not exist yet;
- * 2. it leaves the unauthenticated ops surface (`/health`, `/metrics`) alone, and that surface
+ * 2. it leaves the unauthenticated ops surface (`/healthz`, `/metrics`) alone, and that surface
  *    must not grow the fields the guarded one exposes.
  */
 
@@ -56,9 +57,9 @@ describe('what the guard protects', () => {
     }
   });
 
-  it('LEAVES THE OPS SURFACE ALONE — /health and /metrics need no cookie', async () => {
+  it('LEAVES THE OPS SURFACE ALONE — /healthz and /metrics need no cookie', async () => {
     const service = auth();
-    for (const url of ['/health', '/metrics', '/', '/login', '/assets/main.js']) {
+    for (const url of ['/healthz', '/health', '/metrics', '/', '/login', '/assets/main.js']) {
       const { context, reflector } = ctx(withCookie(url));
       await expect(new WebAuthGuard(service, reflector).canActivate(context)).resolves.toBe(true);
     }
@@ -73,7 +74,7 @@ describe('what the guard protects', () => {
   });
 
   it('ignores the query string when matching', async () => {
-    const { context, reflector } = ctx(withCookie('/health?verbose=1'));
+    const { context, reflector } = ctx(withCookie('/healthz?verbose=1'));
     await expect(new WebAuthGuard(auth(), reflector).canActivate(context)).resolves.toBe(true);
   });
 });
@@ -145,25 +146,24 @@ describe('@AdminOnly', () => {
 });
 
 /**
- * The Tech Lead's ruling: the unauthenticated ops `/health` and the guarded dashboard health are
+ * The Tech Lead's ruling: the unauthenticated ops `/healthz` and the guarded dashboard health are
  * two different things and must stay apart. This is the guard that keeps them apart, so the
  * forbidden list lives here. **IB-030: add any detailed field that must never appear
  * unauthenticated.**
  */
-describe('the ops /health must not leak the dashboard\'s detail', () => {
+describe('the ops /healthz must not leak the dashboard\'s detail', () => {
   const FORBIDDEN_IN_OPS_HEALTH = [
     'coverage', 'gapReports', 'gap_reports', 'partitions', 'databaseSize', 'pg_database_size',
     'users', 'members', 'invites', 'deposit', 'tgUserId', 'chatId',
   ];
 
   it('the ops payload carries only liveness fields', async () => {
-    // the shape insight-bot's unauthenticated GET /health has served since IB-003
-    const opsHealth = {
-      streams: [{ id: 'binance-perp:kline_1m', venue: 'binance', lastMessageAgeSec: 1, reconnects24h: 0, gapsOpen: 0, mode: 'ws', degradedReason: null, expectedIntervalSec: null }],
-      db: { lagSec: null },
-      budget: { binanceWeightUsed1m: 0 },
-    };
-    const serialised = JSON.stringify(opsHealth);
+    // WD-011: the REAL controller's answer, not a literal of it — a literal here would keep passing
+    // while the controller grew a field
+    const serialised = JSON.stringify(new HealthController().get());
+    for (const field of ['streams', 'lagSec', 'budget', 'binanceWeightUsed1m', 'noSpot']) {
+      expect(serialised).not.toContain(field);
+    }
     for (const field of FORBIDDEN_IN_OPS_HEALTH) {
       expect(serialised).not.toContain(field);
     }

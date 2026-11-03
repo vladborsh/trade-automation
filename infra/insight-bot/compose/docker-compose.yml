@@ -55,8 +55,9 @@ services:
       DATABASE_URL: postgres://insight:${POSTGRES_PASSWORD}@postgres:5432/insight
     expose:
       - '3005'
+    # WD-011: the liveness probe is /healthz ({status} only); /health is the dashboard's page now.
     healthcheck:
-      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:3005/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:3005/healthz\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
       interval: 30s
       timeout: 10s
       retries: 5

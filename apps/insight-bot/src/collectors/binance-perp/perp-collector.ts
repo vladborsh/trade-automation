@@ -163,7 +163,7 @@ export class BinancePerpCollector {
   /**
    * One demultiplexed payload. Public so a spec can drive the collector without a socket. Every
    * message proves the socket alive (the policy); only a `forceOrder` is liquidation data — the
-   * liveness mark price is neither stored nor counted as the stream's last message, so /health and
+   * liveness mark price is neither stored nor counted as the stream's last message, so the admin health page and
    * the watchdog still see the real age of the last liquidation.
    */
   async onMessage(_stream: string, data: unknown): Promise<void> {

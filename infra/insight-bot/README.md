@@ -12,7 +12,7 @@ SSM, a nightly `pg_dump` to S3, and a deploy path through ECR + `ssm send-comman
 
 ```
 probe-venues.mjs              venue connectivity probe — run FIRST on a fresh box (§7)
-RUNBOOK.md                    operations, in plain Russian (deploy, restore, rotate, /health, alerts)
+RUNBOOK.md                    operations, in plain Russian (deploy, restore, rotate, /healthz, alerts)
 terraform/                    the stack: EC2, security group, IAM, S3 backups, Budgets
   versions.tf variables.tf main.tf iam.tf s3.tf budgets.tf outputs.tf
   user_data.sh.tftpl          first-boot script; inlines the files below so the box needs no repo

@@ -6,7 +6,7 @@ import { StreamRegistry } from './stream-registry';
  * architecture/insight-bot-system-design.md §6.1 — the six metrics `/metrics` exposes, named
  * exactly as that section lists them. Counters are incremented by the collectors and writers
  * (IB-005 onwards); the two gauges are computed at scrape time from the `StreamRegistry` and
- * the Binance weight tracker, so they cannot drift from what `/health` reports.
+ * the Binance weight tracker, so they cannot drift from what the admin health page (`/api/web/health/streams`) reports.
  */
 @Injectable()
 export class MetricsService {
@@ -19,7 +19,7 @@ export class MetricsService {
    * the poll ends and then misreports for the whole gap until the next one. Measured on IB-007's
    * acceptance run — the gauge sat at 150 for five minutes after a pass whose calls had long
    * since aged out of the trailing minute. The collector registers its tracker here at boot and
-   * both `/metrics` and `/health` read it at the instant they are asked.
+   * both `/metrics` and the admin health page (`/api/web/health/streams`) read it at the instant they are asked.
    */
   private weightSource: (() => number) | null = null;
   private binanceWeightUsed1m = 0;
@@ -74,7 +74,7 @@ export class MetricsService {
       labelNames: ['stream'],
       registers: [this.registry],
       collect() {
-        // A stream with no message yet is reported as null by /health; a gauge has no null, so
+        // A stream with no message yet is reported as null by the admin health page; a gauge has no null, so
         // it is simply not sampled until its first message — an absent series, which is what an
         // alert rule on "older than N seconds" needs (§6.2).
         for (const s of streams.snapshot()) {

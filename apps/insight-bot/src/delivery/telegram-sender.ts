@@ -29,7 +29,7 @@ export class TelegramSender {
     if (!this.enabled) {
       this.logger.warn(
         'Telegram is not configured (TELEGRAM_BOT_TOKEN / TELEGRAM_SERVICE_CHAT_ID) — ' +
-          'watchdog alerts and the daily gap report will be logged instead of sent',
+          'watchdog alerts will be logged instead of sent',
       );
     }
   }
@@ -40,7 +40,8 @@ export class TelegramSender {
 
   /**
    * Sends one message. Never throws: an operator channel that can take the process down with it
-   * is worse than one that misses a message, and the report is stored in `gap_reports` regardless.
+   * is worse than one that misses a message; what the watchdog alerts on is also in
+   * `collector_gaps` and on the admin health page.
    */
   async send(text: string): Promise<boolean> {
     if (!this.enabled) {

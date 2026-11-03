@@ -12,7 +12,7 @@ import type { StreamHealth } from './stream-registry';
  *
  * 1. **A degraded stream is not a silent stream.** IB-005's collector records a message on every
  *    answered REST poll precisely so this can tell "working on the fallback" from "dead", and a
- *    degraded spell is already reported by `/health` and by its own `collector_gaps` row. Alerting
+ *    degraded spell is already reported by the admin health page (`/api/web/health/streams`) and by its own `collector_gaps` row. Alerting
  *    every 30 minutes for the hours a venue is unreachable would bury the one alert that matters.
  * 2. **A stream that has never spoken is given its window from registration, not from epoch.**
  *    `lastMessageAgeSec` is null until the first message; at boot that is every stream.
@@ -65,7 +65,7 @@ export class Watchdog {
       const memory = this.memory.get(stream.id) ?? { firstSeenAt: now, alertedAt: null, silentSince: null };
       this.memory.set(stream.id, memory);
 
-      // (1) working on the REST fallback: loud in /health, not here
+      // (1) working on the REST fallback: loud in the admin health page, not here
       if (stream.mode === 'degraded') {
         memory.silentSince = null;
         memory.alertedAt = null;
@@ -104,7 +104,7 @@ export class Watchdog {
     return Math.max(this.silenceMs, cadenceMs);
   }
 
-  /** Streams currently in an alerted state (for /health and specs). */
+  /** Streams currently in an alerted state (for the admin health page and specs). */
   get alerting(): string[] {
     return [...this.memory.entries()].filter(([, m]) => m.alertedAt !== null).map(([id]) => id);
   }

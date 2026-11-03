@@ -12,7 +12,7 @@ import { TtlCache } from './ttl-cache';
  * WD-008 — the venue clients the on-demand layer reads through, built once from config.
  *
  * **`BinanceWeightTracker` is a singleton HERE** (it was OpsModule's, IB-063). OpsModule imports and
- * re-exports this module, so the collectors, `/health`, `/metrics` and every on-demand read still
+ * re-exports this module, so the collectors, the admin health page (`/api/web/health/streams`), `/metrics` and every on-demand read still
  * record into ONE instance — two trackers would each report half of what the IP spent, and the
  * 1 800/min refusal would be checked against the smaller half.
  *

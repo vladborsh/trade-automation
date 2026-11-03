@@ -23,7 +23,7 @@ describe('the dashboard SPA fallback exclusions', () => {
     '/api/web/health/streams',
     '/api/web/nope',            // the case that regressed: unrouted, must not get index.html
     '/api/anything/at/all',
-    '/health',
+    '/healthz',                 // WD-011: the ops liveness probe
     '/metrics',
   ])('%s is excluded from the fallback', (url) => {
     expect(excluded(url)).toBe(true);
@@ -33,7 +33,9 @@ describe('the dashboard SPA fallback exclusions', () => {
     '/',
     '/login',
     '/coverage',
-    '/health-page',             // a page whose name merely starts like the ops route
+    '/health',                  // WD-011: the dashboard's admin Health page — a reload must get index.html
+    '/health/',
+    '/healthz-page',            // a page whose name merely starts like the ops route
     '/instrument/BTCUSDT',      // IB-031's route: a deep link must still boot the SPA
     '/market',
   ])('%s still falls through to the SPA', (url) => {

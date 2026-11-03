@@ -4,7 +4,8 @@ import * as http from 'http';
 
 /**
  * IB-BUG-001 — the regression guard for IB-003's rule (§2.1, §7): `DATABASE_URL` has no default,
- * and **without one the app still boots and serves `/health` and `/metrics`**. IB-010's
+ * and **without one the app still boots and serves `/healthz` and `/metrics`** (WD-011: the liveness
+ * probe moved from `/health` to `/healthz`). IB-010's
  * `CalendarModule` broke that by importing `WritersModule` statically (`Writers` throws with no
  * database), so the process exited before the HTTP server was listening.
  *
@@ -53,9 +54,20 @@ describe('booting with no DATABASE_URL (IB-BUG-001)', () => {
     expect(app).toBeDefined();
   });
 
-  it('serves /health with 200', async () => {
-    const res = await get('/health');
+  it('serves /healthz with 200 and exactly {"status":"ok"}', async () => {
+    const res = await get('/healthz');
     expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toStrictEqual({ status: 'ok' });
+  });
+
+  it('no longer serves the ops JSON at /health (that path is the dashboard\'s)', async () => {
+    // Never the old { streams, db, budget, noSpot } payload. The SPA answer is not checked here:
+    // under Test.createTestingModule ServeStaticModule gets its NoopLoader whatever public/ holds
+    // (see test/web/ops-routes.http.spec.ts, which boots through NestFactory to check it)
+    const res = await get('/health');
+    expect([200, 404]).toContain(res.status);
+    expect(res.body).not.toContain('streams');
+    expect(res.body).not.toContain('noSpot');
   });
 
   it('serves /metrics with 200', async () => {

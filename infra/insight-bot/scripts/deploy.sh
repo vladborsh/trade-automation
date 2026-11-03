@@ -5,7 +5,7 @@
 #   deploy.sh sha-9f2c1ab4d0e1 # deploys this tag instead (a rollback, or a test)
 #
 # 1. render /opt/insight-bot/.env from SSM   2. log in to ECR with the instance role   3. pull
-# 4. up -d   5. health check
+# 4. up -d   5. health check (GET /healthz from inside the app container)
 #
 # The image lives in the private ECR repository `insight-bot` in this account and region. Its URL
 # is derived here (account + region), not stored anywhere, and the tag is never `latest`: tags are
@@ -14,7 +14,7 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-ap-northeast-1}"
 PREFIX="${SSM_PREFIX:-/insight-bot}"
-DIR=/opt/insight-bot
+DIR="${DEPLOY_DIR:-/opt/insight-bot}" # overridden only by scripts/deploy.test.sh
 
 TAG="${1:-}"
 if [ -z "$TAG" ]; then
@@ -61,14 +61,20 @@ if grep -q '^TUNNEL_TOKEN=' "$DIR/cloudflared.env" 2>/dev/null; then
   SERVICES+=(cloudflared)
   PROFILES=(--profile tunnel)
 fi
-docker compose "${PROFILES[@]}" pull "${SERVICES[@]}"
+docker compose ${PROFILES[@]+"${PROFILES[@]}"} pull "${SERVICES[@]}"
 
 echo "==> starting: ${SERVICES[*]}"
-docker compose "${PROFILES[@]}" up -d "${SERVICES[@]}"
+docker compose ${PROFILES[@]+"${PROFILES[@]}"} up -d "${SERVICES[@]}"
 
-echo "==> waiting for /health"
+# WD-011: the liveness probe is /healthz ({"status":"ok"}). /health is now the dashboard's page and
+# would answer 200 with index.html. Only r.ok is checked, not the body, so a rollback to an image
+# from before WD-011 still passes: on such an image /healthz is answered by the SPA fallback with
+# 200, which proves exactly what the old /health check proved (the process is serving). On a
+# WD-011+ image, a /healthz route that went missing is a 404 (it is excluded from the SPA fallback),
+# so this check fails. Proved both ways by scripts/deploy.test.sh.
+echo "==> waiting for /healthz"
 for _ in $(seq 1 30); do
-  if docker compose exec -T insight-bot node -e 'fetch("http://127.0.0.1:3005/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' 2>/dev/null; then
+  if docker compose exec -T insight-bot node -e 'fetch("http://127.0.0.1:3005/healthz").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' 2>/dev/null; then
     echo "deploy.sh: healthy on ${IMAGE}"
     docker image prune -f >/dev/null || true
     exit 0
@@ -76,5 +82,5 @@ for _ in $(seq 1 30); do
   sleep 5
 done
 
-echo "deploy.sh: /health did not answer within 150 s — see 'docker compose logs insight-bot'" >&2
+echo "deploy.sh: /healthz did not answer within 150 s — see 'docker compose logs insight-bot'" >&2
 exit 1

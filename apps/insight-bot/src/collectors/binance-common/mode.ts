@@ -67,7 +67,7 @@ export class ModePolicy {
     return this.state;
   }
 
-  /** Why we are degraded, for /health; null in ws mode. */
+  /** Why we are degraded, for the admin health page; null in ws mode. */
   get reason(): 'silent-after-open' | 'silence' | null {
     return this.state === 'degraded' ? this.lastReason : null;
   }

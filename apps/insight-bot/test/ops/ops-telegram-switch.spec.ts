@@ -1,18 +1,16 @@
 import { Logger } from '@nestjs/common';
 import type { EconomicEvent } from '@trade-automation/contracts';
 import { EnvSchema } from '../../src/config/env.schema';
-import type { Db } from '../../src/db/db.port';
 import { CalendarNotifierService } from '../../src/delivery/calendar-notifier.service';
 import type { CalendarNotifyStore } from '../../src/delivery/pg/calendar-notify.repo';
-import { GapReportService } from '../../src/ops/gap-report.service';
 import type { StreamHealth } from '../../src/ops/stream-registry';
 import { WatchdogService } from '../../src/ops/watchdog.service';
-import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
 
 /**
  * IB-094 (owner ruling 2026-11-03) — the operator's Telegram pushes are OFF unless
- * OPS_TELEGRAM_ALERTS is explicitly true. The watchdog and the gap report then log what they
- * would have sent; detection and storage are unchanged. The calendar notifier shares the sender and
+ * OPS_TELEGRAM_ALERTS is explicitly true. The watchdog then logs what it would have sent;
+ * detection and storage are unchanged. (WD-011 deleted the daily gap report and its half of this
+ * spec with it.) The calendar notifier shares the sender and
  * is NOT behind the switch.
  */
 
@@ -73,37 +71,6 @@ describe('WatchdogService', () => {
     await new WatchdogService(configWith(true), registry, sender).tick(T);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toContain('bybit:allLiquidation');
-  });
-});
-
-describe('GapReportService', () => {
-  const db = () => {
-    const stored: string[] = [];
-    const handle: Db = {
-      query: async (sql: string) => { if (sql.includes('gap_reports')) stored.push('stored'); return []; },
-      transaction: async (fn) => fn(handle),
-    };
-    return { handle, stored };
-  };
-
-  it('default (false): the report is still built and STORED, but not sent — logged instead', async () => {
-    const lines = logged();
-    const { handle, stored } = db();
-    const { sent, sender } = spySender();
-    const report = await new GapReportService(configWith(false), handle, sender, new BinanceWeightTracker()).runForDay('2026-11-02');
-    expect(report).not.toBeNull();
-    expect(stored).toEqual(['stored']);
-    expect(sent).toEqual([]);
-    expect(lines.some((l) => l.startsWith('OPS_TELEGRAM_ALERTS=false — would have sent to Telegram:') && l.includes('2026-11-02'))).toBe(true);
-  });
-
-  it('true: stored, then sent (the old behaviour)', async () => {
-    logged();
-    const { handle, stored } = db();
-    const { sent, sender } = spySender();
-    await new GapReportService(configWith(true), handle, sender, new BinanceWeightTracker()).runForDay('2026-11-02');
-    expect(stored).toEqual(['stored']);
-    expect(sent).toHaveLength(1);
   });
 });
 
