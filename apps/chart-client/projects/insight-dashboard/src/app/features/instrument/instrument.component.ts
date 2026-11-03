@@ -11,6 +11,7 @@ import { InstrumentChartComponent, type PaneData } from './instrument-chart.comp
 import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
 import { instrumentTailJobs } from './instrument-tail';
+import { focusView, parseAt, type FocusView } from './focus-at';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
@@ -76,6 +77,8 @@ export class InstrumentComponent {
   /** Bumped by every fresh load, so an answer for an abandoned choice is dropped. */
   private generation = 0;
   readonly error = signal<string | null>(null);
+  /** IB-098: the moment `?at=` linked to; dropped as soon as the reader picks another symbol or frame. */
+  readonly focus = signal<FocusView | null>(null);
 
   /** IB-066 — the live tail: candles every 5 s, the rest every minute. The rules are `live-tail.ts`'s. */
   private readonly tail = new LiveTail({
@@ -108,6 +111,9 @@ export class InstrumentComponent {
   constructor() {
     const fromRoute = this.route.snapshot.paramMap.get('symbol');
     if (fromRoute) this.symbol.set(fromRoute.toUpperCase());
+    const at = parseAt(this.route.snapshot.queryParamMap.get('at'), Date.now());
+    if (at !== null) this.focus.set(focusView(at, Date.now()));
+    this.timeframe.set(this.focus()?.timeframe ?? this.timeframe());
     void this.loadUniverse();
     void this.loadFigures();
     void this.load();
@@ -143,12 +149,16 @@ export class InstrumentComponent {
     const next = symbol.trim().toUpperCase();
     if (next.length === 0 || next === this.symbol()) return;
     this.symbol.set(next);
+    this.focus.set(null);
     void this.router.navigate(['/instrument', next]);
     void this.load();
   }
 
   chooseTimeframe(tf: WebTimeframe): void {
     this.timeframe.set(tf);
+    // the moment belonged to the link: off the screen and off the URL, so a reload does not jump back
+    if (this.focus()) void this.router.navigate([], { queryParams: { at: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    this.focus.set(null);
     void this.load();
   }
 

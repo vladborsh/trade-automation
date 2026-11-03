@@ -152,6 +152,7 @@ export const en: Strings = {
   'instrument.resizeHint': 'Drag the lower edge of a pane to change its height; the panes below move down. Remembered in this browser.',
   'instrument.resizeHandle': 'Resize the pane above',
   'instrument.loadingEarlier': 'Loading earlier history…',
+  'instrument.focus.marker': 'the moment from the link',
   'instrument.historyStart': 'No earlier history: this is where the venue\'s data starts.',
   'instrument.picker.open': 'Instrument {symbol}: choose another',
   'instrument.picker.search': 'Find a symbol',

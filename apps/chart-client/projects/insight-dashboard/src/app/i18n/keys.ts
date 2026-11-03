@@ -162,6 +162,7 @@ export type StringKey =
   | 'instrument.resizeHint'
   | 'instrument.resizeHandle'
   | 'instrument.loadingEarlier'
+  | 'instrument.focus.marker'
   | 'instrument.historyStart'
   | 'instrument.picker.open'
   | 'instrument.picker.search'

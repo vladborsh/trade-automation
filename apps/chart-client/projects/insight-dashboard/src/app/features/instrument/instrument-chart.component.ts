@@ -20,6 +20,8 @@ import {
 } from './panels.model';
 import { TimeAxisStrip } from './time-axis-strip';
 import { keepView } from './carried-view';
+import type { FocusView } from './focus-at';
+import { FocusMarker } from './focus-marker';
 import { futureSlots } from './future-bars';
 
 export type { PaneData } from './pane-data';
@@ -76,6 +78,8 @@ export class InstrumentChartComponent implements OnDestroy {
   readonly edgeNote = input<string | null>(null);
   /** An earlier window is loading after a scroll left: an inline loader in the foot. */
   readonly loadingEarlier = input(false);
+  /** IB-098: open on this moment (from `?at=`) and mark it, when the data is the frame it chose. */
+  readonly focus = input<FocusView | null>(null);
   /** The reader scrolled or zoomed out past the oldest bar drawn. */
   readonly nearLeftEdge = output<void>();
 
@@ -85,6 +89,7 @@ export class InstrumentChartComponent implements OnDestroy {
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('chartHost');
   private readonly axisHost = viewChild.required<ElementRef<HTMLDivElement>>('axisHost');
   private axis: TimeAxisStrip | null = null;
+  private marker: FocusMarker | null = null;
   private chart: IChartApi | null = null;
   private renderers: PanelRenderers = createPanelRenderers();
   private observer: ResizeObserver | null = null;
@@ -166,6 +171,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const current = this.chart;
     if (current && (data.extendsPrevious || data.extendsLater)) {
       keepView(current, data, () => (this.renderers = redrawPanels(current, data, this.renderers, PANELS.map((p) => p.key))));
+      this.marker?.place();
       return this.axis?.refresh(futureSlots(data));
     }
     this.teardown();
@@ -177,7 +183,11 @@ export class InstrumentChartComponent implements OnDestroy {
     for (const panel of PANELS) drawPanel(panel.key, chart, data, this.renderers);
     for (const pane of chart.panes()) pane.priceScale('right').applyOptions(PANEL_PRICE_SCALE);
     this.applyHeights();
-    showWholeWindow(chart, data);
+    const focus = this.focus();
+    if (focus?.timeframe === data.timeframe) {
+      FocusMarker.open(chart, focus);
+      this.marker = new FocusMarker(chart, host.parentElement as HTMLElement, focus, this.t('instrument.focus.marker'));
+    } else showWholeWindow(chart, data);
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
     chart.subscribeCrosshairMove((p: MouseEventParams) =>
       this.hover.set(p.time !== undefined && p.point ? { time: p.time as number, x: p.point.x } : null));
@@ -218,6 +228,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const size = chart.options();
     if (size.width !== width || size.height !== this.chartHeight()) chart.resize(width, this.chartHeight());
     this.axis?.resize();
+    this.marker?.place();
   }
 
   private teardown(): void {
@@ -226,6 +237,8 @@ export class InstrumentChartComponent implements OnDestroy {
     this.observer = null;
     this.axis?.destroy();
     this.axis = null;
+    this.marker?.destroy();
+    this.marker = null;
     this.chart?.remove();
     this.chart = null;
   }

@@ -158,6 +158,7 @@ export const ru: Strings = {
   'instrument.resizeHint': 'Потяните нижний край панели, чтобы изменить её высоту; панели ниже сдвинутся. Запоминается в этом браузере.',
   'instrument.resizeHandle': 'Изменить высоту панели над линией',
   'instrument.loadingEarlier': 'Загружаю более раннюю историю…',
+  'instrument.focus.marker': 'момент из ссылки',
   'instrument.historyStart': 'Раньше истории нет: здесь начинаются данные биржи.',
   'instrument.picker.open': 'Инструмент {symbol}: выбрать другой',
   'instrument.picker.search': 'Найти тикер',
