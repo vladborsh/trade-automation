@@ -5,9 +5,8 @@
 # host and docker compose injects it at runtime (§7). Dockerfile.dockerignore keeps a developer's
 # node_modules and .env files out of the context.
 #
-# The bot consumes the workspace libs as built packages (dist/), like signal-server's image.
-# It imports @trade-automation/calendar-core without declaring it in its package.json (it resolves
-# locally through workspace hoisting), so the image carries calendar-core explicitly.
+# The bot consumes the workspace libs as built packages (dist/), like signal-server's image:
+# contracts, binance-client, calendar-core and market-data-core (its package.json dependencies).
 
 # The build stage runs on the BUILDER's platform (native, not under QEMU): it emits only
 # platform-independent JS and static files. Only the runtime stage, which installs the production
