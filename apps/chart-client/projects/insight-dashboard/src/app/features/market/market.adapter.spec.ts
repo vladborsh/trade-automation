@@ -1,12 +1,24 @@
+import { fearGreedZone } from '@trade-automation/contracts';
 import { coinPrice, fearGreedBand, FEAR_GREED_BANDS } from './market.adapter';
 
 describe('the Fear & Greed dial', () => {
-  it('bands split at the venue’s own boundaries', () => {
-    expect(fearGreedBand(0).key).toBe('market.fg.extremeFear');
-    expect(fearGreedBand(24).key).toBe('market.fg.extremeFear');
-    expect(fearGreedBand(25).key).toBe('market.fg.fear');
-    expect(fearGreedBand(54).key).toBe('market.fg.neutral');
-    expect(fearGreedBand(75).key).toBe('market.fg.extremeGreed');
+  /**
+   * IB-102: pinned at the row's ten edges to the zones the BOT uses (its fngBand reads the contract's
+   * table). This spec used to assert 75 → extreme greed, i.e. it pinned the client's old off-by-one
+   * copy (neutral ≤ 54, greed ≤ 74) instead of the server's 55 / 75.
+   */
+  it.each([
+    [0, 'market.fg.extremeFear'], [24, 'market.fg.extremeFear'], [25, 'market.fg.fear'], [44, 'market.fg.fear'],
+    [45, 'market.fg.neutral'], [55, 'market.fg.neutral'], [56, 'market.fg.greed'], [75, 'market.fg.greed'],
+    [76, 'market.fg.extremeGreed'], [100, 'market.fg.extremeGreed'],
+  ] as const)('%i → %s, the bot\'s zone too', (value, key) => {
+    expect(fearGreedBand(value).key).toBe(key);
+    expect(fearGreedBand(value).band).toBe(fearGreedZone(value));
+  });
+
+  it('agrees with the bot\'s zone for EVERY reading 0–100, not just at the edges', () => {
+    const disagree = Array.from({ length: 101 }, (_, v) => v).filter((v) => fearGreedBand(v).band !== fearGreedZone(v));
+    expect(disagree).toEqual([]);
   });
 
   it('clamps a value outside 0–100 instead of falling off the end of the table', () => {

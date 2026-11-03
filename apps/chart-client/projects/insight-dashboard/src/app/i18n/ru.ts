@@ -247,6 +247,10 @@ export const ru: Strings = {
   'market.fg.neutral': 'нейтрально',
   'market.fg.greed': 'жадность',
   'market.fg.extremeGreed': 'крайняя жадность',
+  'market.fg.gaugeLabel': 'Индекс страха и жадности {value}: {band}',
+  'market.fg.lineLabel': 'Страх и жадность за последние 30 дней',
+  'market.fg.lineTitle': 'за 30 дней',
+  'market.fg.weekAgoMark': 'неделю назад',
 
   'market.dominance.title': 'Доля BTC во всём рынке',
   'market.dominance.day': 'За сутки {change}',

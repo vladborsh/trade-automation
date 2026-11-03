@@ -1,0 +1,29 @@
+<svg class="gauge" [attr.viewBox]="'0 0 ' + box.w + ' ' + box.h" role="img"
+     [attr.aria-label]="t('market.fg.gaugeLabel', { value: card().now.value, band: t(band().key) })">
+  @for (arc of gauge().arcs; track arc.band) {
+    <path class="arc" [attr.d]="arc.d" [attr.stroke]="style[arc.band].colour" />
+  }
+  <line class="needle" [attr.x1]="gauge().centre.x" [attr.y1]="gauge().centre.y" [attr.x2]="gauge().needle.x" [attr.y2]="gauge().needle.y" />
+  <circle class="hub" [attr.cx]="gauge().centre.x" [attr.cy]="gauge().centre.y" r="5" />
+</svg>
+<p class="value" [style.color]="band().colour">{{ card().now.value }}</p>
+<p class="label" [style.color]="band().colour">{{ t(band().key) }}</p>
+<p class="muted">{{ t('market.asOf', { when: card().now.day }) }} · {{ card().now.classification }} · {{ t('market.source', { source: card().source }) }}</p>
+@if (line(); as l) {
+  <svg class="line" [attr.viewBox]="'0 0 ' + lineBox.w + ' ' + lineBox.h" preserveAspectRatio="none" role="img" [attr.aria-label]="t('market.fg.lineLabel')">
+    @for (b of l.bands; track b.band) {
+      <rect [attr.x]="0" [attr.y]="b.y" [attr.width]="lineBox.w" [attr.height]="b.height" [attr.fill]="style[b.band].colour" class="zone" />
+    }
+    @if (l.weekAgoX !== null) {
+      <line class="week-mark" [attr.x1]="l.weekAgoX" y1="0" [attr.x2]="l.weekAgoX" [attr.y2]="lineBox.h" />
+    }
+    <polyline class="history" [attr.points]="l.points" />
+  </svg>
+  <p class="line-caption muted">
+    <span>{{ t('market.fg.lineTitle') }}</span>
+    @if (weekCaption(); as c) {
+      <span class="week-caption" [class.end]="c.side === 'right'"
+            [style.left.%]="c.side === 'left' ? c.pct : null" [style.right.%]="c.side === 'right' ? c.pct : null">{{ t('market.fg.weekAgoMark') }}</span>
+    }
+  </p>
+}

@@ -65,16 +65,13 @@
     @if (firstLoad()) {
       <app-loader variant="skeleton" [lines]="4" [label]="t('market.loading')" />
     } @else if (fearGreed(); as fg) {
-      <p class="value" [style.color]="band(fg.now.value).colour">{{ fg.now.value }}</p>
-      <p class="label" [style.color]="band(fg.now.value).colour">{{ t(band(fg.now.value).key) }}</p>
-      <p class="muted">{{ t('market.asOf', { when: fg.now.day }) }} · {{ fg.now.classification }}</p>
+      <app-fear-greed-gauge [card]="fg" />
       @if (fg.previous; as prev) {
         <p>{{ t('market.fg.wasYesterday', { day: prev.day, value: prev.value, band: t(band(prev.value).key) }) }}</p>
       }
       @if (fg.weekAgo; as week) {
         <p>{{ t('market.fg.wasWeek', { value: week.value, band: t(band(week.value).key) }) }}</p>
       }
-      <p class="muted source">{{ t('market.source', { source: fg.source }) }}</p>
     } @else {
       <p class="muted">{{ t('market.fg.none') }}</p>
     }

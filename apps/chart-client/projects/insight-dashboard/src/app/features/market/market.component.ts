@@ -12,6 +12,7 @@ import { CapsBlockComponent } from '../caps/caps-block.component';
 import { LiquidationsBlockComponent } from '../liquidations/liquidations-block.component';
 import { PositioningBlockComponent } from '../positioning/positioning-block.component';
 import { BlockConclusionComponent } from './shell/block-conclusion.component';
+import { FearGreedGaugeComponent } from './fear-greed-gauge.component';
 import { fearGreedBand } from './market.adapter';
 import { BlockScheduler, liveAge, type BlockId } from './shell/block-scheduler';
 import { InsightsBlockComponent } from './shell/insights-block.component';
@@ -39,7 +40,7 @@ import { PeriodSwitchComponent } from './shell/period-switch.component';
   standalone: true,
   imports: [
     LiquidationsBlockComponent, PositioningBlockComponent, CapsBlockComponent, BlockConclusionComponent, LoaderComponent,
-    PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent,
+    PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent, FearGreedGaugeComponent
   ],
   templateUrl: './market.component.html',
   styleUrl: './market.component.scss',

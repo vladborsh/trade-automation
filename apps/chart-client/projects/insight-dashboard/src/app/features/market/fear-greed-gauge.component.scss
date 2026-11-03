@@ -1,0 +1,18 @@
+/* Dark-terminal palette (AGENTS.md); the zone colours come from FEAR_GREED_STYLE. */
+:host { display: block; }
+.gauge { display: block; width: 100%; max-width: 240px; margin: 0 auto; }
+.arc { fill: none; stroke-width: 14; }
+.needle { stroke: #c9d1d9; stroke-width: 3; stroke-linecap: round; }
+.hub { fill: #c9d1d9; }
+p { margin: 0; text-align: center; }
+.value { font-size: 28px; font-weight: 600; line-height: 1.1; }
+.label { font-size: 13px; }
+.muted { color: #8b949e; font-size: 12px; }
+/* the line keeps a readable shape on a wide card: capped and centred, its caption the same width */
+.line { display: block; width: 100%; max-width: 420px; height: 44px; margin: 8px auto 0; border: 1px solid #30363d; }
+.zone { opacity: 0.16; }
+.week-mark { stroke: #8b949e; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.history { fill: none; stroke: #c9d1d9; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.line-caption { position: relative; max-width: 420px; height: 16px; margin: 2px auto 0; text-align: left; }
+.week-caption { position: absolute; top: 0; white-space: nowrap; border-left: 1px dashed #8b949e; padding-left: 4px; }
+.week-caption.end { border-left: 0; border-right: 1px dashed #8b949e; padding: 0 4px 0 0; }

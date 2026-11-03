@@ -1,3 +1,5 @@
+import { FEAR_GREED_ZONES, fearGreedZone, type FearGreedBand } from '@trade-automation/contracts';
+
 /**
  * IB-037 — what the market CARDS need, after §12.1 replaced the charts.
  *
@@ -12,14 +14,22 @@
 export const BTC_COLOUR = '#f0b90b';
 export const BAND_COLOURS = ['#26a69a', '#2f81f7', '#8957e5', '#db6d28', '#3fb950', '#6e7681', '#1f6feb', '#a371f7'];
 
-/** The Fear & Greed bands, as alternative.me defines them — value → the class it belongs to. */
-export const FEAR_GREED_BANDS = [
-  { upTo: 24, key: 'market.fg.extremeFear', colour: '#ef5350' },
-  { upTo: 44, key: 'market.fg.fear', colour: '#db6d28' },
-  { upTo: 54, key: 'market.fg.neutral', colour: '#8b949e' },
-  { upTo: 74, key: 'market.fg.greed', colour: '#3fb950' },
-  { upTo: 100, key: 'market.fg.extremeGreed', colour: '#26a69a' },
-] as const;
+/** The word and colour of each zone. The EDGES are not here: they are the contract's (IB-102). */
+export const FEAR_GREED_STYLE = {
+  extreme_fear: { key: 'market.fg.extremeFear', colour: '#ef5350' },
+  fear: { key: 'market.fg.fear', colour: '#db6d28' },
+  neutral: { key: 'market.fg.neutral', colour: '#8b949e' },
+  greed: { key: 'market.fg.greed', colour: '#3fb950' },
+  extreme_greed: { key: 'market.fg.extremeGreed', colour: '#26a69a' },
+} as const satisfies Record<FearGreedBand, { key: string; colour: string }>;
+
+/**
+ * The Fear & Greed bands, as alternative.me defines them — value → the class it belongs to. IB-102:
+ * the edges come from the contract's `FEAR_GREED_ZONES`, the same table the bot's `fngBand` (KPI
+ * strip, R7) reads. This file had its own copy with neutral ≤ 54 and greed ≤ 74 (IB-037), so 55 and
+ * 75 were worded one zone higher here than in the bot's statements.
+ */
+export const FEAR_GREED_BANDS = FEAR_GREED_ZONES.map((zone) => ({ upTo: zone.upTo, band: zone.band, ...FEAR_GREED_STYLE[zone.band] }));
 
 /**
  * The band a value falls in. The venue also sends its own `classification` string, which is what
@@ -28,8 +38,8 @@ export const FEAR_GREED_BANDS = [
  * number — both come from the same value.
  */
 export function fearGreedBand(value: number): (typeof FEAR_GREED_BANDS)[number] {
-  const clamped = Math.max(0, Math.min(100, value));
-  return FEAR_GREED_BANDS.find((band) => clamped <= band.upTo) ?? FEAR_GREED_BANDS[FEAR_GREED_BANDS.length - 1];
+  const band = fearGreedZone(value);
+  return FEAR_GREED_BANDS.find((b) => b.band === band) as (typeof FEAR_GREED_BANDS)[number];
 }
 
 /**

@@ -49,6 +49,21 @@ async function withNormBlock(page: Page): Promise<void> {
     route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...overview, asOf, block: normBlock }) }));
 }
 
+/**
+ * IB-102: the recorded card (2026-11-03) predates `history`. A SYNTHETIC 31-day history, ending at the
+ * recorded `now` (26) and passing through the recorded previous (37) and week-ago (48) readings, with one
+ * missed day (10-20): test data, not a capture.
+ */
+const SYNTHETIC_FNG_HISTORY = Array.from({ length: 31 }, (_, i) => {
+  const day = new Date(Date.UTC(2026, 9, 4) + i * 86_400_000).toISOString().slice(0, 10);
+  const value = day === '2026-11-03' ? 26 : day === '2026-11-02' ? 37 : day === '2026-10-27' ? 48 : Math.round(55 + 20 * Math.sin(i / 4) - i * 0.6);
+  return { day, value, classification: value <= 24 ? 'Extreme Fear' : value <= 44 ? 'Fear' : value <= 55 ? 'Neutral' : 'Greed' };
+}).filter((r) => r.day !== '2026-10-20');
+async function withFngHistory(page: Page): Promise<void> {
+  await page.route('**/api/web/context/cards**', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...cards, fearGreed: { ...cards.fearGreed, history: SYNTHETIC_FNG_HISTORY } }) }));
+}
+
 async function openMarket(page: Page, setup?: (page: Page) => Promise<void>): Promise<void> {
   await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
   await mockApi(page);
@@ -164,6 +179,17 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     await expect(rows).toHaveCount(8); // a new period starts folded
   });
 
+  test('IB-102 phone: the Fear & Greed gauge and its 30-day line fit, no page scroll', async ({ page }, info) => {
+    await openMarket(page, withFngHistory);
+    const card = page.locator('#sentiment app-fear-greed-gauge');
+    await expect(card.locator('svg.gauge path.arc')).toHaveCount(5);
+    await expect(card.locator('.value')).toHaveText('26');
+    await expect(card.locator('svg.line polyline.history')).toBeVisible();
+    await expect(card).toContainText('source: alternative.me');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await info.attach('phone-390-fng.png', { body: await page.locator('#sentiment').screenshot(), contentType: 'image/png' });
+  });
+
   test('IB-090 heat table: scrolls in its own box with the ticker column pinned; every cell readable', async ({ page }) => {
     await openMarket(page);
     const box = page.locator('app-pos-heat .scroll');
@@ -228,6 +254,13 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
 
 test.describe('market page — desktop 1440×900 (IB-088)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('IB-102 desktop: the gauge and the 30-day line', async ({ page }, info) => {
+    await openMarket(page, withFngHistory);
+    const card = page.locator('#sentiment app-fear-greed-gauge');
+    await expect(card.locator('svg.line polyline.history')).toBeVisible();
+    await info.attach('desktop-fng.png', { body: await page.locator('#sentiment').screenshot(), contentType: 'image/png' });
+  });
 
   test('IB-101 desktop: «where» folds to the top 8 and unfolds to all 20', async ({ page }, info) => {
     await openMarket(page);

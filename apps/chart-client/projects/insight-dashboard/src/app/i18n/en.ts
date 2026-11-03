@@ -241,6 +241,10 @@ export const en: Strings = {
   'market.fg.neutral': 'neutral',
   'market.fg.greed': 'greed',
   'market.fg.extremeGreed': 'extreme greed',
+  'market.fg.gaugeLabel': 'Fear and greed index {value}: {band}',
+  'market.fg.lineLabel': 'Fear and greed over the last 30 days',
+  'market.fg.lineTitle': 'last 30 days',
+  'market.fg.weekAgoMark': 'a week ago',
 
   'market.dominance.title': 'BTC share of the whole market',
   'market.dominance.day': 'Over 24 h {change}',
