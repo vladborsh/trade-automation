@@ -99,6 +99,14 @@ export class FundingService {
     if (used > WEIGHT_CEILING_1M) throw new Error(`Binance weight ${used} above ${WEIGHT_CEILING_1M}/min; not adding to it`);
   }
 
+  /**
+   * IB-085 (D9): Binance's settled funding alone, for the positioning baseline — the same read the
+   * panel makes, without asking Bybit and OKX for a series the table does not use.
+   */
+  async binanceSettledHistory(symbol: string, fromMs: number, toMs: number): Promise<WebFundingPoint[]> {
+    return this.binanceSettled(symbol, fromMs, toMs);
+  }
+
   private async binanceSettled(symbol: string, fromMs: number, toMs: number): Promise<WebFundingPoint[]> {
     this.refuseAboveCeiling();
     this.options.weight.recordCall(FUNDING_CALL_WEIGHT, this.now());

@@ -20,3 +20,22 @@ export const LARGE_LIMIT = 50;
 
 /** D8: the liquidation block's server cache, per period. */
 export const LIQUIDATION_BLOCK_CACHE_MS = 5_000;
+
+// ---- IB-085 positioning (D9) and KPIs (D10) ---------------------------------------------------
+
+/** D3: a cell's rarity needs at least this many days of the coin's own history. */
+export const POSITIONING_MIN_HISTORY_DAYS = 20;
+/** The baseline history every cell's rarity is measured against. */
+export const POSITIONING_BASELINE_DAYS = 30;
+/** D9 quadrant: |price change| below this percent is "flat" … */
+export const PRICE_FLAT_PCT = 0.5;
+/** … and |OI change| below this percent is "flat". */
+export const OI_FLAT_PCT = 1;
+/** D9: baselines (klines 1h × 720, funding history, OI/LS 1h) are rebuilt hourly … */
+export const POSITIONING_BASELINE_CACHE_MS = 60 * 60_000;
+/** … the current values every minute; the KPI strip too (D10). */
+export const POSITIONING_CURRENT_CACHE_MS = 60_000;
+export const KPI_CACHE_MS = 60_000;
+/** "quiet": every measured cell under this rarity, and at least this many measured. */
+export const QUIET_MAX_RARITY = 0.5;
+export const QUIET_MIN_CELLS = 3;

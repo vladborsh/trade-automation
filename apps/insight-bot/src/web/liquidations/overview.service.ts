@@ -10,7 +10,7 @@ import { TtlCache } from '../../venues/ttl-cache';
 import { AssetClassifier } from './asset-classes';
 import { availableFrom, hourly, largeEvents, periodNorm, periodTotals, verdict } from './block.assemble';
 import { normPeriodStart } from './norm';
-import { windowStats } from './overview.assemble';
+import { completeWindowStarts, sampleFor, windowStats } from './overview.assemble';
 import * as repo from './pg/overview.repo';
 
 /**
@@ -77,6 +77,42 @@ export class LiquidationsOverviewService {
       const present = await repo.distinctKeys(db, { fromMs: nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000, toMs: nowMs + 60_000 });
       const out: ClassKeys = { crypto: [], tradfi: [], unknown: [] };
       for (const { venue, symbol } of present) out[this.classifier.classify(venue, symbol)].push(`${venue}:${symbol}`);
+      return out;
+    });
+  }
+
+  /**
+   * IB-085 (D9): per CRYPTO coin, the period's USD and the sample it is rare against — one sum per
+   * complete aligned window of the period's length over the norm period, empty windows as 0. `days`
+   * is that sample's length in days, so the caller can refuse under its minimum. 7d gives no sample
+   * (D14). Cached with the overview's 5 s.
+   */
+  async coinPeriodSamples(period: WebMarketPeriod): Promise<Map<string, { usd: number; sample: number[]; days: number }>> {
+    return this.cache.getOrLoad(`coin-samples:${period}`, OVERVIEW_CACHE_MS, async () => {
+      const db = this.db;
+      if (!db) throw new Error('no database');
+      const nowMs = this.now();
+      const keys = await this.classKeys(db, nowMs);
+      const periodSec = WEB_MARKET_PERIOD_SECONDS[period];
+      const capMs = nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000;
+      const [firstSeen, trailing, buckets] = await Promise.all([
+        repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+        repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.crypto }),
+        period === '7d' ? Promise.resolve([]) : repo.alignedBuckets(db, { windowSec: periodSec, fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+      ]);
+      const out = new Map<string, { usd: number; sample: number[]; days: number }>();
+      const ids = new Set(trailing.map((r) => r.symbolId).concat(firstSeen.map((r) => r.symbolId)).filter((id): id is string => id !== null));
+      for (const id of ids) {
+        const rows = firstSeen.filter((r) => r.symbolId === id);
+        const venues = [...new Set(rows.map((r) => r.venue))];
+        const start = normPeriodStart(venues.map((v) => Math.min(...rows.filter((r) => r.venue === v).map((r) => r.firstSeenMs))), nowMs);
+        const starts = period === '7d' ? [] : completeWindowStarts(start, nowMs, periodSec);
+        out.set(id, {
+          usd: periodTotals(trailing, periodSec, id).usd,
+          sample: sampleFor(buckets.filter((b) => b.symbolId === id), starts, null),
+          days: (starts.length * periodSec) / 86_400,
+        });
+      }
       return out;
     });
   }

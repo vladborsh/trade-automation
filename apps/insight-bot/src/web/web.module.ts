@@ -29,6 +29,8 @@ import { FundingService } from './market/funding.service';
 import { OiLsService } from './market/oi-ls.service';
 import { DB, type Db } from '../db/db.port';
 import { oiLsStoredReader } from './series/pg/oi-ls-stored.repo';
+import { PositioningService } from './market/positioning/positioning.service';
+import { KpisService } from './market/positioning/kpis.service';
 import { TtlCache } from '../venues/ttl-cache';
 import { FuturesDataClient } from '../venues/binance/futures-data.client';
 import { PerpRest } from '../venues/binance/perp.rest';
@@ -146,6 +148,22 @@ export class WebModule {
           inject: [FuturesDataClient, TtlCache, BinanceWeightTracker, DB],
           useFactory: (client: FuturesDataClient, cache: TtlCache, weight: BinanceWeightTracker, db: Db | null) =>
             new OiLsService({ client, cache, weight, stored: db ? oiLsStoredReader(db) : null }),
+        },
+        {
+          // IB-085 (D9): positioning — every read through the services above, none of its own
+          provide: PositioningService,
+          inject: [AppConfigService, TtlCache, UniverseSummaryService, CandlesService, FundingService, OiLsService, LiquidationsOverviewService],
+          useFactory: (config: AppConfigService, cache: TtlCache, summary: UniverseSummaryService, candles: CandlesService,
+            funding: FundingService, oiLs: OiLsService, liquidations: LiquidationsOverviewService) =>
+            new PositioningService({ symbols: config.symbols, cache, summary, candles, funding, oiLs, liquidations }),
+        },
+        {
+          // IB-085 (D10): the KPI strip, from existing reads
+          provide: KpisService,
+          inject: [AppConfigService, TtlCache, MarketCardsService, LiquidationsOverviewService, OiLsService, UniverseSummaryService],
+          useFactory: (config: AppConfigService, cache: TtlCache, cards: MarketCardsService, liquidations: LiquidationsOverviewService,
+            oiLs: OiLsService, summary: UniverseSummaryService) =>
+            new KpisService({ cache, cards, liquidations, oiLs, summary, btcSymbol: config.symbols.find((s) => s.base === 'BTC')?.id ?? 'BTCUSDT' }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
