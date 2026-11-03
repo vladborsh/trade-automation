@@ -15,6 +15,7 @@ export type StringKey =
   | 'nav.brand'
   | 'nav.market'
   | 'nav.instrument'
+  | 'nav.admin'
   | 'nav.health'
   | 'nav.logins'
   // shared controls
@@ -64,6 +65,7 @@ export type StringKey =
   | 'menu.logout'
   | 'menu.logoutAll'
   | 'menu.logoutAllConfirm'
+  | 'logins.intro'
   | 'logins.title'
   | 'logins.col.time'
   | 'logins.col.login'
@@ -79,6 +81,7 @@ export type StringKey =
   | 'logins.outcome.password_changed'
   | 'logins.outcome.logout_all'
   // health
+  | 'health.intro'
   | 'health.title'
   | 'health.streams'
   | 'health.streamsDegraded'

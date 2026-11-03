@@ -2,6 +2,8 @@
   <h1>{{ t('health.title') }}</h1>
   <button type="button" (click)="load()" [disabled]="loading()">{{ t('action.refresh') }}</button>
 </header>
+<!-- IB-099: one line saying what this page is, for a reader who arrived from the nav -->
+<p class="intro">{{ t('health.intro') }}</p>
 
 @if (error(); as message) {
   <p class="error" role="alert">{{ message }}</p>

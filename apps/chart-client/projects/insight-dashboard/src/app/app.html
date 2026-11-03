@@ -5,8 +5,12 @@
   <a routerLink="/market" routerLinkActive="active">{{ t('nav.market') }}</a>
   <a routerLink="/instrument/BTCUSDT" routerLinkActive="active">{{ t('nav.instrument') }}</a>
   @if (isAdmin()) {
-    <a routerLink="/health" routerLinkActive="active">{{ t('nav.health') }}</a>
-    <a routerLink="/admin/logins" routerLinkActive="active">{{ t('nav.logins') }}</a>
+    <!-- IB-099: the operator's two pages, grouped and labelled, so a reader knows they are not market pages -->
+    <span class="admin" role="group" [attr.aria-label]="t('nav.admin')">
+      <span class="admin-label">{{ t('nav.admin') }}</span>
+      <a routerLink="/health" routerLinkActive="active">{{ t('nav.health') }}</a>
+      <a routerLink="/admin/logins" routerLinkActive="active">{{ t('nav.logins') }}</a>
+    </span>
   }
   <app-alerts-toggle class="nav-end" />
   <app-account-menu />

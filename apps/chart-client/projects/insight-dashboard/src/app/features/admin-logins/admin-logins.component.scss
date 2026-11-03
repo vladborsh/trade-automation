@@ -10,3 +10,6 @@ th { color: var(--muted); }
 .muted { color: var(--muted); }
 .warn { color: #d29922; }
 .error { color: var(--down); }
+
+/* IB-099: the page's one-line explanation, under the title. */
+.intro { margin: 4px 0 12px; color: #8b949e; font-size: 13px; }

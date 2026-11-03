@@ -40,3 +40,17 @@ describe('App nav', () => {
     expect(hrefs).toContain('/admin/logins');
   });
 });
+
+describe('IB-099: the admin pages say what they are', () => {
+  it('grouped under an «admin» label, named by what they hold', () => {
+    const root = render(true);
+    const group = root.querySelector('nav .admin') as HTMLElement;
+    expect([...group.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/health', '/admin/logins']);
+    expect(group.querySelector('.admin-label')?.textContent?.trim()).toBeTruthy();
+  });
+
+  it('a member does not even get the group', () => {
+    expect(render(false).querySelector('nav .admin')).toBeNull();
+  });
+});
+

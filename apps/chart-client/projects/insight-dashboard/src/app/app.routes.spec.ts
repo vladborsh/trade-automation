@@ -68,6 +68,14 @@ describe('the nav labels', () => {
     }
   });
 
+  it('IB-099: the admin tabs are named by what they hold, matching their page titles', () => {
+    expect([ru['nav.health'], ru['nav.logins'], ru['nav.admin']]).toEqual(['сбор данных', 'журнал входов', 'админ']);
+    expect(ru['nav.logins'].toLowerCase()).toBe(ru['logins.title'].toLowerCase());
+    expect(ru['nav.health'].toLowerCase()).toBe(ru['health.title'].toLowerCase());
+    expect(en['nav.health'].toLowerCase()).toBe(en['health.title'].toLowerCase());
+    expect(en['nav.logins'].toLowerCase()).toBe(en['logins.title'].toLowerCase());
+  });
+
   it('gives Market and Instrument Russian labels, since those are what a member lands on', () => {
     expect(ru['nav.market']).toMatch(/\p{Script=Cyrillic}/u);
     expect(ru['nav.instrument']).toMatch(/\p{Script=Cyrillic}/u);

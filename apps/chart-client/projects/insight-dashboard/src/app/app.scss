@@ -23,6 +23,22 @@
   color: var(--text);
 }
 
+/* IB-099: the admin pages sit apart, behind a separator and a small label. */
+.admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.admin-label {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* IB-061: the alerts switch sits at the right end of the bar. */
 .nav-end {
   margin-left: auto;
