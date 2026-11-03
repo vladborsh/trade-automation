@@ -37,9 +37,15 @@ data "aws_iam_policy_document" "instance" {
   }
 
   statement {
-    sid       = "ReadOwnSecrets"
-    actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
-    resources = ["arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_parameter_prefix}/*"]
+    sid     = "ReadOwnSecrets"
+    actions = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
+    # GetParametersByPath is authorised against the PATH itself (parameter/insight-bot), not the
+    # parameters under it, so the path needs its own ARN — without it render-env.sh is denied
+    # (found by the first deploy, IB-083).
+    resources = [
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_parameter_prefix}",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_parameter_prefix}/*",
+    ]
   }
 
   statement {
