@@ -1,15 +1,12 @@
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
 import type { BinanceRestKline } from '@trade-automation/binance-client';
-import { BatchWriter } from '../../src/collectors/writers/batch-writer';
 import type { AppConfigService } from '../../src/config/config.service';
 import { runMigrations } from '../../src/db/migration-runner';
-import { buildCreatePartition, monthsBetween, partitionsFor } from '../../src/db/partitions';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { ReactionService } from '../../src/news/reaction.service';
 import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
 import type { PerpRest } from '../../src/venues/binance/perp.rest';
-import * as retired from './retired-tables';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
 /**
@@ -18,9 +15,9 @@ import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scr
  * Binance klines, so this file now pins the NEW path:
  *
  * - a story AFTER the tape stopped is measured, from the venue;
- * - the old tape is not read at all. Its rows are still in the table (WD-006 drops it, not IB-097)
- *   and are priced FLAT at 1, while the venue rises 0.1 % a minute, so a reaction that read even one
- *   tape row would come out different, and one read wholly from it would be 0.
+ * - the old tape is not read at all. Since WD-006 (migration 024) the table does not even exist, so a
+ *   read of it would throw and fail this file. (Until 024 this spec kept the tape, priced flat, under
+ *   both stories, to show the numbers did not come from it.)
  */
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -64,17 +61,6 @@ maybeDescribe('IB-097: news reactions after candles_1m stopped are measured from
     await runMigrations({ connectionString: url.toString() });
     db = new PgDatabase(url.toString());
 
-    // the old tape: five hours of FLAT bars (close 1). The app no longer maintains this table's
-    // partitions, so the spec creates the month itself.
-    const tape = [{ table: 'candles_1m', column: 'open_time' }];
-    for (const p of partitionsFor(monthsBetween(new Date(DAY), new Date(DAY)), tape)) await db.query(buildCreatePartition(p, tape));
-    await new BatchWriter<retired.Candle1mRow>(db, retired.CANDLES_1M, retired.candle1mTuple).write(
-      Array.from({ length: 300 }, (_, i) => ({
-        venue: 'binance', market: 'perp' as const, symbol: 'BTCUSDT', openTime: new Date(DAY + i * MIN),
-        open: 1, high: 1, low: 1, close: 1, volume: 1, source: 'archive' as const,
-      })),
-    );
-
     const story = async (id: string, at: number) => {
       await db.query(
         `insert into raw_news (id, source, url, title, published_at, fetched_at, url_hash, title_hash)
@@ -100,9 +86,9 @@ maybeDescribe('IB-097: news reactions after candles_1m stopped are measured from
     );
   const minutes: Record<string, number> = { '15m': 15, '1h': 60, '4h': 240 };
 
-  it('the trap is set: the old tape is still there, flat, under both stories', async () => {
-    const [n] = await db.query<{ n: number }>(`select count(*)::int n from candles_1m where close = 1`, []);
-    expect(n.n).toBe(300);
+  it('the tape table is gone (WD-006): a read of it could only throw', async () => {
+    const [r] = await db.query<{ t: string | null }>(`select to_regclass('public.candles_1m')::text as t`, []);
+    expect(r.t).toBeNull();
   });
 
   it('a story after the last candle: every horizon is MEASURED from the venue (it used to refuse)', async () => {
@@ -114,7 +100,7 @@ maybeDescribe('IB-097: news reactions after candles_1m stopped are measured from
     }
   });
 
-  it('a story inside the old tape is priced from the venue too: never 0, which is what the flat tape would give', async () => {
+  it('a story inside the old tape\'s hours is priced from the venue too', async () => {
     for (const reaction of await rows('inside')) {
       expect(reaction.refused).toBeNull();
       expect(Number(reaction.return_pct)).toBeCloseTo((1.001 ** minutes[reaction.horizon] - 1) * 100, 6);

@@ -5,8 +5,9 @@ type AggTimeframe = '15m' | '1h' | '4h' | '1d';
 
 /**
  * WD-010 — the TableSpecs of tables the box no longer WRITES (candles, mark/funding), kept here only
- * so the migration-002 spec can still exercise the schema while the tables exist. WD-006 drops the
- * tables; this file goes with them. Copied verbatim from src/collectors/writers/tables.ts @ master.
+ * so the migration-002 spec can still exercise the schema. WD-006 (migration 024) drops the tables;
+ * the migration-002 spec migrates to 023, where they still exist, and keeps using this file.
+ * Copied verbatim from src/collectors/writers/tables.ts @ master.
  */
 export interface Candle1mRow {
   venue: string;

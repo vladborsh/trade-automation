@@ -45,6 +45,13 @@ const SCHEMA_PARTITIONED_TABLES = [
   { table: 'playbook_frame_pins', column: 'close_time' },
 ];
 
+/**
+ * WD-006: migration 024 drops seven of 002's nine tables (the candle/funding tape and gap_reports'
+ * neighbours). This spec is about 002's schema, so it migrates to 023, the last version where all of
+ * it exists; 024 has its own spec (migration-024.integration.spec.ts).
+ */
+const SCHEMA_OF_002_UNTIL = '023';
+
 const TABLES_002 = [
   'candles_1m', 'candles_agg', 'mark_funding_1m', 'funding_settlements',
   'open_interest_5m', 'long_short_5m', 'liquidations', 'calendar_events', 'collector_gaps',
@@ -67,7 +74,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
     await dropLeftovers(admin, prefix);
     await admin.query(`create database ${name}`);
     db = new PgDatabase(scratchUrl);
-    await runMigrations({ connectionString: scratchUrl });
+    await runMigrations({ connectionString: scratchUrl, target: SCHEMA_OF_002_UNTIL });
   }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -263,7 +270,7 @@ maybeDescribe('migration 002: the partitioned time-series schema', () => {
     expect(afterUndo).toContain('symbols'); // 001 is untouched
     expect(afterUndo.filter((t) => t.startsWith('candles_1m_'))).toEqual([]);
 
-    await runMigrations({ connectionString: scratchUrl });
+    await runMigrations({ connectionString: scratchUrl, target: SCHEMA_OF_002_UNTIL });
     for (const table of TABLES_002) expect(await tableNames()).toContain(table);
   }, DB_HOOK_TIMEOUT_MS);
 });
