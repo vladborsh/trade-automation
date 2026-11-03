@@ -106,6 +106,11 @@ describe('conclusionView — D15, one line per block', () => {
       for (const t of [ru, en]) expect((t as Record<string, string>)[`insight.neutral.${reason}`]).toBeTruthy();
     }
   });
+  it('a reason without a basis (no rules for the block) carries no basis line', () => {
+    const v = conclusionView({ block: 'caps', statement: null, neutral: { key: 'insight.neutral', reason: 'no_rules', basis: null } } as never, 0);
+    expect(v).toEqual({ kind: 'neutral', key: 'insight.neutral.no_rules', basis: null });
+  });
+
   it('before insights load there is no line at all (not «nothing unusual»)', () => {
     expect(conclusionView(null, 0)).toBeNull();
   });

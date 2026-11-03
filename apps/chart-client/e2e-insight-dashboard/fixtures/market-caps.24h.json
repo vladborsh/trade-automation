@@ -1,0 +1,293 @@
+{
+ "period": "24h",
+ "coins": [
+  {
+   "id": "bitcoin",
+   "symbol": "BTC",
+   "name": "Bitcoin",
+   "capUsd": 1559825896136,
+   "priceUsd": 77583,
+   "changePct": 0.31134,
+   "stable": false
+  },
+  {
+   "id": "ethereum",
+   "symbol": "ETH",
+   "name": "Ethereum",
+   "capUsd": 280352274864,
+   "priceUsd": 2294.47,
+   "changePct": 1.277,
+   "stable": false
+  },
+  {
+   "id": "tether",
+   "symbol": "USDT",
+   "name": "Tether",
+   "capUsd": 178938696399,
+   "priceUsd": 0.999012,
+   "changePct": 0.00065,
+   "stable": true
+  },
+  {
+   "id": "binancecoin",
+   "symbol": "BNB",
+   "name": "BNB",
+   "capUsd": 91591183923,
+   "priceUsd": 696.45,
+   "changePct": -0.7773,
+   "stable": false
+  },
+  {
+   "id": "ripple",
+   "symbol": "XRP",
+   "name": "XRP",
+   "capUsd": 81041897029,
+   "priceUsd": 1.28,
+   "changePct": 2.49023,
+   "stable": false
+  },
+  {
+   "id": "usd-coin",
+   "symbol": "USDC",
+   "name": "USDC",
+   "capUsd": 70783348804,
+   "priceUsd": 0.99952,
+   "changePct": -0.00665,
+   "stable": true
+  },
+  {
+   "id": "solana",
+   "symbol": "SOL",
+   "name": "Solana",
+   "capUsd": 55079011495,
+   "priceUsd": 93.31,
+   "changePct": 0.30434,
+   "stable": false
+  },
+  {
+   "id": "tron",
+   "symbol": "TRX",
+   "name": "TRON",
+   "capUsd": 30671297383,
+   "priceUsd": 0.322774,
+   "changePct": 1.21544,
+   "stable": false
+  },
+  {
+   "id": "figure-heloc",
+   "symbol": "FIGR_HELOC",
+   "name": "Figure Heloc",
+   "capUsd": 26884137279,
+   "priceUsd": 1.031,
+   "changePct": -1.88856,
+   "stable": false
+  },
+  {
+   "id": "hyperliquid",
+   "symbol": "HYPE",
+   "name": "Hyperliquid",
+   "capUsd": 20638624353,
+   "priceUsd": 86.21,
+   "changePct": 2.42447,
+   "stable": false
+  },
+  {
+   "id": "zcash",
+   "symbol": "ZEC",
+   "name": "Zcash",
+   "capUsd": 20545922471,
+   "priceUsd": 1207.06,
+   "changePct": -1.11968,
+   "stable": false
+  },
+  {
+   "id": "dogecoin",
+   "symbol": "DOGE",
+   "name": "Dogecoin",
+   "capUsd": 11771912363,
+   "priceUsd": 0.075199,
+   "changePct": 0.58922,
+   "stable": false
+  },
+  {
+   "id": "monero",
+   "symbol": "XMR",
+   "name": "Monero",
+   "capUsd": 11769480082,
+   "priceUsd": 625.17,
+   "changePct": 3.89905,
+   "stable": false
+  },
+  {
+   "id": "usds",
+   "symbol": "USDS",
+   "name": "USDS",
+   "capUsd": 9571818137,
+   "priceUsd": 0.999976,
+   "changePct": -0.01267,
+   "stable": true
+  },
+  {
+   "id": "whitebit",
+   "symbol": "WBT",
+   "name": "WhiteBIT Coin",
+   "capUsd": 8862675626,
+   "priceUsd": 74.67,
+   "changePct": 0.46366,
+   "stable": false
+  },
+  {
+   "id": "leo-token",
+   "symbol": "LEO",
+   "name": "LEO Token",
+   "capUsd": 8524470854,
+   "priceUsd": 9.27,
+   "changePct": -1.24156,
+   "stable": false
+  },
+  {
+   "id": "chainlink",
+   "symbol": "LINK",
+   "name": "Chainlink",
+   "capUsd": 8515592896,
+   "priceUsd": 11.1,
+   "changePct": -0.34911,
+   "stable": false
+  },
+  {
+   "id": "cardano",
+   "symbol": "ADA",
+   "name": "Cardano",
+   "capUsd": 7128010359,
+   "priceUsd": 0.189687,
+   "changePct": -0.10778,
+   "stable": false
+  },
+  {
+   "id": "stellar",
+   "symbol": "XLM",
+   "name": "Stellar",
+   "capUsd": 5770314584,
+   "priceUsd": 0.163391,
+   "changePct": -2.04808,
+   "stable": false
+  },
+  {
+   "id": "bitcoin-cash",
+   "symbol": "BCH",
+   "name": "Bitcoin Cash",
+   "capUsd": 5547367743,
+   "priceUsd": 275.83,
+   "changePct": 0.65312,
+   "stable": false
+  },
+  {
+   "id": "near",
+   "symbol": "NEAR",
+   "name": "NEAR Protocol",
+   "capUsd": 5009024276,
+   "priceUsd": 3.82,
+   "changePct": -3.69151,
+   "stable": false
+  },
+  {
+   "id": "dai",
+   "symbol": "DAI",
+   "name": "Dai",
+   "capUsd": 4535056260,
+   "priceUsd": 1,
+   "changePct": 0.00088,
+   "stable": true
+  },
+  {
+   "id": "ethena-usde",
+   "symbol": "USDE",
+   "name": "Ethena USDe",
+   "capUsd": 4517140462,
+   "priceUsd": 0.999013,
+   "changePct": 0.07216,
+   "stable": true
+  },
+  {
+   "id": "rain",
+   "symbol": "RAIN",
+   "name": "Rain",
+   "capUsd": 4455296492,
+   "priceUsd": 0.00623649,
+   "changePct": 8.79869,
+   "stable": false
+  },
+  {
+   "id": "uniswap",
+   "symbol": "UNI",
+   "name": "Uniswap",
+   "capUsd": 4422622501,
+   "priceUsd": 7.29,
+   "changePct": 1.31257,
+   "stable": false
+  },
+  {
+   "id": "litecoin",
+   "symbol": "LTC",
+   "name": "Litecoin",
+   "capUsd": 4215638071,
+   "priceUsd": 54.19,
+   "changePct": -0.37091,
+   "stable": false
+  },
+  {
+   "id": "canton-network",
+   "symbol": "CC",
+   "name": "Canton",
+   "capUsd": 3816587190,
+   "priceUsd": 0.095445,
+   "changePct": 0.32813,
+   "stable": false
+  },
+  {
+   "id": "usd1-wlfi",
+   "symbol": "USD1",
+   "name": "USD1",
+   "capUsd": 3816446996,
+   "priceUsd": 0.99869,
+   "changePct": 0.16818,
+   "stable": true
+  },
+  {
+   "id": "avalanche-2",
+   "symbol": "AVAX",
+   "name": "Avalanche",
+   "capUsd": 3784847875,
+   "priceUsd": 8.52,
+   "changePct": 0.8888,
+   "stable": false
+  },
+  {
+   "id": "sui",
+   "symbol": "SUI",
+   "name": "Sui",
+   "capUsd": 3697638791,
+   "priceUsd": 0.893356,
+   "changePct": 1.35428,
+   "stable": false
+  }
+ ],
+ "coinsUnavailable": null,
+ "changeUnavailable": null,
+ "dominance": {
+  "btcPct": 59.26421274915974,
+  "ethPct": 10.65616947794842,
+  "stablesPct": 11.398161952448948,
+  "restPct": 18.681455820442892,
+  "totalCapUsd": 2625014706004.548,
+  "totalCapChangePct24h": -2.298788064919246,
+  "stablesCounted": 250,
+  "asOf": "2026-11-03T17:19:34.000Z"
+ },
+ "dominanceUnavailable": null,
+ "source": {
+  "name": "CoinGecko",
+  "url": "https://www.coingecko.com"
+ },
+ "generatedAt": "2026-11-03T17:19:31.659Z"
+}

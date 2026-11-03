@@ -95,7 +95,9 @@ export function changeColour(change: number | null, scale: number): string {
   if (change === null || scale <= 0) return NEUTRAL_TILE;
   const k = Math.min(1, Math.abs(change) / scale);
   const to = change >= 0 ? UP : DOWN;
-  const mix = BASE.map((b, i) => Math.round(b + (to[i] - b) * (0.25 + 0.75 * k)));
+  // linear from neutral: a +0.02 % coin is nearly neutral, as it should look — no floor that would
+  // paint a non-move like a move
+  const mix = BASE.map((b, i) => Math.round(b + (to[i] - b) * k));
   return change === 0 ? NEUTRAL_TILE : `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 }
 

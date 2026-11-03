@@ -3,6 +3,11 @@ import cards from './fixtures/context-cards.json';
 import insights from './fixtures/market-insights.24h.json';
 import kpis from './fixtures/market-kpis.json';
 import overview from './fixtures/liquidations-overview.24h.json';
+// IB-090: real answers from slot dev-3 (2026-11-03): 30 positioning rows with oiUsd, caps for 24h
+// (coloured) and 4h (refused by the source: period_not_served).
+import caps24h from './fixtures/market-caps.24h.json';
+import caps4h from './fixtures/market-caps.4h.json';
+import positioning from './fixtures/market-positioning.24h.json';
 // IB-089: the contract's block fixture carries what a young slot cannot — a 30-day norm, an outlier
 // hour, a verdict, a series — so the charts are also measured with everything drawn.
 import normBlock from '../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
@@ -30,6 +35,8 @@ async function mockApi(page: Page): Promise<void> {
       '/market/insights': { ...insights, period },
       '/liquidations/overview': { ...overview, block: { ...overview.block, period } },
       '/calendar/upcoming': { events: [] },
+      '/market/positioning': { ...positioning, period },
+      '/market/caps': period === '4h' ? caps4h : { ...caps24h, period },
     };
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
     else await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'NOT_FOUND', message: path }) });
@@ -125,11 +132,58 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(total).toBeGreaterThan(5);
     await expect(cards.filter({ visible: true })).toHaveCount(5);
     await page.getByRole('button', { name: `Show all (${total})` }).click();
+    await page.clock.runFor(100); // the page's timers are faked: let Angular render
     await expect(cards.filter({ visible: true })).toHaveCount(total);
     await expect(page.locator('app-liquidations-feed, app-liquidations-where')).toHaveCount(0);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    await page.getByRole('button', { name: 'Show fewer' }).click();
+    await page.getByRole('button', { name: 'Show fewer' }).first().click();
+    await page.clock.runFor(100);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(height);
+  });
+
+  test('IB-090 heat table: scrolls in its own box with the ticker column pinned; every cell readable', async ({ page }) => {
+    await openMarket(page);
+    const box = page.locator('app-pos-heat .scroll');
+    const rows = page.locator('app-pos-heat tbody tr');
+    await expect(rows).toHaveCount(positioning.rows.length);
+    await expect(rows.filter({ visible: true })).toHaveCount(10); // phone: the ten most unusual first
+    await page.locator('app-pos-heat').getByRole('button', { name: `Show all (${positioning.rows.length})` }).click();
+    await page.clock.runFor(100);
+    await expect(rows.filter({ visible: true })).toHaveCount(positioning.rows.length);
+    const before = await page.locator('app-pos-heat tbody th').first().boundingBox();
+    const scrolled = await box.evaluate((el) => { el.scrollLeft = 400; return el.scrollLeft; });
+    expect(scrolled).toBeGreaterThan(0); // the table really is wider than the phone
+    const after = await page.locator('app-pos-heat tbody th').first().boundingBox();
+    expect(after?.x).toBeCloseTo(before?.x ?? -1, 0); // pinned
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
+
+  test('IB-090 caps: CoinGecko credited beside the treemap; 4h says the source publishes no change', async ({ page }) => {
+    await openMarket(page);
+    const source = page.locator('app-caps-block a.source');
+    await expect(source).toBeVisible();
+    await expect(source).toHaveAttribute('href', caps24h.source.url);
+    const colours = await page.locator('app-caps-treemap rect').evaluateAll((els) => new Set(els.map((e) => e.getAttribute('fill'))).size);
+    expect(colours).toBeGreaterThan(3);
+    await page.getByRole('button', { name: '4h', exact: true }).click();
+    await page.clock.runFor(1_000);
+    await expect(page.locator('app-caps-block')).toContainText('CoinGecko does not publish a 4h change');
+    const fills4h = await page.locator('app-caps-treemap rect').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute('fill')))]);
+    expect(fills4h).toEqual(['#21262d']);
+    await expect(source).toBeVisible();
+    const sum = await page.locator('app-dominance-bar .seg').evaluateAll((els) => els.reduce((s, e) => s + e.getBoundingClientRect().width, 0));
+    const bar = await page.locator('app-dominance-bar .bar').evaluate((e) => e.getBoundingClientRect().width);
+    expect(sum).toBeCloseTo(bar, 0);
+  });
+
+  test('IB-090 quadrant and treemap fit the phone and keep their aspect', async ({ page }) => {
+    await openMarket(page);
+    for (const sel of ['app-pos-quadrant svg', 'app-caps-treemap svg']) {
+      const b = (await page.locator(sel).boundingBox())!;
+      expect(b.x + b.width).toBeLessThanOrEqual(390);
+      expect(b.height / b.width).toBeGreaterThan(0.6);
+    }
+    await expect(page.locator('app-pos-quadrant circle')).toHaveCount(positioning.rows.filter((r) => r.priceChangePct.value !== null && r.oiChangePct.value !== null).length);
   });
 
   test('one column: every card starts at the same left edge', async ({ page }) => {
@@ -141,7 +195,7 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
   test('the period switch puts the period in the URL and asks for it', async ({ page }) => {
     await openMarket(page);
     const asked = page.waitForRequest((r) => r.url().includes('/market/insights') && r.url().includes('period=1h'));
-    await page.getByRole('button', { name: '1h' }).click();
+    await page.getByRole('button', { name: '1h', exact: true }).click();
     await page.clock.runFor(500);
     await asked;
     await expect(page).toHaveURL(/[?&]p=1h/);

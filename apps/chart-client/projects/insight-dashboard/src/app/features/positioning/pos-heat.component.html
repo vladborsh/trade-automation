@@ -1,5 +1,5 @@
 <!-- D16: the table scrolls inside its own box, ticker column pinned -->
-<div class="scroll">
+<div class="scroll" [class.expanded]="expanded()">
   <table>
     <thead>
       <tr>
@@ -15,8 +15,8 @@
       </tr>
     </thead>
     <tbody>
-      @for (r of view(); track r.symbol) {
-        <tr>
+      @for (r of view(); track r.symbol; let i = $index) {
+        <tr [class.extra]="i >= limit">
           <th class="coin" scope="row"><a [routerLink]="['/instrument', r.symbol]">{{ r.base }}</a></th>
           @for (c of columns; track c) {
             <td class="num" [attr.data-heat]="heat(r, c)" [attr.title]="title(r, c)">{{ text(r, c) }}</td>
@@ -27,4 +27,9 @@
     </tbody>
   </table>
 </div>
+@if (view().length > limit) {
+  <button type="button" class="more" (click)="expanded.set(!expanded())">
+    {{ expanded() ? t('liq.large.showFewer') : t('liq.large.showAll', { count: view().length }) }}
+  </button>
+}
 <p class="legend">{{ t('positioning.legend') }}</p>

@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { WebPositioningRow } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
-import { HEAT_COLUMNS, heatRow, sortHeat, type HeatColumn, type HeatRow, type HeatSort } from './pos-layout';
+import { HEAT_COLUMNS, heatRow, PHONE_HEAT_LIMIT, sortHeat, type HeatColumn, type HeatRow, type HeatSort } from './pos-layout';
 
 /**
  * IB-090 (D9) — one row per coin: price, OI, funding, L/S crowd, L/S top traders, liquidations.
@@ -27,6 +27,9 @@ export class PosHeatComponent {
   readonly columns = HEAT_COLUMNS;
   readonly sort = signal<HeatSort>({ column: 'rarity', dir: 'desc' });
   readonly view = computed(() => sortHeat(this.rows(), this.sort()).map(heatRow));
+  /** On a phone the table stops here, most unusual first, with «показать все» (the 4 900 px rule). */
+  readonly limit = PHONE_HEAT_LIMIT;
+  readonly expanded = signal(false);
 
   /** Tap a header: sort by it, biggest first; tap again to flip; a third column resets nothing. */
   sortBy(column: HeatColumn | 'base'): void {

@@ -63,6 +63,7 @@ describe('colour — symmetric around 0', () => {
     expect(changeColour(9, 4)).toBe(changeColour(4, 4)); // clipped at the scale's end
     expect(changeColour(4, 4)).toBe('rgb(38, 166, 154)');
     expect(changeColour(-4, 4)).toBe('rgb(239, 83, 80)');
+    expect(changeColour(0.02, 1)).toBe('rgb(33, 41, 47)'); // a non-move stays next to neutral
   });
 
   it('the scale is ±max |change|, whole percent, at least 1 %; stablecoins do not set it', () => {

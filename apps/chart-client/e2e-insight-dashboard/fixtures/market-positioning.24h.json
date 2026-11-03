@@ -1,0 +1,1297 @@
+{
+ "period": "24h",
+ "asOf": 1793726362,
+ "baselinesAsOf": 1793726362,
+ "rows": [
+  {
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "priceChangePct": {
+    "value": 0.2641138245385699,
+    "rarity": 0.16810344827586207,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 1.632392221490675,
+    "rarity": 0.624103299856528,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7111111111111111,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.4412,
+    "rarity": 0.8571428571428571,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.7748,
+    "rarity": 0.42579750346740636,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 5101567.1143,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 7734809793.570668,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "priceChangePct": {
+    "value": 1.3071175083210207,
+    "rarity": 0.5531609195402298,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.9182767691493732,
+    "rarity": 0.48206599713055953,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.85,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.2819,
+    "rarity": 0.9868238557558946,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.5732,
+    "rarity": 0.4459084604715673,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 9727825.81964,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 5447732052.990053,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "ZECUSDT",
+   "base": "ZEC",
+   "priceChangePct": {
+    "value": -1.9318809052241925,
+    "rarity": 0.3031609195402299,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.3108781118404291,
+    "rarity": 0.08177905308464849,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7277777777777777,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 0.8208,
+    "rarity": 0.13730929264909847,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.282,
+    "rarity": 0.8828016643550625,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 689134.79758,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 520402131.2116136,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "priceChangePct": {
+    "value": 0.03212335367812624,
+    "rarity": 0.008620689655172414,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -2.062288113321842,
+    "rarity": 0.6126255380200861,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7222222222222222,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 3.0833,
+    "rarity": 0.7524271844660194,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.3689,
+    "rarity": 0.5104022191400832,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 1427128.436424,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 872184599.2482767,
+   "quadrant": "long_closing",
+   "signal": null
+  },
+  {
+   "symbol": "XRPUSDT",
+   "base": "XRP",
+   "priceChangePct": {
+    "value": 2.543796496280293,
+    "rarity": 0.7327586206896551,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 19.50229737782081,
+    "rarity": 0.9842180774748924,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.4666666666666667,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.3146,
+    "rarity": 0.7912621359223301,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.1305,
+    "rarity": 0.20527045769764216,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 626941.83632,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 443141830.27808,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "HYPEUSDT",
+   "base": "HYPE",
+   "priceChangePct": {
+    "value": 1.0353349027323988,
+    "rarity": 0.257183908045977,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -2.4911195269984865,
+    "rarity": 0.48923959827833574,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.3055555555555556,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 1.6976,
+    "rarity": 0.35159500693481277,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.2844,
+    "rarity": 0.08737864077669903,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 737326.0224725001,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 373660337.376344,
+   "quadrant": "short_closing",
+   "signal": "quiet"
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "base": "DOGE",
+   "priceChangePct": {
+    "value": 0.3732338043188621,
+    "rarity": 0.11206896551724138,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 1.8383342262258129,
+    "rarity": 0.5279770444763271,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7555555555555555,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.6193,
+    "rarity": 0.5083217753120666,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.851,
+    "rarity": 0.7295423023578363,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 2481.57277,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 203286168.57570884,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "NEARUSDT",
+   "base": "NEAR",
+   "priceChangePct": {
+    "value": -3.7204625439919536,
+    "rarity": 0.4468390804597701,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -1.7195151701237643,
+    "rarity": 0.4261119081779053,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.6277777777777778,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.2396,
+    "rarity": 0.3578363384188627,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.9487,
+    "rarity": 0.9091539528432733,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 44569.1894,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 181503071.984,
+   "quadrant": "long_closing",
+   "signal": null
+  },
+  {
+   "symbol": "UNIUSDT",
+   "base": "UNI",
+   "priceChangePct": {
+    "value": 1.0941828254847685,
+    "rarity": 0.20545977011494254,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 3.266577235606971,
+    "rarity": 0.7733142037302726,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.6444444444444445,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.6357,
+    "rarity": 0.25450762829403606,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 3.1851,
+    "rarity": 0.897364771151179,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 42613.864,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 174295531.21859908,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "BNBUSDT",
+   "base": "BNB",
+   "priceChangePct": {
+    "value": -0.8000227359925005,
+    "rarity": 0.382183908045977,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -1.5780707184902876,
+    "rarity": 0.7087517934002869,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5.324e-05,
+    "rarity": 0.8,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.7821,
+    "rarity": 0.7517337031900139,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.1006,
+    "rarity": 0.3002773925104022,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 13535.521310000002,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 396228461.4455,
+   "quadrant": "long_closing",
+   "signal": null
+  },
+  {
+   "symbol": "SUIUSDT",
+   "base": "SUI",
+   "priceChangePct": {
+    "value": 1.0951789544992652,
+    "rarity": 0.22701149425287356,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -1.4002517176964657,
+    "rarity": 0.31850789096126253,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7055555555555556,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.942,
+    "rarity": 0.239251040221914,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.8274,
+    "rarity": 0.9167822468793343,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 31597.762169999998,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 95212125.5303087,
+   "quadrant": "short_closing",
+   "signal": null
+  },
+  {
+   "symbol": "ENAUSDT",
+   "base": "ENA",
+   "priceChangePct": {
+    "value": 0.05257930712156966,
+    "rarity": 0.008620689655172414,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -0.44038024825425737,
+    "rarity": 0.133428981348637,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.25833333333333336,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 1.2336,
+    "rarity": 0.6615811373092927,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.4904,
+    "rarity": 0.7697642163661581,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 119822.9273317,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 95621190.44379605,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "1000PEPEUSDT",
+   "base": "PEPE",
+   "priceChangePct": {
+    "value": 3.8253128628564115,
+    "rarity": 0.603448275862069,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.493395590304746,
+    "rarity": 0.07890961262553801,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.3388888888888889,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.2992,
+    "rarity": 0.28779472954230234,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.7273,
+    "rarity": 0.43966712898751736,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 805856.6989054,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 106804917.1623213,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "ARBUSDT",
+   "base": "ARB",
+   "priceChangePct": {
+    "value": 0.23991413599342426,
+    "rarity": 0.03879310344827586,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.8372130830280433,
+    "rarity": 0.23529411764705882,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.8444444444444444,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.0555,
+    "rarity": 0.6705963938973648,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.4047,
+    "rarity": 0.6352288488210819,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 5061.749831200001,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 36297174.095557,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "WLDUSDT",
+   "base": "WLD",
+   "priceChangePct": {
+    "value": -2.379693283976736,
+    "rarity": 0.35201149425287354,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.42632654813705706,
+    "rarity": 0.06169296987087518,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 8.812e-05,
+    "rarity": 0.4111111111111111,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.2227,
+    "rarity": 0.6393897364771152,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.1222,
+    "rarity": 0.7558945908460472,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 12124.322680000001,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 65841275.60163202,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "ADAUSDT",
+   "base": "ADA",
+   "priceChangePct": {
+    "value": -0.05260389268805232,
+    "rarity": 0.021551724137931036,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 1.0377716566308592,
+    "rarity": 0.296987087517934,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.5388888888888889,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.9369,
+    "rarity": 0.5242718446601942,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.6116,
+    "rarity": 0.7961165048543689,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 10888.6516,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 65697489.1739911,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "PUMPUSDT",
+   "base": "PUMP",
+   "priceChangePct": {
+    "value": 4.839506172839503,
+    "rarity": 0.6436781609195402,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 2.312377188209269,
+    "rarity": 0.5136298421807748,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.425,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 0.8464,
+    "rarity": 0.09223300970873786,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.664,
+    "rarity": 0.6269070735090153,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 219803.0376706,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 71809160.51676612,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "LINKUSDT",
+   "base": "LINK",
+   "priceChangePct": {
+    "value": -0.5184589255385674,
+    "rarity": 0.11925287356321838,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.07898269168664651,
+    "rarity": 0.03156384505021521,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7388888888888889,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.0039,
+    "rarity": 0.9840499306518724,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.8443,
+    "rarity": 0.8654646324549237,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 8817.69563,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 92426573.87943046,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "TAOUSDT",
+   "base": "TAO",
+   "priceChangePct": {
+    "value": -0.0044150110375285045,
+    "rarity": 0.0014367816091954023,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 1.8992778092260743,
+    "rarity": 0.533715925394548,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.2777777777777778,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 1.2267,
+    "rarity": 0.8391123439667129,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 3.1749,
+    "rarity": 0.6754507628294036,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 27135.76231,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 53915676.10983634,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "base": "TRUMP",
+   "priceChangePct": {
+    "value": -2.806589383770597,
+    "rarity": 0.5790229885057471,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -0.46048401631653135,
+    "rarity": 0.15351506456241032,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 2.178e-05,
+    "rarity": 0.6055555555555555,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 2.0741,
+    "rarity": 0.9611650485436893,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.0692,
+    "rarity": 0.6435506241331485,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 22914.15027,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 37049183.74077,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "base": "AVAX",
+   "priceChangePct": {
+    "value": 0.9462976105985232,
+    "rarity": 0.25287356321839083,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 1.8319815216604196,
+    "rarity": 0.46915351506456243,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7611111111111111,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.7855,
+    "rarity": 0.6137309292649098,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.1042,
+    "rarity": 0.7628294036061026,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 18530.754,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 74258816.5584965,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "MARSCOINUSDT",
+   "base": "MARSCOIN",
+   "priceChangePct": {
+    "value": -3.8980794827913945,
+    "rarity": 0.49712643678160917,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -3.815568658734181,
+    "rarity": 0.7517934002869441,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.3638888888888889,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 1.1039,
+    "rarity": 0.8529819694868238,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.8701,
+    "rarity": 0.31761442441054094,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 88.54960750000001,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 8518177.10123,
+   "quadrant": "long_closing",
+   "signal": null
+  },
+  {
+   "symbol": "BCHUSDT",
+   "base": "BCH",
+   "priceChangePct": {
+    "value": -0.02172889580994708,
+    "rarity": 0.0014367816091954023,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.0235837601793909,
+    "rarity": 0.010043041606886656,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7166666666666667,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.9481,
+    "rarity": 0.7323162274618585,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.1724,
+    "rarity": 0.869625520110957,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 1096.30496,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 77112466.91083731,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "FILUSDT",
+   "base": "FIL",
+   "priceChangePct": {
+    "value": 1.1666859189095602,
+    "rarity": 0.1939655172413793,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.6300754192042568,
+    "rarity": 0.09899569583931134,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.6055555555555555,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.2139,
+    "rarity": 0.09847434119278779,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.402,
+    "rarity": 0.06102635228848821,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 185942.0497049,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 41043077.83667448,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "ONDOUSDT",
+   "base": "ONDO",
+   "priceChangePct": {
+    "value": 0.38580246913579863,
+    "rarity": 0.08333333333333333,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 5.3880022055622145,
+    "rarity": 0.8565279770444764,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.3416666666666667,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 1.3425,
+    "rarity": 0.5395284327323162,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.3847,
+    "rarity": 0.9084604715672677,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 5.2137,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 41929748.2791981,
+   "quadrant": "new_longs",
+   "signal": null
+  },
+  {
+   "symbol": "LTCUSDT",
+   "base": "LTC",
+   "priceChangePct": {
+    "value": -0.5680776983690738,
+    "rarity": 0.21408045977011494,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.619830349117434,
+    "rarity": 0.23672883787661406,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.6833333333333333,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.9771,
+    "rarity": 0.0159500693481276,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.5205,
+    "rarity": 0.8155339805825242,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 1926.4327700000001,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 61228806.31993,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "DASHUSDT",
+   "base": "DASH",
+   "priceChangePct": {
+    "value": -1.928783382789312,
+    "rarity": 0.42528735632183906,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.7538591703546427,
+    "rarity": 0.1951219512195122,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 2.184e-05,
+    "rarity": 0.4444444444444444,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 0.9279,
+    "rarity": 0.2947295423023578,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 3.0892,
+    "rarity": 0.1678224687933426,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 1266.64068,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 15722217.06977227,
+   "quadrant": "flat",
+   "signal": "quiet"
+  },
+  {
+   "symbol": "ONEUSDT",
+   "base": "ONE",
+   "priceChangePct": {
+    "value": -0.20724454856730912,
+    "rarity": 0.041666666666666664,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -2.410997080933397,
+    "rarity": 0.3916786226685796,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 5e-05,
+    "rarity": 0.4222222222222222,
+    "unavailable": null,
+    "sample": 180
+   },
+   "lsGlobal": {
+    "value": 1.3004,
+    "rarity": 0.9930651872399445,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 3.1002,
+    "rarity": 0.9694868238557559,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 15.85083,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 2644742.0199959,
+   "quadrant": "long_closing",
+   "signal": null
+  },
+  {
+   "symbol": "AAVEUSDT",
+   "base": "AAVE",
+   "priceChangePct": {
+    "value": -1.5237802062490369,
+    "rarity": 0.30028735632183906,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.5579904382833512,
+    "rarity": 0.13916786226685796,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.8333333333333334,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.3031,
+    "rarity": 0.11650485436893204,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 2.0831,
+    "rarity": 0.39667128987517336,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 61211.54110000002,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 57599405.4970471,
+   "quadrant": "flat",
+   "signal": null
+  },
+  {
+   "symbol": "QNTUSDT",
+   "base": "QNT",
+   "priceChangePct": {
+    "value": -2.5077585343878273,
+    "rarity": 0.4267241379310345,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.3661248807918627,
+    "rarity": 0.054519368723098996,
+    "unavailable": null,
+    "sample": 697
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.7166666666666667,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.1801,
+    "rarity": 0.6754507628294036,
+    "unavailable": null,
+    "sample": 721
+   },
+   "lsTopPosition": {
+    "value": 1.689,
+    "rarity": 0.5839112343966713,
+    "unavailable": null,
+    "sample": 721
+   },
+   "liqUsd": {
+    "value": 23935.973230800002,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "oiUsd": 21891658.20828106,
+   "quadrant": "flat",
+   "signal": null
+  }
+ ]
+}

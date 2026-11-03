@@ -161,7 +161,7 @@ export function wordInsight(v: Pick<InsightView, 'key' | 'params' | 'nested'>, t
 
 export type ConclusionView =
   | { kind: 'statement'; view: InsightView }
-  | { kind: 'neutral'; key: StringKey; basis: { key: StringKey; params: Record<string, string | number> } };
+  | { kind: 'neutral'; key: StringKey; basis: { key: StringKey; params: Record<string, string | number> } | null };
 
 /**
  * D15 — a block's one conclusion line: its best statement, or the neutral line with the REASON
@@ -172,5 +172,7 @@ export function conclusionView(line: WebInsightBlockLine | null | undefined, now
   if (!line) return null;
   if (line.statement) return { kind: 'statement', view: insightView(line.statement, nowSec) };
   if (!line.neutral) return null;
-  return { kind: 'neutral', key: `insight.neutral.${line.neutral.reason}` as StringKey, basis: basisView(line.neutral.basis ?? null, nowSec) };
+  // a reason with no basis (no rules for this block) says only the reason: «основа не указана» says nothing
+  const basis = line.neutral.basis ? basisView(line.neutral.basis, nowSec) : null;
+  return { kind: 'neutral', key: `insight.neutral.${line.neutral.reason}` as StringKey, basis };
 }

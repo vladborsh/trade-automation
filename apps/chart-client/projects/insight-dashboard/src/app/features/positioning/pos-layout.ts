@@ -181,6 +181,9 @@ export function signalKey(s: WebPositioningSignal): StringKey {
   return `positioning.signal.${s}` as StringKey;
 }
 
+/** Rows the heat table shows on a phone before «показать все». */
+export const PHONE_HEAT_LIMIT = 10;
+
 export type HeatSort = { column: HeatColumn | 'rarity' | 'base'; dir: 'asc' | 'desc' };
 
 /**

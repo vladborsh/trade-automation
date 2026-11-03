@@ -33,10 +33,10 @@ export class BlockConclusionComponent {
     return this.t(v.key, { period: this.t(`market.period.${this.period()}` as StringKey) });
   }
 
-  basis(): string {
+  basis(): string | null {
     const v = this.view();
-    if (!v) return '';
+    if (!v) return null;
     const b = v.kind === 'statement' ? v.view.basis : v.basis;
-    return this.t(b.key, b.params);
+    return b === null ? null : this.t(b.key, b.params);
   }
 }

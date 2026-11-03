@@ -1,7 +1,9 @@
 @if (view(); as v) {
   <div class="conclusion" [class.neutral]="v.kind === 'neutral'">
     <p class="sentence">{{ sentence() }}</p>
-    <p class="basis">{{ basis() }}</p>
+    @if (basis(); as b) {
+      <p class="basis">{{ b }}</p>
+    }
     @if (v.kind === 'statement' && 'commands' in v.view.link) {
       <a class="link" [routerLink]="v.view.link.commands" [queryParams]="v.view.link.queryParams">{{ t('insight.open') }}</a>
     }

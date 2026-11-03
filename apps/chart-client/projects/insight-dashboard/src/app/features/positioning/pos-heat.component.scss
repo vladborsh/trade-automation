@@ -25,7 +25,23 @@ td[data-heat='none'] {
 .signal { color: #d29922; }
 .legend { margin: 6px 0 0; font-size: 12px; color: #8b949e; }
 
-/* D16 phone: headers and ticker links are ≥ 40 px touch targets. */
+.more {
+  display: none;
+  margin-top: 6px;
+  min-height: 40px;
+  width: 100%;
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* D16 phone: headers and ticker links are ≥ 40 px touch targets; the first PHONE_HEAT_LIMIT rows,
+   the rest behind «показать все» (TL 2026-11-03, the page-length rule). */
 @media (max-width: 767px) {
+  .scroll:not(.expanded) tr.extra { display: none; }
+  .more { display: block; }
   th button, .coin a { display: inline-flex; align-items: center; min-height: 40px; min-width: 40px; }
 }
