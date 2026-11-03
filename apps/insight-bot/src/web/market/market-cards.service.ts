@@ -76,6 +76,16 @@ export class MarketCardsService {
   }
 
   /**
+   * IB-087 — `/global` through the same 120 s slot the cards use, so the caps block's dominance bar
+   * costs no extra CoinGecko call. Null when it has never been read successfully.
+   */
+  async global(): Promise<GlobalPayload | null> {
+    const cg = this.options.coingeckoBaseUrl.replace(/\/$/, '');
+    return this.cached('global', COINGECKO_TTL_MS, async (): Promise<GlobalPayload> =>
+      GlobalPayloadSchema.parse(await this.get(`${cg}/api/v3/global`)));
+  }
+
+  /**
    * One source through its cache: fresh → the cached value; stale or absent → one shared read;
    * a failed read → the last good value however old, else null.
    */

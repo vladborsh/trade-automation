@@ -42,3 +42,32 @@ export const CoinMarketRowSchema = z.object({
   market_cap_change_percentage_24h: z.number().nullable(),
 }).passthrough();
 export type CoinMarketRow = z.infer<typeof CoinMarketRowSchema>;
+
+/**
+ * IB-087 — one element of `GET /api/v3/coins/markets?vs_currency=usd&order=market_cap_desc
+ * &per_page=250&price_change_percentage=1h,24h,7d`. The three `…_in_currency` changes are present
+ * only because they are requested; already percentages. Pinned by
+ * `test/fixtures/context/coins-markets-top.json` (captured 2026-11-03), parsed in `caps.spec.ts`.
+ */
+export const CapsMarketRowSchema = z.object({
+  id: z.string(),
+  symbol: z.string(),
+  name: z.string(),
+  current_price: z.number().nullable(),
+  market_cap: z.number().nullable(),
+  price_change_percentage_1h_in_currency: z.number().nullable().optional(),
+  price_change_percentage_24h_in_currency: z.number().nullable().optional(),
+  price_change_percentage_7d_in_currency: z.number().nullable().optional(),
+}).passthrough();
+export type CapsMarketRow = z.infer<typeof CapsMarketRowSchema>;
+
+/**
+ * IB-087 — one element of `…/coins/markets?vs_currency=usd&category=stablecoins&per_page=250`:
+ * only the id (to flag a coin as a stablecoin) and its cap (for the tail outside the top 250).
+ * Pinned by `test/fixtures/context/coins-markets-stablecoins.json` (captured 2026-11-03).
+ */
+export const StablecoinRowSchema = z.object({
+  id: z.string(),
+  market_cap: z.number().nullable(),
+}).passthrough();
+export type StablecoinRow = z.infer<typeof StablecoinRowSchema>;

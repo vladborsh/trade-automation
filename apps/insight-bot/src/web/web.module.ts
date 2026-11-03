@@ -13,6 +13,8 @@ import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
 import { WebContextController } from './context/context.controller';
+import { WebMarketController } from './market/market.controller';
+import { CapsService } from './market/caps.service';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
@@ -65,7 +67,7 @@ export class WebModule {
       controllers: [
         WebAuthController, WebHealthController, WebAdminController,
         SeriesController, UniverseController, LiquidationsController, WebContextController,
-        CalendarController, WebPushController,
+        CalendarController, WebPushController, WebMarketController,
       ],
       providers: [
         WebAuthService,
@@ -91,6 +93,13 @@ export class WebModule {
               fngBaseUrl: config.env.get('FNG_BASE_URL'),
               coingeckoBaseUrl: config.env.get('COINGECKO_BASE_URL'),
             }),
+        },
+        {
+          // IB-087: the caps block; /global shared with the market cards, the rest via the shared TtlCache
+          provide: CapsService,
+          inject: [AppConfigService, TtlCache, MarketCardsService],
+          useFactory: (config: AppConfigService, cache: TtlCache, cards: MarketCardsService) =>
+            new CapsService({ coingeckoBaseUrl: config.env.get('COINGECKO_BASE_URL'), cache, cards }),
         },
         {
           // IB-063: the chart's candles, live from Binance; weight into the shared tracker
