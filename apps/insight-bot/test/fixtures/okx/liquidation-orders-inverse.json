@@ -1,0 +1,46 @@
+{
+  "_captured": "2026-11-03T13:36Z, GET www.okx.com/api/v5/public/liquidation-orders?instType=SWAP&uly=BTC-USD&state=filled, first 3 details kept (one probe; IB-BUG-018). Same {instId, details[]} shape the liquidation-orders channel pushes.",
+  "code": "0",
+  "data": [
+    {
+      "details": [
+        {
+          "bkLoss": "0",
+          "bkPx": "77706.7",
+          "ccy": "",
+          "posSide": "short",
+          "side": "buy",
+          "sz": "0.1",
+          "time": 1793712693074,
+          "ts": "1793712693074"
+        },
+        {
+          "bkLoss": "0",
+          "bkPx": "77687.7",
+          "ccy": "",
+          "posSide": "short",
+          "side": "buy",
+          "sz": "18.6",
+          "time": 1793712692095,
+          "ts": "1793712692095"
+        },
+        {
+          "bkLoss": "0",
+          "bkPx": "77686.3",
+          "ccy": "",
+          "posSide": "short",
+          "side": "buy",
+          "sz": "24.5",
+          "time": 1793712691712,
+          "ts": "1793712691712"
+        }
+      ],
+      "instFamily": "BTC-USD",
+      "instId": "BTC-USD-SWAP",
+      "instType": "SWAP",
+      "totalLoss": "0",
+      "uly": "BTC-USD"
+    }
+  ],
+  "msg": ""
+}

@@ -167,3 +167,31 @@ describe('liquidation-orders (real payloads)', () => {
     expect(liquidationRows(two, SPECS)).toHaveLength(2);
   });
 });
+
+/**
+ * IB-BUG-018 — OKX's `liquidation-orders` channel (instType SWAP) carries INVERSE swaps too.
+ * Captured 2026-11-03 13:36 UTC (one probe): `BTC-USD-SWAP` is `ctType: inverse`, `ctVal: 100`,
+ * `ctValCcy: USD` — its size is in USD contracts, so `ctVal × sz` is not base units.
+ */
+describe('IB-BUG-018 inverse swaps are never sized (real payloads)', () => {
+  const instrument = fixture<{ data: OkxInstrument[] }>('instrument-inverse-swap').data[0];
+  const inverse = fixture<{ data: OkxLiquidation[] }>('liquidation-orders-inverse').data[0];
+
+  it('the captured instrument really is inverse and valued in USD', () => {
+    expect(instrument).toMatchObject({ instId: 'BTC-USD-SWAP', ctType: 'inverse', ctValCcy: 'USD', ctVal: '100' });
+    expect(inverse.instId).toBe('BTC-USD-SWAP');
+    expect(inverse.details.length).toBeGreaterThan(0);
+  });
+
+  it('no contract spec is made for it, so its liquidations take the "no contract size" skip path', () => {
+    expect(parseContractSpec(instrument)).toBeNull();
+    const specs = contractSpecs([instrument]);
+    const skipped: string[] = [];
+    expect(liquidationRows(inverse, specs, (instId, reason) => skipped.push(`${instId}: ${reason}`))).toEqual([]);
+    expect(skipped).toHaveLength(1);
+  });
+
+  it('a linear USDT swap is still sized as before', () => {
+    expect(parseContractSpec({ instId: 'BTC-USDT-SWAP', ctVal: '0.01', ctValCcy: 'BTC', ctMult: '1', ctType: 'linear' })?.baseUnitsPerContract).toBe(0.01);
+  });
+});

@@ -61,6 +61,24 @@ export function markRowFromPremiumIndex(row: PremiumIndexRow, ts: Date): MarkFun
 }
 
 /**
+ * IB-BUG-018 — the only contracts whose `forceOrder` this collector can price: **USDT-margined
+ * linear perpetuals**, `<BASE>USDT`. There `q`/`z` is in the base coin and `price × qty` is USD(T).
+ *
+ * `!forceOrder@arr` on `/market` also carries, measured on insight_coord 2026-11-02/03 (one run):
+ * COIN-M perps `BTCUSD_PERP` and quarterlies `BTCUSD_261225` (INVERSE: `q` counts USD contracts —
+ * 100 USD for BTC, 10 USD for most — so `price × qty` was ~760× too high; 22 rows were 61 % of a
+ * day's total), `ETHBTC` (quoted in BTC, so `price × qty` is BTC, not USD), USDT quarterlies
+ * `BTCUSDT_261225`, and stablecoin-margined `…USDC`, `BTCUSD1`, `BTCU`. The decision (Tech Lead):
+ * the universe is USDT-M, so anything not shaped `<BASE>USDT` is skipped AND COUNTED by the
+ * collector — never silently converted with a guessed contract size.
+ */
+export const USDT_LINEAR_PERP = /^[A-Z0-9]+USDT$/;
+
+export function isUsdtLinearPerp(symbol: string): boolean {
+  return USDT_LINEAR_PERP.test(symbol);
+}
+
+/**
  * `forceOrder` → a `liquidations` row. **Side is normalised to the side LIQUIDATED**: the engine
  * submits a SELL to close a long, so `S = SELL` is a `long` liquidation and `BUY` a `short` one
  * (§3.3, D6). Binance publishes at most one such event per second per symbol, so these rows
@@ -75,6 +93,11 @@ export function markRowFromPremiumIndex(row: PremiumIndexRow, ts: Date): MarkFun
  */
 export function liquidationRowFromEvent(event: ForceOrderEvent): LiquidationRow {
   const o = event.o;
+  // IB-BUG-018: the collector filters first; this is the backstop, so a caller that forgets cannot
+  // store an inverse or BTC-quoted contract's price × qty as USD
+  if (!isUsdtLinearPerp(o.s)) {
+    throw new RangeError(`forceOrder ${o.s}: not a USDT-linear perpetual, price × qty would not be USD`);
+  }
   if (o.S !== 'SELL' && o.S !== 'BUY') {
     throw new RangeError(`forceOrder ${o.s}: side '${String(o.S)}' is neither BUY nor SELL`);
   }

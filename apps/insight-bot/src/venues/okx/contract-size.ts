@@ -21,6 +21,9 @@ import { OkxInstrument } from './payloads';
  * Binance and Bybit quote linear-perp sizes in base units already; this conversion is OKX-only,
  * which is exactly why it is easy to miss.
  */
+/** A contract valued in one of these is valued in quote, not in the base coin. */
+const QUOTE_CURRENCIES = new Set(['USD', 'USDT', 'USDC']);
+
 export interface ContractSpec {
   instId: string;
   /** Base units per contract — `ctVal × ctMult`. */
@@ -28,7 +31,17 @@ export interface ContractSpec {
   ctValCcy: string;
 }
 
+/**
+ * IB-BUG-018 — an INVERSE swap (`BTC-USD-SWAP`: `ctType: inverse`, `ctVal: 100`, `ctValCcy: USD`,
+ * captured 2026-11-03, test/fixtures/okx/instrument-inverse-swap.json) is sized in USD, so
+ * `ctVal × ctMult` is not base units and `price × qty` would overstate it ~price-fold. No spec is
+ * made for it, so its liquidations take the existing "no contract size → skipped with a warning"
+ * path. Today the collector's universe filter (all `-USDT-SWAP`) already stops them earlier; this is
+ * the second line, where the conversion itself happens.
+ */
 export function parseContractSpec(instrument: OkxInstrument): ContractSpec | null {
+  if (instrument.ctType !== undefined && instrument.ctType !== 'linear') return null;
+  if (QUOTE_CURRENCIES.has(instrument.ctValCcy.toUpperCase())) return null;
   const ctVal = Number(instrument.ctVal);
   const ctMult = Number(instrument.ctMult === '' || instrument.ctMult === undefined ? '1' : instrument.ctMult);
   if (!Number.isFinite(ctVal) || ctVal <= 0 || !Number.isFinite(ctMult) || ctMult <= 0) return null;

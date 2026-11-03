@@ -1,4 +1,4 @@
-import { fundingSettlementRow, liquidationRowFromEvent, markRowFromEvent, markRowFromPremiumIndex } from '../../../src/collectors/binance-perp/mappers';
+import { fundingSettlementRow, isUsdtLinearPerp, liquidationRowFromEvent, markRowFromEvent, markRowFromPremiumIndex } from '../../../src/collectors/binance-perp/mappers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { demultiplex } from '../../../src/collectors/binance-common/socket';
@@ -159,5 +159,30 @@ describe('IB-BUG-012 live forceOrder fixture (shape and side invariant)', () => 
     const at = { ...events[0], o: { ...events[0].o, ap: events[0].o.p } };
     expect(liquidationRowFromEvent(at).side).toBe('long');
     expect(liquidationRowFromEvent({ ...at, o: { ...at.o, S: 'BUY' } }).side).toBe('short');
+  });
+});
+
+/**
+ * IB-BUG-018 — which contracts' forceOrder can be priced as `price × qty` in USD: USDT-linear
+ * perpetuals only. Every shape below was seen on insight_coord's `liquidations` 2026-11-02/03.
+ */
+describe('IB-BUG-018 isUsdtLinearPerp and the mapper backstop', () => {
+  it('accepts <BASE>USDT, including numeric bases', () => {
+    for (const ok of ['BTCUSDT', '1000PEPEUSDT', 'XAUTUSDT', 'KGENUSDT']) expect(isUsdtLinearPerp(ok)).toBe(true);
+  });
+
+  it('refuses COIN-M perps and quarterlies, USDT quarterlies, BTC-quoted, and stablecoin-margined shapes', () => {
+    for (const bad of ['BTCUSD_PERP', 'BNBUSD_270326', 'BTCUSD_261225', 'BTCUSDT_261225', 'ETHBTC', 'ETHUSDC', 'BTCUSD1', 'BTCU', '']) {
+      expect(isUsdtLinearPerp(bad)).toBe(false);
+    }
+  });
+
+  it('the mapper itself throws on a COIN-M event, so a caller that forgets the filter cannot store it', () => {
+    const coinm: ForceOrderEvent = {
+      e: 'forceOrder', E: 1,
+      o: { s: 'BTCUSD_PERP', S: 'SELL', o: 'LIMIT', f: 'IOC', q: '897', p: '76000', ap: '76427', X: 'FILLED', l: '897', z: '897', T: 1 },
+    };
+    // the coordinator's row: 897 contracts × $100 ≈ $89.7k, stored as 897 × 76 427 = $68.6M
+    expect(() => liquidationRowFromEvent(coinm)).toThrow(/not a USDT-linear perpetual/);
   });
 });

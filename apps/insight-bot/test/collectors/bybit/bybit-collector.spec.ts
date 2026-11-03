@@ -242,3 +242,9 @@ describe('BybitCollector — boot funding backfill (§4.3)', () => {
     expect(h.sockets[0].opened).toBe(1);
   });
 });
+
+describe('IB-BUG-018: only USDT-linear symbols can be subscribed', () => {
+  it('a non-USDT universe symbol (an inverse BTCUSD) is refused at construction', () => {
+    expect(() => harness({ symbols: ['BTCUSDT', 'BTCUSD'] })).toThrow(/non-USDT-linear symbols BTCUSD/);
+  });
+});

@@ -54,6 +54,19 @@ export class MetricsService {
     registers: [this.registry],
   });
 
+  /**
+   * IB-BUG-018 — liquidation events deliberately NOT stored, per venue and reason. Binance's
+   * `!forceOrder@arr` also carries COIN-M (inverse, sized in USD contracts), delivery, stablecoin-
+   * and BTC-quoted contracts; storing them as price × qty inflated totals ~760×. They are counted
+   * here so "skipped" is a number, never a silence.
+   */
+  readonly liquidationsSkipped = new client.Counter({
+    name: 'ib_liquidations_skipped_total',
+    help: 'Liquidation events not stored because the contract cannot be priced as USDT-linear, per venue and reason',
+    labelNames: ['venue', 'reason'],
+    registers: [this.registry],
+  });
+
   constructor(private readonly streams: StreamRegistry) {
     new client.Gauge({
       name: 'ib_stream_last_message_age_seconds',

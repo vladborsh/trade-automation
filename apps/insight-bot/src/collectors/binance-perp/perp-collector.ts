@@ -3,7 +3,7 @@ import { mapWsKline, type BinanceWsKlineMessage } from '@trade-automation/binanc
 import type { CandleSource } from '@trade-automation/market-data-core';
 import type { Candle1mRow, CollectorGapRow, FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
 import { DegradedGapTracker } from './degraded-gaps';
-import { fundingSettlementRow, liquidationRowFromEvent, markRowFromPremiumIndex, VENUE } from './mappers';
+import { fundingSettlementRow, isUsdtLinearPerp, liquidationRowFromEvent, markRowFromPremiumIndex, VENUE } from './mappers';
 import { MarkSampler, minuteBoundary } from './mark-sampler';
 import { KlineIngest } from '../binance-common/kline-ingest';
 import { ModePolicy, type CollectorMode, type ModePolicyOptions } from '../binance-common/mode';
@@ -51,6 +51,8 @@ export interface CollectorMetrics {
   gapsDetected: { inc(labels: Record<string, string>, value?: number): void };
   gapsUnrepaired: { inc(labels: Record<string, string>, value?: number): void };
   wsReconnects: { inc(labels: Record<string, string>, value?: number): void };
+  /** IB-BUG-018: events not stored, per venue and reason. Optional so older ports still compile. */
+  liquidationsSkipped?: { inc(labels: Record<string, string>, value?: number): void };
   setBinanceWeightUsed1m(weight: number): void;
 }
 
@@ -99,8 +101,18 @@ export class BinancePerpCollector {
   private lastMinute: number | null = null;
   private ticking = false;
   private stopped = false;
+  /** IB-BUG-018: each skipped symbol is logged once per process, then only counted. */
+  private readonly skippedSymbols = new Set<string>();
+  /** How many forceOrder events were skipped as not USDT-linear (also on the metric). */
+  skippedLiquidations = 0;
 
   constructor(private readonly ports: PerpCollectorPorts) {
+    // IB-BUG-018: a universe symbol the liquidation rule would refuse is a configuration error —
+    // its liquidations would all be dropped. Refuse at construction rather than count them away.
+    const misfit = ports.symbols.filter((symbol) => !isUsdtLinearPerp(symbol));
+    if (misfit.length > 0) {
+      throw new RangeError(`binance-perp universe has non-USDT-linear symbols ${misfit.join(', ')}: their liquidations could not be priced`);
+    }
     this.now = ports.now ?? Date.now;
     this.policy = new ModePolicy(ports.mode);
     for (const symbol of ports.symbols) this.instruments.set(symbol, perpInstrument(symbol));
@@ -205,6 +217,16 @@ export class BinancePerpCollector {
 
   private async onForceOrder(event: Parameters<typeof liquidationRowFromEvent>[0], now: number): Promise<void> {
     this.ports.registry.recordMessage(STREAM_LIQUIDATION, now);
+    if (!isUsdtLinearPerp(event.o.s)) {
+      // IB-BUG-018: COIN-M / delivery / non-USDT-quoted contracts — skipped and counted, never stored
+      this.skippedLiquidations++;
+      this.ports.metrics?.liquidationsSkipped?.inc({ venue: VENUE, reason: 'not-usdt-linear' });
+      if (!this.skippedSymbols.has(event.o.s)) {
+        this.skippedSymbols.add(event.o.s);
+        this.ports.logger.log(`binance-perp: skipping liquidations of ${event.o.s} (not a USDT-linear perpetual; counted on ib_liquidations_skipped_total, logged once)`);
+      }
+      return;
+    }
     await this.ports.writers.liquidations.write([liquidationRowFromEvent(event)]);
   }
 

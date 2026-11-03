@@ -80,6 +80,12 @@ export class BybitCollector {
 
   constructor(private readonly ports: BybitCollectorPorts) {
     this.now = ports.now ?? Date.now;
+    // IB-BUG-018: `allLiquidation.{symbol}` is subscribed per universe symbol on the LINEAR endpoint
+    // (BYBIT_WS_URL …/v5/public/linear), so an inverse `BTCUSD` cannot arrive. The universe is the
+    // only way one could: refuse a symbol that is not `<BASE>USDT` instead of storing its
+    // price × qty as USD.
+    const misfit = ports.symbols.filter((symbol) => !/^[A-Z0-9]+USDT$/.test(symbol));
+    if (misfit.length > 0) throw new RangeError(`bybit universe has non-USDT-linear symbols ${misfit.join(', ')}`);
     this.symbols = new Set(ports.symbols);
     this.state = new TickerState(new Set(ports.signalSet.filter((s) => this.symbols.has(s))));
   }

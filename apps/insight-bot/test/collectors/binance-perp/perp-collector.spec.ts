@@ -166,6 +166,31 @@ describe('BinancePerpCollector — the websocket path (§4.1)', () => {
     expect(h.registry.messages).toContain(STREAM_LIQUIDATION);
   });
 
+  it('IB-BUG-018: a COIN-M / delivery / BTC-quoted forceOrder is NOT stored — counted on the metric, logged once per symbol', async () => {
+    const skipped: Array<Record<string, string>> = [];
+    const logs: string[] = [];
+    const metrics = {
+      gapsDetected: { inc: () => undefined }, gapsUnrepaired: { inc: () => undefined }, wsReconnects: { inc: () => undefined },
+      liquidationsSkipped: { inc: (labels: Record<string, string>) => void skipped.push(labels) },
+      setBinanceWeightUsed1m: () => undefined,
+    };
+    const h = harness({ metrics, logger: { log: (m: string) => void logs.push(m), warn: () => undefined } });
+    await h.collector.start();
+    for (const symbol of ['BTCUSD_PERP', 'BTCUSD_PERP', 'BTCUSD_261225', 'ETHBTC', 'BTCUSDT_261225', 'ETHUSDC']) {
+      await h.collector.onMessage('!forceOrder@arr', forceOrder(symbol, T0 + 1_000));
+    }
+    await h.collector.onMessage('!forceOrder@arr', forceOrder('ETHUSDT', T0 + 2_000));
+
+    expect(h.written.liquidations.map((r) => r.symbol)).toEqual(['ETHUSDT']);
+    expect(h.collector.skippedLiquidations).toBe(6);
+    expect(skipped).toEqual(Array(6).fill({ venue: 'binance', reason: 'not-usdt-linear' }));
+    expect(logs.filter((m) => m.includes('skipping liquidations of BTCUSD_PERP'))).toHaveLength(1); // once, not per event
+  });
+
+  it('IB-BUG-018: a universe symbol the rule would refuse is a configuration error at construction', () => {
+    expect(() => harness({ symbols: ['BTCUSDT', 'BTCUSD_PERP'] })).toThrow(/non-USDT-linear symbols BTCUSD_PERP/);
+  });
+
   it('writes one mark row per symbol per minute — the last sample (D5)', async () => {
     const h = harness();
     await h.collector.start();
