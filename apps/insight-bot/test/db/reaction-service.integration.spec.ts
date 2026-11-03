@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { Logger } from '@nestjs/common';
 import { Client } from 'pg';
 import type { BinanceRestKline } from '@trade-automation/binance-client';
 import type { AppConfigService } from '../../src/config/config.service';
@@ -193,6 +194,19 @@ maybeDescribe('IB-097 reaction job: Postgres for news, on-demand Binance klines 
     await service(ok.perp).tick(LATER + 5 * MIN);
     expect(ok.calls).toHaveLength(3);
     expect((await row('n1', '4h')).refused).toBeNull();
+  });
+
+  it('a venue error is summarised in ONE warn line per pass (count + first message), not one per call', async () => {
+    await story('n1', DAY + 10 * MIN);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      await service(stubPerp({ fail: true }).perp).tick(LATER);
+      const lines = warn.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('klines'));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/^3 klines calls failed this pass, no rows written, retried next pass — first: BTCUSDT_PERP_SPELLING: Binance REST .* 503/);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('-1121 "Invalid symbol" is stored as the PERMANENT refusal symbol_unavailable and never asked again', async () => {

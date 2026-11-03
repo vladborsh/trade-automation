@@ -25,6 +25,8 @@ export interface ReactionPass {
   refused: number;
   /** Left pending with NO row written, for the next pass: over the call cap, over the weight ceiling, or a venue error. */
   deferred: { callCap: number; weightCeiling: number; venueError: number };
+  /** The first venue error's message, for the one summary line a pass logs (not one line per call). */
+  firstVenueError: string | null;
   /** Stored as the permanent refusal `symbol_unavailable`: the venue answered -1121 "Invalid symbol". */
   symbolUnavailable: number;
 }
@@ -92,6 +94,7 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
     const pass: ReactionPass = {
       venueCalls: 0, venueWeight: 0, measured: 0, refused: 0,
       deferred: { callCap: 0, weightCeiling: 0, venueError: 0 },
+      firstVenueError: null,
       symbolUnavailable: 0,
     };
     try {
@@ -99,6 +102,10 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
         await this.computeHorizon(db, horizon, now, pass);
       }
       const { callCap, weightCeiling, venueError } = pass.deferred;
+      if (venueError > 0) {
+        // one line per pass, however many calls failed: during a venue outage that is up to 100 calls
+        this.logger.warn(`${venueError} klines calls failed this pass, no rows written, retried next pass — first: ${pass.firstVenueError}`);
+      }
       if (pass.venueCalls + pass.measured + pass.refused + callCap + weightCeiling + venueError > 0) {
         this.logger.log(
           `pass: ${pass.measured} measured, ${pass.refused} refused; ${pass.venueCalls} klines calls, ` +
@@ -183,9 +190,9 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
         pass.symbolUnavailable += 1;
         return 'symbol_unavailable';
       }
-      // any other 4xx/5xx or network error: no row, retried next pass
+      // any other 4xx/5xx or network error: no row, retried next pass; summarised once per pass
       pass.deferred.venueError += 1;
-      this.logger.warn(`klines for ${scope.spelling} failed, no row written, retried next pass — ${(error as Error).message}`);
+      pass.firstVenueError ??= `${scope.spelling}: ${(error as Error).message}`;
       return null;
     }
   }
