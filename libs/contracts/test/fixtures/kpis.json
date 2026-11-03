@@ -1,0 +1,118 @@
+{
+ "asOf": 1793719530,
+ "tiles": [
+  {
+   "id": "market_cap",
+   "value": 2620000000000.0,
+   "delta": -2.97,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.change",
+    "params": {
+     "deltaPct": -2.97
+    }
+   },
+   "source": {
+    "name": "CoinGecko",
+    "url": "https://www.coingecko.com"
+   },
+   "unavailable": null,
+   "asOf": 1793719500
+  },
+  {
+   "id": "btc_dominance",
+   "value": 59.21,
+   "delta": 0.4,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": null,
+   "source": {
+    "name": "CoinGecko",
+    "url": "https://www.coingecko.com"
+   },
+   "unavailable": null,
+   "asOf": 1793719500
+  },
+  {
+   "id": "fear_greed",
+   "value": 26,
+   "delta": -11,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.fng_band",
+    "params": {
+     "band": "fear"
+    }
+   },
+   "source": {
+    "name": "alternative.me",
+    "url": "https://alternative.me/crypto/fear-and-greed-index/"
+   },
+   "unavailable": null,
+   "asOf": 1793664000
+  },
+  {
+   "id": "liquidations_24h",
+   "value": 17394071,
+   "delta": null,
+   "deltaBasis": "24h",
+   "split": {
+    "long": 5813960,
+    "short": 11580111
+   },
+   "context": {
+    "key": "kpi.ctx.liq_side",
+    "params": {
+     "side": "short",
+     "sharePct": 67
+    }
+   },
+   "source": {
+    "name": "Binance, Bybit, OKX",
+    "url": null
+   },
+   "unavailable": null,
+   "asOf": 1793719530
+  },
+  {
+   "id": "btc_oi",
+   "value": 7400000000.0,
+   "delta": 1.8,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.change",
+    "params": {
+     "deltaPct": 1.8
+    }
+   },
+   "source": {
+    "name": "Binance",
+    "url": null
+   },
+   "unavailable": null,
+   "asOf": 1793719200
+  },
+  {
+   "id": "btc_funding",
+   "value": 0.00012,
+   "delta": null,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.funding_side",
+    "params": {
+     "side": "longs_pay"
+    }
+   },
+   "source": {
+    "name": "Binance",
+    "url": null
+   },
+   "unavailable": null,
+   "asOf": 1793719530
+  }
+ ]
+}

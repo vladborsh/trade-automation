@@ -1,0 +1,175 @@
+{
+ "period": "24h",
+ "asOf": 1793719530,
+ "baselinesAsOf": 1793718000,
+ "rows": [
+  {
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "priceChangePct": {
+    "value": -1.2,
+    "rarity": 0.62,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 3.4,
+    "rarity": 0.93,
+    "unavailable": null,
+    "sample": 696
+   },
+   "fundingRate": {
+    "value": 0.00012,
+    "rarity": 0.71,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.84,
+    "rarity": 0.55,
+    "unavailable": null,
+    "sample": 720
+   },
+   "lsTopPosition": {
+    "value": 0.91,
+    "rarity": 0.88,
+    "unavailable": null,
+    "sample": 720
+   },
+   "liqUsd": {
+    "value": 3433420,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "quadrant": "new_shorts",
+   "signal": null
+  },
+  {
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "priceChangePct": {
+    "value": -4.8,
+    "rarity": 0.96,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": -6.1,
+    "rarity": 0.95,
+    "unavailable": null,
+    "sample": 696
+   },
+   "fundingRate": {
+    "value": -4e-05,
+    "rarity": 0.82,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 2.31,
+    "rarity": 0.91,
+    "unavailable": null,
+    "sample": 720
+   },
+   "lsTopPosition": {
+    "value": 1.12,
+    "rarity": 0.47,
+    "unavailable": null,
+    "sample": 720
+   },
+   "liqUsd": {
+    "value": 8346763,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "quadrant": "long_closing",
+   "signal": "capitulation"
+  },
+  {
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "priceChangePct": {
+    "value": 0.1,
+    "rarity": 0.12,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 26.0,
+    "rarity": 0.99,
+    "unavailable": null,
+    "sample": 696
+   },
+   "fundingRate": {
+    "value": 0.0003,
+    "rarity": 0.97,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 3.1,
+    "rarity": 0.98,
+    "unavailable": null,
+    "sample": 720
+   },
+   "lsTopPosition": {
+    "value": 1.9,
+    "rarity": 0.93,
+    "unavailable": null,
+    "sample": 720
+   },
+   "liqUsd": {
+    "value": 936065,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "quadrant": "new_longs",
+   "signal": "crowded_long"
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "base": "DOGE",
+   "priceChangePct": {
+    "value": 0.4,
+    "rarity": 0.31,
+    "unavailable": null,
+    "sample": 696
+   },
+   "oiChangePct": {
+    "value": 0.2,
+    "rarity": 0.18,
+    "unavailable": null,
+    "sample": 696
+   },
+   "fundingRate": {
+    "value": 0.0001,
+    "rarity": 0.4,
+    "unavailable": null,
+    "sample": 90
+   },
+   "lsGlobal": {
+    "value": 1.6,
+    "rarity": 0.35,
+    "unavailable": null,
+    "sample": 720
+   },
+   "lsTopPosition": {
+    "value": 1.0,
+    "rarity": 0.2,
+    "unavailable": null,
+    "sample": 720
+   },
+   "liqUsd": {
+    "value": 80000,
+    "rarity": null,
+    "unavailable": "insufficient_history",
+    "sample": 0
+   },
+   "quadrant": "flat",
+   "signal": "quiet"
+  }
+ ]
+}

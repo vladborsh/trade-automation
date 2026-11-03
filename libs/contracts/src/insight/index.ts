@@ -25,3 +25,5 @@ export * from './calendar';
 export * from './push';
 // IB-087 — the market page redesign: the shared period enum and the caps block (treemap + dominance).
 export * from './market';
+// IB-085 — positioning table + KPI strip (design D9, D10).
+export * from './market-positioning';
