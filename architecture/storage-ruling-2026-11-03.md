@@ -4,7 +4,7 @@
 (`reports/coordinator-storage-and-image-2026-11-02.md` §2): «на сервере хранить только кеш; писать
 сбор level2 данных в базу (liquidation, OI, calendar ...)», and the Tech Lead's request
 (`reports/tl-to-architect-storage-ruling.md`). · **Amends:** `member-access-design-2026-10-31.md` §3
-(which dropped the OI/LS poller). · **Output:** WD-006/010/011/012/016 revised, IB-080, IB-081, an
+(which dropped the OI/LS poller) and its news deletion (S8, 2026-11-03). · **Output:** WD-006/010/011/012/016 revised, IB-080, IB-081, an
 IB-077 note.
 
 ## 1. The rule
@@ -17,6 +17,7 @@ in WD-008's `TtlCache`.
 | Liquidations (Binance, Bybit, OKX) | **stored**, websockets as now | No venue serves liquidation history over REST. |
 | Open interest + 4 long/short ratios (Binance, 5 m) | **stored**, the existing `OiLsPoller` | `/futures/data/*` keeps about 30 days and refuses older windows with -1130. |
 | Economic calendar | **stored**, as now | The notifications and the chart read it. |
+| **News** (S8, owner ruling 2026-11-03) | **stored**: `raw_news`, `news_clusters`, `news_cluster_members`, `news_assets`, `news_reactions` | Each RSS source keeps a short rolling feed. An article missed is gone. |
 | **Funding** | **on demand, not stored (S1)** | See S1. |
 | Candles, tickers, summary, market cards, F&G, market cap | cache only | The venue serves them whenever asked. |
 
@@ -35,6 +36,8 @@ writes its outages there as stream `binance-perp:oi-ls-5m`), `symbols`, partitio
 | S5 | **`coverageFrom`/`truncated` keep their meaning over the joined series.** `coverageFrom` is the first point of the joined answer. `truncated` is true when that is later than `from` + period. No contract change. | The dashboard (IB-081) reads these two fields once, whichever part supplied the start. |
 | S6 | **Known limit, stated:** an outage longer than the venue's retention leaves a hole in the stored part that the line will bridge. The outage itself is recorded in `collector_gaps`. A `gaps` field on the response is the later fix if this ever happens. It is not built now. | It takes the box being down for about a month, and then the alert and `/health` will already have said so. |
 | S7 (amended by `https-without-domain-2026-11-03.md` H7: the header is `CLIENT_IP_HEADER`, not `CF-Connecting-IP`) | **Ops endpoints leave the public path.** Liveness moves from `/health` to `/healthz` and answers `{status}` only. `/health` belongs to the dashboard. `/metrics` answers 404 to any request carrying `CF-Connecting-IP`. | dev-1 and dev-3 both found the ops `/health` shadowing the dashboard route and showing collector internals on the bot origin. Through the tunnel, `/metrics` exposes the same internals (stream lag, Binance weight). Cloudflare adds `CF-Connecting-IP` to every tunnelled request and the box has no inbound port, so "header present" means "came from the internet". A spoofed header only gets the spoofer a 404. No env flag is needed, so this does not depend on IB-078's `TRUST_CF_CONNECTING_IP`. |
+
+| S8 | **Amended 2026-11-03, owner ruling (`reports/coordinator-keep-news-2026-11-03.md`): news stays, stored in Postgres.** `src/news/**` (8 RSS sources, clustering, asset tags, reactions) and its five tables stay. WD-010 has already kept them (0270e2e), and WD-006 does not drop them. **The one thing news needed that the wind-down removes is the price.** `news_reactions` read `candles_1m` (`db/pg/reaction-reads.ts`: `closeAtOrBefore`, `windowCoverage`), and after WD-010 nothing writes that table, so every new reaction refuses with `window_not_covered`. **Decision: reactions read 1m klines from Binance on demand (IB-097). `candles_1m` is not kept alive for them**, and WD-006 drops it after IB-097 merges. | Storing a minute tape for 40 symbols to answer three questions per article is exactly what the storage rule removes. The venue serves 1m klines for any past window, so on-demand reads do *better* than the tape: a reaction whose window fell in a box outage is still measurable afterwards, where the tape gave a permanent refusal. Only the measurement moves. The stored reaction row, its venue/market/spelling stamp, the refusal reasons and `othersInWindow` (a `news_*` read) are unchanged. Weight (Binance docs, not measured): one `/fapi/v1/klines` call per measurement. `limit` < 100 costs 1 (15m), and < 500 costs 2 (1h, 4h: 61 and 241 bars). That is ≤ 5 per tagged article over all three horizons, and IB-097 caps a pass. |
 
 ## 3. Weight and disk (arithmetic from the code, not measured)
 
@@ -62,3 +65,4 @@ writes its outages there as stream `binance-perp:oi-ls-5m`), `symbols`, partitio
 - **IB-080** (new, P1): the S3–S5 read rule.
 - **IB-081** (new): the dashboard shows funding `unavailable` and OI/LS `coverageFrom`/`truncated`.
 - **IB-077**: the `/health` step becomes S7's checks.
+- **IB-097** (new, S8): news reactions on on-demand klines. WD-006 waits for it before dropping `candles_1m`; news tables stay.
