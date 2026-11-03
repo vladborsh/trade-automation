@@ -10,7 +10,7 @@ describe('BlockScheduler', () => {
   afterEach(() => vi.useRealTimers());
 
   it('the cadences are D13\'s', () => {
-    expect(BLOCK_INTERVALS_MS).toEqual({ liquidations: 10_000, insights: 60_000, kpis: 60_000, positioning: 60_000, caps: 120_000, flows: 300_000 });
+    expect(BLOCK_INTERVALS_MS).toEqual({ liquidations: 10_000, insights: 60_000, kpis: 60_000, positioning: 60_000, caps: 120_000, sentiment: 120_000, flows: 300_000 });
   });
 
   it('each block polls at its own cadence: in 120 s, liquidations 13×, kpis 3×, caps 2×', async () => {

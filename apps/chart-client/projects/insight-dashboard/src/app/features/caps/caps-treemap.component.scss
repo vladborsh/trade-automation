@@ -1,0 +1,9 @@
+/* Dark-terminal palette (AGENTS.md). Tiles are separated by the page background, not borders. */
+:host { display: block; min-width: 0; }
+.chart { display: block; }
+rect { stroke: #0d1117; stroke-width: 1; cursor: pointer; }
+g.selected rect { stroke: #c9d1d9; stroke-width: 2; }
+.sym { fill: #f0f6fc; font-size: 12px; font-weight: 600; pointer-events: none; }
+.chg { fill: #f0f6fc; font-size: 12px; pointer-events: none; opacity: 0.9; }
+p { margin: 4px 0 0; font-size: 12px; }
+.muted { color: #8b949e; }

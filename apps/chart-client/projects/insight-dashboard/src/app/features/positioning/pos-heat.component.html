@@ -1,0 +1,30 @@
+<!-- D16: the table scrolls inside its own box, ticker column pinned -->
+<div class="scroll">
+  <table>
+    <thead>
+      <tr>
+        <th class="coin" scope="col">
+          <button type="button" (click)="sortBy('base')">{{ header('base') }} {{ arrow('base') }}</button>
+        </th>
+        @for (c of columns; track c) {
+          <th scope="col">
+            <button type="button" (click)="sortBy(c)">{{ header(c) }} {{ arrow(c) }}</button>
+          </th>
+        }
+        <th scope="col">{{ t('positioning.col.signal') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of view(); track r.symbol) {
+        <tr>
+          <th class="coin" scope="row"><a [routerLink]="['/instrument', r.symbol]">{{ r.base }}</a></th>
+          @for (c of columns; track c) {
+            <td class="num" [attr.data-heat]="heat(r, c)" [attr.title]="title(r, c)">{{ text(r, c) }}</td>
+          }
+          <td class="signal">{{ r.signalKey ? t(r.signalKey) : '' }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+<p class="legend">{{ t('positioning.legend') }}</p>

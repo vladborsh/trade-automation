@@ -14,6 +14,8 @@ export const BLOCK_INTERVALS_MS = {
   kpis: 60_000,
   positioning: 60_000,
   caps: 120_000,
+  /** IB-090: the Fear & Greed card (/context/cards) — a daily index, read as often as the caps. */
+  sentiment: 120_000,
   flows: 300_000,
 } as const;
 export type BlockId = keyof typeof BLOCK_INTERVALS_MS;

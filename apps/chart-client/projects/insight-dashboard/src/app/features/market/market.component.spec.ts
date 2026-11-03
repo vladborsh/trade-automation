@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import type { WebInsightsResponse, WebKpisResponse, WebLiquidationBlock, WebLiquidationsOverviewResponse, WebMarketPeriod } from '@trade-automation/contracts';
+import type { WebCapsResponse, WebInsightsResponse, WebKpisResponse, WebPositioningResponse, WebLiquidationBlock, WebLiquidationsOverviewResponse, WebMarketPeriod } from '@trade-automation/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import insightsFixture from '../../../../../../../../libs/contracts/test/fixtures/insights.24h.json';
 import kpisFixture from '../../../../../../../../libs/contracts/test/fixtures/kpis.json';
 import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
+import positioningFixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { MarketComponent } from './market.component';
@@ -21,6 +22,13 @@ const overview = (period: WebMarketPeriod): WebLiquidationsOverviewResponse => (
   block: { ...(blockFixture as unknown as WebLiquidationBlock), period },
 });
 
+const caps = (period: WebMarketPeriod): WebCapsResponse => ({
+  period, coins: [{ id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', capUsd: 1.5e12, priceUsd: 77_000, changePct: 1.2, stable: false }],
+  coinsUnavailable: null, changeUnavailable: null, dominanceUnavailable: null,
+  dominance: { btcPct: 59, ethPct: 11, stablesPct: 8, restPct: 22, totalCapUsd: 2.6e12, totalCapChangePct24h: -1, stablesCounted: 10, asOf: '2026-11-03T17:00:00Z' },
+  source: { name: 'CoinGecko', url: 'https://www.coingecko.com' }, generatedAt: '2026-11-03T17:00:00Z',
+});
+
 interface Call { endpoint: string; period?: WebMarketPeriod }
 
 function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean } = {}) {
@@ -34,7 +42,9 @@ function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean 
       const body = { ...(insightsFixture as unknown as WebInsightsResponse), period };
       return new Promise<WebInsightsResponse>((r) => setTimeout(() => r(body), opts.insightsDelayMs ?? 0));
     },
-    marketCards: async () => { calls.push({ endpoint: 'caps' }); if (opts.capsFail) throw new Error('502 from CoinGecko'); return null; },
+    marketCards: async () => { calls.push({ endpoint: 'sentiment' }); return null; },
+    marketPositioning: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'positioning', period }); return { ...(positioningFixture as unknown as WebPositioningResponse), period }; },
+    marketCaps: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'caps', period }); if (opts.capsFail) throw new Error('502 from CoinGecko'); return caps(period); },
   };
   TestBed.configureTestingModule({
     imports: [MarketComponent],
@@ -60,9 +70,10 @@ describe('MarketComponent shell (IB-088)', () => {
     const { calls } = setup({ p: '4h' });
     await vi.advanceTimersByTimeAsync(0);
     expect(calls).toEqual(expect.arrayContaining([
-      { endpoint: 'liquidations', period: '4h' }, { endpoint: 'insights', period: '4h' }, { endpoint: 'kpis' }, { endpoint: 'caps' },
+      { endpoint: 'liquidations', period: '4h' }, { endpoint: 'insights', period: '4h' }, { endpoint: 'kpis' },
+      { endpoint: 'positioning', period: '4h' }, { endpoint: 'caps', period: '4h' }, { endpoint: 'sentiment' },
     ]));
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(6);
   });
 
   it('an unknown ?p= is 24h, not an error', async () => {
@@ -71,11 +82,12 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(calls.find((c) => c.endpoint === 'insights')?.period).toBe('24h');
   });
 
-  it('one minute: liquidations 7×, insights and KPIs 2×, caps once — the cadences reach the endpoints', async () => {
+  it('one minute: liquidations 7×, insights / KPIs / positioning 2×, caps and sentiment once — the cadences reach the endpoints', async () => {
     const { calls } = setup();
     await vi.advanceTimersByTimeAsync(60_000);
-    expect({ liq: count(calls, 'liquidations'), ins: count(calls, 'insights'), kpis: count(calls, 'kpis'), caps: count(calls, 'caps') })
-      .toEqual({ liq: 7, ins: 2, kpis: 2, caps: 1 });
+    const n = (e: string) => count(calls, e);
+    expect({ liq: n('liquidations'), ins: n('insights'), kpis: n('kpis'), pos: n('positioning'), caps: n('caps'), sent: n('sentiment') })
+      .toEqual({ liq: 7, ins: 2, kpis: 2, pos: 2, caps: 1, sent: 1 });
   });
 
   it('a period switch DURING a request: the old answer is dropped, the new period is asked at once, the URL carries it', async () => {
@@ -88,6 +100,7 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(cmp.insights()?.period).toBe('1h');
     expect(calls.filter((c) => c.endpoint === 'insights').map((c) => c.period)).toEqual(['24h', '1h']);
     expect(cmp.liquidations()?.block.period).toBe('1h');
+    expect([cmp.positioning()?.period, cmp.caps()?.period]).toEqual(['1h', '1h']); // IB-090: both blocks follow the period
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { p: '1h' }, replaceUrl: true }));
   });
 
@@ -114,7 +127,7 @@ describe('MarketComponent shell (IB-088)', () => {
     vis.mockReturnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(0);
-    expect(calls.length).toBe(before + 4);
+    expect(calls.length).toBe(before + 6);
     vis.mockRestore();
   });
 

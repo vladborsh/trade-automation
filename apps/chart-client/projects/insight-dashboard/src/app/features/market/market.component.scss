@@ -50,14 +50,6 @@ h2 { font-size: 12px; margin: 0 0 0.5rem; color: #8b949e; text-transform: upperc
   font-size: 13px;
 }
 
-/* D16: a wide table scrolls inside its own box; the page never scrolls sideways. */
-.table-scroll { overflow-x: auto; max-width: 100%; }
-table { border-collapse: collapse; width: 100%; }
-th, td { text-align: left; padding: 0.15rem 0.6rem 0.15rem 0; white-space: nowrap; }
-th { color: #8b949e; font-weight: normal; }
-.num { text-align: right; }
-.up { color: #26a69a; }
-.down { color: #ef5350; }
 
 /* D16 phone: one column under 768 px, every card full width, nothing wider than the screen. */
 @media (max-width: 767px) {

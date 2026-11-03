@@ -17,18 +17,6 @@
 const MINUS = '−';
 
 /**
- * A sample's instant, UTC and to the minute — `2026-10-12 12:04`.
- *
- * UTC rather than the reader's zone, and said so in the string table: these are venue snapshots,
- * and a member comparing a figure against CoinGecko's own page needs the clock the venue publishes
- * on. The seconds are dropped because no card is accurate to a second.
- */
-export function asOfUtc(ms: number | null | undefined): string | null {
-  if (ms === null || ms === undefined || !Number.isFinite(ms)) return null;
-  return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
-}
-
-/**
  * A signed change — `+2.14`, `${MINUS}0.30`, `0.00`.
  *
  * The caller's string says what the unit is (percentage points for the dominance cards, percent for
@@ -44,11 +32,6 @@ export function signed(value: number | null | undefined, digits = 2): string | n
 export function percent(value: number | null | undefined, digits = 2): string | null {
   if (value === null || value === undefined || !Number.isFinite(value)) return null;
   return value.toFixed(digits);
-}
-
-/** A 0..1 fraction as a percentage — the shape the caps table stores shares in. */
-export function fractionPercent(value: number | null | undefined, digits = 2): string | null {
-  return value === null || value === undefined ? null : percent(value * 100, digits);
 }
 
 /** A 0..1 fractional change as a signed percentage — the caps table's 24 h and 7 d columns. */

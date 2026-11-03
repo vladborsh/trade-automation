@@ -1,0 +1,18 @@
+<svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height()" [attr.width]="width()" [attr.height]="height()"
+     role="img" [attr.aria-label]="legend()">
+  @for (tile of tiles(); track tile.item.id) {
+    <g (click)="pick(tile.item.id)" [class.selected]="tile.item.id === selected()">
+      <rect [attr.x]="tile.x" [attr.y]="tile.y" [attr.width]="tile.w" [attr.height]="tile.h" [attr.fill]="tile.fill">
+        <title>{{ describe(tile.item) }}</title>
+      </rect>
+      @if (tile.text !== 'none') {
+        <text class="sym" [attr.x]="tile.x + 4" [attr.y]="tile.y + 14">{{ tile.item.symbol }}</text>
+      }
+      @if (tile.text === 'full') {
+        <text class="chg" [attr.x]="tile.x + 4" [attr.y]="tile.y + 28">{{ change(tile.item) }}</text>
+      }
+    </g>
+  }
+</svg>
+<p class="muted">{{ detail() ?? t('caps.treemap.tap') }}</p>
+<p class="muted">{{ legend() }}</p>

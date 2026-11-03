@@ -34,8 +34,27 @@
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 
-@if (live()) {
-  <p class="muted">{{ t('market.live') }}</p>
+<!-- IB-090: positioning (quadrant + heat table) and market cap (treemap + dominance), each with its D15 line -->
+@if (positioning(); as pos) {
+  <app-positioning-block [positioning]="pos" [period]="period()" [line]="insightLine('positioning')" />
+} @else if (!blockError('positioning')) {
+  <section class="card wide">
+    <app-loader variant="block" [label]="t('market.loading')" />
+  </section>
+}
+@if (blockError('positioning'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+}
+
+@if (caps(); as c) {
+  <app-caps-block [caps]="c" [period]="period()" [line]="insightLine('caps')" />
+} @else if (!blockError('caps')) {
+  <section class="card wide">
+    <app-loader variant="block" [label]="t('market.loading')" />
+  </section>
+}
+@if (blockError('caps'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 
 <div class="cards" id="sentiment">
@@ -60,112 +79,8 @@
       <p class="muted">{{ t('market.fg.none') }}</p>
     }
   </section>
-
-  <!-- BTC dominance. The deltas are percentage POINTS: dominance is already a percentage, so
-       "rose 2 %" would be ambiguous where "rose 2 points" is not. -->
-  <section class="card">
-    <h2>{{ t('market.dominance.title') }}</h2>
-    @if (firstLoad()) {
-      <app-loader variant="skeleton" [lines]="4" [label]="t('market.loading')" />
-    } @else if (dominance(); as dom) {
-      <p class="value">{{ percent(dom.btcPct) }}</p>
-      <p class="muted">{{ t('market.asOf', { when: asOf(dom.atMs) ?? t('market.unknown') }) }}</p>
-      @if (!live() || dom.changePct24h !== null) {
-        <p>{{ t('market.dominance.day', { change: points(dom.changePct24h) }) }}</p>
-      }
-      @if (!live() || dom.changePct7d !== null) {
-        <p>{{ t('market.dominance.week', { change: points(dom.changePct7d) }) }}</p>
-      }
-      @if (!live() && dom.changePct7d === null) {
-        <!-- §10: this series is collected forward and cannot be backfilled. Two different reasons
-             for a missing 7-day move, and the card must not give the wrong one: under a week of
-             collection is youth, a week or more of it with no comparable sample is a gap in the
-             collection (which is what a pause leaves behind). -->
-        @if (dom.coverageDays < 7) {
-          <p class="muted">{{ t('market.dominance.coverage', { days: dom.coverageDays }) }}</p>
-        } @else {
-          <p class="muted">{{ t('market.dominance.gap', { days: dom.coverageDays }) }}</p>
-        }
-      }
-      @if (dom.ethPct !== null) {
-        <p>{{ t('market.dominance.eth', { value: percent(dom.ethPct) }) }}</p>
-      }
-      @if (cap(dom.totalUsd); as total) {
-        <p>{{ t('market.dominance.total', { value: total, change: percent(dom.totalChangePct24h, { sign: true }) }) }}</p>
-      }
-      <p class="muted source">{{ t('market.source', { source: dom.source }) }}</p>
-    } @else {
-      <p class="muted">{{ t('market.dominance.none') }}</p>
-    }
-  </section>
-
-  <!-- BTC against the top 20. The denominator is on the card: a share of three coins is not a
-       share of twenty, and the deltas compare only days with the same coverage. -->
-  <section class="card">
-    <h2>{{ t('market.btcVsTop.title') }}</h2>
-    @if (firstLoad()) {
-      <app-loader variant="skeleton" [lines]="3" [label]="t('market.loading')" />
-    } @else if (btcVsTop(); as top) {
-      <p class="value">{{ percent(top.sharePct) }}</p>
-      <p class="muted">{{ t('market.btcVsTop.counted', { counted: top.coinsCounted, expected: top.coinsExpected, day: top.day }) }}</p>
-      @if (!live() || top.changePct7d !== null) {
-        <p>{{ t('market.btcVsTop.week', { change: points(top.changePct7d) }) }}</p>
-      }
-      @if (!live() || top.changePct30d !== null) {
-        <p>{{ t('market.btcVsTop.month', { change: points(top.changePct30d) }) }}</p>
-      }
-      <p class="muted source">{{ t('market.source', { source: top.source }) }}</p>
-    } @else {
-      <p class="muted">{{ t('market.btcVsTop.none') }}</p>
-    }
-  </section>
-
 </div>
-
-@if (blockError('caps'); as message) {
+<app-block-conclusion [line]="insightLine('sentiment')" [period]="period()" />
+@if (blockError('sentiment'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
-<section class="card wide" id="caps">
-  <h2>{{ t('market.table.title') }}</h2>
-  @if (capsDay(); as day) {
-    <p class="muted">{{ t('market.asOf', { when: day }) }}</p>
-  }
-  <!-- D16: the table scrolls inside its own box, never the page -->
-  <div class="table-scroll">
-  <table>
-    <thead>
-      <!-- §11 English-by-rule: field names in a table of raw data (allow-listed with the reason) -->
-      <tr><th>coin</th><th class="num">cap</th><th class="num">price</th><th class="num">share</th><th class="num">24h</th>@if (!live()) {<th class="num">7d</th>}</tr>
-    </thead>
-    <tbody>
-      @for (row of heldCaps(); track row.coin) {
-        <tr>
-          <td>{{ row.coin }}</td>
-          <td class="num">{{ cap(row.capUsd) ?? t('market.unknown') }}</td>
-          <td class="num">{{ price(row.priceUsd) ?? t('market.unknown') }}</td>
-          <td class="num">{{ fraction(row.share) }}</td>
-          <td class="num" [class.up]="(row.change24h ?? 0) > 0" [class.down]="(row.change24h ?? 0) < 0">{{ fraction(row.change24h, { sign: true }) }}</td>
-          @if (!live()) {
-            <!-- live: the 7-day cap move is paid history, so the column would be all «нет данных» -->
-            <td class="num" [class.up]="(row.change7d ?? 0) > 0" [class.down]="(row.change7d ?? 0) < 0">{{ fraction(row.change7d, { sign: true }) }}</td>
-          }
-        </tr>
-      } @empty {
-        @if (firstLoad()) {
-          <tr><td colspan="6"><app-loader variant="skeleton" [lines]="5" [label]="t('market.loading')" /></td></tr>
-        } @else {
-          <tr><td colspan="6" class="muted">{{ t('market.table.none') }}</td></tr>
-        }
-      }
-    </tbody>
-  </table>
-  </div>
-  @if (missingCaps() > 0) {
-    <!-- the coins the collector has not reached today are counted, not listed: twenty rows of
-         «нет данных» is not information, and the count is the fact a reader needs -->
-    <p class="muted">{{ t('market.table.missing', { count: missingCaps() }) }}</p>
-  }
-  @if (cards(); as payload) {
-    <p class="muted source">{{ t('market.source', { source: payload.capsSource }) }}</p>
-  }
-</section>

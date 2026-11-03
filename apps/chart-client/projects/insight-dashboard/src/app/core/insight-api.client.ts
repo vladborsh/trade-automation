@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import type {
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
-  WebFundingResponse, WebLiquidationsResponse, WebInsightsResponse, WebKpisResponse, WebMarketPeriod,
+  WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
@@ -162,6 +162,18 @@ export class InsightApiClient {
   /** D1: «Главное сейчас» for the page's period (server cache 60 s). */
   async marketInsights(period: WebMarketPeriod): Promise<WebInsightsResponse> {
     return this.get<WebInsightsResponse>('/market/insights', { period });
+  }
+
+  // ------------------------------------------------------ IB-090, positioning and caps blocks
+
+  /** D9: one row per crypto coin for the period (server cache 60 s, baselines hourly). */
+  async marketPositioning(period: WebMarketPeriod): Promise<WebPositioningResponse> {
+    return this.get<WebPositioningResponse>('/market/positioning', { period });
+  }
+
+  /** D11: treemap coins and the dominance bar (server cache 120 s; 4h is refused by the source). */
+  async marketCaps(period: WebMarketPeriod): Promise<WebCapsResponse> {
+    return this.get<WebCapsResponse>('/market/caps', { period });
   }
 
   // ------------------------------------------------------ IB-079, login + password (IB-078's server)
