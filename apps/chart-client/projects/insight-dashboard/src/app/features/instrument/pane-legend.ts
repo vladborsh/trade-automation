@@ -1,6 +1,6 @@
 import type { StringKey } from '../../i18n/keys';
 import type { PaneData } from './pane-data';
-import type { PanelDef } from './panels.model';
+import { PANELS, panelHeading, type PanelDef } from './panels.model';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
 import { LEVEL_COLOURS } from './prior-levels';
 import { SESSIONS, showsSessions } from './trading-sessions';
@@ -41,4 +41,22 @@ export function legendEntries(
     { label: t('instrument.legend.usdEvents'), colour: EVENT_LINE_COLOUR, line: true },
     ...closed,
   ];
+}
+
+/**
+ * Every pane's legend box: its heading, its entries, at its pane's top edge (`paneEdges`), in
+ * `PANELS` order. Moved out of the chart component (IB-098) — it is mapping, not wiring.
+ */
+export function paneLegends(
+  t: (key: StringKey) => string,
+  data: Pick<PaneData, 'timeframe'> | null,
+  symbol: string,
+  edges: ReadonlyArray<{ top: number }>,
+): Array<{ key: PanelDef['key']; heading: string; entries: LegendEntry[]; top: number }> {
+  return PANELS.map((panel, i) => ({
+    key: panel.key,
+    heading: panelHeading(t, panel, symbol),
+    entries: legendEntries(panel, data, t),
+    top: edges[i].top,
+  }));
 }

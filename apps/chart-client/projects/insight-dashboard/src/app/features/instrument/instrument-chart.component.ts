@@ -14,9 +14,9 @@ import {
   DEFAULT_PANE_HEIGHTS, browserStore, loadPaneHeights, paneEdges, resizePane, savePaneHeights, totalPaneHeight,
   type PaneHeights, type PaneKey,
 } from './pane-heights';
-import { legendEntries } from './pane-legend';
+import { paneLegends } from './pane-legend';
 import {
-  PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, panelHeading, showWholeWindow,
+  PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, showWholeWindow,
 } from './panels.model';
 import { TimeAxisStrip } from './time-axis-strip';
 import { keepView } from './carried-view';
@@ -101,15 +101,7 @@ export class InstrumentChartComponent implements OnDestroy {
   /** Each pane's edges in px from the chart's top: its legend at the top, its handle at the bottom. */
   readonly edges = computed(() => paneEdges(this.heights()));
 
-  readonly legends = computed(() => {
-    const data = this.data();
-    return PANELS.map((panel, i) => ({
-      key: panel.key,
-      heading: panelHeading(this.t, panel, this.symbol()),
-      entries: legendEntries(panel, data, this.t),
-      top: this.edges()[i].top,
-    }));
-  });
+  readonly legends = computed(() => paneLegends(this.t, this.data(), this.symbol(), this.edges()));
 
   /** IB-060: the bar under the crosshair, and the economic events on it for the tooltip. */
   readonly hover = signal<{ time: number; x: number } | null>(null);

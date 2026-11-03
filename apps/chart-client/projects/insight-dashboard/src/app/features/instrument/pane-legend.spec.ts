@@ -1,6 +1,6 @@
 import { ru } from '../../i18n/ru';
 import type { StringKey } from '../../i18n/keys';
-import { legendEntries } from './pane-legend';
+import { legendEntries, paneLegends } from './pane-legend';
 import { PANELS } from './panels.model';
 import { LEVEL_COLOURS } from './prior-levels';
 import { SESSIONS } from './trading-sessions';
@@ -37,5 +37,16 @@ describe('legendEntries', () => {
 
   it('before data, the price pane shows only its own entries', () => {
     expect(legendEntries(price, null, t)).toHaveLength(price.legend.length);
+  });
+});
+
+describe('paneLegends (moved out of the chart component, IB-098)', () => {
+  it('one box per pane in PANELS order, at its pane\'s top, headed with the symbol\'s units', () => {
+    const edges = PANELS.map((_, i) => ({ top: i * 100 }));
+    const boxes = paneLegends(t, { timeframe: '1m' }, 'BTCUSDT', edges);
+    expect(boxes.map((b) => b.key)).toEqual(PANELS.map((p) => p.key));
+    expect(boxes.map((b) => b.top)).toEqual(edges.map((e) => e.top));
+    expect(boxes[0].heading).toBe('Цена · USDT');
+    expect(boxes[0].entries).toEqual(legendEntries(price, { timeframe: '1m' }, t));
   });
 });
