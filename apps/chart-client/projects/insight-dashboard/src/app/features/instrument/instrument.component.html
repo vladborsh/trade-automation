@@ -19,7 +19,6 @@
         <button type="button" class="legend-toggle" [attr.aria-pressed]="!legendsHidden()" (click)="toggleLegends()">
           {{ legendsHidden() ? t('instrument.legends.show') : t('instrument.legends.hide') }}
         </button>
-        <app-fullscreen-button [target]="chartColumn" />
       </div>
     </div>
   </header>
@@ -31,6 +30,8 @@
   }
   <div class="body">
     <div #chartColumn class="chart-column" [class.legends-hidden]="legendsHidden()">
+      <!-- IB-099 item 3: inside the expanded element, so the way out is on screen in full screen too -->
+      <app-fullscreen-button class="fs-button" [target]="chartColumn" />
       @if (panes(); as data) {
         <app-instrument-chart
           [data]="data"

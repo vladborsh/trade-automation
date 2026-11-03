@@ -143,3 +143,7 @@
     color: #8b949e;
   }
 }
+
+/* IB-099 item 3: the full-screen button sits on the chart's top-right corner, inside the element
+   it expands — a toolbar button would be off screen once the chart column fills it. */
+.fs-button { position: absolute; top: 4px; right: 4px; z-index: 6; }

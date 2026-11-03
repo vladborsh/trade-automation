@@ -27,9 +27,10 @@ export class FullscreenButtonComponent {
   constructor() {
     // native: the browser's own Esc (and F11, and a swipe) leaves without asking us
     const onChange = () => this.active.set(this.doc.fullscreenElement === this.target());
-    // fallback: Esc is ours to handle
+    // Esc leaves either way: the fallback layer is ours to close, and a native full screen the
+    // browser did not already close (it usually does, before the page sees the key) is closed here
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && this.active() && this.doc.fullscreenElement !== this.target()) this.exitFallback();
+      if (e.key === 'Escape' && this.active()) void this.exit();
     };
     this.doc.addEventListener('fullscreenchange', onChange);
     this.doc.addEventListener('keydown', onKey);
