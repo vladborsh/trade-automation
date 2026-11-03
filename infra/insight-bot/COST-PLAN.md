@@ -16,11 +16,12 @@ they are estimates to re-check in the AWS calculator, not quotes.
 |---|---|---|
 | EC2 `t4g.micro` (2 vCPU arm64, 1 GB) | ~0.0108/h × 730 h, on-demand, no commitment | **7.88** |
 | EBS gp3 root, 50 GB | 50 × 0.096; 3000 IOPS and 125 MB/s are included free | **4.80** |
-| Public IPv4 (1 address, in use) | 0.005/h × 730 h — the line the old estimate missed | **3.65** |
+| Public IPv4 (1 address, in use) | 0.005/h × 730 h — since IB-082 this one address is the site's Elastic IP (attached: same price; idle on a stopped box: same price too, so never release it) | **3.65** |
 | S3 backups | ~6 GB average held (35 daily `pg_dump -Fc`, lifecycle-expired) × 0.025 | **0.15** |
 | S3 requests | ~1 PUT/day + occasional GET | **0.01** |
 | Data transfer out | venue REST/WS + Telegram; far below the 100 GB/month free allowance | **0.00** |
-| ECR | at most 10 images × image size × 0.10/GB-month (ECR design E3; size measured at the first push) | ≈ 0.0x |
+| ECR | ≤ 10 images × ~0.1 GB (first image 104 MB compressed, 2026-11-03; shared layers count once) × 0.10/GB-month | ≈ 0.1 |
+| Domain | none — the site is `<a-b-c-d>.sslip.io` with a Let's Encrypt certificate (https-without-domain, 2026-11-03) | 0.00 |
 | NAT gateway / ALB | not used, and never will be for this design | 0.00 |
 | AWS Budgets | first two budgets are free | 0.00 |
 | **Total** | | **≈ 16.49** |

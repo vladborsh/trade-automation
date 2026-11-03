@@ -1,82 +1,99 @@
-# Живые ресурсы AWS от незавершённой IB-013 — и как их снести
+# Живые ресурсы AWS insight-bot — что есть и где
 
-> **Обновление 2026-11-03 (IB-073): сервер создан, всё под управлением OpenTofu.** Пять ресурсов
-> ниже и ещё два (`aws_s3_bucket_public_access_block`, `aws_s3_bucket_server_side_encryption_configuration`)
-> импортированы в состояние; созданы `aws_instance.insight_bot` = **`i-002c057dfb439ca24`**
-> (t4g.micro, arm64, диск gp3 50 ГБ, защита от удаления), политика роли, версионирование и
-> правило хранения бакета, бюджет `insight-bot-monthly`. Состояние теперь не в worktree, а в S3:
-> `s3://vb-insight-bot-backups-apne1/tofu/insight-bot.tfstate` (с файлом блокировки).
-> Раздел «Как снести» ниже устарел: сносить — только `tofu destroy` после снятия защиты (RUNBOOK §10).
-> Полная переработка этого файла — шаг 7 IB-073.
+**Состояние на 2026-11-03 (IB-073, IB-082, IB-083).** Сервер в Токио работает и собирает данные;
+сайт — **https://35-74-48-140.sslip.io**. Всё перечисленное ниже управляется OpenTofu из
+`infra/insight-bot/terraform/`. `tofu plan` без аргументов пустой: код в git совпадает с тем, что
+живёт в AWS.
 
-**Записано 2026-10-23 при свёртывании разработки.** IB-013 (бокс в Токио для websocket-ликвидаций
-Binance) так и не была доведена до конца: `tofu apply` прошёл частично и создал 5 ресурсов из 12.
-**EC2-инстанса не существует** — проверено `aws ec2 describe-instances` (пусто). Расход на то, что
-осталось, измерялся как $0.27/мес (роль, security group, instance profile и пустой бакет —
-всё в пределах free tier).
+Регион — **`ap-northeast-1`** (Токио). Номер аккаунта здесь намеренно не приводится: его видно из
+`aws sts get-caller-identity` с профилем `insight-bot`.
 
-При свёртывании решено снести всё: бокс был нужен ровно для ликвидаций Binance, а после перехода
-insight-bot на on-demand сбора ликвидаций больше не будет.
+## Где лежит состояние OpenTofu
 
-## Зачем этот файл существует
+**S3 `vb-insight-bot-backups-apne1`, ключ `tofu/insight-bot.tfstate`**, с блокировкой
+(`use_lockfile`), шифрование на стороне S3, бакет версионируется. Описано в `terraform/backend.tf`,
+`terraform/.terraform.lock.hcl` закреплён в git (провайдер aws 5.100.0).
 
-Состояние OpenTofu (`terraform.tfstate`) gitignored и жило **в одной единственной копии** внутри
-worktree `se-bt-auth-server`. Бэкап, который считался существующим
-(`~/.claude/jobs/.../reports/ib-013-state-backup/`), был вычищен вместе с tmp задания. То есть
-удаление папки worktree уничтожило бы единственную запись о платных ресурсах в чужом регионе.
-Поэтому идентификаторы выписаны сюда, в git, а копия состояния лежит в
-`~/insight-tape-backups/ib-013-state-backup/` и входит в архивный бандл.
+Работать так:
+
+```bash
+cd infra/insight-bot/terraform
+export AWS_PROFILE=insight-bot   # пользователь insight-bot-provisioner, права — iam/provisioner-policy.json
+tofu init
+tofu plan                        # должен быть пустым; всё, что не пусто, — сначала понять, потом применять
+```
+
+Права провижинера — файл `iam/provisioner-policy.json`; владелец вставляет его в консоли IAM
+(политика `insight-bot-provisioner`). Последняя вставка — 8b5689f (ECR, OIDC, роль деплоя; там же
+права для IB-082).
 
 ## Что живёт
 
-Регион — **`ap-northeast-1`** (Токио). Номер аккаунта здесь намеренно не приводится; он есть в
-скопированном состоянии.
+### Сервер и сеть
 
-| Ресурс OpenTofu | Тип | Идентификатор |
+| Ресурс OpenTofu | Что это | Идентификатор |
 |---|---|---|
-| `aws_iam_role.instance` | IAM role | `insight-bot-instance` |
-| `aws_iam_role_policy_attachment.ssm_core` | IAM policy attachment | `insight-bot-instance-20261007192450730000000001` (прикрепляет `AmazonSSMManagedInstanceCore`) |
-| `aws_iam_instance_profile.insight_bot` | IAM instance profile | `insight-bot-instance` |
-| `aws_security_group.insight_bot` | Security group | `sg-01cb82a6578c17200` (в дефолтном VPC `vpc-cef1fea9`) |
-| `aws_s3_bucket.backups` | S3 bucket | `vb-insight-bot-backups-apne1` (версионируемый, приватный, шифрованный) |
+| `aws_instance.insight_bot` | сервер, t4g.micro arm64, диск gp3 50 ГБ (шифрованный) | `i-002c057dfb439ca24`, диск `vol-094308f857f6e0dc8`, AMI `ami-044e34eed8cbeb354` |
+| `aws_eip.insight_bot` + `aws_eip_association.insight_bot` | постоянный адрес сайта | `35.74.48.140` (`eipalloc-039ce8d8282302949`) |
+| `aws_security_group.insight_bot` | входящие: **только TCP 80 и 443** от 0.0.0.0/0 (IPv4), для Caddy; исходящие — всё | `sg-01cb82a6578c17200` (дефолтный VPC `vpc-cef1fea9`, подсеть `subnet-f42d17af`) |
+| `aws_iam_role.instance`, `aws_iam_instance_profile.insight_bot`, `aws_iam_role_policy_attachment.ssm_core`, `aws_iam_role_policy.instance` | роль сервера: Session Manager; чтение `/insight-bot/*` в SSM; запись/чтение бакета копий; скачивание образа из ECR | `insight-bot-instance` |
 
-Ничем не управляемые data-источники (удалять нечего): дефолтный VPC `vpc-cef1fea9`, его подсети,
-AMI `ami-00a205e9e967454f6`, caller identity.
+### Образ и деплой
 
-## Как снести — руками в консоли
+| Ресурс OpenTofu | Что это | Идентификатор |
+|---|---|---|
+| `aws_ecr_repository.insight_bot` + `aws_ecr_lifecycle_policy.insight_bot` | хранилище образов: теги `sha-<12>` неизменяемые, хранятся последние 10, неотмеченные — 1 день, сканирование при загрузке | `insight-bot` |
+| `aws_iam_openid_connect_provider.github` | доверие к GitHub Actions (без ключей) | `token.actions.githubusercontent.com` |
+| `aws_iam_role.deploy` + `aws_iam_role_policy.deploy` | роль GitHub Actions: push в ECR, запись `/insight-bot/IMAGE_TAG`, запуск `deploy.sh` на сервере через SSM. Доверяет **только** workflow из `master` этого репозитория (неизменяемый subject с id владельца и репозитория) | `insight-bot-deploy` |
 
-`tofu destroy` **не предлагать**: он снова упрётся в ту же нехватку прав `s3:GetBucketPolicy`,
-из-за которой apply и развалился (политика провижинера в консоли отставала от
-`iam/provisioner-policy.json`), а состояние существует только в одной копии вне git. Пять ресурсов
-быстрее и надёжнее удалить вручную. Порядок важен — IAM не даёт удалить то, на что ещё ссылаются:
+Переменные репозитория для workflow (не секреты): `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`, `INSTANCE_ID`.
 
-1. **IAM → Roles → `insight-bot-instance`** → вкладка Permissions → отсоединить
-   `AmazonSSMManagedInstanceCore` и удалить встроенную политику (она читала SSM-параметры
-   `/insight-bot/*` и писала в бакет бэкапов).
-2. **IAM → Roles** → у роли убрать instance profile, затем **удалить instance profile**
-   `insight-bot-instance`. В консоли профиль не показан отдельным разделом — он удаляется вместе
-   с ролью, если создавался консолью; здесь он создан OpenTofu, поэтому может потребоваться
-   `aws iam delete-instance-profile --instance-profile-name insight-bot-instance`.
-3. **Удалить роль** `insight-bot-instance`.
-4. **S3 → `vb-insight-bot-backups-apne1`** → бакет **версионируемый**, поэтому сначала Empty
-   (удаляет и все версии, и delete-маркеры), и только потом Delete. Непустой версионируемый
-   бакет не удаляется, и это самая частая заминка в этом списке.
-5. **EC2 → Security Groups → `sg-01cb82a6578c17200`** → удалить. Дефолтный VPC `vpc-cef1fea9`
-   **не трогать** — он принадлежит аккаунту, а не этому проекту.
+### Резервные копии
 
-Отдельного бюджетного стража `insight-bot-monthly` создать не успели, удалять нечего. Личный
-бюджет аккаунта на $20/мес с оповещением на почту владельца существует с 2024 года и к этому
-проекту не относится — его оставить.
+| Ресурс OpenTofu | Что это | Идентификатор |
+|---|---|---|
+| `aws_s3_bucket.backups` (+ `public_access_block`, `server_side_encryption_configuration`, `versioning`, `lifecycle_configuration`) | ежедневный `pg_dump` в `pg_dump/`, хранение 35 дней (и текущие, и старые версии); там же состояние OpenTofu | `vb-insight-bot-backups-apne1` |
 
-## Проверка, что ничего не осталось
+### Параметры SSM (`/insight-bot/*`)
 
-```
-aws ec2 describe-instances --region ap-northeast-1 \
-  --filters Name=tag:Project,Values=insight-bot --query 'Reservations[].Instances[].InstanceId'
-aws iam list-roles --query "Roles[?RoleName=='insight-bot-instance'].RoleName"
-aws s3api list-buckets --query "Buckets[?Name=='vb-insight-bot-backups-apne1'].Name"
-aws ec2 describe-security-groups --region ap-northeast-1 \
-  --group-ids sg-01cb82a6578c17200
-```
+| Параметр | Кто пишет |
+|---|---|
+| `SITE_ADDRESS`, `WEB_BASE_URL`, `WEB_COOKIE_SECURE`, `CLIENT_IP_HEADER` | **OpenTofu** (`aws_ssm_parameter.web`, `web.tf`) — руками не менять |
+| `IMAGE_TAG` | `scripts/push-image.sh` и GitHub Actions — после каждого успешного push |
+| `POSTGRES_PASSWORD` (SecureString) | создан один раз 2026-11-03, сгенерирован, нигде не напечатан |
+| `TELEGRAM_BOT_TOKEN` (SecureString) | владелец |
+| `TELEGRAM_BOT_USERNAME`, `ADMIN_TG_USER_ID`, `TELEGRAM_SERVICE_CHAT_ID` | заданы 2026-11-03 по ответам владельца |
 
-Первые три должны вернуть пустые списки, последняя — ошибку `InvalidGroup.NotFound`.
+### Расходы
+
+| Ресурс OpenTofu | Что это | Идентификатор |
+|---|---|---|
+| `aws_budgets_budget.monthly[0]` | письмо владельцу при расходе > 18 $ за месяц (факт и прогноз) | `insight-bot-monthly` |
+
+Ожидаемо ≈ 16.5 $ в месяц (`COST-PLAN.md`).
+
+## Защиты от случайной потери данных
+
+- **Сервер:** `disable_api_termination = true`; корневой диск при удалении сервера **не**
+  удаляется (`delete_on_termination = false`); OpenTofu игнорирует изменения `ami` и `user_data`
+  (новый образ Amazon Linux или правка скриптов не пересоздают и не перезапускают сервер).
+- **Elastic IP:** `prevent_destroy` — tofu не даст его освободить (адрес сайта и все ссылки
+  поменялись бы).
+- **ECR:** `force_delete = false` — репозиторий с образами не удалится, пока в нём есть образы.
+- **Бакет:** версионируется; непустой бакет `tofu destroy` не удалит.
+
+## Если всё это действительно нужно снести
+
+Только по решению владельца. Порядок:
+
+1. Свежий дамп и проверка его восстановления (RUNBOOK §6) — лента ликвидаций второй раз не
+   скачивается.
+2. Снять защиты в коде: `disable_api_termination = false`, убрать `prevent_destroy` у EIP,
+   `force_delete = true` у ECR; `tofu apply`.
+3. `tofu destroy` — показать план владельцу до применения.
+4. Отдельно вручную: оставшийся диск `insight-bot-root` (EC2 → Volumes) и бакет (сначала
+   скачать нужные дампы; бакет хранит и само состояние tofu — удалять последним).
+
+История: до 2026-11-03 этот файл описывал пять ресурсов, оставшихся от незавершённой IB-013, и
+как их снести вручную. 2026-11-03 их не снесли, а **импортировали** в OpenTofu (IB-073), и на
+них построен нынешний сервер.
