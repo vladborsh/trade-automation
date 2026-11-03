@@ -8,6 +8,7 @@ import { ReactionService } from '../../src/news/reaction.service';
 import { MAX_VENUE_CALLS_PER_PASS } from '../../src/news/reaction-prices';
 import { BinanceWeightTracker } from '../../src/venues/binance/binance-weight.tracker';
 import type { PerpRest } from '../../src/venues/binance/perp.rest';
+import { BinanceRestError } from '../../src/venues/binance/rest.base';
 import { WEIGHT_CEILING_1M } from '../../src/web/market/universe-summary.service';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
@@ -33,7 +34,15 @@ const DAY = Date.UTC(2026, 5, 1);
 const MIN = 60_000;
 const LATER = DAY + 10 * 3_600_000; // well past every horizon of a story at DAY + 10m
 /** The canonical id and Binance's spelling deliberately differ, so a request by the id is caught. */
-const config = { symbols: [{ id: 'BTCUSDT', binance_perp: 'BTCUSDT_PERP_SPELLING' }] } as unknown as AppConfigService;
+const config = {
+  symbols: [
+    { id: 'BTCUSDT', binance_perp: 'BTCUSDT_PERP_SPELLING' },
+    // in the universe, but the venue no longer knows the spelling (a delisted contract)
+    { id: 'DEADUSDT', binance_perp: 'DEADUSDT' },
+  ],
+} as unknown as AppConfigService;
+/** The venue's real answer for an unknown symbol (test/fixtures/binance/fapi-klines-invalid-symbol.json). */
+const invalidSymbol = () => new BinanceRestError('/fapi/v1/klines', 400, 'Bad Request', -1121, 'Invalid symbol.');
 
 const priceAt = (openTime: number) => 100 * 1.001 ** ((openTime - DAY) / MIN);
 
@@ -43,6 +52,8 @@ interface StubOptions {
   /** Ignore endTime and return this many extra bars after it, priced absurdly. */
   extraAfterEnd?: number;
   fail?: boolean;
+  /** Throw this for a symbol instead of answering (null = answer normally). */
+  errorFor?: (symbol: string) => Error | null;
 }
 
 function stubPerp(opts: StubOptions = {}) {
@@ -51,6 +62,8 @@ function stubPerp(opts: StubOptions = {}) {
     klinesRange: async (symbol: string, startTime: number, endTime: number, limit: number): Promise<BinanceRestKline[]> => {
       calls.push({ symbol, startTime, endTime, limit });
       if (opts.fail) throw new Error('Binance REST /fapi/v1/klines failed: 503 Service Unavailable');
+      const error = opts.errorFor?.(symbol);
+      if (error) throw error;
       const rows: BinanceRestKline[] = [];
       const last = endTime + (opts.extraAfterEnd ?? 0) * MIN;
       for (let t = startTime; t <= last && rows.length < limit + (opts.extraAfterEnd ?? 0); t += MIN) {
@@ -87,13 +100,13 @@ maybeDescribe('IB-097 reaction job: Postgres for news, on-demand Binance klines 
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
-  const story = async (id: string, at: number) => {
+  const story = async (id: string, at: number, symbol = 'BTCUSDT') => {
     await db.query(
       `insert into raw_news (id, source, url, title, published_at, fetched_at, url_hash, title_hash)
        values ($1,'decrypt',$2,'BTC moves',$3,$3,$4,$5)`,
       [id, `https://x/${id}`, new Date(at), `u-${id}`, `t-${id}`],
     );
-    await db.query(`insert into news_assets (news_id, symbol, via, matched) values ($1,'BTCUSDT','ticker','BTC')`, [id]);
+    await db.query(`insert into news_assets (news_id, symbol, via, matched) values ($1,$2,'ticker','X')`, [id, symbol]);
   };
   const reset = async () => {
     await db.query('delete from news_reactions', []);
@@ -181,6 +194,50 @@ maybeDescribe('IB-097 reaction job: Postgres for news, on-demand Binance klines 
     expect(ok.calls).toHaveLength(3);
     expect((await row('n1', '4h')).refused).toBeNull();
   });
+
+  it('-1121 "Invalid symbol" is stored as the PERMANENT refusal symbol_unavailable and never asked again', async () => {
+    await story('d1', DAY + 10 * MIN, 'DEADUSDT');
+    const { perp, calls } = stubPerp({ errorFor: (s) => (s === 'DEADUSDT' ? invalidSymbol() : null) });
+    const pass = await service(perp).tick(LATER);
+    expect(pass?.symbolUnavailable).toBe(3);
+    expect(pass?.deferred.venueError).toBe(0);
+    for (const h of ['15m', '1h', '4h']) {
+      expect(await row('d1', h)).toMatchObject({ refused: 'symbol_unavailable', return_pct: null, symbol_spelling: 'DEADUSDT' });
+    }
+    await service(perp).tick(LATER + 5 * MIN);
+    expect(calls).toHaveLength(3); // the second pass did not ask again
+  });
+
+  it('any OTHER 400 (here -1100) is not a refusal: no row, retried', async () => {
+    await story('d1', DAY + 10 * MIN, 'DEADUSDT');
+    const other = new BinanceRestError('/fapi/v1/klines', 400, 'Bad Request', -1100, 'Illegal characters found in parameter.');
+    const pass = await service(stubPerp({ errorFor: () => other }).perp).tick(LATER);
+    expect(pass?.deferred.venueError).toBe(3);
+    const rows = await db.query<{ n: number }>(`select count(*)::int n from news_reactions`, []);
+    expect(rows[0].n).toBe(0);
+  });
+
+  it('101 stories on a delisted symbol no longer block a valid one (they used to spend the cap every pass)', async () => {
+    // 101 delisted stories, all OLDER than the valid one, so they come first in every pass
+    for (let i = 0; i < 101; i++) await story(`d${i}`, DAY + i * 1000, 'DEADUSDT');
+    await story('valid', DAY + 200 * 1000);
+    const now = DAY + 200 * 1000 + 16 * MIN; // only the 15m windows have closed
+    const { perp, calls } = stubPerp({ errorFor: (s) => (s === 'DEADUSDT' ? invalidSymbol() : null) });
+
+    const first = await service(perp).tick(now);
+    expect(first?.venueCalls).toBe(MAX_VENUE_CALLS_PER_PASS); // 100 delisted answers, each now a stored refusal
+    expect(first?.symbolUnavailable).toBe(100);
+
+    const second = await service(perp).tick(now + 5 * MIN);
+    // the 101st delisted one and the valid one: the cap is no longer spent on answers that cannot change
+    expect(second?.venueCalls).toBe(2);
+    expect((await row('valid', '15m')).refused).toBeNull();
+    expect(Number((await row('valid', '15m')).return_pct)).toBeGreaterThan(0);
+
+    const third = await service(perp).tick(now + 10 * MIN);
+    expect(third?.venueCalls).toBe(0);
+    expect(calls).toHaveLength(102);
+  }, 60_000);
 
   it(`101 pending measurements → ${MAX_VENUE_CALLS_PER_PASS} calls in the pass; the rest wait, unwritten`, async () => {
     // 101 stories, each tagged once; only the 15m horizon is closed at `now`, so 101 measurements

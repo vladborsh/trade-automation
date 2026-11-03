@@ -1,4 +1,5 @@
 import { HttpException, Logger } from '@nestjs/common';
+import { BINANCE_INVALID_SYMBOL } from '../../venues/binance/rest.base';
 import { BinanceHttpError, type BinanceRestKline } from '@trade-automation/binance-client';
 import type { WebCandle, WebMarket, WebTimeframe } from '@trade-automation/contracts';
 import { BinanceWeightTracker } from '../../venues/binance/binance-weight.tracker';
@@ -75,8 +76,8 @@ export const PERP_TAIL_WEIGHT = 1;
 /** `/api/v3/klines` (Binance docs: 2 at any `limit`). */
 export const SPOT_PAGE_WEIGHT = 2;
 
-/** Binance's code for an unknown symbol, on both fapi and api. */
-const INVALID_SYMBOL = -1121;
+/** Binance's code for an unknown symbol, on both fapi and api (one definition: venues/binance/rest.base.ts). */
+const INVALID_SYMBOL = BINANCE_INVALID_SYMBOL;
 
 export interface CandlesServiceOptions {
   futuresBaseUrl: string;

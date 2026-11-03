@@ -34,7 +34,14 @@ export type RefusalReason =
   | 'window_not_covered'
   | 'no_price_at_anchor'
   | 'no_price_at_horizon'
-  | 'no_venue_spelling';
+  | 'no_venue_spelling'
+  /**
+   * IB-097: the venue answered the price request with -1121 "Invalid symbol" (it does not know the
+   * spelling, e.g. a delisted contract). Permanent, unlike every other venue error: retrying would
+   * spend the per-pass call cap on an answer that cannot change. Set by the service, not by
+   * `computeReaction`, because only the venue's answer can tell.
+   */
+  | 'symbol_unavailable';
 
 /**
  * How far the publisher's date may precede our first sight before a reaction is refused.

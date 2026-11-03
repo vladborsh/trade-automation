@@ -4,6 +4,7 @@ import { DB, type Db } from '../db/db.port';
 import { othersInWindow, pendingReactions, saveReaction, type PriceScope } from '../db/pg/reaction-reads';
 import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { PerpRest } from '../venues/binance/perp.rest';
+import { isInvalidSymbol } from '../venues/binance/rest.base';
 import { WEIGHT_CEILING_1M } from '../web/market/universe-summary.service';
 import { computeReaction, HORIZONS, reactionWindow, type Horizon, type Reaction } from './reaction';
 import {
@@ -24,6 +25,8 @@ export interface ReactionPass {
   refused: number;
   /** Left pending with NO row written, for the next pass: over the call cap, over the weight ceiling, or a venue error. */
   deferred: { callCap: number; weightCeiling: number; venueError: number };
+  /** Stored as the permanent refusal `symbol_unavailable`: the venue answered -1121 "Invalid symbol". */
+  symbolUnavailable: number;
 }
 
 /**
@@ -38,7 +41,11 @@ export interface ReactionPass {
  * refusal that needs no price has been ruled out (stale story, no spelling, open window), so an
  * article that refuses anyway costs nothing. Weight and call shape are in `reaction-prices.ts`.
  *
- * **A failure to ask is not a refusal.** A venue error, the per-pass cap or the shared weight ceiling
+ * **One venue answer IS a refusal: -1121 "Invalid symbol"** (`isInvalidSymbol`: HTTP 400 AND that
+ * code, never any 400). It is stored as `symbol_unavailable`, so a delisted spelling stops spending
+ * the call cap; otherwise enough of them, pending oldest-first, would starve every valid reaction.
+ *
+ * **Any other failure to ask is not a refusal.** A venue error, the per-pass cap or the shared weight ceiling
  * (`WEIGHT_CEILING_1M`, the same one the on-demand reads respect) writes NO row. A stored refusal is
  * permanent (`pendingReactions` re-offers only `window_not_closed`), so saving one here would turn
  * a network blip into a reaction that is never measured. With no row the article stays pending and
@@ -85,6 +92,7 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
     const pass: ReactionPass = {
       venueCalls: 0, venueWeight: 0, measured: 0, refused: 0,
       deferred: { callCap: 0, weightCeiling: 0, venueError: 0 },
+      symbolUnavailable: 0,
     };
     try {
       for (const horizon of HORIZONS) {
@@ -131,12 +139,14 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
       if (reaction.refused === 'window_not_covered' && scope !== null) {
         const bars = await this.fetchBars(scope, window, now, pass);
         if (bars === null) continue; // no row: still pending, asked again next pass
-        reaction = computeReaction({
-          ...base,
-          windowCovered: windowCoverage(bars, window.from, window.to).covered,
-          priceAtAnchor: closeAtOrBefore(bars, window.from),
-          priceAtHorizon: closeAtOrBefore(bars, window.to),
-        });
+        reaction = bars === 'symbol_unavailable'
+          ? { ...reaction, returnPct: null, refused: 'symbol_unavailable' }
+          : computeReaction({
+            ...base,
+            windowCovered: windowCoverage(bars, window.from, window.to).covered,
+            priceAtAnchor: closeAtOrBefore(bars, window.from),
+            priceAtHorizon: closeAtOrBefore(bars, window.to),
+          });
       }
 
       await saveReaction(db, item.newsId, item.symbol, scope ?? this.unknownScope(item.symbol), reaction);
@@ -145,10 +155,13 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
     }
   }
 
-  /** The window's closed 1m bars from the venue, or null when the pass must not or could not ask. */
+  /**
+   * The window's closed 1m bars from the venue; `'symbol_unavailable'` when the venue says it does
+   * not know the symbol (-1121, a permanent answer); null when the pass must not or could not ask.
+   */
   private async fetchBars(
     scope: PriceScope, window: { from: Date; to: Date }, now: number, pass: ReactionPass,
-  ): Promise<ReactionBar[] | null> {
+  ): Promise<ReactionBar[] | 'symbol_unavailable' | null> {
     if (pass.venueCalls >= MAX_VENUE_CALLS_PER_PASS) {
       pass.deferred.callCap += 1;
       return null;
@@ -166,6 +179,11 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
       const rows = await this.perp.klinesRange(scope.spelling, request.startTime, request.endTime, request.limit);
       return closedBars(barsFromKlines(rows), now);
     } catch (error) {
+      if (isInvalidSymbol(error)) {
+        pass.symbolUnavailable += 1;
+        return 'symbol_unavailable';
+      }
+      // any other 4xx/5xx or network error: no row, retried next pass
       pass.deferred.venueError += 1;
       this.logger.warn(`klines for ${scope.spelling} failed, no row written, retried next pass — ${(error as Error).message}`);
       return null;
