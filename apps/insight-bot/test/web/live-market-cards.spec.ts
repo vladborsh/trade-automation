@@ -4,7 +4,7 @@ import { WebMarketCardsResponseSchema } from '@trade-automation/contracts';
 import type { FetchLike } from '../../src/venues/binance/rest.base';
 import { liveDominance, liveMarketCards } from '../../src/web/market/live-market-cards';
 import { CoinMarketRowSchema, FngPayloadSchema, GlobalPayloadSchema } from '../../src/web/market/market-cards.payloads';
-import { COINGECKO_TTL_MS, MarketCardsService } from '../../src/web/market/market-cards.service';
+import { COINGECKO_TTL_MS, FNG_DAYS, FNG_TTL_MS, MarketCardsService } from '../../src/web/market/market-cards.service';
 
 /**
  * The market cards read live (2026-10-24). The fixtures are real venue answers, so a renamed
@@ -101,10 +101,25 @@ describe('MarketCardsService', () => {
     expect(calls.filter((u) => u.includes('/fng/'))).toHaveLength(1); // its own, longer window
   });
 
-  it('asks alternative.me for eight days and CoinGecko for exactly our coins', async () => {
+  it('IB-102: still ONE alternative.me request per FNG_TTL_MS, however many pages read the card', async () => {
+    let now = NOW;
+    const { impl, calls } = fakeFetch();
+    const service = new MarketCardsService({ fngBaseUrl: 'https://f', coingeckoBaseUrl: 'https://cg', fetchImpl: impl, now: () => now });
+    // the market page, the instrument page and rule R7 all read through cards(): ten reads in one window
+    await Promise.all(Array.from({ length: 10 }, () => service.cards(COINS)));
+    now += FNG_TTL_MS - 1;
+    await service.cards([]);
+    expect(calls.filter((u) => u.includes('/fng/'))).toHaveLength(1);
+    now += 2;
+    await service.cards([]);
+    expect(calls.filter((u) => u.includes('/fng/'))).toHaveLength(2); // the next window: one more, not one per read
+  });
+
+  it('asks alternative.me for 31 days (IB-102: the gauge line rides the same request) and CoinGecko for exactly our coins', async () => {
     const { impl, calls } = fakeFetch();
     await new MarketCardsService({ fngBaseUrl: 'https://f/', coingeckoBaseUrl: 'https://cg/', fetchImpl: impl, now: () => NOW }).cards(COINS);
-    expect(calls).toContain('https://f/fng/?limit=8');
+    expect(calls).toContain(`https://f/fng/?limit=${FNG_DAYS}`);
+    expect(FNG_DAYS).toBe(31);
     expect(calls).toContain('https://cg/api/v3/global');
     expect(calls.find((u) => u.includes('/coins/markets'))).toBe(
       'https://cg/api/v3/coins/markets?vs_currency=usd&ids=bitcoin%2Cethereum%2Csolana&per_page=3',

@@ -39,6 +39,20 @@ describe('fearGreedCard', () => {
     expect(without.weekAgo).toBeNull();
   });
 
+  it('IB-102: history is the published days, oldest first, ending with now; a missed day stays missing', () => {
+    const card = fearGreedCard([fg('2026-10-12', 69), fg('2026-10-10', 44, 'Neutral'), fg('2026-10-09', 40, 'Fear')])!;
+    expect(card.history.map((r) => r.day)).toEqual(['2026-10-09', '2026-10-10', '2026-10-12']); // 10-11 never published
+    expect(card.history.at(-1)).toEqual(card.now);
+  });
+
+  it('IB-102: history keeps at most the newest 31 days', () => {
+    const days = Array.from({ length: 40 }, (_, i) => fg(shiftDay('2026-10-01', i), 50, 'Neutral'));
+    const card = fearGreedCard(days)!;
+    expect(card.history).toHaveLength(31);
+    expect(card.history[0].day).toBe(shiftDay('2026-10-01', 9));
+    expect(card.history.at(-1)!.day).toBe(card.now.day);
+  });
+
   it('copes with a single day, and with none at all', () => {
     expect(fearGreedCard([fg('2026-10-12', 69)])).toMatchObject({ previous: null, weekAgo: null });
     expect(fearGreedCard([])).toBeNull();

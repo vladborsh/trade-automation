@@ -1,3 +1,4 @@
+import { FEAR_GREED_HISTORY_MAX } from '@trade-automation/contracts';
 import type {
   WebBtcVsTopCard,
   WebDominanceCard,
@@ -47,6 +48,8 @@ export function fearGreedCard(points: readonly WebFearGreedPoint[]): WebFearGree
     now: { day: now.day, value: now.value, classification: now.classification },
     previous: previous && { day: previous.day, value: previous.value, classification: previous.classification },
     weekAgo: weekAgo && { day: weekAgo.day, value: weekAgo.value, classification: weekAgo.classification },
+    // IB-102: the published days themselves, oldest first, ending with `now`; a missed day stays missing
+    history: byDay.slice(-FEAR_GREED_HISTORY_MAX).map((p) => ({ day: p.day, value: p.value, classification: p.classification })),
     source: 'alternative.me',
   };
 }

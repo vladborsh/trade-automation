@@ -29,8 +29,12 @@ import {
 export const COINGECKO_TTL_MS = 120_000;
 export const FNG_TTL_MS = 600_000;
 const TIMEOUT_MS = 10_000;
-/** Eight published days: today, yesterday and a week ago, which is what the card's sentences say. */
-const FNG_DAYS = 8;
+/**
+ * IB-102: 31 published days, in the SAME one request under the SAME key and TTL: the card's
+ * sentences (today, the previous day, a week ago) plus the gauge's 30-day line. Still one request per
+ * FNG_TTL_MS (≈ 0.1/min, 144 a day) whatever the page count; 31 small rows instead of 8 in memory.
+ */
+export const FNG_DAYS = 31;
 
 export interface MarketCardsOptions {
   fngBaseUrl: string;
