@@ -74,4 +74,14 @@ describe('PositioningBlockComponent (IB-090)', () => {
     expect(liq.getAttribute('title')).toBe('not enough history yet (under 20 days)');
     expect(el.textContent).toContain('crowd in longs');
   });
+
+  it('the OI in USD is ONE venue\'s, and says so: «OI Binance» in the tap text and the legend (Architect, 2026-11-03)', () => {
+    const el = render(PositioningBlockComponent, { positioning: positioningFixture as unknown as WebPositioningResponse, period: '24h' });
+    const btc = [...el.querySelectorAll('app-pos-quadrant circle')].find((c) => c.querySelector('title')?.textContent === 'BTC') as SVGElement;
+    btc.dispatchEvent(new MouseEvent('click'));
+    TestBed.tick();
+    const text = el.querySelector('app-pos-quadrant')?.textContent ?? '';
+    expect(text).toContain('BTC: price −1.20 %, open interest +3.40 %, OI Binance $8.1B');
+    expect(text).toContain('dot size: OI Binance in USD');
+  });
 });
