@@ -22,6 +22,18 @@ describe('IB-085 contracts', () => {
     expect(parsed.rows.map((r) => r.quadrant)).toEqual(['new_shorts', 'long_closing', 'new_longs', 'flat']);
   });
 
+  it('IB-090: oiUsd is the dot size — a level in USD, null when the venue did not answer, never negative', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fixture = require('./fixtures/positioning.24h.json');
+    const parsed = WebPositioningResponseSchema.parse(fixture);
+    expect(parsed.rows.map((r) => r.oiUsd)).toEqual([8.1e9, 5.2e9, 9.4e8, 3.1e8]);
+    const row = (oiUsd: unknown) => ({ ...fixture, rows: [{ ...fixture.rows[0], oiUsd }] });
+    expect(WebPositioningResponseSchema.safeParse(row(null)).success).toBe(true);
+    expect(WebPositioningResponseSchema.safeParse(row(-1)).success).toBe(false);
+    const { oiUsd: _dropped, ...without } = fixture.rows[0];
+    expect(WebPositioningResponseSchema.safeParse({ ...fixture, rows: [without] }).success).toBe(false); // absence is stated, not omitted
+  });
+
   it('the example KPI fixture parses, with all six tiles in order', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const parsed = WebKpisResponseSchema.parse(require('./fixtures/kpis.json'));

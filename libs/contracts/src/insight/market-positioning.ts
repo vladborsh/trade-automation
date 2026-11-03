@@ -69,6 +69,12 @@ export const WebPositioningRowSchema = z.object({
   lsTopPosition: WebPositioningCellSchema,
   /** USD liquidated over the period (crypto rows, our tape). */
   liqUsd: WebPositioningCellSchema,
+  /**
+   * IB-090: the coin's CURRENT open interest in USD (Binance `sumOpenInterestValue`, the last point
+   * of the period's series) — the quadrant sizes its dot by it. Null when the venue did not answer;
+   * a level, so it has no rarity and is not a cell.
+   */
+  oiUsd: z.number().nonnegative().nullable(),
   quadrant: WebPositioningQuadrantSchema.nullable(),
   signal: WebPositioningSignalSchema.nullable(),
 });
