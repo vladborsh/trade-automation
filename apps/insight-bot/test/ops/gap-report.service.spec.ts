@@ -51,7 +51,9 @@ describe('GapReportService', () => {
       transaction: async (fn) => fn(db as never),
     };
     const sender = { send: async () => { order.push('sent'); return true; } } as unknown as TelegramSender;
-    await new GapReportService(config, db, sender, new BinanceWeightTracker()).runForDay('2026-09-27');
+    // IB-094: sending is opt-in now; this case is about the order WHEN it sends
+    const sending = { env: { get: (k: string) => (k === 'OPS_TELEGRAM_ALERTS' ? true : '3') } } as never;
+    await new GapReportService(sending, db, sender, new BinanceWeightTracker()).runForDay('2026-09-27');
     expect(order).toEqual(['stored', 'sent']);
   });
 

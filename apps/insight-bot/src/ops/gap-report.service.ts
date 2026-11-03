@@ -22,6 +22,8 @@ const CHECK_MS = 60_000;
 export class GapReportService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(GapReportService.name);
   private readonly silenceMin: number;
+  /** IB-094: false (the default) logs the report instead of posting it; it is stored either way. */
+  private readonly pushToTelegram: boolean;
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastDayRun: string | null = null;
 
@@ -32,6 +34,7 @@ export class GapReportService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly weight: BinanceWeightTracker,
   ) {
     this.silenceMin = Number(config.env.get('WATCHDOG_SILENCE_MIN'));
+    this.pushToTelegram = config.env.get('OPS_TELEGRAM_ALERTS') === true;
   }
 
   onApplicationBootstrap(): void {
@@ -83,7 +86,8 @@ export class GapReportService implements OnApplicationBootstrap, OnModuleDestroy
     this.weight.resetPeak();
     const text = renderGapReport(report);
     this.logger.log(`gap report ${day}: ${report.clean ? 'clean' : 'NOT clean'}`);
-    await this.telegram.send(text);
+    if (this.pushToTelegram) await this.telegram.send(text);
+    else this.logger.log(`OPS_TELEGRAM_ALERTS=false — would have sent to Telegram: ${text.replace(/\n/g, ' | ')}`);
     return report;
   }
 

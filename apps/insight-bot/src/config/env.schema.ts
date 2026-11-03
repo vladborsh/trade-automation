@@ -71,6 +71,10 @@ export const EnvSchema = z.object({
 
   // §6.2 — the watchdog alerts once when a stream has been silent for this many minutes.
   WATCHDOG_SILENCE_MIN: z.coerce.number().int().positive().default(3),
+  // IB-094 (owner ruling 2026-11-03): the watchdog and the daily gap report do NOT post to Telegram
+  // unless this is explicitly true; when false they log what they would have sent. Detection and
+  // storage are unchanged. The calendar notifier is not behind this switch (it shares only the sender).
+  OPS_TELEGRAM_ALERTS: booleanFlag(false),
   // brief §1 — the per-user daily alert budget the gate enforces (§8.5).
   ALERTS_PER_DAY: z.coerce.number().int().positive().default(3),
 
