@@ -46,7 +46,7 @@ writes its outages there as stream `binance-perp:oi-ls-5m`), `symbols`, partitio
   **0** venue calls.
 - **Rows.** 40 symbols × 288 slots/day × 5 series = 57 600 rows/day ≈ 21 M/year. **Bytes per row are
   not known.** WD-010 measures them: the boot backfill writes 30 days at once, so `pg_total_relation_size`
-  of the two tables ÷ 30 gives bytes/day right away. WD-010 reports GB/year against the box's 20 GB.
+  of the two tables ÷ 30 gives bytes/day right away. WD-010 reports GB/year against the box's 50 GB disk (owner ruling 2026-11-02).
   If the figure does not fit with room to spare, that is a retention decision for the owner, not a
   silent cut.
 
