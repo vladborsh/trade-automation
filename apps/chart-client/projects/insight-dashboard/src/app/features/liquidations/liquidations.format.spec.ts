@@ -1,7 +1,6 @@
 import type { WebLiquidationWindowStats } from '@trade-automation/contracts';
 import {
-  basisLine, cellIntensity, escalation, formatRatio, formatUsd, hasAnyFlow, hasRatio, leaning,
-  sideShare, sortByUrgency,
+  basisLine, escalation, formatRatio, formatUsd, hasRatio, leaning, sideShare,
 } from './liquidations.format';
 
 const side = (usd: number, ratio: number | null = null, median: number | null = null) => ({ usd, ratio, median });
@@ -57,7 +56,6 @@ describe('escalation', () => {
 
   it('A MISSING RATIO IS NOT A CALM ONE', () => {
     expect(escalation(null)).toBe('none');
-    expect(cellIntensity(side(5_000, null))).toBe(0);
   });
 });
 
@@ -107,30 +105,5 @@ describe('hasRatio', () => {
     expect(hasRatio(side(1, 2))).toBe(true);
     expect(hasRatio(side(1, null))).toBe(false);
     expect(hasRatio(side(0, 0))).toBe(true); // a measured zero is a ratio
-  });
-});
-
-describe('sortByUrgency', () => {
-  const coin = (symbol: string, ratio: number | null, usd: number) => ({
-    symbol, windows: [win({ total: side(usd, ratio) })],
-  });
-
-  it('floats a cascade to the top', () => {
-    const sorted = sortByUrgency([coin('A', 1.2, 10), coin('B', 8, 5), coin('C', 2, 99)]);
-    expect(sorted.map((c) => c.symbol)).toEqual(['B', 'C', 'A']);
-  });
-
-  it('keeps coins with no ratio, ordered by money, below those that have one', () => {
-    // On a thin tape "no norm yet" is most of the list; dropping those rows would empty the
-    // table exactly when it is the only thing telling a member what is happening.
-    const sorted = sortByUrgency([coin('A', null, 10), coin('B', 1.1, 1), coin('C', null, 900)]);
-    expect(sorted.map((c) => c.symbol)).toEqual(['B', 'C', 'A']);
-  });
-});
-
-describe('hasAnyFlow', () => {
-  it('hides a coin with nothing in any window, and keeps one with something', () => {
-    expect(hasAnyFlow({ windows: [win(), win()] })).toBe(false);
-    expect(hasAnyFlow({ windows: [win(), win({ total: side(1) })] })).toBe(true);
   });
 });

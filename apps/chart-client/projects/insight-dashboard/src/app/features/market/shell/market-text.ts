@@ -1,5 +1,5 @@
 import {
-  WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod,
+  WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightBlockLine, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../../i18n/keys';
 import { formatUsd } from '../../liquidations/liquidations.format';
@@ -150,4 +150,27 @@ export function basisView(b: WebInsightBasis | null, _nowSec: number): { key: St
       from: b.from === null ? '—' : new Date(b.from * 1000).toISOString().slice(0, 10),
     },
   };
+}
+
+/** The words of an insight: its nested keys translated INTO its params first (a side, a quadrant). */
+export function wordInsight(v: Pick<InsightView, 'key' | 'params' | 'nested'>, t: (key: StringKey, params?: Record<string, string | number>) => string): string {
+  const params: Record<string, string | number> = { ...v.params };
+  for (const [name, key] of Object.entries(v.nested)) params[name] = t(key);
+  return t(v.key, params);
+}
+
+export type ConclusionView =
+  | { kind: 'statement'; view: InsightView }
+  | { kind: 'neutral'; key: StringKey; basis: { key: StringKey; params: Record<string, string | number> } };
+
+/**
+ * D15 — a block's one conclusion line: its best statement, or the neutral line with the REASON
+ * (nothing unusual over the period / not enough history / no rules for this block yet) and the
+ * basis it stood on. Null before insights have loaded: the line is absent, not «nothing unusual».
+ */
+export function conclusionView(line: WebInsightBlockLine | null | undefined, nowSec: number): ConclusionView | null {
+  if (!line) return null;
+  if (line.statement) return { kind: 'statement', view: insightView(line.statement, nowSec) };
+  if (!line.neutral) return null;
+  return { kind: 'neutral', key: `insight.neutral.${line.neutral.reason}` as StringKey, basis: basisView(line.neutral.basis ?? null, nowSec) };
 }

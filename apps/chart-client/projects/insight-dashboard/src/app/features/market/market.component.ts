@@ -2,15 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signa
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import type {
-  WebInsightsResponse, WebKpisResponse, WebLiquidationsOverviewResponse, WebMarketCardsResponse, WebMarketPeriod,
+  WebInsightBlock, WebInsightBlockLine, WebInsightsResponse, WebKpisResponse, WebLiquidationsOverviewResponse, WebMarketCardsResponse, WebMarketPeriod,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
 import { LoaderComponent } from '../../ui/loader.component';
-import { LiquidationsFeedComponent } from '../liquidations/liquidations-feed.component';
-import { LiquidationsNowComponent } from '../liquidations/liquidations-now.component';
-import { LiquidationsWhereComponent } from '../liquidations/liquidations-where.component';
+import { LiquidationsBlockComponent } from '../liquidations/liquidations-block.component';
 import { coinPrice, fearGreedBand } from './market.adapter';
 import { asOfUtc, capUsd, fractionPercent, fractionSigned, percent, signed } from './market.format';
 import { BlockScheduler, liveAge, type BlockId } from './shell/block-scheduler';
@@ -48,7 +46,7 @@ import { PeriodSwitchComponent } from './shell/period-switch.component';
   selector: 'app-market',
   standalone: true,
   imports: [
-    LiquidationsNowComponent, LiquidationsWhereComponent, LiquidationsFeedComponent, LoaderComponent,
+    LiquidationsBlockComponent, LoaderComponent,
     PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent,
   ],
   templateUrl: './market.component.html',
@@ -67,14 +65,12 @@ export class MarketComponent {
   readonly liquidations = signal<WebLiquidationsOverviewResponse | null>(null);
   readonly kpis = signal<WebKpisResponse | null>(null);
   readonly insights = signal<WebInsightsResponse | null>(null);
-  readonly minUsd = signal(100_000);
   /** Ticks every second so the live indicator's age moves without a request. */
   readonly nowMs = signal(Date.now());
   /** The scheduler's per-block state, re-read whenever it changes. */
   private readonly blocks = signal(new Map<BlockId, { error: string | null; loaded: boolean }>());
 
   readonly firstLoad = computed(() => this.cards() === null && !this.blockError('caps'));
-  readonly liquidationsFirstLoad = computed(() => this.liquidations() === null && !this.blockError('liquidations'));
   readonly nowSec = computed(() => Math.floor(this.nowMs() / 1000));
   readonly age = computed(() => liveAge(this.scheduler.snapshot(), this.nowMs()));
   readonly staleTitle = computed(() => {
@@ -103,10 +99,12 @@ export class MarketComponent {
     );
     // A response is kept only if the parameters it was asked with are still the page's: a period
     // switch during a request must not show the old period's answer under the new label.
+    // IB-089: the page reads only `block`; the IB-038 feed is asked for one row (its min and
+    // limit are the server's to clamp), not thirty nobody draws.
     this.scheduler.register('liquidations', async () => {
-      const [minUsd, period] = [this.minUsd(), this.period()];
-      const r = await this.api.liquidationsOverview(minUsd, 30, period);
-      if (minUsd === this.minUsd() && period === this.period()) this.liquidations.set(r);
+      const period = this.period();
+      const r = await this.api.liquidationsOverview(100_000, 1, period);
+      if (period === this.period()) this.liquidations.set(r);
     });
     this.scheduler.register('kpis', async () => this.kpis.set(await this.api.marketKpis()));
     this.scheduler.register('insights', async () => {
@@ -135,9 +133,9 @@ export class MarketComponent {
     this.scheduler.refresh('insights');
   }
 
-  onMinUsdChange(value: number): void {
-    this.minUsd.set(value);
-    this.scheduler.refresh('liquidations');
+  /** D15: that block's one conclusion line from the insights response. */
+  insightLine(block: WebInsightBlock): WebInsightBlockLine | null {
+    return this.insights()?.blocks.find((b) => b.block === block) ?? null;
   }
 
   /** This block's error, shown on this block only (D13). */

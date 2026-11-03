@@ -1,0 +1,8 @@
+/* Dark-terminal palette (AGENTS.md). The block's last word: set apart by a rule above it. */
+:host { display: block; }
+.conclusion { border-top: 1px solid #30363d; padding-top: 8px; margin-top: 4px; }
+p { margin: 0; }
+.sentence { font-size: 13px; color: #c9d1d9; font-weight: 600; }
+.neutral .sentence { font-weight: normal; color: #8b949e; }
+.basis { font-size: 12px; color: #8b949e; }
+.link { display: inline-flex; align-items: center; min-height: 40px; font-size: 13px; color: #58a6ff; }

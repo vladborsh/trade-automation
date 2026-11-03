@@ -1,0 +1,14 @@
+/* Dark-terminal palette (AGENTS.md). A long liquidated is price falling: red; a short: green. */
+:host { display: block; min-width: 0; }
+.chart { display: block; overflow: visible; }
+.short { fill: #26a69a; }
+.long { fill: #ef5350; }
+.hit { fill: transparent; cursor: pointer; }
+.bucket.partial .short, .bucket.partial .long { opacity: 0.45; }
+.bucket.selected .hit { fill: rgb(201 209 217 / 8%); }
+.axis { stroke: #30363d; stroke-width: 1; }
+.norm { stroke: #c9d1d9; stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
+.callout { fill: #d29922; font-size: 12px; text-anchor: middle; }
+.tick { fill: #8b949e; font-size: 12px; text-anchor: middle; }
+p { margin: 4px 0 0; font-size: 12px; }
+.muted { color: #8b949e; }

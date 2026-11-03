@@ -1,0 +1,19 @@
+/* Dark-terminal palette (AGENTS.md). */
+:host { display: block; min-width: 0; }
+.block { border: 1px solid #30363d; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: #0d1117; color: #c9d1d9; }
+h2 { margin: 0; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
+h3 { margin: 0 0 6px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+p { margin: 0; font-size: 12px; }
+.totals { font-size: 13px; }
+.warn { color: #d29922; }
+.muted { color: #8b949e; }
+.outside { color: #8b949e; margin-top: 6px; }
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.panel { min-width: 0; }
+.panel.wide { grid-column: 1 / -1; }
+
+/* D16: one column under 768 px. */
+@media (max-width: 767px) {
+  .block { padding: 10px; }
+  .charts { grid-template-columns: minmax(0, 1fr); }
+}

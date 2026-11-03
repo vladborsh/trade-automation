@@ -22,6 +22,18 @@
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 
+<!-- IB-089: the liquidation block (charts + its conclusion line), right after «Главное сейчас» (design §1) -->
+@if (liquidations(); as liq) {
+  <app-liquidations-block [overview]="liq" [period]="period()" [line]="insightLine('liquidations')" [nowSec]="nowSec()" />
+} @else if (!blockError('liquidations')) {
+  <section class="card wide">
+    <app-loader variant="block" [label]="t('market.loadingLiquidations')" />
+  </section>
+}
+@if (blockError('liquidations'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+}
+
 @if (live()) {
   <p class="muted">{{ t('market.live') }}</p>
 }
@@ -108,30 +120,7 @@
     }
   </section>
 
-  @if (liquidations(); as liq) {
-    <!-- IB-038's card, mounted as dev-2 wrote it: input-only, nothing wrapped around it. -->
-    <app-liquidations-now [windows]="liq.windows" [venues]="liq.venues" [unmappedRows]="liq.unmappedRows" />
-  }
 </div>
-
-@if (liquidationsFirstLoad()) {
-  <section class="card wide">
-    <app-loader variant="block" [label]="t('market.loadingLiquidations')" />
-  </section>
-}
-@if (blockError('liquidations'); as message) {
-  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
-}
-@if (liquidations(); as liq) {
-  <div id="liquidations"></div>
-  <app-liquidations-where [coins]="liq.perCoin" [venues]="liq.venues" />
-  <app-liquidations-feed
-    [events]="liq.feed"
-    [minUsd]="liq.feedMinUsd"
-    [venues]="liq.venues"
-    (minUsdChange)="onMinUsdChange($event)"
-  />
-}
 
 @if (blockError('caps'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>

@@ -1,0 +1,31 @@
+/* Dark-terminal palette (AGENTS.md). Longs (price falling) red to the left, shorts green to the right. */
+:host { display: block; min-width: 0; }
+h3 { margin: 0 0 6px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+p { margin: 0; font-size: 12px; }
+.muted, .legend { color: #8b949e; }
+.legend { text-align: center; margin-bottom: 4px; }
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: 'coin left right' 'coin amounts amounts';
+  column-gap: 2px;
+  align-items: center;
+}
+.coin { grid-area: coin; color: #c9d1d9; text-decoration: none; font-size: 13px; }
+.coin:hover { color: #26a69a; text-decoration: underline; }
+.track { height: 12px; display: flex; background: rgb(48 54 61 / 35%); }
+.track.left { grid-area: left; justify-content: flex-end; }
+.track.right { grid-area: right; justify-content: flex-start; }
+.bar { display: block; height: 100%; }
+.bar.long { background: #ef5350; }
+.bar.short { background: #26a69a; }
+.amounts { grid-area: amounts; text-align: center; color: #8b949e; font-variant-numeric: tabular-nums; }
+.long-text { color: #ef5350; }
+.short-text { color: #26a69a; }
+.verdict { margin-left: 6px; font-weight: 600; }
+
+/* D16 phone: the coin link is a ≥ 40 px touch target. */
+@media (max-width: 767px) {
+  .coin { display: inline-flex; align-items: center; min-height: 40px; min-width: 40px; }
+}

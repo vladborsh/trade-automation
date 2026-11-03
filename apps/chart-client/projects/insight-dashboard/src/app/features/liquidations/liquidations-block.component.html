@@ -1,0 +1,40 @@
+@let v = view();
+@let block = overview().block;
+<section class="block" id="liquidations">
+  <h2>{{ t('liq.block.title') }}</h2>
+  <p class="totals">{{ t('liq.block.totals', { period: periodLabel(), usd: v.totals.usd, long: v.totals.long, short: v.totals.short, events: v.totals.events }) }}</p>
+  @if (say(v.present); as present) {
+    <p class="muted">{{ present }}</p>
+  }
+  @if (say(v.venues); as missing) {
+    <p class="warn">{{ missing }}</p>
+  }
+
+  <div class="charts">
+    <div class="panel">
+      <h3>{{ block.hourly.bucketSec > 3600 ? t('liq.hourly.title4h') : t('liq.hourly.title') }}</h3>
+      <app-liq-hourly [hourly]="block.hourly" [note]="say(v.hourlyNote)" />
+    </div>
+    <div class="panel">
+      <app-liq-where [perCoin]="block.perCoin" [note]="say(v.whereNote)" />
+      @if (say(v.tradfi); as tradfi) {
+        <p class="outside">{{ tradfi }}</p>
+      }
+      @if (say(v.unknown); as unknown) {
+        <p class="outside">{{ unknown }}</p>
+      }
+    </div>
+    <div class="panel wide">
+      <app-liq-large
+        [large]="block.large"
+        [minUsd]="block.largeMinUsd"
+        [from]="v.window.from"
+        [to]="v.window.to"
+        [bucketSec]="block.hourly.bucketSec"
+        [note]="say(v.largeNote)"
+      />
+    </div>
+  </div>
+
+  <app-block-conclusion [line]="line()" [period]="period()" />
+</section>

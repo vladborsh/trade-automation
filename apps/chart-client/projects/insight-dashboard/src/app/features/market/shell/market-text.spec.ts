@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WEB_INSIGHT_KEYS, WEB_KPI_IDS } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { basisView, fundingPct, insightView, kpiView, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
+import { basisView, conclusionView, fundingPct, insightView, kpiView, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -83,5 +83,30 @@ describe('insightView', () => {
   it('a block anchor stays an anchor; no basis is said in words', () => {
     expect(insightView({ ...(st as object), link: { anchor: 'positioning' } } as never, 1).link).toEqual({ anchor: 'positioning' });
     expect(basisView(null, 1).key).toBe('insight.basis.none');
+  });
+});
+
+describe('conclusionView — D15, one line per block', () => {
+  const basis = { window: '24h', venues: ['binance'], sampleWindows: 0, observedWindows: 0, from: 1_793_714_400 };
+  it('a statement is worded with its nested keys translated into it', () => {
+    const line = { block: 'liquidations', neutral: null, statement: {
+      ruleId: 'R1', block: 'liquidations', key: 'insight.liq_surge', params: { side: 'long', ratio: 3.2, usd: 4.2e6 },
+      rarity: 0.97, magnitude: 3.2, basis, link: { anchor: 'liquidations' },
+    } } as never;
+    const v = conclusionView(line, 0);
+    expect(v?.kind).toBe('statement');
+    const said = wordInsight((v as unknown as { view: never }).view, (k, p) => (k === 'insight.side.long' ? 'LONGS' : `${k}|${JSON.stringify(p)}`));
+    expect(said).toContain('"side":"LONGS"');
+    expect(said).toContain('"ratio":"×3.2"');
+  });
+  it('a neutral line says WHY, with its basis; every reason is translated', () => {
+    for (const reason of ['nothing_unusual', 'insufficient_history', 'no_rules'] as const) {
+      const v = conclusionView({ block: 'liquidations', statement: null, neutral: { key: 'insight.neutral', reason, basis } } as never, 0);
+      expect(v).toMatchObject({ kind: 'neutral', key: `insight.neutral.${reason}`, basis: { key: 'insight.basis' } });
+      for (const t of [ru, en]) expect((t as Record<string, string>)[`insight.neutral.${reason}`]).toBeTruthy();
+    }
+  });
+  it('before insights load there is no line at all (not «nothing unusual»)', () => {
+    expect(conclusionView(null, 0)).toBeNull();
   });
 });

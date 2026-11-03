@@ -1,0 +1,43 @@
+<h3>{{ t('liq.large.title') }} <span class="muted">{{ t('liq.large.threshold', { usd: usd(minUsd()) }) }}</span></h3>
+@if (cards().length === 0) {
+  <p class="muted">{{ t('liq.large.empty', { usd: usd(minUsd()) }) }}</p>
+} @else {
+  @let l = layout();
+  <svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height" [attr.width]="width()" [attr.height]="height"
+       role="img" [attr.aria-label]="t('liq.large.legend')">
+    <line class="axis" x1="0" [attr.x2]="width()" [attr.y1]="l.axisY" [attr.y2]="l.axisY" />
+    @for (b of l.bubbles; track b.event.time + b.event.symbol + b.event.venue + b.event.usd) {
+      <circle [class]="b.event.side" [attr.cx]="b.cx" [attr.cy]="b.cy" [attr.r]="b.r" (click)="open(b.event)">
+        <title>{{ b.event.base }} · {{ side(b.event) }} · {{ usd(b.event.usd) }} · {{ time(b.event) }}</title>
+      </circle>
+    }
+    @for (tick of l.ticks; track tick.time) {
+      <text class="tick" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
+    }
+  </svg>
+  <p class="muted">{{ t('liq.large.legend') }}</p>
+  <ol class="cards" [class.expanded]="expanded()">
+    @for (card of cards(); track card.event.time + card.event.symbol + card.event.venue + card.event.usd; let i = $index) {
+      <li [class.extra]="i >= limit">
+        <a class="card" [routerLink]="card.link.commands" [queryParams]="card.link.queryParams" [attr.data-side]="card.event.side">
+          <span class="head"><strong>{{ card.event.base }}</strong> · <span class="side">{{ side(card.event) }}</span> · <strong class="amount">{{ usd(card.event.usd) }}</strong></span>
+          <span class="meta">{{ time(card.event) }} · {{ card.event.venue }}</span>
+          @if (card.xMedian; as x) {
+            <span class="ctx">{{ word(x) }}</span>
+          }
+          @if (card.series; as s) {
+            <span class="ctx series">{{ word(s) }}</span>
+          }
+        </a>
+      </li>
+    }
+  </ol>
+  @if (cards().length > limit) {
+    <button type="button" class="more" (click)="expanded.set(!expanded())">
+      {{ expanded() ? t('liq.large.showFewer') : t('liq.large.showAll', { count: cards().length }) }}
+    </button>
+  }
+}
+@if (note(); as n) {
+  <p class="muted">{{ n }}</p>
+}
