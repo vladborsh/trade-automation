@@ -6,6 +6,7 @@ import type {
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
+import type { StringKey } from '../../i18n/keys';
 import { LoaderComponent } from '../../ui/loader.component';
 import { LiquidationsFeedComponent } from '../liquidations/liquidations-feed.component';
 import { LiquidationsNowComponent } from '../liquidations/liquidations-now.component';
@@ -76,6 +77,10 @@ export class MarketComponent {
   readonly liquidationsFirstLoad = computed(() => this.liquidations() === null && !this.blockError('liquidations'));
   readonly nowSec = computed(() => Math.floor(this.nowMs() / 1000));
   readonly age = computed(() => liveAge(this.scheduler.snapshot(), this.nowMs()));
+  readonly staleTitle = computed(() => {
+    const late = this.age()?.stale ?? [];
+    return late.length === 0 ? null : this.t('market.liveStale', { blocks: late.map((id) => this.t(`market.block.${id}` as StringKey)).join(', ') });
+  });
 
   readonly fearGreed = computed(() => this.cards()?.fearGreed ?? null);
   readonly dominance = computed(() => this.cards()?.dominance ?? null);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WEB_INSIGHT_KEYS, WEB_KPI_IDS } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { basisView, fundingPct, insightView, kpiView, parsePeriod, periodAvailability, signedPct } from './market-text';
+import { basisView, fundingPct, insightView, kpiView, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -37,6 +37,16 @@ describe('kpiView', () => {
     expect(kpiView(tile('fear_greed', 26, -11))).toMatchObject({ value: '26', delta: { text: '−11', tone: 'down' } });
     expect(kpiView(tile('btc_funding', 0.0001, null))).toMatchObject({ value: '0.0100 %', delta: null });
     expect(kpiView(tile('btc_oi', null, null))).toMatchObject({ value: null, delta: null });
+  });
+
+  it('the 24h move is said ONCE: a context that restates the delta is dropped, one that adds something stays', () => {
+    const withCtx = (delta: number, ctx: unknown, basis = '24h') => ({ ...(tile('market_cap', 2.62e12, delta) as object), deltaBasis: basis, context: ctx }) as never;
+    const change = (deltaPct: number) => ({ key: 'kpi.ctx.change', params: { deltaPct } });
+    expect(kpiView(withCtx(-2.58, change(-2.58)))).toMatchObject({ delta: { text: '−2.58 %', overKey: 'kpi.over.24h' }, context: null });
+    expect(restatesDelta(withCtx(-2.58, change(-2.58), '7d'))).toBe(false); // a different period is information
+    expect(restatesDelta(withCtx(-2.58, change(1.2)))).toBe(false); // a different number is information
+    expect(kpiView(withCtx(2.03, { key: 'kpi.ctx.liq_side', params: { side: 'short', sharePct: 71 } })).context).toEqual({ key: 'kpi.ctx.liq.short', params: { share: 71 } });
+    for (const t of [ru, en]) for (const k of ['kpi.over.24h', 'kpi.over.7d']) expect((t as Record<string, string>)[k]).toBeTruthy();
   });
 
   it('every tile has a label in both languages', () => {

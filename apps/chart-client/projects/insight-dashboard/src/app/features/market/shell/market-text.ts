@@ -49,7 +49,8 @@ export const toneOf = (v: number | null): Tone | null => (v === null ? null : v 
 export interface KpiView {
   labelKey: StringKey;
   value: string | null;
-  delta: { text: string; tone: Tone } | null;
+  /** The move, with the period it is over (`kpi.over.24h`): said once, here (IB-089 follow-up). */
+  delta: { text: string; tone: Tone; overKey: StringKey } | null;
   context: { key: StringKey; params: Record<string, string | number> } | null;
   source: { name: string; url: string | null };
 }
@@ -71,10 +72,21 @@ export function kpiView(tile: WebKpiTile): KpiView {
   return {
     labelKey: `kpi.${tile.id}` as StringKey,
     value,
-    delta: deltaText === null ? null : { text: deltaText, tone: toneOf(d) as Tone },
-    context: kpiContext(tile),
+    delta: deltaText === null ? null : { text: deltaText, tone: toneOf(d) as Tone, overKey: `kpi.over.${tile.deltaBasis}` as StringKey },
+    context: restatesDelta(tile) ? null : kpiContext(tile),
     source: tile.source,
   };
+}
+
+/**
+ * TL 2026-11-03: «−2.58 %» then «за 24ч −2.58 %» says one thing twice. A `kpi.ctx.change` line is
+ * dropped only when it is the delta again (same 24h basis, same number at the shown precision); a
+ * context that adds something — a band, a side, a share — stays.
+ */
+export function restatesDelta(tile: WebKpiTile): boolean {
+  const c = tile.context;
+  if (c?.key !== 'kpi.ctx.change' || tile.delta === null || tile.deltaBasis !== '24h') return false;
+  return Math.abs(Number(c.params['deltaPct']) - tile.delta) < 0.005;
 }
 
 function kpiContext(tile: WebKpiTile): KpiView['context'] {

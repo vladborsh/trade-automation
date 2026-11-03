@@ -8,7 +8,7 @@
         <p class="value muted">{{ t('kpi.unavailable') }}</p>
       }
       @if (tile.view.delta; as delta) {
-        <p class="delta" [class.up]="delta.tone === 'up'" [class.down]="delta.tone === 'down'">{{ delta.text }}</p>
+        <p class="delta" [class.up]="delta.tone === 'up'" [class.down]="delta.tone === 'down'">{{ delta.text }} <span class="over">{{ t(delta.overKey) }}</span></p>
       }
       @if (tile.view.context; as ctx) {
         <p class="ctx">{{ t(ctx.key, ctx.params) }}</p>

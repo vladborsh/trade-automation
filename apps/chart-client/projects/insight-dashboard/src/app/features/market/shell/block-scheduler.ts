@@ -143,13 +143,18 @@ export class BlockScheduler {
 }
 
 /**
- * D13: "live · обновлено N с назад" is the OLDEST block's age; amber past 2× ITS cadence.
- * A block not yet loaded does not count (the page shows its own skeleton); none loaded → null.
+ * D13 as amended by the TL (2026-11-03): "live · обновлено N с назад" is the age of the NEWEST
+ * successful update — a block refreshed 2 s ago next to «118 с назад» read as a stale page — and it
+ * turns amber when ANY loaded block is past 2× ITS OWN cadence; `stale` names those blocks for the
+ * title. A block not yet loaded does not count (the page shows its own skeleton); none loaded → null.
  */
-export function liveAge(blocks: ReadonlyArray<{ intervalMs: number; state: Pick<BlockState, 'lastOkAt'> }>, nowMs: number): { seconds: number; stale: boolean } | null {
+export function liveAge(
+  blocks: ReadonlyArray<{ id: BlockId; intervalMs: number; state: Pick<BlockState, 'lastOkAt'> }>,
+  nowMs: number,
+): { seconds: number; stale: BlockId[] } | null {
   const loaded = blocks.filter((b) => b.state.lastOkAt !== null);
   if (loaded.length === 0) return null;
-  const oldest = loaded.reduce((a, b) => ((b.state.lastOkAt as number) < (a.state.lastOkAt as number) ? b : a));
-  const ageMs = Math.max(0, nowMs - (oldest.state.lastOkAt as number));
-  return { seconds: Math.floor(ageMs / 1000), stale: ageMs > 2 * oldest.intervalMs };
+  const age = (b: (typeof loaded)[number]) => Math.max(0, nowMs - (b.state.lastOkAt as number));
+  const newestMs = Math.min(...loaded.map(age));
+  return { seconds: Math.floor(newestMs / 1000), stale: loaded.filter((b) => age(b) > 2 * b.intervalMs).map((b) => b.id) };
 }

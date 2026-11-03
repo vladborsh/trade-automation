@@ -6,8 +6,8 @@
     [nowSec]="nowSec()"
     (periodChange)="onPeriodChange($event)"
   />
-  <!-- D13: the oldest block's age, amber when one block is more than two of its intervals behind -->
-  <p class="live-age" [class.stale]="age()?.stale" aria-live="off">
+  <!-- D13 (TL 2026-11-03): the newest update's age; amber, with the late blocks named, when any is past 2× its cadence -->
+  <p class="live-age" [class.stale]="staleTitle() !== null" [attr.title]="staleTitle()" aria-live="off">
     @if (age(); as a) { {{ t('market.liveAge', { seconds: a.seconds }) }} } @else { {{ t('market.liveWaiting') }} }
   </p>
 </header>

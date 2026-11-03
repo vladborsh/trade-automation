@@ -86,14 +86,23 @@ describe('BlockScheduler', () => {
 });
 
 describe('liveAge', () => {
-  it('the OLDEST loaded block, amber past 2× its own cadence', () => {
-    const blocks = [
-      { intervalMs: 10_000, state: { lastOkAt: 95_000 } },
-      { intervalMs: 60_000, state: { lastOkAt: 50_000 } },
-      { intervalMs: 120_000, state: { lastOkAt: null } },
-    ];
-    expect(liveAge(blocks, 100_000)).toEqual({ seconds: 50, stale: false });
-    expect(liveAge(blocks, 171_000)).toEqual({ seconds: 121, stale: true });
-    expect(liveAge([{ intervalMs: 10_000, state: { lastOkAt: null } }], 1)).toBeNull();
+  const blocks = [
+    { id: 'liquidations' as const, intervalMs: 10_000, state: { lastOkAt: 95_000 } },
+    { id: 'kpis' as const, intervalMs: 60_000, state: { lastOkAt: 50_000 } },
+    { id: 'caps' as const, intervalMs: 120_000, state: { lastOkAt: null } },
+  ];
+
+  it('the NEWEST update is the age shown: a fresh block is not hidden behind a slow one', () => {
+    expect(liveAge(blocks, 100_000)).toEqual({ seconds: 5, stale: [] });
+  });
+
+  it('amber when ANY block is past 2× its own cadence, and it is named', () => {
+    // liquidations 26 s old > 2 × 10 s; kpis 71 s old < 2 × 60 s
+    expect(liveAge(blocks, 121_000)).toEqual({ seconds: 26, stale: ['liquidations'] });
+    expect(liveAge(blocks, 171_000)?.stale).toEqual(['liquidations', 'kpis']);
+  });
+
+  it('nothing loaded yet is no age at all, not «0 s»', () => {
+    expect(liveAge([{ id: 'kpis', intervalMs: 10_000, state: { lastOkAt: null } }], 1)).toBeNull();
   });
 });
