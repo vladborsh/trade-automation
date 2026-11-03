@@ -50,6 +50,11 @@ resource "aws_instance" "insight_bot" {
   vpc_security_group_ids = [aws_security_group.insight_bot.id]
   iam_instance_profile   = aws_iam_instance_profile.insight_bot.name
 
+  # The root volume is the only copy of the liquidation tape since the last daily pg_dump, and a
+  # venue never serves liquidations again. So a terminate must be deliberate (flip this first),
+  # and even then the volume survives it (delete_on_termination = false below). RUNBOOK §10.
+  disable_api_termination = true
+
   # IMDSv2 only.
   metadata_options {
     http_endpoint               = "enabled"
@@ -61,7 +66,9 @@ resource "aws_instance" "insight_bot" {
     volume_type = "gp3"
     volume_size = var.root_volume_gb
     encrypted   = true
-    tags        = { Name = "insight-bot-root" }
+    # Survives a terminate: an orphan 50 GB volume (≈ 4.80 USD/month) is cheaper than the tape.
+    delete_on_termination = false
+    tags                  = { Name = "insight-bot-root" }
   }
 
   user_data_replace_on_change = false # changing the bootstrap must not recycle the database volume
