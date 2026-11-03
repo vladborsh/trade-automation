@@ -3,9 +3,9 @@ output "instance_id" {
   value       = aws_instance.insight_bot.id
 }
 
-output "image_ref" {
-  description = "The GHCR image the box pulls (ECR is not used — COST-PLAN.md)."
-  value       = var.image_ref
+output "ecr_repository_url" {
+  description = "Where images are pushed (push-image.sh, CI) and pulled from; tags are sha-<12>, immutable."
+  value       = aws_ecr_repository.insight_bot.repository_url
 }
 
 output "backup_bucket" {
@@ -14,6 +14,6 @@ output "backup_bucket" {
 }
 
 output "deploy_role_arn" {
-  description = "Role GitHub Actions assumes; null when the OIDC inputs were left empty."
-  value       = local.deploy_role_enabled ? aws_iam_role.deploy[0].arn : null
+  description = "Role GitHub Actions assumes (repo variable AWS_DEPLOY_ROLE_ARN)."
+  value       = aws_iam_role.deploy.arn
 }

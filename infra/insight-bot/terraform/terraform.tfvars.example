@@ -5,11 +5,8 @@
 backup_bucket_name = "vb-insight-bot-backups-apne1"   # the user's name; add a short suffix if taken
 budget_alert_email = ""                              # where the 18 USD alert goes; empty = no budget
 
-# Leave both empty to skip the CI deploy role; fill them to let GitHub Actions assume it.
-# github_oidc_provider_arn = "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
-# deploy_role_github_sub   = "repo:<owner>/<repo>:ref:refs/heads/master"
-
 # region                = "ap-northeast-1"
 # instance_type         = "t4g.small"
 # root_volume_gb        = 50
+# deploy_role_github_sub = "repo:vladborsh/trade-automation:ref:refs/heads/master"
 # backup_retention_days = 35

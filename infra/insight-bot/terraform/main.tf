@@ -76,7 +76,6 @@ resource "aws_instance" "insight_bot" {
     region         = var.region
     ssm_prefix     = var.ssm_parameter_prefix
     backup_bucket  = aws_s3_bucket.backups.bucket
-    image_ref      = var.image_ref
     compose_file   = file("${path.module}/../compose/docker-compose.yml")
     render_env_sh  = file("${path.module}/../scripts/render-env.sh")
     deploy_sh      = file("${path.module}/../scripts/deploy.sh")
@@ -92,7 +91,13 @@ resource "aws_instance" "insight_bot" {
   # replacement — the next plan would destroy the box and its root volume, which holds pgdata (the
   # liquidation tape a venue never serves again). OS updates happen on the box (dnf), not by
   # recreating it; a deliberate rebuild is `tofu apply -replace=aws_instance.insight_bot`.
+  #
+  # user_data is first-boot only: cloud-init runs it once per instance, and an in-place change is a
+  # stop + ModifyInstanceAttribute + start, which takes the box down and changes its public IP for
+  # nothing. So a later edit to any file inlined below (compose, scripts, systemd units) does not
+  # reach a running box through tofu: scripts/sync-box.sh copies them over SSM (RUNBOOK §3). The
+  # image tag never lived here after IB-083: it is in SSM /insight-bot/IMAGE_TAG (ECR design E10).
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
 }

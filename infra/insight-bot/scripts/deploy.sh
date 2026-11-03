@@ -1,42 +1,60 @@
 #!/usr/bin/env bash
-# What `ssm send-command` runs on the box (design §7 deploy path). Idempotent.
+# What `ssm send-command` runs on the box (design §7 deploy path; ECR design E5, E10). Idempotent.
 #
-#   deploy.sh <image-tag>     # e.g. deploy.sh sha-9f2c1ab   (default: latest)
+#   deploy.sh                 # deploys the tag in SSM /insight-bot/IMAGE_TAG
+#   deploy.sh sha-9f2c1ab4d0e1 # deploys this tag instead (a rollback, or a test)
 #
-# 1. render /opt/insight-bot/.env from SSM   2. log in to GHCR   3. pull   4. up -d   5. health check
+# 1. render /opt/insight-bot/.env from SSM   2. log in to ECR with the instance role   3. pull
+# 4. up -d   5. health check
+#
+# The image lives in the private ECR repository `insight-bot` in this account and region. Its URL
+# is derived here (account + region), not stored anywhere, and the tag is never `latest`: tags are
+# immutable `sha-<12>` (E2), so the tag in a deploy log names exactly one image.
 set -euo pipefail
 
-TAG="${1:-latest}"
 REGION="${AWS_REGION:-ap-northeast-1}"
+PREFIX="${SSM_PREFIX:-/insight-bot}"
 DIR=/opt/insight-bot
-IMAGE_REF="$(cat "$DIR/image-ref")"      # e.g. ghcr.io/<owner>/insight-bot:latest
-REGISTRY="${IMAGE_REF%%/*}"
-IMAGE_BASE="${IMAGE_REF%:*}"
+
+TAG="${1:-}"
+if [ -z "$TAG" ]; then
+  TAG="$(aws ssm get-parameter --region "$REGION" --name "${PREFIX}/IMAGE_TAG" \
+    --query Parameter.Value --output text 2>/dev/null || true)"
+fi
+case "$TAG" in
+  sha-*) ;;
+  *)
+    echo "deploy.sh: refusing image tag '${TAG}' — give sha-<commit> or set ${PREFIX}/IMAGE_TAG (never latest)" >&2
+    exit 2
+    ;;
+esac
+
+ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
+IMAGE="${REGISTRY}/insight-bot:${TAG}"
 
 cd "$DIR"
 
 echo "==> rendering .env from SSM"
 AWS_REGION="$REGION" "$DIR/render-env.sh"
 
-# GHCR needs a read-only token (a GitHub PAT with `read:packages`), kept in SSM and rendered into
-# .env by the step above. A public package needs no login, so a missing token is not fatal.
-echo "==> registry login (${REGISTRY})"
-GHCR_TOKEN="$(grep -m1 '^GHCR_TOKEN=' "$DIR/.env" | cut -d= -f2- | tr -d "'" || true)"
-GHCR_USER="$(grep -m1 '^GHCR_USER=' "$DIR/.env" | cut -d= -f2- | tr -d "'" || true)"
-if [ -n "$GHCR_TOKEN" ]; then
-  printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" --username "${GHCR_USER:-token}" --password-stdin
-else
-  echo "    no GHCR_TOKEN in .env — assuming a public package"
-fi
+echo "==> registry login (${REGISTRY}, instance role)"
+aws ecr get-login-password --region "$REGION" | docker login "$REGISTRY" --username AWS --password-stdin >/dev/null
 
-echo "==> pulling ${IMAGE_BASE}:${TAG}"
-IMAGE="${IMAGE_BASE}:${TAG}"
+echo "==> pulling ${IMAGE}"
 grep -q '^IMAGE=' "$DIR/.env" && sed -i '/^IMAGE=/d' "$DIR/.env"
 printf "IMAGE='%s'\n" "$IMAGE" >>"$DIR/.env"
-docker compose pull
 
-echo "==> starting"
-docker compose up -d --remove-orphans
+# The Cloudflare tunnel runs only once its token exists (RUNBOOK §11). Without it, cloudflared
+# would exit and restart for ever, so it is not started at all.
+SERVICES=(postgres insight-bot)
+if grep -q '^TUNNEL_TOKEN=' "$DIR/cloudflared.env" 2>/dev/null; then
+  SERVICES+=(cloudflared)
+fi
+docker compose pull "${SERVICES[@]}"
+
+echo "==> starting: ${SERVICES[*]}"
+docker compose up -d "${SERVICES[@]}"
 
 echo "==> waiting for /health"
 for _ in $(seq 1 30); do

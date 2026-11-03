@@ -23,8 +23,19 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
 }
 
 data "aws_iam_policy_document" "instance" {
-  # No ECR statements: the image comes from GHCR with a read-only token kept in SSM below
-  # (COST-PLAN.md). The box's only AWS rights are its own parameters and its own backups.
+  # ECR design E5: pull only, from the one repository. GetAuthorizationToken cannot be scoped.
+  statement {
+    sid       = "EcrLogin"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "PullOwnImage"
+    actions   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"]
+    resources = [aws_ecr_repository.insight_bot.arn]
+  }
+
   statement {
     sid       = "ReadOwnSecrets"
     actions   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
@@ -61,24 +72,24 @@ resource "aws_iam_instance_profile" "insight_bot" {
 }
 
 # ---------------------------------------------------------------------------------------------
-# The deploy role GitHub Actions assumes (OIDC, no long-lived keys). Created only when the user
-# supplies their OIDC provider ARN and the repo subject; otherwise the deploy job authenticates
-# some other way and this stays absent.
+# CI's identity (ECR design E6): GitHub's OIDC provider and the role a workflow on master assumes.
+# No long-lived keys. Only one provider per URL may exist in an account; if one already exists it
+# is imported (imports.tf), not created twice.
 # ---------------------------------------------------------------------------------------------
-locals {
-  deploy_role_enabled = var.github_oidc_provider_arn != "" && var.deploy_role_github_sub != ""
+resource "aws_iam_openid_connect_provider" "github" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  # No thumbprint_list: AWS validates GitHub's certificate itself for this provider.
 }
 
 data "aws_iam_policy_document" "deploy_assume" {
-  count = local.deploy_role_enabled ? 1 : 0
-
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
     principals {
       type        = "Federated"
-      identifiers = [var.github_oidc_provider_arn]
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
     }
 
     condition {
@@ -96,10 +107,29 @@ data "aws_iam_policy_document" "deploy_assume" {
 }
 
 data "aws_iam_policy_document" "deploy" {
-  count = local.deploy_role_enabled ? 1 : 0
+  # E8: push the image (skipping a tag that already exists), name it in SSM, deploy it.
+  statement {
+    sid       = "EcrLogin"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
 
-  # The image is pushed to GHCR with GitHub's own token, so CI needs no AWS rights for the build.
-  # Its AWS role exists for one verb: run the deploy script on this one instance.
+  statement {
+    sid = "PushOwnImage"
+    actions = [
+      "ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage", "ecr:DescribeImages",
+    ]
+    resources = [aws_ecr_repository.insight_bot.arn]
+  }
+
+  # E10: the tag the box deploys. This one parameter only.
+  statement {
+    sid       = "NameTheImage"
+    actions   = ["ssm:PutParameter", "ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_parameter_prefix}/IMAGE_TAG"]
+  }
+
   statement {
     sid     = "RunDeployCommand"
     actions = ["ssm:SendCommand"]
@@ -117,14 +147,12 @@ data "aws_iam_policy_document" "deploy" {
 }
 
 resource "aws_iam_role" "deploy" {
-  count              = local.deploy_role_enabled ? 1 : 0
   name               = "insight-bot-deploy"
-  assume_role_policy = data.aws_iam_policy_document.deploy_assume[0].json
+  assume_role_policy = data.aws_iam_policy_document.deploy_assume.json
 }
 
 resource "aws_iam_role_policy" "deploy" {
-  count  = local.deploy_role_enabled ? 1 : 0
   name   = "insight-bot-deploy"
-  role   = aws_iam_role.deploy[0].id
-  policy = data.aws_iam_policy_document.deploy[0].json
+  role   = aws_iam_role.deploy.id
+  policy = data.aws_iam_policy_document.deploy.json
 }

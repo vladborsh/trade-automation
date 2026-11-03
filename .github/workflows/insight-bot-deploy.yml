@@ -1,27 +1,27 @@
-# IB-013 — build the arm64 image, push it to ECR, then have SSM run the box's deploy script
-# (design §7). Manual by default; the push trigger is commented out until the stack exists and the
-# user has approved deploys.
+# Build the arm64 insight-bot image, push it to ECR, name it in SSM, and have SSM run the box's
+# deploy script (architecture/ecr-image-2026-11-03.md E6, E8, E10). Manual only.
 #
-# The image goes to GHCR (ECR is dropped — infra/insight-bot/COST-PLAN.md), pushed with GitHub's
-# own GITHUB_TOKEN, so the build needs no AWS credentials at all. AWS is used for one verb: running
-# the deploy script on the box through SSM, via OIDC.
+# AWS identity: GitHub OIDC → the role insight-bot-deploy, which trusts workflows on master of this
+# repository only. No long-lived keys. The role may push to the one ECR repository, write the one
+# SSM parameter /insight-bot/IMAGE_TAG, and send the deploy command to the one instance.
+#
+# Tags are immutable `sha-<12-char commit>` (E2), never `latest`. A tag that already exists is not
+# rebuilt: the job deploys the existing image instead (redeploy / rollback of a commit).
+# The hand-run equivalent is infra/insight-bot/scripts/push-image.sh.
 #
 # Repository variables (no secrets):
 #   AWS_REGION            ap-northeast-1
-#   AWS_DEPLOY_ROLE_ARN   arn:aws:iam::<account>:role/insight-bot-deploy   (Terraform output)
-#   INSTANCE_ID           i-…                                             (Terraform output)
+#   AWS_DEPLOY_ROLE_ARN   arn:aws:iam::<account>:role/insight-bot-deploy   (tofu output deploy_role_arn)
+#   INSTANCE_ID           i-…                                             (tofu output instance_id)
 name: insight-bot deploy
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit or branch to build
+        description: Commit or branch to build (the workflow itself always runs from master)
         required: false
         default: master
-  # push:
-  #   branches: [master]
-  #   paths: ['apps/insight-bot/**', 'libs/**', 'infra/insight-bot/**', '.github/workflows/insight-bot-deploy.yml']
 
 concurrency:
   group: insight-bot-deploy
@@ -30,7 +30,6 @@ concurrency:
 permissions:
   id-token: write # OIDC to AWS
   contents: read
-  packages: write # push the image to GHCR
 
 jobs:
   deploy:
@@ -44,14 +43,10 @@ jobs:
       # the dispatch ran from), and the image tag must name what was built.
       - name: Resolve the built commit
         id: rev
-        run: echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          echo "tag=sha-${sha:0:12}" >>"$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -59,10 +54,28 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Does this tag already exist?
+        id: exists
+        run: |
+          if aws ecr describe-images --repository-name insight-bot \
+               --image-ids imageTag="${{ steps.rev.outputs.tag }}" >/dev/null 2>&1; then
+            echo "found=true" >>"$GITHUB_OUTPUT"
+            echo "${{ steps.rev.outputs.tag }} is already in ECR — deploying it without a rebuild"
+          else
+            echo "found=false" >>"$GITHUB_OUTPUT"
+          fi
+
       - uses: docker/setup-qemu-action@v3 # arm64 on an x86 runner
+        if: steps.exists.outputs.found == 'false'
       - uses: docker/setup-buildx-action@v3
+        if: steps.exists.outputs.found == 'false'
 
       - name: Build and push linux/arm64
+        if: steps.exists.outputs.found == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -70,11 +83,16 @@ jobs:
           platforms: linux/arm64
           push: true
           provenance: false
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/insight-bot:sha-${{ steps.rev.outputs.sha }}
-            ghcr.io/${{ github.repository_owner }}/insight-bot:latest
+          labels: org.opencontainers.image.revision=${{ steps.rev.outputs.sha }}
+          tags: ${{ steps.ecr.outputs.registry }}/insight-bot:${{ steps.rev.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # E10: the box deploys whatever this parameter names; a rollback is putting an older tag.
+      - name: Name the image in SSM
+        run: |
+          aws ssm put-parameter --name /insight-bot/IMAGE_TAG --type String \
+            --value "${{ steps.rev.outputs.tag }}" --overwrite >/dev/null
 
       # The box has no inbound port: the deploy runs through SSM (design §7, D11).
       - name: Run deploy.sh on the instance
@@ -84,8 +102,8 @@ jobs:
           command_id=$(aws ssm send-command \
             --instance-ids "${{ vars.INSTANCE_ID }}" \
             --document-name AWS-RunShellScript \
-            --comment "deploy sha-${{ steps.rev.outputs.sha }}" \
-            --parameters "commands=['/opt/insight-bot/deploy.sh sha-${{ steps.rev.outputs.sha }}']" \
+            --comment "deploy ${{ steps.rev.outputs.tag }}" \
+            --parameters "commands=['/opt/insight-bot/deploy.sh ${{ steps.rev.outputs.tag }}']" \
             --query 'Command.CommandId' --output text)
           echo "command_id=$command_id" >>"$GITHUB_OUTPUT"
           aws ssm wait command-executed --command-id "$command_id" --instance-id "${{ vars.INSTANCE_ID }}" || true

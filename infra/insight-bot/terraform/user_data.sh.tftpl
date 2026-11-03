@@ -67,11 +67,10 @@ chmod 0755 /opt/insight-bot/*.sh
 
 # Static facts the scripts read instead of hardcoding.
 printf '%s' "${backup_bucket}" >/opt/insight-bot/backup-bucket
-printf '%s' "${image_ref}" >/opt/insight-bot/image-ref
 printf 'AWS_REGION=%s\nSSM_PREFIX=%s\n' "${region}" "${ssm_prefix}" >/etc/profile.d/insight-bot.sh
 chmod 0644 /etc/profile.d/insight-bot.sh
 
 systemctl daemon-reload
 systemctl enable --now insight-bot-backup.timer
 
-echo "bootstrap done: run /opt/insight-bot/deploy.sh <tag> once the image is in ECR" >/opt/insight-bot/BOOTSTRAP-OK
+echo "bootstrap done: run /opt/insight-bot/deploy.sh once /insight-bot/IMAGE_TAG names an image in ECR" >/opt/insight-bot/BOOTSTRAP-OK

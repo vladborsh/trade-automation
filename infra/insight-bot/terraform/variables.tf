@@ -33,15 +33,6 @@ variable "backup_retention_days" {
   default     = 35
 }
 
-variable "image_ref" {
-  description = <<-EOT
-    The container image the box pulls, on GHCR (ECR is dropped: it bills per GB and GHCR is free
-    for this use — COST-PLAN.md). The deploy step overrides the tag per release.
-  EOT
-  type        = string
-  default     = "ghcr.io/vladborsh/insight-bot:latest"
-}
-
 variable "budget_alert_usd" {
   description = "AWS Budgets alerts the user above this monthly spend; 2 USD under the 20 cap."
   type        = number
@@ -66,16 +57,9 @@ variable "ssm_parameter_prefix" {
 
 variable "deploy_role_github_sub" {
   description = <<-EOT
-    The GitHub OIDC subject allowed to assume the deploy role, e.g.
-    "repo:<owner>/<repo>:ref:refs/heads/master". Empty disables the deploy role, which is the
-    default until the user decides how CI authenticates.
+    The GitHub OIDC subject allowed to assume the deploy role (ECR design E6): workflows on master
+    of this repository only.
   EOT
   type        = string
-  default     = ""
-}
-
-variable "github_oidc_provider_arn" {
-  description = "ARN of the account's existing GitHub OIDC provider; empty means create none and skip the deploy role."
-  type        = string
-  default     = ""
+  default     = "repo:vladborsh/trade-automation:ref:refs/heads/master"
 }
