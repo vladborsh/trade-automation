@@ -64,6 +64,13 @@ async function withFngHistory(page: Page): Promise<void> {
     route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...cards, fearGreed: { ...cards.fearGreed, history: SYNTHETIC_FNG_HISTORY } }) }));
 }
 
+async function openPositioning(page: Page, url = '/positioning?p=24h'): Promise<void> {
+  await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
+  await mockApi(page);
+  await page.goto(url);
+  await page.clock.runFor(2_000);
+  await expect(page.locator('app-pos-heat tbody tr').first()).toBeAttached();
+}
 async function openMarket(page: Page, setup?: (page: Page) => Promise<void>): Promise<void> {
   await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
   await mockApi(page);
@@ -190,8 +197,18 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     await info.attach('phone-390-fng.png', { body: await page.locator('#sentiment').screenshot(), contentType: 'image/png' });
   });
 
-  test('IB-090 heat table: scrolls in its own box with the ticker column pinned; every cell readable', async ({ page }) => {
+  test('IB-103 Market: the compact table — the five most unusual coins and «Full table →» with the period', async ({ page }) => {
     await openMarket(page);
+    const rows = page.locator('app-positioning-block app-pos-heat tbody tr');
+    await expect(rows).toHaveCount(5);
+    await expect(page.locator('app-positioning-block app-pos-quadrant')).toHaveCount(0); // the quadrant moved to /positioning
+    const link = page.locator('app-positioning-block a.full');
+    await expect(link).toHaveAttribute('href', '/positioning?p=24h');
+    expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+  });
+
+  test('IB-103 /positioning: the full table scrolls in its own box with the ticker pinned; a header tap sorts and writes the URL', async ({ page }, info) => {
+    await openPositioning(page);
     const box = page.locator('app-pos-heat .scroll');
     const rows = page.locator('app-pos-heat tbody tr');
     await expect(rows).toHaveCount(positioning.rows.length);
@@ -205,6 +222,13 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     const after = await page.locator('app-pos-heat tbody th').first().boundingBox();
     expect(after?.x).toBeCloseTo(before?.x ?? -1, 0); // pinned
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await box.evaluate((el) => { el.scrollLeft = 0; });
+    await page.locator('app-pos-heat thead th.coin button').click();
+    await page.clock.runFor(100);
+    await expect(page).toHaveURL(/sort=base&dir=asc/);
+    const tickers = await page.locator('app-pos-heat tbody th').allTextContents();
+    expect(tickers.map((t) => t.trim())).toEqual([...tickers.map((t) => t.trim())].sort());
+    await info.attach('phone-390-positioning.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   });
 
   test('IB-090 caps: CoinGecko credited beside the treemap; 4h says the source publishes no change', async ({ page }) => {
@@ -225,14 +249,20 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(sum).toBeCloseTo(bar, 0);
   });
 
-  test('IB-090 quadrant and treemap fit the phone and keep their aspect', async ({ page }) => {
+  test('IB-090 treemap fits the phone and keeps its aspect', async ({ page }) => {
     await openMarket(page);
-    for (const sel of ['app-pos-quadrant svg', 'app-caps-treemap svg']) {
-      const b = (await page.locator(sel).boundingBox())!;
-      expect(b.x + b.width).toBeLessThanOrEqual(390);
-      expect(b.height / b.width).toBeGreaterThan(0.6);
-    }
+    const b = (await page.locator('app-caps-treemap svg').boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+    expect(b.height / b.width).toBeGreaterThan(0.6);
+  });
+
+  test('IB-103 /positioning: the quadrant fits the phone, keeps its aspect and places every coin with both changes', async ({ page }) => {
+    await openPositioning(page);
+    const b = (await page.locator('app-pos-quadrant svg').boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+    expect(b.height / b.width).toBeGreaterThan(0.6);
     await expect(page.locator('app-pos-quadrant circle')).toHaveCount(positioning.rows.filter((r) => r.priceChangePct.value !== null && r.oiChangePct.value !== null).length);
+    await expect(page.locator('app-pos-quadrant')).toContainText('OI Binance');
   });
 
   test('one column: every card starts at the same left edge', async ({ page }) => {
@@ -254,6 +284,21 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
 
 test.describe('market page — desktop 1440×900 (IB-088)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('IB-103 /positioning desktop: a larger quadrant and the whole table, no page scroll', async ({ page }, info) => {
+    await openPositioning(page, '/positioning?p=24h&sort=oi&dir=desc');
+    // the quadrant lays out from its host's measured width (a ResizeObserver after the first render);
+    // the page clock is faked here, so let time run until the measurement lands
+    await expect.poll(async () => {
+      await page.clock.runFor(200);
+      return (await page.locator('app-pos-quadrant svg').boundingBox())!.height;
+    }, { timeout: 10_000 }).toBeGreaterThan(360); // the Market block capped it at 360
+    await expect(page.locator('app-pos-heat tbody tr').filter({ visible: true })).toHaveCount(positioning.rows.length);
+    const oi = await page.locator('app-pos-heat tbody tr').evaluateAll((trs) => trs.map((tr) => tr.querySelectorAll('td')[6]?.textContent?.trim()));
+    expect(oi.length).toBe(positioning.rows.length);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+    await info.attach('desktop-positioning.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+  });
 
   test('IB-102 desktop: the gauge and the 30-day line', async ({ page }, info) => {
     await openMarket(page, withFngHistory);

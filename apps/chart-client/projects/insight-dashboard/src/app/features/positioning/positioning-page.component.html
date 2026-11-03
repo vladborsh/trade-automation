@@ -1,0 +1,20 @@
+<header class="head">
+  <h1>{{ t('positioning.title') }}</h1>
+  <app-period-switch [period]="period()" (periodChange)="onPeriodChange($event)" />
+</header>
+<p class="intro">{{ t('positioning.page.intro') }}</p>
+@if (error(); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+}
+@if (data(); as d) {
+  <section class="panel">
+    <h2>{{ t('positioning.quadrant.title') }}</h2>
+    <app-pos-quadrant [rows]="d.rows" [maxHeight]="quadrantMaxHeight" />
+  </section>
+  <section class="panel">
+    <h2>{{ t('positioning.table.title') }}</h2>
+    <app-pos-heat [rows]="d.rows" [sort]="sort()" (sortChange)="onSortChange($event)" />
+  </section>
+} @else if (!error()) {
+  <app-loader variant="block" [label]="t('market.loading')" />
+}

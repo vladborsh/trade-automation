@@ -8,7 +8,13 @@ thead th { color: #8b949e; font-weight: normal; font-size: 12px; }
 th button {
   background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left;
 }
-th button:hover { color: #c9d1d9; }
+th button:hover:not(:disabled) { color: #c9d1d9; }
+th button:disabled { cursor: default; }
+/* IB-103: the per-column «sort by rarity» button, small beside the header */
+.by-rarity { margin-left: 4px; padding: 0 3px; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; }
+.by-rarity.on { border-color: #d29922; color: #d29922; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td, tbody tr:hover .coin { background-color: rgb(48 54 61 / 40%); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .coin { position: sticky; left: 0; background: #0d1117; z-index: 1; }
 .coin a { color: #c9d1d9; text-decoration: none; }

@@ -24,8 +24,10 @@ export class PosQuadrantComponent {
 
   readonly rows = input.required<readonly WebPositioningRow[]>();
   readonly width = hostWidth(342);
+  /** IB-103: the Market block caps it at 360 px; the positioning page lets it grow. */
+  readonly maxHeight = input(360);
   /** D16: the quadrant keeps its aspect ratio on a phone (4:3, capped). */
-  readonly height = computed(() => Math.round(Math.min(360, this.width() * 0.75)));
+  readonly height = computed(() => Math.round(Math.min(this.maxHeight(), this.width() * 0.75)));
   readonly layout = computed(() => quadrantLayout(this.rows(), { width: this.width(), height: this.height() }));
   readonly pad = QUADRANT_PAD;
   readonly selected = signal<string | null>(null);

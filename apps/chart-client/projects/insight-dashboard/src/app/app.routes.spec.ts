@@ -47,7 +47,7 @@ describe('landing', () => {
   it('orders the table the way the nav reads: market, instrument, then the operator pages', () => {
     // IB-079's auth pages (set-password, account, admin/logins) are not nav destinations
     const order = routes.map((r) => r.path).filter((p) => p && !['', '**', 'login', 'set-password', 'account', 'admin/logins'].includes(p));
-    expect(order).toEqual(['health', 'instrument/:symbol', 'market']);
+    expect(order).toEqual(['health', 'instrument/:symbol', 'market', 'positioning']); // IB-103: positioning has its own page
   });
 
   it('IB-079: the login journal is behind the admin guard, like /health', () => {

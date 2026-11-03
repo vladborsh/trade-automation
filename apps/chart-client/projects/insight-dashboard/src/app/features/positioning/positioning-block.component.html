@@ -1,14 +1,6 @@
 <section class="block" id="positioning">
   <h2>{{ t('positioning.title') }}</h2>
-  <div class="charts">
-    <div class="panel">
-      <h3>{{ t('positioning.quadrant.title') }}</h3>
-      <app-pos-quadrant [rows]="positioning().rows" />
-    </div>
-    <div class="panel">
-      <h3>{{ t('positioning.table.title') }}</h3>
-      <app-pos-heat [rows]="positioning().rows" />
-    </div>
-  </div>
+  <app-pos-heat [rows]="positioning().rows" [limit]="rows" />
+  <a class="full" routerLink="/positioning" [queryParams]="{ p: period() }">{{ t('positioning.fullTable') }}</a>
   <app-block-conclusion [line]="line()" [period]="period()" />
 </section>

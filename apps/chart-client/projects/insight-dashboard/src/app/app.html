@@ -3,6 +3,7 @@
   <!-- Market is the landing page and comes first; the instrument view next; the operator's two
        pages stay, but last (see app.routes.ts). -->
   <a routerLink="/market" routerLinkActive="active">{{ t('nav.market') }}</a>
+  <a routerLink="/positioning" routerLinkActive="active">{{ t('nav.positioning') }}</a>
   <a routerLink="/instrument/BTCUSDT" routerLinkActive="active">{{ t('nav.instrument') }}</a>
   @if (isAdmin()) {
     <!-- IB-099: the operator's two pages, grouped and labelled, so a reader knows they are not market pages -->

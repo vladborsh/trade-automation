@@ -53,5 +53,10 @@ export const routes: Routes = [
     path: 'market',
     loadComponent: () => import('./features/market/market.component').then((m) => m.MarketComponent),
   },
+  {
+    // IB-103: positioning as a page (the Market tab keeps a compact top 5); signed in, like /market
+    path: 'positioning',
+    loadComponent: () => import('./features/positioning/positioning-page.component').then((m) => m.PositioningPageComponent),
+  },
   { path: '**', redirectTo: LANDING_REDIRECT },
 ];

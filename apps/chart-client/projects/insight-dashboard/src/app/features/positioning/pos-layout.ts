@@ -184,25 +184,4 @@ export function signalKey(s: WebPositioningSignal): StringKey {
 /** Rows the heat table shows on a phone before «показать все». */
 export const PHONE_HEAT_LIMIT = 10;
 
-export type HeatSort = { column: HeatColumn | 'rarity' | 'base'; dir: 'asc' | 'desc' };
-
-/**
- * Sort by a column's VALUE (the default is the row's highest rarity, so the unusual rows come
- * first). A missing value always sinks to the bottom, whichever way the column is sorted: an
- * absence is not the smallest number. Ties keep universe order (a stable sort).
- */
-export function sortHeat(rows: readonly WebPositioningRow[], sort: HeatSort): WebPositioningRow[] {
-  const key = (r: WebPositioningRow): number | string | null =>
-    sort.column === 'base' ? r.base
-      : sort.column === 'rarity' ? (heatRow(r).maxRarity < 0 ? null : heatRow(r).maxRarity)
-      : r[sort.column].value;
-  const sign = sort.dir === 'asc' ? 1 : -1;
-  return rows
-    .map((r, i) => ({ r, i, k: key(r) }))
-    .sort((a, b) => {
-      if (a.k === null || b.k === null) return a.k === b.k ? a.i - b.i : a.k === null ? 1 : -1;
-      const c = typeof a.k === 'string' ? a.k.localeCompare(b.k as string) : a.k - (b.k as number);
-      return c !== 0 ? sign * c : a.i - b.i;
-    })
-    .map((x) => x.r);
-}
+/* IB-103: sorting moved to pos-sort.ts (sortRows: any column's value or rarity, OI, ticker; ties by ticker). */

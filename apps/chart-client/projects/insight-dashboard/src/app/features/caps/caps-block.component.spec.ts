@@ -64,10 +64,12 @@ describe('CapsBlockComponent (IB-090)', () => {
   });
 });
 
-describe('PositioningBlockComponent (IB-090)', () => {
-  it('dots for every coin, rows sorted most-unusual first, a missing rarity hatched with its reason', () => {
-    const el = render(PositioningBlockComponent, { positioning: positioningFixture as unknown as WebPositioningResponse, period: '24h' });
-    expect(el.querySelectorAll('app-pos-quadrant circle')).toHaveLength(4);
+describe('PositioningBlockComponent — the compact Market version (IB-090, IB-103)', () => {
+  const fixture = positioningFixture as unknown as WebPositioningResponse;
+
+  it('the most unusual rows, a missing rarity hatched with its reason — and no quadrant (it moved to /positioning)', () => {
+    const el = render(PositioningBlockComponent, { positioning: fixture, period: '24h' });
+    expect(el.querySelector('app-pos-quadrant')).toBeNull();
     expect([...el.querySelectorAll('app-pos-heat tbody th')].map((t) => t.textContent?.trim())).toEqual(['SOL', 'ETH', 'BTC', 'DOGE']);
     const liq = el.querySelector('app-pos-heat tbody tr td:nth-of-type(6)') as HTMLElement;
     expect(liq.getAttribute('data-heat')).toBe('none');
@@ -75,13 +77,15 @@ describe('PositioningBlockComponent (IB-090)', () => {
     expect(el.textContent).toContain('crowd in longs');
   });
 
-  it('the OI in USD is ONE venue\'s, and says so: «OI Binance» in the tap text and the legend (Architect, 2026-11-03)', () => {
-    const el = render(PositioningBlockComponent, { positioning: positioningFixture as unknown as WebPositioningResponse, period: '24h' });
-    const btc = [...el.querySelectorAll('app-pos-quadrant circle')].find((c) => c.querySelector('title')?.textContent === 'BTC') as SVGElement;
-    btc.dispatchEvent(new MouseEvent('click'));
-    TestBed.tick();
-    const text = el.querySelector('app-pos-quadrant')?.textContent ?? '';
-    expect(text).toContain('BTC: price −1.20 %, open interest +3.40 %, OI Binance $8.1B');
-    expect(text).toContain('dot size: OI Binance in USD');
+  it('IB-103: at most 5 rows, no re-sorting and no «show all» — then «Full table →» to /positioning with the same period', () => {
+    const many = { ...fixture, rows: Array.from({ length: 9 }, (_, i) => ({ ...fixture.rows[i % fixture.rows.length], symbol: `C${i}USDT`, base: `C${i}` })) };
+    const el = render(PositioningBlockComponent, { positioning: many, period: '7d' });
+    expect(el.querySelectorAll('app-pos-heat tbody tr')).toHaveLength(5);
+    expect(el.querySelector('app-pos-heat button.more')).toBeNull();
+    expect(el.querySelector('app-pos-heat .by-rarity')).toBeNull();
+    expect(([...el.querySelectorAll('app-pos-heat thead button')] as HTMLButtonElement[]).every((b) => b.disabled)).toBe(true);
+    const link = el.querySelector('a.full') as HTMLAnchorElement;
+    expect(link.textContent?.trim()).toBe('Full table →');
+    expect(link.getAttribute('href')).toBe('/positioning?p=7d');
   });
 });

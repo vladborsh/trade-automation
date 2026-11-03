@@ -17,3 +17,10 @@ p { margin: 0; font-size: 12px; }
   .block { padding: 10px; }
   .charts { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* IB-103: the link to the full page; a ≥ 40 px target on a phone */
+.full { display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; color: #58a6ff; text-decoration: none; font-size: 13px; }
+.full:hover { text-decoration: underline; }
+@media (max-width: 767px) {
+  .full { min-height: 40px; }
+}

@@ -1,33 +1,41 @@
 <!-- D16: the table scrolls inside its own box, ticker column pinned -->
-<div class="scroll" [class.expanded]="expanded()">
+<div class="scroll" [class.expanded]="expanded() || compact()">
   <table>
     <thead>
       <tr>
         <th class="coin" scope="col">
-          <button type="button" (click)="sortBy('base')">{{ header('base') }} {{ arrow('base') }}</button>
+          <button type="button" [disabled]="compact()" (click)="sortBy('base')">{{ header('base') }} {{ arrow('base') }}</button>
         </th>
         @for (c of columns; track c) {
           <th scope="col">
-            <button type="button" (click)="sortBy(c)">{{ header(c) }} {{ arrow(c) }}</button>
+            <button type="button" [disabled]="compact()" (click)="sortBy(c)">{{ header(c) }} {{ arrow(c) }}</button>
+            @if (!compact()) {
+              <button type="button" class="by-rarity" [class.on]="arrow(rarityKey(c)) !== ''" [attr.title]="t('positioning.sortByRarity')"
+                      [attr.aria-label]="t('positioning.sortByRarityOf', { column: header(c) })" (click)="sortBy(rarityKey(c))">{{ t('positioning.rarityShort') }} {{ arrow(rarityKey(c)) }}</button>
+            }
           </th>
         }
+        <th scope="col">
+          <button type="button" [disabled]="compact()" (click)="sortBy('oi')">{{ header('oi') }} {{ arrow('oi') }}</button>
+        </th>
         <th scope="col">{{ t('positioning.col.signal') }}</th>
       </tr>
     </thead>
     <tbody>
       @for (r of view(); track r.symbol; let i = $index) {
-        <tr [class.extra]="i >= limit">
-          <th class="coin" scope="row"><a [routerLink]="['/instrument', r.symbol]">{{ r.base }}</a></th>
+        <tr [class.extra]="i >= phoneLimit" (click)="open(r.symbol)">
+          <th class="coin" scope="row"><a [routerLink]="['/instrument', r.symbol]" (click)="$event.stopPropagation()">{{ r.base }}</a></th>
           @for (c of columns; track c) {
             <td class="num" [attr.data-heat]="heat(r, c)" [attr.title]="title(r, c)">{{ text(r, c) }}</td>
           }
+          <td class="num">{{ oi(r.oiUsd) }}</td>
           <td class="signal">{{ r.signalKey ? t(r.signalKey) : '' }}</td>
         </tr>
       }
     </tbody>
   </table>
 </div>
-@if (view().length > limit) {
+@if (!compact() && view().length > phoneLimit) {
   <button type="button" class="more" (click)="expanded.set(!expanded())">
     {{ expanded() ? t('liq.large.showFewer') : t('liq.large.showAll', { count: view().length }) }}
   </button>

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
-import { type Box, DOT_R_MAX, DOT_R_MIN, heatOf, heatRow, LABEL_CHAR_PX, niceMax, quadrantLayout, sortHeat } from './pos-layout';
+import { type Box, DOT_R_MAX, DOT_R_MIN, heatOf, heatRow, LABEL_CHAR_PX, niceMax, quadrantLayout } from './pos-layout';
 
 /** IB-090 — positioning geometry and cell words, on the contract fixture (BTC, ETH, SOL, DOGE). */
 const rows = (fixture as unknown as WebPositioningResponse).rows;
@@ -79,17 +79,5 @@ describe('heat — by rarity, not by sign', () => {
   it('every signal word is translated (the enum is closed)', () => {
     expect(heatRow(rows.find((r) => r.base === 'SOL')!).signalKey).toBe('positioning.signal.crowded_long');
     for (const s of ['squeeze', 'capitulation', 'crowded_long', 'crowded_short', 'quiet']) for (const t of [ru, en]) expect((t as Record<string, string>)[`positioning.signal.${s}`], s).toBeTruthy();
-  });
-});
-
-describe('sortHeat', () => {
-  it('default: the most unusual row first', () => {
-    expect(sortHeat(rows, { column: 'rarity', dir: 'desc' }).map((r) => r.base)).toEqual(['SOL', 'ETH', 'BTC', 'DOGE']);
-  });
-  it('by a column, both ways; a missing value sinks to the bottom either way', () => {
-    const withGap = [...rows, row('X', null, 1)];
-    expect(sortHeat(withGap, { column: 'priceChangePct', dir: 'desc' }).map((r) => r.base)).toEqual(['DOGE', 'SOL', 'BTC', 'ETH', 'X']);
-    expect(sortHeat(withGap, { column: 'priceChangePct', dir: 'asc' }).map((r) => r.base)).toEqual(['ETH', 'BTC', 'SOL', 'DOGE', 'X']);
-    expect(sortHeat(rows, { column: 'base', dir: 'asc' }).map((r) => r.base)).toEqual(['BTC', 'DOGE', 'ETH', 'SOL']);
   });
 });
