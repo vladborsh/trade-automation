@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { WEB_INSIGHT_KEYS } from '@trade-automation/contracts';
 import { en } from './en';
 import { ru } from './ru';
 import type { StringKey } from './keys';
@@ -255,5 +256,48 @@ describe('the string tables', () => {
     );
     expect(untranslated).toEqual([]);
     expect(keys.filter((key) => cyrillic.test(en[key]))).toEqual([]);
+  });
+});
+
+/** Every `.ts` and `.html` under `dir`, specs excluded: a key used only by a spec is not used. */
+function codeFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) out.push(...codeFiles(path));
+    else if ((entry.endsWith('.ts') || entry.endsWith('.html')) && !entry.endsWith('.spec.ts')) out.push(path);
+  }
+  return out;
+}
+
+/**
+ * WD-012 — every key in the tables is used. Parity between en, ru and keys.ts cannot see a key that
+ * nothing reads: 12 such keys had piled up (IB-039's liquidation panel, the instrument redesign, the
+ * market shell, the password pages) before WD-012 deleted them. A key counts as used when:
+ * - it appears as a quoted literal in app code outside i18n/ (specs excluded);
+ * - it starts with a prefix the code builds keys from (`prefix.${…}` or `'prefix.' + …`);
+ * - or the SERVER emits it: the insight sentence keys (`WEB_INSIGHT_KEYS`, contracts) arrive as data.
+ */
+describe('every key is used', () => {
+  const sources = codeFiles(APP_DIR)
+    .filter((path) => !path.includes(`${join('app', 'i18n')}`))
+    .map((path) => readFileSync(path, 'utf8'));
+  const corpus = sources.join('\n');
+  const prefixes = [
+    ...[...corpus.matchAll(/`([a-zA-Z0-9_.]+\.)\$\{/g)].map((m) => m[1]),
+    ...[...corpus.matchAll(/'([a-zA-Z0-9_.]+\.)'\s*\+/g)].map((m) => m[1]),
+  ];
+  const serverKeys = new Set<string>(WEB_INSIGHT_KEYS);
+  const used = (key: string) =>
+    corpus.includes(`'${key}'`) || corpus.includes(`"${key}"`) || serverKeys.has(key) || prefixes.some((p) => key.startsWith(p));
+
+  it('reads the app code it claims to (the walk is not empty, and a known key is found)', () => {
+    expect(sources.length).toBeGreaterThan(50);
+    expect(used('nav.market')).toBe(true);
+    expect(used('no.such.key.anywhere')).toBe(false);
+  });
+
+  it('has no key that nothing reads', () => {
+    expect((Object.keys(en) as StringKey[]).filter((key) => !used(key))).toEqual([]);
   });
 });
