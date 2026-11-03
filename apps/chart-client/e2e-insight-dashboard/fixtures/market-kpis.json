@@ -1,0 +1,118 @@
+{
+ "asOf": 1793723239,
+ "tiles": [
+  {
+   "id": "market_cap",
+   "value": 2620196600413.8027,
+   "delta": -2.489791968491184,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.change",
+    "params": {
+     "deltaPct": -2.49
+    }
+   },
+   "source": {
+    "name": "CoinGecko",
+    "url": "https://www.coingecko.com"
+   },
+   "unavailable": null,
+   "asOf": 1793722766
+  },
+  {
+   "id": "btc_dominance",
+   "value": 59.24534462403195,
+   "delta": null,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": null,
+   "source": {
+    "name": "CoinGecko",
+    "url": "https://www.coingecko.com"
+   },
+   "unavailable": null,
+   "asOf": 1793722766
+  },
+  {
+   "id": "fear_greed",
+   "value": 26,
+   "delta": -11,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.fng_band",
+    "params": {
+     "band": "fear"
+    }
+   },
+   "source": {
+    "name": "alternative.me",
+    "url": "https://alternative.me/crypto/fear-and-greed-index/"
+   },
+   "unavailable": null,
+   "asOf": 1793664000
+  },
+  {
+   "id": "liquidations_24h",
+   "value": 21785428.38406395,
+   "delta": null,
+   "deltaBasis": "24h",
+   "split": {
+    "long": 6308893.176597759,
+    "short": 15476535.207466193
+   },
+   "context": {
+    "key": "kpi.ctx.liq_side",
+    "params": {
+     "side": "short",
+     "sharePct": 71
+    }
+   },
+   "source": {
+    "name": "Binance, Bybit, OKX",
+    "url": null
+   },
+   "unavailable": null,
+   "asOf": 1793723239
+  },
+  {
+   "id": "btc_oi",
+   "value": 7714176480.574345,
+   "delta": 2.29,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.change",
+    "params": {
+     "deltaPct": 2.29
+    }
+   },
+   "source": {
+    "name": "Binance",
+    "url": null
+   },
+   "unavailable": null,
+   "asOf": 1793723100
+  },
+  {
+   "id": "btc_funding",
+   "value": 0.0001,
+   "delta": null,
+   "deltaBasis": "24h",
+   "split": null,
+   "context": {
+    "key": "kpi.ctx.funding_side",
+    "params": {
+     "side": "longs_pay"
+    }
+   },
+   "source": {
+    "name": "Binance",
+    "url": null
+   },
+   "unavailable": null,
+   "asOf": 1793723239
+  }
+ ]
+}

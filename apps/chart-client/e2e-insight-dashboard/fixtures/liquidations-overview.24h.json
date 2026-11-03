@@ -1,0 +1,3568 @@
+{
+ "asOf": 1793723238,
+ "block": {
+  "period": "24h",
+  "totals": {
+   "usd": 21785428.38406395,
+   "long": 6308893.176597759,
+   "short": 15476535.207466193,
+   "events": 3550
+  },
+  "basis": {
+   "periodDays": 0,
+   "windowsInPeriod": 0,
+   "windowsObserved": 0,
+   "venues": [
+    "binance",
+    "bybit",
+    "okx"
+   ],
+   "unavailable": "insufficient_history"
+  },
+  "hourly": {
+   "bucketSec": 3600,
+   "buckets": [
+    {
+     "time": 1793635200,
+     "long": 0,
+     "short": 0,
+     "partial": true,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793638800,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793642400,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793646000,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793649600,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793653200,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793656800,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793660400,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793664000,
+     "long": 712.92777,
+     "short": 145.3578,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793667600,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793671200,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793674800,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793678400,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793682000,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793685600,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793689200,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793692800,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793696400,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793700000,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793703600,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793707200,
+     "long": 0,
+     "short": 0,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793710800,
+     "long": 1818815.3188893003,
+     "short": 10438869.672393221,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793714400,
+     "long": 3997619.1882203603,
+     "short": 1141371.5253127299,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793718000,
+     "long": 141501.28997549997,
+     "short": 3882213.9127363204,
+     "partial": false,
+     "rarity": null,
+     "outlier": false
+    },
+    {
+     "time": 1793721600,
+     "long": 350244.4517426001,
+     "short": 13934.73922392,
+     "partial": true,
+     "rarity": null,
+     "outlier": false
+    }
+   ],
+   "norm": {
+    "long": null,
+    "short": null,
+    "total": null
+   },
+   "basis": {
+    "periodDays": 0.1,
+    "windowsInPeriod": 2,
+    "windowsObserved": 2,
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "unavailable": "insufficient_history"
+   }
+  },
+  "perCoin": [
+   {
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "totals": {
+     "usd": 5052168.899900001,
+     "long": 1144283.97486,
+     "short": 3907884.92504,
+     "events": 363
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "totals": {
+     "usd": 9700480.71381,
+     "long": 2337946.28826,
+     "short": 7362534.42555,
+     "events": 333
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "ZECUSDT",
+    "base": "ZEC",
+    "totals": {
+     "usd": 685500.76793,
+     "long": 306315.42958,
+     "short": 379185.33835,
+     "events": 229
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "SOLUSDT",
+    "base": "SOL",
+    "totals": {
+     "usd": 1427128.436424,
+     "long": 612180.6525,
+     "short": 814947.783924,
+     "events": 131
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "XRPUSDT",
+    "base": "XRP",
+    "totals": {
+     "usd": 626941.83632,
+     "long": 458320.66786,
+     "short": 168621.16846000002,
+     "events": 101
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "HYPEUSDT",
+    "base": "HYPE",
+    "totals": {
+     "usd": 737326.0224725001,
+     "long": 79242.9096184,
+     "short": 658083.1128541001,
+     "events": 129
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "DOGEUSDT",
+    "base": "DOGE",
+    "totals": {
+     "usd": 2481.57277,
+     "long": 401.49616,
+     "short": 2080.07661,
+     "events": 13
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "NEARUSDT",
+    "base": "NEAR",
+    "totals": {
+     "usd": 40486.6454,
+     "long": 20652.2281,
+     "short": 19834.4173,
+     "events": 53
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "UNIUSDT",
+    "base": "UNI",
+    "totals": {
+     "usd": 42613.864,
+     "long": 1988.153,
+     "short": 40625.711,
+     "events": 46
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "BNBUSDT",
+    "base": "BNB",
+    "totals": {
+     "usd": 13535.521310000002,
+     "long": 2478.1002000000003,
+     "short": 11057.421110000001,
+     "events": 20
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "SUIUSDT",
+    "base": "SUI",
+    "totals": {
+     "usd": 31496.643389999997,
+     "long": 544.22988,
+     "short": 30952.41351,
+     "events": 20
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "ENAUSDT",
+    "base": "ENA",
+    "totals": {
+     "usd": 119816.9230817,
+     "long": 74053.6912614,
+     "short": 45763.2318203,
+     "events": 31
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "1000PEPEUSDT",
+    "base": "PEPE",
+    "totals": {
+     "usd": 805204.0739054,
+     "long": 283124.1085861,
+     "short": 522079.9653193,
+     "events": 135
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "ARBUSDT",
+    "base": "ARB",
+    "totals": {
+     "usd": 5061.749831200001,
+     "long": 3637.4534172000003,
+     "short": 1424.296414,
+     "events": 11
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "WLDUSDT",
+    "base": "WLD",
+    "totals": {
+     "usd": 12124.322680000001,
+     "long": 3691.37448,
+     "short": 8432.9482,
+     "events": 25
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "ADAUSDT",
+    "base": "ADA",
+    "totals": {
+     "usd": 10888.6516,
+     "long": 559.4388,
+     "short": 10329.2128,
+     "events": 16
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "PUMPUSDT",
+    "base": "PUMP",
+    "totals": {
+     "usd": 219803.0376706,
+     "long": 132534.01897449998,
+     "short": 87269.0186961,
+     "events": 36
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "LINKUSDT",
+    "base": "LINK",
+    "totals": {
+     "usd": 8817.69563,
+     "long": 5347.37936,
+     "short": 3470.31627,
+     "events": 12
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "TAOUSDT",
+    "base": "TAO",
+    "totals": {
+     "usd": 27135.76231,
+     "long": 9182.05896,
+     "short": 17953.70335,
+     "events": 9
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   },
+   {
+    "symbol": "TRUMPUSDT",
+    "base": "TRUMP",
+    "totals": {
+     "usd": 22174.10681,
+     "long": 13644.31074,
+     "short": 8529.79607,
+     "events": 26
+    },
+    "verdict": null,
+    "basis": {
+     "periodDays": 0,
+     "windowsInPeriod": 0,
+     "windowsObserved": 0,
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "unavailable": "insufficient_history"
+    }
+   }
+  ],
+  "large": [
+   {
+    "time": 1793714575,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "long",
+    "usd": 1748582.11465,
+    "price": 2278.85,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "long-1793714575",
+    "seriesCount": 4,
+    "seriesSpanSec": 4
+   },
+   {
+    "time": 1793720481,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 800401.7661000001,
+    "price": 2298.09,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793712533,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 779504.4179400001,
+    "price": 2287.54,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712584,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 594880.29286,
+    "price": 2292.71,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712722,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 484989.14925,
+    "price": 2305.75,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712185,
+    "symbol": "SOLUSDT",
+    "base": "SOL",
+    "side": "long",
+    "usd": 463050,
+    "price": 92.61,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": null,
+    "seriesCount": 0,
+    "seriesSpanSec": 0
+   },
+   {
+    "time": 1793720481,
+    "symbol": "SOLUSDT",
+    "base": "SOL",
+    "side": "short",
+    "usd": 389720.39238,
+    "price": 93.6164,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793712175,
+    "symbol": "XRPUSDT",
+    "base": "XRP",
+    "side": "long",
+    "usd": 319250,
+    "price": 1.277,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": null,
+    "seriesCount": 0,
+    "seriesSpanSec": 0
+   },
+   {
+    "time": 1793720791,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 301471.4216,
+    "price": 77698.82,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793720795,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 301027.02723,
+    "price": 77724.51,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793720481,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 300770.2356,
+    "price": 77598.1,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793712582,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 300302.5025,
+    "price": 77577.5,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793721950,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "long",
+    "usd": 299940.9656,
+    "price": 77544.2,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": null,
+    "seriesCount": 0,
+    "seriesSpanSec": 0
+   },
+   {
+    "time": 1793712575,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 299928.8833,
+    "price": 2291.02,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793714579,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "long",
+    "usd": 296144.39166,
+    "price": 2278.77,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "long-1793714575",
+    "seriesCount": 4,
+    "seriesSpanSec": 4
+   },
+   {
+    "time": 1793715864,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 291654.6768,
+    "price": 2297.76,
+    "venue": "bybit",
+    "xMedian": null,
+    "seriesId": null,
+    "seriesCount": 0,
+    "seriesSpanSec": 0
+   },
+   {
+    "time": 1793712721,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 283779.27544999996,
+    "price": 2305.93,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712692,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 279358.7632,
+    "price": 2304.56,
+    "venue": "bybit",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712658,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 272742.28849999997,
+    "price": 77726.5,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712596,
+    "symbol": "BTCUSDC",
+    "base": "BTCUSDC",
+    "side": "short",
+    "usd": 271542.95,
+    "price": 77583.7,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712585,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 260386.39612000002,
+    "price": 2292.82,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712784,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 253166.2128,
+    "price": 2314.98,
+    "venue": "bybit",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712716,
+    "symbol": "SOLUSDT",
+    "base": "SOL",
+    "side": "short",
+    "usd": 227811.301144,
+    "price": 93.5401,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712585,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 205439.2287,
+    "price": 77612.1,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793720770,
+    "symbol": "HYPEUSDT",
+    "base": "HYPE",
+    "side": "short",
+    "usd": 166500.80000000002,
+    "price": 87.632,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793712783,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 161055.124,
+    "price": 2307.38,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712714,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 154568.96639,
+    "price": 2300.51,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712724,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 153789.89849999998,
+    "price": 2305.35,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712587,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 153579.23859999998,
+    "price": 77643.7,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712597,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 152219.55419999998,
+    "price": 77941.4,
+    "venue": "bybit",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793716203,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "long",
+    "usd": 151832.1497,
+    "price": 77111.3,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": null,
+    "seriesCount": 0,
+    "seriesSpanSec": 0
+   },
+   {
+    "time": 1793720481,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 150044.768,
+    "price": 2297.6,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793712569,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 143478.06261999998,
+    "price": 2289.02,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712718,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 138245.2816,
+    "price": 2301.02,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793720792,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 130260.57642000001,
+    "price": 2299.23,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793714577,
+    "symbol": "PUMPUSDT",
+    "base": "PUMP",
+    "side": "long",
+    "usd": 125255.99999999999,
+    "price": 0.0041752,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "long-1793714575",
+    "seriesCount": 4,
+    "seriesSpanSec": 4
+   },
+   {
+    "time": 1793716233,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 122996.86157,
+    "price": 2289.89,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": null,
+    "seriesCount": 0,
+    "seriesSpanSec": 0
+   },
+   {
+    "time": 1793712715,
+    "symbol": "ETHUSDC",
+    "base": "ETHUSDC",
+    "side": "short",
+    "usd": 122511.93138000001,
+    "price": 2297.07,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712693,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 113130.21479999999,
+    "price": 77806.2,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712658,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 112830.54409000001,
+    "price": 2295.59,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712588,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 109264.5472,
+    "price": 2301.76,
+    "venue": "bybit",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712588,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 103407.91016,
+    "price": 2294.69,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793712553,
+    "symbol": "ETHUSDT",
+    "base": "ETH",
+    "side": "short",
+    "usd": 102953.25,
+    "price": 2287.85,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": "short-1793712533",
+    "seriesCount": 26,
+    "seriesSpanSec": 251
+   },
+   {
+    "time": 1793720777,
+    "symbol": "BTCUSDT",
+    "base": "BTC",
+    "side": "short",
+    "usd": 100483.49018,
+    "price": 77671.4,
+    "venue": "okx",
+    "xMedian": null,
+    "seriesId": "short-1793720481",
+    "seriesCount": 9,
+    "seriesSpanSec": 314
+   },
+   {
+    "time": 1793714579,
+    "symbol": "FILUSDT",
+    "base": "FIL",
+    "side": "long",
+    "usd": 100263.04450890001,
+    "price": 0.873249,
+    "venue": "binance",
+    "xMedian": null,
+    "seriesId": "long-1793714575",
+    "seriesCount": 4,
+    "seriesSpanSec": 4
+   }
+  ],
+  "largeMinUsd": 100000,
+  "tradfi": {
+   "usd": 6951161.2933467,
+   "long": 4865550.7025309,
+   "short": 2085610.5908158002,
+   "events": 864
+  },
+  "unknown": {
+   "usd": 0,
+   "long": 0,
+   "short": 0,
+   "events": 0
+  },
+  "availableFrom": {
+   "1h": null,
+   "4h": null,
+   "24h": 1793750912,
+   "7d": 1794269312
+  }
+ },
+ "windows": [
+  {
+   "window": "1h",
+   "events": 530,
+   "long": {
+    "usd": 376233.8568537,
+    "median": null,
+    "ratio": null
+   },
+   "short": {
+    "usd": 3798944.60955362,
+    "median": null,
+    "ratio": null
+   },
+   "total": {
+    "usd": 4175178.4664073205,
+    "median": null,
+    "ratio": null
+   },
+   "basis": {
+    "periodDays": 0.1,
+    "windowsInPeriod": 2,
+    "windowsObserved": 2,
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "unavailable": "insufficient_history"
+   }
+  },
+  {
+   "window": "4h",
+   "events": 3546,
+   "long": {
+    "usd": 6308180.248827759,
+    "median": null,
+    "ratio": null
+   },
+   "short": {
+    "usd": 15476389.849666193,
+    "median": null,
+    "ratio": null
+   },
+   "total": {
+    "usd": 21784570.09849395,
+    "median": null,
+    "ratio": null
+   },
+   "basis": {
+    "periodDays": 0,
+    "windowsInPeriod": 0,
+    "windowsObserved": 0,
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "unavailable": "insufficient_history"
+   }
+  },
+  {
+   "window": "24h",
+   "events": 3550,
+   "long": {
+    "usd": 6308893.176597759,
+    "median": null,
+    "ratio": null
+   },
+   "short": {
+    "usd": 15476535.207466193,
+    "median": null,
+    "ratio": null
+   },
+   "total": {
+    "usd": 21785428.384063948,
+    "median": null,
+    "ratio": null
+   },
+   "basis": {
+    "periodDays": 0,
+    "windowsInPeriod": 0,
+    "windowsObserved": 0,
+    "venues": [
+     "binance",
+     "bybit",
+     "okx"
+    ],
+    "unavailable": "insufficient_history"
+   }
+  }
+ ],
+ "perCoin": [
+  {
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 82,
+     "long": {
+      "usd": 302190.01,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 1313855.94164,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 1616045.95164,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 362,
+     "long": {
+      "usd": 1143571.04709,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 3907884.92504,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 5051455.972130001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 363,
+     "long": {
+      "usd": 1144283.97486,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 3907884.92504,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 5052168.899900001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 59,
+     "long": {
+      "usd": 736.5018600000001,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 1339624.82349,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 1340361.32535,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 333,
+     "long": {
+      "usd": 2337946.28826,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 7362534.42555,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 9700480.71381,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 333,
+     "long": {
+      "usd": 2337946.28826,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 7362534.42555,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 9700480.71381,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "ZECUSDT",
+   "base": "ZEC",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 65,
+     "long": {
+      "usd": 10229.37616,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 204724.52348,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 214953.89964000002,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 229,
+     "long": {
+      "usd": 306315.42958,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 379185.33835,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 685500.76793,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 229,
+     "long": {
+      "usd": 306315.42958,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 379185.33835,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 685500.76793,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 42,
+     "long": {
+      "usd": 2348.6121,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 460012.78988,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 462361.40198,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 130,
+     "long": {
+      "usd": 612180.6525,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 814855.533924,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 1427036.186424,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 131,
+     "long": {
+      "usd": 612180.6525,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 814947.783924,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 1427128.436424,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "XRPUSDT",
+   "base": "XRP",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 10,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 7625.13081,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 7625.13081,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 101,
+     "long": {
+      "usd": 458320.66786,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 168621.16846000002,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 626941.83632,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 101,
+     "long": {
+      "usd": 458320.66786,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 168621.16846000002,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 626941.83632,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "HYPEUSDT",
+   "base": "HYPE",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 23,
+     "long": {
+      "usd": 505.76410999999996,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 219899.7664863,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 220405.5305963,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 129,
+     "long": {
+      "usd": 79242.9096184,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 658083.1128541001,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 737326.0224725001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 129,
+     "long": {
+      "usd": 79242.9096184,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 658083.1128541001,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 737326.0224725001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "base": "DOGE",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 1,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 27.395609999999998,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 27.395609999999998,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 13,
+     "long": {
+      "usd": 401.49616,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 2080.07661,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 2481.57277,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 13,
+     "long": {
+      "usd": 401.49616,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 2080.07661,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 2481.57277,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "NEARUSDT",
+   "base": "NEAR",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 4,
+     "long": {
+      "usd": 1061.768,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 170.06,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 1231.828,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 53,
+     "long": {
+      "usd": 20652.2281,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 19834.4173,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 40486.6454,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 53,
+     "long": {
+      "usd": 20652.2281,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 19834.4173,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 40486.6454,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "UNIUSDT",
+   "base": "UNI",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 6,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 7515.4145,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 7515.4145,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 46,
+     "long": {
+      "usd": 1988.153,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 40625.711,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 42613.864,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 46,
+     "long": {
+      "usd": 1988.153,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 40625.711,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 42613.864,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "BNBUSDT",
+   "base": "BNB",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 6,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 2484.9706,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 2484.9706,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 20,
+     "long": {
+      "usd": 2478.1002000000003,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 11057.421110000001,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 13535.521310000002,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 20,
+     "long": {
+      "usd": 2478.1002000000003,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 11057.421110000001,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 13535.521310000002,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "SUIUSDT",
+   "base": "SUI",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 3,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 7082.47919,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 7082.47919,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 20,
+     "long": {
+      "usd": 544.22988,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 30952.41351,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 31496.643389999997,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 20,
+     "long": {
+      "usd": 544.22988,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 30952.41351,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 31496.643389999997,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "ENAUSDT",
+   "base": "ENA",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 0,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 31,
+     "long": {
+      "usd": 74053.6912614,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 45763.2318203,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 119816.9230817,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 31,
+     "long": {
+      "usd": 74053.6912614,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 45763.2318203,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 119816.9230817,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "1000PEPEUSDT",
+   "base": "PEPE",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 1,
+     "long": {
+      "usd": 551.7812536,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 551.7812536,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 133,
+     "long": {
+      "usd": 283124.1085861,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 522026.8575193,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 805150.9661054,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 135,
+     "long": {
+      "usd": 283124.1085861,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 522079.9653193,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 805204.0739054,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "ARBUSDT",
+   "base": "ARB",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 3,
+     "long": {
+      "usd": 2331.8062267,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 2331.8062267,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 11,
+     "long": {
+      "usd": 3637.4534172000003,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 1424.296414,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 5061.749831200001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 11,
+     "long": {
+      "usd": 3637.4534172000003,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 1424.296414,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 5061.749831200001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "WLDUSDT",
+   "base": "WLD",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 2,
+     "long": {
+      "usd": 126.25256,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 18.2427,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 144.49526,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 25,
+     "long": {
+      "usd": 3691.37448,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 8432.9482,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 12124.322680000001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 25,
+     "long": {
+      "usd": 3691.37448,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 8432.9482,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 12124.322680000001,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "ADAUSDT",
+   "base": "ADA",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 0,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 1,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 16,
+     "long": {
+      "usd": 559.4388,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 10329.2128,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 10888.6516,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 16,
+     "long": {
+      "usd": 559.4388,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 10329.2128,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 10888.6516,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "PUMPUSDT",
+   "base": "PUMP",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 9,
+     "long": {
+      "usd": 1118.0227065000001,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 80186.9936741,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 81305.0163806,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 36,
+     "long": {
+      "usd": 132534.01897449998,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 87269.0186961,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 219803.0376706,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 36,
+     "long": {
+      "usd": 132534.01897449998,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 87269.0186961,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 219803.0376706,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "LINKUSDT",
+   "base": "LINK",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 0,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 12,
+     "long": {
+      "usd": 5347.37936,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 3470.31627,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 8817.69563,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 12,
+     "long": {
+      "usd": 5347.37936,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 3470.31627,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 8817.69563,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "TAOUSDT",
+   "base": "TAO",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 0,
+     "long": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 0,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 9,
+     "long": {
+      "usd": 9182.05896,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 17953.70335,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 27135.76231,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 9,
+     "long": {
+      "usd": 9182.05896,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 17953.70335,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 27135.76231,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "base": "TRUMP",
+   "windows": [
+    {
+     "window": "1h",
+     "events": 4,
+     "long": {
+      "usd": 551.984,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 850.31153,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 1402.2955299999999,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0.1,
+      "windowsInPeriod": 2,
+      "windowsObserved": 2,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "4h",
+     "events": 26,
+     "long": {
+      "usd": 13644.31074,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 8529.79607,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 22174.10681,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    },
+    {
+     "window": "24h",
+     "events": 26,
+     "long": {
+      "usd": 13644.31074,
+      "median": null,
+      "ratio": null
+     },
+     "short": {
+      "usd": 8529.79607,
+      "median": null,
+      "ratio": null
+     },
+     "total": {
+      "usd": 22174.10681,
+      "median": null,
+      "ratio": null
+     },
+     "basis": {
+      "periodDays": 0,
+      "windowsInPeriod": 0,
+      "windowsObserved": 0,
+      "venues": [
+       "binance",
+       "bybit",
+       "okx"
+      ],
+      "unavailable": "insufficient_history"
+     }
+    }
+   ]
+  }
+ ],
+ "feed": [
+  {
+   "time": 1793721950,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "long",
+   "usd": 299940.9656,
+   "price": 77544.2,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720795,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "short",
+   "usd": 301027.02723,
+   "price": 77724.51,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720792,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 130260.57642000001,
+   "price": 2299.23,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720791,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "short",
+   "usd": 301471.4216,
+   "price": 77698.82,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720777,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "short",
+   "usd": 100483.49018,
+   "price": 77671.4,
+   "venue": "okx"
+  },
+  {
+   "time": 1793720770,
+   "symbol": "HYPEUSDT",
+   "base": "HYPE",
+   "side": "short",
+   "usd": 166500.80000000002,
+   "price": 87.632,
+   "venue": "okx"
+  },
+  {
+   "time": 1793720481,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 800401.7661000001,
+   "price": 2298.09,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720481,
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "side": "short",
+   "usd": 389720.39238,
+   "price": 93.6164,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720481,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 150044.768,
+   "price": 2297.6,
+   "venue": "binance"
+  },
+  {
+   "time": 1793720481,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "short",
+   "usd": 300770.2356,
+   "price": 77598.1,
+   "venue": "binance"
+  },
+  {
+   "time": 1793716233,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 122996.86157,
+   "price": 2289.89,
+   "venue": "binance"
+  },
+  {
+   "time": 1793716203,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "long",
+   "usd": 151832.1497,
+   "price": 77111.3,
+   "venue": "binance"
+  },
+  {
+   "time": 1793715864,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 291654.6768,
+   "price": 2297.76,
+   "venue": "bybit"
+  },
+  {
+   "time": 1793714579,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "long",
+   "usd": 296144.39166,
+   "price": 2278.77,
+   "venue": "binance"
+  },
+  {
+   "time": 1793714579,
+   "symbol": "FILUSDT",
+   "base": "FIL",
+   "side": "long",
+   "usd": 100263.04450890001,
+   "price": 0.873249,
+   "venue": "binance"
+  },
+  {
+   "time": 1793714577,
+   "symbol": "PUMPUSDT",
+   "base": "PUMP",
+   "side": "long",
+   "usd": 125255.99999999999,
+   "price": 0.0041752,
+   "venue": "binance"
+  },
+  {
+   "time": 1793714575,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "long",
+   "usd": 1748582.11465,
+   "price": 2278.85,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712784,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 253166.2128,
+   "price": 2314.98,
+   "venue": "bybit"
+  },
+  {
+   "time": 1793712783,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 161055.124,
+   "price": 2307.38,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712724,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 153789.89849999998,
+   "price": 2305.35,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712722,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 484989.14925,
+   "price": 2305.75,
+   "venue": "okx"
+  },
+  {
+   "time": 1793712721,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 283779.27544999996,
+   "price": 2305.93,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712718,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 138245.2816,
+   "price": 2301.02,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712716,
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "side": "short",
+   "usd": 227811.301144,
+   "price": 93.5401,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712715,
+   "symbol": "ETHUSDC",
+   "base": "ETHUSDC",
+   "side": "short",
+   "usd": 122511.93138000001,
+   "price": 2297.07,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712714,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 154568.96639,
+   "price": 2300.51,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712693,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "short",
+   "usd": 113130.21479999999,
+   "price": 77806.2,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712692,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 279358.7632,
+   "price": 2304.56,
+   "venue": "bybit"
+  },
+  {
+   "time": 1793712658,
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "side": "short",
+   "usd": 272742.28849999997,
+   "price": 77726.5,
+   "venue": "binance"
+  },
+  {
+   "time": 1793712658,
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "side": "short",
+   "usd": 112830.54409000001,
+   "price": 2295.59,
+   "venue": "binance"
+  }
+ ],
+ "feedMinUsd": 100000,
+ "venues": {
+  "present": [
+   "binance",
+   "bybit",
+   "okx"
+  ],
+  "missing": []
+ },
+ "unmappedRows": 1731
+}

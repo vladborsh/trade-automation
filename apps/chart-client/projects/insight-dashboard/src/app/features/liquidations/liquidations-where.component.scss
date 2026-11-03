@@ -34,7 +34,7 @@
   thead th {
     color: #8b949e;
     font-weight: 500;
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
@@ -60,7 +60,7 @@
 .mult {
   margin-left: 6px;
   color: #8b949e;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* §12.3: four steps of background intensity by ratio, hue by the side taking the damage.
@@ -89,5 +89,14 @@ td[data-side='shorts'] {
 
 .note.warn {
   color: #d29922;
-  font-size: 11px;
+  font-size: 12px;
+}
+
+/* IB-088 phone (D16): the table scrolls inside its own box, never the page, and every link or
+   button is a ≥ 40 px touch target. Desktop is unchanged. */
+@media (max-width: 767px) {
+  .grid { display: block; overflow-x: auto; max-width: 100%; }
+  .grid a { display: inline-flex; align-items: center; min-height: 40px; min-width: 40px; }
+  .picker { flex-wrap: wrap; margin-left: 0; }
+  .picker button { min-height: 40px; min-width: 40px; }
 }

@@ -1,0 +1,120 @@
+{
+ "period": "24h",
+ "top": [
+  {
+   "ruleId": "R4",
+   "block": "positioning",
+   "key": "insight.oi_vs_price",
+   "params": {
+    "symbol": "XRPUSDT",
+    "quadrant": "new_longs",
+    "oiPct": 20.478724548781322,
+    "pricePct": 2.1545855026031457
+   },
+   "rarity": 0.994261119081779,
+   "magnitude": 20.478724548781322,
+   "basis": {
+    "window": "24h",
+    "venues": [
+     "binance"
+    ],
+    "sampleWindows": 697,
+    "observedWindows": 697,
+    "from": 1791131240
+   },
+   "link": {
+    "route": "instrument",
+    "symbol": "XRPUSDT",
+    "timeSec": null
+   }
+  }
+ ],
+ "blocks": [
+  {
+   "block": "liquidations",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "insufficient_history",
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance",
+      "bybit",
+      "okx"
+     ],
+     "sampleWindows": 0,
+     "observedWindows": 0,
+     "from": 1793714400
+    }
+   }
+  },
+  {
+   "block": "positioning",
+   "statement": {
+    "ruleId": "R4",
+    "block": "positioning",
+    "key": "insight.oi_vs_price",
+    "params": {
+     "symbol": "XRPUSDT",
+     "quadrant": "new_longs",
+     "oiPct": 20.478724548781322,
+     "pricePct": 2.1545855026031457
+    },
+    "rarity": 0.994261119081779,
+    "magnitude": 20.478724548781322,
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance"
+     ],
+     "sampleWindows": 697,
+     "observedWindows": 697,
+     "from": 1791131240
+    },
+    "link": {
+     "route": "instrument",
+     "symbol": "XRPUSDT",
+     "timeSec": null
+    }
+   },
+   "neutral": null
+  },
+  {
+   "block": "caps",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "no_rules",
+    "basis": null
+   }
+  },
+  {
+   "block": "flows",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "no_rules",
+    "basis": null
+   }
+  },
+  {
+   "block": "sentiment",
+   "statement": null,
+   "neutral": {
+    "key": "insight.neutral",
+    "reason": "nothing_unusual",
+    "basis": {
+     "window": "24h",
+     "venues": [
+      "binance"
+     ],
+     "sampleWindows": 695,
+     "observedWindows": 695,
+     "from": 1791131240
+    }
+   }
+  }
+ ],
+ "asOf": 1793723240
+}

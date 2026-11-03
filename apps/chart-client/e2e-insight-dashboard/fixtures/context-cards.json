@@ -1,0 +1,205 @@
+{
+ "fearGreed": {
+  "now": {
+   "day": "2026-11-03",
+   "value": 26,
+   "classification": "Fear"
+  },
+  "previous": {
+   "day": "2026-11-02",
+   "value": 37,
+   "classification": "Fear"
+  },
+  "weekAgo": {
+   "day": "2026-10-27",
+   "value": 48,
+   "classification": "Neutral"
+  },
+  "source": "alternative.me"
+ },
+ "dominance": {
+  "btcPct": 59.24534462403195,
+  "ethPct": 10.640858559950585,
+  "totalUsd": 2620196600413.8027,
+  "atMs": 1793722766000,
+  "changePct24h": null,
+  "changePct7d": null,
+  "totalChangePct24h": -2.489791968491184,
+  "coverageDays": 0,
+  "source": "coingecko"
+ },
+ "btcVsTop": {
+  "sharePct": 72.16945469820529,
+  "day": "2026-11-03",
+  "coinsCounted": 20,
+  "coinsExpected": 20,
+  "changePct7d": null,
+  "changePct30d": null,
+  "source": "coingecko"
+ },
+ "caps": [
+  {
+   "coin": "bitcoin",
+   "capUsd": 1555678426871,
+   "priceUsd": 77381,
+   "change24h": 0.0008305,
+   "change7d": null,
+   "share": 0.7216945469820528
+  },
+  {
+   "coin": "ethereum",
+   "capUsd": 279349350338,
+   "priceUsd": 2286.55,
+   "change24h": 0.007995799999999999,
+   "change7d": null,
+   "share": 0.12959291545066282
+  },
+  {
+   "coin": "binancecoin",
+   "capUsd": 91781115418,
+   "priceUsd": 697.9,
+   "change24h": -0.005583,
+   "change7d": null,
+   "share": 0.04257816356451512
+  },
+  {
+   "coin": "ripple",
+   "capUsd": 80710519758,
+   "priceUsd": 1.27,
+   "change24h": 0.0195724,
+   "change7d": null,
+   "share": 0.0374424051830513
+  },
+  {
+   "coin": "solana",
+   "capUsd": 54932269533,
+   "priceUsd": 93.06,
+   "change24h": -0.002589,
+   "change7d": null,
+   "share": 0.025483620965968335
+  },
+  {
+   "coin": "hyperliquid",
+   "capUsd": 20609462907,
+   "priceUsd": 86.1,
+   "change24h": 0.0049331,
+   "change7d": null,
+   "share": 0.009560932863308353
+  },
+  {
+   "coin": "zcash",
+   "capUsd": 20288544952,
+   "priceUsd": 1192.68,
+   "change24h": -0.0385419,
+   "change7d": null,
+   "share": 0.009412055862668852
+  },
+  {
+   "coin": "dogecoin",
+   "capUsd": 11741738328,
+   "priceUsd": 0.075023,
+   "change24h": 0.0008991,
+   "change7d": null,
+   "share": 0.005447108076475526
+  },
+  {
+   "coin": "chainlink",
+   "capUsd": 8477610994,
+   "priceUsd": 11.05,
+   "change24h": -0.010427599999999999,
+   "change7d": null,
+   "share": 0.003932847251800476
+  },
+  {
+   "coin": "cardano",
+   "capUsd": 7122998521,
+   "priceUsd": 0.189564,
+   "change24h": -0.0009957,
+   "change7d": null,
+   "share": 0.00330442918148996
+  },
+  {
+   "coin": "near",
+   "capUsd": 4984502912,
+   "priceUsd": 3.81,
+   "change24h": -0.0465529,
+   "change7d": null,
+   "share": 0.0023123600024729644
+  },
+  {
+   "coin": "uniswap",
+   "capUsd": 4414319891,
+   "priceUsd": 7.28,
+   "change24h": -0.0127779,
+   "change7d": null,
+   "share": 0.0020478464822430054
+  },
+  {
+   "coin": "sui",
+   "capUsd": 3685431925,
+   "priceUsd": 0.890503,
+   "change24h": 0.0083814,
+   "change7d": null,
+   "share": 0.0017097081746487587
+  },
+  {
+   "coin": "bittensor",
+   "capUsd": 2633816454,
+   "priceUsd": 225.37,
+   "change24h": -0.0042068,
+   "change7d": null,
+   "share": 0.0012218533983444032
+  },
+  {
+   "coin": "ethena",
+   "capUsd": 2285880730,
+   "priceUsd": 0.17055,
+   "change24h": -0.0110496,
+   "change7d": null,
+   "share": 0.0010604425885177818
+  },
+  {
+   "coin": "pepe",
+   "capUsd": 2045013287,
+   "priceUsd": 4.86e-06,
+   "change24h": 0.0428946,
+   "change7d": null,
+   "share": 0.0009487018089607578
+  },
+  {
+   "coin": "pump-fun",
+   "capUsd": 1937271265,
+   "priceUsd": 0.0042155,
+   "change24h": 0.0343722,
+   "change7d": null,
+   "share": 0.0008987192236043381
+  },
+  {
+   "coin": "worldcoin-wld",
+   "capUsd": 1373073260,
+   "priceUsd": 0.367223,
+   "change24h": -0.0317704,
+   "change7d": null,
+   "share": 0.0006369822112542807
+  },
+  {
+   "coin": "arbitrum",
+   "capUsd": 1090971611,
+   "priceUsd": 0.1583,
+   "change24h": -0.0016477,
+   "change7d": null,
+   "share": 0.0005061124773418316
+  },
+  {
+   "coin": "official-trump",
+   "capUsd": 448898100,
+   "priceUsd": 1.59,
+   "change24h": -0.0278316,
+   "change7d": null,
+   "share": 0.00020824825061835754
+  }
+ ],
+ "capsDay": "2026-11-03",
+ "capsSource": "coingecko",
+ "live": true
+}

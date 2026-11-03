@@ -10,6 +10,7 @@
     "mock-server": "tsx watch mock-server/server.ts",
     "mock-server:once": "tsx mock-server/server.ts",
     "e2e": "playwright test",
+    "e2e:insight-dashboard": "playwright test -c playwright.insight-dashboard.config.ts",
     "test:chart-client": "NODE_OPTIONS=\"$NODE_OPTIONS --no-experimental-webstorage\" ng test chart-client --watch=false",
     "test:insight-dashboard": "NODE_OPTIONS=\"$NODE_OPTIONS --no-experimental-webstorage\" ng test insight-dashboard --watch=false",
     "build:insight-dashboard": "ng build insight-dashboard",
