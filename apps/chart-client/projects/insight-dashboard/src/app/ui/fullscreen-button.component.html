@@ -1,0 +1,3 @@
+<button type="button" class="fullscreen" [attr.aria-pressed]="active()" (click)="toggle()">
+  {{ active() ? t('ui.fullscreen.exit') : t('ui.fullscreen.enter') }}
+</button>

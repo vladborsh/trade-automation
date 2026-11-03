@@ -165,6 +165,8 @@ export const ru: Strings = {
   'instrument.view': 'Вид',
   'instrument.legends.hide': 'Скрыть легенду',
   'instrument.legends.show': 'Показать легенду',
+  'ui.fullscreen.enter': 'Во весь экран',
+  'ui.fullscreen.exit': 'Свернуть',
   'instrument.historyStart': 'Раньше истории нет: здесь начинаются данные биржи.',
   'instrument.picker.open': 'Инструмент {symbol}: выбрать другой',
   'instrument.picker.search': 'Найти тикер',

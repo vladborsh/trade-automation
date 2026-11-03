@@ -159,6 +159,8 @@ export const en: Strings = {
   'instrument.view': 'View',
   'instrument.legends.hide': 'Hide legend',
   'instrument.legends.show': 'Show legend',
+  'ui.fullscreen.enter': 'Full screen',
+  'ui.fullscreen.exit': 'Exit full screen',
   'instrument.historyStart': 'No earlier history: this is where the venue\'s data starts.',
   'instrument.picker.open': 'Instrument {symbol}: choose another',
   'instrument.picker.search': 'Find a symbol',

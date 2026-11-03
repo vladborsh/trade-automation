@@ -11,3 +11,16 @@ html, body {
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
 }
+
+/* IB-099 item 3: the full-screen fallback layer (iOS Safari refuses element fullscreen). Global
+   because the expanded element belongs to the page, not to the button that expands it. */
+.fs-fallback {
+  position: fixed !important;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: var(--color-bg);
+  padding: 8px;
+}
+/* native fullscreen: the element fills the screen and scrolls if the panes are taller */
+:fullscreen { overflow: auto; background: var(--color-bg); padding: 8px; }

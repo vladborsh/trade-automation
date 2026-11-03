@@ -169,6 +169,8 @@ export type StringKey =
   | 'instrument.view'
   | 'instrument.legends.hide'
   | 'instrument.legends.show'
+  | 'ui.fullscreen.enter'
+  | 'ui.fullscreen.exit'
   | 'instrument.historyStart'
   | 'instrument.picker.open'
   | 'instrument.picker.search'

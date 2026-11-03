@@ -19,6 +19,7 @@
         <button type="button" class="legend-toggle" [attr.aria-pressed]="!legendsHidden()" (click)="toggleLegends()">
           {{ legendsHidden() ? t('instrument.legends.show') : t('instrument.legends.hide') }}
         </button>
+        <app-fullscreen-button [target]="chartColumn" />
       </div>
     </div>
   </header>
@@ -29,7 +30,7 @@
     <p class="error">{{ t('instrument.loadFailed', { message }) }}</p>
   }
   <div class="body">
-    <div class="chart-column" [class.legends-hidden]="legendsHidden()">
+    <div #chartColumn class="chart-column" [class.legends-hidden]="legendsHidden()">
       @if (panes(); as data) {
         <app-instrument-chart
           [data]="data"

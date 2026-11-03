@@ -17,6 +17,7 @@ import { browserStore } from './pane-heights';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
+import { FullscreenButtonComponent } from '../../ui/fullscreen-button.component';
 import { LoaderComponent } from '../../ui/loader.component';
 import { SymbolPickerComponent } from './symbol-picker.component';
 import { PICKER_SIZE } from './symbol-picker.rows';
@@ -35,7 +36,7 @@ import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LoaderComponent, SymbolPickerComponent],
+  imports: [DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

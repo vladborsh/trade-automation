@@ -1,0 +1,15 @@
+/* Dark-terminal palette (AGENTS.md); the same look as the instrument toolbar's buttons. */
+:host { display: inline-block; }
+.fullscreen {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  padding: 2px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.fullscreen:hover { border-color: #8b949e; }
+.fullscreen[aria-pressed='true'] { color: #26a69a; border-color: #26a69a; }
+@media (max-width: 767px) {
+  .fullscreen { min-height: 40px; min-width: 40px; }
+}
