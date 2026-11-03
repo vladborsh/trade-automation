@@ -21,6 +21,7 @@ import {
 import { TimeAxisStrip } from './time-axis-strip';
 import { keepView } from './carried-view';
 import type { FocusView } from './focus-at';
+import { ChartOverlays } from './chart-overlays';
 import { FocusMarker } from './focus-marker';
 import { futureSlots } from './future-bars';
 
@@ -89,7 +90,7 @@ export class InstrumentChartComponent implements OnDestroy {
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('chartHost');
   private readonly axisHost = viewChild.required<ElementRef<HTMLDivElement>>('axisHost');
   private axis: TimeAxisStrip | null = null;
-  private marker: FocusMarker | null = null;
+  private overlays: ChartOverlays | null = null;
   private chart: IChartApi | null = null;
   private renderers: PanelRenderers = createPanelRenderers();
   private observer: ResizeObserver | null = null;
@@ -111,7 +112,10 @@ export class InstrumentChartComponent implements OnDestroy {
   /** IB-060: the bar under the crosshair, and the economic events on it for the tooltip. */
   readonly hover = signal<{ time: number; x: number } | null>(null);
   private readonly marks = computed(() => { const d = this.data(); return d ? eventMarks(d) : []; });
-  readonly hoverMark = computed(() => markAt(this.marks(), this.hover()?.time ?? null));
+  /** IB-099: a calendar badge hovered or tapped — it wins over the crosshair until unpinned. */
+  readonly badge = signal<{ time: number; x: number } | null>(null);
+  readonly tipAt = computed(() => this.badge() ?? this.hover());
+  readonly hoverMark = computed(() => markAt(this.marks(), this.tipAt()?.time ?? null));
 
   /** IB-039: built from the venues the DATA came from, never from the filter the page sent. */
   readonly scopeLabel = (venues: readonly string[], undercounted: boolean): string =>
@@ -171,7 +175,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const current = this.chart;
     if (current && (data.extendsPrevious || data.extendsLater)) {
       keepView(current, data, () => (this.renderers = redrawPanels(current, data, this.renderers, PANELS.map((p) => p.key))));
-      this.marker?.place();
+      this.overlays?.update(this.marks());
       return this.axis?.refresh(futureSlots(data));
     }
     this.teardown();
@@ -183,11 +187,11 @@ export class InstrumentChartComponent implements OnDestroy {
     for (const panel of PANELS) drawPanel(panel.key, chart, data, this.renderers);
     for (const pane of chart.panes()) pane.priceScale('right').applyOptions(PANEL_PRICE_SCALE);
     this.applyHeights();
-    const focus = this.focus();
-    if (focus?.timeframe === data.timeframe) {
-      FocusMarker.open(chart, focus);
-      this.marker = new FocusMarker(chart, host.parentElement as HTMLElement, focus, this.t('instrument.focus.marker'));
-    } else showWholeWindow(chart, data);
+    const focus = this.focus()?.timeframe === data.timeframe ? this.focus() : null;
+    if (focus) FocusMarker.open(chart, focus); else showWholeWindow(chart, data);
+    this.overlays = new ChartOverlays(chart, host.parentElement as HTMLElement, {
+      focus, focusLabel: this.t('instrument.focus.marker'), marks: this.marks(), onBadge: (b) => this.badge.set(b),
+    });
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
     chart.subscribeCrosshairMove((p: MouseEventParams) =>
       this.hover.set(p.time !== undefined && p.point ? { time: p.time as number, x: p.point.x } : null));
@@ -228,7 +232,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const size = chart.options();
     if (size.width !== width || size.height !== this.chartHeight()) chart.resize(width, this.chartHeight());
     this.axis?.resize();
-    this.marker?.place();
+    this.overlays?.place();
   }
 
   private teardown(): void {
@@ -237,8 +241,9 @@ export class InstrumentChartComponent implements OnDestroy {
     this.observer = null;
     this.axis?.destroy();
     this.axis = null;
-    this.marker?.destroy();
-    this.marker = null;
+    this.overlays?.destroy();
+    this.overlays = null;
+    this.badge.set(null);
     this.chart?.remove();
     this.chart = null;
   }

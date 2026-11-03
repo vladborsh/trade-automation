@@ -13,7 +13,7 @@
       }
     </div>
   }
-  <app-calendar-tooltip [mark]="hoverMark()" [x]="hover()?.x ?? 0" />
+  <app-calendar-tooltip [mark]="hoverMark()" [x]="tipAt()?.x ?? 0" />
   @for (handle of edges(); track handle.key) {
     <!-- A pane's lower edge: dragging it resizes that pane alone and moves the ones below. -->
     <div
