@@ -38,6 +38,11 @@ cd "$DIR"
 echo "==> rendering .env from SSM"
 AWS_REGION="$REGION" "$DIR/render-env.sh"
 
+# The bind-mounted parent of Postgres's data dir must be traversable by the postgres user, or the
+# container restart-loops on "mkdir: Permission denied" (found at the first deploy, IB-083). Boxes
+# bootstrapped before that fix have it 0700; this heals them, and is a no-op afterwards.
+chmod 0711 "$DIR/pgdata"
+
 echo "==> registry login (${REGISTRY}, instance role)"
 aws ecr get-login-password --region "$REGION" | docker login "$REGISTRY" --username AWS --password-stdin >/dev/null
 

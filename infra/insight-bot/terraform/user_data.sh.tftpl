@@ -21,7 +21,10 @@ chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 systemctl enable --now amazon-ssm-agent
 
 install -d -m 0755 /opt/insight-bot
-install -d -m 0700 /opt/insight-bot/pgdata
+# 0711, not 0700: the postgres container creates its data dir pgdata/pgdata as root, then re-runs
+# as the postgres user (uid 70), which must be able to traverse this bind-mounted parent. It still
+# cannot be listed by anyone but root; the data dir itself is 0700 postgres (IB-083).
+install -d -m 0711 /opt/insight-bot/pgdata
 
 # COST-PLAN.md: the box is a 1 GB t4g.micro. A 2 GB swap file means a burst pages to disk instead
 # of the OOM killer taking Postgres or the collector down.
