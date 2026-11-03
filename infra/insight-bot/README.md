@@ -35,8 +35,8 @@ The GitHub Actions job is `.github/workflows/insight-bot-deploy.yml` (manual tri
   decrypt only via SSM, and write only the backup bucket.
 - **Backups.** Versioned bucket, 35-day expiry on current and noncurrent versions, and a restore
   drill (`restore.sh … --into-check`) that never touches the live database.
-- **Cost.** ≈ **13.6 USD/month** against the user's hard 20 cap (`COST-PLAN.md`): `t4g.micro`
-  + 20 GB gp3 + the public IPv4 charge the first estimate missed + a few cents of S3. No ECR, no
+- **Cost.** ≈ **16.5 USD/month** against the user's hard 20 cap (`COST-PLAN.md`): `t4g.micro`
+  + 50 GB gp3 + the public IPv4 charge the first estimate missed + a few cents of S3. No ECR, no
   NAT gateway, default VPC, and an AWS Budgets alert at 18 USD.
 
 ## The order of the apply (agreed with the Tech Lead)

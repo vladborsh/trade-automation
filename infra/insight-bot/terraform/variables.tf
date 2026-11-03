@@ -15,11 +15,11 @@ variable "instance_type" {
 
 variable "root_volume_gb" {
   description = <<-EOT
-    gp3 root volume; the Postgres data directory lives on it. 20 GB ≈ one year of collection at
-    §3.3's row estimate, and gp3 grows online — 50 GB would be +2.88 USD/month (COST-PLAN.md).
+    gp3 root volume; the Postgres data directory lives on it. 50 GB: owner ruling 2026-11-02,
+    +2.88 USD/month over 20 GB (COST-PLAN.md). gp3 grows online (ModifyVolume + growpart + xfs_growfs); it cannot shrink.
   EOT
   type        = number
-  default     = 20
+  default     = 50
 }
 
 variable "backup_bucket_name" {
