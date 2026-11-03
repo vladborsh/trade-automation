@@ -98,8 +98,8 @@ describe('authentication', () => {
     expect(request.ibUser).toBe(member);
   });
 
-  it('@Public() opens a route — the exchange arrives with no cookie', async () => {
-    const { context, reflector } = ctx(withCookie('/api/web/auth/exchange'), { 'ib:public': true });
+  it('@Public() opens a route — /auth/login arrives with no cookie', async () => {
+    const { context, reflector } = ctx(withCookie('/api/web/auth/login'), { 'ib:public': true });
     await expect(new WebAuthGuard(auth(), reflector).canActivate(context)).resolves.toBe(true);
     expect(typeof Public()).toBe('function');
   });

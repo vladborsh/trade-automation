@@ -1,0 +1,32 @@
+// IB-079 — the shared look of the three auth forms (login, set-password, account). Phone first:
+// the login form is the first thing a member sees, usually on a phone.
+.auth { max-width: 360px; margin: 48px auto; }
+h1 { font-size: 15px; margin: 0 0 16px; }
+h2 { font-size: 13px; color: var(--muted); margin: 20px 0 8px; font-weight: normal; }
+form { display: flex; flex-direction: column; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; }
+label span { color: var(--muted); }
+small { color: var(--muted); }
+input {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px;
+  font: inherit;
+  font-size: 16px; // below 16px iOS zooms the page on focus
+}
+input[readonly] { color: var(--muted); }
+button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+button:disabled { color: var(--muted); cursor: default; }
+.muted { color: var(--muted); }
+.error { color: var(--down); }
+.ok { color: var(--up); }
+.hint { margin-top: 16px; }
+.lang { margin-top: 24px; color: var(--muted); border-color: transparent; padding: 4px 0; }

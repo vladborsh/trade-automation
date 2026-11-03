@@ -1,0 +1,5 @@
+:host { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+a { color: var(--muted); text-decoration: none; }
+a:hover { color: var(--text); }
+button { background: transparent; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0; }
+button:hover { color: var(--text); }

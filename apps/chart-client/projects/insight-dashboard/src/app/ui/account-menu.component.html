@@ -1,0 +1,5 @@
+@if (user(); as u) {
+  <a routerLink="/account">{{ u.login ?? t('menu.account') }}</a>
+  <button type="button" (click)="logout()">{{ t('menu.logout') }}</button>
+  <button type="button" (click)="logoutAll()">{{ t('menu.logoutAll') }}</button>
+}

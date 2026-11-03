@@ -1,0 +1,12 @@
+.head { display: flex; align-items: baseline; gap: 12px; }
+h1 { font-size: 15px; margin: 0 0 12px; }
+button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 2px 8px; cursor: pointer; font: inherit; }
+button:disabled { color: var(--muted); cursor: default; }
+.scroll { overflow-x: auto; } // phone width: the table scrolls, the page does not
+table { border-collapse: collapse; }
+th, td { padding: 2px 12px 2px 0; text-align: left; font-weight: normal; }
+th { color: var(--muted); }
+.nowrap { white-space: nowrap; }
+.muted { color: var(--muted); }
+.warn { color: #d29922; }
+.error { color: var(--down); }

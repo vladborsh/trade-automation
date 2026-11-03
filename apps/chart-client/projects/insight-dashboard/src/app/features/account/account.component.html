@@ -1,0 +1,34 @@
+<section class="auth">
+  <h1>{{ t('account.title') }}</h1>
+  @if (user()?.login; as login) {
+    <p class="muted">{{ t('account.login', { login }) }}</p>
+  }
+  <h2>{{ t('account.changeTitle') }}</h2>
+  <form (submit)="submit($event)">
+    <!-- a hidden username lets a password manager attach the new password to the right account -->
+    <input class="sr-only" name="username" autocomplete="username" readonly tabindex="-1" aria-hidden="true" [value]="user()?.login ?? ''" />
+    <label>
+      <span>{{ t('account.current') }}</span>
+      <input name="current-password" type="password" autocomplete="current-password" required
+             [value]="current()" (input)="current.set($any($event.target).value)" />
+    </label>
+    <label>
+      <span>{{ t('setPassword.password') }}</span>
+      <input name="new-password" type="password" autocomplete="new-password" required
+             [value]="next()" (input)="next.set($any($event.target).value)" />
+      <small>{{ t('setPassword.passwordHint', { min: 10 }) }}</small>
+    </label>
+    <label>
+      <span>{{ t('setPassword.repeat') }}</span>
+      <input name="repeat-password" type="password" autocomplete="new-password" required
+             [value]="repeat()" (input)="repeat.set($any($event.target).value)" />
+    </label>
+    @if (error(); as e) {
+      <p class="error" role="alert">{{ t(e.key, e.params) }}</p>
+    }
+    @if (changed()) {
+      <p class="ok" role="status">{{ t('account.changed') }}</p>
+    }
+    <button type="submit" [disabled]="busy()">{{ t('account.submit') }}</button>
+  </form>
+</section>

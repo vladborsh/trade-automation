@@ -5,6 +5,7 @@ import { App } from './app';
 import { CalendarAlertsService } from './core/calendar-alerts.service';
 import { SessionService } from './core/session.service';
 import { AlertsToggleComponent } from './ui/alerts-toggle.component';
+import { AccountMenuComponent } from './ui/account-menu.component';
 
 /** IB-075 — the shell offers the Health link to an admin only; market and instrument to everyone. */
 function render(admin: boolean): HTMLElement {
@@ -17,7 +18,7 @@ function render(admin: boolean): HTMLElement {
     ],
   });
   // the alerts switch is not under test here; keep it out rather than fake its whole service
-  TestBed.overrideComponent(App, { remove: { imports: [AlertsToggleComponent] }, add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] } });
+  TestBed.overrideComponent(App, { remove: { imports: [AlertsToggleComponent, AccountMenuComponent] }, add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] } });
   const fixture = TestBed.createComponent(App);
   fixture.detectChanges();
   return fixture.nativeElement as HTMLElement;
@@ -30,9 +31,12 @@ describe('App nav', () => {
     const hrefs = links(render(false));
     expect(hrefs).toContain('/market');
     expect(hrefs).not.toContain('/health');
+    expect(hrefs).not.toContain('/admin/logins'); // IB-079: nor the login journal
   });
 
-  it('an admin also sees Health', () => {
-    expect(links(render(true))).toContain('/health');
+  it('an admin also sees Health and (IB-079) the login journal', () => {
+    const hrefs = links(render(true));
+    expect(hrefs).toContain('/health');
+    expect(hrefs).toContain('/admin/logins');
   });
 });

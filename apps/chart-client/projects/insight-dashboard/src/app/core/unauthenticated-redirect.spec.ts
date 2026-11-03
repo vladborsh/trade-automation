@@ -69,9 +69,8 @@ describe('an unauthenticated call sends the member to the login screen', () => {
 });
 
 describe('the login page is never redirected away from', () => {
-  it('does NOT redirect when the 401 came from /login — that would destroy the ?t= token', async () => {
-    // the shell calls /auth/me on every load; on /login a 401 is the normal state, there is no
-    // session yet. Navigating to /login then drops the query string and the bot's link dies.
+  it('does NOT redirect when the 401 came from /login — a 401 is the normal state there', async () => {
+    // the shell calls /auth/me on every load; on /login there is no session yet, by definition
     const { api, navigated } = setup(401, { code: 'UNAUTHENTICATED' }, '/login');
     await expect(api.me()).rejects.toThrow();
     expect(navigated).toEqual([]);
@@ -83,6 +82,20 @@ describe('the login page is never redirected away from', () => {
     // the token was destroyed anyway. This is that exact state.
     const { api, navigated } = setup(401, { code: 'UNAUTHENTICATED' }, '/login', '/');
     await expect(api.me()).rejects.toThrow();
+    expect(navigated).toEqual([]);
+  });
+});
+
+describe('IB-079: /set-password is never redirected away from either', () => {
+  it('a 401 on /set-password stays there — the ?t= link must survive', async () => {
+    const { api, navigated } = setup(401, { code: 'UNAUTHENTICATED' }, '/set-password');
+    await expect(api.me()).rejects.toThrow();
+    expect(navigated).toEqual([]);
+  });
+
+  it('a wrong current password (401 INVALID_CREDENTIALS) is not a lost session: no redirect', async () => {
+    const { api, navigated } = setup(401, { code: 'INVALID_CREDENTIALS' }, '/account');
+    await expect(api.changePassword({ current: 'a', next: 'b' })).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
     expect(navigated).toEqual([]);
   });
 });

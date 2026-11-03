@@ -1,0 +1,37 @@
+<header class="head">
+  <h1>{{ t('logins.title') }}</h1>
+  <button type="button" (click)="load()" [disabled]="loading()">{{ t('action.refresh') }}</button>
+</header>
+
+@if (error(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+} @else if (loading()) {
+  <p class="muted">{{ t('state.loading') }}</p>
+} @else if (rows().length === 0) {
+  <p class="muted">{{ t('logins.empty') }}</p>
+} @else {
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t('logins.col.time') }}</th>
+          <th>{{ t('logins.col.login') }}</th>
+          <th>{{ t('logins.col.outcome') }}</th>
+          <th>{{ t('logins.col.ip') }}</th>
+          <th>{{ t('logins.col.device') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of rows(); track r.id) {
+          <tr>
+            <td class="nowrap">{{ r.time }}</td>
+            <td>{{ r.login }}</td>
+            <td [class.warn]="r.failed">{{ t(r.outcome) }}</td>
+            <td>{{ r.ip }}</td>
+            <td>{{ r.device }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

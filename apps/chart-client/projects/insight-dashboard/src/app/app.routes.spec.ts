@@ -45,8 +45,17 @@ describe('landing', () => {
   });
 
   it('orders the table the way the nav reads: market, instrument, then the operator pages', () => {
-    const order = routes.map((r) => r.path).filter((p) => p && !['', '**', 'login'].includes(p));
+    // IB-079's auth pages (set-password, account, admin/logins) are not nav destinations
+    const order = routes.map((r) => r.path).filter((p) => p && !['', '**', 'login', 'set-password', 'account', 'admin/logins'].includes(p));
     expect(order).toEqual(['health', 'instrument/:symbol', 'market']);
+  });
+
+  it('IB-079: the login journal is behind the admin guard, like /health', () => {
+    const journal = routes.find((r) => r.path === 'admin/logins');
+    const health = routes.find((r) => r.path === 'health');
+    expect(journal?.canActivate).toHaveLength(1);
+    expect(health?.canActivate).toHaveLength(1);
+    expect(routes.find((r) => r.path === 'set-password')?.canActivate).toBeUndefined(); // public, like /login
   });
 });
 

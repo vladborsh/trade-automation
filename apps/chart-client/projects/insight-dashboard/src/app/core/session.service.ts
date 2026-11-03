@@ -21,6 +21,21 @@ export class SessionService {
   readonly user = this.current.asReadonly();
   readonly isAdmin = computed(() => isAdmin(this.current()));
 
+  /**
+   * IB-079: a login just succeeded — this is the member now, whoever was known before. Without it a
+   * logout followed by a login as someone else kept the first member (and their nav) until reload.
+   */
+  signedIn(user: WebUser): void {
+    this.inflight = null;
+    this.current.set(user);
+  }
+
+  /** IB-079: logout / logout everywhere — nobody is known; the next `ensure()` asks the server again. */
+  signedOut(): void {
+    this.inflight = null;
+    this.current.set(null);
+  }
+
   /** The signed-in member, or null; asks the server only while none is known. */
   ensure(): Promise<WebUser | null> {
     const known = this.current();

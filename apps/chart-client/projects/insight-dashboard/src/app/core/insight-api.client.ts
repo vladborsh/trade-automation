@@ -1,8 +1,9 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
-  WebCandlesResponse, WebDbHealthResponse, WebExchangeRequest, WebMarketCardsResponse,
-  WebExchangeResponse, WebFundingResponse, WebLiquidationsResponse,
+  WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
+  WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
+  WebFundingResponse, WebLiquidationsResponse,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
@@ -25,6 +26,9 @@ import { toWebApiError } from './web-api-error';
  * `credentials: 'include'` on every call: the session is a cookie, and the dev server runs on a
  * different origin from the API (`:4215` against `:3015`).
  */
+/** Pages a visitor is on WITHOUT a session by design: a 401 there is normal, never a redirect. */
+export const PUBLIC_PAGES: readonly string[] = ['/login', '/set-password'];
+
 @Injectable({ providedIn: 'root' })
 export class InsightApiClient {
   private readonly config = inject(AppConfigService);
@@ -148,24 +152,44 @@ export class InsightApiClient {
     return this.get<WebMarketCardsResponse>('/context/cards');
   }
 
-  /**
-   * IB-029's one-time login link. The only POST here, and the only call that may be made without
-   * a session — it is how the session is obtained. `toWebApiError` keeps the server's `{code}`, which
-   * is what the page branches on (a forwarded link and an expired one need different sentences).
-   */
-  async exchange(token: string): Promise<WebExchangeResponse> {
-    const body: WebExchangeRequest = { token };
-    const url = buildUrl(this.config.get().apiBaseUrl, '/auth/exchange', window.location.origin);
-    const response = await fetch(url, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      throw toWebApiError('POST', '/auth/exchange', response.status, await this.safeJson(response));
-    }
-    return (await response.json()) as WebExchangeResponse;
+  // ------------------------------------------------------ IB-079, login + password (IB-078's server)
+  //
+  // None of these redirect on failure: a wrong password is 401 INVALID_CREDENTIALS, not
+  // UNAUTHENTICATED, and each page branches on the code itself.
+
+  /** Which bot to tell people to message (`/password`). Public. */
+  async authContext(): Promise<WebAuthContext> {
+    return this.get<WebAuthContext>('/auth/context');
+  }
+
+  async login(body: WebLoginRequest): Promise<WebLoginResponse> {
+    return this.sendJson<WebLoginResponse>('POST', '/auth/login', body);
+  }
+
+  /** Whether the set-password page asks for a login. Does not spend the link. */
+  async credentialsInfo(token: string): Promise<WebCredentialsInfoResponse> {
+    return this.get<WebCredentialsInfoResponse>('/auth/credentials', { t: token });
+  }
+
+  async setCredentials(body: WebSetCredentialsRequest): Promise<void> {
+    await this.send('POST', '/auth/credentials', body);
+  }
+
+  async changePassword(body: WebChangePasswordRequest): Promise<void> {
+    await this.send('POST', '/auth/password', body);
+  }
+
+  async logout(): Promise<void> {
+    await this.send('POST', '/auth/logout', {});
+  }
+
+  async logoutAll(): Promise<void> {
+    await this.send('POST', '/auth/logout-all', {});
+  }
+
+  /** Admin only: the login journal, newest first. */
+  async loginEvents(limit = 200): Promise<WebLoginEventsResponse> {
+    return this.get<WebLoginEventsResponse>('/admin/login-events', { limit });
   }
 
   // ------------------------------------------------------ IB-069, browser push
@@ -183,7 +207,7 @@ export class InsightApiClient {
     await this.send('DELETE', '/push/subscription', { endpoint });
   }
 
-  private async send(method: 'POST' | 'DELETE', path: string, body: unknown): Promise<void> {
+  private async send(method: 'POST' | 'DELETE', path: string, body: unknown): Promise<Response> {
     const url = buildUrl(this.config.get().apiBaseUrl, path, window.location.origin);
     const response = await fetch(url, {
       method,
@@ -192,6 +216,11 @@ export class InsightApiClient {
       body: JSON.stringify(body),
     });
     if (!response.ok) throw toWebApiError(method, path, response.status, await this.safeJson(response));
+    return response;
+  }
+
+  private async sendJson<T>(method: 'POST', path: string, body: unknown): Promise<T> {
+    return (await (await this.send(method, path, body)).json()) as T;
   }
 
   private async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
@@ -216,8 +245,9 @@ export class InsightApiClient {
       // `router.url` is still '/'. Measured on a live run — the guard written against the router
       // let the redirect through and the token was destroyed anyway. `location.pathname` is
       // correct from the first byte.
-      const onLogin = this.document.location.pathname === '/login';
-      if (error.code === 'UNAUTHENTICATED' && !onLogin) void this.router.navigateByUrl('/login');
+      // IB-079: /set-password is the other page a visitor is on with no session by design
+      const onPublicPage = PUBLIC_PAGES.includes(this.document.location.pathname);
+      if (error.code === 'UNAUTHENTICATED' && !onPublicPage) void this.router.navigateByUrl('/login');
       throw error;
     }
     return (await response.json()) as T;

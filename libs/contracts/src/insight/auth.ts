@@ -22,30 +22,9 @@ export const WebUserSchema = z.object({
 });
 export type WebUser = z.infer<typeof WebUserSchema>;
 
-/**
- * IB-029's link exchange. **The server endpoint is gone** (IB-078, password-login design P11); these
- * two schemas stay exported only because the dashboard's current login page still compiles against
- * them. IB-079 replaces that page and deletes them.
- */
-export const WebExchangeRequestSchema = z.object({
-  /** The 32 random bytes from the login link, base64url. */
-  token: z.string().min(1).max(256),
-});
-export type WebExchangeRequest = z.infer<typeof WebExchangeRequestSchema>;
-
-export const WebExchangeResponseSchema = z.object({ user: WebUserSchema });
-export type WebExchangeResponse = z.infer<typeof WebExchangeResponseSchema>;
-
 export const WebMeResponseSchema = z.object({ user: WebUserSchema });
 export type WebMeResponse = z.infer<typeof WebMeResponseSchema>;
 
-/**
- * The exchange's failure codes (§4). They are deliberately distinguishable **to the person who
- * holds the link**: 401 for a token we have never issued, 410 for one that was really issued and
- * is now spent or stale. Unlike an invite code (IB-021), a login link is not something an
- * outsider can usefully enumerate — it is 256 bits and lives for ten minutes — so telling its
- * holder "you already used this" is help, not a leak.
- */
 /**
  * IB-BUG-008 — what the login page needs before anyone is signed in: which bot to talk to.
  * Public by nature (a member has to be able to find the bot) and deliberately nothing else —
@@ -55,13 +34,14 @@ export const WebAuthContextSchema = z.object({ botUsername: z.string() });
 export type WebAuthContext = z.infer<typeof WebAuthContextSchema>;
 
 /**
- * `NOT_A_MEMBER` and `TELEGRAM_LOGIN_UNAVAILABLE` belonged to IB-072's Telegram widget, which IB-078
- * deleted from the server (P11); no server route sends them any more. They stay listed until IB-079
- * removes the dashboard code that still names them.
+ * The token codes are deliberately distinguishable **to the person who holds the link** (IB-029,
+ * now the credentials link of IB-078): 401 for a token never issued, 410 for one really issued and
+ * now spent or stale. A 256-bit, ten-minute link is not something an outsider enumerates, so telling
+ * its holder "you already used this" is help, not a leak. A wrong login or password, by contrast,
+ * is ONE code whatever the cause (INVALID_CREDENTIALS).
  */
 export const WEB_AUTH_ERROR_CODES = [
   'TOKEN_INVALID', 'TOKEN_USED', 'TOKEN_EXPIRED', 'UNAUTHENTICATED', 'FORBIDDEN',
-  'NOT_A_MEMBER', 'TELEGRAM_LOGIN_UNAVAILABLE',
   // IB-078 (design §3)
   'INVALID_CREDENTIALS', 'TOO_MANY_ATTEMPTS', 'LOGIN_TAKEN', 'BAD_LOGIN', 'WEAK_PASSWORD',
 ] as const;

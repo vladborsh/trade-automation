@@ -6,8 +6,10 @@
   <a routerLink="/instrument/BTCUSDT" routerLinkActive="active">{{ t('nav.instrument') }}</a>
   @if (isAdmin()) {
     <a routerLink="/health" routerLinkActive="active">{{ t('nav.health') }}</a>
+    <a routerLink="/admin/logins" routerLinkActive="active">{{ t('nav.logins') }}</a>
   }
   <app-alerts-toggle class="nav-end" />
+  <app-account-menu />
 </nav>
 <main class="page">
   <router-outlet />

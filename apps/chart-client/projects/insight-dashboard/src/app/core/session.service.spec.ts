@@ -42,3 +42,28 @@ describe('SessionService', () => {
     expect(service.isAdmin()).toBe(true);
   });
 });
+
+describe('IB-079: the session follows login and logout without a reload', () => {
+  it('logout, then a login as SOMEONE ELSE: the nav sees the new member, not the old one', async () => {
+    let who: 'admin' | 'member' = 'admin';
+    const { service, me } = setup(async () => body(who));
+    expect((await service.ensure())?.role).toBe('admin');
+
+    service.signedOut();
+    expect(service.user()).toBeNull();
+    expect(service.isAdmin()).toBe(false);
+
+    who = 'member';
+    expect((await service.ensure())?.role).toBe('member'); // asked again, not answered from memory
+    expect(me).toHaveBeenCalledTimes(2);
+  });
+
+  it('signedIn replaces whoever was known, with no request', async () => {
+    const { service, me } = setup(async () => body('admin'));
+    await service.ensure();
+    service.signedIn({ id: 2, tgUserId: 222, role: 'member', lang: 'ru', login: 'bob' });
+    expect(service.isAdmin()).toBe(false);
+    expect((await service.ensure())?.login).toBe('bob');
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+});

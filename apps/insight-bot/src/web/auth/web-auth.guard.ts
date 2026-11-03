@@ -21,7 +21,7 @@ export const ADMIN_ONLY_KEY = 'ib:adminOnly';
 /** Marks a route as admin-only; the guard enforces it after authentication. */
 export const AdminOnly = (): MethodDecorator & ClassDecorator => SetMetadata(ADMIN_ONLY_KEY, true);
 
-/** Marks a route as public — only the exchange endpoint, which has no cookie yet. */
+/** Marks a route as public — /auth/login, /auth/credentials, /auth/context, /auth/logout: no cookie yet. */
 export const PUBLIC_KEY = 'ib:public';
 export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(PUBLIC_KEY, true);
 

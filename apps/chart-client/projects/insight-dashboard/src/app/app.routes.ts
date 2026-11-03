@@ -9,7 +9,7 @@ import { adminGuard } from './core/admin.guard';
  * view — already merged and working — had no menu entry at all.
  *
  * `LANDING_ROUTE` is the single place that decides where "in" is: the default route, the unknown-path
- * fallback and the login exchange all read it, so moving the landing page is one edit rather than
+ * fallback and the login page all read it, so moving the landing page is one edit rather than
  * three that can disagree. IB-037's card page has landed, so it is `/market`.
  */
 
@@ -23,6 +23,21 @@ export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./features/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    // IB-079: the bot's one link (set up / reset the password). Public, like /login.
+    path: 'set-password',
+    loadComponent: () => import('./features/set-password/set-password.component').then((m) => m.SetPasswordComponent),
+  },
+  {
+    path: 'account',
+    loadComponent: () => import('./features/account/account.component').then((m) => m.AccountComponent),
+  },
+  {
+    // IB-079 (password-login design P10): the login journal — admin only, IB-075's guard.
+    path: 'admin/logins',
+    canActivate: [adminGuard(LANDING_ROUTE)],
+    loadComponent: () => import('./features/admin-logins/admin-logins.component').then((m) => m.AdminLoginsComponent),
   },
   {
     // IB-075 (member-access design M8): the operator page is admin-only; a member lands on the market.
