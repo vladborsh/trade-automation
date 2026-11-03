@@ -20,7 +20,7 @@ they are estimates to re-check in the AWS calculator, not quotes.
 | S3 backups | ~6 GB average held (35 daily `pg_dump -Fc`, lifecycle-expired) × 0.025 | **0.15** |
 | S3 requests | ~1 PUT/day + occasional GET | **0.01** |
 | Data transfer out | venue REST/WS + Telegram; far below the 100 GB/month free allowance | **0.00** |
-| ECR | **dropped** — images come from GHCR (free for this use) | 0.00 |
+| ECR | at most 10 images × image size × 0.10/GB-month (ECR design E3; size measured at the first push) | ≈ 0.0x |
 | NAT gateway / ALB | not used, and never will be for this design | 0.00 |
 | AWS Budgets | first two budgets are free | 0.00 |
 | **Total** | | **≈ 16.49** |
@@ -62,21 +62,14 @@ user**, plus a forecast alert at the same threshold so it warns mid-month rather
 bill. 18 leaves 2 USD of slack under the 20 cap. It is in the Terraform, so it exists from the
 first apply — not something to remember later.
 
-## Deploy path: GitHub Actions → GHCR, deployment through SSM
+## Deploy path: ECR, deployment through SSM (since 2026-11-03)
 
-The user left the choice to me; I pick **GHCR for the image and SSM Run Command to deploy**, and
-the box pulls with a read-only token from SSM Parameter Store.
-
-- **Why not ECR:** it bills per GB stored. GHCR is free for this repository's use, and the image is
-  the only thing we would have paid ECR for.
-- **Why not build on the box:** a 1 GB arm64 instance building a Node image is slow and would need
-  the source and a toolchain on the production host. Pulling a finished image keeps the box thin.
-- **Why SSM rather than SSH:** no inbound port, no key to keep, and it is already how the operator
-  gets a shell (design §7, D11). GitHub Actions authenticates to AWS by OIDC **only** for
-  `ssm:SendCommand` on this one instance; if the user prefers no CI at all, the same one-line
-  command runs from their machine — the RUNBOOK gives both.
-- **What this needs:** one SSM parameter `/insight-bot/GHCR_TOKEN` (a GitHub PAT with
-  `read:packages`, nothing else) for the box's `docker login ghcr.io`.
+The earlier choice of GHCR (git history of this file) was reversed by the user's ruling of 2026-11-03: the
+image lives in **AWS ECR** (`architecture/ecr-image-2026-11-03.md`). Reason: the repository may go
+private, and with ECR the box pulls with its instance role, so nothing depends on GitHub
+visibility and no GitHub token sits in SSM. ECR bills only stored GB (≤ 10 images kept) and a
+same-region pull is free: cents per month. Deploys still run through SSM Run Command, from CI by
+OIDC or by hand (RUNBOOK §3).
 
 ## What changed in the IaC to match
 
@@ -84,8 +77,8 @@ the box pulls with a read-only token from SSM Parameter Store.
 |---|---|
 | `instance_type = "t4g.small"` | `"t4g.micro"` (variable, so a stop-change-start upgrade is one edit) |
 | `root_volume_gb = 50` | `20` (back to `50` by the owner's ruling 2026-11-02) |
-| `ecr.tf` with a repository and lifecycle policy | **deleted**; `image_ref` variable points at GHCR |
-| instance role could pull from ECR | ECR statements removed; it reads `/insight-bot/*` and writes the bucket, nothing else |
+| `ecr.tf` with a repository and lifecycle policy | deleted for GHCR, then **back** (2026-11-03, ECR design): immutable `sha-` tags, keep 10 |
+| instance role could pull from ECR | pull from the one repository again (2026-11-03); reads `/insight-bot/*`, writes the bucket |
 | no budget | `budgets.tf`: `insight-bot-monthly`, actual and forecast alerts at 18 USD |
 | no swap | 2 GB swap file created in `user_data` before the containers start |
 | compose `postgres` tuned for 2 GB | tuned for 1 GB (above) |

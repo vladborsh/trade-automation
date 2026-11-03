@@ -17,7 +17,7 @@
 | Контейнеры | `postgres:16-alpine` + `insight-bot` + `cloudflared`, запускает `docker compose` | база данных, само приложение и туннель, через который сайт виден из интернета (§11) |
 | Секреты | AWS SSM Parameter Store, префикс `/insight-bot` | токены и пароли; в репозитории их нет |
 | Резервные копии | S3 `vb-insight-bot-backups-apne1`, папка `pg_dump/`, хранение 35 дней | ежедневный дамп базы в 01:00 UTC |
-| Образ приложения | **GHCR** (`ghcr.io/<owner>/insight-bot`) | собирается в GitHub Actions под arm64; ECR не используется — он платный за хранение |
+| Образ приложения | **AWS ECR**, репозиторий `insight-bot` в Токио | теги только `sha-<12 символов коммита>`, неизменяемые, `latest` нет; хранятся последние 10; какой тег запускать — в SSM `/insight-bot/IMAGE_TAG`; сервер скачивает образ своей ролью, без токенов |
 | Доступ на сервер | **только** AWS SSM Session Manager | входящих портов нет вообще, SSH-ключей нет |
 | Адрес сайта | домен владельца → Cloudflare Tunnel → `insight-bot:3005` | участники открывают `https://<домен>`; туннель сам звонит наружу в Cloudflare, поэтому входящие порты по-прежнему закрыты |
 
@@ -43,23 +43,38 @@ cd /opt/insight-bot
 
 ## 3. Как выкатить новую версию (деплой)
 
-Обычный путь — через GitHub Actions:
+Образ лежит в AWS ECR (репозиторий `insight-bot`, Токио). Тег — всегда `sha-<первые 12 символов
+коммита>`, теги неизменяемые, `latest` нет. Какой образ должен работать, записано в параметре SSM
+`/insight-bot/IMAGE_TAG`.
 
-1. Открыть в GitHub вкладку **Actions** → workflow **insight-bot deploy** → **Run workflow**.
-2. Он соберёт образ под arm64, положит его в ECR и запустит на сервере `deploy.sh`.
-3. В конце job печатает вывод с сервера. Успех — строка `deploy.sh: healthy on …`.
+**Обычный путь — GitHub Actions:** вкладка **Actions** → workflow **insight-bot deploy** →
+**Run workflow** (по умолчанию собирает `master`). Он соберёт образ под arm64, положит в ECR
+(если такого тега ещё нет), запишет тег в `/insight-bot/IMAGE_TAG` и запустит на сервере
+`deploy.sh`. В конце job печатает вывод с сервера; успех — строка `deploy.sh: healthy on …`.
 
-Руками (если Actions недоступен), уже находясь на сервере:
+**Руками, с машины разработчика** (если Actions недоступен), из чистого дерева на нужном коммите:
 
 ```bash
-/opt/insight-bot/deploy.sh latest      # или конкретный тег: sha-9f2c1ab
+infra/insight-bot/scripts/push-image.sh            # собрать из git archive, запушить, записать IMAGE_TAG
+aws ssm send-command --region ap-northeast-1 --instance-ids <id> \
+  --document-name AWS-RunShellScript --parameters 'commands=["/opt/insight-bot/deploy.sh"]'
 ```
 
-`deploy.sh` делает по порядку: собирает `.env` из секретов SSM, логинится в ECR,
-скачивает образ, поднимает контейнеры, ждёт ответа `/health` до 150 секунд.
+`deploy.sh` без аргумента берёт тег из `/insight-bot/IMAGE_TAG`; с аргументом
+(`deploy.sh sha-<12>`) — этот тег. Тег не вида `sha-…` (в том числе `latest`) он отказывается
+запускать. Дальше по порядку: собирает `.env` из SSM, входит в ECR ролью сервера, скачивает образ,
+поднимает `postgres` и `insight-bot` (и `cloudflared`, только если есть токен туннеля), ждёт
+`/health` до 150 секунд.
 
-**Откат:** тот же скрипт с предыдущим тегом, например `deploy.sh sha-<прошлый коммит>`.
-Список тегов: `aws ecr list-images --repository-name insight-bot --region ap-northeast-1`.
+**Откат:** записать в `/insight-bot/IMAGE_TAG` прошлый тег (или передать его аргументом) и
+запустить `deploy.sh`. Список тегов:
+`aws ecr describe-images --repository-name insight-bot --region ap-northeast-1 --query 'imageDetails[].imageTags'`.
+
+**Если поменялись файлы сервера** (`compose/docker-compose.yml`, скрипты в `scripts/`, юниты
+`systemd/`): OpenTofu их на работающий сервер **не** доставляет. `user_data` выполняется только при
+первом запуске, а его изменение остановило бы сервер, поэтому tofu его игнорирует. Доставка —
+`infra/insight-bot/scripts/sync-box.sh` (из чистого дерева; коммит записывается в
+`/opt/insight-bot/SYNCED-FROM`), затем `deploy.sh`.
 
 ---
 
