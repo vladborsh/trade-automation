@@ -4,9 +4,10 @@ import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { UptimeRecorder } from '../uptime/uptime.recorder';
 import { Writers } from '../writers/batch-writer';
+import { describeFailure } from '../writers/write-isolated';
 import { CollectorGapRow } from '../writers/tables';
 import { contractSpecs } from '../../venues/okx/contract-size';
-import { OkxCollector, STREAM_FUNDING, STREAM_LIQUIDATION, STREAM_MARK } from './okx-collector';
+import { OkxCollector, STREAM_FUNDING, STREAM_LIQUIDATION, STREAM_MARK, writeOkxDrain } from './okx-collector';
 import { OkxRest } from '../../venues/okx/okx-rest';
 import { OkxSocket, OkxSubscription } from './okx-socket';
 import { settlementRowsFromHistory, VENUE } from './mappers';
@@ -133,7 +134,7 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
       // Dead-socket rule, as IB-005/IB-008 (the socket owns it; no degraded REST mode exists for
       // these channels, so silence means reconnect).
       this.socket?.checkSilence(now);
-      void this.flush().catch((err) => this.logger.error(`OKX write failed: ${(err as Error).message}`));
+      void this.flush().catch((err) => this.logger.error(`OKX flush failed: ${(err as Error).message}`));
     }, TICK_MS);
     this.timer.unref?.();
   }
@@ -141,9 +142,7 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
   private async flush(): Promise<void> {
     const drained = this.collector?.drain();
     if (drained === undefined) return;
-    if (drained.markFunding.length > 0) await this.writers.markFunding.write(drained.markFunding);
-    if (drained.liquidations.length > 0) await this.writers.liquidations.write(drained.liquidations);
-    if (drained.settlements.length > 0) await this.writers.fundingSettlements.write(drained.settlements);
+    for (const failure of await writeOkxDrain(drained, this.writers)) this.logger.error(describeFailure('OKX', failure));
   }
 
   /**

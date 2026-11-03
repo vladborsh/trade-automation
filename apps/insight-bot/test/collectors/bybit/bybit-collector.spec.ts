@@ -129,6 +129,30 @@ describe('BybitCollector — streams (§4.3)', () => {
     ]);
   });
 
+  it('IB-BUG-015: a refused prediction row does not cost the settled rate, and the warning names the table', async () => {
+    const funding: FundingSettlementRow[] = [];
+    const warnings: string[] = [];
+    const h = harness({
+      writers: {
+        markFunding: { write: async () => { throw new Error('mark_funding_1m: write of 1 of 1 row(s) failed: boom'); } },
+        fundingSettlements: { write: async (rows) => (funding.push(...rows), rows.length) },
+        liquidations: { write: async (rows) => rows.length },
+      },
+      logger: { log: () => undefined, warn: (m: string) => void warnings.push(m) },
+    });
+    await h.collector.start();
+    await h.collector.whenBackfilled();
+    funding.length = 0;
+
+    await h.collector.onMessage(ticker('XRPUSDT', 'snapshot', { markPrice: '2.1', fundingRate: '0.00031', nextFundingTime: String(NEXT_FUNDING) }));
+    await h.collector.onMessage(ticker('XRPUSDT', 'delta', { nextFundingTime: String(NEXT_FUNDING + 8 * 3_600_000) }));
+
+    expect(funding).toEqual([
+      { venue: 'bybit', symbol: 'XRPUSDT', fundingTime: new Date(NEXT_FUNDING), rate: 0.0001, markPrice: null, source: 'rest' },
+    ]);
+    expect(warnings).toContainEqual(expect.stringMatching(/^bybit write to mark_funding_1m failed, 1 row\(s\) not written: .*boom/));
+  });
+
   it('the recorded snapshot+delta pair keeps the mark price through the delta', async () => {
     const h = harness({ symbols: ['BTCUSDT'], signalSet: ['BTCUSDT'] });
     await h.collector.start();

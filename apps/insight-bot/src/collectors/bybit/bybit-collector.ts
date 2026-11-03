@@ -4,6 +4,7 @@ import { isLiquidationMessage, isTickerMessage } from './payloads';
 import type { BybitRest } from '../../venues/bybit/bybit.rest';
 import { shouldPageFurther } from '../../venues/bybit/bybit.rest';
 import { TickerState } from './ticker-state';
+import { describeFailure, step, writeIsolated } from '../writers/write-isolated';
 
 /**
  * IB-008 — the Bybit collector (design §4.3).
@@ -180,7 +181,11 @@ export class BybitCollector {
   private async settleFunding(): Promise<void> {
     const rollovers = this.state.rollovers();
     if (rollovers.length === 0) return;
-    await this.ports.writers.markFunding.write(rollovers.map((r) => r.lastPrediction));
+    // IB-BUG-015: a refused prediction row must not cost the settled rate fetched below.
+    const predictions = rollovers.map((r) => r.lastPrediction);
+    for (const failure of await writeIsolated([step('mark_funding_1m', predictions, (rows) => this.ports.writers.markFunding.write(rows))])) {
+      this.ports.logger.warn(describeFailure('bybit', failure));
+    }
     const settled: FundingSettlementRow[] = [];
     for (const rollover of rollovers) {
       try {

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Db, DbHandle, DB } from '../../db/db.port';
 import { MetricsService } from '../../ops/metrics.service';
 import * as t from './tables';
-import { buildInsert, buildUpsert, chunk, MAX_ROWS_PER_STATEMENT, TableSpec } from './upsert';
+import { buildInsert, buildUpsert, chunk, MAX_ROWS_PER_STATEMENT, TableSpec, updatedColumns } from './upsert';
 
 /**
  * architecture/insight-bot-system-design.md §3.1, §2.1 (`collectors/writers`) — one writer per
@@ -34,14 +34,56 @@ export class BatchWriter<TRow> {
   /** The same write against a caller-supplied handle, e.g. inside `db.transaction(...)`. */
   async writeOn(handle: DbHandle, rows: readonly TRow[]): Promise<number> {
     if (rows.length === 0) return 0;
-    for (const batch of chunk(rows, MAX_ROWS_PER_STATEMENT)) {
+    const tuples = lastPerConflictKey(this.spec, rows.map((row) => this.toTuple(row)));
+    for (const batch of chunk(tuples, MAX_ROWS_PER_STATEMENT)) {
       const sql =
         this.spec.conflict.length === 0 ? buildInsert(this.spec, batch.length) : buildUpsert(this.spec, batch.length);
-      await handle.query(sql, batch.flatMap((row) => this.toTuple(row)));
+      try {
+        await handle.query(sql, batch.flat());
+      } catch (error) {
+        // IB-BUG-015: the bare Postgres message never said WHICH table refused, so six lost OKX
+        // batches were logged as "OKX write failed" with no writer in the line.
+        throw new Error(
+          `${this.spec.table}: write of ${batch.length} of ${tuples.length} row(s) failed: ${(error as Error).message}`,
+          { cause: error },
+        );
+      }
     }
-    this.metrics?.rowsWritten.inc({ table: this.spec.table }, rows.length);
-    return rows.length;
+    this.metrics?.rowsWritten.inc({ table: this.spec.table }, tuples.length);
+    return tuples.length;
   }
+}
+
+/**
+ * IB-BUG-015 — one row per natural key, the LAST one in the batch winning (the same answer two
+ * separate upserts in order would give). `ON CONFLICT DO UPDATE` refuses a statement that names
+ * one key twice ("cannot affect row a second time"), and a collector buffer legitimately holds
+ * repeats: OKX's `funding-rate` channel re-sends the settled rate for the same `prevFundingTime`
+ * on every push, so a drain with two pushes for one instrument carried the key twice and the whole
+ * batch was refused — 6 times in 14 h on the coordinator, every time `funding_settlements`.
+ *
+ * Deduped here, in the one writer every collector goes through, rather than in each collector:
+ * a per-collector fix would leave the next buffer that repeats a key to rediscover the bug.
+ * A `DO NOTHING` table (liquidations) and an append-only one (no key) are left alone: Postgres
+ * accepts repeats there, keeping the first, and changing which row survives is not this fix.
+ */
+export function lastPerConflictKey(spec: TableSpec, tuples: readonly unknown[][]): unknown[][] {
+  if (spec.conflict.length === 0 || updatedColumns(spec).length === 0) return [...tuples];
+  const keyAt = spec.conflict.map((column) => spec.columns.indexOf(column));
+  const byKey = new Map<string, unknown[]>();
+  for (const tuple of tuples) {
+    const key = keyAt.map((i) => keyPart(tuple[i])).join('\u0001');
+    byKey.delete(key); // re-inserted below, so the surviving row keeps its latest position
+    byKey.set(key, tuple);
+  }
+  return [...byKey.values()];
+}
+
+/** A Date compares by instant (two `new Date(x)` are different objects), everything else by type + value. */
+function keyPart(value: unknown): string {
+  if (value instanceof Date) return `d${value.getTime()}`;
+  if (value === null || value === undefined) return 'n';
+  return `${typeof value}:${String(value)}`;
 }
 
 /**

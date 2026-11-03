@@ -11,6 +11,7 @@ import { isForceOrderEvent, isMarkPriceEvent, type MarkPriceEvent } from './payl
 import { gapRow } from '../binance-common/rows';
 import type { PerpRest } from '../../venues/binance/perp.rest';
 import { perpStreamNames } from './streams';
+import { describeFailure, step, writeIsolated } from '../writers/write-isolated';
 
 /**
  * IB-005 — the Binance USD-M perp collector (design §4.1, §16.1).
@@ -241,7 +242,11 @@ export class BinancePerpCollector {
   private async settleFunding(): Promise<void> {
     const rollovers = this.sampler.rollovers();
     if (rollovers.length === 0) return;
-    await this.ports.writers.markFunding.write(rollovers.map((r) => r.lastPrediction));
+    // IB-BUG-015: a refused prediction row must not cost the settled rate fetched below.
+    const predictions = rollovers.map((r) => r.lastPrediction);
+    for (const failure of await writeIsolated([step('mark_funding_1m', predictions, (rows) => this.ports.writers.markFunding.write(rows))])) {
+      this.ports.logger.warn(describeFailure('binance-perp', failure));
+    }
     const settled: FundingSettlementRow[] = [];
     for (const rollover of rollovers) {
       try {

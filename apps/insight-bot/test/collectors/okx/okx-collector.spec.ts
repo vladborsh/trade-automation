@@ -1,5 +1,5 @@
 import { contractSpecs } from '../../../src/venues/okx/contract-size';
-import { OkxCollector } from '../../../src/collectors/okx/okx-collector';
+import { OkxCollector, writeOkxDrain } from '../../../src/collectors/okx/okx-collector';
 import { OkxFundingRate, OkxLiquidation, OkxMarkPrice } from '../../../src/collectors/okx/payloads';
 
 const BTC = 'BTC-USDT-SWAP';
@@ -162,5 +162,50 @@ describe('drain', () => {
     collector.acceptLiquidation(liquidation(BTC, 'long', '1'));
     expect(collector.drain().liquidations).toHaveLength(1);
     expect(collector.drain().liquidations).toEqual([]);
+  });
+});
+
+describe('IB-BUG-015 writeOkxDrain — one refused table does not lose the others', () => {
+  it('a failing mark_funding_1m write still lets liquidations and settlements land, and names the table and count', async () => {
+    const collector = build();
+    collector.acceptMarkPrice(mark(BTC, '80000'));
+    collector.sampleMinute(new Date(MINUTE));
+    collector.acceptLiquidation(liquidation(BTC, 'long', '3'));
+    collector.acceptFundingRate(funding(BTC));
+
+    const written = { liquidations: 0, settlements: 0 };
+    const failures = await writeOkxDrain(collector.drain(), {
+      markFunding: { write: async () => { throw new Error('ON CONFLICT DO UPDATE command cannot affect row a second time'); } },
+      liquidations: { write: async (rows) => (written.liquidations += rows.length) },
+      fundingSettlements: { write: async (rows) => (written.settlements += rows.length) },
+    });
+
+    expect(written).toEqual({ liquidations: 1, settlements: 1 });
+    expect(failures).toEqual([{ table: 'mark_funding_1m', rows: 1, message: 'ON CONFLICT DO UPDATE command cannot affect row a second time' }]);
+  });
+
+  it('liquidations are written first, so nothing ahead of them can stop them', async () => {
+    const collector = build();
+    collector.acceptMarkPrice(mark(BTC, '80000'));
+    collector.sampleMinute(new Date(MINUTE));
+    collector.acceptLiquidation(liquidation(BTC, 'long', '3'));
+    collector.acceptFundingRate(funding(BTC));
+    const order: string[] = [];
+    await writeOkxDrain(collector.drain(), {
+      markFunding: { write: async (rows) => (order.push('mark'), rows.length) },
+      liquidations: { write: async (rows) => (order.push('liquidations'), rows.length) },
+      fundingSettlements: { write: async (rows) => (order.push('settlements'), rows.length) },
+    });
+    expect(order).toEqual(['liquidations', 'mark', 'settlements']);
+  });
+
+  it('the channel re-sending a settled rate puts the same key in one drain twice — the input the bug needed', () => {
+    const collector = build();
+    collector.acceptFundingRate(funding(BTC));
+    collector.acceptFundingRate(funding(BTC, { ts: String(MINUTE + 30_000) }));
+    const { settlements } = collector.drain();
+    expect(settlements.map((r) => [r.symbol, r.fundingTime.getTime()])).toEqual([
+      [BTC, SETTLE - EIGHT_HOURS], [BTC, SETTLE - EIGHT_HOURS],
+    ]);
   });
 });

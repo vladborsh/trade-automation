@@ -1,5 +1,6 @@
 import { ContractSpec } from '../../venues/okx/contract-size';
 import { FundingSettlementRow, LiquidationRow, MarkFundingRow } from '../writers/tables';
+import { step, writeIsolated, WriteFailure } from '../writers/write-isolated';
 import {
   fundingTimeOf,
   liquidationRows,
@@ -142,4 +143,23 @@ export class OkxCollector {
     this.out = { markFunding: [], liquidations: [], settlements: [] };
     return out;
   }
+}
+
+export interface OkxDrainWriters {
+  markFunding: { write(rows: readonly MarkFundingRow[]): Promise<number> };
+  liquidations: { write(rows: readonly LiquidationRow[]): Promise<number> };
+  fundingSettlements: { write(rows: readonly FundingSettlementRow[]): Promise<number> };
+}
+
+/**
+ * IB-BUG-015 — writes one drain, each table on its own, liquidations FIRST (the priority data,
+ * owner ruling 2026-10-31). A refused table is returned, not thrown, so the other two still land;
+ * the caller logs each failure with its table and row count.
+ */
+export function writeOkxDrain(drained: OkxDrain, writers: OkxDrainWriters): Promise<WriteFailure[]> {
+  return writeIsolated([
+    step('liquidations', drained.liquidations, (rows) => writers.liquidations.write(rows)),
+    step('mark_funding_1m', drained.markFunding, (rows) => writers.markFunding.write(rows)),
+    step('funding_settlements', drained.settlements, (rows) => writers.fundingSettlements.write(rows)),
+  ]);
 }

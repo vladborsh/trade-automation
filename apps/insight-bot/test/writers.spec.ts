@@ -1,4 +1,4 @@
-import { BatchWriter } from '../src/collectors/writers/batch-writer';
+import { BatchWriter, lastPerConflictKey } from '../src/collectors/writers/batch-writer';
 import * as t from '../src/collectors/writers/tables';
 import { buildInsert, buildUpsert, chunk, MAX_ROWS_PER_STATEMENT, updatedColumns } from '../src/collectors/writers/upsert';
 import { Db, DbHandle } from '../src/db/db.port';
@@ -159,3 +159,52 @@ describe('BatchWriter', () => {
     expect(db.calls.map((c) => c.sql.split(' ')[2])).toEqual(['candles_1m', 'liquidations']);
   });
 });
+
+describe('IB-BUG-015 — a batch naming one natural key twice', () => {
+  const settlement = (rate: number, symbol = 'BTC-USDT-SWAP'): t.FundingSettlementRow => ({
+    venue: 'okx', symbol, fundingTime: new Date(Date.UTC(2026, 10, 3, 8)), rate, markPrice: null, source: 'ws',
+  });
+
+  it('sends one row per key, the last one winning, and counts what it sent', async () => {
+    const db = new FakeDb();
+    const inc = jest.fn();
+    const writer = new BatchWriter(db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple, { rowsWritten: { inc } } as never);
+    // a NEW Date per row, as the mapper makes them: equal instants, different objects
+    expect(await writer.write([settlement(0.0001), settlement(0.0002, 'ETH-USDT-SWAP'), settlement(0.0003)])).toBe(2);
+
+    expect(db.calls).toHaveLength(1);
+    const rows = chunkParams(db.calls[0].params, t.FUNDING_SETTLEMENTS.columns.length);
+    expect(rows.map((r) => [r[1], r[3]])).toEqual([['ETH-USDT-SWAP', 0.0002], ['BTC-USDT-SWAP', 0.0003]]);
+    expect(inc).toHaveBeenCalledWith({ table: 'funding_settlements' }, 2);
+  });
+
+  it('leaves a DO NOTHING table and an append-only one exactly as given', () => {
+    const liq = t.liquidationTuple({ venue: 'okx', symbol: 'BTC-USDT-SWAP', ts: new Date(0), side: 'long', price: 1, qty: 2, notional: 2, source: 'ws' });
+    expect(lastPerConflictKey(t.LIQUIDATIONS, [liq, [...liq]])).toHaveLength(2);
+    const gap = t.collectorGapTuple({ stream: 's', venue: 'okx', gapFrom: new Date(0), gapTo: new Date(0), expected: 1, detectedAt: new Date(0) });
+    expect(lastPerConflictKey(t.COLLECTOR_GAPS, [gap, [...gap]])).toHaveLength(2);
+  });
+
+  it('keeps rows whose keys differ only in a way Postgres also tells apart', () => {
+    const a = t.markFundingTuple({ venue: 'okx', symbol: 'X', ts: new Date(60_000), source: 'ws' });
+    const b = t.markFundingTuple({ venue: 'okx', symbol: 'X', ts: new Date(60_001), source: 'ws' });
+    const c = t.markFundingTuple({ venue: 'bybit', symbol: 'X', ts: new Date(60_000), source: 'ws' });
+    expect(lastPerConflictKey(t.MARK_FUNDING_1M, [a, b, c])).toHaveLength(3);
+  });
+
+  it('a refused statement names its table and the row count', async () => {
+    const db: Db = {
+      query: async () => { throw new Error('ON CONFLICT DO UPDATE command cannot affect row a second time'); },
+      transaction: async (fn) => fn(db),
+    };
+    await expect(new BatchWriter(db, t.FUNDING_SETTLEMENTS, t.fundingSettlementTuple).write([settlement(0.0001)])).rejects.toThrow(
+      'funding_settlements: write of 1 of 1 row(s) failed: ON CONFLICT DO UPDATE command cannot affect row a second time',
+    );
+  });
+});
+
+function chunkParams(params: readonly unknown[], width: number): unknown[][] {
+  const out: unknown[][] = [];
+  for (let i = 0; i < params.length; i += width) out.push(params.slice(i, i + width) as unknown[]);
+  return out;
+}

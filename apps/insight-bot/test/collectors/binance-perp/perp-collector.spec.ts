@@ -198,6 +198,37 @@ describe('BinancePerpCollector — the websocket path (§4.1)', () => {
   });
 });
 
+describe('BinancePerpCollector — IB-BUG-015 write isolation', () => {
+  it('a refused prediction row at a rollover does not cost the settled rate, and the warning names the table', async () => {
+    const funding: FundingSettlementRow[] = [];
+    const warnings: string[] = [];
+    const ok = async (rows: readonly unknown[]) => rows.length;
+    const h = harness({
+      writers: {
+        candles1m: { write: ok }, liquidations: { write: ok }, collectorGaps: { write: ok },
+        // the minute sample is written fine; only the rollover's prediction row is refused
+        markFunding: { write: async (rows) => {
+          if (rows.some((r) => r.ts.getTime() === Date.UTC(2026, 8, 28, 16))) throw new Error('mark_funding_1m: write of 1 of 1 row(s) failed: boom');
+          return rows.length;
+        } },
+        fundingSettlements: { write: async (rows) => (funding.push(...rows), rows.length) },
+      },
+      logger: { log: () => undefined, warn: (m: string) => void warnings.push(m) },
+    });
+    await h.collector.start();
+    await h.collector.tick();
+    const settlement = Date.UTC(2026, 8, 28, 16);
+    await h.collector.onMessage('!markPrice@arr@1s', [markEvent('BTCUSDT', T0 + 1_000, { r: '0.00031', T: settlement })]);
+    await h.collector.onMessage('!markPrice@arr@1s', [markEvent('BTCUSDT', T0 + 2_000, { r: '0.00005', T: settlement + 8 * 3_600_000 })]);
+
+    h.at(T0 + 61_000);
+    await h.collector.tick();
+
+    expect(funding).toEqual([{ venue: 'binance', symbol: 'BTCUSDT', fundingTime: new Date(settlement), rate: 0.00031, markPrice: 100, source: 'rest' }]);
+    expect(warnings).toContainEqual(expect.stringMatching(/^binance-perp write to mark_funding_1m failed, 1 row\(s\) not written: .*boom/));
+  });
+});
+
 describe('BinancePerpCollector — degraded mode (§16.1)', () => {
   it('a socket that opens and stays mute falls back to REST after 30 s, and /health says so', async () => {
     const h = harness();
