@@ -183,7 +183,7 @@ Sizing rules for IB-030/IB-031, so nobody guesses:
 |---|---|---|
 | OS + docker + `cloudflared` | ≈ 150 MB | `cloudflared` ≈ 30 MB; nothing else runs on the host |
 | Postgres 16 | ≈ 350 MB peak | `shared_buffers=256MB`, `max_connections=20`, `work_mem=4MB` (already in the IaC); the web readers get **their own pool of ≤ 4 connections** and `statement_timeout=5s` |
-| insight-bot (Node) | **≤ 265 MB RSS worst case**, `--max-old-space-size=128 --max-semi-space-size=8` in the image `CMD` (IB-096; was 400 MB / 320, never implemented and larger than the measured box leaves) | collectors' batched writers (≤ 500 rows in flight per table) + web readers (below). Measured under client cadence: 154–175 MB RSS, live heap ≤ 67 MB; arithmetic and a spec that pins the `CMD` in `apps/insight-bot/src/ops/memory-budget.ts` |
+| insight-bot (Node) | **≤ 265 MB RSS worst case**, `--max-old-space-size=128 --max-semi-space-size=8` in the image `CMD` (IB-096; was 400 MB / 320, never implemented and larger than the measured box leaves) | collectors' batched writers (≤ 500 rows in flight per table) + web readers (below). Measured under client cadence: 154–175 MB RSS, live heap ≤ 76 MB (warm heap snapshot); arithmetic and a spec that pins the `CMD` in `apps/insight-bot/src/ops/memory-budget.ts` |
 | headroom / page cache | ≈ 100 MB | swap absorbs bursts (IB-012 backfill is the known offender and runs before the collectors or on a temporary `t4g.small`) |
 
 **Angular build: never on the box.** `ng build insight-dashboard` runs in the

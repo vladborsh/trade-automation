@@ -3,7 +3,7 @@
  * passes `nodeFlags()` (a spec reads the Dockerfile and fails if they drift apart).
  *
  * **Why a cap at all.** Uncapped, V8 sizes its heap for the machine, not for the box: on slot dev-3
- * the bot sat at 265–311 MB RSS under client cadence with only 63–111 MB of it live heap — the rest
+ * the bot sat at 265–311 MB RSS under client cadence with heapUsed 63–111 MB and ~76 MB live (heap snapshot) — the rest
  * was heap V8 had grown into and kept (heapTotal up to 221 MB). With these flags the same load ran
  * at 154–175 MB RSS, heapTotal ≤ 86 MB, every request 200, no OOM (run C, 2026-11-04; run B at 160
  * gave 164–191 MB). Latency unchanged: median 62 vs 69 ms, p95 2.5 vs 2.8 s, the cold `insights`
@@ -22,8 +22,12 @@ export const HEAP_OLD_SPACE_MB = 128;
 export const HEAP_SEMI_SPACE_MB = 8;
 export const YOUNG_GEN_SEMI_SPACES = 3;
 
-/** Highest live heap seen under client cadence (heapUsed, runs B and C, 30 s samples). */
-export const MEASURED_PEAK_HEAP_USED_MB = 67;
+/**
+ * Live heap under client cadence: 76 MB of reachable objects in a warm heap snapshot (taken after a
+ * GC, before the IB-096 trims, so an upper figure). Not `heapUsed`: an uncapped sample of it
+ * includes garbage awaiting collection (58–111 MB in the same load) and says little about what lives.
+ */
+export const MEASURED_PEAK_LIVE_HEAP_MB = 76;
 /** Old space must hold the measured peak with this much room: below it, a busier day is an OOM. */
 export const MIN_HEAP_HEADROOM_RATIO = 1.5;
 
