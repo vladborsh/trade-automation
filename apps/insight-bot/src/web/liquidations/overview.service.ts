@@ -6,7 +6,7 @@ import {
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
 import { LARGE_LIMIT, LARGE_MIN_USD, LIQUIDATION_BLOCK_CACHE_MS, SERIES_MIN_USD } from '../../insights/thresholds';
-import { TtlCache } from '../../venues/ttl-cache';
+import { IDLE_SWEEP_MS, TtlCache } from '../../venues/ttl-cache';
 import { AssetClassifier } from './asset-classes';
 import { availableFrom, hourly, largeEvents, periodNorm, periodTotals, verdict } from './block.assemble';
 import { normPeriodStart } from './norm';
@@ -74,7 +74,7 @@ export class LiquidationsOverviewService {
     /** Injected so the cache's expiry is spec'able without sleeping. `@Optional()` or Nest fails to resolve it. */
     @Optional() private readonly now: () => number = () => Date.now(),
   ) {
-    this.cache = new TtlCache({ now: () => this.now(), name: 'liquidations' });
+    this.cache = new TtlCache({ now: () => this.now(), name: 'liquidations', idleSweepMs: IDLE_SWEEP_MS });
   }
 
   async overview(q: OverviewQuery): Promise<WebLiquidationsOverviewResponse> {

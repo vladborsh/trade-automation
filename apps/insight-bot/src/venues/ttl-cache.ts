@@ -17,6 +17,13 @@ import { familyStats, registerCache, type CacheStats, type InspectableCache } fr
 export const DEFAULT_MAX_ENTRIES = 2_000;
 /** IB-096: expired entries are swept on insert, at most this often. */
 export const SWEEP_EVERY_MS = 10_000;
+/**
+ * IB-096: and on a timer, for a process nobody is reading. Measured on slot dev-3: after a warm
+ * load and 3.5 h with no request, 237 entries were still held, all expired (the 1 h positioning
+ * baselines among them), because the insert-time sweep needs an insert. Heap used 62 MB vs 45 MB
+ * on a fresh idle (one occasion, a note).
+ */
+export const IDLE_SWEEP_MS = 60_000;
 
 /** TTLs from the WD-008 task row. OI and long-short: the venue's own period is 5 minutes. */
 export const FUNDING_TTL_MS = 60_000;
@@ -32,6 +39,11 @@ export interface TtlCacheOptions {
   now?: () => number;
   /** IB-096: registered under this name for `/metrics` (entries per key family). */
   name?: string;
+  /**
+   * IB-096: also sweep on an unref'd timer this often, so an idle process lets go of what expired.
+   * Off unless asked for: the process-wide caches pass `IDLE_SWEEP_MS`; a spec's cache needs no timer.
+   */
+  idleSweepMs?: number;
 }
 
 export class TtlCache implements InspectableCache {
@@ -48,9 +60,14 @@ export class TtlCache implements InspectableCache {
       throw new Error(`maxEntries must be a positive integer, got ${this.maxEntries}`);
     }
     if (options.name) registerCache(options.name, this);
+    if (options.idleSweepMs !== undefined) {
+      if (!(options.idleSweepMs > 0)) throw new Error(`idleSweepMs must be positive, got ${options.idleSweepMs}`);
+      // unref: the timer never keeps the process (or a test run) alive on its own
+      setInterval(() => this.sweep(), options.idleSweepMs).unref();
+    }
   }
 
-  /** IB-096: entries per key family, and how many are expired but still held (dropped only on read). */
+  /** IB-096: entries per key family, and how many are expired but not yet swept. */
   stats(): CacheStats[] {
     const now = this.now();
     return familyStats(this.entries.entries(), (e) => e.expiresAt <= now);
@@ -88,7 +105,7 @@ export class TtlCache implements InspectableCache {
    * IB-096 — drops every expired entry. An expired entry used to leave only when its key was read
    * again, and most never are (a window key moves with `now`): measured on slot dev-3, 270 of 450
    * held OI/LS windows were expired, ~60 % of the cache's ~20 MB. Run on insert, at most once per
-   * `SWEEP_EVERY_MS`, so a burst of inserts costs one pass, not one per insert.
+   * `SWEEP_EVERY_MS`, so a burst of inserts costs one pass, not one per insert; and on the idle timer.
    */
   sweep(): void {
     const now = this.now();

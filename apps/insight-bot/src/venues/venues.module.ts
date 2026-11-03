@@ -6,7 +6,7 @@ import { FuturesDataClient } from './binance/futures-data.client';
 import { PerpRest } from './binance/perp.rest';
 import { BybitRest } from './bybit/bybit.rest';
 import { OkxRest } from './okx/okx-rest';
-import { TtlCache } from './ttl-cache';
+import { IDLE_SWEEP_MS, TtlCache } from './ttl-cache';
 
 /**
  * WD-008 — the venue clients the on-demand layer reads through, built once from config.
@@ -23,7 +23,7 @@ import { TtlCache } from './ttl-cache';
   imports: [AppConfigModule],
   providers: [
     BinanceWeightTracker,
-    { provide: TtlCache, useFactory: () => new TtlCache({ name: 'venues' }) },
+    { provide: TtlCache, useFactory: () => new TtlCache({ name: 'venues', idleSweepMs: IDLE_SWEEP_MS }) },
     {
       provide: FuturesDataClient,
       inject: [AppConfigService, BinanceWeightTracker],

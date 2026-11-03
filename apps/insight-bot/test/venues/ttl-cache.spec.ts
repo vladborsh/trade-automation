@@ -1,4 +1,4 @@
-import { SWEEP_EVERY_MS, TtlCache, windowKey } from '../../src/venues/ttl-cache';
+import { IDLE_SWEEP_MS, SWEEP_EVERY_MS, TtlCache, windowKey } from '../../src/venues/ttl-cache';
 
 describe('TtlCache (WD-008)', () => {
   let t = 0;
@@ -76,6 +76,36 @@ describe('TtlCache sweep (IB-096): an expired entry is not held until someone re
     now = SWEEP_EVERY_MS + 10;
     cache.set('c', 1, 60_000);
     expect(cache.size).toBe(2); // 'a' swept, 'b' and 'c' live
+  });
+
+  it('an idle process lets go too: with idleSweepMs, expired entries leave with no read and no insert', () => {
+    jest.useFakeTimers();
+    try {
+      let now = 0;
+      const cache = new TtlCache({ now: () => now, idleSweepMs: IDLE_SWEEP_MS });
+      cache.set('baselines', 1, 3_600_000);
+      cache.set('window', 2, 300_000);
+      now = 3_600_000 + SWEEP_EVERY_MS; // both expired; nobody reads or writes from here on
+      expect(cache.size).toBe(2);
+      jest.advanceTimersByTime(IDLE_SWEEP_MS);
+      expect(cache.size).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('without idleSweepMs there is no timer (a spec cache must not need one), and a bad value refuses', () => {
+    jest.useFakeTimers();
+    try {
+      new TtlCache();
+      expect(jest.getTimerCount()).toBe(0);
+      new TtlCache({ idleSweepMs: IDLE_SWEEP_MS });
+      expect(jest.getTimerCount()).toBe(1);
+      expect(() => new TtlCache({ idleSweepMs: 0 })).toThrow('idleSweepMs must be positive');
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
   });
 });
 
