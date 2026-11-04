@@ -51,7 +51,7 @@ function cellBasis(s: InsightSnapshot, sample: number): WebInsightBasis {
 const refuse = (refused: Refusal['refused'], basis: WebInsightBasis | null = null): Refusal => ({ refused, basis });
 
 export const R1: Rule = {
-  id: 'R1', block: 'liquidations',
+  id: 'R1', block: 'liquidations', sources: ['tape'],
   run(s) {
     const l = s.liquidations;
     if (!l) return refuse('no_data');
@@ -72,7 +72,7 @@ export const R1: Rule = {
 };
 
 export const R2: Rule = {
-  id: 'R2', block: 'liquidations',
+  id: 'R2', block: 'liquidations', sources: ['tape'],
   run(s) {
     const l = s.liquidations;
     if (!l) return refuse('no_data');
@@ -95,7 +95,7 @@ export const R2: Rule = {
 };
 
 export const R3: Rule = {
-  id: 'R3', block: 'liquidations',
+  id: 'R3', block: 'liquidations', sources: ['tape'],
   run(s) {
     const l = s.liquidations;
     if (!l) return refuse('no_data');
@@ -129,7 +129,7 @@ function measuredRows(s: InsightSnapshot, has: (r: WebPositioningRow) => boolean
 }
 
 export const R4: Rule = {
-  id: 'R4', block: 'positioning',
+  id: 'R4', block: 'positioning', sources: ['binance'],
   run(s) {
     const rows = measuredRows(s, (r) => r.oiChangePct.rarity !== null && r.priceChangePct.rarity !== null);
     if (!Array.isArray(rows)) return rows;
@@ -153,7 +153,7 @@ export const R4: Rule = {
 };
 
 export const R5: Rule = {
-  id: 'R5', block: 'positioning',
+  id: 'R5', block: 'positioning', sources: ['binance'],
   run(s) {
     const rows = measuredRows(s, (r) => r.fundingRate.rarity !== null && r.fundingRate.value !== null);
     if (!Array.isArray(rows)) return rows;
@@ -171,7 +171,7 @@ export const R5: Rule = {
 };
 
 export const R6: Rule = {
-  id: 'R6', block: 'positioning',
+  id: 'R6', block: 'positioning', sources: ['binance'],
   run(s) {
     const rows = measuredRows(s, (r) => r.lsGlobal.rarity !== null && r.lsTopPosition.rarity !== null);
     if (!Array.isArray(rows)) return rows;
@@ -191,7 +191,7 @@ export const R6: Rule = {
 };
 
 export const R7: Rule = {
-  id: 'R7', block: 'sentiment',
+  id: 'R7', block: 'sentiment', sources: ['binance'],
   run(s) {
     const b = s.breadth;
     if (!b) return refuse('no_data');
@@ -216,7 +216,7 @@ function flowsBasis(s: InsightSnapshot, window: WebInsightBasis['window'], venue
 
 /** R8 — BTC implied vol (Deribit DVOL) ROSE unusually over the period: a spike is a rise (TL ruling). */
 export const R8: Rule = {
-  id: 'R8', block: 'flows',
+  id: 'R8', block: 'flows', sources: ['deribit'],
   run(s) {
     const t = s.flows?.dvol;
     if (!t || t.value === null || !t.change) return refuse('no_data');
@@ -233,7 +233,7 @@ export const R8: Rule = {
 
 /** R9 — total stablecoin supply moved unusually in 1 day (7 on the 7d page): a mint or a burn. */
 export const R9: Rule = {
-  id: 'R9', block: 'flows',
+  id: 'R9', block: 'flows', sources: ['defillama'],
   run(s) {
     const t = s.flows?.stablecoins;
     if (!t || t.supplyUsd === null || !t.changeUsd) return refuse('no_data');
@@ -254,7 +254,7 @@ export const R9: Rule = {
  * (`insufficient_minutes`); a premium that flips sign is not sustained and says nothing.
  */
 export const R10: Rule = {
-  id: 'R10', block: 'flows',
+  id: 'R10', block: 'flows', sources: ['coinbase', 'binance'],
   run(s) {
     const t = s.flows?.coinbasePremium;
     if (!t || !t.premiumPct) return refuse('no_data');

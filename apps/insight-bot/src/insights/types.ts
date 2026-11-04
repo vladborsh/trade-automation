@@ -1,5 +1,5 @@
 import type {
-  WebFlowsResponse, WebInsightBasis, WebInsightBlock, WebInsightStatement, WebLiquidationLargeEvent, WebMarketPeriod, WebPositioningRow,
+  WebFlowsResponse, WebInsightBasis, WebInsightBlock, WebInsightSource, WebInsightStatement, WebLiquidationLargeEvent, WebMarketPeriod, WebPositioningRow,
 } from '@trade-automation/contracts';
 
 /**
@@ -46,6 +46,8 @@ export interface Refusal {
 export interface Rule {
   id: WebInsightStatement['ruleId'];
   block: WebInsightBlock;
+  /** IB-BUG-028: where it reads from — named on the block line when none of the block's rules could look. */
+  sources: readonly WebInsightSource[];
   /** A statement (any rarity — the engine gates), a refusal, or null (ran, found nothing to say). */
   run(s: InsightSnapshot): WebInsightStatement | Refusal | null;
 }

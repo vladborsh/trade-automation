@@ -1,5 +1,5 @@
 import {
-  WEB_INSIGHT_BLOCKS, type WebInsightBlock, type WebInsightBlockLine, type WebInsightStatement, type WebInsightsResponse,
+  WEB_INSIGHT_BLOCKS, type WebInsightBlock, type WebInsightBlockLine, type WebInsightSource, type WebInsightStatement, type WebInsightsResponse,
 } from '@trade-automation/contracts';
 import { INSIGHTS_TOP_N, RARITY_SHOW } from './thresholds';
 import { isRefusal, type InsightSnapshot, type Refusal, type Rule } from './types';
@@ -24,17 +24,16 @@ export function runInsights(rules: readonly Rule[], s: InsightSnapshot): Omit<We
     const own = results.filter((x) => x.rule.block === block);
     if (own.length === 0) return { block, statement: null, neutral: { key: 'insight.neutral', reason: 'no_rules', basis: null } };
     const refusals = own.map((x) => x.out).filter((o): o is Refusal => isRefusal(o));
-    const allHistory = refusals.length === own.length && refusals.some((r) => r.refused === 'insufficient_history');
-    // IB-091 (D18): every rule of the block refused and R10 for too few valid premium minutes
-    const allMinutes = refusals.length === own.length && refusals.some((r) => r.refused === 'insufficient_minutes');
     const ran = own.map((x) => x.out).find((o): o is WebInsightStatement => o !== null && !isRefusal(o));
+    const { reason, sources } = neutralReason(own.map((x) => x.rule), refusals);
     return {
       block,
       statement: null,
       neutral: {
         key: 'insight.neutral',
-        reason: allHistory ? 'insufficient_history' : allMinutes ? 'insufficient_minutes' : 'nothing_unusual',
+        reason,
         basis: ran?.basis ?? refusals.find((r) => r.basis !== null)?.basis ?? null,
+        ...(sources ? { sources } : {}),
       },
     };
   });
@@ -56,3 +55,20 @@ function safe(rule: Rule, s: InsightSnapshot): WebInsightStatement | Refusal | n
 }
 
 export type { WebInsightBlock };
+
+/**
+ * Why a block with rules says nothing — pure. Only when EVERY rule of the block refused is the line
+ * about the refusal; one rule that looked and found nothing makes it «nothing unusual». Precedence:
+ * thin history, then too few premium minutes (D18), then — IB-BUG-028 — every rule refused for
+ * `no_data`: the rules could not look, so the line names the sources that did not answer instead of
+ * claiming the market was quiet.
+ */
+export function neutralReason(
+  rules: readonly Rule[], refusals: readonly Refusal[],
+): { reason: 'nothing_unusual' | 'insufficient_history' | 'insufficient_minutes' | 'source_unavailable'; sources?: WebInsightSource[] } {
+  const all = refusals.length === rules.length && rules.length > 0;
+  if (all && refusals.some((r) => r.refused === 'insufficient_history')) return { reason: 'insufficient_history' };
+  if (all && refusals.some((r) => r.refused === 'insufficient_minutes')) return { reason: 'insufficient_minutes' };
+  if (all && refusals.every((r) => r.refused === 'no_data')) return { reason: 'source_unavailable', sources: [...new Set(rules.flatMap((r) => r.sources))] };
+  return { reason: 'nothing_unusual' };
+}

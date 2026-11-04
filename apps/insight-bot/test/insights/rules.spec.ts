@@ -1,5 +1,5 @@
 import type { WebFlowsResponse, WebInsightStatement, WebPositioningCell, WebPositioningRow } from '@trade-automation/contracts';
-import { rank, runInsights } from '../../src/insights/engine';
+import { neutralReason, rank, runInsights } from '../../src/insights/engine';
 import { R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, RULES } from '../../src/insights/rules';
 import { isRefusal, type InsightSnapshot } from '../../src/insights/types';
 
@@ -147,7 +147,7 @@ describe('the engine', () => {
   });
 
   it('drops anything under 0.90, and a thrown rule does not take the page down', () => {
-    const boom = { id: 'R1' as const, block: 'liquidations' as const, run: () => { throw new Error('bug'); } };
+    const boom = { id: 'R1' as const, block: 'liquidations' as const, sources: ['tape'] as const, run: () => { throw new Error('bug'); } };
     const out = runInsights([boom, R7], snapshot());
     expect(out.top).toEqual([]);
     expect(out.blocks).toHaveLength(5);
@@ -221,6 +221,25 @@ describe('R10 Coinbase premium — D18', () => {
   it('the flows block line says insufficient_minutes when that is why nothing was said', () => {
     const s = snapshot({ flows: flows({ dvol: { value: null, change: null }, stablecoins: { supplyUsd: null, changeUsd: null }, coinbasePremium: { premiumPct: ch(0.1, 0.5), minutes: 30, sameSignMinutes: 30, unavailable: 'insufficient_minutes' } }) });
     expect(runInsights(RULES, s).blocks.find((b) => b.block === 'flows')?.neutral?.reason).toBe('insufficient_minutes');
+  });
+});
+
+describe('IB-BUG-028: a block whose rules could not look says so, and names the source', () => {
+  const line = (snap: InsightSnapshot, block: string) => runInsights(RULES, snap).blocks.find((b) => b.block === block)?.neutral;
+  it('every rule refused for no_data → source_unavailable with the block\'s sources, never «nothing unusual»', () => {
+    expect(line(snapshot({ flows: null }), 'flows')).toMatchObject({ reason: 'source_unavailable', sources: ['deribit', 'defillama', 'coinbase', 'binance'] });
+    expect(line(snapshot({ liquidations: null }), 'liquidations')).toMatchObject({ reason: 'source_unavailable', sources: ['tape'] });
+  });
+  it('mixed — one rule looked and found nothing rare — is «nothing unusual»', () => {
+    const onlyDvol = snapshot({ flows: flows({ stablecoins: { supplyUsd: null, changeUsd: null }, coinbasePremium: { premiumPct: null, unavailable: 'source_unavailable' } }) });
+    expect(line(onlyDvol, 'flows')).toMatchObject({ reason: 'nothing_unusual' });
+    expect(line(onlyDvol, 'flows')?.sources).toBeUndefined();
+  });
+  it('precedence: a thin history still says so before a missing source', () => {
+    const rules = [R8, R9];
+    expect(neutralReason(rules, [{ refused: 'insufficient_history', basis: null }, { refused: 'no_data', basis: null }]).reason).toBe('insufficient_history');
+    expect(neutralReason(rules, [{ refused: 'no_data', basis: null }, { refused: 'no_data', basis: null }])).toEqual({ reason: 'source_unavailable', sources: ['deribit', 'defillama'] });
+    expect(neutralReason(rules, [{ refused: 'no_data', basis: null }]).reason).toBe('nothing_unusual'); // one ran
   });
 });
 
