@@ -106,6 +106,19 @@ export const WEB_KPI_CONTEXT_KEYS = [
 ] as const;
 export const WebKpiContextKeySchema = z.enum(WEB_KPI_CONTEXT_KEYS);
 
+/**
+ * IB-106 (design §7.5, D25) — the tile's small muted note under its bar: a fact the tile does not
+ * otherwise carry. A closed key set worded by the client, as `context`. Null = no note (the tile has
+ * none, or its read failed: a soft read never empties a tile).
+ */
+export const WEB_KPI_NOTE_KEYS = [
+  'kpi.note.eth_share',      // {ethPct}: "ETH 10.6%" (btc_dominance; CoinGecko /global, the same fetch)
+  'kpi.note.fng_history',    // {yesterday, weekAgo}: "вчера 37 · неделю назад 48" (fear_greed); a null half is omitted
+  'kpi.note.ls_accounts',    // {ratio}: "лонги/шорты по счетам 2.62" (btc_funding; Binance global-account L/S, last point)
+] as const;
+export const WebKpiNoteKeySchema = z.enum(WEB_KPI_NOTE_KEYS);
+export type WebKpiNoteKey = z.infer<typeof WebKpiNoteKeySchema>;
+
 export const WebKpiTileSchema = z.object({
   id: WebKpiIdSchema,
   /** USD for cap / liquidations / OI-notional; percent for dominance; index 0–100 for F&G; a fraction for funding. */
@@ -116,6 +129,8 @@ export const WebKpiTileSchema = z.object({
   /** Long/short split, liquidations only. */
   split: z.object({ long: z.number().nonnegative(), short: z.number().nonnegative() }).nullable(),
   context: z.object({ key: WebKpiContextKeySchema, params: z.record(z.string(), z.union([z.number(), z.string()])) }).nullable(),
+  /** IB-106: the note under the bar (§7.5). Required, so a server that forgets it fails the parse rather than hiding it. */
+  note: z.object({ key: WebKpiNoteKeySchema, params: z.record(z.string(), z.number().nullable()) }).nullable(),
   /** Attribution the tile must show (§5: alternative.me requires it for F&G). */
   source: z.object({ name: z.string(), url: z.string().url().nullable() }),
   /** Why `value` is null, when it is. */

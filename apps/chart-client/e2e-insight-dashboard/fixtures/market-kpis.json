@@ -13,6 +13,7 @@
      "deltaPct": -2.49
     }
    },
+   "note": null,
    "source": {
     "name": "CoinGecko",
     "url": "https://www.coingecko.com"
@@ -27,6 +28,12 @@
    "deltaBasis": "24h",
    "split": null,
    "context": null,
+   "note": {
+    "key": "kpi.note.eth_share",
+    "params": {
+     "ethPct": 10.6
+    }
+   },
    "source": {
     "name": "CoinGecko",
     "url": "https://www.coingecko.com"
@@ -44,6 +51,13 @@
     "key": "kpi.ctx.fng_band",
     "params": {
      "band": "fear"
+    }
+   },
+   "note": {
+    "key": "kpi.note.fng_history",
+    "params": {
+     "yesterday": 37,
+     "weekAgo": 48
     }
    },
    "source": {
@@ -69,6 +83,7 @@
      "sharePct": 71
     }
    },
+   "note": null,
    "source": {
     "name": "Binance, Bybit, OKX",
     "url": null
@@ -88,6 +103,7 @@
      "deltaPct": 2.29
     }
    },
+   "note": null,
    "source": {
     "name": "Binance",
     "url": null
@@ -105,6 +121,12 @@
     "key": "kpi.ctx.funding_side",
     "params": {
      "side": "longs_pay"
+    }
+   },
+   "note": {
+    "key": "kpi.note.ls_accounts",
+    "params": {
+     "ratio": 2.62
     }
    },
    "source": {

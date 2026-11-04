@@ -41,6 +41,19 @@ describe('IB-085 contracts', () => {
     expect(parsed.tiles.find((t) => t.id === 'fear_greed')?.source.name).toBe('alternative.me');
   });
 
+  it('IB-106: the KPI note is a closed key with numeric params; required, null allowed', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const kpis = require('./fixtures/kpis.json');
+    const parsed = WebKpisResponseSchema.parse(kpis);
+    expect(parsed.tiles.map((t) => t.note?.key ?? null)).toEqual([null, 'kpi.note.eth_share', 'kpi.note.fng_history', null, null, 'kpi.note.ls_accounts']);
+    const withNote = (note: unknown) => ({ ...kpis, tiles: [{ ...kpis.tiles[0], note }, ...kpis.tiles.slice(1)] });
+    expect(WebKpisResponseSchema.safeParse(withNote({ key: 'kpi.note.fng_history', params: { yesterday: 37, weekAgo: null } })).success).toBe(true);
+    expect(WebKpisResponseSchema.safeParse(withNote({ key: 'kpi.note.source', params: {} })).success).toBe(false); // closed set
+    expect(WebKpisResponseSchema.safeParse(withNote({ key: 'kpi.note.eth_share', params: { ethPct: '10.6' } })).success).toBe(false); // numbers only
+    const { note: _dropped, ...without } = kpis.tiles[0];
+    expect(WebKpisResponseSchema.safeParse({ ...kpis, tiles: [without, ...kpis.tiles.slice(1)] }).success).toBe(false); // absence is stated
+  });
+
   it('five tiles do not parse — an unavailable tile says so, it does not vanish', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const kpis = require('./fixtures/kpis.json');
