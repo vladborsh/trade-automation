@@ -3,7 +3,7 @@ import type { WebInsightsResponse, WebMarketPeriod } from '@trade-automation/con
 import { RouterLink } from '@angular/router';
 import { I18nService } from '../../../i18n/i18n.service';
 import type { StringKey } from '../../../i18n/keys';
-import { basisView, insightView, neutralLine, wordInsight, type BasisView, type InsightView } from './market-text';
+import { basisView, insightView, neutralLine, sourceNames, wordInsight, type BasisView, type InsightView } from './market-text';
 
 /**
  * IB-088 (D1–D4) — «Главное сейчас»: 3–5 cards, each a sentence worded HERE from the server's key and
@@ -33,14 +33,18 @@ export class InsightsBlockComponent {
     const lines = this.insights()?.blocks ?? [];
     const withBasis = lines.find((l) => l.neutral?.basis);
     const history = lines.length > 0 && lines.filter((l) => l.neutral).every((l) => l.neutral?.reason !== 'nothing_unusual');
-    return { history, basis: basisView(withBasis?.neutral?.basis ?? null, this.nowSec()) };
+    // IB-BUG-028: every block that has rules could not look → name what did not answer
+    const ruled = lines.filter((l) => l.neutral && l.neutral.reason !== 'no_rules');
+    const allDown = ruled.length > 0 && ruled.every((l) => l.neutral?.reason === 'source_unavailable');
+    const down = allDown ? [...new Set(ruled.flatMap((l) => l.neutral?.sources ?? []))] : [];
+    return { history, down, basis: basisView(withBasis?.neutral?.basis ?? null, this.nowSec()) };
   });
 
-  readonly neutralChoice = computed(() => neutralLine(this.unavailableFrom(), this.neutral().history));
+  readonly neutralChoice = computed(() => neutralLine(this.unavailableFrom(), this.neutral().history, this.neutral().down));
 
   neutralText(): string {
     const c = this.neutralChoice();
-    return this.t(c.key, { period: this.periodLabel(), date: c.date ?? '' });
+    return this.t(c.key, { period: this.periodLabel(), date: c.date ?? '', sources: sourceNames(c.sources, this.t) });
   }
 
   sentence(v: InsightView): string {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WEB_INSIGHT_KEYS, WEB_KPI_IDS } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
+import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, sourceNames, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -109,7 +109,7 @@ describe('conclusionView — D15, one line per block', () => {
   });
   it('a reason without a basis (no rules for the block) carries no basis line', () => {
     const v = conclusionView({ block: 'caps', statement: null, neutral: { key: 'insight.neutral', reason: 'no_rules', basis: null } } as never, 0);
-    expect(v).toEqual({ kind: 'neutral', key: 'insight.neutral.no_rules', basis: null });
+    expect(v).toEqual({ kind: 'neutral', key: 'insight.neutral.no_rules', basis: null, sources: [] });
   });
 
   it('before insights load there is no line at all (not «nothing unusual»)', () => {
@@ -119,10 +119,10 @@ describe('conclusionView — D15, one line per block', () => {
 
 describe('neutralLine (IB-BUG-022)', () => {
   it('unavailable beats everything, with its date and no basis; then thin history; then nothing unusual', () => {
-    expect(neutralLine('2026-11-10', false)).toEqual({ key: 'insight.neutral.unavailable', date: '2026-11-10', basis: false });
+    expect(neutralLine('2026-11-10', false)).toEqual({ key: 'insight.neutral.unavailable', date: '2026-11-10', basis: false, sources: [] });
     expect(neutralLine('2026-11-10', true).key).toBe('insight.neutral.unavailable');
-    expect(neutralLine(null, true)).toEqual({ key: 'insight.neutral.insufficient_history', date: null, basis: true });
-    expect(neutralLine(null, false)).toEqual({ key: 'insight.neutral.nothing_unusual', date: null, basis: true });
+    expect(neutralLine(null, true)).toEqual({ key: 'insight.neutral.insufficient_history', date: null, basis: true, sources: [] });
+    expect(neutralLine(null, false)).toEqual({ key: 'insight.neutral.nothing_unusual', date: null, basis: true, sources: [] });
   });
 
   it('the unavailability line names the period and the date in both languages', () => {
@@ -155,6 +155,19 @@ describe('the basis line says the period as a word (IB-BUG-024)', () => {
     expect(ruLine.startsWith(`за ${ru['market.period.24h']} ·`)).toBe(true);
     expect(ruLine).not.toContain('24h');
     expect(wordInsight(basisView({ ...b, window: '1h' }, 0), fill(ru as Record<string, string>) as never)).toContain(`за ${ru['market.period.1h']}`);
+  });
+});
+
+describe('IB-BUG-028: a line that could not look names what did not answer', () => {
+  const t = (k: string) => (ru as Record<string, string>)[k] ?? k;
+  it('a source_unavailable block line carries its sources; the tape is a phrase, venues are names', () => {
+    const v = conclusionView({ block: 'flows', statement: null, neutral: { key: 'insight.neutral', reason: 'source_unavailable', basis: null, sources: ['deribit', 'coinbase', 'binance'] } }, 0);
+    expect(v).toMatchObject({ kind: 'neutral', key: 'insight.neutral.source_unavailable', sources: ['deribit', 'coinbase', 'binance'] });
+    expect(sourceNames(['tape', 'binance'], t as never)).toBe('наша лента ликвидаций, Binance');
+  });
+  it('«Главное сейчас»: every source down → that, never «nothing unusual»; an unavailable period still comes first', () => {
+    expect(neutralLine(null, true, ['tape', 'binance'])).toEqual({ key: 'insight.neutral.source_unavailable', date: null, basis: false, sources: ['tape', 'binance'] });
+    expect(neutralLine('2026-11-10', false, ['tape']).key).toBe('insight.neutral.unavailable');
   });
 });
 

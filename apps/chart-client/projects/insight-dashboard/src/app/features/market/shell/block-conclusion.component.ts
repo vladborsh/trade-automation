@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { WebInsightBlockLine, WebMarketPeriod } from '@trade-automation/contracts';
 import { I18nService } from '../../../i18n/i18n.service';
 import type { StringKey } from '../../../i18n/keys';
-import { conclusionView, wordInsight } from './market-text';
+import { conclusionView, wordInsight, sourceNames } from './market-text';
 
 /**
  * IB-089 (D15) — the one conclusion line a block ends with: the server's best statement for that
@@ -30,7 +30,7 @@ export class BlockConclusionComponent {
     const v = this.view();
     if (!v) return '';
     if (v.kind === 'statement') return wordInsight(v.view, this.t);
-    return this.t(v.key, { period: this.t(`market.period.${this.period()}` as StringKey) });
+    return this.t(v.key, { period: this.t(`market.period.${this.period()}` as StringKey), sources: sourceNames(v.sources, this.t) });
   }
 
   basis(): string | null {

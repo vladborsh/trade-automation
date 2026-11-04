@@ -1,5 +1,5 @@
 import {
-  WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightBlockLine, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod,
+  WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightBlockLine, type WebInsightSource, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../../i18n/keys';
 import { formatUsd } from '../../liquidations/liquidations.format';
@@ -190,7 +190,7 @@ export function wordInsight(v: Pick<InsightView, 'key' | 'params' | 'nested'>, t
 
 export type ConclusionView =
   | { kind: 'statement'; view: InsightView }
-  | { kind: 'neutral'; key: StringKey; basis: BasisView | null };
+  | { kind: 'neutral'; key: StringKey; basis: BasisView | null; sources: WebInsightSource[] };
 
 /**
  * D15 — a block's one conclusion line: its best statement, or the neutral line with the REASON
@@ -203,7 +203,7 @@ export function conclusionView(line: WebInsightBlockLine | null | undefined, now
   if (!line.neutral) return null;
   // a reason with no basis (no rules for this block) says only the reason: «основа не указана» says nothing
   const basis = line.neutral.basis ? basisView(line.neutral.basis, nowSec) : null;
-  return { kind: 'neutral', key: `insight.neutral.${line.neutral.reason}` as StringKey, basis };
+  return { kind: 'neutral', key: `insight.neutral.${line.neutral.reason}` as StringKey, basis, sources: line.neutral.sources ?? [] };
 }
 
 /**
@@ -212,10 +212,23 @@ export function conclusionView(line: WebInsightBlockLine | null | undefined, now
  * «ничего необычного», which would be a claim about a market nobody looked at. Then thin
  * history, then «nothing unusual». `basis` is false for the unavailability: there was none.
  */
+/**
+ * IB-BUG-028: the sources a line could not read, in words. Our own tape is a phrase and is
+ * translated; a venue's name is an identifier (like a ticker) and stays as it is (i18n rule).
+ */
+const VENUE_NAMES: Readonly<Record<Exclude<WebInsightSource, 'tape'>, string>> = {
+  binance: 'Binance', deribit: 'Deribit', defillama: 'DefiLlama', coinbase: 'Coinbase',
+};
+export function sourceNames(sources: readonly WebInsightSource[], t: (key: StringKey) => string): string {
+  return sources.map((src) => (src === 'tape' ? t('insight.source.tape') : VENUE_NAMES[src])).join(', ');
+}
+
 export function neutralLine(
-  unavailableFromDay: string | null, history: boolean,
-): { key: 'insight.neutral.unavailable' | 'insight.neutral.insufficient_history' | 'insight.neutral.nothing_unusual'; date: string | null; basis: boolean } {
-  if (unavailableFromDay !== null) return { key: 'insight.neutral.unavailable', date: unavailableFromDay, basis: false };
-  if (history) return { key: 'insight.neutral.insufficient_history', date: null, basis: true };
-  return { key: 'insight.neutral.nothing_unusual', date: null, basis: true };
+  unavailableFromDay: string | null, history: boolean, down: readonly WebInsightSource[] = [],
+): { key: 'insight.neutral.unavailable' | 'insight.neutral.source_unavailable' | 'insight.neutral.insufficient_history' | 'insight.neutral.nothing_unusual'; date: string | null; basis: boolean; sources: WebInsightSource[] } {
+  if (unavailableFromDay !== null) return { key: 'insight.neutral.unavailable', date: unavailableFromDay, basis: false, sources: [] };
+  // IB-BUG-028: nothing was said because nothing could be read — never «nothing unusual»
+  if (down.length > 0) return { key: 'insight.neutral.source_unavailable', date: null, basis: false, sources: [...down] };
+  if (history) return { key: 'insight.neutral.insufficient_history', date: null, basis: true, sources: [] };
+  return { key: 'insight.neutral.nothing_unusual', date: null, basis: true, sources: [] };
 }

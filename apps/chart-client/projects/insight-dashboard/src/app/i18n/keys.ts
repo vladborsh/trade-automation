@@ -439,7 +439,9 @@ export type StringKey =
   | 'insight.dvol_spike'
   | 'insight.stablecoin_supply'
   | 'insight.coinbase_premium'
-  | 'insight.neutral.insufficient_minutes';
+  | 'insight.neutral.insufficient_minutes'
+  | 'insight.neutral.source_unavailable'
+  | 'insight.source.tape';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;
