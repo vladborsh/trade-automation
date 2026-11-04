@@ -33,3 +33,5 @@ export * from './market-insights';
 export * from './members';
 // IB-091 — «Деривативы и потоки»: DVOL, put/call by OI, stablecoin supply, Coinbase premium.
 export * from './market-flows';
+// IB-BUG-032 — one spelling of every venue and data provider, for the bot's credits and the dashboard's basis lines.
+export * from './venue-names';
