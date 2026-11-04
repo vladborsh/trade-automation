@@ -40,6 +40,12 @@ export const WEB_ERROR_CODES = [
   'LOGIN_TAKEN',
   'BAD_LOGIN',
   'WEAK_PASSWORD',
+  // IB-035 — the members page (409s) and the settings PATCH (400, with `field`); listed here for the
+  // same reason as IB-078's.
+  'CANNOT_DISABLE_SELF',
+  'LAST_ADMIN',
+  'BOT_NOT_CONFIGURED',
+  'INVALID_SETTING',
 ] as const;
 export type WebErrorCode = (typeof WEB_ERROR_CODES)[number];
 
