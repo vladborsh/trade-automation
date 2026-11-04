@@ -441,6 +441,6 @@ export const ru: Strings = {
   'insight.coinbase_premium': 'Премия Coinbase {pct} к доллару держалась {minutes} мин из последнего часа',
   'insight.neutral.insufficient_minutes': 'Мало полных минут для премии Coinbase — вывод не делаем',
   // IB-BUG-028 — a block that could not look names the source
-  'insight.neutral.source_unavailable': 'Не смогли проверить: не ответил источник ({sources})',
+  'insight.neutral.source_unavailable': 'Не смогли проверить: данные не пришли (источники: {sources})',
   'insight.source.tape': 'наша лента ликвидаций',
 };

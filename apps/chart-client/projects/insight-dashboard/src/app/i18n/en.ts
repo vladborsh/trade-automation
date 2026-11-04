@@ -435,6 +435,6 @@ export const en: Strings = {
   'insight.coinbase_premium': 'Coinbase premium {pct} against the dollar held {minutes} min of the last hour',
   'insight.neutral.insufficient_minutes': 'Too few complete minutes for the Coinbase premium: no conclusion',
   // IB-BUG-028 — a block that could not look names the source
-  'insight.neutral.source_unavailable': 'Could not check: the source did not answer ({sources})',
+  'insight.neutral.source_unavailable': 'Could not check: no data arrived (sources: {sources})',
   'insight.source.tape': 'our liquidation tape',
 };

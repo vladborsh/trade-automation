@@ -20,10 +20,11 @@ describe('BlockConclusionComponent (IB-BUG-028)', () => {
   it('names the sources that did not answer — and does not say «nothing unusual»', () => {
     const down: WebInsightBlockLine = { block: 'flows', statement: null, neutral: { key: 'insight.neutral', reason: 'source_unavailable', basis: null, sources: ['deribit', 'defillama', 'coinbase', 'binance'] } };
     const ru = render(down, 'ru');
-    expect(ru).toContain('Не смогли проверить: не ответил источник (Deribit, DefiLlama, Coinbase, Binance)');
+    // the block's sources, not a claim that each one failed: the engine knows only that no data came
+    expect(ru).toContain('Не смогли проверить: данные не пришли (источники: Deribit, DefiLlama, Coinbase, Binance)');
     expect(ru).not.toContain('Ничего необычного');
     TestBed.resetTestingModule();
     const tape: WebInsightBlockLine = { block: 'liquidations', statement: null, neutral: { key: 'insight.neutral', reason: 'source_unavailable', basis: null, sources: ['tape'] } };
-    expect(render(tape, 'en')).toContain('Could not check: the source did not answer (our liquidation tape)');
+    expect(render(tape, 'en')).toContain('Could not check: no data arrived (sources: our liquidation tape)');
   });
 });
