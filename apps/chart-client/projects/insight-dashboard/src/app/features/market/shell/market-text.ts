@@ -129,7 +129,8 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
   const params: Record<string, string | number> = {};
   const nested: Record<string, StringKey> = {};
   if (typeof p['symbol'] === 'string') params['symbol'] = p['symbol'];
-  if (num('usd') !== null) params['usd'] = formatUsd(num('usd') as number);
+  // a negative amount (R9: supply burnt) takes the page's minus sign, as signedPct does
+  if (num('usd') !== null) params['usd'] = `${(num('usd') as number) < 0 ? '−' : ''}${formatUsd(Math.abs(num('usd') as number))}`;
   if ('ratio' in p) params['ratio'] = num('ratio') === null ? '—' : `×${(num('ratio') as number).toFixed(1)}`;
   for (const k of ['oiPct', 'pricePct', 'altGapPct']) if (num(k) !== null) params[k] = signedPct(num(k)) as string;
   // IB-091 (R8–R10): DVOL points, a % change or premium, a number of days

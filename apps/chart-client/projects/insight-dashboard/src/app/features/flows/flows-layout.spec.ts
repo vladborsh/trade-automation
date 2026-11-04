@@ -15,6 +15,7 @@ describe('flowsTiles', () => {
     expect(tile(base, 'putCall')).toMatchObject({ value: '0.99', note: { params: { volume: '1.79', date: '2026-11-03' } } });
     expect(tile(base, 'stablecoins')).toMatchObject({ value: '$295B', tone: 'down' });
     expect(tile(base, 'stablecoins').detail?.params['days']).toBe(1);
+    expect(tile(base, 'stablecoins').detail?.params['usd']).toBe('−$935M'); // the page's minus, not '-'
     expect(tile(base, 'coinbasePremium').note.key).toBe('flows.premium.note'); // "against the dollar, USDT corrected"
     expect(tile(base, 'coinbasePremium').detail).toMatchObject({ key: 'flows.premium.minutes', params: { same: 60, minutes: 60 } });
     expect(t.every((x) => x.series.length > 0)).toBe(true);

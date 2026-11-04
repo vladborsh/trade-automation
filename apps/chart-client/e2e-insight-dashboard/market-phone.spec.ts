@@ -11,6 +11,8 @@ import positioning from './fixtures/market-positioning.24h.json';
 // IB-089: the contract's block fixture carries what a young slot cannot — a 30-day norm, an outlier
 // hour, a verdict, a series — so the charts are also measured with everything drawn.
 import normBlock from '../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
+// IB-091: the contract's example, built from one real probe of each source (2026-11-04)
+import flows from '../../../libs/contracts/test/fixtures/flows.24h.json';
 
 /**
  * IB-088 acceptance (Architect dd91ada): the market page on a 390×844 phone — no page horizontal
@@ -37,6 +39,7 @@ async function mockApi(page: Page): Promise<void> {
       '/calendar/upcoming': { events: [] },
       '/market/positioning': { ...positioning, period },
       '/market/caps': period === '4h' ? caps4h : { ...caps24h, period },
+      '/market/flows': { ...flows, period },
     };
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
     else await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'NOT_FOUND', message: path }) });
@@ -129,6 +132,22 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(m.small).toEqual([]);
     expect(m.tiny).toEqual([]);
     expect(m.loose).toEqual([]);
+  });
+
+  test('IB-091 phone: «Derivatives and flows» — four tiles in one column, each chart drawn, sources credited, no page scroll', async ({ page }, info) => {
+    await openMarket(page);
+    const block = page.locator('app-flows-block');
+    await block.scrollIntoViewIfNeeded();
+    await expect(block.locator('article.tile')).toHaveCount(4);
+    await expect(block.locator('[data-tile="coinbasePremium"] .note')).toHaveText('against the dollar, USDT corrected');
+    await expect(block.locator('.source')).toHaveText('Data: Deribit · OKX · DefiLlama · Coinbase');
+    await expect(block.locator('app-mini-chart canvas').first()).toBeVisible(); // real Chromium draws them
+    const lefts = await block.locator('article.tile').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    expect(new Set(lefts).size).toBe(1); // one column
+    await info.attach('phone-390-flows.png', { body: await block.screenshot(), contentType: 'image/png' });
+    const m = await measure(page);
+    expect(m.scrollWidth).toBeLessThanOrEqual(390);
+    expect(m.small).toEqual([]);
   });
 
   test('IB-089 charts with a norm: outlier «×», verdict, cards — still no page scroll, targets ≥ 40 px', async ({ page }, info) => {
@@ -316,6 +335,15 @@ test.describe('market page — desktop 1440×900 (IB-088)', () => {
     await where.getByRole('button', { name: 'Show all (12)' }).click();
     await page.clock.runFor(100);
     await expect(where.locator('li.row')).toHaveCount(20);
+  });
+
+  test('IB-091 desktop: the four flow tiles side by side', async ({ page }, info) => {
+    await openMarket(page);
+    const tiles = page.locator('app-flows-block article.tile');
+    await expect(tiles).toHaveCount(4);
+    const tops = await tiles.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1); // one row
+    await info.attach('desktop-1440-flows.png', { body: await page.locator('app-flows-block').screenshot(), contentType: 'image/png' });
   });
 
   test('no horizontal scroll, and the screenshot', async ({ page }, info) => {

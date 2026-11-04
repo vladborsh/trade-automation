@@ -44,6 +44,8 @@ const colourOf = (t: Tone) => (t === 'up' ? UP : t === 'down' ? DOWN : NEUTRAL);
 const unusual = (c: WebFlowsChange | null) => c !== null && c.rarity !== null && c.rarity >= UNUSUAL;
 const reasonWords = (r: WebFlowsUnavailable | null, minutes = 0): Words | null =>
   r === null ? null : { key: `flows.reason.${r}` as StringKey, params: { minutes } };
+/** A signed USD amount with the page's minus sign («−», as `signedPct`), never the ASCII hyphen. */
+export const signedUsd = (v: number): string => `${v > 0 ? '+' : v < 0 ? '−' : ''}${formatUsd(Math.abs(v))}`;
 const day = (sec: number | null) => (sec === null ? '—' : new Date(sec * 1000).toISOString().slice(0, 10));
 
 export function flowsTiles(r: WebFlowsResponse, period: WebMarketPeriod): TileView[] {
@@ -75,7 +77,7 @@ export function flowsTiles(r: WebFlowsResponse, period: WebMarketPeriod): TileVi
       value: sc.supplyUsd === null ? null : formatUsd(sc.supplyUsd),
       detail: sc.changeUsd ? {
         key: 'flows.stable.change',
-        params: { usd: `${sc.changeUsd.value > 0 ? '+' : ''}${formatUsd(sc.changeUsd.value)}`, pct: signedPct(sc.changePct) ?? '—', days: sc.changeDays },
+        params: { usd: signedUsd(sc.changeUsd.value), pct: signedPct(sc.changePct) ?? '—', days: sc.changeDays },
       } : null,
       note: { key: 'flows.stable.note', params: {} },
       reason: reasonWords(sc.unavailable), series: sc.series, lineColour: colourOf(scTone),

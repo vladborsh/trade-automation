@@ -22,7 +22,8 @@ const routes = (over: Partial<Record<'usdt', FakeRoute['answer']>> = {}): FakeRo
   { match: /products\/BTC-USD\/candles\?granularity=60$/, answer: { body: cbBtc } },
   { match: 'granularity=3600', answer: { body: [] } }, // no hourly history in this spec: rarity refuses, the value stands
 ];
-const candles = { candles: async (_m: string, _s: string, tf: string) => (tf === '1m' ? bnSpot : []) } as unknown as CandlesService;
+const markets: string[] = [];
+const candles = { candles: async (m: string, _s: string, tf: string) => { markets.push(m); return tf === '1m' ? bnSpot : []; } } as unknown as CandlesService;
 const service = (f: ReturnType<typeof fakeFetch>) => new FlowsService({ cache: new TtlCache(), candles, fetchImpl: f.impl, now: () => NOW });
 
 describe('FlowsService (IB-091)', () => {
@@ -52,5 +53,12 @@ describe('FlowsService (IB-091)', () => {
     await s.flows('1h'); // another period re-uses every source read
     expect(f.calls.length).toBe(n);
     expect(f.callsTo('granularity=3600').length).toBe(4); // 2 pages × BTC-USD and USDT-USD = 25 days (D3)
+  });
+
+  it('Binance is read as SPOT only: the flows path adds nothing to the fapi weight', async () => {
+    markets.length = 0;
+    await service(fakeFetch(routes())).flows('24h');
+    expect(markets.length).toBeGreaterThan(0);
+    expect(new Set(markets)).toEqual(new Set(['spot']));
   });
 });
