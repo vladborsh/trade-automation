@@ -19,6 +19,8 @@ export interface InsightPorts {
   positioningSeries?: () => Promise<InsightSnapshot['positioningSeries']>;
   /** IB-113 (V16): the OI divergence journal's newest on-time alert of the last 24 h, with its OI series. */
   oiDivergence?: (nowMs: number) => Promise<InsightSnapshot['oiDivergence']>;
+  /** IB-113 (V16, TL): `alert_settings.members_visible` — whether a non-admin sees R11. Absent or failed → hidden. */
+  oiAlertsMembersVisible?: () => Promise<boolean>;
   breadth?: (period: WebMarketPeriod) => Promise<InsightSnapshot['breadth']>;
   fng?: () => Promise<number | null>;
   /** IB-091: «Деривативы и потоки» for R8–R10. */
@@ -39,8 +41,22 @@ export class InsightsService {
     this.now = options.now ?? Date.now;
   }
 
-  async insights(period: WebMarketPeriod): Promise<WebInsightsResponse> {
-    return this.options.cache.getOrLoad(`insights:${period}`, INSIGHTS_CACHE_MS, async () => {
+  /**
+   * The period's statements for this viewer. IB-113 (TL review): R11 is owner-first like the rest of
+   * the alerts — an admin always sees it, anyone else only while `members_visible` is on; hidden, the
+   * other rules rank as if it did not exist. One snapshot per period is cached (the reads are shared);
+   * the engine — pure, a few dozen comparisons — runs per request on the viewer's variant. Default:
+   * hidden.
+   */
+  async insights(period: WebMarketPeriod, viewer: { admin: boolean } = { admin: false }): Promise<WebInsightsResponse> {
+    const { snapshot, membersVisible } = await this.snapshot(period);
+    const sees = viewer.admin || membersVisible;
+    const view: InsightSnapshot = sees ? snapshot : { ...snapshot, oiDivergence: null };
+    return { ...runInsights(RULES, view), asOf: Math.floor(snapshot.nowMs / 1000) };
+  }
+
+  private snapshot(period: WebMarketPeriod): Promise<{ snapshot: InsightSnapshot; membersVisible: boolean }> {
+    return this.options.cache.getOrLoad(`insights:snapshot:${period}`, INSIGHTS_CACHE_MS, async () => {
       const nowMs = this.now();
       const soft = async <T>(label: string, f: (() => Promise<T>) | undefined): Promise<T | null> => {
         if (!f) return null;
@@ -52,7 +68,7 @@ export class InsightsService {
         }
       };
       const p = this.options.ports;
-      const [liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence] = await Promise.all([
+      const [liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence, membersVisible] = await Promise.all([
         soft('liquidations', p.liquidations && (() => (p.liquidations as NonNullable<InsightPorts['liquidations']>)(period))),
         soft('positioning', p.positioning && (() => (p.positioning as NonNullable<InsightPorts['positioning']>)(period))),
         soft('positioning series', p.positioningSeries),
@@ -60,9 +76,10 @@ export class InsightsService {
         soft('fng', p.fng),
         soft('flows', p.flows && (() => (p.flows as NonNullable<InsightPorts['flows']>)(period))),
         soft('oi divergence', p.oiDivergence && (() => (p.oiDivergence as NonNullable<InsightPorts['oiDivergence']>)(nowMs))),
+        soft('oi alerts visibility', p.oiAlertsMembersVisible),
       ]);
       const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence };
-      return { ...runInsights(RULES, snapshot), asOf: Math.floor(nowMs / 1000) };
+      return { snapshot, membersVisible: membersVisible === true };
     });
   }
 }

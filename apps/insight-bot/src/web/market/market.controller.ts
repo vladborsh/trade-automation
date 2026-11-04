@@ -1,6 +1,8 @@
 import { Controller, Get, HttpException, Optional, Query } from '@nestjs/common';
 import { WebMarketPeriodSchema, type WebCapsResponse, type WebFlowsResponse, type WebInsightsResponse, type WebKpisResponse, type WebPositioningResponse } from '@trade-automation/contracts';
 import { InsightsService } from '../../insights/insights.service';
+import type { User } from '../../users/user.model';
+import { CurrentUser } from '../auth/web-auth.guard';
 import { CapsService } from './caps.service';
 import { FlowsService } from './flows.service';
 import { KpisService } from './positioning/kpis.service';
@@ -56,10 +58,11 @@ export class WebMarketController {
 
   /** `GET …/market/insights?period=` — «Главное сейчас» (IB-086, D1–D5, D15). */
   @Get('insights')
-  async insights(@Query('period') period = '24h'): Promise<WebInsightsResponse> {
+  async insights(@CurrentUser() user: User, @Query('period') period = '24h'): Promise<WebInsightsResponse> {
     const parsed = WebMarketPeriodSchema.safeParse(period);
     if (!parsed.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'period must be 1h, 4h, 24h or 7d' }, 400);
     if (!this.insightsService) throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'insights not configured' }, 503);
-    return this.insightsService.insights(parsed.data);
+    // IB-113: R11 (OI divergence) is owner-first — an admin always, members only while members_visible
+    return this.insightsService.insights(parsed.data, { admin: user?.role === 'admin' });
   }
 }

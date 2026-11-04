@@ -218,6 +218,8 @@ export class WebModule {
                 },
                 positioning: async (period) => (await positioning.positioning(period)).rows,
                 positioningSeries: () => positioning.sparkSeries(),
+                // IB-113 (TL): R11 owner-first — members see it only while the admin page's members_visible is on
+                oiAlertsMembersVisible: async () => (db ? new PgOiAlertsVisibility(db).membersVisible() : false),
                 // IB-113 (V16): the journal's newest on-time alert of 24 h, its OI per bar from our DB — no venue call
                 oiDivergence: async (nowMs) => {
                   if (!db) return null;
