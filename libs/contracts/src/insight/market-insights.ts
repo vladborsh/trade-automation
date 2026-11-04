@@ -40,6 +40,14 @@ export const WEB_INSIGHT_KEYS = [
 export const WebInsightKeySchema = z.enum(WEB_INSIGHT_KEYS);
 export type WebInsightKey = z.infer<typeof WebInsightKeySchema>;
 
+/**
+ * IB-BUG-028 — where a block's rules read from, so a line can say WHICH source it could not read:
+ * `tape` is our own liquidation tape (Postgres); the rest are venues and data providers by name.
+ */
+export const WEB_INSIGHT_SOURCES = ['tape', 'binance', 'deribit', 'defillama', 'coinbase'] as const;
+export const WebInsightSourceSchema = z.enum(WEB_INSIGHT_SOURCES);
+export type WebInsightSource = z.infer<typeof WebInsightSourceSchema>;
+
 /** D3: what a statement stands on. The client renders it ("за 24ч · Binance+Bybit+OKX · норма: 30 дн., 22 из 30"). */
 export const WebInsightBasisSchema = z.object({
   window: WebMarketPeriodSchema,
@@ -84,9 +92,17 @@ export const WebInsightBlockLineSchema = z.object({
   statement: WebInsightStatementSchema.nullable(),
   neutral: z.object({
     key: z.literal('insight.neutral'),
-    // IB-091 (D18): R10 refuses with insufficient_minutes when the premium had < 45 valid minutes
-    reason: z.enum(['nothing_unusual', 'insufficient_history', 'insufficient_minutes', 'no_rules']),
+    // IB-091 (D18): R10 refuses with insufficient_minutes when the premium had < 45 valid minutes.
+    // IB-BUG-028: source_unavailable — every rule of the block refused because its source did not
+    // answer: the rules could not LOOK, which is not «nothing unusual».
+    reason: z.enum(['nothing_unusual', 'insufficient_history', 'insufficient_minutes', 'source_unavailable', 'no_rules']),
     basis: WebInsightBasisSchema.nullable(),
+    /** IB-BUG-028: the sources that did not answer — set exactly when the reason is `source_unavailable`. */
+    sources: z.array(WebInsightSourceSchema).min(1).optional(),
+  }).superRefine((n, ctx) => {
+    if ((n.reason === 'source_unavailable') !== (n.sources !== undefined)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sources'], message: 'sources is set exactly when the reason is source_unavailable' });
+    }
   }).nullable(),
 });
 export type WebInsightBlockLine = z.infer<typeof WebInsightBlockLineSchema>;

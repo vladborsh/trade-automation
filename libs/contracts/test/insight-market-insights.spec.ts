@@ -1,4 +1,4 @@
-import { WEB_INSIGHT_BLOCKS, WEB_INSIGHT_KEYS, WebInsightStatementSchema, WebInsightsResponseSchema } from '../src/insight';
+import { WEB_INSIGHT_BLOCKS, WEB_INSIGHT_KEYS, WEB_INSIGHT_SOURCES, WebInsightBlockLineSchema, WebInsightStatementSchema, WebInsightsResponseSchema } from '../src/insight';
 
 /** IB-086 — «Главное сейчас» (design D1–D5, D15). Fixtures are what IB-088 builds against. */
 describe('IB-086 contracts', () => {
@@ -31,3 +31,19 @@ describe('IB-086 contracts', () => {
     expect(WebInsightsResponseSchema.safeParse({ ...day, top: six }).success).toBe(false);
   });
 });
+
+describe('IB-BUG-028: a block line that could not look says so, and names the source', () => {
+  const line = (neutral: object) => WebInsightBlockLineSchema.safeParse({ block: 'flows', statement: null, neutral: { key: 'insight.neutral', basis: null, ...neutral } });
+  it('source_unavailable carries the sources; no other reason may', () => {
+    expect(line({ reason: 'source_unavailable', sources: ['deribit', 'defillama'] }).success).toBe(true);
+    expect(line({ reason: 'source_unavailable' }).success).toBe(false);
+    expect(line({ reason: 'source_unavailable', sources: [] }).success).toBe(false);
+    expect(line({ reason: 'nothing_unusual', sources: ['deribit'] }).success).toBe(false);
+    expect(line({ reason: 'nothing_unusual' }).success).toBe(true); // additive: old lines still parse
+  });
+  it('the sources are a closed list', () => {
+    expect([...WEB_INSIGHT_SOURCES]).toEqual(['tape', 'binance', 'deribit', 'defillama', 'coinbase']);
+    expect(line({ reason: 'source_unavailable', sources: ['somewhere'] }).success).toBe(false);
+  });
+});
+
