@@ -37,7 +37,8 @@ class DryRunRollback extends Error {
 // eslint-disable-next-line no-console
 const say = (line: string): void => console.log(line);
 
-async function main(argv: string[]): Promise<void> {
+/** `now` is the run's one clock (IB-051: threaded, not read twice); production passes nothing. */
+async function main(argv: string[], now: () => number = Date.now): Promise<void> {
   const mode = argv.includes('--dry-run') ? 'dry-run' : argv.includes('--write') ? 'write' : null;
   if (mode === null || (argv.includes('--dry-run') && argv.includes('--write'))) {
     throw new Error('usage: backfill.cli.js --dry-run | --write  (exactly one)');
@@ -47,9 +48,9 @@ async function main(argv: string[]): Promise<void> {
   const db = new PgDatabase(env.DATABASE_URL);
   const weight = new BinanceWeightTracker();
   const candles = new CandlesService({ futuresBaseUrl: env.BINANCE_FUTURES_REST_BASE_URL, spotBaseUrl: env.BINANCE_SPOT_REST_BASE_URL, weight });
-  const pacer = new WeightPacer(BACKFILL_WEIGHT_PER_MIN);
+  const pacer = new WeightPacer(BACKFILL_WEIGHT_PER_MIN, now);
   const reader = new OiWindowReader(db);
-  const started = Date.now();
+  const started = now();
   say(`oi backfill ${mode}: build ${env.BUILD_SHA}, budget ${BACKFILL_WEIGHT_PER_MIN} weight/min`);
 
   const bars: HistoryBackfillPorts['bars'] = async (symbol, tf, fromSec, toSec) => {
@@ -80,7 +81,7 @@ async function main(argv: string[]): Promise<void> {
     if (mode === 'dry-run') {
       try {
         await db.transaction(async (tx) => {
-          const report = await replayHistory(portsOn(tx), Math.floor(Date.now() / 1000));
+          const report = await replayHistory(portsOn(tx), Math.floor(now() / 1000));
           throw new DryRunRollback({ report, counts: await new PgBackfillReads(tx).backfillCounts() });
         });
       } catch (error) {
@@ -90,14 +91,14 @@ async function main(argv: string[]): Promise<void> {
       }
     } else {
       const ports = portsOn(db);
-      const report = await replayHistory(ports, Math.floor(Date.now() / 1000));
+      const report = await replayHistory(ports, Math.floor(now() / 1000));
       const reads = new PgBackfillReads(db);
       printReport(report, await reads.backfillCounts(), pacer.total);
       const barsWeight = pacer.total;
       const paths = await measureBackfillPaths(
         { store: ports.store, build: env.BUILD_SHA, log: say,
           klines5m: async (symbol, from, limit) => candles.closedKlines(symbol, '5m', from * 1000, limit) },
-        pacer, Date.now,
+        pacer, now,
       );
       const left = await reads.unmeasuredBackfillPaths();
       paths.left = left.count;
@@ -105,7 +106,7 @@ async function main(argv: string[]): Promise<void> {
         + `left ${left.count}${left.lastCloses ? ` (the last window closes ${new Date(left.lastCloses * 1000).toISOString()}; a rerun after it measures them)` : ''}`);
       say(`total weight ${barsWeight + paths.weight} (bars ${barsWeight}, paths ${paths.weight})`);
     }
-    say(`done in ${Math.round((Date.now() - started) / 1000)} s`);
+    say(`done in ${Math.round((now() - started) / 1000)} s`);
   } finally {
     await db.end();
   }
