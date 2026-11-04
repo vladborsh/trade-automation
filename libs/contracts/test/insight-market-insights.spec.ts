@@ -5,7 +5,7 @@ describe('IB-086 contracts', () => {
   it('blocks and sentence keys are closed lists', () => {
     expect([...WEB_INSIGHT_BLOCKS]).toEqual(['liquidations', 'positioning', 'caps', 'flows', 'sentiment']);
     expect(WEB_INSIGHT_KEYS).toContain('insight.neutral');
-    expect(WEB_INSIGHT_KEYS).toHaveLength(8);
+    expect(WEB_INSIGHT_KEYS).toHaveLength(11); // IB-091: R8–R10
   });
 
   it('a statement whose key is not in the list does not parse', () => {

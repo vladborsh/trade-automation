@@ -14,8 +14,8 @@ export const WEB_INSIGHT_BLOCKS = ['liquidations', 'positioning', 'caps', 'flows
 export const WebInsightBlockSchema = z.enum(WEB_INSIGHT_BLOCKS);
 export type WebInsightBlock = z.infer<typeof WebInsightBlockSchema>;
 
-/** D5 rule set v1. */
-export const WEB_INSIGHT_RULES = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'] as const;
+/** D5 rule set v1; R8–R10 are phase 2's «Деривативы и потоки» (IB-091). */
+export const WEB_INSIGHT_RULES = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10'] as const;
 export const WebInsightRuleSchema = z.enum(WEB_INSIGHT_RULES);
 
 /**
@@ -27,11 +27,15 @@ export const WebInsightRuleSchema = z.enum(WEB_INSIGHT_RULES);
  * - `insight.funding_extremes` R5 {count, total, symbol, rate}        — coins with funding beyond their own p95/p5
  * - `insight.crowd_vs_top`     R6 {symbol, global, top}              — crowd and top traders on opposite sides
  * - `insight.breadth`          R7 {upPct, altGapPct, fngBand}         — share of coins up / alts vs BTC, with F&G
+ * - `insight.dvol_spike`       R8 {value, change}                     — BTC implied vol (DVOL) rose unusually over the period
+ * - `insight.stablecoin_supply` R9 {usd, pct, days}                  — total stablecoin supply moved unusually in 1 or 7 days
+ * - `insight.coinbase_premium` R10 {pct, minutes}                    — Coinbase BTC held a premium / discount most of the last hour
  * - `insight.neutral`          the block line when nothing passes      {} (the reason is a field, not a param)
  */
 export const WEB_INSIGHT_KEYS = [
   'insight.liq_surge', 'insight.liq_coin', 'insight.liq_cascade', 'insight.oi_vs_price',
-  'insight.funding_extremes', 'insight.crowd_vs_top', 'insight.breadth', 'insight.neutral',
+  'insight.funding_extremes', 'insight.crowd_vs_top', 'insight.breadth',
+  'insight.dvol_spike', 'insight.stablecoin_supply', 'insight.coinbase_premium', 'insight.neutral',
 ] as const;
 export const WebInsightKeySchema = z.enum(WEB_INSIGHT_KEYS);
 export type WebInsightKey = z.infer<typeof WebInsightKeySchema>;
@@ -80,7 +84,8 @@ export const WebInsightBlockLineSchema = z.object({
   statement: WebInsightStatementSchema.nullable(),
   neutral: z.object({
     key: z.literal('insight.neutral'),
-    reason: z.enum(['nothing_unusual', 'insufficient_history', 'no_rules']),
+    // IB-091 (D18): R10 refuses with insufficient_minutes when the premium had < 45 valid minutes
+    reason: z.enum(['nothing_unusual', 'insufficient_history', 'insufficient_minutes', 'no_rules']),
     basis: WebInsightBasisSchema.nullable(),
   }).nullable(),
 });
