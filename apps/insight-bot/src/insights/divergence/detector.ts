@@ -99,8 +99,25 @@ export interface DivergenceResult {
 /** V7: ATR over this many bars, and the |ΔOI| median over this many bars before B. */
 export const ATR_PERIOD = 14;
 export const OI_MEDIAN_BARS = 100;
-/** Fewer |ΔOI| values than this before B and there is no noise floor to measure against: no evaluation. */
+/**
+ * B is evaluated only once all `OI_MEDIAN_BARS` per-bar moves before it exist POSITIONALLY (V7: «over the 100
+ * bars before B» — not «whatever history there is»), and at least this many of them are known (a bar the venue
+ * did not publish has no OI and no move; a TradFi coin's closed sessions must not mute it).
+ */
 export const OI_MEDIAN_MIN = 20;
+
+/**
+ * IB-110 (TL 2026-11-04, V10) — how many CLOSED bars a caller must hand the detector so that the newest B it can
+ * confirm is judged on full context, derived from the constants, never typed by hand:
+ * - its farthest A (W bars back) must itself be a pivot: N bars before A → B ≥ W + N;
+ * - the noise floor's 100 moves end at B's previous bar and start at bar B − OI_MEDIAN_BARS − 1 → B ≥ OI_MEDIAN_BARS + 1;
+ *   ATR14 needs B ≥ ATR_PERIOD, always the smaller;
+ * - after B: its OI pivot up to k bars later, then N bars to confirm → k + N bars, plus B's own bar.
+ * Defaults: 15m 112, 1h 136, 4h 111. The spec checks that one bar fewer loses the evaluation.
+ */
+export function barsForEvaluation(p: Pick<DivergenceParams, 'n' | 'k' | 'w'>): number {
+  return Math.max(p.w + p.n, OI_MEDIAN_BARS + 1, ATR_PERIOD) + p.k + p.n + 1;
+}
 
 export function detectDivergences(input: DivergenceInput): DivergenceResult {
   const { bars, params } = input;
@@ -177,7 +194,7 @@ interface Noise {
 
 /** V7: δp from ATR14 at B, δoi from the median per-bar OI move over the 100 bars before B. Null: not enough history to judge. */
 function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: number, p: DivergenceParams): Noise | null {
-  if (i < ATR_PERIOD) return null;
+  if (i < ATR_PERIOD || i < OI_MEDIAN_BARS + 1) return null;
   let tr = 0;
   for (let t = i - ATR_PERIOD + 1; t <= i; t++) {
     const prevClose = bars[t - 1].close;
