@@ -1,5 +1,5 @@
 import {
-  WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightBlockLine, type WebInsightSource, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod,
+  WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightBlockLine, type WebInsightSource, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod, venueName,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../../i18n/keys';
 import { formatUsd } from '../../liquidations/liquidations.format';
@@ -29,6 +29,14 @@ export function periodAvailability(
 }
 
 const MINUS = '−';
+/**
+ * IB-BUG-032: a signed number with no unit — `+2.4`, `−2.4`, `0.0` — with the page's minus («−»),
+ * never the ASCII hyphen. Every hand-built sign on the page was a place to forget it (DVOL's change
+ * printed «-2.4 пт»); a signed figure goes through here, `signedPct` or `signedUsd`.
+ */
+export function signedFixed(value: number, digits: number): string {
+  return `${value > 0 ? '+' : value < 0 ? MINUS : ''}${Math.abs(value).toFixed(digits)}`;
+}
 /** `+2.10 %`, `−0.30 %`; null stays null (the template says "no data" in words). */
 export function signedPct(value: number | null | undefined, digits = 2): string | null {
   if (value === null || value === undefined || !Number.isFinite(value)) return null;
@@ -135,7 +143,7 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
   for (const k of ['oiPct', 'pricePct', 'altGapPct']) if (num(k) !== null) params[k] = signedPct(num(k)) as string;
   // IB-091 (R8–R10): DVOL points, a % change or premium, a number of days
   if (num('value') !== null) params['value'] = (num('value') as number).toFixed(1);
-  if (num('change') !== null) params['change'] = `${(num('change') as number) > 0 ? '+' : ''}${(num('change') as number).toFixed(1)}`;
+  if (num('change') !== null) params['change'] = signedFixed(num('change') as number, 1);
   if (num('pct') !== null) params['pct'] = signedPct(num('pct'), Math.abs(num('pct') as number) < 0.1 ? 3 : 2) as string;
   if (num('days') !== null) params['days'] = num('days') as number;
   if (num('rate') !== null) params['rate'] = fundingPct(num('rate')) as string;
@@ -155,7 +163,7 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
   };
 }
 
-/** D3's basis line: «за 24ч · binance+bybit+okx · выборка 30 (22 с данными) · с 2026-10-04». */
+/** D3's basis line: «за 24ч · Binance+Bybit+OKX · выборка 30 (22 с данными) · с 2026-10-04». */
 /**
  * A basis line, worded by `wordInsight`. IB-BUG-024: the period is a WORD here («за 24ч»), not an
  * identifier, so it goes through the period labels as a nested key — it used to print the code
@@ -173,7 +181,8 @@ export function basisView(b: WebInsightBasis | null, _nowSec: number): BasisView
     key: 'insight.basis',
     nested: { window: `market.period.${b.window}` as StringKey },
     params: {
-      venues: b.venues.join('+'),
+      // IB-BUG-032: spelled as the credit line spells them («DefiLlama», «OKX»), never the raw key
+      venues: b.venues.map(venueName).join('+'),
       sample: b.sampleWindows,
       observed: b.observedWindows,
       from: b.from === null ? '—' : new Date(b.from * 1000).toISOString().slice(0, 10),
@@ -216,11 +225,8 @@ export function conclusionView(line: WebInsightBlockLine | null | undefined, now
  * IB-BUG-028: the sources a line could not read, in words. Our own tape is a phrase and is
  * translated; a venue's name is an identifier (like a ticker) and stays as it is (i18n rule).
  */
-const VENUE_NAMES: Readonly<Record<Exclude<WebInsightSource, 'tape'>, string>> = {
-  binance: 'Binance', deribit: 'Deribit', defillama: 'DefiLlama', coinbase: 'Coinbase',
-};
 export function sourceNames(sources: readonly WebInsightSource[], t: (key: StringKey) => string): string {
-  return sources.map((src) => (src === 'tape' ? t('insight.source.tape') : VENUE_NAMES[src])).join(', ');
+  return sources.map((src) => (src === 'tape' ? t('insight.source.tape') : venueName(src))).join(', ');
 }
 
 export function neutralLine(

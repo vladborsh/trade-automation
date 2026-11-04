@@ -1,7 +1,7 @@
 import type { WebFlowsChange, WebFlowsPoint, WebFlowsResponse, WebFlowsUnavailable, WebMarketPeriod } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 import { formatUsd } from '../liquidations/liquidations.format';
-import { signedPct } from '../market/shell/market-text';
+import { signedFixed, signedPct } from '../market/shell/market-text';
 
 /**
  * IB-091 — «Деривативы и потоки»: the four tiles as views, pure. The template only places them;
@@ -61,7 +61,7 @@ export function flowsTiles(r: WebFlowsResponse, period: WebMarketPeriod): TileVi
     {
       id: 'dvol', title: 'flows.dvol.title', tone: dvTone, unusual: unusual(dv.change),
       value: dv.value === null ? null : dv.value.toFixed(1),
-      detail: dv.change ? { key: 'flows.dvol.change', params: { change: `${dv.change.value > 0 ? '+' : ''}${dv.change.value.toFixed(1)}`, period } } : null,
+      detail: dv.change ? { key: 'flows.dvol.change', params: { change: signedFixed(dv.change.value, 1), period } } : null,
       note: { key: 'flows.dvol.note', params: {} },
       reason: reasonWords(dv.unavailable), series: dv.series, lineColour: colourOf(dvTone),
     },

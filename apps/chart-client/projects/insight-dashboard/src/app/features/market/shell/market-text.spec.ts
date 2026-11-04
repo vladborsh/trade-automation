@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { WEB_INSIGHT_KEYS, WEB_KPI_IDS } from '@trade-automation/contracts';
+import { WEB_INSIGHT_KEYS, WEB_KPI_IDS, WEB_VENUE_NAMES } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, sourceNames, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
+import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, sourceNames, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedFixed, signedPct } from './market-text';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -77,7 +77,7 @@ describe('insightView', () => {
     expect(v.params).toMatchObject({ usd: '$3.1M', count: 4, minutes: 9, symbol: 'ETHUSDT' });
     expect(v.nested['side']).toBe('insight.side.short');
     expect(v.link).toEqual({ commands: ['/instrument', 'ETHUSDT'], queryParams: { at: 1_793_712_533 } });
-    expect(v.basis.params).toMatchObject({ venues: 'binance+bybit+okx', sample: 720, observed: 690, from: '2026-10-04' });
+    expect(v.basis.params).toMatchObject({ venues: 'Binance+Bybit+OKX', sample: 720, observed: 690, from: '2026-10-04' });
     expect(v.basis.nested).toEqual({ window: 'market.period.24h' }); // IB-BUG-024: a word, translated
   });
 
@@ -171,3 +171,58 @@ describe('IB-BUG-028: a line that could not look names what did not answer', () 
   });
 });
 
+
+/** An ASCII hyphen directly before a digit, not inside a word or a date («2026-10-04», «top-50»). */
+const ASCII_MINUS = /(?<![\w.])-\d/;
+
+describe('IB-BUG-032: every signed figure takes the page\'s minus «−», never the ASCII hyphen', () => {
+  it('signedFixed', () => {
+    expect([2.4, -2.4, 0].map((v) => signedFixed(v, 1))).toEqual(['+2.4', '−2.4', '0.0']);
+  });
+
+  it('a statement with EVERY signed parameter negative prints no hyphen-minus', () => {
+    const negative = {
+      ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike',
+      params: { usd: -9.06e8, oiPct: -20.5, pricePct: -2.15, altGapPct: -1.2, change: -2.4, pct: -0.014, rate: -0.00025, value: 37.4 },
+      rarity: 0.95, magnitude: 1, basis: null, link: { anchor: 'flows' },
+    } as never;
+    const params = insightView(negative, 1).params;
+    for (const k of ['usd', 'oiPct', 'pricePct', 'altGapPct', 'change', 'pct', 'rate']) {
+      expect(String(params[k]), k).toContain('−');
+      expect(String(params[k]), k).not.toMatch(ASCII_MINUS);
+    }
+    expect(params['change']).toBe('−2.4');
+  });
+
+  // a level (a cap, a dominance, an index) is never negative; funding is the one signed tile value
+  it('a negative delta on EVERY KPI tile, and a negative funding rate', () => {
+    for (const id of WEB_KPI_IDS) {
+      const v = kpiView({ id, value: id === 'btc_funding' ? -0.00025 : 1, delta: -3.06, deltaBasis: '24h', split: null, context: null, source: { name: 'X', url: null }, unavailable: null, asOf: 1 } as never);
+      expect(`${v.value} ${v.delta?.text}`, id).not.toMatch(ASCII_MINUS);
+      expect(v.delta?.text, id).toContain('−');
+    }
+    expect(kpiView({ id: 'btc_funding', value: -0.00025, delta: null, deltaBasis: '24h', split: null, context: null, source: { name: 'X', url: null }, unavailable: null, asOf: 1 } as never).value).toBe('−0.0250 %');
+  });
+});
+
+describe('IB-BUG-032: a basis line spells every venue as the credit line does, never its raw key', () => {
+  const fill = (key: string, params: Record<string, string | number> = {}) =>
+    ((ru as Record<string, string>)[key] ?? key).replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
+  const line = (venues: string[]) => wordInsight(basisView({ window: '24h', venues, sampleWindows: 30, observedWindows: 22, from: 1_791_157_260 }, 0), fill as never);
+
+  it.each(Object.entries(WEB_VENUE_NAMES))('%s → «%s»', (key, name) => {
+    const l = line([key]);
+    expect(l).toContain(name);
+    expect(l).not.toMatch(new RegExp(`\\b${key}\\b`)); // case-sensitive: «okx» fails, «OKX» passes
+  });
+
+  it('the lists the rules send today (R1–R10)', () => {
+    expect(line(['binance', 'bybit', 'okx'])).toContain('Binance+Bybit+OKX');
+    expect(line(['defillama'])).toContain('DefiLlama');
+    expect(line(['coinbase', 'binance'])).toContain('Coinbase+Binance');
+  });
+
+  it('the «could not read» list uses the same spelling', () => {
+    expect(sourceNames(['deribit', 'defillama', 'coinbase', 'binance'], fill as never)).toBe('Deribit, DefiLlama, Coinbase, Binance');
+  });
+});

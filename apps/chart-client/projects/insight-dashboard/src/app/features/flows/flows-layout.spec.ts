@@ -46,3 +46,28 @@ describe('flowsTiles', () => {
     expect(sourceNames(base)).toBe('Deribit · OKX · DefiLlama · Coinbase');
   });
 });
+
+/**
+ * IB-BUG-032 — every signed figure on the tiles NEGATIVE, so the minus is exercised whatever the day
+ * gives (the real example has DVOL up, which is how «-2.4 пт» got past IB-091's check).
+ */
+describe('flowsTiles — every signed value negative takes the page\'s minus', () => {
+  const ASCII_MINUS = /(?<![\w.])-\d/;
+  const down: WebFlowsResponse = {
+    ...base,
+    dvol: { ...base.dvol, change: { ...base.dvol.change!, value: -2.4 } },
+    stablecoins: { ...base.stablecoins, changeUsd: { ...base.stablecoins.changeUsd!, value: -9.06e8 }, changePct: -0.31 },
+    coinbasePremium: { ...base.coinbasePremium, premiumPct: { ...base.coinbasePremium.premiumPct!, value: -0.014 } },
+  };
+
+  it('DVOL «−2.4», stablecoins «−$906M (−0.31 %)», premium «−0.014 %» — and no hyphen-minus anywhere on a tile', () => {
+    expect(tile(down, 'dvol').detail?.params['change']).toBe('−2.4');
+    expect(tile(down, 'dvol').tone).toBe('down');
+    expect(tile(down, 'stablecoins').detail?.params).toMatchObject({ usd: '−$906M', pct: '−0.31 %' });
+    expect(tile(down, 'coinbasePremium').value).toBe('−0.014 %');
+    for (const t of flowsTiles(down, '24h')) {
+      const printed = [t.value, ...Object.values(t.detail?.params ?? {}), ...Object.values(t.note.params)].map(String);
+      for (const s of printed) expect(s, `${t.id}: ${s}`).not.toMatch(ASCII_MINUS);
+    }
+  });
+});

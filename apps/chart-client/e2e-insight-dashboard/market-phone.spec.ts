@@ -84,6 +84,49 @@ async function openMarket(page: Page, setup?: (page: Page) => Promise<void>): Pr
   await expect(page.locator('app-insights-block')).toContainText('XRPUSDT');
 }
 
+/**
+ * IB-BUG-032: the same captured answers with EVERY signed figure turned negative — KPI deltas and
+ * funding, each positioning change and funding, each cap change, the three flow changes, and a
+ * statement per signed parameter. Test data derived from the captures, so the minus is exercised
+ * whatever the day gave (the capture had DVOL up, which is how «-2.4» got past IB-091's check).
+ * The insight lines also carry one basis per venue list the rules send, to read them in words.
+ */
+const neg = (v: number | null | undefined) => (typeof v === 'number' ? -Math.abs(v || 1) : v);
+const negCell = <T extends { value: number | null }>(c: T): T => ({ ...c, value: neg(c.value) as number | null });
+async function withEverySignNegative(page: Page): Promise<void> {
+  const fulfil = (body: unknown) => (route: import('@playwright/test').Route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+  await page.route('**/api/web/market/kpis**', fulfil({
+    ...kpis, tiles: kpis.tiles.map((t) => ({ ...t, delta: neg(t.delta ?? 1), value: t.id === 'btc_funding' ? neg(t.value) : t.value })),
+  }));
+  await page.route('**/api/web/market/positioning**', fulfil({
+    ...positioning,
+    rows: positioning.rows.map((r) => ({ ...r, priceChangePct: negCell(r.priceChangePct), oiChangePct: negCell(r.oiChangePct), fundingRate: negCell(r.fundingRate) })),
+  }));
+  await page.route('**/api/web/market/caps**', fulfil({
+    ...caps24h, coins: caps24h.coins.map((c) => ({ ...c, changePct: neg(c.changePct) })),
+    dominance: { ...caps24h.dominance, totalCapChangePct24h: neg(caps24h.dominance.totalCapChangePct24h) },
+  }));
+  await page.route('**/api/web/market/flows**', fulfil({
+    ...flows,
+    dvol: { ...flows.dvol, change: { ...flows.dvol.change, value: -2.4 } },
+    stablecoins: { ...flows.stablecoins, changeUsd: { ...flows.stablecoins.changeUsd, value: -9.06e8 }, changePct: -0.31 },
+    coinbasePremium: { ...flows.coinbasePremium, premiumPct: { ...flows.coinbasePremium.premiumPct, value: -0.014 } },
+  }));
+  const basis = (venues: string[]) => ({ window: '24h', venues, sampleWindows: 30, observedWindows: 22, from: 1_791_157_260 });
+  const r10 = { ruleId: 'R10', block: 'flows', key: 'insight.coinbase_premium', params: { pct: -0.014, minutes: 52 }, rarity: 0.97, magnitude: 0.014, basis: basis(['coinbase', 'binance']), link: { anchor: 'flows' } };
+  const r9 = { ruleId: 'R9', block: 'flows', key: 'insight.stablecoin_supply', params: { usd: -9.06e8, pct: -0.31, days: 1 }, rarity: 0.96, magnitude: 9.06e8, basis: basis(['defillama']), link: { anchor: 'flows' } };
+  const r4 = { ...insights.top[0], params: { ...insights.top[0].params, oiPct: -20.48, pricePct: -2.15 } };
+  await page.route('**/api/web/market/insights**', fulfil({
+    ...insights, top: [r4, r10, r9],
+    blocks: [
+      ...insights.blocks.filter((b) => b.block !== 'flows' && b.block !== 'sentiment'),
+      { block: 'flows', statement: r9, neutral: null },
+      { block: 'sentiment', statement: null, neutral: { key: 'insight.neutral', reason: 'nothing_unusual', basis: basis(['deribit']) } },
+    ],
+  }));
+}
+
 /** Everything a reader or a thumb meets, measured in the page. */
 async function measure(page: Page) {
   return page.evaluate(() => {
@@ -132,6 +175,31 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(m.small).toEqual([]);
     expect(m.tiny).toEqual([]);
     expect(m.loose).toEqual([]);
+  });
+
+  test('IB-BUG-032: with every signed figure negative, the page prints «−» and never an ASCII hyphen before a digit', async ({ page }, info) => {
+    await openMarket(page, withEverySignNegative);
+    const text = await page.locator('app-market').innerText();
+    const hyphens = [...text.matchAll(/(?<![\w.])-\d[^\s]*/g)].map((m) => m[0]);
+    expect(hyphens).toEqual([]);
+    // the negatives did reach the page: the DVOL change, the flows, the KPI strip, a statement
+    await expect(page.locator('[data-tile="dvol"] .detail')).toContainText('−2.4');
+    await expect(page.locator('[data-tile="stablecoins"] .detail')).toContainText('−$906M');
+    await expect(page.locator('[data-tile="coinbasePremium"] .value')).toContainText('−0.014 %');
+    await expect(page.locator('app-kpi-strip')).toContainText('−');
+    await expect(page.locator('app-insights-block')).toContainText('−20.48 %');
+    await info.attach('phone-390-negative.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+  });
+
+  test('IB-BUG-032: a basis line spells each venue as the credit line does — no raw key («defillama», «okx»)', async ({ page }) => {
+    await openMarket(page, withEverySignNegative);
+    const lines = await page.locator('app-market .basis').allInnerTexts();
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    const raw = lines.filter((l) => /\b(binance|bybit|okx|deribit|defillama|coinbase)\b/.test(l));
+    expect(raw).toEqual([]);
+    const all = lines.join('\n');
+    for (const name of ['DefiLlama', 'Binance+Bybit+OKX', 'Deribit']) expect(all).toContain(name);
+    await expect(page.locator('app-flows-block .source')).toHaveText('Data: Deribit · OKX · DefiLlama · Coinbase');
   });
 
   test('IB-091 phone: «Derivatives and flows» — four tiles in one column, each chart drawn, sources credited, no page scroll', async ({ page }, info) => {
