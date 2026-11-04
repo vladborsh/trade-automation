@@ -38,3 +38,4 @@ export * from './venue-names';
 // IB-109 — price vs OI divergence alerts: params, chart lines, journal, admin (design V1–V17).
 export * from './oi-divergence';
 export * from './oi-divergence-admin';
+export * from './oi-divergence-research';
