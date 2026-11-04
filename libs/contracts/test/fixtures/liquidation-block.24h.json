@@ -321,6 +321,7 @@
   }
  ],
  "largeMinUsd": 100000,
+ "otherCoins": { "totals": { "usd": 17800000, "long": 12900000, "short": 4900000, "events": 3690 }, "coins": 14 },
  "tradfi": {
   "usd": 3200000.0,
   "long": 2000000.0,

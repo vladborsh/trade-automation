@@ -14,6 +14,7 @@ const block = {
   perCoin: [{ symbol: 'BTCUSDT', base: 'BTC', totals: zero, verdict: null, basis }],
   large: [],
   largeMinUsd: 100_000,
+  otherCoins: { totals: zero, coins: 0 },
   tradfi: zero,
   unknown: zero,
   availableFrom: { '1h': null, '4h': null, '24h': 1_793_000_000, '7d': 1_793_500_000 },
@@ -31,7 +32,7 @@ describe('IB-084 liquidation block contract', () => {
   });
 
   it('TradFi and unknown are separate fields — there is no way to put them in totals by shape', () => {
-    expect(Object.keys(WebLiquidationBlockSchema.shape)).toEqual(expect.arrayContaining(['tradfi', 'unknown', 'totals']));
+    expect(Object.keys(WebLiquidationBlockSchema.shape)).toEqual(expect.arrayContaining(['tradfi', 'unknown', 'totals', 'otherCoins']));
   });
 
   it('a large event carries its context and series, and refuses a negative multiple', () => {
@@ -48,5 +49,14 @@ describe('the example block clients build against (test/fixtures/liquidation-blo
     const parsed = WebLiquidationBlockSchema.parse(example);
     expect(parsed.hourly.buckets).toHaveLength(24);
     expect(parsed.large[0].seriesCount).toBe(4);
+  });
+
+  it('IB-BUG-025: the coin rows plus otherCoins equal the crypto totals, field by field', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const parsed = WebLiquidationBlockSchema.parse(require('./fixtures/liquidation-block.24h.json'));
+    for (const k of ['usd', 'long', 'short', 'events'] as const) {
+      const rows = parsed.perCoin.reduce((s, c) => s + c.totals[k], 0);
+      expect(rows + parsed.otherCoins.totals[k]).toBeCloseTo(parsed.totals[k], 6);
+    }
   });
 });

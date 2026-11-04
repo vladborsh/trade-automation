@@ -248,6 +248,13 @@ export const WebLiquidationBlockSchema = z.object({
   /** Largest crypto events of the period, biggest first, at or above `largeMinUsd`. */
   large: z.array(WebLiquidationLargeEventSchema),
   largeMinUsd: z.number().nonnegative(),
+  /**
+   * IB-BUG-025: the crypto in `totals` that is in no `perCoin` row, stated so the rows plus this
+   * line equal `totals` exactly: universe coins ranked below the rows, and every Binance coin the
+   * universe does not list (`!forceOrder@arr` carries all of them — 12.9 % of 24h crypto on the box,
+   * 2026-11-04). `coins` = distinct base assets in it. Never a remainder computed by subtraction.
+   */
+  otherCoins: z.object({ totals: WebLiquidationPeriodTotalsSchema, coins: z.number().int().nonnegative() }),
   /** D6: TradFi perps (commodities, equities, FX, indices on Binance's TRADIFI contracts) — outside every total. */
   tradfi: WebLiquidationPeriodTotalsSchema,
   /** Rows neither class could be given (e.g. a crypto index perp): counted here, in no total. */
@@ -275,9 +282,12 @@ export const WebLiquidationsOverviewResponseSchema = z.object({
    */
   venues: z.object({ present: z.array(z.string()), missing: z.array(z.string()) }),
   /**
-   * Rows whose venue symbol is not in `symbols`, so they are in the market-wide totals but in no
-   * coin's row. Normally 0. Surfaced as a number because the alternative — a join quietly
-   * dropping them — looks exactly like a quieter market.
+   * Events in the widest window (24h) whose venue symbol maps to no universe coin, OF EVERY CLASS:
+   * Binance's all-market stream carries hundreds of symbols the universe does not list (TradFi and
+   * crypto alike), so this is thousands a day, not 0 — the "normally 0" this comment used to say
+   * stopped being true with IB-084 (IB-BUG-025: 12 475 on the box for one 24h, 2026-11-04). Their
+   * crypto part is in `block.otherCoins`; TradFi in `block.tradfi`. Kept as a number because the
+   * alternative — a join quietly dropping rows — looks exactly like a quieter market.
    */
   unmappedRows: z.number().int().nonnegative(),
   /** IB-084: the market page's block for the requested `?period=` (default 24h). */
