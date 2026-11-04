@@ -19,6 +19,12 @@ import { slotOf } from './slot-grid';
  *   its slots present, never above `expected` and never down.
  * - A real new outage is a range overlapping nothing registered, so it is still written. Hiding
  *   it would be the opposite failure, and the spec pins both.
+ *
+ * **Known limit, accepted (Tech Lead, IB-BUG-020 review).** An outage contiguous with a hole
+ * already registered for the same symbol overlaps that row and is not written for that symbol.
+ * The same happens to any later outage on a symbol whose registered row is the moving
+ * whole-window range. Accepted because a poller outage hits every symbol, and the crypto ones,
+ * which have no closed sessions, still record it.
  */
 export interface GapRange {
   from: number;
