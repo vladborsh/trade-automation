@@ -77,7 +77,7 @@ describe('IB-081 — the coverage statements on the OI, long/short and funding p
   });
 
   it('funding: «нет ответа: bybit, okx» when venues failed, nothing when every venue answered', () => {
-    expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith(['bybit', 'okx']) }, tp).at(-1)?.label).toBe('нет ответа: bybit, okx');
+    expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith(['bybit', 'okx']) }, tp).at(-1)?.label).toBe('нет ответа: Bybit, OKX');
     expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith() }, tp)).toHaveLength(fundingPane.legend.length);
     expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith([]) }, tp)).toHaveLength(fundingPane.legend.length);
   });

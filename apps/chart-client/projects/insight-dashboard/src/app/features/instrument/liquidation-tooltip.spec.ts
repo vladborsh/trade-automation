@@ -34,7 +34,7 @@ describe('tooltipLines', () => {
     expect(lines).toEqual([
       '$4.2M liquidated · mostly shorts',
       '1,250 liquidations · largest $1.1M',
-      'binance, okx',
+      'Binance, OKX', // IB-BUG-033: names, not keys
     ]);
   });
 

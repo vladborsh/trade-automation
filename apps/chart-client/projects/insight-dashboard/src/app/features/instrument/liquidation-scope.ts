@@ -1,3 +1,4 @@
+import { venueName } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 
 /**
@@ -48,8 +49,9 @@ export function liquidationScopeLabel(
   total24h?: string | null,
 ): string {
   if (venuesPresent.length === 0) return t('instrument.liq.noVenues');
-  // venue names are codes: English in both languages, per §11
-  const venues = [...venuesPresent].sort().join(', ');
+  // venue names are identifiers: never translated (§11), but spelled as their owners spell them
+  // («Binance, Bybit, OKX»), not as our keys (IB-BUG-033, the WEB_VENUE_NAMES map of IB-BUG-032)
+  const venues = [...venuesPresent].sort().map(venueName).join(', ');
   const key: StringKey = undercounted
     ? 'instrument.liq.scopeUndercounted'
     : 'instrument.liq.scope';

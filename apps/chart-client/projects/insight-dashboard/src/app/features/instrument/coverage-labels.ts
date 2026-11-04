@@ -1,3 +1,4 @@
+import { venueName } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 
 /**
@@ -33,10 +34,10 @@ export function seriesStartLabel(coverage: Coverage | undefined): CoverageLabel 
   return { key: 'instrument.coverage.from', params: { date: utcDate(coverage.coverageFrom) } };
 }
 
-/** «нет ответа: bybit, okx» when a venue did not answer, else null. */
+/** «нет ответа: Bybit, OKX» when a venue did not answer, else null (names, not keys: IB-BUG-033). */
 export function noAnswerLabel(unavailable: readonly string[] | undefined): CoverageLabel | null {
   if (!unavailable || unavailable.length === 0) return null;
-  return { key: 'instrument.coverage.noAnswer', params: { venues: [...new Set(unavailable)].join(', ') } };
+  return { key: 'instrument.coverage.noAnswer', params: { venues: [...new Set(unavailable)].map(venueName).join(', ') } };
 }
 
 /** The UTC calendar day of an epoch second, `YYYY-MM-DD`: the format Market's «доступно с» uses. */

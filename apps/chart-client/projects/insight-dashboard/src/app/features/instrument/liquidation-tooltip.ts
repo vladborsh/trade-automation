@@ -1,3 +1,4 @@
+import { venueName } from '@trade-automation/contracts';
 import { formatUsd } from '../liquidations/liquidations.format';
 import type { LiquidationMarker } from './liquidation-markers.adapter';
 
@@ -39,7 +40,7 @@ export function tooltipLines(m: LiquidationMarker): string[] {
   return [
     `${formatUsd(m.usd)} liquidated · ${who}`,
     m.events === 1 ? count : `${count} · largest ${formatUsd(m.largestUsd)}`,
-    m.venues.join(', '),
+    m.venues.map(venueName).join(', '), // IB-BUG-033: «Binance, OKX», not the keys
   ];
 }
 

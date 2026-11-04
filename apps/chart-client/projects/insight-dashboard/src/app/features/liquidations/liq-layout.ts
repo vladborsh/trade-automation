@@ -1,5 +1,5 @@
 import {
-  WEB_MARKET_PERIOD_SECONDS,
+  WEB_MARKET_PERIOD_SECONDS, venueName,
   type WebLiquidationsOverviewResponse,
   type WebLiquidationCoinPeriod,
   type WebLiquidationHourly,
@@ -218,6 +218,8 @@ export interface LargeCard {
   /** «серия: 4 за 9 мин» for an event in an R3 cascade. */
   series: { key: StringKey; params: { count: number; minutes: number } } | null;
   link: { commands: string[]; queryParams: { at: number } };
+  /** The venue as its owner spells it («OKX»), never the key (IB-BUG-033). */
+  venue: string;
 }
 
 /**
@@ -233,6 +235,7 @@ export function largeCards(large: readonly WebLiquidationLargeEvent[]): LargeCar
       params: { count: event.seriesCount, minutes: Math.max(1, Math.round(event.seriesSpanSec / 60)) },
     },
     link: { commands: ['/instrument', event.symbol], queryParams: { at: event.time } },
+    venue: venueName(event.venue),
   }));
 }
 

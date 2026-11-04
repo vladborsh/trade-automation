@@ -197,6 +197,9 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(lines.length).toBeGreaterThanOrEqual(3);
     const raw = lines.filter((l) => /\b(binance|bybit|okx|deribit|defillama|coinbase)\b/.test(l));
     expect(raw).toEqual([]);
+    // IB-BUG-033: and nowhere else on the page either — the venue notes, the large-liquidation cards
+    const page_ = await page.locator('app-market').innerText();
+    expect(page_.match(/\b(binance|bybit|okx|deribit|defillama|coinbase)\b/g) ?? []).toEqual([]);
     const all = lines.join('\n');
     for (const name of ['DefiLlama', 'Binance+Bybit+OKX', 'Deribit']) expect(all).toContain(name);
     await expect(page.locator('app-flows-block .source')).toHaveText('Data: Deribit · OKX · DefiLlama · Coinbase');

@@ -137,6 +137,11 @@ describe('largeCards', () => {
     expect(cards[2].series).toBeNull();
     expect(cards[0].link).toEqual({ commands: ['/instrument', 'BTCUSDT'], queryParams: { at: block.large.find((e) => e.usd === 2_400_000)!.time } });
   });
+
+  it('IB-BUG-033: each card names its venue as the venue spells it, never our key', () => {
+    const names = { binance: 'Binance', bybit: 'Bybit', okx: 'OKX' } as Record<string, string>;
+    for (const c of largeCards(block.large)) expect(c.venue).toBe(names[c.event.venue]);
+  });
 });
 
 describe('normNote — no empty space where a norm would be', () => {
@@ -173,7 +178,7 @@ describe('blockView — the facts around the charts', () => {
     expect(v.tradfi).toEqual({ key: 'liq.tradfi', params: { usd: '$3.2M' } });
     expect(v.unknown).toEqual({ key: 'liq.unknown', params: { usd: '$12K', events: 2 } });
     expect(v.venues).toBeNull();
-    expect(v.present).toEqual({ key: 'liq.venues.present', params: { venues: 'binance' } });
+    expect(v.present).toEqual({ key: 'liq.venues.present', params: { venues: 'Binance' } });
     expect(v.largeNote).toBeNull(); // every fixture card has its «× медианы»
     expect(v.hourlyNote.key).toBe('liq.norm.median');
   });
@@ -181,7 +186,7 @@ describe('blockView — the facts around the charts', () => {
   it('a venue that wrote nothing is named; nothing outside the totals means no line', () => {
     const zero = { usd: 0, long: 0, short: 0, events: 0 };
     const v = blockView(overview({ unknown: zero, tradfi: zero }, ['okx']), '1h', 0);
-    expect(v.venues?.params).toEqual({ venues: 'okx' });
+    expect(v.venues?.params).toEqual({ venues: 'OKX' });
     expect([v.tradfi, v.unknown]).toEqual([null, null]);
   });
 

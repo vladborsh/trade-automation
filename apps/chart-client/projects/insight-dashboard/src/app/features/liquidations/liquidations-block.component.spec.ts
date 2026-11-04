@@ -40,8 +40,8 @@ describe('LiquidationsBlockComponent (IB-089)', () => {
     expect(el.querySelector('app-liq-large .card')?.textContent).toContain('×180 the median event');
     expect(el.querySelector('app-liq-large .card')?.getAttribute('href')).toMatch(/^\/instrument\/BTCUSDT\?at=\d+$/);
     expect(el.textContent).toContain('TradFi (gold, oil, indices): $3.2M, outside the totals');
-    expect(el.textContent).toContain('okx: no data');
-    expect(el.textContent).toContain('data: binance, bybit');
+    expect(el.textContent).toContain('OKX: no data');
+    expect(el.textContent).toContain('data: Binance, Bybit');
   });
 
   it('the first week: no norm line, no «×», and the day the norm appears said in words', () => {

@@ -24,13 +24,13 @@ describe('liquidationScopeLabel', () => {
   it('NAMES THE VENUES THE DATA CAME FROM', () => {
     // IB-BUG-011: the old label took the filter, so a query that reached one venue still read
     // «все биржи». This one can only say what actually contributed.
-    expect(liquidationScopeLabel(tRu, ['okx', 'bybit'], false)).toContain('bybit, okx');
+    expect(liquidationScopeLabel(tRu, ['okx', 'bybit'], false)).toContain('Bybit, OKX');
   });
 
   it('says «нет данных» when nothing contributed, instead of a venue list', () => {
     // A filter always has a value even when the result is empty; this distinguishes them.
     const label = liquidationScopeLabel(tRu, [], false);
-    expect(label).not.toContain('bybit');
+    expect(label).not.toContain('Bybit');
     expect(label).toBe(ru['instrument.liq.noVenues']);
   });
 
@@ -44,12 +44,17 @@ describe('liquidationScopeLabel', () => {
   it('says the same thing in English — the warning is not a Russian-only courtesy', () => {
     const capped = liquidationScopeLabel(tEn, ['bybit'], true);
     expect(capped).not.toContain('MISSING:');
-    expect(capped).toContain('bybit');
+    expect(capped).toContain('Bybit');
   });
 
-  it('keeps venue names as CODES in both languages (§11)', () => {
-    expect(liquidationScopeLabel(tRu, ['bybit', 'okx'], false)).toContain('bybit, okx');
-    expect(liquidationScopeLabel(tEn, ['bybit', 'okx'], false)).toContain('bybit, okx');
+  // IB-BUG-033: identifiers are not translated (§11) but are SPELLED as their owners spell them, the
+  // same map as the Market page's basis lines and credits (WEB_VENUE_NAMES) — never our lowercase keys
+  it('keeps venue names untranslated and the same in both languages, spelled as names, not keys', () => {
+    for (const t of [tRu, tEn]) {
+      const label = liquidationScopeLabel(t, ['binance', 'bybit', 'okx'], false);
+      expect(label).toContain('Binance, Bybit, OKX');
+      expect(label).not.toMatch(/\b(binance|bybit|okx)\b/);
+    }
   });
 
   it('CARRIES THE 24h TOTAL ABOVE THE FOLD, and says the detail is below', () => {
@@ -57,7 +62,7 @@ describe('liquidationScopeLabel', () => {
     // not, so it has to tell a reader the number exists and roughly how big it is.
     const withTotal = liquidationScopeLabel(tRu, ['bybit'], false, '$10M');
     expect(withTotal).toContain('$10M');
-    expect(withTotal).toContain('bybit');
+    expect(withTotal).toContain('Bybit');
     expect(withTotal.length).toBeGreaterThan(liquidationScopeLabel(tRu, ['bybit'], false).length);
   });
 

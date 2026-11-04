@@ -106,6 +106,20 @@ test.describe('instrument page — desktop (IB-099)', () => {
     await info.attach('desktop-legend-toggle.png', { body: await page.locator('.chart-column').screenshot(), contentType: 'image/png' });
   });
 
+  test('IB-BUG-033: venues are spelled as names on the instrument page (footer, legends; the tooltip by its unit spec) — never our keys', async ({ page }) => {
+    await open(page);
+    const RAW = /\b(binance|bybit|okx|deribit|defillama|coinbase)\b/g;
+    await expect(page.locator('.pane-note')).toContainText('Binance, Bybit, OKX');
+    // the raw-data table's `venue` column is English-by-rule (matched against the venue's data and our
+    // logs, allow-listed in no-literals.spec.ts); everything a member reads as a sentence is checked
+    const text = await page.locator('app-instrument').evaluate((el) => {
+      const copy = el.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll('table.top').forEach((t) => t.remove());
+      return copy.innerText ?? copy.textContent ?? '';
+    });
+    expect(text.match(RAW) ?? []).toEqual([]);
+  });
+
   test('item 3: full screen grows the SAME chart and gives the view back; the button and Esc both leave', async ({ page }) => {
     await open(page);
     const canvas = page.locator('.chart-host canvas').first();

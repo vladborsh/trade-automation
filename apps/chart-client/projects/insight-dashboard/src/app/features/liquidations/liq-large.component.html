@@ -21,7 +21,7 @@
       <li [class.extra]="i >= limit">
         <a class="card" [routerLink]="card.link.commands" [queryParams]="card.link.queryParams" [attr.data-side]="card.event.side">
           <span class="head"><strong>{{ card.event.base }}</strong> · <span class="side">{{ side(card.event) }}</span> · <strong class="amount">{{ usd(card.event.usd) }}</strong></span>
-          <span class="meta">{{ time(card.event) }} · {{ card.event.venue }}</span>
+          <span class="meta">{{ time(card.event) }} · {{ card.venue }}</span>
           @if (card.xMedian; as x) {
             <span class="ctx">{{ word(x) }}</span>
           }

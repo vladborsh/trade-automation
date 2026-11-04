@@ -30,7 +30,7 @@ describe('seriesStartLabel (OI, long/short)', () => {
 
 describe('noAnswerLabel (funding)', () => {
   it('names the venues that did not answer, as the server names them', () => {
-    expect(noAnswerLabel(['bybit', 'okx'])).toEqual({ key: 'instrument.coverage.noAnswer', params: { venues: 'bybit, okx' } });
+    expect(noAnswerLabel(['bybit', 'okx'])).toEqual({ key: 'instrument.coverage.noAnswer', params: { venues: 'Bybit, OKX' } }); // IB-BUG-033: names, not keys
   });
 
   it('absent or empty means every venue answered: nothing to say', () => {
@@ -39,7 +39,7 @@ describe('noAnswerLabel (funding)', () => {
   });
 
   it('a venue named twice is said once', () => {
-    expect(noAnswerLabel(['okx', 'okx'])?.params['venues']).toBe('okx');
+    expect(noAnswerLabel(['okx', 'okx'])?.params['venues']).toBe('OKX');
   });
 });
 

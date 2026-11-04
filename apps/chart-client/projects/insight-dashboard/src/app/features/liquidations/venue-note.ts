@@ -1,4 +1,4 @@
-import type { WebLiquidationsOverviewResponse } from '@trade-automation/contracts';
+import { venueName, type WebLiquidationsOverviewResponse } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 
 /**
@@ -19,11 +19,11 @@ export interface VenueNote {
  */
 export function venueNote(venues: WebLiquidationsOverviewResponse['venues']): VenueNote | null {
   if (venues.missing.length === 0) return null;
-  return { key: 'liq.venues.missing', params: { venues: venues.missing.join(', ') } };
+  return { key: 'liq.venues.missing', params: { venues: venues.missing.map(venueName).join(', ') } };
 }
 
 /** The venues the figures DID come from, so "all venues" is never implied by silence. */
 export function presentNote(venues: WebLiquidationsOverviewResponse['venues']): VenueNote | null {
   if (venues.present.length === 0) return null;
-  return { key: 'liq.venues.present', params: { venues: venues.present.join(', ') } };
+  return { key: 'liq.venues.present', params: { venues: venues.present.map(venueName).join(', ') } };
 }
