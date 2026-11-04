@@ -48,3 +48,38 @@ describe('oiPerBar', () => {
     expect(pivots(min, 1, 'low')).toEqual([1]); // bar 1, not bar 2
   });
 });
+
+/**
+ * The venue convention `oiPerBar` rests on, pinned by a committed probe: 90 reads (5 coins × 6 boundaries
+ * × 15/35/60 s after each). If Binance ever labelled a row with the START of the 5 minutes it describes,
+ * a row labelled at a boundary could not exist seconds after that boundary — this fails, and the
+ * ownership rule (`open < t ≤ close`) must be revisited.
+ */
+describe('openInterestHist labels are the moment of the reading (fixture)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const f = require('../../fixtures/binance/open-interest-hist-labels.json') as { reads: Array<{ symbol: string; requestedAt: string; labels: string[] }> };
+
+  it('the probe is what it says: 90 reads over six boundaries, five coins', () => {
+    expect(f.reads).toHaveLength(90);
+    expect(new Set(f.reads.map((r) => r.symbol)).size).toBe(5);
+    expect(new Set(f.reads.map((r) => Math.floor(Date.parse(r.requestedAt) / 300_000))).size).toBe(6);
+  });
+
+  it('no label is ever later than the request that returned it', () => {
+    const future = f.reads.flatMap((r) => r.labels.filter((l) => Date.parse(l) > Date.parse(r.requestedAt)));
+    expect(future).toEqual([]);
+  });
+
+  it('on EVERY boundary some coin already serves the row labelled with it, under a minute after it', () => {
+    const byBoundary = new Map<number, number>();
+    for (const r of f.reads) {
+      const boundary = Math.floor(Date.parse(r.requestedAt) / 300_000) * 300_000;
+      if (r.labels.some((l) => Date.parse(l) === boundary)) {
+        const age = Date.parse(r.requestedAt) - boundary;
+        byBoundary.set(boundary, Math.min(byBoundary.get(boundary) ?? Infinity, age));
+      }
+    }
+    expect(byBoundary.size).toBe(6);
+    expect(Math.max(...byBoundary.values())).toBeLessThan(60_000);
+  });
+});
