@@ -25,8 +25,18 @@ export interface InsightSnapshot {
     coins: Map<string, { usd: number; sample: number[]; days: number }>;
     /** The block's large events, with their series (IB-084). */
     large: WebLiquidationLargeEvent[];
+    /**
+     * IB-107 (D24): the period's bars of the overview's mirrored chart, oldest first — the same call
+     * the port already makes. R1/R3 draw their spark from them.
+     */
+    bars: { time: number; long: number; short: number }[];
   } | null;
   positioning: WebPositioningRow[] | null;
+  /**
+   * IB-107 (D24): per coin, the tails of the hourly baselines the positioning service already holds —
+   * the row's server-side twin, NOT on `WebPositioningRow`. R4/R6/R5 draw their spark from them.
+   */
+  positioningSeries: Map<string, PositioningSeries> | null;
   breadth: {
     upShare: number; altGapPct: number; upShareSample: number[]; altGapSample: number[]; days: number; coins: number;
   } | null;
@@ -34,6 +44,13 @@ export interface InsightSnapshot {
   fng: number | null;
   /** IB-091: «Деривативы и потоки» (DVOL, stablecoins, Coinbase premium) for R8–R10. */
   flows: WebFlowsResponse | null;
+}
+
+/** IB-107: the last hourly OI and global account L/S points, and the last funding settlements, oldest first. */
+export interface PositioningSeries {
+  oi: number[];
+  lsGlobal: number[];
+  funding: number[];
 }
 
 /** A rule that could not judge: its basis is too thin, or its data is absent. */

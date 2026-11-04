@@ -195,9 +195,12 @@ export class WebModule {
                     liquidations.marketSamples(period), liquidations.coinPeriodSamples(period),
                     liquidations.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 1, period }),
                   ]);
-                  return { ...m, coins, large: overview.block.large };
+                  // IB-107: the mirrored chart's bars from the same call — R1/R3's sparks, no read of their own
+                  const bars = overview.block.hourly.buckets.map((x) => ({ time: x.time, long: x.long, short: x.short }));
+                  return { ...m, coins, large: overview.block.large, bars };
                 },
                 positioning: async (period) => (await positioning.positioning(period)).rows,
+                positioningSeries: () => positioning.sparkSeries(),
                 breadth: (period) => positioning.breadth(period),
                 fng: async () => (await cards.cards([])).fearGreed?.now.value ?? null,
                 flows: (period) => flows.flows(period),

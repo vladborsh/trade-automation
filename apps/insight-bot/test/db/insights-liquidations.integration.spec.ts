@@ -37,7 +37,7 @@ maybeDescribe('IB-086 liquidation rules on the crypto-only read path', () => {
   const r1 = async () => {
     const svc = new LiquidationsOverviewService(db, stubClassifier(universe), () => NOW);
     const m = await svc.marketSamples('24h');
-    const snap = { period: '24h', nowMs: NOW, liquidations: { ...m, coins: new Map(), large: [] }, positioning: null, breadth: null, fng: null, flows: null } as InsightSnapshot;
+    const snap = { period: '24h', nowMs: NOW, liquidations: { ...m, coins: new Map(), large: [], bars: [] }, positioning: null, positioningSeries: null, breadth: null, fng: null, flows: null } as InsightSnapshot;
     const out = R1.run(snap);
     return out && !isRefusal(out) && out.rarity >= 0.9 ? out : null;
   };

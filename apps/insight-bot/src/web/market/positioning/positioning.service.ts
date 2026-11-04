@@ -57,6 +57,9 @@ interface Baseline {
 
 const H = 3_600_000;
 const CONCURRENCY = 4;
+/** IB-107 (§7.3): a day of hourly points (R4, R6) and 7 days of 8-hourly settlements (R5) per coin. */
+const SPARK_HOURS = 24;
+const SPARK_SETTLEMENTS = 21;
 
 export class PositioningService {
   private readonly logger = new Logger(PositioningService.name);
@@ -161,6 +164,21 @@ export class PositioningService {
       days: (n + steps) / 24,
       coins: series.length,
     };
+  }
+
+  /**
+   * IB-107 (market-page design D24, §7.3) — the tails of the hourly baselines this service already
+   * holds, for the insight cards' mini-charts: the last 24 OI and global account L/S points and the
+   * last 21 funding settlements per coin. The row's server-side twin: never on `WebPositioningRow`.
+   * Reads the same cached baselines as `positioning()` — no venue call of its own.
+   */
+  async sparkSeries(): Promise<Map<string, { oi: number[]; lsGlobal: number[]; funding: number[] }>> {
+    const base = await this.baselines();
+    return new Map([...base.entries()].map(([id, b]) => [id, {
+      oi: b.oiHourly.slice(-SPARK_HOURS),
+      lsGlobal: b.lsGlobalHourly.slice(-SPARK_HOURS),
+      funding: b.fundingSettled.slice(-SPARK_SETTLEMENTS),
+    }] as const));
   }
 
   /** The hourly baselines for every coin, rebuilt once an hour (D9). A coin whose reads fail is absent. */
