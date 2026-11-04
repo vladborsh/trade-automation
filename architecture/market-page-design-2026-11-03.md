@@ -70,6 +70,24 @@ Binance fapi total ≈ **54 / 2400 per minute (2.2 %)**. That is arithmetic from
 survey's own figures are single probes. Each server task states its measured figure from
 `ib_binance_weight_used_1m` in its report.
 
+### 3a. Redone against the box (2026-11-04)
+
+**Measured:** median **90 / min** (mean ≈ 89, range 40–102), with one 400 in the minute of the hourly baseline rebuild. Two tabs on Market for 60 min, dev-3, `reports/dev-3-IB-093.md` item 2 and note A. The IB-096 watch on another occasion also gave a median of 90, so this is two occasions with 60 one-minute samples each. With no Market tab open it was 0–2 / min. **Population:** the gauge is Binance's own `X-MBX-USED-WEIGHT-1M` for the box's IP whenever a `/fapi/*` response is under a minute old (`BinanceWeightTracker`). `/futures/data/*` returns no such header (measured 2026-09-28, 5/5 on two occasions). So the 90 is **fapi weight only**, and dev-3's first candidate (the OI/LS `/futures/data` reads) cannot be in it.
+
+**What the table above got wrong, by code reading (2026-11-04):**
+
+| Line | Table said | Code does | fapi / min |
+|---|---|---|---|
+| Universe summary (`ticker/24hr` 40 + `premiumIndex` 10) | 50, "shared" | `UniverseSummaryService` holds **one** cached answer, keyed by the symbol list. Market asks it with two lists: positioning (30 crypto coins, 60 s) and KPIs (`[BTC]`, 60 s). Each request evicts the other's answer, so the venue is asked **twice a minute**. `universe.controller` makes a third list. | **≈ 100** (≈ 150 if a third list is asked every minute) |
+| Price baselines, 1h klines | 40 × 5 / 60 ≈ 3.3 | 30 coins × one 1 500-row page at weight 10, hourly (`CandlesService`), all in one minute | median 0, ≈ 300 in the rebuild minute (the measured 400 with the rest of that minute) |
+| Funding baselines | ≈ 0.1 | 30 × 1, hourly, with the klines | median 0 |
+
+**Reconciliation:** two summary fetches a minute is ≈ 100. The trailing-minute header sometimes holds one fetch (≈ 50) and sometimes two (≈ 100), depending on how the 60 s timers fall. That fits the measured median of 90 and the 40–102 range. This is a prediction from code, not an attribution: one sample per minute cannot separate endpoints. **The check:** count `ticker/24hr` calls per minute on the box (log or `recordCall` per path). The arithmetic predicts 2.
+
+**Same cause, outside the gauge:** each summary refresh also makes one `/futures/data/openInterestHist` call per listed symbol (31 per Market minute pair, ≈ 62 / min). This is against the separate `/futures/data` limit, alongside the OI/LS poller's average of 40 / min and positioning's ≈ 18 / min.
+
+**Fix (filed by the Tech Lead from this note):** cache the symbol-less venue reads (`ticker/24hr`, `premiumIndex`) once per 60 s, independent of the list, and assemble each caller's rows from them. Cache the per-symbol OI by symbol. Expected after the fix, by arithmetic: fapi ≈ 50 / min median, which is the original design figure. `/futures/data` drops by ≈ 31 / min. A spec that can disagree: two callers with different lists within 60 s give exactly **one** `ticker/24hr` call. **Budget verdict either way:** 90 is 3.75 % of 2 400 and far under `WEIGHT_CEILING_1M` (1 800), so this is waste, not danger. Until the fix lands, IB-096's "weight must not rise" baseline is the measured 90, not 54.
+
 ## 4. Decomposition
 
 All server tasks put **contracts first** (their first commit), so client tasks can start against
