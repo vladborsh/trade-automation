@@ -52,6 +52,7 @@ hidden tab.
 | D15 | **Each block ends with one conclusion line**, the highest-rarity statement from D1 whose rule belongs to that block (rules declare a `block`). If no statement passes, there is a neutral line ("ничего необычного за 24ч") with its basis. | One mechanism, not a second wording engine per block. |
 | D16 | **Phone:** blocks stack in one column under 768 px; tables scroll inside their own box; the treemap and quadrant keep their aspect ratio; tap replaces hover for tooltips. Checked at **390 px** (the owner's phone viewport; amended 2026-11-03 after the owner found the current page cramped) in every client task, with a screenshot; IB-088 asserts no horizontal page scroll at 390×844 in e2e. | Brief §2.8. |
 | D17 | **Old list components are deleted when their chart replaces them** (`liquidations-where`, `liquidations-feed`, the cap cards), along with their i18n keys (`no-literals.spec` parity). `liquidations-now` survives only as the KPI tile's data. | No dead UI, no orphan keys breaking the build. |
+| D18 | **Amended 2026-11-04 (Tech Lead approved; dev-3, `reports/dev-3-IB-091-premium-usdt.md`).** **The Coinbase premium is measured against the dollar with USDT divided out:** `premium = CB BTC-USD ÷ (BN BTCUSDT × CB USDT-USD) − 1`. It is computed minute by minute, only on minutes where all three 1m closes exist. The hourly history for R10's rarity uses the same formula on the three 1h series. **There is no fallback to the raw difference:** a minute without USDT-USD is a missing minute, not a raw one. R10's "sustained ≥ 45 of 60 minutes" counts valid minutes only. With fewer than 45, the rule refuses (`insufficient_minutes`), and the tile shows the value with that reason instead of a sign. The tile's explanation line says «к доллару, с поправкой на USDT», so the definition is visible. | The raw `CB BTC-USD − BN BTCUSDT` mixes two things: US demand for BTC and USDT's own price against the dollar. One probe (60 minutes, 2026-11-04 ~03:20 UTC; a note, not a rule) gave −0.162 % raw against −0.014 % adjusted, with USDT at 0.9985. So over 90 % of the "discount" was USDT. A moving USDT basis would fire R10 as a US-demand event. A fallback would silently swap one quantity for another under the same label. Cost: +1 Coinbase call/min (USDT-USD 1m, 60 s cache) and +1/h; Binance unchanged. |
 
 ## 3. Venue weight per minute (box-wide, after caches)
 
@@ -64,7 +65,7 @@ hidden tab.
 | `/coins/markets` + `/global` | CoinGecko (existing gate) | ≤ 1 call / min |
 | Phase 2: Deribit DVOL (15 min) — book summary dropped with max pain/skew (owner, 2026-11-03) | Deribit public | < 0.1 / min |
 | Phase 2: put/call by OI, daily series (60 min) | OKX rubik (public) | < 0.1 / min |
-| Phase 2: DefiLlama stablecoins (60 min); Coinbase candles 1m (1 / min) | keyless | ≈ 1 / min |
+| Phase 2: DefiLlama stablecoins (60 min); Coinbase 1m candles BTC-USD + USDT-USD (D18) | keyless | ≈ 2 / min |
 
 Binance fapi total ≈ **54 / 2400 per minute (2.2 %)**. That is arithmetic from documented weights; the
 survey's own figures are single probes. Each server task states its measured figure from
