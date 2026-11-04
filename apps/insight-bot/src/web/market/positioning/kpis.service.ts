@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { WEB_KPI_IDS, type WebKpiId, type WebKpiTile, type WebKpisResponse } from '@trade-automation/contracts';
+import { WEB_KPI_IDS, WEB_VENUE_NAMES, type WebKpiId, type WebKpiTile, type WebKpisResponse } from '@trade-automation/contracts';
 import { KPI_CACHE_MS } from '../../../insights/thresholds';
 import type { TtlCache } from '../../../venues/ttl-cache';
 import type { LiquidationsOverviewService } from '../../liquidations/overview.service';
@@ -31,8 +31,8 @@ export interface KpisOptions {
 const SOURCES = {
   coingecko: { name: 'CoinGecko', url: 'https://www.coingecko.com' },
   fng: { name: 'alternative.me', url: 'https://alternative.me/crypto/fear-and-greed-index/' },
-  liquidations: { name: 'Binance, Bybit, OKX', url: null },
-  binance: { name: 'Binance', url: null },
+  liquidations: { name: [WEB_VENUE_NAMES.binance, WEB_VENUE_NAMES.bybit, WEB_VENUE_NAMES.okx].join(', '), url: null },
+  binance: { name: WEB_VENUE_NAMES.binance, url: null },
 } as const;
 
 export class KpisService {

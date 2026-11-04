@@ -1,4 +1,4 @@
-import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow } from '@trade-automation/contracts';
+import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow, type WebVenueKey } from '@trade-automation/contracts';
 import { levelRarity, rarity } from './rarity';
 import { fngBand } from './sentiment';
 import { LIQ_RULE_MIN_DAYS, PREMIUM_SUSTAINED_MIN, R2_MIN_USD, RARITY_SHOW, VENUE_RULE_MIN_DAYS } from './thresholds';
@@ -24,7 +24,8 @@ import type { InsightSnapshot, Refusal, Rule } from './types';
  * R7 sentiment and breadth — share of coins up and median alt change minus BTC, each two-sided rare
  *    in its own hourly history; F&G band in the params for the wording.
  */
-const venuesAll = ['binance', 'bybit', 'okx'];
+// IB-BUG-032: typed against the display-name map, so a venue added here without a name does not compile
+const venuesAll: WebVenueKey[] = ['binance', 'bybit', 'okx'];
 const sec = (ms: number | null) => (ms === null ? null : Math.floor(ms / 1000));
 const median = (xs: readonly number[]) => {
   if (xs.length === 0) return null;
@@ -210,7 +211,7 @@ export const R7: Rule = {
 // ---- IB-091 «Деривативы и потоки» (phase 2) ----------------------------------------------------
 
 /** A phase-2 basis: the source, how many past values the rarity was measured against, from when. */
-function flowsBasis(s: InsightSnapshot, window: WebInsightBasis['window'], venues: string[], c: WebFlowsChange): WebInsightBasis {
+function flowsBasis(s: InsightSnapshot, window: WebInsightBasis['window'], venues: WebVenueKey[], c: WebFlowsChange): WebInsightBasis {
   return { window, venues, sampleWindows: c.sample, observedWindows: c.sample, from: sec(s.nowMs - c.sampleDays * 86_400_000) };
 }
 

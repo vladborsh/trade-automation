@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type { WebFlowsResponse, WebFlowsUnavailable, WebMarketPeriod } from '@trade-automation/contracts';
+import { WEB_VENUE_NAMES, type WebFlowsResponse, type WebFlowsUnavailable, type WebMarketPeriod } from '@trade-automation/contracts';
 import {
   COINBASE_PAGE_BARS, DVOL_DAILY_DAYS, DVOL_HOURLY_DAYS, FLOWS_CACHE_MS, FLOWS_DVOL_CACHE_MS, FLOWS_MINUTE_CACHE_MS,
   FLOWS_PREMIUM_HISTORY_CACHE_MS, FLOWS_PUTCALL_CACHE_MS, FLOWS_STABLECOINS_CACHE_MS, PREMIUM_HISTORY_HOURS,
@@ -40,10 +40,10 @@ export const FLOWS_BASE_URLS = {
 } as const;
 
 const SOURCES = {
-  dvol: { name: 'Deribit', url: 'https://www.deribit.com' },
-  putCall: { name: 'OKX', url: 'https://www.okx.com' },
-  stablecoins: { name: 'DefiLlama', url: 'https://defillama.com/stablecoins' },
-  coinbasePremium: { name: 'Coinbase', url: 'https://exchange.coinbase.com' },
+  dvol: { name: WEB_VENUE_NAMES.deribit, url: 'https://www.deribit.com' },
+  putCall: { name: WEB_VENUE_NAMES.okx, url: 'https://www.okx.com' },
+  stablecoins: { name: WEB_VENUE_NAMES.defillama, url: 'https://defillama.com/stablecoins' },
+  coinbasePremium: { name: WEB_VENUE_NAMES.coinbase, url: 'https://exchange.coinbase.com' },
 } as const;
 
 const TIMEOUT_MS = 10_000;
