@@ -88,6 +88,8 @@ export const ru: Strings = {
   'health.col.reconnects': 'переподключений за 24 ч',
   'health.col.openGaps': 'открытых пропусков',
   'health.openGapsTotal': 'всего открытых пропусков: {count}',
+  'health.gapsVenue': '+{count}: биржа не публиковала',
+  'health.gapsVenueHint': 'Слоты, которые биржа не опубликовала, пока наш сборщик работал (например, закрытые сессии TradFi-контрактов). Не сбой, предупреждением не считается.',
   'health.weight': 'Вес запросов к Binance',
   'health.weightNone': 'вес ещё не измерен',
   'health.weightPerMinute': 'в минуту',

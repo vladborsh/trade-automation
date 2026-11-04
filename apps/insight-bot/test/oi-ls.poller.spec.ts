@@ -30,10 +30,14 @@ class FakeDb implements Db {
 }
 
 /** Captures what each writer was handed, without a database. */
-function fakeWriters() {
+function fakeWriters(onGaps?: (rows: t.CollectorGapRow[]) => void) {
   const written: Record<string, unknown[]> = { oi: [], ls: [], gaps: [] };
   const writer = (key: string) =>
-    ({ write: async (rows: unknown[]) => { written[key].push(...rows); return rows.length; } }) as unknown as BatchWriter<never>;
+    ({ write: async (rows: unknown[]) => {
+      written[key].push(...rows);
+      if (key === 'gaps') onGaps?.(rows as t.CollectorGapRow[]); // written through, as the real writer does
+      return rows.length;
+    } }) as unknown as BatchWriter<never>;
   return {
     written,
     writers: { openInterest: writer('oi'), longShort: writer('ls'), collectorGaps: writer('gaps') } as never,
@@ -77,8 +81,9 @@ function build(opts: {
   symbols?: string[];
   rowsFor?: (endpoint: string, symbol: string) => unknown[] | Error;
   db?: Db;
+  onGaps?: (rows: t.CollectorGapRow[]) => void;
 }) {
-  const { written, writers } = fakeWriters();
+  const { written, writers } = fakeWriters(opts.onGaps);
   const streams = new StreamRegistry();
   const metrics = new MetricsService(streams);
   const weight = new BinanceWeightTracker();
@@ -288,6 +293,10 @@ describe('OiLsPoller.backfill — a hole is registered once, and repaired when i
     constructor(private storedNow: () => Date[]) { super({ STALEUSDT: null }); }
     async query<T>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
       if (sql.includes('select ts from open_interest_5m')) return this.storedNow().map((ts) => ({ ts })) as T[];
+      // IB-104's classification read: the open windows, with no neighbour stored (a one-symbol universe)
+      if (sql.includes('generate_series')) {
+        return this.gaps.filter((g) => g.repaired < g.expected).map(() => ({ error: 'not returned by the venue inside its retention window', min_neighbours: 0 })) as T[];
+      }
       if (sql.includes('from collector_gaps')) return this.gaps as T[];
       if (sql.startsWith('update collector_gaps')) {
         this.updates.push([...params]);
@@ -300,11 +309,11 @@ describe('OiLsPoller.backfill — a hole is registered once, and repaired when i
   }
   /** One boot over the same db; the gaps it writes are added to the db as the writer would. */
   async function boot(db: LedgerDb) {
-    const { poller, written, streams } = build({ symbols: ['STALEUSDT'], db });
+    const onGaps = (rows: t.CollectorGapRow[]) => {
+      for (const g of rows) db.gaps.push({ id: String(db.gaps.length + 1), detected_at: g.detectedAt, gap_from: g.gapFrom, gap_to: g.gapTo, expected: g.expected, repaired: g.repaired ?? 0 });
+    };
+    const { poller, written, streams } = build({ symbols: ['STALEUSDT'], db, onGaps });
     await poller.backfill(now);
-    for (const g of written.gaps as t.CollectorGapRow[]) {
-      db.gaps.push({ id: String(db.gaps.length + 1), detected_at: g.detectedAt, gap_from: g.gapFrom, gap_to: g.gapTo, expected: g.expected, repaired: g.repaired ?? 0 });
-    }
     return { written: written.gaps as t.CollectorGapRow[], open: streams.snapshot().find((s) => s.id === STREAM_ID)?.gapsOpen };
   }
   // the venue serves :00, :05, :15 — the :10 slot never comes (a closed TradFi session)

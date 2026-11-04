@@ -53,7 +53,7 @@ describe('OPS_TELEGRAM_ALERTS in the env schema', () => {
 describe('WatchdogService', () => {
   const silent: StreamHealth = {
     id: 'bybit:allLiquidation', venue: 'bybit', lastMessageAgeSec: 10 * 60,
-    reconnects24h: 0, gapsOpen: 0, mode: 'ws', degradedReason: null, expectedIntervalSec: null,
+    reconnects24h: 0, gapsOpen: 0, gapsVenue: 0, mode: 'ws', degradedReason: null, expectedIntervalSec: null,
   };
   const registry = { snapshot: () => [silent] } as never;
 

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import type { WebDbHealthResponse, WebStreamsResponse } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
+import { gapCell } from './gap-cell';
 import { ageSec, anyMissing, isPartial, uptimeStateClass, uptimeStateKey, windowOf } from './liquidation-uptime.mapper';
 
 /**
@@ -39,6 +40,7 @@ export class HealthComponent {
   readonly stateKey = uptimeStateKey;
   readonly stateClass = uptimeStateClass;
   readonly windowOf = windowOf;
+  readonly gapCell = gapCell;
   readonly isPartial = isPartial;
 
   constructor() {

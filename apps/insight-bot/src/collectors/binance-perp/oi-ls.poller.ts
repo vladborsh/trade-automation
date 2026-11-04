@@ -18,6 +18,7 @@ import {
   TakerRatioRow,
   VENUE,
 } from '../../venues/binance/oi-ls.mapper';
+import { OpenWindow, splitOpen } from './gap-classifier';
 import { GapRange, planGaps, RegisteredGap } from './gap-ledger';
 import { missingRanges, nextPollAt, SLOT_MS, slotForPoll, slotOf } from './slot-grid';
 
@@ -202,7 +203,6 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     const stale = await this.staleSymbols(now);
     let oi = 0;
     let longShort = 0;
-    let open = 0;
 
     for (const symbol of stale) {
       const oiRaw = await this.client.fetchBackward<OpenInterestHistRow>(
@@ -225,11 +225,12 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
       // Whatever the venue did not return inside the window is a gap, recorded per symbol so
       // §6.2's daily report can count it rather than silently showing a complete grid.
       const stored = await this.storedSlots(symbol, from, now);
-      open += await this.recordMissing(symbol, from, now, stored);
+      await this.recordMissing(symbol, from, now, stored);
     }
-    // IB-BUG-020: the distinct windows still open over every backfilled symbol. It was the last
-    // symbol's count alone, each symbol overwriting the one before.
-    if (stale.length > 0) this.streams.setGapsOpen(STREAM_ID, open);
+    // IB-BUG-020: every open window of the stream, not the last symbol's count. IB-104: split by
+    // whose fault it is (`gap-classifier.ts`), so the venue's closed sessions do not paint the row.
+    const split = splitOpen(await this.openWindows(from), this.symbols().length - 1);
+    this.streams.setGapsOpen(STREAM_ID, split.ours, split.venue);
 
     this.logger.log(`OI/LS backfill: ${stale.length} symbol(s), ${oi} OI rows, ${longShort} long/short rows.`);
     return { symbols: stale.length, oi, longShort };
@@ -273,7 +274,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
    * **nothing at all** has no edge to anchor to and is recorded as one gap over the whole window,
    * which is a real failure and must stay visible.
    */
-  private async recordMissing(symbol: string, from: number, to: number, stored: readonly Date[]): Promise<number> {
+  private async recordMissing(symbol: string, from: number, to: number, stored: readonly Date[]): Promise<void> {
     const storedMs = stored.map((ts) => ts.getTime());
     let found: GapRange[];
     let error: string;
@@ -295,7 +296,32 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
       await this.db.query('update collector_gaps set repaired = $3 where id = $1 and detected_at = $2', [r.id, r.detectedAt, r.repaired]);
     }
     await this.writeGaps(plan.insert, symbol, error);
-    return plan.open;
+  }
+
+  /**
+   * IB-104 — every open window of this stream inside the venue's window, distinct, with the evidence
+   * the classifier needs: in its emptiest slot, how many OTHER active symbols had OI stored. One
+   * query at the end of the boot backfill. On the box that is ~240 windows and ~3 000 slots, each an
+   * index probe on the primary key (venue, symbol, ts), and no venue call.
+   */
+  private async openWindows(from: number): Promise<OpenWindow[]> {
+    const rows = await this.db.query<{ error: string | null; min_neighbours: string | number }>(
+      `with w as (
+         select distinct symbol, gap_from, gap_to, error
+           from collector_gaps
+          where stream = $1 and detected_at >= $2 and gap_to >= $2 and repaired < expected
+       ), slots as (
+         select w.symbol, w.gap_from, w.gap_to, w.error, gs.slot
+           from w cross join lateral generate_series(w.gap_from, w.gap_to, interval '5 minutes') as gs(slot)
+       )
+       select s.error,
+              min((select count(*) from open_interest_5m o
+                    where o.venue = $3 and o.ts = s.slot and o.symbol = any($4) and o.symbol <> s.symbol)) as min_neighbours
+         from slots s
+        group by s.symbol, s.gap_from, s.gap_to, s.error`,
+      [STREAM_ID, new Date(from), VENUE, this.symbols()],
+    );
+    return rows.map((r) => ({ error: r.error, minNeighboursStored: Number(r.min_neighbours) }));
   }
 
   /**

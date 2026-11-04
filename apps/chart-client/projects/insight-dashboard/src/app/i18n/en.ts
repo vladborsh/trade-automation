@@ -82,6 +82,8 @@ export const en: Strings = {
   'health.col.reconnects': 'reconnects 24h',
   'health.col.openGaps': 'open gaps',
   'health.openGapsTotal': 'open gaps total: {count}',
+  'health.gapsVenue': '+{count} the venue did not publish',
+  'health.gapsVenueHint': 'Slots the venue did not publish while our collector was recording (e.g. closed sessions of TradFi perps). Not an outage; not counted as a warning.',
   'health.weight': 'Binance REST weight',
   'health.weightNone': 'no weight reported yet',
   'health.weightPerMinute': 'per min',

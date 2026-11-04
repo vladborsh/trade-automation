@@ -92,6 +92,9 @@ export type StringKey =
   | 'health.col.reconnects'
   | 'health.col.openGaps'
   | 'health.openGapsTotal'
+  // IB-104: open gaps the venue did not publish while we were recording
+  | 'health.gapsVenue'
+  | 'health.gapsVenueHint'
   | 'health.weight'
   | 'health.weightNone'
   | 'health.weightPerMinute'

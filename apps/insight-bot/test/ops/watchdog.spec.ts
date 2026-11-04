@@ -11,7 +11,7 @@ const MIN = 60_000;
 
 const stream = (over: Partial<StreamHealth> = {}): StreamHealth => ({
   id: 'binance-perp:kline_1m', venue: 'binance', lastMessageAgeSec: 1,
-  reconnects24h: 0, gapsOpen: 0, mode: 'ws', degradedReason: null, expectedIntervalSec: null, ...over,
+  reconnects24h: 0, gapsOpen: 0, gapsVenue: 0, mode: 'ws', degradedReason: null, expectedIntervalSec: null, ...over,
 });
 
 describe('Watchdog (§6.2)', () => {

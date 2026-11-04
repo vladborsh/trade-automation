@@ -6,7 +6,10 @@ export interface StreamHealth {
   venue: string;
   lastMessageAgeSec: number | null;
   reconnects24h: number;
+  /** Open gaps that are ours: we failed to record (IB-104: the warning). */
   gapsOpen: number;
+  /** IB-104 — open gaps the venue did not publish while we were recording (informational). */
+  gapsVenue: number;
   /** IB-005 / §16.1: `degraded` while the collector is on REST because its socket is mute. */
   mode: CollectorStreamMode;
   /** Why it is degraded, for the operator; null on a healthy stream. */
@@ -27,6 +30,7 @@ interface StreamState {
   lastMessageAt: number | null;
   reconnects: number[]; // epoch ms, trimmed to the last 24h on read
   gapsOpen: number;
+  gapsVenue: number;
   mode: CollectorStreamMode;
   degradedReason: string | null;
   expectedIntervalSec: number | null;
@@ -56,7 +60,7 @@ export class StreamRegistry {
    */
   register(id: string, venue: string, expectedIntervalSec: number | null = null): void {
     if (!this.streams.has(id)) {
-      this.streams.set(id, { venue, lastMessageAt: null, reconnects: [], gapsOpen: 0, mode: 'ws', degradedReason: null, expectedIntervalSec });
+      this.streams.set(id, { venue, lastMessageAt: null, reconnects: [], gapsOpen: 0, gapsVenue: 0, mode: 'ws', degradedReason: null, expectedIntervalSec });
     }
   }
 
@@ -82,10 +86,16 @@ export class StreamRegistry {
     }
   }
 
-  /** The number of gaps this stream has detected and not yet repaired (§6.2's gap report). */
-  setGapsOpen(id: string, gapsOpen: number): void {
+  /**
+   * The gaps this stream has detected and not yet repaired (§6.2's gap report). IB-104: `gapsVenue`
+   * is the part the venue did not publish while we were recording; `gapsOpen` is the rest, ours.
+   */
+  setGapsOpen(id: string, gapsOpen: number, gapsVenue = 0): void {
     const state = this.streams.get(id);
-    if (state) state.gapsOpen = gapsOpen;
+    if (state) {
+      state.gapsOpen = gapsOpen;
+      state.gapsVenue = gapsVenue;
+    }
   }
 
   snapshot(now = Date.now()): StreamHealth[] {
@@ -100,6 +110,7 @@ export class StreamRegistry {
         lastMessageAgeSec: state.lastMessageAt === null ? null : Math.max(0, Math.round((now - state.lastMessageAt) / 1000)),
         reconnects24h: state.reconnects.length,
         gapsOpen: state.gapsOpen,
+        gapsVenue: state.gapsVenue,
         mode: state.mode,
         degradedReason: state.degradedReason,
         expectedIntervalSec: state.expectedIntervalSec,

@@ -23,7 +23,14 @@ export const WebStreamHealthRowSchema = z.object({
   /** Seconds since the last message; null when the stream has never delivered one. */
   lastMessageAgeSec: z.number().nonnegative().nullable(),
   reconnects24h: z.number().int().nonnegative(),
+  /** Open gaps that are OURS: we failed to record (a warning). */
   gapsOpen: z.number().int().nonnegative(),
+  /**
+   * IB-104 — open gaps the venue did not publish while our collector was recording: Binance's OI on
+   * the TradFi perps while their market is closed. Informational, not a warning. Defaults to 0 so an
+   * answer from before IB-104 still parses.
+   */
+  gapsVenue: z.number().int().nonnegative().default(0),
 });
 export type WebStreamHealthRow = z.infer<typeof WebStreamHealthRowSchema>;
 

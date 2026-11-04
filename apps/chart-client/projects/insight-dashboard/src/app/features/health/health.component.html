@@ -34,7 +34,13 @@
             <td [class.degraded]="s.mode === 'degraded'">{{ s.mode }}@if (s.reason) {<span class="muted">&nbsp;({{ s.reason }})</span>}</td>
             <td>{{ age(s.lastMessageAgeSec) }}</td>
             <td>{{ s.reconnects24h }}</td>
-            <td [class.warn]="s.gapsOpen > 0">{{ s.gapsOpen }}</td>
+            @let gaps = gapCell(s);
+            <td [class.warn]="gaps.warn">
+              {{ gaps.ours }}
+              @if (gaps.venueNote; as note) {
+                <span class="muted venue-gaps" [title]="t('health.gapsVenueHint')">{{ t(note.key, note.params) }}</span>
+              }
+            </td>
           </tr>
         }
       </tbody>

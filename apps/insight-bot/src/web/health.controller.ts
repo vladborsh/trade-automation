@@ -51,6 +51,7 @@ export class WebHealthController {
         lastMessageAgeSec: s.lastMessageAgeSec,
         reconnects24h: s.reconnects24h,
         gapsOpen: s.gapsOpen,
+        gapsVenue: s.gapsVenue,
       })),
       weights: [
         { market: 'futures', used1m: this.metrics.getBinanceWeightUsed1m(), budget1m: BINANCE_WEIGHT_BUDGET },
