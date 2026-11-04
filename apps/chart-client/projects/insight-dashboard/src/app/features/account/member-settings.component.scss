@@ -1,0 +1,9 @@
+.settings { margin-top: 24px; max-width: 420px; }
+h2 { font-size: 14px; margin: 0 0 8px; }
+.row { display: flex; align-items: center; gap: 8px; margin: 8px 0; min-height: 32px; }
+select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; font: inherit; padding: 4px 6px; }
+input[type='checkbox'] { width: 18px; height: 18px; }
+.hint { font-size: 12px; }
+.muted { color: #8b949e; }
+.ok { color: #26a69a; }
+.error { color: #ef5350; }

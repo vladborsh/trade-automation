@@ -1,0 +1,20 @@
+.head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 15px; margin: 0 0 12px; }
+button { background: transparent; border: 1px solid #30363d; color: #c9d1d9; padding: 2px 8px; cursor: pointer; font: inherit; min-height: 32px; }
+button.primary { border-color: #26a69a; }
+button:disabled { color: #8b949e; cursor: default; }
+.intro { margin: 4px 0 12px; color: #8b949e; font-size: 13px; }
+.scroll { overflow-x: auto; } // phone width: the table scrolls in its own box, the page does not
+table { border-collapse: collapse; }
+th, td { padding: 4px 12px 4px 0; text-align: left; font-weight: normal; }
+th { color: #8b949e; }
+tr.off td { color: #8b949e; }
+.nowrap { white-space: nowrap; }
+.muted { color: #8b949e; }
+.warn { color: #d29922; }
+.error { color: #ef5350; }
+.confirm { margin-right: 6px; }
+.invite { border: 1px solid #30363d; padding: 8px 12px; margin: 0 0 12px; max-width: 640px; }
+.invite p { margin: 0 0 6px; font-size: 13px; }
+.link-row { display: flex; gap: 8px; }
+.link { flex: 1; min-width: 0; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; font: inherit; padding: 4px 6px; }

@@ -5,6 +5,7 @@ import { SessionService } from '../../core/session.service';
 import { I18nService } from '../../i18n/i18n.service';
 import { changePasswordFailure, ruleMessage, type Message } from '../auth/auth-messages';
 import { passwordProblem } from '../auth/auth-rules';
+import { MemberSettingsComponent } from './member-settings.component';
 
 /**
  * IB-079 (password-login design P9) — change the password while signed in. The server ends every
@@ -13,6 +14,7 @@ import { passwordProblem } from '../auth/auth-rules';
 @Component({
   selector: 'app-account',
   standalone: true,
+  imports: [MemberSettingsComponent],
   templateUrl: './account.component.html',
   styleUrl: './account.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

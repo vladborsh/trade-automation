@@ -1,0 +1,68 @@
+<header class="head">
+  <h1>{{ t('members.title') }}</h1>
+  <button type="button" (click)="load()" [disabled]="loading()">{{ t('action.refresh') }}</button>
+  <button type="button" class="primary" (click)="createInvite()" [disabled]="busy()">{{ t('members.invite') }}</button>
+</header>
+<p class="intro">{{ t('members.intro') }}</p>
+
+@if (invite(); as inv) {
+  <div class="invite" role="status">
+    <p>{{ t('members.inviteOnce', { until: inviteUntil(inv.expiresAt) }) }}</p>
+    <div class="link-row">
+      <input class="link" readonly [value]="inv.link" (focus)="$any($event.target).select()" />
+      <button type="button" (click)="copy(inv.link)">{{ copied() ? t('members.copied') : t('members.copy') }}</button>
+    </div>
+  </div>
+}
+@if (actionError(); as key) {
+  <p class="error" role="alert">{{ t(key) }}</p>
+}
+
+@if (loadError(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+} @else if (loading()) {
+  <p class="muted">{{ t('state.loading') }}</p>
+} @else {
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t('members.col.telegram') }}</th>
+          <th>{{ t('members.col.login') }}</th>
+          <th>{{ t('members.col.role') }}</th>
+          <th>{{ t('members.col.status') }}</th>
+          <th>{{ t('members.col.joined') }}</th>
+          <th>{{ t('members.col.lastLogin') }}</th>
+          <th>{{ t('members.col.sessions') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of rows(); track r.id) {
+          <tr [class.off]="r.disabled">
+            <td>{{ r.tgUserId }}</td>
+            <td>{{ r.login }}</td>
+            <td>{{ t(r.role) }}</td>
+            <td [class.warn]="r.disabled">{{ t(r.disabled ? 'members.status.disabled' : 'members.status.active') }}</td>
+            <td class="nowrap">{{ r.joined }}</td>
+            <td class="nowrap">{{ r.lastLogin }}</td>
+            <td>{{ r.sessions }}</td>
+            <td class="nowrap">
+              @if (r.action; as action) {
+                @if (confirming() === r.id) {
+                  <span class="confirm">{{ t(action === 'disable' ? 'members.confirmDisable' : 'members.confirmEnable') }}</span>
+                  <button type="button" class="primary" (click)="confirm(r.id, action === 'disable')" [disabled]="busy()">{{ t('members.yes') }}</button>
+                  <button type="button" (click)="cancel()" [disabled]="busy()">{{ t('members.no') }}</button>
+                } @else {
+                  <button type="button" (click)="ask(r.id)">{{ t(action === 'disable' ? 'members.disable' : 'members.enable') }}</button>
+                }
+              } @else {
+                <span class="muted">{{ t('members.you') }}</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

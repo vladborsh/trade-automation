@@ -1,0 +1,20 @@
+<section class="settings" aria-labelledby="settings-title">
+  <h2 id="settings-title">{{ t('settings.title') }}</h2>
+  @if (settings(); as s) {
+    <label class="row">
+      <span>{{ t('settings.lang') }}</span>
+      <select [value]="s.lang" (change)="setLang($any($event.target).value)" [disabled]="busy()">
+        <option value="ru">{{ t('settings.lang.ru') }}</option>
+        <option value="en">{{ t('settings.lang.en') }}</option>
+      </select>
+    </label>
+    <label class="row">
+      <input type="checkbox" [checked]="s.calendarAlerts" (change)="setCalendar($any($event.target).checked)" [disabled]="busy()" />
+      <span>{{ t('settings.calendar') }}</span>
+    </label>
+    <p class="muted hint">{{ t('settings.hint') }}</p>
+  }
+  @if (status(); as key) {
+    <p [class.ok]="key === 'settings.saved'" [class.error]="key !== 'settings.saved'" role="status">{{ t(key) }}</p>
+  }
+</section>

@@ -40,6 +40,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin-logins/admin-logins.component').then((m) => m.AdminLoginsComponent),
   },
   {
+    // IB-035: the members page — admin only, IB-075's guard; the server answers 403 to a member anyway
+    path: 'admin/members',
+    canActivate: [adminGuard(LANDING_ROUTE)],
+    loadComponent: () => import('./features/admin-members/admin-members.component').then((m) => m.AdminMembersComponent),
+  },
+  {
     // IB-075 (member-access design M8): the operator page is admin-only; a member lands on the market.
     path: 'health',
     canActivate: [adminGuard(LANDING_ROUTE)],

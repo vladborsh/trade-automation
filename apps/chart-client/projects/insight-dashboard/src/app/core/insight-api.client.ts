@@ -1,6 +1,7 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
+  WebInviteResponse, WebMemberResponse, WebMemberSettings, WebMemberSettingsPatch, WebMembersResponse,
   WebOpenInterestResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
@@ -218,6 +219,31 @@ export class InsightApiClient {
     return this.get<WebLoginEventsResponse>('/admin/login-events', { limit });
   }
 
+  // ------------------------------------------------------ IB-035, members and own settings
+
+  /** Admin only: everyone with access, with their site login, last sign-in and live sessions. */
+  async members(): Promise<WebMembersResponse> {
+    return this.get<WebMembersResponse>('/admin/members');
+  }
+
+  /** Admin only: a new invite. The link is in this answer only. */
+  async createInvite(): Promise<WebInviteResponse> {
+    return this.sendJson<WebInviteResponse>('POST', '/admin/invites', {});
+  }
+
+  /** Admin only: disabling also signs the member out everywhere (the server deletes their sessions). */
+  async setMemberDisabled(id: number, disabled: boolean): Promise<WebMemberResponse> {
+    return this.sendJson<WebMemberResponse>('POST', `/admin/members/${id}/${disabled ? 'disable' : 'enable'}`, {});
+  }
+
+  async memberSettings(): Promise<WebMemberSettings> {
+    return this.get<WebMemberSettings>('/me/settings');
+  }
+
+  async updateMemberSettings(patch: WebMemberSettingsPatch): Promise<WebMemberSettings> {
+    return this.sendJson<WebMemberSettings>('PATCH', '/me/settings', patch);
+  }
+
   // ------------------------------------------------------ IB-069, browser push
 
   /** `publicKey: null` — push is off on this server; the in-tab alerts still work. */
@@ -233,7 +259,7 @@ export class InsightApiClient {
     await this.send('DELETE', '/push/subscription', { endpoint });
   }
 
-  private async send(method: 'POST' | 'DELETE', path: string, body: unknown): Promise<Response> {
+  private async send(method: 'POST' | 'PATCH' | 'DELETE', path: string, body: unknown): Promise<Response> {
     const url = buildUrl(this.config.get().apiBaseUrl, path, window.location.origin);
     const response = await fetch(url, {
       method,
@@ -245,7 +271,7 @@ export class InsightApiClient {
     return response;
   }
 
-  private async sendJson<T>(method: 'POST', path: string, body: unknown): Promise<T> {
+  private async sendJson<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
     return (await (await this.send(method, path, body)).json()) as T;
   }
 
