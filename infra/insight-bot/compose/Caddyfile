@@ -4,6 +4,24 @@
 # UPSTREAM is only overridden by the local rehearsal; on the box the app is insight-bot:3005 on the
 # compose network and publishes no port.
 
+# IB-BUG-031: the default log carries Caddy's error lines (http.log.error.*, e.g. a 502 while the app
+# restarts), each with the request's uri — the site `log` filter below does not reach them. Same
+# scrub, so a set-password token never lands in either. JSON, as the default log already writes.
+{
+	log default {
+		output stderr
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace t REDACTED
+					replace token REDACTED
+				}
+			}
+		}
+	}
+}
+
 {$SITE_ADDRESS} {
 	# H7: the Prometheus endpoint never answers from outside. The app adds its own 404 too (WD-011): any
 	# request carrying CLIENT_IP_HEADER (x-real-ip, set below on every proxied request) gets 404.
@@ -24,8 +42,21 @@
 		header_up X-Real-IP {remote_host}
 	}
 
+	# IB-BUG-031: the access log keeps the path and never a credential. Caddy already prints Cookie,
+	# Set-Cookie and Authorization as REDACTED (log_credentials is off); the URL is ours to scrub:
+	# `t` is the one-time set-password token (/set-password?t=…, /api/web/auth/credentials?t=…), a
+	# member's password reset for 10 minutes. Same list as SECRET_QUERY_PARAMS in
+	# apps/insight-bot/src/ops/http-log.ts — a new secret query parameter goes in both.
 	log {
 		output stdout
-		format console
+		format filter {
+			wrap console
+			fields {
+				request>uri query {
+					replace t REDACTED
+					replace token REDACTED
+				}
+			}
+		}
 	}
 }
