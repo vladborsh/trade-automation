@@ -236,7 +236,8 @@ export function cardView(s: WebInsightStatement, nowSec: number): CardView {
     chip: chipOf(s),
     when: whenOf(s, nowSec),
     ...wordingOf(s),
-    spark: s.spark,
+    // the contract requires the field; an older payload without it is no chart, not a crash
+    spark: s.spark ?? null,
     sparkScale: sparkScaleOf(s.ruleId),
     link: { label: linkLabel(s), target: insightView(s, nowSec).link },
     basis,

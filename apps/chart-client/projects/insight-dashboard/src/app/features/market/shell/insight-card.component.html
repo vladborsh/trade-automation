@@ -4,11 +4,8 @@
     <span class="chip">{{ word({ key: v.chip.key, params: {}, nested: {} }) }}</span>
     <span class="when">{{ word(v.when) }}</span>
   </p>
-  <h3 class="title">
-    @for (run of titleRuns(); track $index) {
-      @if (run.num) { <span class="num">{{ run.text }}</span> } @else { {{ run.text }} }
-    }
-  </h3>
+  <!-- no whitespace between runs: a figure inside «(+6.1)» must not gain spaces -->
+  <h3 class="title">@for (run of titleRuns(); track $index) {@if (run.num) {<span class="num">{{ run.text }}</span>} @else {<ng-container>{{ run.text }}</ng-container>}}</h3>
   <p class="explanation">{{ explanation() }}</p>
   @if (spark(); as g) {
     <div class="spark" aria-hidden="true">

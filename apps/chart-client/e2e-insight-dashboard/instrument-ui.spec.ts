@@ -203,7 +203,7 @@ test.describe('an R4 statement opens the whole period (IB-BUG-023)', () => {
     const statement = {
       ruleId: 'R4', block: 'positioning', key: 'insight.oi_vs_price', rarity: 0.95, magnitude: 2.2, basis,
       params: { symbol: 'BTCUSDT', quadrant: 'new_longs', oiPct: 2.2, pricePct: 0.4 },
-      link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: at },
+      link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: at }, spark: null,
     };
     const neutral = (block: string) => ({ block, statement: null, neutral: { key: 'insight.neutral', reason: 'nothing_unusual', basis } });
     const insights = { period: '1h', asOf: nowSec, top: [statement], blocks: ['liquidations', 'positioning', 'caps', 'flows', 'sentiment'].map(neutral) };

@@ -81,7 +81,8 @@ async function openMarket(page: Page, setup?: (page: Page) => Promise<void>): Pr
   await page.goto('/market?p=24h');
   await page.clock.runFor(2_000);
   await expect(page.locator('app-kpi-strip')).toContainText('2.62');
-  await expect(page.locator('app-insights-block')).toContainText('XRPUSDT');
+  // IB-107: the card names the coin as a member does (§7.4 {base}), not the instrument id
+  await expect(page.locator('app-insights-block')).toContainText('XRP: open interest');
 }
 
 /**
@@ -114,8 +115,10 @@ async function withEverySignNegative(page: Page): Promise<void> {
     coinbasePremium: { ...flows.coinbasePremium, premiumPct: { ...flows.coinbasePremium.premiumPct, value: -0.014 } },
   }));
   const basis = (venues: string[]) => ({ window: '24h', venues, sampleWindows: 30, observedWindows: 22, from: 1_791_157_260 });
-  const r10 = { ruleId: 'R10', block: 'flows', key: 'insight.coinbase_premium', params: { pct: -0.014, minutes: 52 }, rarity: 0.97, magnitude: 0.014, basis: basis(['coinbase', 'binance']), link: { anchor: 'flows' } };
-  const r9 = { ruleId: 'R9', block: 'flows', key: 'insight.stablecoin_supply', params: { usd: -9.06e8, pct: -0.31, days: 1 }, rarity: 0.96, magnitude: 9.06e8, basis: basis(['defillama']), link: { anchor: 'flows' } };
+  const r10 = { ruleId: 'R10', block: 'flows', key: 'insight.coinbase_premium', params: { pct: -0.014, minutes: 52 }, rarity: 0.97, magnitude: 0.014, basis: basis(['coinbase', 'binance']), link: { anchor: 'flows' },
+    // IB-107: a signed spark (the premium's two-minute means), all negative: bars hang from zero
+    spark: { values: Array.from({ length: 30 }, (_, i) => -0.01 - (i % 5) * 0.002), highlight: 29 } };
+  const r9 = { ruleId: 'R9', block: 'flows', key: 'insight.stablecoin_supply', params: { usd: -9.06e8, pct: -0.31, days: 1 }, rarity: 0.96, magnitude: 9.06e8, basis: basis(['defillama']), link: { anchor: 'flows' }, spark: null };
   const r4 = { ...insights.top[0], params: { ...insights.top[0].params, oiPct: -20.48, pricePct: -2.15 } };
   await page.route('**/api/web/market/insights**', fulfil({
     ...insights, top: [r4, r10, r9],
@@ -187,7 +190,7 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     await expect(page.locator('[data-tile="stablecoins"] .detail')).toContainText('−$906M');
     await expect(page.locator('[data-tile="coinbasePremium"] .value')).toContainText('−0.014 %');
     await expect(page.locator('app-kpi-strip')).toContainText('−');
-    await expect(page.locator('app-insights-block')).toContainText('−20.48 %');
+    await expect(page.locator('app-insights-block')).toContainText('−20.5 %'); // IB-107: the card prints OI to one decimal (§7.4 «+7.3%»)
     await info.attach('phone-390-negative.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   });
 

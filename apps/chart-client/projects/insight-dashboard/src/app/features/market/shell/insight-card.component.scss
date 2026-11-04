@@ -28,7 +28,7 @@
 .zero { position: absolute; left: 0; right: 0; height: 1px; background: var(--card-border); }
 .link {
   align-self: flex-start; display: inline-flex; align-items: center;
-  min-height: var(--touch-min); // phone acceptance: touch targets ≥ 40 px
+  min-height: var(--touch-min, 40px); // phone acceptance: touch targets ≥ 40 px, whichever lands first, IB-106 or this
   font: var(--type-note); color: var(--link); text-decoration: none;
 }
 .link:hover { color: var(--link-hover); }

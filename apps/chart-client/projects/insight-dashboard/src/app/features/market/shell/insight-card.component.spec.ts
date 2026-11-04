@@ -43,6 +43,12 @@ describe('InsightCardComponent (IB-107)', () => {
     expect(el.querySelector('.basis')?.getAttribute('title')).toBe('норма: 690 окон с данными из 697, с 2026-10-05');
   });
 
+  it('figures sit in the title with no added spaces: «… 52 (+6.1)»', () => {
+    const r8: WebInsightStatement = { ...r3, ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: { value: 52.2, change: 6.1 }, link: { anchor: 'flows' }, spark: null };
+    const el = render(r8, 'ru');
+    expect(el.querySelector('.title')?.textContent).toBe('Опционы BTC подорожали: ожидаемая волатильность 52 (+6.1)');
+  });
+
   it('no spark: no chart, the rest stands', () => {
     const el = render({ ...r3, spark: null }, 'en');
     expect(el.querySelector('.spark')).toBeNull();

@@ -184,6 +184,10 @@ describe('the parts every card shares', () => {
     expect(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10'].map(sparkScaleOf))
       .toEqual(['zero', 'zero', 'zero', 'range', 'zero', 'range', 'zero', 'range', 'range', 'zero']);
   });
+  it('a payload without the spark field (older server) is no chart, not a crash', () => {
+    const { spark: _gone, ...old } = st({ ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: { value: 40, change: 2 } });
+    expect(cardView(old as WebInsightStatement, NOW).spark).toBeNull();
+  });
   it('raw period codes never render: the «when» is a word', () => {
     const w = whenOf(st({ ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: {} }), NOW);
     expect(say(w)).toBe('за 24ч');
