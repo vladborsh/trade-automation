@@ -25,13 +25,15 @@ export function runInsights(rules: readonly Rule[], s: InsightSnapshot): Omit<We
     if (own.length === 0) return { block, statement: null, neutral: { key: 'insight.neutral', reason: 'no_rules', basis: null } };
     const refusals = own.map((x) => x.out).filter((o): o is Refusal => isRefusal(o));
     const allHistory = refusals.length === own.length && refusals.some((r) => r.refused === 'insufficient_history');
+    // IB-091 (D18): every rule of the block refused and R10 for too few valid premium minutes
+    const allMinutes = refusals.length === own.length && refusals.some((r) => r.refused === 'insufficient_minutes');
     const ran = own.map((x) => x.out).find((o): o is WebInsightStatement => o !== null && !isRefusal(o));
     return {
       block,
       statement: null,
       neutral: {
         key: 'insight.neutral',
-        reason: allHistory ? 'insufficient_history' : 'nothing_unusual',
+        reason: allHistory ? 'insufficient_history' : allMinutes ? 'insufficient_minutes' : 'nothing_unusual',
         basis: ran?.basis ?? refusals.find((r) => r.basis !== null)?.basis ?? null,
       },
     };

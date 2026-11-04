@@ -20,6 +20,7 @@ import { AssetClassifier } from './liquidations/asset-classes';
 import { WebContextController } from './context/context.controller';
 import { WebMarketController } from './market/market.controller';
 import { CapsService } from './market/caps.service';
+import { FlowsService } from './market/flows.service';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
@@ -175,10 +176,17 @@ export class WebModule {
             new KpisService({ cache, cards, liquidations, oiLs, summary, btcSymbol: config.symbols.find((s) => s.base === 'BTC')?.id ?? 'BTCUSDT' }),
         },
         {
+          // IB-091: «Деривативы и потоки» — Deribit, OKX rubik, DefiLlama, Coinbase; cache only (D7), D18 premium
+          provide: FlowsService,
+          inject: [TtlCache, CandlesService],
+          useFactory: (cache: TtlCache, candles: CandlesService) => new FlowsService({ cache, candles }),
+        },
+        {
           // IB-086 (D1): the insight engine lives in src/insights/; it reads these services through ports
           provide: InsightsService,
-          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService],
-          useFactory: (cache: TtlCache, liquidations: LiquidationsOverviewService, positioning: PositioningService, cards: MarketCardsService) =>
+          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService, FlowsService],
+          useFactory: (cache: TtlCache, liquidations: LiquidationsOverviewService, positioning: PositioningService, cards: MarketCardsService,
+            flows: FlowsService) =>
             new InsightsService({
               cache,
               ports: {
@@ -192,6 +200,7 @@ export class WebModule {
                 positioning: async (period) => (await positioning.positioning(period)).rows,
                 breadth: (period) => positioning.breadth(period),
                 fng: async () => (await cards.cards([])).fearGreed?.now.value ?? null,
+                flows: (period) => flows.flows(period),
               },
             }),
         },

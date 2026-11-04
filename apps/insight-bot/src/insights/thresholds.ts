@@ -51,3 +51,35 @@ export const VENUE_RULE_MIN_DAYS = 20;
 export const R2_MIN_USD = 250_000;
 /** D13: the insights endpoint's cache. */
 export const INSIGHTS_CACHE_MS = 60_000;
+
+// ---- IB-091 «Деривативы и потоки» (phase 2, D7, D18) ------------------------------------------
+// Judgements, to be revisited after a week of the box's data (TL ruling 2026-11-04).
+
+/** D7 caches, per box: how fast each source changes (design §6 table). */
+export const FLOWS_DVOL_CACHE_MS = 15 * 60_000;
+export const FLOWS_PUTCALL_CACHE_MS = 60 * 60_000;
+export const FLOWS_STABLECOINS_CACHE_MS = 60 * 60_000;
+/** Coinbase BTC-USD + USDT-USD 1m (D18) and the Binance spot tail: once a minute. */
+export const FLOWS_MINUTE_CACHE_MS = 60_000;
+/** The hourly premium history for R10's rarity: three 1h series, refreshed hourly. */
+export const FLOWS_PREMIUM_HISTORY_CACHE_MS = 60 * 60_000;
+/** The flows endpoint's own cache (its slowest-moving tile is hourly, its fastest per minute). */
+export const FLOWS_CACHE_MS = 60_000;
+
+/** DVOL history read: hourly for 1h/4h changes, daily for 24h/7d (the source keeps both from 2021). */
+export const DVOL_HOURLY_DAYS = 30;
+export const DVOL_DAILY_DAYS = 400;
+/** R9: the supply changes a 1-day / 7-day change is rare against. */
+export const STABLECOIN_SAMPLE_DAYS = 365;
+/** R10 (D18): the window, and how many of its VALID minutes must share the mean's sign ("sustained"). */
+export const PREMIUM_WINDOW_MIN = 60;
+export const PREMIUM_SUSTAINED_MIN = 45;
+/**
+ * R10's history: 600 hourly bars = 25 days, so the D3 minimum (FLOWS_MIN_HISTORY_DAYS = 20) holds.
+ * Coinbase serves 300 bars per call, so two pages per Coinbase series (the plan said one page,
+ * 12.5 days — under D3; corrected while building).
+ */
+export const PREMIUM_HISTORY_HOURS = 600;
+export const COINBASE_PAGE_BARS = 300;
+/** D3 for the phase-2 rules: the source's own history must span this many days. */
+export const FLOWS_MIN_HISTORY_DAYS = 20;

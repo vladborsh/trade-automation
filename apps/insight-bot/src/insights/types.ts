@@ -1,5 +1,5 @@
 import type {
-  WebInsightBasis, WebInsightBlock, WebInsightStatement, WebLiquidationLargeEvent, WebMarketPeriod, WebPositioningRow,
+  WebFlowsResponse, WebInsightBasis, WebInsightBlock, WebInsightStatement, WebLiquidationLargeEvent, WebMarketPeriod, WebPositioningRow,
 } from '@trade-automation/contracts';
 
 /**
@@ -32,11 +32,14 @@ export interface InsightSnapshot {
   } | null;
   /** Fear & Greed now (0–100), for R7's wording. */
   fng: number | null;
+  /** IB-091: «Деривативы и потоки» (DVOL, stablecoins, Coinbase premium) for R8–R10. */
+  flows: WebFlowsResponse | null;
 }
 
 /** A rule that could not judge: its basis is too thin, or its data is absent. */
 export interface Refusal {
-  refused: 'insufficient_history' | 'no_data';
+  /** `insufficient_minutes` (D18): R10's premium had fewer valid minutes than it needs to call a sign. */
+  refused: 'insufficient_history' | 'insufficient_minutes' | 'no_data';
   basis: WebInsightBasis | null;
 }
 

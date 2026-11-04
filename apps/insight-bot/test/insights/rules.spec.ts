@@ -1,6 +1,6 @@
-import type { WebInsightStatement, WebPositioningCell, WebPositioningRow } from '@trade-automation/contracts';
+import type { WebFlowsResponse, WebInsightStatement, WebPositioningCell, WebPositioningRow } from '@trade-automation/contracts';
 import { rank, runInsights } from '../../src/insights/engine';
-import { R1, R2, R3, R4, R5, R6, R7, RULES } from '../../src/insights/rules';
+import { R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, RULES } from '../../src/insights/rules';
 import { isRefusal, type InsightSnapshot } from '../../src/insights/types';
 
 /**
@@ -24,6 +24,7 @@ function snapshot(over: Partial<InsightSnapshot> = {}): InsightSnapshot {
     positioning: [row('BTCUSDT', {})],
     breadth: { upShare: 0.5, altGapPct: 0.1, upShareSample: Array.from({ length: 696 }, (_, i) => 0.3 + (i % 5) * 0.1), altGapSample: Array.from({ length: 696 }, (_, i) => (i % 7) - 3), days: 30, coins: 30 },
     fng: 50,
+    flows: null,
     ...over,
   };
 }
@@ -166,8 +167,60 @@ describe('the engine', () => {
   });
 
   it('an ordinary day: no statements, every block with a neutral line', () => {
-    const out = runInsights(RULES, snapshot());
+    // IB-091: the flows block has rules now; on the captured example (DVOL +1.08 at rarity 0.71, …) they run and stay under 0.90
+    const out = runInsights(RULES, snapshot({ flows: flowsExample }));
     expect(out.top).toEqual([]);
-    expect(out.blocks.map((b) => b.neutral?.reason)).toEqual(['nothing_unusual', 'nothing_unusual', 'no_rules', 'no_rules', 'nothing_unusual']);
+    expect(out.blocks.map((b) => b.neutral?.reason)).toEqual(['nothing_unusual', 'nothing_unusual', 'no_rules', 'nothing_unusual', 'nothing_unusual']);
   });
 });
+
+// ---- IB-091 R8–R10 («Деривативы и потоки»), on the contract's real example ----------------------
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const flowsExample = require('../../../../libs/contracts/test/fixtures/flows.24h.json') as WebFlowsResponse;
+const flows = (over: { dvol?: Partial<WebFlowsResponse['dvol']>; stablecoins?: Partial<WebFlowsResponse['stablecoins']>; coinbasePremium?: Partial<WebFlowsResponse['coinbasePremium']> }): WebFlowsResponse => ({
+  ...flowsExample,
+  dvol: { ...flowsExample.dvol, ...over.dvol },
+  stablecoins: { ...flowsExample.stablecoins, ...over.stablecoins },
+  coinbasePremium: { ...flowsExample.coinbasePremium, ...over.coinbasePremium },
+});
+const ch = (value: number, rarity: number | null) => ({ value, rarity, sample: 600, sampleDays: 25 });
+
+describe('R8 DVOL spike — rise only (TL ruling)', () => {
+  it('a rare RISE speaks; a rare FALL does not (a spike is a rise)', () => {
+    expect(shown(R8.run(snapshot({ flows: flows({ dvol: { change: ch(6.5, 0.97) } }) })))).toMatchObject({ key: 'insight.dvol_spike', params: { change: 6.5 } });
+    expect(R8.run(snapshot({ flows: flows({ dvol: { change: ch(-6.5, 0.97) } }) }))).toBeNull();
+  });
+  it('refuses a thin history, and says no data without the source', () => {
+    expect(R8.run(snapshot({ flows: flows({ dvol: { change: ch(6.5, null) } }) }))).toMatchObject({ refused: 'insufficient_history' });
+    expect(R8.run(snapshot({ flows: null }))).toMatchObject({ refused: 'no_data' });
+  });
+});
+
+describe('R9 stablecoin supply — two-sided', () => {
+  it('a rare BURN speaks as a mint would; the basis names the 1-day (or 7-day) change it measured', () => {
+    const burn = shown(R9.run(snapshot({ flows: flows({ stablecoins: { changeUsd: ch(-4e9, 0.98), changePct: -1.4, changeDays: 1 } }) })));
+    expect(burn).toMatchObject({ key: 'insight.stablecoin_supply', params: { usd: -4e9, days: 1 }, magnitude: 4e9 });
+    expect(burn?.basis.window).toBe('24h');
+    const week = R9.run(snapshot({ period: '7d', flows: flows({ stablecoins: { changeUsd: ch(9e9, 0.95), changePct: 3, changeDays: 7 } }) }));
+    expect(isRefusal(week) ? null : week?.basis.window).toBe('7d');
+  });
+});
+
+describe('R10 Coinbase premium — D18', () => {
+  const prem = (over: Partial<WebFlowsResponse['coinbasePremium']>) => snapshot({ flows: flows({ coinbasePremium: { premiumPct: ch(0.18, 0.96), minutes: 60, sameSignMinutes: 58, unavailable: null, ...over } }) });
+  it('sustained (≥ 45 of the valid minutes share the sign) and rare: speaks, two-sided', () => {
+    expect(shown(R10.run(prem({})))).toMatchObject({ key: 'insight.coinbase_premium', params: { pct: 0.18, minutes: 58 } });
+    expect(shown(R10.run(prem({ premiumPct: ch(-0.18, 0.96) })))).toMatchObject({ params: { pct: -0.18 } });
+  });
+  it('44 valid minutes: REFUSES insufficient_minutes (D18) — however rare the value', () => {
+    expect(R10.run(prem({ minutes: 44, sameSignMinutes: 44, unavailable: 'insufficient_minutes' }))).toMatchObject({ refused: 'insufficient_minutes' });
+  });
+  it('a premium that flips sign is not sustained: silent', () => {
+    expect(R10.run(prem({ sameSignMinutes: 40 }))).toBeNull();
+  });
+  it('the flows block line says insufficient_minutes when that is why nothing was said', () => {
+    const s = snapshot({ flows: flows({ dvol: { value: null, change: null }, stablecoins: { supplyUsd: null, changeUsd: null }, coinbasePremium: { premiumPct: ch(0.1, 0.5), minutes: 30, sameSignMinutes: 30, unavailable: 'insufficient_minutes' } }) });
+    expect(runInsights(RULES, s).blocks.find((b) => b.block === 'flows')?.neutral?.reason).toBe('insufficient_minutes');
+  });
+});
+

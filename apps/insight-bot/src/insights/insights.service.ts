@@ -17,6 +17,8 @@ export interface InsightPorts {
   positioning?: (period: WebMarketPeriod) => Promise<InsightSnapshot['positioning']>;
   breadth?: (period: WebMarketPeriod) => Promise<InsightSnapshot['breadth']>;
   fng?: () => Promise<number | null>;
+  /** IB-091: «Деривативы и потоки» for R8–R10. */
+  flows?: (period: WebMarketPeriod) => Promise<InsightSnapshot['flows']>;
 }
 
 export interface InsightsServiceOptions {
@@ -46,13 +48,14 @@ export class InsightsService {
         }
       };
       const p = this.options.ports;
-      const [liquidations, positioning, breadth, fng] = await Promise.all([
+      const [liquidations, positioning, breadth, fng, flows] = await Promise.all([
         soft('liquidations', p.liquidations && (() => (p.liquidations as NonNullable<InsightPorts['liquidations']>)(period))),
         soft('positioning', p.positioning && (() => (p.positioning as NonNullable<InsightPorts['positioning']>)(period))),
         soft('breadth', p.breadth && (() => (p.breadth as NonNullable<InsightPorts['breadth']>)(period))),
         soft('fng', p.fng),
+        soft('flows', p.flows && (() => (p.flows as NonNullable<InsightPorts['flows']>)(period))),
       ]);
-      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, breadth, fng };
+      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, breadth, fng, flows };
       return { ...runInsights(RULES, snapshot), asOf: Math.floor(nowMs / 1000) };
     });
   }

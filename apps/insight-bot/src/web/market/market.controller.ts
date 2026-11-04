@@ -1,7 +1,8 @@
 import { Controller, Get, HttpException, Optional, Query } from '@nestjs/common';
-import { WebMarketPeriodSchema, type WebCapsResponse, type WebInsightsResponse, type WebKpisResponse, type WebPositioningResponse } from '@trade-automation/contracts';
+import { WebMarketPeriodSchema, type WebCapsResponse, type WebFlowsResponse, type WebInsightsResponse, type WebKpisResponse, type WebPositioningResponse } from '@trade-automation/contracts';
 import { InsightsService } from '../../insights/insights.service';
 import { CapsService } from './caps.service';
+import { FlowsService } from './flows.service';
 import { KpisService } from './positioning/kpis.service';
 import { PositioningService } from './positioning/positioning.service';
 
@@ -16,7 +17,17 @@ export class WebMarketController {
     @Optional() private readonly positioningService?: PositioningService,
     @Optional() private readonly kpisService?: KpisService,
     @Optional() private readonly insightsService?: InsightsService,
+    @Optional() private readonly flowsService?: FlowsService,
   ) {}
+
+  /** IB-091 `GET …/market/flows?period=1h|4h|24h|7d` (default 24h) — «Деривативы и потоки» (phase 2, D18). */
+  @Get('flows')
+  async flows(@Query('period') period = '24h'): Promise<WebFlowsResponse> {
+    const parsed = WebMarketPeriodSchema.safeParse(period);
+    if (!parsed.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'period must be 1h, 4h, 24h or 7d' }, 400);
+    if (!this.flowsService) throw new HttpException({ code: 'VENUE_UNAVAILABLE', message: 'flows not configured' }, 503);
+    return this.flowsService.flows(parsed.data);
+  }
 
   /** `GET …/market/caps?period=1h|4h|24h|7d` (default 24h) — treemap + dominance bar (D11). */
   @Get('caps')

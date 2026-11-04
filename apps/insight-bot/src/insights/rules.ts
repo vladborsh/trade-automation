@@ -1,7 +1,7 @@
-import { WEB_MARKET_PERIOD_SECONDS, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow } from '@trade-automation/contracts';
+import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow } from '@trade-automation/contracts';
 import { levelRarity, rarity } from './rarity';
 import { fngBand } from './sentiment';
-import { LIQ_RULE_MIN_DAYS, R2_MIN_USD, RARITY_SHOW, VENUE_RULE_MIN_DAYS } from './thresholds';
+import { LIQ_RULE_MIN_DAYS, PREMIUM_SUSTAINED_MIN, R2_MIN_USD, RARITY_SHOW, VENUE_RULE_MIN_DAYS } from './thresholds';
 import type { InsightSnapshot, Refusal, Rule } from './types';
 
 /**
@@ -207,4 +207,67 @@ export const R7: Rule = {
   },
 };
 
-export const RULES: readonly Rule[] = [R1, R2, R3, R4, R5, R6, R7];
+// ---- IB-091 «Деривативы и потоки» (phase 2) ----------------------------------------------------
+
+/** A phase-2 basis: the source, how many past values the rarity was measured against, from when. */
+function flowsBasis(s: InsightSnapshot, window: WebInsightBasis['window'], venues: string[], c: WebFlowsChange): WebInsightBasis {
+  return { window, venues, sampleWindows: c.sample, observedWindows: c.sample, from: sec(s.nowMs - c.sampleDays * 86_400_000) };
+}
+
+/** R8 — BTC implied vol (Deribit DVOL) ROSE unusually over the period: a spike is a rise (TL ruling). */
+export const R8: Rule = {
+  id: 'R8', block: 'flows',
+  run(s) {
+    const t = s.flows?.dvol;
+    if (!t || t.value === null || !t.change) return refuse('no_data');
+    const basis = flowsBasis(s, s.period, ['deribit'], t.change);
+    if (t.change.rarity === null) return refuse('insufficient_history', basis);
+    if (t.change.value <= 0) return null;
+    return {
+      ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike',
+      params: { value: t.value, change: t.change.value },
+      rarity: t.change.rarity, magnitude: t.change.value, basis, link: { anchor: 'flows' },
+    };
+  },
+};
+
+/** R9 — total stablecoin supply moved unusually in 1 day (7 on the 7d page): a mint or a burn. */
+export const R9: Rule = {
+  id: 'R9', block: 'flows',
+  run(s) {
+    const t = s.flows?.stablecoins;
+    if (!t || t.supplyUsd === null || !t.changeUsd) return refuse('no_data');
+    // the basis says what was measured: a 1-day or a 7-day change, whatever the page's period
+    const basis = flowsBasis(s, t.changeDays === 7 ? '7d' : '24h', ['defillama'], t.changeUsd);
+    if (t.changeUsd.rarity === null) return refuse('insufficient_history', basis);
+    return {
+      ruleId: 'R9', block: 'flows', key: 'insight.stablecoin_supply',
+      params: { usd: t.changeUsd.value, pct: t.changePct, days: t.changeDays },
+      rarity: t.changeUsd.rarity, magnitude: Math.abs(t.changeUsd.value), basis, link: { anchor: 'flows' },
+    };
+  },
+};
+
+/**
+ * R10 — Coinbase BTC held a premium or a discount (D18: against the dollar, USDT divided out) for
+ * most of the last hour, unusually for the last 25 days. Too few valid minutes refuses
+ * (`insufficient_minutes`); a premium that flips sign is not sustained and says nothing.
+ */
+export const R10: Rule = {
+  id: 'R10', block: 'flows',
+  run(s) {
+    const t = s.flows?.coinbasePremium;
+    if (!t || !t.premiumPct) return refuse('no_data');
+    const basis = flowsBasis(s, '1h', ['coinbase', 'binance'], t.premiumPct);
+    if (t.unavailable === 'insufficient_minutes') return refuse('insufficient_minutes', basis);
+    if (t.premiumPct.rarity === null) return refuse('insufficient_history', basis);
+    if (t.sameSignMinutes < PREMIUM_SUSTAINED_MIN) return null;
+    return {
+      ruleId: 'R10', block: 'flows', key: 'insight.coinbase_premium',
+      params: { pct: t.premiumPct.value, minutes: t.sameSignMinutes },
+      rarity: t.premiumPct.rarity, magnitude: Math.abs(t.premiumPct.value), basis, link: { anchor: 'flows' },
+    };
+  },
+};
+
+export const RULES: readonly Rule[] = [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10];

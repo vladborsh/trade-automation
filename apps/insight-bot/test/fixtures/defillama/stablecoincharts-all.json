@@ -1,0 +1,146 @@
+{
+ "_captured": "IB-091: GET stablecoins.llama.fi/stablecoincharts/all, one probe 2026-11-04 ~03:12-03:20 UTC, trimmed (rows only, shape untouched); first row + last 12, only peggedUSD/peggedEUR kept",
+ "rows": [
+  {
+   "date": "1511913600",
+   "totalCirculating": {
+    "peggedUSD": 109970
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 110105
+   }
+  },
+  {
+   "date": "1792800000",
+   "totalCirculating": {
+    "peggedUSD": 303220411833,
+    "peggedEUR": 730510314
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 302800712166,
+    "peggedEUR": 814101234
+   }
+  },
+  {
+   "date": "1792886400",
+   "totalCirculating": {
+    "peggedUSD": 303052597783,
+    "peggedEUR": 730329279
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 302597421031,
+    "peggedEUR": 814789716
+   }
+  },
+  {
+   "date": "1792972800",
+   "totalCirculating": {
+    "peggedUSD": 302820798814,
+    "peggedEUR": 728083533
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 302279985720,
+    "peggedEUR": 813526159
+   }
+  },
+  {
+   "date": "1793059200",
+   "totalCirculating": {
+    "peggedUSD": 302070197047,
+    "peggedEUR": 733704368
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 301564083750,
+    "peggedEUR": 803537382
+   }
+  },
+  {
+   "date": "1793145600",
+   "totalCirculating": {
+    "peggedUSD": 301991901089,
+    "peggedEUR": 731971187
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 301599773086,
+    "peggedEUR": 815821217
+   }
+  },
+  {
+   "date": "1793232000",
+   "totalCirculating": {
+    "peggedUSD": 300754891938,
+    "peggedEUR": 733960874
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 300122400802,
+    "peggedEUR": 820576577
+   }
+  },
+  {
+   "date": "1793318400",
+   "totalCirculating": {
+    "peggedUSD": 300128564490,
+    "peggedEUR": 733160550
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 299701584707,
+    "peggedEUR": 815769719
+   }
+  },
+  {
+   "date": "1793404800",
+   "totalCirculating": {
+    "peggedUSD": 299281677602,
+    "peggedEUR": 740607363
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 298962628291,
+    "peggedEUR": 827084378
+   }
+  },
+  {
+   "date": "1793491200",
+   "totalCirculating": {
+    "peggedUSD": 298804901282,
+    "peggedEUR": 750393497
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 298364689533,
+    "peggedEUR": 837001416
+   }
+  },
+  {
+   "date": "1793577600",
+   "totalCirculating": {
+    "peggedUSD": 298233370824,
+    "peggedEUR": 747896708
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 297625515629,
+    "peggedEUR": 836224348
+   }
+  },
+  {
+   "date": "1793664000",
+   "totalCirculating": {
+    "peggedUSD": 297134662473,
+    "peggedEUR": 748414727
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 296011417684,
+    "peggedEUR": 837301631
+   }
+  },
+  {
+   "date": "1793750400",
+   "totalCirculating": {
+    "peggedUSD": 296228298548.12,
+    "peggedEUR": 750598776.11
+   },
+   "totalCirculatingUSD": {
+    "peggedUSD": 295076471836.72,
+    "peggedEUR": 843064689.01
+   }
+  }
+ ]
+}
