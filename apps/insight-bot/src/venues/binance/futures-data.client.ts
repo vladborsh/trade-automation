@@ -36,8 +36,19 @@ export const PAGE_LIMIT = 500;
 export const RETENTION_MS = 30 * 24 * 60 * 60_000;
 export const RETENTION_ERROR_CODE = -1130;
 
-/** Weight assumed per `/futures/data` call for D15's budget. */
-export const CALL_WEIGHT = 1;
+/**
+ * IB-BUG-030 — what a `/futures/data` call costs of the 2400 weight/min: **0.** Binance's USD-M docs
+ * list Open Interest Statistics and the Long/Short Ratio endpoints at «IP Weight 0» with their own
+ * «IP rate limit 1000 requests/5min» (developers.binance.com, derivatives / usds-margined-futures /
+ * market-data / rest-api, read 2026-11-04). Measured the same day: `/fapi/v1/time` before and after
+ * 20–30 `openInterestHist` calls moved `X-MBX-USED-WEIGHT-1M` by exactly the closing `/time`'s 1 in
+ * **8 clean runs on two occasions (10:52–10:54 and 10:59–11:03 UTC; 4 + 4; three more runs were spoilt
+ * by a minute rollover or another process on the IP)**, and none of 150 responses carried the header.
+ * It was 1 until then, which made the tracker's own count read ~150 during an OI/LS pass that cost
+ * the budget nothing (the gauge then flipped to the true 1–2 whenever a `/fapi` header was fresh).
+ * Recorded through `recordCall` anyway, so the call stays visible in the tracker's own trail.
+ */
+export const CALL_WEIGHT = 0;
 
 export interface FuturesDataQuery {
   endpoint: string;

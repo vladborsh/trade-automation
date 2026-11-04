@@ -45,11 +45,17 @@ describe('buildUrl', () => {
 });
 
 describe('fetchPage', () => {
-  it('counts every call against the weight budget, answer or error', async () => {
+  it('IB-BUG-030: books /futures/data at weight 0 — a whole pass leaves the gauge at 0, a /fapi header then reads as itself', async () => {
+    // «IP Weight 0» (Binance docs) and measured: 8 clean runs on two occasions moved
+    // X-MBX-USED-WEIGHT-1M by 0. Red on the old CALL_WEIGHT = 1: 150 here, then a flip to 2.
     const weight = new BinanceWeightTracker();
-    const f = fakeFetch([{ body: [{ timestamp: 1 }] }]);
-    await client(f.impl, weight).fetchPage({ endpoint: 'openInterestHist', symbol: 'BTCUSDT' });
-    expect(weight.used1m()).toBe(CALL_WEIGHT);
+    const c = client(fakeFetch([{ body: [{ timestamp: 1 }] }]).impl, weight);
+    for (let i = 0; i < 5 * 30; i += 1) await c.fetchPage({ endpoint: 'openInterestHist', symbol: 'BTCUSDT' });
+    expect(CALL_WEIGHT).toBe(0);
+    expect(weight.used1m()).toBe(0);
+    expect(weight.isEstimate()).toBe(true); // no header from /futures/data
+    weight.recordHeader(2); // a /fapi response in the same minute
+    expect(weight.used1m()).toBe(2);
   });
 
   it('prefers the venue header when a response carries one', async () => {

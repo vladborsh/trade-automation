@@ -13,15 +13,21 @@ const MINUTE_MS = 60_000;
  * `openInterestHist`, and present 5/5 and 5/5 on `/fapi/v1/openInterest`.** So this poller,
  * which calls nothing but `/futures/data/*`, cannot read its own usage back from the venue.
  *
+ * **And it does not need to: `/futures/data/*` costs 0 of the 2400** (IB-BUG-030 — docs + measured,
+ * see `CALL_WEIGHT` in `futures-data.client.ts`). Those endpoints have their own per-IP limit of
+ * 1000 requests / 5 min, which this tracker does not measure.
+ *
  * Hence two inputs, and the reading prefers the truthful one:
  * - `recordHeader(n)` — authoritative, from any `/fapi/*` response that carries the header
  *   (gap repair, the funding fetch, the other collectors). Wins while it is fresh.
- * - `recordCall(weight)` — this app's own count, a trailing-minute sum of what it spent. Used
- *   when no header has arrived within the last minute, which for a poller-only process is
- *   always.
+ * - `recordCall(weight)` — this app's own count, a trailing-minute sum of what it spent at the
+ *   documented weights. Used when no header has arrived within the last minute.
  *
  * The estimate is a **lower bound on our own traffic only** — it cannot see another process
  * sharing the IP. That is exactly why the header wins whenever there is one.
+ *
+ * The header counts Binance's **calendar** minute (it resets at :00, seen 2026-11-04); the
+ * estimate is a **trailing** 60 s. They agree away from a minute boundary, not across one.
  */
 @Injectable()
 export class BinanceWeightTracker {

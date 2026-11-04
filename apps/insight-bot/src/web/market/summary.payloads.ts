@@ -29,7 +29,7 @@ export const PremiumIndexSummaryRowSchema = z.object({
 }).passthrough();
 export type PremiumIndexSummaryRow = z.infer<typeof PremiumIndexSummaryRowSchema>;
 
-/** One element of `GET /futures/data/openInterestHist?period=1h` (weight 1, no weight header). */
+/** One element of `GET /futures/data/openInterestHist?period=1h` (weight 0 — IB-BUG-030 — and no weight header). */
 export const OiHistRowSchema = z.object({
   symbol: z.string(),
   sumOpenInterest: z.string(),

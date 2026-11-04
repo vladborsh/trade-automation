@@ -30,20 +30,22 @@ const PERIOD = '5m';
  * 5 m, polled at every 5-minute boundary **+ 20 s** (the venue publishes on the boundary with a
  * lag), for every active universe symbol.
  *
- * **REST weight: 5 calls × 30 symbols per 5 min = 150 calls per 5 min, i.e. §4.5's 30
- * weight/min AVERAGED over the interval (1.25 % of 2400).** Measured on the acceptance run, the
- * instantaneous trailing-minute figure during a pass is ~150, not 30: a pass takes about a
- * minute of wall clock, so its calls land inside one minute rather than spread across the five.
- * That peak is 6.25 % of the budget and well inside it, but `ib_binance_weight_used_1m` reads
- * ~150 while a pass is running and decays to 0 between passes — which is the true picture, and
- * the reason the gauge must be a live reading rather than a number pushed once per poll. The boot backfill is a one-off on top: at most
- * ⌈30 days / (500 slots × 5 min)⌉ = 18 pages per series per symbol, 5 × 18 × 30 = 2700 calls,
- * paced at `BACKFILL_PACING_MS` so it spreads over minutes rather than bursting through the
- * budget.
+ * **REST cost: 5 calls × 30 symbols per 5 min = 150 calls per 5 min, and 0 weight.**
+ * `/futures/data/*` is «IP Weight 0» on Binance's 2400 weight/min (IB-BUG-030: docs + measured, see
+ * `CALL_WEIGHT`); it spends a separate per-IP limit of **1000 requests / 5 min per endpoint**, of
+ * which a steady pass uses 30 per endpoint (3 %). Until IB-BUG-030 this said "30 weight/min, 1.25 %
+ * of 2400" and the tracker booked each call at 1, so `ib_binance_weight_used_1m` read ~150 during a
+ * pass that cost the weight budget nothing.
+ *
+ * The boot backfill is a one-off on top: at most ⌈30 days / (500 slots × 5 min)⌉ = 18 pages per
+ * series per symbol, 5 × 18 × 30 = 2700 calls, paced at `BACKFILL_PACING_MS`. **That pacing is the
+ * only thing near a limit: 120 ms = 500 calls/min over 5 endpoints ≈ 500 per endpoint per 5 min,
+ * half of the 1000/5min — arithmetic, not measured.** Nothing gauges that limit; if a 429/418 ever
+ * shows on `/futures/data`, that is when it earns one.
  *
  * These endpoints send no `X-MBX-USED-WEIGHT-1M` header (measured — see
- * `futures-data.client.ts`), so `ib_binance_weight_used_1m` is fed by
- * `BinanceWeightTracker`'s own count while only this loop is running.
+ * `futures-data.client.ts`) and cost no weight, so this loop alone leaves
+ * `ib_binance_weight_used_1m` at 0; the gauge reads what the `/fapi` traffic spends.
  */
 export const BACKFILL_PACING_MS = 120;
 

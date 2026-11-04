@@ -19,7 +19,7 @@ import {
  * |---|---|---|
  * | `GET /fapi/v1/ticker/24hr` (all symbols) | 40 | 1 |
  * | `GET /fapi/v1/premiumIndex` (all symbols) | 10 | 1 |
- * | `GET /futures/data/openInterestHist?period=1h&limit=25` | 1 | one per symbol (up to 60, `SUMMARY_MAX`) |
+ * | `GET /futures/data/openInterestHist?period=1h&limit=25` | 0 (IB-BUG-030; its own 1000 req/5min) | one per symbol (up to 60, `SUMMARY_MAX`) |
  *
  * So about 50 `fapi` weight plus one `/futures/data` call per listed symbol (40 since IB-070) per refresh.
  *

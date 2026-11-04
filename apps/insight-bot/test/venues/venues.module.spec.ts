@@ -46,14 +46,17 @@ describe('VenuesModule (WD-008)', () => {
     const ref = await Test.createTestingModule({ imports: [ConsumerModule] }).compile();
     const { futures, weight } = ref.get(Consumer);
     const original = global.fetch;
-    // no network: the module's client uses the global fetch, replaced for this one call
-    global.fetch = (async () => new Response('[]', { status: 200 })) as typeof fetch;
+    // no network: the module's client uses the global fetch, replaced for this one call. The answer
+    // carries a weight header so the write is observable: a /futures/data call itself books weight 0
+    // (IB-BUG-030), which cannot tell one tracker from another.
+    global.fetch = (async () => new Response('[]', { status: 200, headers: { 'x-mbx-used-weight-1m': '7' } })) as typeof fetch;
     try {
       await futures.fetchPage({ endpoint: 'openInterestHist', symbol: 'BTCUSDT' });
     } finally {
       global.fetch = original;
     }
-    expect(weight.used1m()).toBe(1);
+    expect(weight.used1m()).toBe(7);
+    expect(weight.isEstimate()).toBe(false);
     await ref.close();
   });
 });

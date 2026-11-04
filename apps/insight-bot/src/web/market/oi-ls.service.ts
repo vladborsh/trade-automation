@@ -36,13 +36,14 @@ import { WEIGHT_CEILING_1M } from './universe-summary.service';
  * answers no points WITH `truncated: true` — never a bare empty series, which a chart would read as
  * "no open interest", the IB-BUG-011 failure.
  *
- * **Weight.** Each `/futures/data` page costs 1 (WD-008 row) and the venue sends no
- * `x-mbx-used-weight-1m` header back, so `FuturesDataClient` counts it into the shared tracker by
- * hand. A window is read at the finest period that fits in 1 000 rows (`oi-ls-window.ts`): at most
- * 2 pages, so **≤ 2 weight per series**, cached `OI_LS_TTL_MS` (300 s, the venue's own 5-minute
- * period) per (symbol, endpoint, period, window snapped to the period). An instrument page showing
- * OI and all four ratios is therefore ≤ 10 weight per uncached window and 0 for 5 minutes after.
- * Above `WEIGHT_CEILING_1M` the read answers 503 rather than adding to the spend.
+ * **Cost.** A `/futures/data` page costs **0 weight** (IB-BUG-030; the WD-008 row said 1) and spends
+ * the endpoint's own per-IP limit of 1000 requests / 5 min; the venue sends no `x-mbx-used-weight-1m`
+ * header, and `FuturesDataClient` records it at weight 0. A window is read at the finest period that
+ * fits in 1 000 rows (`oi-ls-window.ts`): at most 2 pages, so **≤ 2 requests per series**, cached
+ * `OI_LS_TTL_MS` (300 s, the venue's own 5-minute period) per (symbol, endpoint, period, window snapped
+ * to the period). An instrument page showing OI and all four ratios is therefore ≤ 10 requests per
+ * uncached window and 0 for 5 minutes after. Above `WEIGHT_CEILING_1M` (the IP's `/fapi` weight) the
+ * read still answers 503 — conservative: it no longer reflects these calls, only a nearly spent IP.
  */
 export type LongShortKind = WebLongShortResponse['kind'];
 

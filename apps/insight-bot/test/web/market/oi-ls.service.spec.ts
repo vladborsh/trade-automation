@@ -39,11 +39,12 @@ describe('OiLsService (WD-008)', () => {
     expect(f.calls[0]).toContain('period=5m');
   });
 
-  it('counts each page into the shared tracker by hand — /futures/data sends no weight header', async () => {
-    const { weight, service } = setup([{ match: 'openInterestHist', answer: { body: OI_1H } }]);
+  it('a page adds no weight — /futures/data is «IP Weight 0» and sends no header (IB-BUG-030)', async () => {
+    const { f, weight, service } = setup([{ match: 'openInterestHist', answer: { body: OI_1H } }]);
     await service.openInterest('BTCUSDT', FROM, TO);
+    expect(f.calls).toHaveLength(1); // the page was really fetched
     expect(weight.isEstimate(Date.now())).toBe(true);
-    expect(weight.used1m(Date.now())).toBe(1);
+    expect(weight.used1m(Date.now())).toBe(0);
   });
 
   it('serves a repeat read from the cache for its TTL', async () => {

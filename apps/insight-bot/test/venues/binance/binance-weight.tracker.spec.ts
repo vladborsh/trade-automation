@@ -1,4 +1,5 @@
 import { BinanceWeightTracker } from '../../../src/venues/binance/binance-weight.tracker';
+import { CALL_WEIGHT } from '../../../src/venues/binance/futures-data.client';
 
 describe('BinanceWeightTracker', () => {
   it('sums this app\'s own calls over the trailing minute', () => {
@@ -58,21 +59,21 @@ describe('BinanceWeightTracker', () => {
     expect(() => new BinanceWeightTracker().recordCall(-1)).toThrow(/non-negative/);
   });
 
-  it('holds the §4.5 steady-state figure: 5 calls x 30 symbols per 5 min = 30 weight/min', () => {
+  it('IB-BUG-030: an OI/LS pass (5 x 30 /futures/data calls) costs 0 weight, header or not', () => {
+    // «IP Weight 0» per Binance's docs, and measured (CALL_WEIGHT's comment). Until IB-BUG-030 the
+    // pass was booked at 1 per call: the gauge read 150 without a header and the true 1-2 with one.
     const tracker = new BinanceWeightTracker();
-    // One poll pass, then read the minute containing it.
-    for (let i = 0; i < 5 * 30; i += 1) tracker.recordCall(1, 1_000);
-    expect(tracker.used1m(2_000)).toBe(150); // per 5-minute pass
-    expect(150 / 5).toBe(30); // per minute, §4.5's line
-    expect((150 / 5 / 2400) * 100).toBeCloseTo(1.25, 2); // 1.25 % of the budget, D15
+    for (let i = 0; i < 5 * 30; i += 1) tracker.recordCall(CALL_WEIGHT, 1_000);
+    expect(tracker.used1m(2_000)).toBe(0);
+    tracker.recordHeader(2, 2_000); // a /fapi answer in the same minute
+    expect(tracker.used1m(2_500)).toBe(2); // the IP's real figure, and no longer a flip from 150
   });
 
-  it('lets the /fapi header override the /futures/data estimate — one IP, one budget', () => {
-    // IB-005's perp collector reports x-mbx-used-weight-1m from /fapi/*; IB-007's poller counts
-    // its own /futures/data/* calls, which carry no header. Both feed this one tracker, and the
-    // venue's own figure is the truthful one whenever it is fresh.
+  it('lets the /fapi header override our own estimate — one IP, one budget', () => {
+    // Our own count is a lower bound on OUR traffic (documented weights of /fapi calls we made);
+    // the header is the venue's figure for the whole IP, the truthful one whenever it is fresh.
     const tracker = new BinanceWeightTracker();
-    for (let i = 0; i < 150; i += 1) tracker.recordCall(1, 1_000); // a poller pass
+    for (let i = 0; i < 150; i += 1) tracker.recordCall(1, 1_000); // e.g. 150 weight-1 /fapi reads
     expect(tracker.used1m(1_500)).toBe(150);
     expect(tracker.isEstimate(1_500)).toBe(true);
 
