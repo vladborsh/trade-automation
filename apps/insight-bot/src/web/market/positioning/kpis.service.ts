@@ -16,6 +16,13 @@ import { fngBand, fundingSide, liqSide } from './kpis.rules';
  *
  * A source that fails gives its tile `unavailable: 'venue_unavailable'` — the six tiles are always
  * there (the contract refuses five). F&G carries alternative.me's attribution (§5).
+ *
+ * IB-106 (design §7.5, D25) — each tile may carry a `note`. Two come from the cards fetch above (ETH's
+ * share, F&G yesterday / a week ago). The third, BTC's global-account long/short ratio, is **the one
+ * new read**: `oiLs.longShort(btc, 'global_account', now − 2 h, now)`, a `/futures/data` page at
+ * **weight 0**, at most one request per compute (this cache, 60 s) and in practice one per 5 minutes
+ * (OiLsService caches the 5-minute-snapped window 300 s): ≤ 5 of the endpoint's 1 000 per 5 min.
+ * It is soft: a failure leaves the note null and never touches a tile's value.
  */
 export interface KpisOptions {
   cache: TtlCache;
@@ -52,11 +59,12 @@ export class KpisService {
     const soft = <T>(label: string, p: Promise<T>): Promise<T | null> =>
       p.catch((error: unknown) => { this.logger.warn(`kpis ${label}: ${(error as Error).message}`); return null; });
     const btc = this.options.btcSymbol;
-    const [cards, overview, oi, summary] = await Promise.all([
+    const [cards, overview, oi, summary, ls] = await Promise.all([
       soft('cards', this.options.cards.cards([])),
       this.options.liquidations ? soft('liquidations', this.options.liquidations.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 1, period: '24h' })) : Promise.resolve(null),
       soft('oi', this.options.oiLs.openInterest(btc, now - 24 * 3_600_000 - 15 * 60_000, now)),
       soft('summary', this.options.summary.summary([{ id: btc, base: 'BTC', volumeRank: 1 }])),
+      soft('ls_accounts', this.options.oiLs.longShort(btc, 'global_account', now - LS_NOTE_WINDOW_MS, now)),
     ]);
 
     const tiles: Record<WebKpiId, WebKpiTile> = {
@@ -74,12 +82,17 @@ export class KpisService {
         dom.totalChangePct24h == null ? {} : { context: { key: 'kpi.ctx.change', params: { deltaPct: round(dom.totalChangePct24h, 2) } } });
     }
     if (dom) Object.assign(tiles.btc_dominance, available(dom.btcPct, dom.changePct24h, Math.floor(dom.atMs / 1000)));
+    if (dom?.ethPct != null) tiles.btc_dominance.note = { key: 'kpi.note.eth_share', params: { ethPct: round(dom.ethPct, 1) } };
 
     const fg = cards?.fearGreed ?? null;
     if (fg) {
       Object.assign(tiles.fear_greed, available(fg.now.value, fg.previous ? fg.now.value - fg.previous.value : null, dayStartSec(fg.now.day)), {
         context: { key: 'kpi.ctx.fng_band', params: { band: fngBand(fg.now.value) } },
       });
+      // a half the venue did not publish is null (the client omits it); neither half → no note
+      if (fg.previous || fg.weekAgo) {
+        tiles.fear_greed.note = { key: 'kpi.note.fng_history', params: { yesterday: fg.previous?.value ?? null, weekAgo: fg.weekAgo?.value ?? null } };
+      }
     }
 
     if (overview) {
@@ -106,17 +119,23 @@ export class KpisService {
       });
     }
 
+    // the note is its own fact: it stands even when the funding read failed, and its failure empties nothing
+    const lastLs = ls?.points.at(-1);
+    if (lastLs && Number.isFinite(lastLs.ratio)) tiles.btc_funding.note = { key: 'kpi.note.ls_accounts', params: { ratio: round(lastLs.ratio, 2) } };
+
     return { asOf: Math.floor(now / 1000), tiles: WEB_KPI_IDS.map((id) => tiles[id]) };
   }
 }
 
 function tile(id: WebKpiId, source: { name: string; url: string | null }): WebKpiTile {
-  return { id, value: null, delta: null, deltaBasis: '24h', split: null, context: null, source: { ...source }, unavailable: 'venue_unavailable', asOf: null };
+  return { id, value: null, delta: null, deltaBasis: '24h', split: null, context: null, note: null, source: { ...source }, unavailable: 'venue_unavailable', asOf: null };
 }
 
 function available(value: number, delta: number | null | undefined, asOf: number): Partial<WebKpiTile> {
   return { value, delta: delta ?? null, unavailable: null, asOf };
 }
 
+/** IB-106: the window the L/S note reads — the last 5-minute point is all it needs; 2 h covers a late venue. */
+const LS_NOTE_WINDOW_MS = 2 * 3_600_000;
 const round = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 ** digits;
 const dayStartSec = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 1000);
