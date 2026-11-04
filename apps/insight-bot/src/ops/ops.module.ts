@@ -4,6 +4,7 @@ import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
 import { VenuesModule } from '../venues/venues.module';
 import { HealthController } from './health.controller';
+import { loggerModuleParams } from './http-log';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
 import { StreamRegistry } from './stream-registry';
@@ -25,13 +26,8 @@ import { StreamRegistry } from './stream-registry';
     LoggerModule.forRootAsync({
       imports: [AppConfigModule],
       inject: [AppConfigService],
-      useFactory: (config: AppConfigService) => ({
-        pinoHttp: {
-          level: config.env.get('LOG_LEVEL'),
-          autoLogging: true,
-          transport: config.env.get('NODE_ENV') === 'development' ? { target: 'pino-pretty' } : undefined,
-        },
-      }),
+      // IB-BUG-031: no cookie, Authorization, Set-Cookie or URL token ever reaches a log line
+      useFactory: (config: AppConfigService) => loggerModuleParams(config.env.get('LOG_LEVEL'), config.env.get('NODE_ENV')),
     }),
   ],
   controllers: [HealthController, MetricsController],
