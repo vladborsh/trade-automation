@@ -585,6 +585,8 @@ export type StringKey =
   | 'alerts.param.w'
   | 'alerts.param.atrMult'
   | 'alerts.param.oiMedianMult'
+  | 'alerts.param.priceLineTolAtrMult'
+  | 'alerts.param.oiLineTolMedianMult'
   | 'alerts.save'
   | 'alerts.reset'
   | 'alerts.paramsInvalid'

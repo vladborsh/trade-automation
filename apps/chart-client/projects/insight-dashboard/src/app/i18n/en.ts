@@ -581,6 +581,8 @@ export const en: Strings = {
   'alerts.param.w': 'window, candles',
   'alerts.param.atrMult': 'Price threshold, share of ATR14',
   'alerts.param.oiMedianMult': 'OI threshold, share of the median change per candle',
+  'alerts.param.priceLineTolAtrMult': 'Price line tolerance, share of ATR14 at the crossing candle (0 = no crossing)',
+  'alerts.param.oiLineTolMedianMult': 'OI line tolerance, share of the median change per candle (0 = no crossing)',
   'alerts.save': 'Save',
   'alerts.reset': 'Back to saved',
   'alerts.paramsInvalid': 'A field is not a number or out of range — not saved.',

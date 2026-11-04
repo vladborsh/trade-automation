@@ -47,6 +47,10 @@ describe('the params form', () => {
     const f = paramsToForm(OI_DIVERGENCE_DEFAULT_PARAMS);
     expect(formToParams({ ...f, atrMult: '0,3' })?.atrMult).toBe(0.3);
     expect(formToParams({ ...f, atrMult: '' })).toBeNull();
+    expect(formToParams({ ...f, priceLineTolAtrMult: '0' })?.priceLineTolAtrMult).toBe(0); // 0 is the round-1 rule, not empty
+    expect(formToParams({ ...f, oiLineTolMedianMult: '0,75' })?.oiLineTolMedianMult).toBe(0.75);
+    expect(formToParams({ ...f, priceLineTolAtrMult: '' })).toBeNull();
+    expect(formToParams({ ...f, oiLineTolMedianMult: '5.5' })).toBeNull(); // V18: max 5
     expect(formToParams({ ...f, perTf: { ...f.perTf, '4h': { ...f.perTf['4h'], n: '0' } } })).toBeNull();
     expect(formToParams({ ...f, perTf: { ...f.perTf, '15m': { ...f.perTf['15m'], k: 'abc' } } })).toBeNull();
     expect(formToParams({ ...f, perTf: { ...f.perTf, '1h': { ...f.perTf['1h'], w: '7.5' } } })).toBeNull(); // whole bars only

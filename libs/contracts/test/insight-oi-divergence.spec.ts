@@ -1,5 +1,5 @@
 import {
-  OI_DIVERGENCE_DEFAULT_PARAMS, OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS, OiDivergenceParamsSchema, WebAlertSymbolSchema,
+  OI_DIVERGENCE_DEFAULT_PARAMS, OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS, OiDivergenceJournalParamsSchema, OiDivergenceParamsSchema, WebAlertSymbolSchema,
   WebOiDivergenceAlertSchema, WebOiDivergenceLineSchema, WebOiDivergenceSeriesResponseSchema,
 } from '../src/insight';
 
@@ -11,12 +11,30 @@ const line = {
 };
 
 describe('OI divergence contracts (IB-109)', () => {
-  it('the V5–V7 defaults parse: N 6, k 3, W 96/120/90, δp 0.25 × ATR, δoi 0.5 × median', () => {
+  it('the defaults parse: N 6, k 3, W 96/168/90 (V19), δp 0.25 × ATR, δoi 0.5 × median, line tolerances 0.25 / 0.5 (V18)', () => {
     expect(OiDivergenceParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual({
-      perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } },
-      atrMult: 0.25, oiMedianMult: 0.5,
+      perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 168 }, '4h': { n: 6, k: 3, w: 90 } },
+      atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5,
     });
     expect(OI_DIVERGENCE_TFS.map((tf) => OI_DIVERGENCE_TF_SEC[tf])).toEqual([900, 3_600, 14_400]);
+  });
+
+  it('V18: the line tolerances are required in settings, 0 … 5 inclusive', () => {
+    const { priceLineTolAtrMult: _p, ...noPrice } = OI_DIVERGENCE_DEFAULT_PARAMS;
+    const { oiLineTolMedianMult: _o, ...noOi } = OI_DIVERGENCE_DEFAULT_PARAMS;
+    expect(OiDivergenceParamsSchema.safeParse(noPrice).success).toBe(false);
+    expect(OiDivergenceParamsSchema.safeParse(noOi).success).toBe(false);
+    for (const key of ['priceLineTolAtrMult', 'oiLineTolMedianMult'] as const) {
+      const at = (v: number) => OiDivergenceParamsSchema.safeParse({ ...OI_DIVERGENCE_DEFAULT_PARAMS, [key]: v }).success;
+      expect([key, at(0), at(5), at(-0.01), at(5.01)]).toEqual([key, true, true, false, false]);
+    }
+  });
+
+  it('V20: a journal row from before 026 (no tolerances) reads as tolerance 0, not the new default; a stored value is kept', () => {
+    const { priceLineTolAtrMult: _p, oiLineTolMedianMult: _o, ...round1 } = OI_DIVERGENCE_DEFAULT_PARAMS;
+    expect(OiDivergenceJournalParamsSchema.parse(round1)).toEqual({ ...round1, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 });
+    expect(OiDivergenceJournalParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
+    expect(OiDivergenceJournalParamsSchema.safeParse({ ...round1, priceLineTolAtrMult: 6 }).success).toBe(false);
   });
 
   it('a line parses; a repeat must say a run of at least 3 pivots', () => {
@@ -41,6 +59,8 @@ describe('OI divergence contracts (IB-109)', () => {
       priceAtFire: null, price4h: null, price24h: null, outcomeAt: null };
     expect(WebOiDivergenceAlertSchema.safeParse(row).success).toBe(true);
     expect(WebOiDivergenceAlertSchema.safeParse({ ...row, runLength: 1 }).success).toBe(false);
+    const { priceLineTolAtrMult: _p, oiLineTolMedianMult: _o, ...round1 } = OI_DIVERGENCE_DEFAULT_PARAMS;
+    expect(WebOiDivergenceAlertSchema.parse({ ...row, params: round1 }).params).toMatchObject({ priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 });
     expect(WebAlertSymbolSchema.safeParse({ symbol: 'TRXUSDT', base: 'TRX', enabled: true, addedAt: 1, addedBy: null }).success).toBe(true);
     expect(WebAlertSymbolSchema.safeParse({ symbol: 'trx/usdt', base: 'TRX', enabled: true, addedAt: 1, addedBy: null }).success).toBe(false);
   });

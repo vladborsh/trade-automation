@@ -1,5 +1,5 @@
 {
- "_comment": "IB-112 SYNTHETIC (no server yet): shaped by the IB-109 contract, values plausible, not a capture",
+ "_comment": "IB-112 SYNTHETIC (no server yet): shaped by the IB-109 contract, values plausible, not a capture; IB-114: settings carry the round-2 defaults (1h W 168, line tolerances); journal rows read as tolerance 0 (V20: found before 026)",
  "settings": {
   "enabled": false,
   "membersVisible": false,
@@ -13,7 +13,7 @@
     "1h": {
      "n": 6,
      "k": 3,
-     "w": 120
+     "w": 168
     },
     "4h": {
      "n": 6,
@@ -22,7 +22,9 @@
     }
    },
    "atrMult": 0.25,
-   "oiMedianMult": 0.5
+   "oiMedianMult": 0.5,
+   "priceLineTolAtrMult": 0.25,
+   "oiLineTolMedianMult": 0.5
   },
   "updatedBy": null,
   "updatedAt": 1793750400
@@ -110,7 +112,9 @@
      }
     },
     "atrMult": 0.25,
-    "oiMedianMult": 0.5
+    "oiMedianMult": 0.5,
+    "priceLineTolAtrMult": 0,
+    "oiLineTolMedianMult": 0
    },
    "confirmedAt": 1793815200,
    "firedAt": null,
@@ -159,7 +163,9 @@
      }
     },
     "atrMult": 0.25,
-    "oiMedianMult": 0.5
+    "oiMedianMult": 0.5,
+    "priceLineTolAtrMult": 0,
+    "oiLineTolMedianMult": 0
    },
    "confirmedAt": 1793811600,
    "firedAt": null,
@@ -208,7 +214,9 @@
      }
     },
     "atrMult": 0.25,
-    "oiMedianMult": 0.5
+    "oiMedianMult": 0.5,
+    "priceLineTolAtrMult": 0,
+    "oiLineTolMedianMult": 0
    },
    "confirmedAt": 1793808000,
    "firedAt": 1793808360,

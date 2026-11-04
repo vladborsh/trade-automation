@@ -587,6 +587,8 @@ export const ru: Strings = {
   'alerts.param.w': 'окно, свечей',
   'alerts.param.atrMult': 'Порог цены, доля ATR14',
   'alerts.param.oiMedianMult': 'Порог OI, доля медианного изменения за свечу',
+  'alerts.param.priceLineTolAtrMult': 'Допуск линии цены, доля ATR14 на свече пересечения (0 — без пересечений)',
+  'alerts.param.oiLineTolMedianMult': 'Допуск линии OI, доля медианного изменения за свечу (0 — без пересечений)',
   'alerts.save': 'Сохранить',
   'alerts.reset': 'Вернуть сохранённые',
   'alerts.paramsInvalid': 'Есть поле не числом или вне допустимого — не сохранено.',

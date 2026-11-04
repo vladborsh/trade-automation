@@ -84,6 +84,8 @@
       </div>
       <label class="mult">{{ t('alerts.param.atrMult') }} <input inputmode="decimal" [value]="f.atrMult" (input)="editParam(null, 'atrMult', $any($event.target).value)" /></label>
       <label class="mult">{{ t('alerts.param.oiMedianMult') }} <input inputmode="decimal" [value]="f.oiMedianMult" (input)="editParam(null, 'oiMedianMult', $any($event.target).value)" /></label>
+      <label class="mult">{{ t('alerts.param.priceLineTolAtrMult') }} <input inputmode="decimal" [value]="f.priceLineTolAtrMult" (input)="editParam(null, 'priceLineTolAtrMult', $any($event.target).value)" /></label>
+      <label class="mult">{{ t('alerts.param.oiLineTolMedianMult') }} <input inputmode="decimal" [value]="f.oiLineTolMedianMult" (input)="editParam(null, 'oiLineTolMedianMult', $any($event.target).value)" /></label>
       <div class="actions">
         <button type="button" class="primary" (click)="saveParams()" [disabled]="busy() || !paramsChanged()">{{ t('alerts.save') }}</button>
         <button type="button" (click)="resetParams()" [disabled]="busy()">{{ t('alerts.reset') }}</button>

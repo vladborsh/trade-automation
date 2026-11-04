@@ -100,8 +100,12 @@ describe('AdminAlertsComponent (IB-112)', () => {
     await cmp.saveParams();
     expect(sent).toEqual([]);
     cmp.editParam('1h', 'k', '2');
+    cmp.editParam(null, 'priceLineTolAtrMult', '0'); // IB-114 (V18): 0 = the round-1 rule, a value, not «empty»
     expect(cmp.paramsChanged()).toBe(true);
     await cmp.saveParams();
-    expect(sent).toEqual([['settings', { params: { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { n: 6, k: 2, w: 120 } } } }]]);
+    expect(sent).toEqual([['settings', { params: {
+      ...OI_DIVERGENCE_DEFAULT_PARAMS, priceLineTolAtrMult: 0,
+      perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'], k: 2 } },
+    } }]]);
   });
 });

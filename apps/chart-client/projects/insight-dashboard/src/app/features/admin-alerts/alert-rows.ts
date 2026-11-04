@@ -79,11 +79,16 @@ export interface ParamsForm {
   perTf: Record<OiDivergenceTf, { n: string; k: string; w: string }>;
   atrMult: string;
   oiMedianMult: string;
+  priceLineTolAtrMult: string;
+  oiLineTolMedianMult: string;
 }
 
 export function paramsToForm(p: OiDivergenceParams): ParamsForm {
   const perTf = Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => [tf, { n: String(p.perTf[tf].n), k: String(p.perTf[tf].k), w: String(p.perTf[tf].w) }])) as ParamsForm['perTf'];
-  return { perTf, atrMult: String(p.atrMult), oiMedianMult: String(p.oiMedianMult) };
+  return {
+    perTf, atrMult: String(p.atrMult), oiMedianMult: String(p.oiMedianMult),
+    priceLineTolAtrMult: String(p.priceLineTolAtrMult), oiLineTolMedianMult: String(p.oiLineTolMedianMult),
+  };
 }
 
 /**
@@ -97,6 +102,8 @@ export function formToParams(f: ParamsForm): OiDivergenceParams | null {
     perTf: Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => [tf, { n: num(f.perTf[tf].n), k: num(f.perTf[tf].k), w: num(f.perTf[tf].w) }])),
     atrMult: num(f.atrMult),
     oiMedianMult: num(f.oiMedianMult),
+    priceLineTolAtrMult: num(f.priceLineTolAtrMult),
+    oiLineTolMedianMult: num(f.oiLineTolMedianMult),
   };
   const parsed = OiDivergenceParamsSchema.safeParse(candidate);
   return parsed.success ? parsed.data : null;

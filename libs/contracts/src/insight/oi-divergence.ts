@@ -31,24 +31,56 @@ export const OiDivergenceTfParamsSchema = z.object({
 });
 export type OiDivergenceTfParams = z.infer<typeof OiDivergenceTfParamsSchema>;
 
-export const OiDivergenceParamsSchema = z.object({
+/** V18: a line tolerance multiplier. 0 is the round-1 rule (no crossing at all). */
+const LineTolSchema = z.number().nonnegative().max(5);
+
+const paramsShape = {
   perTf: z.object({ '15m': OiDivergenceTfParamsSchema, '1h': OiDivergenceTfParamsSchema, '4h': OiDivergenceTfParamsSchema }),
   /** δp = atrMult × ATR14 at B: the price must be worse by more than this. */
   atrMult: z.number().nonnegative(),
   /** δoi = oiMedianMult × median |ΔOI per bar| over the 100 bars before B: OI must be better by more than this. */
   oiMedianMult: z.number().nonnegative(),
-});
+  /**
+   * V18: a wick between A and B may cross the A–B price line by up to this × ATR14 **at that bar**
+   * (on the boundary it passes). 0 = no crossing allowed (round 1).
+   */
+  priceLineTolAtrMult: LineTolSchema,
+  /**
+   * V18: a per-bar OI between the two OI pivots may cross the OI line by up to this × the SAME median
+   * |ΔOI per bar| as δoi (the 100 bars before B). 0 = no crossing allowed (round 1).
+   */
+  oiLineTolMedianMult: LineTolSchema,
+};
+
+/** `alert_settings.params` and the admin's writes: every key required (V19 — migration 026 adds the two tolerances). */
+export const OiDivergenceParamsSchema = z.object(paramsShape);
 export type OiDivergenceParams = z.infer<typeof OiDivergenceParamsSchema>;
 
 /**
- * V5–V7's defaults: N = 6 on every TF (owner: "n > 5"), k = 3 (half of N), W = 24 h on 15m, 5 days
- * on 1h, 15 days on 4h. **Starting values, not measured**: IB-111 reports counts with them and the
- * owner judges. Migration 025 seeds `alert_settings.params` with exactly this (a spec compares them).
+ * V20 — a journal row's `params`, as READ. Rows written before migration 026 lack the two tolerances;
+ * they were found under the round-1 rule, so an absent tolerance reads as **0**, never as today's
+ * default (a hit rate split by params would otherwise credit the new rule with the old signals).
+ * The output type is `OiDivergenceParams`: what the API sends always carries both keys.
+ */
+export const OiDivergenceJournalParamsSchema = z.object({
+  ...paramsShape,
+  priceLineTolAtrMult: LineTolSchema.default(0),
+  oiLineTolMedianMult: LineTolSchema.default(0),
+});
+
+/**
+ * V5–V7's defaults: N = 6 on every TF (owner: "n > 5"), k = 3 (half of N), W = 24 h on 15m, **7 days
+ * on 1h** (owner, round 2, V19; was 5), 15 days on 4h. Line tolerances 0.25 × ATR14 and 0.5 × the
+ * median (owner, round 2, V18). **Starting values, not measured**: IB-111 / IB-114 report counts with
+ * them and the owner judges. Migration 025 seeded round 1's values; 026 brings an untouched row to
+ * exactly this (`migration-026.integration.spec.ts` compares the end of the chain with it).
  */
 export const OI_DIVERGENCE_DEFAULT_PARAMS: OiDivergenceParams = {
-  perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } },
+  perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 168 }, '4h': { n: 6, k: 3, w: 90 } },
   atrMult: 0.25,
   oiMedianMult: 0.5,
+  priceLineTolAtrMult: 0.25,
+  oiLineTolMedianMult: 0.5,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -144,8 +176,11 @@ export const WebOiDivergenceAlertSchema = z.object({
   runOf: z.number().int().positive().nullable(),
   /** Pivots in the run: 2 for a first alert, 3 for «третий … подряд». */
   runLength: z.number().int().min(2),
-  /** The params this row was detected with: a hit rate is meaningless if they changed under it. */
-  params: OiDivergenceParamsSchema,
+  /**
+   * The params this row was detected with: a hit rate is meaningless if they changed under it. Read
+   * with V20's schema: a row from before 026 has tolerance 0.
+   */
+  params: OiDivergenceJournalParamsSchema,
   confirmedAt: TimeSec,
   firedAt: TimeSec.nullable(),
   late: z.boolean(),
