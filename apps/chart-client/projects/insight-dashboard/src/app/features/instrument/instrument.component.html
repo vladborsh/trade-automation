@@ -15,11 +15,6 @@
           <button type="button" [class.active]="tf === timeframe()" (click)="chooseTimeframe(tf)">{{ timeframeLabel(tf) }}</button>
         }
       </div>
-      <div class="group" role="group" [attr.aria-label]="t('instrument.view')">
-        <button type="button" class="legend-toggle" [attr.aria-pressed]="!legendsHidden()" (click)="toggleLegends()">
-          {{ legendsHidden() ? t('instrument.legends.show') : t('instrument.legends.hide') }}
-        </button>
-      </div>
     </div>
   </header>
   @if (downsampled()) {
@@ -29,9 +24,11 @@
     <p class="error">{{ t('instrument.loadFailed', { message }) }}</p>
   }
   <div class="body">
-    <div #chartColumn class="chart-column" [class.legends-hidden]="legendsHidden()">
+    <div #chartColumn class="chart-column" [class.legends-hidden]="legendToggle.hidden()">
       <!-- IB-099 item 3: inside the expanded element, so the way out is on screen in full screen too -->
       <app-fullscreen-button class="fs-button" [target]="chartColumn" />
+      <!-- IB-105: the legend switch sits ON the chart, at the price legend's corner (it owns the state) -->
+      <app-legend-toggle #legendToggle class="legend-button" />
       @if (panes(); as data) {
         <app-instrument-chart
           [data]="data"

@@ -205,7 +205,6 @@ export type StringKey =
   | 'instrument.loadingEarlier'
   | 'instrument.focus.marker'
   | 'instrument.focus.periodStart'
-  | 'instrument.view'
   | 'instrument.legends.hide'
   | 'instrument.legends.show'
   | 'ui.fullscreen.enter'

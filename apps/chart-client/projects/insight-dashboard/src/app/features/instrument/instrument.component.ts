@@ -12,9 +12,8 @@ import { InstrumentChartComponent, type PaneData } from './instrument-chart.comp
 import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
 import { instrumentTailJobs } from './instrument-tail';
-import { loadLegendsHidden, saveLegendsHidden } from './chart-prefs';
 import { focusFromQuery, type FocusView } from './focus-at';
-import { browserStore } from './pane-heights';
+import { LegendToggleComponent } from './legend-toggle.component';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
@@ -37,7 +36,7 @@ import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [AmountPipe, DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
+  imports: [AmountPipe, DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LegendToggleComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -81,8 +80,6 @@ export class InstrumentComponent {
   /** Bumped by every fresh load, so an answer for an abandoned choice is dropped. */
   private generation = 0;
   readonly error = signal<string | null>(null);
-  /** IB-099: one switch hides every pane legend; remembered per viewer (`chart-prefs.ts`). */
-  readonly legendsHidden = signal(loadLegendsHidden(browserStore()));
   /** IB-098: the moment `?at=` linked to; dropped as soon as the reader picks another symbol or frame. */
   readonly focus = signal<FocusView | null>(null);
 
@@ -157,11 +154,6 @@ export class InstrumentComponent {
     this.focus.set(null);
     void this.router.navigate(['/instrument', next]);
     void this.load();
-  }
-
-  toggleLegends(): void {
-    this.legendsHidden.set(!this.legendsHidden());
-    saveLegendsHidden(browserStore(), this.legendsHidden());
   }
 
   chooseTimeframe(tf: WebTimeframe): void {

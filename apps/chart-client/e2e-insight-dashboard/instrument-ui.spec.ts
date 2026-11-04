@@ -3,7 +3,7 @@ import recorded from './fixtures/instrument-btcusdt.json';
 
 /**
  * IB-099 — the owner's instrument-page fixes, in a real browser: the calendar badge opens the
- * tooltip, the legend switch survives a reload, full screen resizes the SAME chart and gives the
+ * tooltip, the legend switch (on the chart since IB-105) survives a reload, full screen resizes the SAME chart and gives the
  * view back. The API is replayed from a recording of slot dev-3 (BTCUSDT, 2026-11-03, one USD
  * high-impact event in the 1m window: «Congressional Elections», 15:16 UTC) with the page clock
  * fixed to the recording's instant, so every window the page asks for is the one recorded.
@@ -21,6 +21,22 @@ async function open(page: Page): Promise<void> {
   await page.goto('/instrument/BTCUSDT');
   await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
 }
+
+/** IB-BUG-019's measure: what the CHART holds (lightweight-charts' panes and series, and the marks the
+ *  component attached), read through Angular's dev-mode handle — not a DOM node the switch could hide. */
+async function chartState(page: Page): Promise<{ panes: number; series: number; primitives: number }> {
+  return page.evaluate(() => {
+    const ng = (window as unknown as { ng: { getComponent(el: Element): unknown } }).ng;
+    const c = ng.getComponent(document.querySelector('app-instrument-chart')!) as {
+      chart: { panes(): Array<{ getSeries(): unknown[] }> };
+      renderers: { paneMarks: unknown[] };
+    };
+    const panes = c.chart.panes();
+    return { panes: panes.length, series: panes.reduce((n, p) => n + p.getSeries().length, 0), primitives: c.renderers.paneMarks.length };
+  });
+}
+const overlap = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 test.describe('instrument page — desktop (IB-099)', () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
@@ -42,19 +58,52 @@ test.describe('instrument page — desktop (IB-099)', () => {
     await expect(page.locator('.calendar-tooltip')).toContainText('Congressional Elections');
   });
 
-  test('item 2: one switch hides every legend, and the choice survives a reload', async ({ page }) => {
+  test('IB-105: the on-chart switch hides every legend and nothing else; same spot to show them; reload keeps it', async ({ page }) => {
     await open(page);
     const legends = page.locator('.pane-legend');
+    const toggle = page.locator('.chart-column app-legend-toggle button');
     await expect(legends.first()).toBeVisible();
-    await page.getByRole('button', { name: 'Hide legend' }).click();
+    // one control: the toolbar has no legend switch any more
+    await expect(page.locator('header.controls').getByRole('button', { name: /legend/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /legend/i })).toHaveCount(1);
+    const before = await chartState(page);
+    expect(before.series).toBeGreaterThan(5);
+    expect(before.primitives).toBeGreaterThan(0);
+    const spot = (await toggle.boundingBox())!;
+
+    await toggle.click();
     await expect(legends.filter({ visible: true })).toHaveCount(0);
+    expect(await chartState(page)).toEqual(before); // IB-BUG-019: the chart keeps every series and mark
+    expect(await toggle.boundingBox()).toEqual(spot); // the way back is where it was
+    await expect(toggle).toHaveAttribute('aria-label', 'Show legend');
+
     await page.reload();
     await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
     await expect(legends.filter({ visible: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Show legend' }).click();
+    expect(await chartState(page)).toEqual(before);
+
+    await toggle.click();
+    await expect(legends.first()).toBeVisible();
     await page.reload();
     await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
     await expect(legends.first()).toBeVisible();
+    expect(await chartState(page)).toEqual(before);
+  });
+
+  test('IB-105: the switch sits at the price legend\'s corner, small, clear of the legend, the price axis, the badge and full screen', async ({ page }, info) => {
+    await open(page);
+    const t = (await page.locator('.chart-column app-legend-toggle button').boundingBox())!;
+    expect(Math.max(t.width, t.height)).toBeLessThanOrEqual(22); // a small glyph on desktop
+    for (const [name, sel] of [['price legend', '.pane-legend[data-pane="price"]'], ['badge', '.calendar-badge'], ['full screen', 'app-fullscreen-button button']] as const) {
+      expect(overlap(t, (await page.locator(sel).boundingBox())!), name).toBe(false);
+    }
+    const host = (await page.locator('.chart-host').boundingBox())!;
+    expect(t.x - host.x).toBeLessThan(12); // at the chart's left edge…
+    expect(t.y - host.y).toBeLessThan(12); // …and its top: the corner, far from the price axis on the right
+    // on the legend's FIRST line («Price · USDT»): the legend itself wraps to two lines at 1440
+    const title = (await page.locator('.pane-legend[data-pane="price"] .pane-title').boundingBox())!;
+    expect(Math.abs((t.y + t.height / 2) - (title.y + title.height / 2))).toBeLessThanOrEqual(3);
+    await info.attach('desktop-legend-toggle.png', { body: await page.locator('.chart-column').screenshot(), contentType: 'image/png' });
   });
 
   test('item 3: full screen grows the SAME chart and gives the view back; the button and Esc both leave', async ({ page }) => {
@@ -90,10 +139,30 @@ test.describe('instrument page — phone 390×844 (IB-099)', () => {
     await badge.tap();
     await expect(page.locator('.calendar-tooltip')).toContainText('Congressional Elections');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-    for (const name of ['Hide legend', 'Full screen']) {
-      const b = (await page.getByRole('button', { name }).boundingBox())!;
-      expect(b.height, name).toBeGreaterThanOrEqual(40);
-    }
+    const fs = (await page.getByRole('button', { name: 'Full screen' }).boundingBox())!;
+    expect(fs.height).toBeGreaterThanOrEqual(40);
+  });
+
+  test('IB-105 phone: the legend switch is a small glyph with a 40 × 40 target, clear of the badge; a tap hides, a tap shows', async ({ page }, info) => {
+    await open(page);
+    const toggle = page.locator('.chart-column app-legend-toggle button');
+    const g = (await toggle.boundingBox())!;
+    expect(Math.max(g.width, g.height)).toBeLessThanOrEqual(22); // the glyph stays small…
+    // …and the target is 40 × 40: every point of the square at the chart's corner lands on the switch
+    const host = (await page.locator('.chart-column').boundingBox())!;
+    const hits = await page.evaluate(([x0, y0]) => [[1, 1], [39, 1], [1, 39], [39, 39], [20, 20]].map(([dx, dy]) =>
+      !!document.elementFromPoint(x0 + dx, y0 + dy)?.closest('app-legend-toggle')), [host.x, host.y]);
+    expect(hits).toEqual([true, true, true, true, true]);
+    expect(overlap(g, (await page.locator('.calendar-badge').boundingBox())!)).toBe(false);
+    const before = await chartState(page);
+    await toggle.tap();
+    await expect(page.locator('.pane-legend').filter({ visible: true })).toHaveCount(0);
+    expect(await chartState(page)).toEqual(before);
+    await info.attach('phone-legends-hidden.png', { body: await page.locator('.chart-column').screenshot(), contentType: 'image/png' });
+    await toggle.tap();
+    await expect(page.locator('.pane-legend').first()).toBeVisible();
+    await info.attach('phone-legends-shown.png', { body: await page.locator('.chart-column').screenshot(), contentType: 'image/png' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });
 

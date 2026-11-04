@@ -1,0 +1,35 @@
+/* IB-105: a small chip on the chart, the dark-terminal palette (AGENTS.md), the legend's own
+   translucent background so it reads as part of the legend strip, not a toolbar button. */
+:host { display: block; }
+
+.legend-toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  background: rgba(13, 17, 23, 0.72);
+  color: #8b949e;
+  cursor: pointer;
+
+  &:hover { color: #c9d1d9; border-color: #8b949e; }
+  &:focus-visible { outline: var(--focus-ring); }
+  &[aria-pressed='false'] { color: #c9d1d9; }
+}
+
+/* Phone: a 40 × 40 touch target around the 20 px glyph, invisible, so nothing on the chart is
+   covered by more than the glyph itself. The page puts the glyph at (6, 4), so this square starts
+   exactly at the chart's top-left corner (instrument.component.scss). */
+@media (max-width: 767px) {
+  .legend-toggle::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -6px;
+    width: 40px;
+    height: 40px;
+  }
+}

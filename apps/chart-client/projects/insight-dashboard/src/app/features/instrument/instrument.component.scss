@@ -147,6 +147,8 @@
 /* IB-099 item 3: the full-screen button sits on the chart's top-right corner, inside the element
    it expands — a toolbar button would be off screen once the chart column fills it. */
 .fs-button { position: absolute; top: 4px; right: 4px; z-index: 6; }
+/* IB-105: the legend switch at the price legend's top-left corner, above the legends (z 3) */
+.legend-button { position: absolute; top: 4px; left: 6px; z-index: 6; }
 
 /* 390 px (IB-099 acceptance): the top-50 table is raw data six columns wide (448 px), and pushed
    the whole page to 465 px on a phone. Under 768 px it scrolls inside its own box instead. */
@@ -154,8 +156,8 @@
   .top { display: block; overflow-x: auto; max-width: 100%; }
 }
 
-/* IB-099 item 2 (and the toolbar it sits in): on a phone every toolbar button — the legend switch,
-   the timeframes — is a ≥ 40 px touch target (IB-088's rule). */
+/* On a phone every toolbar button — the timeframes — is a ≥ 40 px touch target (IB-088's rule).
+   The legend switch left the toolbar for the chart (IB-105); its own target is in its component. */
 @media (max-width: 767px) {
   .group button { min-height: 40px; min-width: 40px; }
 }

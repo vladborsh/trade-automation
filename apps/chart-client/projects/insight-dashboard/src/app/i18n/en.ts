@@ -193,7 +193,6 @@ export const en: Strings = {
   'instrument.loadingEarlier': 'Loading earlier history…',
   'instrument.focus.marker': 'the moment from the link',
   'instrument.focus.periodStart': 'period start',
-  'instrument.view': 'View',
   'instrument.legends.hide': 'Hide legend',
   'instrument.legends.show': 'Show legend',
   'ui.fullscreen.enter': 'Full screen',

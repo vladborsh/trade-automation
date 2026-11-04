@@ -138,3 +138,7 @@
 /* IB-099 item 2: the page's one switch hides every pane legend (the class is on the page's chart
    column, outside this component — hence :host-context). */
 :host-context(.legends-hidden) .pane-legend { display: none; }
+
+/* IB-105: the price legend starts right of the legend switch, which sits at the chart's corner
+   (6 px + its 20 px + 6 px); the panes below keep 8 px. */
+.pane-legend[data-pane='price'] { left: 32px; max-width: calc(100% - 120px); }
