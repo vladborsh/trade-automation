@@ -25,4 +25,14 @@ describe('sparkGeometry', () => {
   it('all zero: flat, no division by zero', () => {
     expect(sparkGeometry({ values: [0, 0], highlight: null }).bars.map((b) => b.height)).toEqual([0, 0]);
   });
+  it('range scale (a level): the series spans its own range above a visible floor', () => {
+    const g = sparkGeometry({ values: [296.0, 296.5, 298.0], highlight: 2 }, 'range');
+    expect(g.zero).toBeNull();
+    expect(g.bars.map((b) => Math.round(b.height))).toEqual([20, 40, 100]);
+    expect(g.bars.map((b) => Math.round(b.top))).toEqual([80, 60, 0]);
+    expect(sparkGeometry({ values: [5, 5], highlight: null }, 'range').bars.map((b) => b.height)).toEqual([100, 100]);
+  });
+  it('range scale never applies to a signed series: zero stays meaningful', () => {
+    expect(sparkGeometry({ values: [3, -1], highlight: null }, 'range').zero).toBe(75);
+  });
 });

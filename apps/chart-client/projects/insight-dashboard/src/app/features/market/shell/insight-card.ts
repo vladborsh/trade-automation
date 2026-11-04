@@ -3,6 +3,7 @@ import { venueName } from '@trade-automation/contracts';
 import type { StringKey } from '../../../i18n/keys';
 import { formatUsd } from '../../liquidations/liquidations.format';
 import { fundingPct, insightView, signedPct, type InsightView } from './market-text';
+import type { SparkScale } from './spark-bars';
 
 /**
  * IB-107 (market-page design §7.3, §7.4, D20) — one «Главное сейчас» card, pure and spec'd: the topic
@@ -29,6 +30,7 @@ export interface CardView {
   figures: string[];
   explanation: Phrase[];
   spark: WebInsightSpark | null;
+  sparkScale: SparkScale;
   link: { label: Phrase; target: InsightView['link'] };
   basis: Phrase;
   basisTip: Phrase;
@@ -62,6 +64,10 @@ export function chipOf(s: Pick<WebInsightStatement, 'block' | 'params'>): CardVi
     tone: s.block === 'liquidations' && (side === 'long' || side === 'short') ? side : tone[s.block],
   };
 }
+
+/** §7.3's spark per rule: OI (R4), global L/S (R6), DVOL (R8) and stablecoin supply (R9) are levels. */
+const LEVEL_SERIES = new Set(['R4', 'R6', 'R8', 'R9']);
+export const sparkScaleOf = (ruleId: string): SparkScale => (LEVEL_SERIES.has(ruleId) ? 'range' : 'zero');
 
 /** The statements whose link time is the START of the period they measure (IB-BUG-023): their «when» is the window. */
 const PERIOD_START = new Set(['R4']);
@@ -231,6 +237,7 @@ export function cardView(s: WebInsightStatement, nowSec: number): CardView {
     when: whenOf(s, nowSec),
     ...wordingOf(s),
     spark: s.spark,
+    sparkScale: sparkScaleOf(s.ruleId),
     link: { label: linkLabel(s), target: insightView(s, nowSec).link },
     basis,
     basisTip: tip,

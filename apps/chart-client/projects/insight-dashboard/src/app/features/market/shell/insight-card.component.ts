@@ -30,7 +30,7 @@ export class InsightCardComponent {
   readonly explanation = computed(() => this.view().explanation.map((p) => this.word(p)).join(' '));
   readonly spark = computed(() => {
     const s = this.view().spark;
-    return s === null ? null : sparkGeometry(s);
+    return s === null ? null : sparkGeometry(s, this.view().sparkScale);
   });
 
   word(p: Phrase): string {

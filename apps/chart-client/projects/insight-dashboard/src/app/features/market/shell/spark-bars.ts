@@ -20,7 +20,29 @@ export interface SparkGeometry {
   zero: number | null;
 }
 
-export function sparkGeometry(spark: WebInsightSpark): SparkGeometry {
+/**
+ * How a series is scaled. `zero`: amounts and signed values (liquidation USD, funding, the premium) —
+ * a bar's height is its size, from zero. `range`: LEVELS (open interest, an L/S ratio, DVOL, total
+ * stablecoin supply) — drawn from zero they are a row of equal bars (a 0.3 % move on $296B), so the
+ * bars span the series' own range above a visible floor; the shape is the information, not the size.
+ */
+export type SparkScale = 'zero' | 'range';
+
+/** In `range` scale, the lowest value's bar: low, but visibly a bar. */
+export const RANGE_FLOOR_PCT = 20;
+
+export function sparkGeometry(spark: WebInsightSpark, scale: SparkScale = 'zero'): SparkGeometry {
+  if (scale === 'range' && spark.values.every((v) => v > 0)) {
+    const lo = Math.min(...spark.values);
+    const hi = Math.max(...spark.values);
+    return {
+      bars: spark.values.map((v, i) => {
+        const height = hi === lo ? 100 : RANGE_FLOOR_PCT + ((v - lo) / (hi - lo)) * (100 - RANGE_FLOOR_PCT);
+        return { top: 100 - height, height, lit: spark.highlight === i };
+      }),
+      zero: null,
+    };
+  }
   const max = Math.max(0, ...spark.values);
   const min = Math.min(0, ...spark.values);
   const range = max - min;
