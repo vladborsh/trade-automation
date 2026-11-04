@@ -46,6 +46,15 @@ const PERIOD = '5m';
  * These endpoints send no `X-MBX-USED-WEIGHT-1M` header (measured — see
  * `futures-data.client.ts`) and cost no weight, so this loop alone leaves
  * `ib_binance_weight_used_1m` at 0; the gauge reads what the `/fapi` traffic spends.
+ *
+ * **IB-109 (OI divergence design V3): the symbols are the universe ∪ the ENABLED `alert_symbols`**,
+ * re-read from the database at the start of every pass — not snapshotted at boot — so a coin added
+ * on the admin page is collected from the next pass, without a deploy. A coin seen for the first
+ * time with no fresh OI gets the same 30-day backfill the boot runs, for that one coin, queued so two
+ * backfills never run at once. A coin removed from the list is no longer polled; its rows stay.
+ * Cost: +5 requests per extra coin per pass (one per endpoint, weight 0) — TRX, the one listed coin
+ * outside the universe today, is +1 of 1000 per endpoint per 5 min — and one backfill of
+ * 5 × ⌈30 d / 500 slots⌉ = 90 paced requests when it first appears.
  */
 export const BACKFILL_PACING_MS = 120;
 
@@ -78,6 +87,13 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly client: FuturesDataClient;
   private timer: NodeJS.Timeout | null = null;
   private stopped = false;
+  /** IB-109: the symbols of the latest pass (universe ∪ listed), and those already backfilled or found fresh. */
+  private current: string[] = [];
+  private readonly seen = new Set<string>();
+  /** Set once the boot backfill has taken its list: before that, every symbol is the boot's to cover, not «new». */
+  private bootListed = false;
+  /** One per-symbol backfill at a time, in the order the symbols appeared. */
+  private backfillQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly config: AppConfigService,
@@ -115,8 +131,24 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** The active universe symbols, by their Binance USD-M symbol (§2.3). */
-  private symbols(): string[] {
+  private universe(): string[] {
     return this.config.symbols.map((s) => s.binance_perp);
+  }
+
+  /**
+   * IB-109 (V3): universe ∪ the enabled alert-list coins, read now. If the list cannot be read, the
+   * previous pass's list stands (a database hiccup must not stop collecting a listed coin).
+   */
+  async collectSymbols(): Promise<string[]> {
+    let listed: string[];
+    try {
+      listed = (await this.db.query<{ symbol: string }>('select symbol from alert_symbols where enabled order by symbol', [])).map((r) => r.symbol);
+    } catch (err) {
+      this.logger.warn(`OI/LS: alert_symbols unreadable, keeping the last list: ${(err as Error).message}`);
+      listed = this.current.filter((s) => !this.universe().includes(s));
+    }
+    this.current = [...new Set([...this.universe(), ...listed])];
+    return this.current;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -151,8 +183,10 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     const oiRows: OpenInterestRow[] = [];
     const lsRows: LongShortRow[] = [];
     const failed: string[] = [];
+    const symbols = await this.collectSymbols();
+    this.queueBackfillForNew(symbols, at);
 
-    for (const symbol of this.symbols()) {
+    for (const symbol of symbols) {
       try {
         const oi = await this.client.fetchPage<OpenInterestHistRow>({
           endpoint: 'openInterestHist', symbol, period: PERIOD, limit: POLL_LIMIT,
@@ -202,7 +236,46 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     // DEFAULT partition), and is how this was caught on the first live run.
     await this.partitions.ensureRange(new Date(from), new Date(now));
 
-    const stale = await this.staleSymbols(now);
+    const symbols = await this.collectSymbols();
+    symbols.forEach((s) => this.seen.add(s)); // the boot backfill covers every symbol it can see now
+    this.bootListed = true;
+    const stale = await this.staleSymbols(now, symbols);
+    const done = await this.backfillSymbols(stale, from, now);
+    // IB-BUG-020: every open window of the stream, not the last symbol's count. IB-104: split by
+    // whose fault it is (`gap-classifier.ts`), so the venue's closed sessions do not paint the row.
+    const split = splitOpen(await this.openWindows(from), this.current.length - 1);
+    this.streams.setGapsOpen(STREAM_ID, split.ours, split.venue);
+
+    this.logger.log(`OI/LS backfill: ${stale.length} symbol(s), ${done.oi} OI rows, ${done.longShort} long/short rows.`);
+    return { symbols: stale.length, oi: done.oi, longShort: done.longShort };
+  }
+
+  /**
+   * IB-109 (V3): a symbol this pass sees for the first time gets the boot's 30-day backfill if its OI
+   * is stale or absent — queued behind any running one, fire-and-forget, so the pass itself is not
+   * held up by 90 paced requests. Returns the queue's tail, for the specs.
+   */
+  queueBackfillForNew(symbols: readonly string[], now: number): Promise<unknown> {
+    // a pass that lands before the boot backfill has listed its symbols must not backfill them a second time
+    if (!this.bootListed) return this.backfillQueue;
+    const fresh = symbols.filter((s) => !this.seen.has(s));
+    if (fresh.length === 0) return this.backfillQueue;
+    fresh.forEach((s) => this.seen.add(s));
+    this.backfillQueue = this.backfillQueue.then(async () => {
+      const from = now - RETENTION_MS + SLOT_MS;
+      await this.partitions.ensureRange(new Date(from), new Date(now));
+      const stale = await this.staleSymbols(now, fresh);
+      const started = Date.now();
+      const done = await this.backfillSymbols(stale, from, now);
+      if (stale.length > 0) {
+        this.logger.log(`OI/LS backfill for newly listed ${stale.join(', ')}: ${done.oi} OI rows, ${done.longShort} long/short rows in ${Math.round((Date.now() - started) / 100) / 10} s.`);
+      }
+    }).catch((err) => this.logger.error(`OI/LS backfill for ${fresh.join(', ')} failed: ${(err as Error).message}`));
+    return this.backfillQueue;
+  }
+
+  /** The per-symbol 30-day walk, shared by the boot and by a newly listed coin. */
+  private async backfillSymbols(stale: readonly string[], from: number, now: number): Promise<{ oi: number; longShort: number }> {
     let oi = 0;
     let longShort = 0;
 
@@ -229,30 +302,27 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
       const stored = await this.storedSlots(symbol, from, now);
       await this.recordMissing(symbol, from, now, stored);
     }
-    // IB-BUG-020: every open window of the stream, not the last symbol's count. IB-104: split by
-    // whose fault it is (`gap-classifier.ts`), so the venue's closed sessions do not paint the row.
-    const split = splitOpen(await this.openWindows(from), this.symbols().length - 1);
-    this.streams.setGapsOpen(STREAM_ID, split.ours, split.venue);
-
-    this.logger.log(`OI/LS backfill: ${stale.length} symbol(s), ${oi} OI rows, ${longShort} long/short rows.`);
-    return { symbols: stale.length, oi, longShort };
+    return { oi, longShort };
   }
 
   private async pace(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, BACKFILL_PACING_MS));
   }
 
-  /** Symbols whose newest stored OI slot is older than one slot, or which have none at all. */
-  private async staleSymbols(now: number): Promise<string[]> {
+  /**
+   * Of `symbols`, those whose newest stored OI slot is older than one slot, or which have none at all.
+   * IB-109: over the list it is given (universe ∪ listed), not the universe table — a listed coin is
+   * not in `symbols`.
+   */
+  private async staleSymbols(now: number, symbols: readonly string[]): Promise<string[]> {
     const rows = await this.db.query<{ symbol: string; last: Date | null }>(
-      `select s.binance_perp as symbol, max(o.ts) as last
-         from symbols s left join open_interest_5m o on o.symbol = s.binance_perp and o.venue = $1
-        where s.active
-        group by s.binance_perp`,
-      [VENUE],
+      `select s.sym as symbol, max(o.ts) as last
+         from unnest($2::text[]) as s(sym) left join open_interest_5m o on o.symbol = s.sym and o.venue = $1
+        group by s.sym`,
+      [VENUE, [...symbols]],
     );
     const cutoff = now - SLOT_MS;
-    return rows.filter((row) => row.last === null || row.last.getTime() < cutoff).map((row) => row.symbol);
+    return rows.filter((row) => symbols.includes(row.symbol) && (row.last === null || row.last.getTime() < cutoff)).map((row) => row.symbol);
   }
 
   private async storedSlots(symbol: string, from: number, to: number): Promise<Date[]> {
@@ -321,7 +391,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
                     where o.venue = $3 and o.ts = s.slot and o.symbol = any($4) and o.symbol <> s.symbol)) as min_neighbours
          from slots s
         group by s.symbol, s.gap_from, s.gap_to, s.error`,
-      [STREAM_ID, new Date(from), VENUE, this.symbols()],
+      [STREAM_ID, new Date(from), VENUE, this.current],
     );
     return rows.map((r) => ({ error: r.error, minNeighboursStored: Number(r.min_neighbours) }));
   }

@@ -373,3 +373,92 @@ describe('OiLsPoller.backfill — the trailing edge (IB-BUG-020)', () => {
     expect(gaps[0].gapTo.getTime()).toBe(SLOT_TS - POLL_LIMIT * SLOT);
   });
 });
+
+/**
+ * IB-109 (OI divergence design V3) — the poller collects universe ∪ the enabled `alert_symbols`,
+ * read at the start of every pass: a coin added between passes is polled in the next one and gets
+ * the 30-day backfill once; a removed coin stops; an unreadable list keeps the last one.
+ */
+class ListDb extends FakeDb {
+  listed: string[] = [];
+  failList = false;
+  constructor(last: Record<string, Date | null>) {
+    super(last);
+  }
+  override async query<T>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
+    if (sql.includes('from alert_symbols')) {
+      if (this.failList) throw new Error('relation "alert_symbols" is locked');
+      return this.listed.map((symbol) => ({ symbol })) as T[];
+    }
+    return super.query<T>(sql, params);
+  }
+}
+
+describe('OiLsPoller — universe ∪ alert list, without a deploy (IB-109)', () => {
+  const now = SLOT_TS + 20_000;
+  const polled = (asked: Array<{ symbol: string; limit?: number }>) => [...new Set(asked.filter((a) => a.limit === POLL_LIMIT).map((a) => a.symbol))];
+  const backfilled = (asked: Array<{ symbol: string; limit?: number }>) => [...new Set(asked.filter((a) => a.limit === undefined).map((a) => a.symbol))];
+
+  it('a coin added between passes is polled in the next pass and backfilled once; removed, it stops', async () => {
+    const db = new ListDb({ BTCUSDT: new Date(now - 60_000), TRXUSDT: null });
+    const { poller, asked } = build({ symbols: ['BTCUSDT'], db });
+    await poller.backfill(now); // boot: BTC fresh, nothing listed
+    await poller.pollOnce(now);
+    expect(polled(asked)).toEqual(['BTCUSDT']);
+    expect(backfilled(asked)).toEqual([]);
+
+    db.listed = ['TRXUSDT']; // the admin adds TRX
+    asked.length = 0;
+    await poller.pollOnce(now + SLOT);
+    await poller.queueBackfillForNew([], now + SLOT); // the backfill runs queued, after the pass: wait for it
+    expect(polled(asked)).toEqual(['BTCUSDT', 'TRXUSDT']);
+    expect(asked.filter((a) => a.symbol === 'TRXUSDT' && a.limit === POLL_LIMIT)).toHaveLength(5); // one per endpoint
+    expect(backfilled(asked)).toEqual(['TRXUSDT']);
+    expect(asked.filter((a) => a.symbol === 'TRXUSDT' && a.limit === undefined)).toHaveLength(5); // all five series walked
+
+    asked.length = 0;
+    await poller.pollOnce(now + 2 * SLOT); // still listed: polled, NOT backfilled again
+    await poller.queueBackfillForNew([], now + 2 * SLOT);
+    expect(polled(asked)).toEqual(['BTCUSDT', 'TRXUSDT']);
+    expect(backfilled(asked)).toEqual([]);
+
+    db.listed = []; // removed (or disabled — the query reads `where enabled`)
+    asked.length = 0;
+    await poller.pollOnce(now + 3 * SLOT);
+    expect(polled(asked)).toEqual(['BTCUSDT']);
+  });
+
+  it('a listed coin that already has fresh OI (a universe coin, or one collected before) is not backfilled', async () => {
+    // ETH's newest row is a minute before the pass that sees it listed: fresh by then
+    const db = new ListDb({ BTCUSDT: new Date(now - 60_000), ETHUSDT: new Date(now + SLOT - 60_000) });
+    const { poller, asked } = build({ symbols: ['BTCUSDT'], db });
+    await poller.backfill(now);
+    db.listed = ['ETHUSDT'];
+    asked.length = 0;
+    await poller.pollOnce(now + SLOT);
+    await poller.queueBackfillForNew([], now + SLOT);
+    expect(polled(asked)).toEqual(['BTCUSDT', 'ETHUSDT']);
+    expect(backfilled(asked)).toEqual([]);
+  });
+
+  it('a pass before the boot backfill has listed its symbols backfills nothing (the boot covers them)', async () => {
+    const db = new ListDb({ BTCUSDT: null });
+    db.listed = ['TRXUSDT'];
+    const { poller, asked } = build({ symbols: ['BTCUSDT'], db });
+    await poller.pollOnce(now);
+    await poller.queueBackfillForNew([], now);
+    expect(polled(asked)).toEqual(['BTCUSDT', 'TRXUSDT']);
+    expect(backfilled(asked)).toEqual([]);
+  });
+
+  it('an unreadable alert list keeps the last one: a database hiccup does not stop a listed coin', async () => {
+    const db = new ListDb({ BTCUSDT: new Date(now - 60_000), TRXUSDT: new Date(now - 60_000) });
+    db.listed = ['TRXUSDT'];
+    const { poller, asked } = build({ symbols: ['BTCUSDT'], db });
+    await poller.pollOnce(now);
+    db.failList = true;
+    asked.length = 0;
+    await poller.pollOnce(now + SLOT);
+    expect(polled(asked)).toEqual(['BTCUSDT', 'TRXUSDT']);
+  });
+});
