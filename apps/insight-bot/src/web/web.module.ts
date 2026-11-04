@@ -15,7 +15,9 @@ import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
 import { WebMembersController } from './members/members.controller';
 import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
-import { PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
+import { PgOiAlertStore, PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
+import { AlertsAdmin, cachedExchangeInfo } from '../alerts/oi-divergence/alerts-admin';
+import { ALERTS_ADMIN, WebAlertsAdminController } from './admin/alerts.controller';
 import { UsersModule } from '../users/users.module';
 import { AssetClassifier } from './liquidations/asset-classes';
 import { WebContextController } from './context/context.controller';
@@ -83,6 +85,8 @@ export class WebModule {
         CalendarController, WebPushController, WebMarketController,
         // IB-035: the admin's members page and a member's own settings
         WebMembersController, WebMeSettingsController,
+        // IB-112: the OI divergence alerts admin page
+        WebAlertsAdminController,
       ],
       providers: [
         WebAuthService,
@@ -216,6 +220,22 @@ export class WebModule {
                 flows: (period) => flows.flows(period),
               },
             }),
+        },
+        {
+          // IB-112 (V17): the alerts admin page; adding a coin checks Binance exchangeInfo (cached 10 min, weight 1)
+          provide: ALERTS_ADMIN,
+          inject: [DB, AppConfigService, BinanceWeightTracker],
+          useFactory: (db: Db | null, config: AppConfigService, weight: BinanceWeightTracker) => {
+            if (!db) return null;
+            const url = `${String(config.env.get('BINANCE_FUTURES_REST_BASE_URL')).replace(/\/+$/, '')}/fapi/v1/exchangeInfo`;
+            return new AlertsAdmin(new PgOiAlertStore(db), cachedExchangeInfo(async () => {
+              const response = await fetch(url);
+              const header = response.headers.get('x-mbx-used-weight-1m');
+              if (header === null) weight.recordCall(1); else weight.recordHeader(Number(header));
+              if (!response.ok) throw new Error(`exchangeInfo HTTP ${response.status}`);
+              return response.json();
+            }));
+          },
         },
         {
           // IB-112 (V13): /me/settings shows members the OI alerts toggle only while members_visible is on
