@@ -97,6 +97,19 @@ test.describe('instrument page — phone 390×844 (IB-099)', () => {
   });
 });
 
+test.describe('the top-50 table prints amounts without float noise (IB-BUG-024)', () => {
+  test.use({ viewport: { width: 1440, height: 1000 } });
+
+  test('OKX quantities recorded as 0.6715000000000001 and 0.27090000000000003 read 0.6715 and 0.2709', async ({ page }) => {
+    await open(page);
+    const cells = page.locator('table.top td.num');
+    await expect(cells.first()).toBeVisible();
+    const texts = await cells.allTextContents();
+    expect(texts.map((x) => x.trim())).toEqual(expect.arrayContaining(['0.6715', '0.2709']));
+    expect(texts.filter((x) => /\d\.\d{9,}/.test(x))).toEqual([]);
+  });
+});
+
 test.describe('an R4 statement opens the whole period (IB-BUG-023)', () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
 

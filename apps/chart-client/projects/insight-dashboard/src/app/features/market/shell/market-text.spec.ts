@@ -77,7 +77,8 @@ describe('insightView', () => {
     expect(v.params).toMatchObject({ usd: '$3.1M', count: 4, minutes: 9, symbol: 'ETHUSDT' });
     expect(v.nested['side']).toBe('insight.side.short');
     expect(v.link).toEqual({ commands: ['/instrument', 'ETHUSDT'], queryParams: { at: 1_793_712_533 } });
-    expect(v.basis.params).toMatchObject({ window: '24h', venues: 'binance+bybit+okx', sample: 720, observed: 690, from: '2026-10-04' });
+    expect(v.basis.params).toMatchObject({ venues: 'binance+bybit+okx', sample: 720, observed: 690, from: '2026-10-04' });
+    expect(v.basis.nested).toEqual({ window: 'market.period.24h' }); // IB-BUG-024: a word, translated
   });
 
   it('a block anchor stays an anchor; no basis is said in words', () => {
@@ -142,6 +143,18 @@ describe('insight links (IB-BUG-023)', () => {
   it('a moment (R3) stays a moment; no time stays no query', () => {
     expect(insightView(st('R3', 1_793_670_000), 1_793_756_400).link).toEqual({ commands: ['/instrument', 'TRUMPUSDT'], queryParams: { at: 1_793_670_000 } });
     expect(insightView(st('R4', null), 1_793_756_400).link).toEqual({ commands: ['/instrument', 'TRUMPUSDT'], queryParams: null });
+  });
+});
+
+describe('the basis line says the period as a word (IB-BUG-024)', () => {
+  const fill = (dict: Record<string, string>) => (key: string, params: Record<string, string | number> = {}) =>
+    (dict[key] ?? key).replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
+  const b = { window: '24h' as const, venues: ['binance'], sampleWindows: 697, observedWindows: 697, from: 1_791_157_260 };
+  it('ru «за 24ч», en «over 24h»-style label — never the bare code next to Russian words', () => {
+    const ruLine = wordInsight(basisView(b, 0), fill(ru as Record<string, string>) as never);
+    expect(ruLine.startsWith(`за ${ru['market.period.24h']} ·`)).toBe(true);
+    expect(ruLine).not.toContain('24h');
+    expect(wordInsight(basisView({ ...b, window: '1h' }, 0), fill(ru as Record<string, string>) as never)).toContain(`за ${ru['market.period.1h']}`);
   });
 });
 

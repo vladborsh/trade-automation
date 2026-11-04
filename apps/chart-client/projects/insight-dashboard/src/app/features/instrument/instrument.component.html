@@ -74,8 +74,8 @@
             <td [class.long]="row.side === 'long'" [class.short]="row.side === 'short'">
               {{ row.side }}
             </td>
-            <td class="num">{{ row.price }}</td>
-            <td class="num">{{ row.qty }}</td>
+            <td class="num">{{ row.price | amount }}</td>
+            <td class="num">{{ row.qty | amount }}</td>
             <td class="num">{{ row.notional | number: '1.0-0' }}</td>
           </tr>
         } @empty {

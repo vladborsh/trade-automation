@@ -37,6 +37,6 @@ export class BlockConclusionComponent {
     const v = this.view();
     if (!v) return null;
     const b = v.kind === 'statement' ? v.view.basis : v.basis;
-    return b === null ? null : this.t(b.key, b.params);
+    return b === null ? null : wordInsight(b, this.t);
   }
 }

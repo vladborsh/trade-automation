@@ -3,7 +3,7 @@ import type { WebInsightsResponse, WebMarketPeriod } from '@trade-automation/con
 import { RouterLink } from '@angular/router';
 import { I18nService } from '../../../i18n/i18n.service';
 import type { StringKey } from '../../../i18n/keys';
-import { basisView, insightView, neutralLine, wordInsight, type InsightView } from './market-text';
+import { basisView, insightView, neutralLine, wordInsight, type BasisView, type InsightView } from './market-text';
 
 /**
  * IB-088 (D1–D4) — «Главное сейчас»: 3–5 cards, each a sentence worded HERE from the server's key and
@@ -47,8 +47,8 @@ export class InsightsBlockComponent {
     return wordInsight(v, this.t);
   }
 
-  basisText(b: { key: StringKey; params: Record<string, string | number> }): string {
-    return this.t(b.key, b.params);
+  basisText(b: BasisView): string {
+    return wordInsight(b, this.t);
   }
 
   periodLabel(): string {

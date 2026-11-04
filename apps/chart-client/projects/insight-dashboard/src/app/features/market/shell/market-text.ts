@@ -106,7 +106,7 @@ export interface InsightView {
   params: Record<string, string | number>;
   /** Keys whose translation goes INTO a param (a side, a quadrant, a band) — resolved by the caller. */
   nested: Record<string, StringKey>;
-  basis: { key: StringKey; params: Record<string, string | number> };
+  basis: BasisView;
   link: { commands: string[]; queryParams: Record<string, number | string> | null } | { anchor: string };
 }
 
@@ -150,12 +150,23 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
 }
 
 /** D3's basis line: «за 24ч · binance+bybit+okx · выборка 30 (22 с данными) · с 2026-10-04». */
-export function basisView(b: WebInsightBasis | null, _nowSec: number): { key: StringKey; params: Record<string, string | number> } {
-  if (!b) return { key: 'insight.basis.none', params: {} };
+/**
+ * A basis line, worded by `wordInsight`. IB-BUG-024: the period is a WORD here («за 24ч»), not an
+ * identifier, so it goes through the period labels as a nested key — it used to print the code
+ * («за 24h») while the rest of the page said «24ч».
+ */
+export interface BasisView {
+  key: StringKey;
+  params: Record<string, string | number>;
+  nested: Record<string, StringKey>;
+}
+
+export function basisView(b: WebInsightBasis | null, _nowSec: number): BasisView {
+  if (!b) return { key: 'insight.basis.none', params: {}, nested: {} };
   return {
     key: 'insight.basis',
+    nested: { window: `market.period.${b.window}` as StringKey },
     params: {
-      window: b.window,
       venues: b.venues.join('+'),
       sample: b.sampleWindows,
       observed: b.observedWindows,
@@ -173,7 +184,7 @@ export function wordInsight(v: Pick<InsightView, 'key' | 'params' | 'nested'>, t
 
 export type ConclusionView =
   | { kind: 'statement'; view: InsightView }
-  | { kind: 'neutral'; key: StringKey; basis: { key: StringKey; params: Record<string, string | number> } | null };
+  | { kind: 'neutral'; key: StringKey; basis: BasisView | null };
 
 /**
  * D15 — a block's one conclusion line: its best statement, or the neutral line with the REASON
