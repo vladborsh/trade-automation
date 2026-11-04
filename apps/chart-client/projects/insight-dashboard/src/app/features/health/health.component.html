@@ -15,36 +15,38 @@
     @if (degraded().length > 0) {
       <p class="warn">{{ t('health.streamsDegraded', { count: degraded().length }) }}</p>
     }
-    <table>
-      <thead>
-        <tr>
-          <th>{{ t('health.col.stream') }}</th>
-          <th>{{ t('health.col.venue') }}</th>
-          <th>{{ t('health.col.mode') }}</th>
-          <th>{{ t('health.col.lastMessage') }}</th>
-          <th>{{ t('health.col.reconnects') }}</th>
-          <th>{{ t('health.col.openGaps') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (s of streams()?.streams ?? []; track s.id) {
+    <div class="scroll">
+      <table>
+        <thead>
           <tr>
-            <td>{{ s.id }}</td>
-            <td>{{ s.venue }}</td>
-            <td [class.degraded]="s.mode === 'degraded'">{{ s.mode }}@if (s.reason) {<span class="muted">&nbsp;({{ s.reason }})</span>}</td>
-            <td>{{ age(s.lastMessageAgeSec) }}</td>
-            <td>{{ s.reconnects24h }}</td>
-            @let gaps = gapCell(s);
-            <td [class.warn]="gaps.warn">
-              {{ gaps.ours }}
-              @if (gaps.venueNote; as note) {
-                <span class="muted venue-gaps" [title]="t('health.gapsVenueHint')">{{ t(note.key, note.params) }}</span>
-              }
-            </td>
+            <th>{{ t('health.col.stream') }}</th>
+            <th>{{ t('health.col.venue') }}</th>
+            <th>{{ t('health.col.mode') }}</th>
+            <th>{{ t('health.col.lastMessage') }}</th>
+            <th>{{ t('health.col.reconnects') }}</th>
+            <th>{{ t('health.col.openGaps') }}</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (s of streams()?.streams ?? []; track s.id) {
+            <tr>
+              <td>{{ s.id }}</td>
+              <td>{{ s.venue }}</td>
+              <td [class.degraded]="s.mode === 'degraded'">{{ s.mode }}@if (s.reason) {<span class="muted">&nbsp;({{ s.reason }})</span>}</td>
+              <td>{{ age(s.lastMessageAgeSec) }}</td>
+              <td>{{ s.reconnects24h }}</td>
+              @let gaps = gapCell(s);
+              <td [class.warn]="gaps.warn">
+                {{ gaps.ours }}
+                @if (gaps.venueNote; as note) {
+                  <span class="muted venue-gaps" [title]="t('health.gapsVenueHint')">{{ t(note.key, note.params) }}</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
     <p class="muted">{{ t('health.openGapsTotal', { count: openGaps() }) }}</p>
   </section>
 
@@ -66,48 +68,50 @@
     @if (uptimeMissing()) {
       <p class="warn">{{ t('health.uptime.missing') }}</p>
     }
-    <table>
-      <thead>
-        <tr>
-          <th>{{ t('health.col.stream') }}</th>
-          <th>{{ t('health.col.venue') }}</th>
-          <th>{{ t('health.uptime.col.lastRow') }}</th>
-          <th>{{ t('health.uptime.col.lastSeen') }}</th>
-          <th>{{ t('health.uptime.col.day') }}</th>
-          <th>{{ t('health.uptime.col.week') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (u of uptime(); track u.stream) {
+    <div class="scroll">
+      <table>
+        <thead>
           <tr>
-            <td>{{ u.stream }}</td>
-            <td>{{ u.venue }}</td>
-            <td>{{ since(u.lastRowAt) }}</td>
-            <td>
-              @if (u.instrumented) {
-                {{ since(u.lastSeen) }}
-              } @else {
-                <span class="warn">{{ t('health.uptime.notInstrumented') }}</span>
-              }
-            </td>
-            @for (hours of [24, 168]; track hours) {
-              @if (windowOf(u, hours); as w) {
-                <td [class]="stateClass(w.state)" [title]="t('health.uptime.coverage', { covered: w.coveredHours, elapsed: w.elapsedHours, outages: w.outages, rows: w.rows })">
-                  {{ t(stateKey(w.state)) }}
-                  @if (isPartial(w)) {
-                    <span class="missing">{{ t('health.uptime.partial', { covered: w.coveredHours, elapsed: w.elapsedHours }) }}</span>
-                  }
-                </td>
-              } @else {
-                <td class="muted">—</td>
-              }
-            }
+            <th>{{ t('health.col.stream') }}</th>
+            <th>{{ t('health.col.venue') }}</th>
+            <th>{{ t('health.uptime.col.lastRow') }}</th>
+            <th>{{ t('health.uptime.col.lastSeen') }}</th>
+            <th>{{ t('health.uptime.col.day') }}</th>
+            <th>{{ t('health.uptime.col.week') }}</th>
           </tr>
-        } @empty {
-          <tr><td colspan="6" class="muted">{{ t('health.uptime.none') }}</td></tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (u of uptime(); track u.stream) {
+            <tr>
+              <td>{{ u.stream }}</td>
+              <td>{{ u.venue }}</td>
+              <td>{{ since(u.lastRowAt) }}</td>
+              <td>
+                @if (u.instrumented) {
+                  {{ since(u.lastSeen) }}
+                } @else {
+                  <span class="warn">{{ t('health.uptime.notInstrumented') }}</span>
+                }
+              </td>
+              @for (hours of [24, 168]; track hours) {
+                @if (windowOf(u, hours); as w) {
+                  <td [class]="stateClass(w.state)" [title]="t('health.uptime.coverage', { covered: w.coveredHours, elapsed: w.elapsedHours, outages: w.outages, rows: w.rows })">
+                    {{ t(stateKey(w.state)) }}
+                    @if (isPartial(w)) {
+                      <span class="missing">{{ t('health.uptime.partial', { covered: w.coveredHours, elapsed: w.elapsedHours }) }}</span>
+                    }
+                  </td>
+                } @else {
+                  <td class="muted">—</td>
+                }
+              }
+            </tr>
+          } @empty {
+            <tr><td colspan="6" class="muted">{{ t('health.uptime.none') }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
     <p class="muted">{{ t('health.uptime.hint') }}</p>
   </section>
 

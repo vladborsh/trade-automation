@@ -18,6 +18,9 @@ button {
 
 button:disabled { color: var(--muted); cursor: default; }
 
+// IB-BUG-034: at phone width a table scrolls in its own box, the page does not (as admin-members/logins)
+.scroll { overflow-x: auto; max-width: 100%; }
+
 table { border-collapse: collapse; }
 th, td { padding: 2px 10px 2px 0; text-align: left; font-weight: normal; }
 th { color: var(--muted); }

@@ -1,0 +1,143 @@
+{
+ "streams": [
+  {
+   "id": "binance-perp:oi-ls-5m",
+   "venue": "binance",
+   "mode": "ws",
+   "reason": null,
+   "lastMessageAgeSec": null,
+   "reconnects24h": 0,
+   "gapsOpen": 0,
+   "gapsVenue": 0
+  },
+  {
+   "id": "calendar/forexfactory",
+   "venue": "forexfactory",
+   "mode": "ws",
+   "reason": null,
+   "lastMessageAgeSec": 48454,
+   "reconnects24h": 0,
+   "gapsOpen": 0,
+   "gapsVenue": 0
+  },
+  {
+   "id": "binance-perp:forceOrder",
+   "venue": "binance",
+   "mode": "ws",
+   "reason": null,
+   "lastMessageAgeSec": null,
+   "reconnects24h": 0,
+   "gapsOpen": 0,
+   "gapsVenue": 0
+  },
+  {
+   "id": "bybit:allLiquidation",
+   "venue": "bybit",
+   "mode": "ws",
+   "reason": null,
+   "lastMessageAgeSec": null,
+   "reconnects24h": 0,
+   "gapsOpen": 0,
+   "gapsVenue": 0
+  },
+  {
+   "id": "okx:liquidation-orders",
+   "venue": "okx",
+   "mode": "ws",
+   "reason": null,
+   "lastMessageAgeSec": null,
+   "reconnects24h": 0,
+   "gapsOpen": 0,
+   "gapsVenue": 0
+  }
+ ],
+ "weights": [
+  {
+   "market": "futures",
+   "used1m": 0,
+   "budget1m": 2400
+  },
+  {
+   "market": "spot",
+   "used1m": 0,
+   "budget1m": 6000
+  }
+ ],
+ "liquidationUptime": [
+  {
+   "stream": "binance:forceOrder",
+   "venue": "binance",
+   "instrumented": true,
+   "lastRowAt": 1793806555101,
+   "lastSeen": 1793806708412,
+   "windows": [
+    {
+     "hours": 24,
+     "state": "recorded",
+     "coveredHours": 13.1,
+     "elapsedHours": 24,
+     "outages": 22,
+     "rows": 8026
+    },
+    {
+     "hours": 168,
+     "state": "recorded",
+     "coveredHours": 14.4,
+     "elapsedHours": 168,
+     "outages": 25,
+     "rows": 10896
+    }
+   ]
+  },
+  {
+   "stream": "bybit:allLiquidation",
+   "venue": "bybit",
+   "instrumented": true,
+   "lastRowAt": 1793806069747,
+   "lastSeen": 1793806708412,
+   "windows": [
+    {
+     "hours": 24,
+     "state": "recorded",
+     "coveredHours": 6.4,
+     "elapsedHours": 24,
+     "outages": 24,
+     "rows": 2389
+    },
+    {
+     "hours": 168,
+     "state": "recorded",
+     "coveredHours": 7.7,
+     "elapsedHours": 168,
+     "outages": 27,
+     "rows": 2881
+    }
+   ]
+  },
+  {
+   "stream": "okx:liquidation-orders",
+   "venue": "okx",
+   "instrumented": true,
+   "lastRowAt": 1793805774706,
+   "lastSeen": 1793806708412,
+   "windows": [
+    {
+     "hours": 24,
+     "state": "recorded",
+     "coveredHours": 6.4,
+     "elapsedHours": 24,
+     "outages": 24,
+     "rows": 1169
+    },
+    {
+     "hours": 168,
+     "state": "recorded",
+     "coveredHours": 7.7,
+     "elapsedHours": 168,
+     "outages": 27,
+     "rows": 1706
+    }
+   ]
+  }
+ ]
+}

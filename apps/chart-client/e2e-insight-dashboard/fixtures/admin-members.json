@@ -1,0 +1,14 @@
+{
+ "members": [
+  {
+   "id": 1,
+   "tgUserId": 111,
+   "login": "owner",
+   "role": "admin",
+   "disabled": false,
+   "createdAt": 1793712159737,
+   "lastLoginAt": 1793806710420,
+   "activeSessions": 60
+  }
+ ]
+}
