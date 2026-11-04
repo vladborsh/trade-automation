@@ -29,3 +29,5 @@ export * from './market';
 export * from './market-positioning';
 // IB-086 — «Главное сейчас»: rule-based statements (design D1–D5, D15).
 export * from './market-insights';
+// IB-035 — the admin's members page and a member's own settings (lang, calendar reminders).
+export * from './members';
