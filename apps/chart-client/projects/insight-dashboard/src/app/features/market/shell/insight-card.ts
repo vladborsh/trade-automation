@@ -247,7 +247,8 @@ export function cardView(s: WebInsightStatement, nowSec: number): CardView {
 
 /**
  * D23: the title's figures in the number face — the worded title split into text and figure runs.
- * A figure that does not occur in the text (a translation that rewrites it) simply stays text.
+ * A figure that does not occur in the text (a translation that rewrites it) simply stays text; a
+ * figure's « %» unit is a text run of its own (the digits are the number, the unit is not).
  */
 export function figureRuns(text: string, figures: readonly string[]): { text: string; num: boolean }[] {
   const wanted = [...new Set(figures.filter((f) => f.length > 0))].sort((a, b) => b.length - a.length);
@@ -261,7 +262,10 @@ export function figureRuns(text: string, figures: readonly string[]): { text: st
       break;
     }
     if (hit.at > 0) out.push({ text: rest.slice(0, hit.at), num: false });
-    out.push({ text: hit.f, num: true });
+    // TL 2026-11-04: the unit stays in the text face — in mono the space before «%» is a full cell
+    const unit = /\s%$/.exec(hit.f);
+    if (unit) out.push({ text: hit.f.slice(0, unit.index), num: true }, { text: unit[0], num: false });
+    else out.push({ text: hit.f, num: true });
     rest = rest.slice(hit.at + hit.f.length);
   }
   return out;

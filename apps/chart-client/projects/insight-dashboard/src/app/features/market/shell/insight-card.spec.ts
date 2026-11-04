@@ -57,9 +57,11 @@ describe('R2 liq_coin', () => {
 
 describe('R3 liq_cascade — the moment is the link and the «when»', () => {
   const r3 = (timeSec: number) => st({ ruleId: 'R3', block: 'liquidations', key: 'insight.liq_cascade', params: { side: 'long', count: 21, minutes: 9, usd: 14_400_000, symbol: 'BTCUSDT' }, link: { route: 'instrument', symbol: 'BTCUSDT', timeSec } });
-  it('«Каскад: 21 ликвидаций лонгов за 9 мин, всего $14M» → «Открыть BTC в 03:00 UTC»', () => {
+  it('«Каскад ликвидаций лонгов за 9 мин: 21, всего $14M» → «Открыть BTC в 03:00 UTC» (the count agrees with no noun: «3», «21» read right)', () => {
     const w = words(r3(TODAY_3AM));
-    expect(w.title).toBe('Каскад: 21 ликвидаций лонгов за 9 мин, всего $14M');
+    expect(w.title).toBe('Каскад ликвидаций лонгов за 9 мин: 21, всего $14M');
+    expect(words({ ...r3(TODAY_3AM), params: { ...r3(TODAY_3AM).params, count: 3 } }).title).toBe('Каскад ликвидаций лонгов за 9 мин: 3, всего $14M');
+    expect(words(r3(TODAY_3AM), 'en').title).toBe('Cascade of long liquidations in 9 min: 21, $14M in total');
     expect(w.expl).toContain('больше всего по BTC');
     expect(w.link).toBe('Открыть BTC в 03:00 UTC →');
     expect(w.when).toBe('сегодня 03:00 UTC');
@@ -198,6 +200,11 @@ describe('the parts every card shares', () => {
       { text: 'Выносит шорты: ', num: false }, { text: '$25M', num: true }, { text: ' за 4ч — ', num: false }, { text: '5×', num: true }, { text: ' обычного', num: false },
     ]);
     expect(figureRuns('no figures here', ['$1M'])).toEqual([{ text: 'no figures here', num: false }]);
+    // TL 2026-11-04: « %» stays in the text face — the digits are the figure
+    expect(figureRuns('BNB: открытый интерес −5.1 % при цене +2.5 %', ['−5.1 %', '+2.5 %'])).toEqual([
+      { text: 'BNB: открытый интерес ', num: false }, { text: '−5.1', num: true }, { text: ' %', num: false },
+      { text: ' при цене ', num: false }, { text: '+2.5', num: true }, { text: ' %', num: false },
+    ]);
   });
 });
 

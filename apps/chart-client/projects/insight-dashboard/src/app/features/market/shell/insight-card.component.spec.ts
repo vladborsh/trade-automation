@@ -31,7 +31,7 @@ describe('InsightCardComponent (IB-107)', () => {
     expect(el.querySelector('.card')?.classList).toContain('tone-long');
     expect(text('.chip')).toBe('Ликвидации');
     expect(text('.when')).toBe('сегодня 03:00 UTC');
-    expect(text('.title')).toBe('Каскад: 21 ликвидаций лонгов за 9 мин, всего $14M');
+    expect(text('.title')).toBe('Каскад ликвидаций лонгов за 9 мин: 21, всего $14M');
     expect([...el.querySelectorAll('.title .num')].map((n) => n.textContent)).toEqual(['21', '$14M']);
     const bars = [...el.querySelectorAll('.spark .bar')];
     expect(bars).toHaveLength(4);
@@ -49,9 +49,17 @@ describe('InsightCardComponent (IB-107)', () => {
     expect(el.querySelector('.title')?.textContent).toBe('Опционы BTC подорожали: ожидаемая волатильность 52 (+6.1)');
   });
 
+  it('a percentage in the title: digits in .num, « %» outside it in the text face (TL 2026-11-04)', () => {
+    const r4: WebInsightStatement = { ...r3, ruleId: 'R4', block: 'positioning', key: 'insight.oi_vs_price', params: { symbol: 'BNBUSDT', quadrant: 'short_closing', oiPct: -5.1, pricePct: 2.5 }, link: { route: 'instrument', symbol: 'BNBUSDT', timeSec: NOW - 86_400 }, spark: null };
+    const title = render(r4, 'ru').querySelector('.title') as HTMLElement;
+    expect([...title.querySelectorAll('.num')].map((n) => n.textContent)).toEqual(['−5.1', '+2.5']);
+    expect(title.textContent).toBe('BNB: открытый интерес −5.1 % при цене +2.5 %');
+    expect([...title.querySelectorAll('.num')].some((n) => n.textContent?.includes('%'))).toBe(false);
+  });
+
   it('no spark: no chart, the rest stands', () => {
     const el = render({ ...r3, spark: null }, 'en');
     expect(el.querySelector('.spark')).toBeNull();
-    expect(el.querySelector('.title')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Cascade: 21 long liquidations in 9 min, $14M in total');
+    expect(el.querySelector('.title')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Cascade of long liquidations in 9 min: 21, $14M in total');
   });
 });
