@@ -32,6 +32,7 @@ describe('App nav', () => {
     expect(hrefs).toContain('/market');
     expect(hrefs).not.toContain('/health');
     expect(hrefs).not.toContain('/admin/logins'); // IB-079: nor the login journal
+    expect(hrefs).not.toContain('/admin/alerts'); // IB-112: nor the alerts page
   });
 
   it('an admin also sees Health and (IB-079) the login journal', () => {
@@ -45,7 +46,7 @@ describe('IB-099: the admin pages say what they are', () => {
   it('grouped under an «admin» label, named by what they hold', () => {
     const root = render(true);
     const group = root.querySelector('nav .admin') as HTMLElement;
-    expect([...group.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/health', '/admin/logins', '/admin/members']); // IB-035: members
+    expect([...group.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/health', '/admin/logins', '/admin/members', '/admin/alerts']); // IB-035: members; IB-112: OI alerts
     expect(group.querySelector('.admin-label')?.textContent?.trim()).toBeTruthy();
   });
 

@@ -46,6 +46,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin-members/admin-members.component').then((m) => m.AdminMembersComponent),
   },
   {
+    // IB-112 (OI divergence design V17): the alerts page — admin only, IB-075's guard
+    path: 'admin/alerts',
+    canActivate: [adminGuard(LANDING_ROUTE)],
+    loadComponent: () => import('./features/admin-alerts/admin-alerts.component').then((m) => m.AdminAlertsComponent),
+  },
+  {
     // IB-075 (member-access design M8): the operator page is admin-only; a member lands on the market.
     path: 'health',
     canActivate: [adminGuard(LANDING_ROUTE)],

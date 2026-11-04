@@ -1,0 +1,234 @@
+{
+ "_comment": "IB-112 SYNTHETIC (no server yet): shaped by the IB-109 contract, values plausible, not a capture",
+ "settings": {
+  "enabled": false,
+  "membersVisible": false,
+  "params": {
+   "perTf": {
+    "15m": {
+     "n": 6,
+     "k": 3,
+     "w": 96
+    },
+    "1h": {
+     "n": 6,
+     "k": 3,
+     "w": 120
+    },
+    "4h": {
+     "n": 6,
+     "k": 3,
+     "w": 90
+    }
+   },
+   "atrMult": 0.25,
+   "oiMedianMult": 0.5
+  },
+  "updatedBy": null,
+  "updatedAt": 1793750400
+ },
+ "symbols": [
+  {
+   "symbol": "BTCUSDT",
+   "base": "BTC",
+   "enabled": true,
+   "addedAt": 1793750400,
+   "addedBy": null
+  },
+  {
+   "symbol": "ETHUSDT",
+   "base": "ETH",
+   "enabled": true,
+   "addedAt": 1793750400,
+   "addedBy": null
+  },
+  {
+   "symbol": "SOLUSDT",
+   "base": "SOL",
+   "enabled": true,
+   "addedAt": 1793750400,
+   "addedBy": null
+  },
+  {
+   "symbol": "BNBUSDT",
+   "base": "BNB",
+   "enabled": true,
+   "addedAt": 1793750400,
+   "addedBy": null
+  },
+  {
+   "symbol": "TRXUSDT",
+   "base": "TRX",
+   "enabled": true,
+   "addedAt": 1793750400,
+   "addedBy": null
+  },
+  {
+   "symbol": "1000PEPEUSDT",
+   "base": "1000PEPE",
+   "enabled": false,
+   "addedAt": 1793800000,
+   "addedBy": 1
+  }
+ ],
+ "alerts": [
+  {
+   "id": 9,
+   "symbol": "1000PEPEUSDT",
+   "tf": "15m",
+   "direction": "bullish",
+   "a": {
+    "time": 1793725200,
+    "price": 0.0102,
+    "oiTime": 1793725500,
+    "oi": 8100000000.0
+   },
+   "b": {
+    "time": 1793793600,
+    "price": 0.00998,
+    "oiTime": 1793793900,
+    "oi": 8600000000.0
+   },
+   "runOf": null,
+   "runLength": 2,
+   "params": {
+    "perTf": {
+     "15m": {
+      "n": 6,
+      "k": 3,
+      "w": 96
+     },
+     "1h": {
+      "n": 6,
+      "k": 3,
+      "w": 120
+     },
+     "4h": {
+      "n": 6,
+      "k": 3,
+      "w": 90
+     }
+    },
+    "atrMult": 0.25,
+    "oiMedianMult": 0.5
+   },
+   "confirmedAt": 1793815200,
+   "firedAt": null,
+   "late": false,
+   "recipients": 0,
+   "priceAtFire": null,
+   "price4h": null,
+   "price24h": null,
+   "outcomeAt": null
+  },
+  {
+   "id": 8,
+   "symbol": "TRXUSDT",
+   "tf": "1h",
+   "direction": "bullish",
+   "a": {
+    "time": 1793721600,
+    "price": 0.3,
+    "oiTime": 1793721900,
+    "oi": 1000000.0
+   },
+   "b": {
+    "time": 1793790000,
+    "price": 0.294,
+    "oiTime": 1793790300,
+    "oi": 1068000.0
+   },
+   "runOf": 6,
+   "runLength": 3,
+   "params": {
+    "perTf": {
+     "15m": {
+      "n": 6,
+      "k": 3,
+      "w": 96
+     },
+     "1h": {
+      "n": 6,
+      "k": 3,
+      "w": 120
+     },
+     "4h": {
+      "n": 6,
+      "k": 3,
+      "w": 90
+     }
+    },
+    "atrMult": 0.25,
+    "oiMedianMult": 0.5
+   },
+   "confirmedAt": 1793811600,
+   "firedAt": null,
+   "late": true,
+   "recipients": 0,
+   "priceAtFire": null,
+   "price4h": null,
+   "price24h": null,
+   "outcomeAt": null
+  },
+  {
+   "id": 7,
+   "symbol": "BTCUSDT",
+   "tf": "4h",
+   "direction": "bearish",
+   "a": {
+    "time": 1793718000,
+    "price": 104200,
+    "oiTime": 1793718300,
+    "oi": 90000
+   },
+   "b": {
+    "time": 1793786400,
+    "price": 105900,
+    "oiTime": 1793786700,
+    "oi": 87500
+   },
+   "runOf": null,
+   "runLength": 2,
+   "params": {
+    "perTf": {
+     "15m": {
+      "n": 6,
+      "k": 3,
+      "w": 96
+     },
+     "1h": {
+      "n": 6,
+      "k": 3,
+      "w": 120
+     },
+     "4h": {
+      "n": 6,
+      "k": 3,
+      "w": 90
+     }
+    },
+    "atrMult": 0.25,
+    "oiMedianMult": 0.5
+   },
+   "confirmedAt": 1793808000,
+   "firedAt": 1793808360,
+   "late": false,
+   "recipients": 1,
+   "priceAtFire": 105900,
+   "price4h": 105100,
+   "price24h": 103300,
+   "outcomeAt": 1793894400
+  }
+ ],
+ "skips": [
+  {
+   "symbol": "SOLUSDT",
+   "tf": "15m",
+   "barTime": 1793814300,
+   "reason": "no_oi_data",
+   "holeFrom": 1793811000,
+   "holeTo": 1793811300,
+   "at": 1793814660
+  }
+ ]
+}

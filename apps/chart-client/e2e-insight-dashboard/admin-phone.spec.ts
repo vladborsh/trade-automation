@@ -4,6 +4,8 @@ import streams from './fixtures/admin-health-streams.json';
 import db from './fixtures/admin-health-db.json';
 import members from './fixtures/admin-members.json';
 import loginEvents from './fixtures/admin-login-events.json';
+// IB-112: SYNTHETIC — the alerts endpoint has no server yet; shaped by the IB-109 contract, longest symbol included
+import alertsPage from './fixtures/admin-alerts.synthetic.json';
 
 /**
  * IB-BUG-034 — the admin pages on a 390×844 phone and at 1440: the PAGE never scrolls sideways. A
@@ -24,6 +26,7 @@ async function mockApi(page: Page): Promise<void> {
       '/health/db': db,
       '/admin/members': members,
       '/admin/login-events': loginEvents,
+      '/admin/alerts': alertsPage,
       '/calendar/upcoming': { events: [] },
     };
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
@@ -53,6 +56,7 @@ const PAGES = [
   ['/health', 'Сбор данных'],
   ['/admin/members', 'Участники'],
   ['/admin/logins', 'Журнал входов'],
+  ['/admin/alerts', 'Сигналы OI'],
 ] as const;
 
 test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {

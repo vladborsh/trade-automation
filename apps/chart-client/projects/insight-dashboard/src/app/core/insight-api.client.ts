@@ -2,6 +2,7 @@ import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
   WebInviteResponse, WebMemberResponse, WebMemberSettings, WebMemberSettingsPatch, WebMembersResponse,
+  WebAlertsAdminResponse, WebAlertSettingsPatch, WebAlertSymbolAdd, WebAlertSymbolPatch,
   WebOpenInterestResponse, OiDivergenceTf, WebOiDivergenceSeriesResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
@@ -227,6 +228,31 @@ export class InsightApiClient {
   /** Admin only: the login journal, newest first. */
   async loginEvents(limit = 200): Promise<WebLoginEventsResponse> {
     return this.get<WebLoginEventsResponse>('/admin/login-events', { limit });
+  }
+
+  // ------------------------------------------------------ IB-112, OI divergence alerts (admin)
+
+  /** Admin only: the settings, the coin list, the last 50 journal rows and skips — the whole page. */
+  async alertsAdmin(): Promise<WebAlertsAdminResponse> {
+    return this.get<WebAlertsAdminResponse>('/admin/alerts');
+  }
+
+  /** Admin only: add a coin; checked against Binance (409 with a refusal code otherwise). */
+  async addAlertSymbol(symbol: string): Promise<WebAlertsAdminResponse> {
+    return this.sendJson<WebAlertsAdminResponse>('POST', '/admin/alerts/symbols', { symbol } satisfies WebAlertSymbolAdd);
+  }
+
+  async setAlertSymbolEnabled(symbol: string, enabled: boolean): Promise<WebAlertsAdminResponse> {
+    return this.sendJson<WebAlertsAdminResponse>('PATCH', `/admin/alerts/symbols/${encodeURIComponent(symbol)}`, { enabled } satisfies WebAlertSymbolPatch);
+  }
+
+  /** Removing a coin stops evaluating it; its OI rows and journal stay (V3). */
+  async removeAlertSymbol(symbol: string): Promise<WebAlertsAdminResponse> {
+    return (await (await this.send('DELETE', `/admin/alerts/symbols/${encodeURIComponent(symbol)}`, {})).json()) as WebAlertsAdminResponse;
+  }
+
+  async patchAlertSettings(patch: WebAlertSettingsPatch): Promise<WebAlertsAdminResponse> {
+    return this.sendJson<WebAlertsAdminResponse>('PATCH', '/admin/alerts/settings', patch);
   }
 
   // ------------------------------------------------------ IB-035, members and own settings

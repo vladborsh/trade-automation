@@ -46,7 +46,7 @@ describe('landing', () => {
 
   it('orders the table the way the nav reads: market, instrument, then the operator pages', () => {
     // IB-079's auth pages (set-password, account, admin/logins) and IB-035's admin/members sit in the admin group, not this order
-    const order = routes.map((r) => r.path).filter((p) => p && !['', '**', 'login', 'set-password', 'account', 'admin/logins', 'admin/members'].includes(p));
+    const order = routes.map((r) => r.path).filter((p) => p && !['', '**', 'login', 'set-password', 'account', 'admin/logins', 'admin/members', 'admin/alerts'].includes(p));
     expect(order).toEqual(['health', 'instrument/:symbol', 'market', 'positioning']); // IB-103: positioning has its own page
   });
 
@@ -56,6 +56,7 @@ describe('landing', () => {
     expect(journal?.canActivate).toHaveLength(1);
     expect(health?.canActivate).toHaveLength(1);
     expect(routes.find((r) => r.path === 'admin/members')?.canActivate).toHaveLength(1); // IB-035, same guard
+    expect(routes.find((r) => r.path === 'admin/alerts')?.canActivate).toHaveLength(1); // IB-112, same guard
     expect(routes.find((r) => r.path === 'set-password')?.canActivate).toBeUndefined(); // public, like /login
   });
 });

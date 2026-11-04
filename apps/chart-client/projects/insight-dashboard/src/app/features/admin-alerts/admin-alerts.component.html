@@ -1,0 +1,141 @@
+<header class="head">
+  <h1>{{ t('alerts.title') }}</h1>
+  <button type="button" (click)="load()" [disabled]="loading()">{{ t('action.refresh') }}</button>
+</header>
+<p class="intro">{{ t('alerts.intro') }}</p>
+
+@if (actionError(); as key) {
+  <p class="error" role="alert">{{ t(key) }}</p>
+}
+
+@if (loadError(); as message) {
+  <p class="error" role="alert">{{ message }}</p>
+} @else if (loading() && !page()) {
+  <p class="muted">{{ t('state.loading') }}</p>
+} @else if (page(); as p) {
+  <section>
+    <h2>{{ t('alerts.switches') }}</h2>
+    <div class="switch">
+      <span>{{ t('alerts.enabled') }}: <strong [class.on]="p.settings.enabled">{{ t(p.settings.enabled ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" [class.primary]="!p.settings.enabled" (click)="setSwitch('enabled', !p.settings.enabled)" [disabled]="busy()">
+        {{ t(p.settings.enabled ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('alerts.enabledNote') }}</p>
+    <div class="switch">
+      <span>{{ t('alerts.membersVisible') }}: <strong [class.on]="p.settings.membersVisible">{{ t(p.settings.membersVisible ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" (click)="setSwitch('membersVisible', !p.settings.membersVisible)" [disabled]="busy()">
+        {{ t(p.settings.membersVisible ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('alerts.membersVisibleNote') }} · {{ t('alerts.updated', { at: updated() }) }}</p>
+  </section>
+
+  <section>
+    <h2>{{ t('alerts.symbols') }}</h2>
+    <form class="add" (submit)="$event.preventDefault(); addSymbol()">
+      <input [value]="newSymbol()" (input)="newSymbol.set($any($event.target).value)" [attr.aria-label]="t('alerts.addLabel')" [placeholder]="t('alerts.addPlaceholder')" autocomplete="off" />
+      <button type="submit" class="primary" [disabled]="busy() || newSymbol().trim() === ''">{{ t('alerts.add') }}</button>
+    </form>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.state') }}</th><th>{{ t('alerts.col.added') }}</th><th></th></tr></thead>
+        <tbody>
+          @for (s of p.symbols; track s.symbol) {
+            <tr [class.off]="!s.enabled">
+              <td>{{ s.symbol }}</td>
+              <td>{{ t(s.enabled ? 'alerts.symbol.on' : 'alerts.symbol.off') }}</td>
+              <td class="nowrap">{{ s.addedBy === null ? t('alerts.seeded') : '' }}</td>
+              <td class="nowrap">
+                <button type="button" (click)="setSymbolEnabled(s.symbol, !s.enabled)" [disabled]="busy()">{{ t(s.enabled ? 'alerts.symbol.disable' : 'alerts.symbol.enable') }}</button>
+                @if (confirmingRemove() === s.symbol) {
+                  <span class="confirm">{{ t('alerts.confirmRemove') }}</span>
+                  <button type="button" class="danger" (click)="removeSymbol(s.symbol)" [disabled]="busy()">{{ t('alerts.yes') }}</button>
+                  <button type="button" (click)="cancelRemove()" [disabled]="busy()">{{ t('alerts.no') }}</button>
+                } @else {
+                  <button type="button" (click)="askRemove(s.symbol)" [disabled]="busy()">{{ t('alerts.remove') }}</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  @if (form(); as f) {
+    <section>
+      <h2>{{ t('alerts.params') }}</h2>
+      <p class="note">{{ t('alerts.paramsNote') }}</p>
+      <div class="scroll">
+        <table class="params">
+          <thead><tr><th></th><th>{{ t('alerts.param.n') }}</th><th>{{ t('alerts.param.k') }}</th><th>{{ t('alerts.param.w') }}</th></tr></thead>
+          <tbody>
+            @for (tf of tfs; track tf) {
+              <tr>
+                <td>{{ tf }}</td>
+                <td><input inputmode="numeric" [value]="f.perTf[tf].n" (input)="editParam(tf, 'n', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.n')" /></td>
+                <td><input inputmode="numeric" [value]="f.perTf[tf].k" (input)="editParam(tf, 'k', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.k')" /></td>
+                <td><input inputmode="numeric" [value]="f.perTf[tf].w" (input)="editParam(tf, 'w', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.w')" /></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <label class="mult">{{ t('alerts.param.atrMult') }} <input inputmode="decimal" [value]="f.atrMult" (input)="editParam(null, 'atrMult', $any($event.target).value)" /></label>
+      <label class="mult">{{ t('alerts.param.oiMedianMult') }} <input inputmode="decimal" [value]="f.oiMedianMult" (input)="editParam(null, 'oiMedianMult', $any($event.target).value)" /></label>
+      <div class="actions">
+        <button type="button" class="primary" (click)="saveParams()" [disabled]="busy() || !paramsChanged()">{{ t('alerts.save') }}</button>
+        <button type="button" (click)="resetParams()" [disabled]="busy()">{{ t('alerts.reset') }}</button>
+        @if (parsedParams() === null) { <span class="error">{{ t('alerts.paramsInvalid') }}</span> }
+      </div>
+    </section>
+  }
+
+  <section>
+    <h2>{{ t('alerts.journal') }}</h2>
+    @if (alerts().length === 0) {
+      <p class="muted">{{ t('alerts.journalEmpty') }}</p>
+    } @else {
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('alerts.col.confirmed') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.tf') }}</th><th>{{ t('alerts.col.direction') }}</th>
+              <th>{{ t('alerts.col.price') }}</th><th>{{ t('alerts.col.oi') }}</th><th>{{ t('alerts.col.run') }}</th><th>{{ t('alerts.col.status') }}</th>
+              <th>{{ t('alerts.col.after4h') }}</th><th>{{ t('alerts.col.after24h') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of alerts(); track r.id) {
+              <tr>
+                <td class="nowrap">{{ r.confirmed }}</td><td>{{ r.symbol }}</td><td>{{ r.tf }}</td><td>{{ t(r.direction) }}</td>
+                <td class="num">{{ r.price }}</td><td class="num">{{ r.oi }}</td><td>{{ r.run ?? '' }}</td>
+                <td [class.warn]="r.status.key === 'alerts.status.late'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
+                <td class="num">{{ r.after4h }}</td><td class="num">{{ r.after24h }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <section>
+    <h2>{{ t('alerts.skips') }}</h2>
+    @if (skips().length === 0) {
+      <p class="muted">{{ t('alerts.skipsEmpty') }}</p>
+    } @else {
+      <div class="scroll">
+        <table>
+          <thead><tr><th>{{ t('alerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.tf') }}</th><th>{{ t('alerts.col.bar') }}</th><th>{{ t('alerts.col.hole') }}</th></tr></thead>
+          <tbody>
+            @for (s of skips(); track $index) {
+              <tr><td class="nowrap">{{ s.at }}</td><td>{{ s.symbol }}</td><td>{{ s.tf }}</td><td class="nowrap">{{ s.bar }}</td><td class="nowrap">{{ s.hole }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+}

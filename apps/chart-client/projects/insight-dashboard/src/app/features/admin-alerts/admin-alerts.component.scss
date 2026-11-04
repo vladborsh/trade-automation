@@ -1,0 +1,31 @@
+// IB-112 — the admin pages' look (admin-members), dashboard tokens where they exist
+:host { display: block; min-width: 0; }
+.head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 15px; margin: 0 0 12px; }
+h2 { font-size: 13px; color: var(--color-text-muted); margin: 20px 0 6px; font-weight: normal; text-transform: uppercase; letter-spacing: 0.06em; }
+button { background: transparent; border: 1px solid var(--card-border); color: var(--color-text); padding: 2px 10px; cursor: pointer; font: inherit; min-height: var(--touch-min, 40px); }
+button.primary { border-color: var(--teal-500); }
+button.danger { border-color: var(--red-500); }
+button:disabled { color: var(--color-text-muted); cursor: default; }
+.intro, .note { margin: 4px 0 12px; color: var(--color-text-muted); font-size: 13px; }
+.switch { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.switch strong { font-weight: 600; color: var(--color-text-muted); }
+.switch strong.on { color: var(--teal-500); }
+.add { display: flex; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+input { background: var(--card-bg); border: 1px solid var(--card-border); color: var(--color-text); font: inherit; padding: 4px 6px; min-height: var(--touch-min, 40px); box-sizing: border-box; }
+.add input { width: 14em; max-width: 100%; }
+.params input { width: 5em; }
+.mult { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 13px; flex-wrap: wrap; }
+.mult input { width: 6em; }
+.actions { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; flex-wrap: wrap; }
+.scroll { overflow-x: auto; max-width: 100%; } // phone width: a table scrolls in its own box, the page does not
+table { border-collapse: collapse; }
+th, td { padding: 4px 12px 4px 0; text-align: left; font-weight: normal; vertical-align: middle; }
+th { color: var(--color-text-muted); }
+tr.off td { color: var(--color-text-muted); }
+.nowrap { white-space: nowrap; }
+.num { font-family: var(--font-num); white-space: nowrap; }
+.muted { color: var(--color-text-muted); }
+.warn { color: var(--amber-500); }
+.error { color: var(--red-500); }
+.confirm { margin: 0 6px; }
