@@ -8,7 +8,8 @@
 }
 .meta { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chip {
-  font: 600 11px/1.4 var(--font-sans); text-transform: uppercase; letter-spacing: .04em;
+  // IB-088's guard: visible text ≥ 12 px — §7.2 says 11 px for chips (TL, 2026-11-04)
+  font: 600 12px/1.4 var(--font-sans); text-transform: uppercase; letter-spacing: .04em;
   padding: 2px 8px; border-radius: 4px;
   background: var(--chip-bg); color: var(--chip-fg);
 }
