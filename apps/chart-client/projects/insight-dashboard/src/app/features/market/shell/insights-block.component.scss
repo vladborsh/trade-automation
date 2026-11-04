@@ -1,12 +1,27 @@
-h2 { margin: 0 0 8px; font-size: 13px; font-weight: normal; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
-.cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.card { border: 1px solid #30363d; padding: 10px 12px; min-width: 0; }
-.sentence { margin: 0; color: #c9d1d9; font-size: 14px; overflow-wrap: anywhere; }
-.basis { margin: 4px 0 0; color: #8b949e; font-size: 12px; overflow-wrap: anywhere; }
-.link {
-  display: inline-flex; align-items: center;
-  min-height: 40px; // phone acceptance: touch targets ≥ 40 px
-  color: #8b949e; font-size: 13px;
+// IB-107 (§7.2, §7.3): «ГЛАВНОЕ СЕЙЧАС» in section caps, then a grid of cards
+h2 { margin: 0 0 12px; font: var(--caps-section); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .08em; }
+.cards {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--card-gap);
+  // 4 across at 1360, one column at 390; never wider than the page at a phone's width
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
 }
-.link:hover { color: #c9d1d9; }
-.neutral { margin: 0; color: #c9d1d9; }
+.cards > li { min-width: 0; display: flex; }
+.cards > li > app-insight-card { flex: 1 1 auto; }
+.neutral-card {
+  display: flex; flex-direction: column; gap: var(--card-inner-gap);
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad);
+}
+.meta { margin: 0; }
+.chip {
+  font: 600 11px/1.4 var(--font-sans); text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 8px; border-radius: 4px; background: var(--chip-bg); color: var(--chip-fg);
+}
+.neutral { margin: 0; font: var(--type-body); color: var(--color-text); overflow-wrap: anywhere; }
+.tone-long { --chip-bg: var(--chip-long-bg); --chip-fg: var(--chip-long-fg); }
+.tone-short { --chip-bg: var(--chip-short-bg); --chip-fg: var(--chip-short-fg); }
+.tone-liq { --chip-bg: var(--chip-liq-bg); --chip-fg: var(--chip-liq-fg); }
+.tone-pos { --chip-bg: var(--chip-pos-bg); --chip-fg: var(--chip-pos-fg); }
+.tone-sent { --chip-bg: var(--chip-sent-bg); --chip-fg: var(--chip-sent-fg); }
+.tone-flows { --chip-bg: var(--chip-flows-bg); --chip-fg: var(--chip-flows-fg); }
+.tone-caps { --chip-bg: var(--chip-caps-bg); --chip-fg: var(--chip-caps-fg); }

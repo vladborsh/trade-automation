@@ -3,21 +3,15 @@
   @if (cards().length > 0) {
     <ol class="cards">
       @for (card of cards(); track card.id) {
-        <li class="card">
-          <p class="sentence">{{ sentence(card.view) }}</p>
-          <p class="basis">{{ basisText(card.view.basis) }}</p>
-          @if ('commands' in card.view.link) {
-            <a class="link" [routerLink]="card.view.link.commands" [queryParams]="card.view.link.queryParams">{{ t('insight.open') }}</a>
-          } @else {
-            <a class="link" [href]="'#' + card.view.link.anchor">{{ t('insight.open') }}</a>
-          }
-        </li>
+        <li><app-insight-card [statement]="card.statement" [nowSec]="card.nowSec" /></li>
       }
     </ol>
   } @else if (insights()) {
-    <p class="neutral">{{ neutralText() }}</p>
-    @if (neutralChoice().basis) {
-      <p class="basis">{{ basisText(neutral().basis) }}</p>
-    }
+    <div class="cards">
+      <article class="neutral-card" [class]="'tone-' + neutral().chip.tone" [attr.title]="neutralChoice().basis ? basisText(neutral().basis) : null">
+        <p class="meta"><span class="chip">{{ t(neutral().chip.key) }}</span></p>
+        <p class="neutral">{{ neutralText() }}</p>
+      </article>
+    </div>
   }
 </section>

@@ -1,0 +1,45 @@
+// IB-107 (§7.2, §7.3): tokens from dashboard-tokens.css (IB-106); names fixed by the design
+:host { display: block; min-width: 0; }
+.card {
+  height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: var(--card-inner-gap);
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius);
+  padding: var(--card-pad);
+}
+.meta { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip {
+  font: 600 11px/1.4 var(--font-sans); text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 8px; border-radius: 4px;
+  background: var(--chip-bg); color: var(--chip-fg);
+}
+.when { font: var(--type-small); color: var(--color-text-muted); }
+.title { margin: 0; font: var(--type-h2); color: var(--color-text-strong); overflow-wrap: anywhere; }
+.explanation { margin: 0; font: var(--type-note); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.spark {
+  position: relative; height: var(--spark-h);
+  display: flex; gap: var(--spark-gap); margin-top: auto;
+}
+.slot { position: relative; flex: 1 1 0; min-width: 0; }
+.bar {
+  position: absolute; left: 0; right: 0;
+  background: var(--chip-fg); opacity: var(--spark-opacity); border-radius: var(--spark-radius);
+}
+.bar.lit { opacity: 1; }
+.zero { position: absolute; left: 0; right: 0; height: 1px; background: var(--card-border); }
+.link {
+  align-self: flex-start; display: inline-flex; align-items: center;
+  min-height: var(--touch-min); // phone acceptance: touch targets ≥ 40 px
+  font: var(--type-note); color: var(--link); text-decoration: none;
+}
+.link:hover { color: var(--link-hover); }
+.link:focus-visible { text-decoration: underline; }
+.basis { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
+
+// the chip colour per topic, and the spark in the chip's foreground (§7.2)
+.tone-long { --chip-bg: var(--chip-long-bg); --chip-fg: var(--chip-long-fg); }
+.tone-short { --chip-bg: var(--chip-short-bg); --chip-fg: var(--chip-short-fg); }
+.tone-liq { --chip-bg: var(--chip-liq-bg); --chip-fg: var(--chip-liq-fg); }
+.tone-pos { --chip-bg: var(--chip-pos-bg); --chip-fg: var(--chip-pos-fg); }
+.tone-sent { --chip-bg: var(--chip-sent-bg); --chip-fg: var(--chip-sent-fg); }
+.tone-flows { --chip-bg: var(--chip-flows-bg); --chip-fg: var(--chip-flows-fg); }
+.tone-caps { --chip-bg: var(--chip-caps-bg); --chip-fg: var(--chip-caps-fg); }
