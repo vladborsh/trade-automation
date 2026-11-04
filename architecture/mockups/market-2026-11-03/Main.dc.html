@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Рынок — обзор</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0d1117}
+a{color:#58a6ff;text-decoration:none}a:hover{color:#79b8ff}
+.num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #0d1117; color: #c9d1d9; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.45;">
+
+  <!-- top nav -->
+  <nav style="display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 14px 24px; border-bottom: 1px solid #30363d;">
+    <span style="font-weight: 700; letter-spacing: 0.08em; font-size: 13px;">ИНСАЙТ</span>
+    <a href="#" style="color: #c9d1d9; font-weight: 600; border-bottom: 2px solid #d29922; padding-bottom: 4px;">Рынок</a>
+    <a href="#" style="color: #8b949e;">Инструмент</a>
+    <a href="#" style="color: #8b949e;">Ликвидации</a>
+    <span style="flex: 1 1 auto;"></span>
+    <span style="color: #8b949e; font-size: 13px;">member · <a href="#">Аккаунт</a> · <a href="#">Выйти</a></span>
+  </nav>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+
+    <!-- header -->
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 700;">Рынок</h1>
+      <span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid #30363d; border-radius: 999px; font-size: 12px; color: #8b949e;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #26a69a;"></span>
+        В реальном времени · обновлено 8 с назад
+      </span>
+      <span style="flex: 1 1 auto;"></span>
+      <div role="group" aria-label="Период" style="display: inline-flex; border: 1px solid #30363d; border-radius: 6px; overflow: hidden;">
+        <button type="button" style="background: transparent; color: #8b949e; border: 0; padding: 8px 14px; font: inherit; min-height: 36px;">1ч</button>
+        <button type="button" style="background: transparent; color: #8b949e; border: 0; border-left: 1px solid #30363d; padding: 8px 14px; font: inherit;">4ч</button>
+        <button type="button" style="background: #21262d; color: #c9d1d9; border: 0; border-left: 1px solid #30363d; padding: 8px 14px; font: inherit; font-weight: 600;">24ч</button>
+        <button type="button" style="background: transparent; color: #8b949e; border: 0; border-left: 1px solid #30363d; padding: 8px 14px; font: inherit;">7д</button>
+      </div>
+    </header>
+
+    <!-- 1. Главное сейчас -->
+    <section aria-labelledby="h-insights" style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 id="h-insights" style="margin: 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: #8b949e; font-weight: 600;">Главное сейчас</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px;">
+        <sc-for list="{{insights}}" as="it" hint-placeholder-count="4">
+          <article style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="{{it.tagStyle}}">{{it.tag}}</span>
+              <span style="color: #8b949e; font-size: 12px;">{{it.when}}</span>
+            </div>
+            <p style="margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35; color: #e6edf3;">{{it.title}}</p>
+            <p style="margin: 0; color: #8b949e; font-size: 13px;">{{it.body}}</p>
+            <div style="display: flex; align-items: flex-end; gap: 3px; height: 34px;" aria-hidden="true">
+              <sc-for list="{{it.spark}}" as="b" hint-placeholder-count="12">
+                <span style="{{b.style}}"></span>
+              </sc-for>
+            </div>
+            <a href="#" style="font-size: 13px;">{{it.link}} →</a>
+          </article>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- 2. KPI strip -->
+    <section aria-label="Ключевые показатели" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+          <span style="color: #8b949e; font-size: 12px;">{{k.label}}</span>
+          <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+            <span class="num" style="font-size: 24px; font-weight: 600; color: #e6edf3;">{{k.value}}</span>
+            <span class="num" style="{{k.deltaStyle}}">{{k.delta}}</span>
+          </div>
+          <div style="display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #21262d;" aria-hidden="true">
+            <span style="{{k.barA}}"></span><span style="{{k.barB}}"></span>
+          </div>
+          <span style="color: #8b949e; font-size: 12px;">{{k.note}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <!-- 3. Ликвидации -->
+    <section aria-labelledby="h-liq" style="display: flex; flex-wrap: wrap; gap: 12px;">
+      <div style="flex: 999 1 560px; min-width: 0; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px;">
+          <h2 id="h-liq" style="margin: 0; font-size: 16px; font-weight: 600;">Ликвидации по часам</h2>
+          <span style="color: #8b949e; font-size: 13px;">вверх — шорты, вниз — лонги · пунктир — средний час за сутки</span>
+        </div>
+        <div style="position: relative; height: 240px; display: flex; flex-direction: column;">
+          <div style="flex: 1 1 0; display: flex; align-items: flex-end; gap: 4px; border-bottom: 1px solid #30363d; position: relative;">
+            <sc-for list="{{hours}}" as="h" hint-placeholder-count="24">
+              <span style="{{h.upStyle}}" title="{{h.tip}}"></span>
+            </sc-for>
+            <span style="position: absolute; left: 0; right: 0; bottom: 6px; border-top: 1px dashed #8b949e; opacity: 0.6;"></span>
+          </div>
+          <div style="flex: 1 1 0; display: flex; align-items: flex-start; gap: 4px; position: relative;">
+            <sc-for list="{{hours}}" as="h" hint-placeholder-count="24">
+              <span style="{{h.downStyle}}" title="{{h.tip}}"></span>
+            </sc-for>
+            <span style="position: absolute; left: 0; right: 0; top: 18px; border-top: 1px dashed #8b949e; opacity: 0.6;"></span>
+          </div>
+          <div style="position: absolute; left: 41%; top: 98%; transform: translate(-50%, -100%); background: #0d1117; border: 1px solid #ef5350; color: #e6edf3; font-size: 12px; padding: 4px 8px; border-radius: 4px; white-space: nowrap;">03:00 · лонги $14.4M · 9× норма</div>
+          <div style="position: absolute; right: 0; top: 0; background: #0d1117; border: 1px solid #26a69a; color: #e6edf3; font-size: 12px; padding: 4px 8px; border-radius: 4px; white-space: nowrap;">сейчас · шорты $11.3M/ч · 7× норма</div>
+        </div>
+        <div class="num" style="display: flex; justify-content: space-between; color: #8b949e; font-size: 11px;">
+          <span>14:00 вчера</span><span>20:00</span><span>02:00</span><span>08:00</span><span>13:00 UTC</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px;">
+          <span><span style="display: inline-block; width: 10px; height: 10px; background: #26a69a; border-radius: 2px;"></span> Шорты $38.7M</span>
+          <span><span style="display: inline-block; width: 10px; height: 10px; background: #ef5350; border-radius: 2px;"></span> Лонги $52.5M</span>
+          <span style="color: #8b949e;">Binance 81% · Bybit 11% · OKX 8%</span>
+        </div>
+      </div>
+
+      <div style="flex: 1 1 380px; min-width: 0; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 600;">Где ликвидируют</h2>
+          <span style="color: #8b949e; font-size: 13px;">24ч, кого выносит сильнее</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 44px minmax(0,1fr) minmax(0,1fr) 92px; gap: 6px 8px; align-items: center; font-size: 13px;">
+          <span></span><span style="color: #ef5350; font-size: 11px; text-align: right;">лонги</span><span style="color: #26a69a; font-size: 11px;">шорты</span><span></span>
+          <sc-for list="{{coins}}" as="c" hint-placeholder-count="10">
+            <span class="num" style="font-weight: 600;">{{c.coin}}</span>
+            <span style="display: flex; justify-content: flex-end;"><span style="{{c.longStyle}}"></span></span>
+            <span style="display: flex;"><span style="{{c.shortStyle}}"></span></span>
+            <span class="num" style="{{c.verdictStyle}}">{{c.verdict}}</span>
+          </sc-for>
+        </div>
+        <p style="margin: 0; color: #8b949e; font-size: 12px;">CL, XAG, XAU, SOXL — нефть, серебро, золото и акции на Binance. По решению «только крипта» их стоит скрыть или вынести отдельно.</p>
+      </div>
+    </section>
+
+    <!-- 4. Крупные ликвидации -->
+    <section aria-labelledby="h-big" style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px;">
+        <h2 id="h-big" style="margin: 0; font-size: 16px; font-weight: 600;">Крупные ликвидации</h2>
+        <span style="color: #8b949e; font-size: 13px;">от $400k · размер круга — сумма · выше линии шорты, ниже — лонги</span>
+        <span style="flex: 1 1 auto;"></span>
+        <label style="font-size: 13px; color: #8b949e;">порог <select style="background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 4px;"><option>$400k</option><option>$1M</option><option>$100k</option></select></label>
+      </div>
+      <div style="position: relative; height: 150px; border-top: 1px solid #21262d; border-bottom: 1px solid #21262d;">
+        <span style="position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #30363d;"></span>
+        <sc-for list="{{bubbles}}" as="b" hint-placeholder-count="8">
+          <span style="{{b.style}}" title="{{b.tip}}"></span>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px;">
+        <sc-for list="{{bigList}}" as="r" hint-placeholder-count="4">
+          <div style="display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid #30363d; border-radius: 6px;">
+            <span style="{{r.dot}}"></span>
+            <div style="display: flex; flex-direction: column; min-width: 0;">
+              <span><span class="num" style="font-weight: 600; color: #e6edf3;">{{r.usd}}</span> · {{r.coin}} {{r.sideRu}}</span>
+              <span class="num" style="color: #8b949e; font-size: 12px;">{{r.time}} · {{r.venue}} · по {{r.price}}</span>
+              <span style="color: #d29922; font-size: 12px;">{{r.ctx}}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- 5. Позиции: квадрант + тепловая таблица -->
+    <section aria-labelledby="h-pos" style="display: flex; flex-wrap: wrap; gap: 12px;">
+      <div style="flex: 1 1 440px; min-width: 0; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <h2 id="h-pos" style="margin: 0; font-size: 16px; font-weight: 600;">Кто набирает позиции</h2>
+        <span style="color: #8b949e; font-size: 13px;">цена за 24ч (→) против открытого интереса за 24ч (↑)</span>
+        <div style="position: relative; height: 340px; border: 1px solid #30363d; border-radius: 6px; overflow: hidden;">
+          <span style="position: absolute; left: 0; right: 0; top: 62%; border-top: 1px solid #30363d;"></span>
+          <span style="position: absolute; top: 0; bottom: 0; left: 70%; border-left: 1px solid #30363d;"></span>
+          <span style="position: absolute; left: 8px; top: 6px; font-size: 11px; color: #ef5350;">Новые шорты · цена ↓ OI ↑</span>
+          <span style="position: absolute; right: 8px; top: 6px; font-size: 11px; color: #26a69a;">Новые лонги · цена ↑ OI ↑</span>
+          <span style="position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: #8b949e;">Закрывают лонги · цена ↓ OI ↓</span>
+          <span style="position: absolute; right: 8px; bottom: 6px; font-size: 11px; color: #8b949e;">Закрывают шорты · цена ↑ OI ↓</span>
+          <sc-for list="{{quad}}" as="q" hint-placeholder-count="12">
+            <span class="num" style="{{q.style}}">{{q.coin}}</span>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 13px;"><b style="color: #e6edf3;">Вывод:</b> рынок падает, но OI у BTC, DOGE, ADA, UNI растёт — открывают шорты на падении. XRP — выброс: OI +26% при стоящей цене.</p>
+      </div>
+
+      <div style="flex: 999 1 560px; min-width: 0; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 600;">Деривативы по монетам</h2>
+        <span style="color: #8b949e; font-size: 13px;">цвет ячейки — насколько значение необычно; клик по строке — график монеты</span>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: 13px; min-width: 560px;">
+            <thead>
+              <tr style="color: #8b949e; font-size: 12px; text-align: right;">
+                <th scope="col" style="text-align: left; font-weight: 500; padding: 4px 8px;">Монета</th>
+                <th scope="col" style="font-weight: 500; padding: 4px 8px;">Цена 24ч</th>
+                <th scope="col" style="font-weight: 500; padding: 4px 8px;">OI 24ч</th>
+                <th scope="col" style="font-weight: 500; padding: 4px 8px;">Фандинг</th>
+                <th scope="col" style="font-weight: 500; padding: 4px 8px;">Лонг/шорт</th>
+                <th scope="col" style="font-weight: 500; padding: 4px 8px;">Ликв. 24ч</th>
+                <th scope="col" style="text-align: left; font-weight: 500; padding: 4px 8px;">Сигнал</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+                <tr class="num" style="text-align: right;">
+                  <td style="text-align: left; padding: 6px 8px; font-weight: 600; color: #e6edf3;">{{r.coin}}</td>
+                  <td style="{{r.pS}}">{{r.p}}</td>
+                  <td style="{{r.oS}}">{{r.o}}</td>
+                  <td style="{{r.fS}}">{{r.f}}</td>
+                  <td style="{{r.lS}}">{{r.l}}</td>
+                  <td style="padding: 6px 8px;">{{r.liq}}</td>
+                  <td style="text-align: left; padding: 6px 8px; font-family: 'IBM Plex Sans', sans-serif; color: #8b949e;">{{r.sig}}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Капитализация -->
+    <section aria-labelledby="h-cap" style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px;">
+        <h2 id="h-cap" style="margin: 0; font-size: 16px; font-weight: 600;">Капитализация</h2>
+        <span style="color: #8b949e; font-size: 13px;">площадь — размер монеты, цвет — изменение за сутки</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px; height: 300px;">
+        <div style="flex: 1546 1 0; min-width: 0; background: #7a2e2c; border-radius: 4px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <span style="font-size: 22px; font-weight: 700; color: #fff;">BTC</span>
+          <span class="num" style="color: #fff;">$1.55T · −1.8%</span>
+        </div>
+        <div style="flex: 1100 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+          <div style="flex: 277 1 0; background: #4a2b2b; border-radius: 4px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+            <span style="font-size: 18px; font-weight: 700; color: #fff;">ETH</span><span class="num" style="color: #fff;">$277B · −0.4%</span>
+          </div>
+          <div style="flex: 300 1 0; display: flex; flex-wrap: wrap; gap: 4px; align-content: stretch;">
+            <sc-for list="{{tiles}}" as="t" hint-placeholder-count="12">
+              <div style="{{t.style}}"><span style="font-weight: 700; color: #fff;">{{t.coin}}</span><span class="num" style="color: #fff; font-size: 12px;">{{t.chg}}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="color: #8b949e; font-size: 12px;">Доли всего рынка $2.62T</span>
+        <div style="display: flex; height: 22px; border-radius: 4px; overflow: hidden; font-size: 11px;" role="img" aria-label="BTC 59.3%, ETH 10.6%, USDT 6.8%, BNB 3.5%, XRP 3.1%, USDC 2.7%, остальное 14%">
+          <span style="flex: 59.3 1 0; background: #d29922; color: #0d1117; padding: 3px 6px; font-weight: 600;">BTC 59.3%</span>
+          <span style="flex: 10.6 1 0; background: #58a6ff; color: #0d1117; padding: 3px 6px; font-weight: 600;">ETH 10.6</span>
+          <span style="flex: 9.5 1 0; background: #6e7681; color: #0d1117; padding: 3px 6px; font-weight: 600;">стейблы 9.5</span>
+          <span style="flex: 20.6 1 0; background: #30363d; color: #c9d1d9; padding: 3px 6px;">альты 20.6</span>
+        </div>
+        <p style="margin: 0; font-size: 13px;"><b style="color: #e6edf3;">Вывод:</b> падает почти всё; альты сильнее BTC (NEAR −10.7%, ETHENA −7.4%, ZEC −7.1% против BTC −1.8%) — деньги уходят в BTC и стейблы.</p>
+      </div>
+    </section>
+
+    <p style="margin: 0; color: #8b949e; font-size: 12px;">Макет. Цифры — реальные данные локального сервера на 2026-11-03 13:33 UTC (без записей COIN-M). Выводы сформулированы вручную как пример того, что будет считать сервер.</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2360}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var UP = '#26a69a', DOWN = '#ef5350', AMBER = '#d29922', BLUE = '#58a6ff';
+    function tag(bg, fg) { return 'font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: ' + bg + '; color: ' + fg + ';'; }
+    function spark(vals, color) {
+      var max = Math.max.apply(null, vals);
+      return vals.map(function (v) { return { style: 'flex: 1 1 0; border-radius: 2px; background: ' + color + '; opacity: 0.85; height: ' + Math.max(2, Math.round(v / max * 34)) + 'px;' }; });
+    }
+    var L = [0.17,0.01,0.12,0.04,0.92,0.02,0.41,6.13,0.24,0.57,0.43,0.95,0.76,3.78,14.42,0.87,4.67,7.46,1.07,2.12,0.84,0.18,0.50,0.98,4.83];
+    var S = [0.05,0,0,0,0,0,0.31,2.15,0.89,0.54,0.27,1.38,0.85,0.28,0.39,0.77,0.56,0.69,1.38,0.23,2.12,0.87,5.05,8.72,11.31];
+    var H = ['13','14','15','16','17','18','19','20','21','22','23','00','01','02','03','04','05','06','07','08','09','10','11','12','13'];
+    var maxv = 14.42;
+    var hours = H.map(function (h, i) {
+      return {
+        tip: h + ':00 UTC — лонги $' + L[i] + 'M, шорты $' + S[i] + 'M',
+        upStyle: 'flex: 1 1 0; background: ' + UP + '; border-radius: 2px 2px 0 0; height: ' + Math.max(1, S[i] / maxv * 100) + '%;',
+        downStyle: 'flex: 1 1 0; background: ' + DOWN + '; border-radius: 0 0 2px 2px; height: ' + Math.max(1, L[i] / maxv * 100) + '%;'
+      };
+    });
+    var insights = [
+      { tag: 'Ликвидации', tagStyle: tag('#0f3d38', UP), when: 'последние 3 часа', title: 'Шорты выносит: $25M за 3 часа — в 5 раз больше обычного', body: 'Средний час за сутки — $1.6M шортов. Больше всего на ETH ($12.3M за сутки), цена ETH ушла с 2 270 до 2 306.', spark: spark(S.slice(13), UP), link: 'Открыть ETH на графике' },
+      { tag: 'Позиции', tagStyle: tag('#3d2e0b', AMBER), when: '24ч', title: 'XRP: открытый интерес +26% при цене +0.4%', body: 'В монету заходят новые позиции, а цена стоит. Так часто бывает перед резким движением в одну из сторон.', spark: spark([1,1.02,1.03,1.05,1.08,1.1,1.12,1.15,1.18,1.2,1.24,1.26], AMBER), link: 'Открыть XRP на графике' },
+      { tag: 'Ликвидации', tagStyle: tag('#3d1515', DOWN), when: 'сегодня 03:00 UTC', title: 'Ночной вынос лонгов: $14.4M за час, крупнейшая — $8.8M по BTC', body: 'Это 9× обычного часа. Каскад начался в 02:00 и продолжился в 05:00–06:00 (ещё $12M).', spark: spark(L.slice(12, 20), DOWN), link: 'Открыть BTC в 03:00' },
+      { tag: 'Настроение', tagStyle: tag('#1a2b44', BLUE), when: 'сегодня', title: 'Страх 26: рынок −3% за сутки, альты падают сильнее BTC', body: 'Вчера индекс был 37, неделю назад — 48. Доля BTC 59.3%: деньги уходят из альтов в BTC и стейблы.', spark: spark([48,46,44,41,40,37,26], BLUE), link: 'Подробнее о настроении' }
+    ];
+    function bar(pct, color) { return 'flex: 0 0 ' + pct + '%; background: ' + color + ';'; }
+    var kpis = [
+      { label: 'Капитализация рынка', value: '$2.62T', delta: '−2.97%', deltaStyle: 'color: ' + DOWN + '; font-size: 13px;', barA: bar(0, DOWN), barB: bar(0, DOWN), note: 'CoinGecko' },
+      { label: 'Доля BTC', value: '59.3%', delta: '+0.4 п.', deltaStyle: 'color: ' + UP + '; font-size: 13px;', barA: bar(59.3, AMBER), barB: bar(0, AMBER), note: 'ETH 10.6%' },
+      { label: 'Страх и жадность', value: '26', delta: 'страх', deltaStyle: 'color: #f0883e; font-size: 13px;', barA: bar(26, '#f0883e'), barB: bar(0, '#f0883e'), note: 'вчера 37 · неделю назад 48' },
+      { label: 'Ликвидации 24ч', value: '$91.2M', delta: '', deltaStyle: '', barA: bar(57.6, DOWN), barB: bar(42.4, UP), note: 'лонги 58% · шорты 42%' },
+      { label: 'Открытый интерес BTC', value: '$7.74B', delta: '+3.7%', deltaStyle: 'color: ' + UP + '; font-size: 13px;', barA: bar(0, UP), barB: bar(0, UP), note: 'Binance, за 24ч' },
+      { label: 'Фандинг BTC', value: '0.0100%', delta: 'норма', deltaStyle: 'color: #8b949e; font-size: 13px;', barA: bar(0, UP), barB: bar(0, UP), note: 'лонги/шорты по счетам 2.62' }
+    ];
+    var C = [['BTC',17.32,7.82],['ETH',3.72,12.26],['ZEC',1.52,2.09],['CL',2.99,0.30],['SOL',1.44,1.31],['XRP',0.50,1.99],['SOXL',1.60,0.70],['XAG',2.08,0.20],['XAU',1.53,0.59],['HOT',0.46,1.13]];
+    var cmax = 17.32;
+    var coins = C.map(function (c) {
+      var l = c[1], s = c[2], verdict, vs;
+      if (l > s * 1.5) { verdict = 'лонги ×' + (l / s).toFixed(1); vs = 'color: ' + DOWN + '; font-size: 12px;'; }
+      else if (s > l * 1.5) { verdict = 'шорты ×' + (s / l).toFixed(1); vs = 'color: ' + UP + '; font-size: 12px;'; }
+      else { verdict = 'поровну'; vs = 'color: #8b949e; font-size: 12px;'; }
+      return {
+        coin: c[0], verdict: verdict, verdictStyle: vs,
+        longStyle: 'display: block; height: 14px; border-radius: 2px 0 0 2px; background: ' + DOWN + '; width: ' + Math.max(1, l / cmax * 100) + '%;',
+        shortStyle: 'display: block; height: 14px; border-radius: 0 2px 2px 0; background: ' + UP + '; width: ' + Math.max(1, s / cmax * 100) + '%;'
+      };
+    });
+    var B = [['03:01','BTC','long',8.781,'Binance','76 600'],['11:07','BTC','short',1.158,'Binance','77 227'],['11:03','ETH','short',1.136,'OKX','2 273'],['20:00','ETH','short',0.806,'Binance','2 254'],['13:28','ETH','short',0.780,'Binance','2 288'],['13:29','ETH','short',0.595,'Binance','2 293'],['13:32','ETH','short',0.485,'OKX','2 306'],['13:23','SOL','long',0.463,'OKX','92.61']];
+    function minutesFromStart(t) { var p = t.split(':'); var m = (+p[0]) * 60 + (+p[1]); var start = 13 * 60 + 33; var d = m - start; if (d < 0) d += 1440; return d; }
+    var bubbles = B.map(function (b) {
+      var x = minutesFromStart(b[0]) / 1440 * 100;
+      var d = Math.round(10 + Math.sqrt(b[3]) * 22);
+      var col = b[2] === 'long' ? DOWN : UP;
+      var top = b[2] === 'long' ? 'calc(75% - ' + d / 2 + 'px)' : 'calc(25% - ' + d / 2 + 'px)';
+      return { tip: b[0] + ' ' + b[1] + ' $' + b[3] + 'M', style: 'position: absolute; left: calc(' + x + '% - ' + d / 2 + 'px); top: ' + top + '; width: ' + d + 'px; height: ' + d + 'px; border-radius: 50%; background: ' + col + '; opacity: 0.75; border: 1px solid #0d1117;' };
+    });
+    var ctx = ['самая крупная за сутки · 55× медианы', 'на росте BTC к 77 200', 'шорты ETH выносит серией', '', 'серия: 4 шорта ETH за 9 минут', '', '', ''];
+    var bigList = B.slice(0, 4).map(function (b, i) {
+      return { usd: '$' + (b[3] >= 1 ? b[3].toFixed(2) + 'M' : Math.round(b[3] * 1000) + 'k'), coin: b[1], sideRu: b[2] === 'long' ? 'лонг' : 'шорт', time: b[0] + ' UTC', venue: b[4], price: b[5], ctx: i === 3 ? ctx[4] : ctx[i], dot: 'flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; background: ' + (b[2] === 'long' ? DOWN : UP) + ';' };
+    });
+    var Q = [['BTC',-1.8,3.7],['ETH',-0.4,-0.1],['SOL',-2.5,-1.4],['XRP',0.4,26.2],['BNB',-2.2,0],['DOGE',-1.9,3.2],['ZEC',-7.1,-3.1],['HYPE',-3.9,-2.1],['LINK',-2.1,-3.5],['ADA',-2.7,3.1],['NEAR',-10.7,-2.3],['SUI',-3.2,-1.9],['UNI',-1.1,3.2]];
+    var quad = Q.map(function (q) {
+      var x = 70 + q[1] * (60 / 11); var y = 62 - Math.min(q[2], 9) * (52 / 9);
+      if (q[2] < 0) y = 62 - q[2] * (30 / 4);
+      var col = q[2] > 0 ? (q[1] < 0 ? DOWN : UP) : '#8b949e';
+      var label = q[0] + (q[2] > 9 ? ' ↑26%' : '');
+      return { coin: label, style: 'position: absolute; left: ' + x + '%; top: ' + y + '%; transform: translate(-50%, -50%); font-size: 12px; font-weight: 600; color: #0d1117; background: ' + col + '; padding: 2px 6px; border-radius: 999px; white-space: nowrap;' };
+    });
+    function cell(v, lo, hi, txt) {
+      var bg = 'transparent', fg = '#c9d1d9';
+      if (v >= hi) { bg = 'rgba(38,166,154,0.22)'; fg = '#4fd1c5'; } else if (v <= lo) { bg = 'rgba(239,83,80,0.22)'; fg = '#ff7b72'; }
+      return 'padding: 6px 8px; background: ' + bg + '; color: ' + fg + ';';
+    }
+    var R = [['BTC',-1.8,3.7,0.0100,2.62,'$25.1M','шорты на падении'],['ETH',-0.4,-0.1,0.0100,2.44,'$16.0M','выносит шорты'],['XRP',0.4,26.2,0.0100,2.32,'$2.5M','OI растёт без цены'],['SOL',-2.5,-1.4,0.0100,3.20,'$2.8M','лонгов много: 3.2'],['ZEC',-7.1,-3.1,0.0013,0.91,'$3.6M','выходят из позиций'],['DOGE',-1.9,3.2,0.0096,2.71,'—','шорты на падении']];
+    var rows = R.map(function (r) {
+      return {
+        coin: r[0], p: (r[1] > 0 ? '+' : '') + r[1] + '%', o: (r[2] > 0 ? '+' : '') + r[2] + '%', f: r[3].toFixed(4) + '%', l: r[4].toFixed(2), liq: r[5], sig: r[6],
+        pS: cell(r[1], -5, 5), oS: cell(r[2], -5, 10), fS: cell(r[3] * 100, 0.2, 5), lS: cell(r[4], 0.95, 3.0)
+      };
+    });
+    var T = [['BNB',91.6,-2.2],['XRP',79.5,0.4],['SOL',54.4,-2.5],['HYPE',20.2,-3.9],['ZEC',19.5,-7.1],['DOGE',11.6,-1.9],['LINK',8.5,-2.1],['ADA',7.1,-2.7],['NEAR',5.0,-10.7],['UNI',4.3,-1.1],['SUI',3.6,-3.2],['TAO',2.6,-4.6]];
+    function heat(c) { if (c > 0) return '#1d5c55'; if (c > -2) return '#4a2b2b'; if (c > -4) return '#6b2d2b'; if (c > -7) return '#8e2f2c'; return '#b3302c'; }
+    var tiles = T.map(function (t) {
+      return { coin: t[0], chg: (t[2] > 0 ? '+' : '') + t[2] + '%', style: 'flex: ' + Math.max(6, t[1]) + ' 1 ' + (t[1] > 50 ? 30 : 16) + '%; min-width: 0; background: ' + heat(t[2]) + '; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;' };
+    });
+    return { insights: insights, kpis: kpis, hours: hours, coins: coins, bubbles: bubbles, bigList: bigList, quad: quad, rows: rows, tiles: tiles };
+  }
+}
+</script>
+</body>
+</html>
