@@ -113,7 +113,7 @@
               <tr>
                 <td class="nowrap">{{ r.confirmed }}</td><td>{{ r.symbol }}</td><td>{{ r.tf }}</td><td>{{ t(r.direction) }}</td>
                 <td class="num">{{ r.price }}</td><td class="num">{{ r.oi }}</td><td>{{ r.run ?? '' }}</td>
-                <td [class.warn]="r.status.key === 'alerts.status.late'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
+                <td [class.warn]="r.status.key === 'alerts.status.late'" [class.history]="r.status.key === 'alerts.status.history'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
                 <td class="num">{{ r.after4h }}</td><td class="num">{{ r.after24h }}</td>
               </tr>
             }

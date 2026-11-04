@@ -8,7 +8,7 @@ import { AdminAlertsComponent } from './admin-alerts.component';
 
 /** IB-112 (V17) — the admin alerts page against a stub API: what it shows, and what it sends. */
 const ALERT: WebOiDivergenceAlert = {
-  id: 7, symbol: 'TRXUSDT', tf: '1h', direction: 'bullish',
+  id: 7, source: 'live', symbol: 'TRXUSDT', tf: '1h', direction: 'bullish',
   a: { time: 1_793_700_000, price: 0.3, oiTime: 1_793_700_300, oi: 1_000_000 },
   b: { time: 1_793_790_000, price: 0.294, oiTime: 1_793_790_300, oi: 1_068_000 },
   runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS,
@@ -59,6 +59,19 @@ describe('AdminAlertsComponent (IB-112)', () => {
     expect([...el.querySelectorAll('tbody tr')].map((r) => r.querySelector('td')?.textContent?.trim())).toContain('TRXUSDT');
     expect(text(el)).toContain('sent: 1');
     expect(text(el)).toContain('on lows');
+  });
+
+  it('IB-116 (V33): a backfilled row is listed with a visible «from history» / «из истории» marker', async () => {
+    const backfill: WebOiDivergenceAlert = { ...ALERT, id: 8, source: 'backfill', firedAt: null, recipients: 0 };
+    const { el } = await setup({ alertsAdmin: async () => ({ ...PAGE, alerts: [ALERT, backfill] }) });
+    const cell = [...el.querySelectorAll('td.history')];
+    expect(cell.map((c) => c.textContent?.trim())).toEqual(['from history']);
+    expect(text(el)).toContain('sent: 1'); // the live row beside it is unchanged
+    TestBed.resetTestingModule();
+    const ru = await setup({ alertsAdmin: async () => ({ ...PAGE, alerts: [backfill] }) });
+    TestBed.inject(I18nService).setLang('ru');
+    ru.fixture.detectChanges();
+    expect(ru.el.querySelector('td.history')?.textContent?.trim()).toBe('из истории');
   });
 
   it('turning sending on sends exactly {enabled: true}, and the page shows what came back', async () => {

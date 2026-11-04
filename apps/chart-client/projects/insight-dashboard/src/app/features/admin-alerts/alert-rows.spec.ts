@@ -4,7 +4,7 @@ import { formToParams, movePct, normalizeSymbol, paramsToForm, pctText, symbolRe
 
 /** IB-112 (V12, V17) — the admin alerts page's mapping. */
 const ALERT: WebOiDivergenceAlert = {
-  id: 7, symbol: 'TRXUSDT', tf: '1h', direction: 'bullish',
+  id: 7, source: 'live', symbol: 'TRXUSDT', tf: '1h', direction: 'bullish',
   a: { time: 1_793_700_000, price: 0.3, oiTime: 1_793_700_300, oi: 1_000_000 },
   b: { time: 1_793_790_000, price: 0.294, oiTime: 1_793_790_300, oi: 1_068_000 },
   runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS,
@@ -24,6 +24,11 @@ describe('toAlertRow', () => {
   it('late beats everything (it was never sent); unsent and not late is «journal only» (the switch was off)', () => {
     expect(toAlertRow({ ...ALERT, late: true, firedAt: null }).status).toEqual({ key: 'alerts.status.late', recipients: 0 });
     expect(toAlertRow({ ...ALERT, firedAt: null, recipients: 0 }).status).toEqual({ key: 'alerts.status.journalOnly', recipients: 0 });
+  });
+  it('IB-116 (V33): a backfilled row says «from history» — not «journal only», not late, whatever its other fields', () => {
+    const history = { ...ALERT, source: 'backfill' as const, firedAt: null, recipients: 0, late: false };
+    expect(toAlertRow(history).status).toEqual({ key: 'alerts.status.history', recipients: 0 });
+    expect(toAlertRow({ ...history, source: 'live' }).status).toEqual({ key: 'alerts.status.journalOnly', recipients: 0 });
   });
   it('a repeat shows its run length; bearish says highs', () => {
     expect(toAlertRow({ ...ALERT, runLength: 3, runOf: 5 }).run).toBe(3);

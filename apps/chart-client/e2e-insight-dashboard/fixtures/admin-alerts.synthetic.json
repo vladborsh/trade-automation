@@ -76,6 +76,7 @@
  "alerts": [
   {
    "id": 9,
+   "source": "live",
    "symbol": "1000PEPEUSDT",
    "tf": "15m",
    "direction": "bullish",
@@ -127,6 +128,7 @@
   },
   {
    "id": 8,
+   "source": "live",
    "symbol": "TRXUSDT",
    "tf": "1h",
    "direction": "bullish",
@@ -178,6 +180,7 @@
   },
   {
    "id": 7,
+   "source": "live",
    "symbol": "BTCUSDT",
    "tf": "4h",
    "direction": "bearish",

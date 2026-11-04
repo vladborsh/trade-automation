@@ -606,6 +606,7 @@ export type StringKey =
   | 'alerts.status.sent'
   | 'alerts.status.late'
   | 'alerts.status.journalOnly'
+  | 'alerts.status.history'
   | 'alerts.skips'
   | 'alerts.skipsEmpty'
   | 'alerts.col.at'

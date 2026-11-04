@@ -608,6 +608,7 @@ export const ru: Strings = {
   'alerts.status.sent': 'отправлено: {count}',
   'alerts.status.late': 'опоздало — не отправлено',
   'alerts.status.journalOnly': 'только в журнале',
+  'alerts.status.history': 'из истории',
   'alerts.skips': 'Пропуски (последние 50)',
   'alerts.skipsEmpty': 'Пропусков не было.',
   'alerts.col.at': 'когда, UTC',

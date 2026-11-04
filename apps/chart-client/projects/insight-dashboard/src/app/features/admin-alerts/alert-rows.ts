@@ -51,8 +51,11 @@ export function toAlertRow(a: WebOiDivergenceAlert): AlertRow {
     price: pctText(movePct(a.a.price, a.b.price)),
     oi: pctText(movePct(a.a.oi, a.b.oi)),
     run: a.runLength > 2 ? a.runLength : null,
-    // late is checked first: a late row was never sent, whatever the switch said (V10)
-    status: a.late
+    // IB-116 (V33): a backfilled row is history first — never sent, never late, and must not read as «journal only»
+    // (which means "found live while sending was off"); then late: never sent, whatever the switch said (V10)
+    status: a.source === 'backfill'
+      ? { key: 'alerts.status.history', recipients: 0 }
+      : a.late
       ? { key: 'alerts.status.late', recipients: 0 }
       : a.firedAt !== null
         ? { key: 'alerts.status.sent', recipients: a.recipients }

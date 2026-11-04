@@ -602,6 +602,7 @@ export const en: Strings = {
   'alerts.status.sent': 'sent: {count}',
   'alerts.status.late': 'late — not sent',
   'alerts.status.journalOnly': 'journal only',
+  'alerts.status.history': 'from history',
   'alerts.skips': 'Skips (last 50)',
   'alerts.skipsEmpty': 'No skips.',
   'alerts.col.at': 'when, UTC',

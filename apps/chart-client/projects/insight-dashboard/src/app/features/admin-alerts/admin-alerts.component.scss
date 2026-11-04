@@ -27,5 +27,7 @@ tr.off td { color: var(--color-text-muted); }
 .num { font-family: var(--font-num); white-space: nowrap; }
 .muted { color: var(--color-text-muted); }
 .warn { color: var(--amber-500); }
+// IB-116 (V33): a backfilled row, «из истории» — marked, so it never reads as a fresh signal
+.history { color: var(--color-text-muted); font-style: italic; }
 .error { color: var(--red-500); }
 .confirm { margin: 0 6px; }
