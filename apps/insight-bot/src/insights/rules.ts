@@ -135,6 +135,10 @@ export const R4: Rule = {
     if (!Array.isArray(rows)) return rows;
     const best = rows
       .filter((r) => (r.priceChangePct.rarity as number) < RARITY_SHOW)
+      // IB-BUG-027: named by one of the four quadrants (design D5) — never `flat`. Rarity is the
+      // coin's OWN history, the quadrant is absolute (|OI| < OI_FLAT_PCT): a +0.81 % that is rare
+      // for a coin whose OI barely moves is still «без изменений», which says nothing.
+      .filter((r) => r.quadrant !== null && r.quadrant !== 'flat')
       .sort((a, b) => (b.oiChangePct.rarity as number) - (a.oiChangePct.rarity as number) || Math.abs(b.oiChangePct.value ?? 0) - Math.abs(a.oiChangePct.value ?? 0))[0];
     if (!best) return null;
     return {

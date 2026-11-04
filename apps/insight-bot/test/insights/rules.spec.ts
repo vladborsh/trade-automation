@@ -95,6 +95,15 @@ describe('R4 OI vs price', () => {
       expect(shown(R4.run(snapshot({ period, positioning: [r] })))?.link).toEqual({ route: 'instrument', symbol: 'SOLUSDT', timeSec: NOW / 1000 - sec });
     }
   });
+  it('IB-BUG-027: a FLAT quadrant is not a statement — a rare-for-the-coin +0.81 % is still «без изменений»', () => {
+    // why it fired: rarity is the coin's OWN history (XRP's OI barely moves, so +0.81 % was rare),
+    // the quadrant is absolute (|OI| < OI_FLAT_PCT = 1 % → flat). Design D5: R4 is named by one of
+    // the four quadrants; flat is not one of them.
+    const flat = { ...row('XRPUSDT', { oi: c(0.81, 0.99), price: c(-0.62, 0.3) }), quadrant: 'flat' as const };
+    expect(shown(R4.run(snapshot({ positioning: [flat] })))).toBeNull();
+    const named = { ...row('SOLUSDT', { oi: c(6, 0.93), price: c(0.4, 0.3) }), quadrant: 'new_longs' as const };
+    expect(shown(R4.run(snapshot({ positioning: [flat, named] })))).toMatchObject({ params: { symbol: 'SOLUSDT', quadrant: 'new_longs' } });
+  });
   it('SILENT when price is rare too (that is a price story, not an OI one)', () => {
     expect(shown(R4.run(snapshot({ positioning: [row('SOLUSDT', { oi: c(26, 0.99), price: c(9, 0.98) })] })))).toBeNull();
   });
