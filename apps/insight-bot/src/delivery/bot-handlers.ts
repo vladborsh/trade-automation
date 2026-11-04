@@ -13,7 +13,7 @@
 import type { Bot, Context } from 'grammy';
 import type { Invite, Lang, User } from '../users/user.model';
 import { INVITE_TTL_MS } from '../users/user.model';
-import { generateInviteCode, inviteLink, isWellFormedCode } from '../users/invite-code';
+import { inviteLink, isWellFormedCode } from '../users/invite-code';
 import { parseCommand, parseLang, parseOnOff } from '../users/settings';
 import type { ConsumeResult, SettingsPatch } from '../users/pg/users.repo';
 import * as T from './templates/texts';
@@ -23,7 +23,8 @@ export interface UsersPort {
   consumeInvite(code: string, tgUserId: number, chatId: number, now: Date): Promise<ConsumeResult>;
   listUsers(): Promise<User[]>;
   updateSettings(userId: number, patch: SettingsPatch): Promise<User | null>;
-  createInvite(code: string, createdBy: number, expiresAt: Date): Promise<Invite>;
+  /** IB-035: the one invite path, shared with the site's members page. */
+  issueInvite(createdBy: number, now: Date, ttlMs?: number): Promise<Invite>;
   setChatId(userId: number, chatId: number): Promise<void>;
 }
 
@@ -186,10 +187,8 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
       }
       case 'invite': {
         if (user.role !== 'admin') { await reply(ctx, T.ADMIN_ONLY, lang); return; }
-        const code = generateInviteCode();
-        const expiresAt = new Date(now().getTime() + ttl);
-        await deps.users.createInvite(code, user.id, expiresAt);
-        await reply(ctx, T.inviteCreated(inviteLink(deps.botUsername, code), expiresAt), lang);
+        const invite = await deps.users.issueInvite(user.id, now(), ttl);
+        await reply(ctx, T.inviteCreated(inviteLink(deps.botUsername, invite.code), invite.expiresAt), lang);
         return;
       }
       case 'web': {

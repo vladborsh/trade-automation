@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 import { registerHandlers, chunk, type UsersPort } from '../../src/delivery/bot-handlers';
 import type { User } from '../../src/users/user.model';
 import * as T from '../../src/delivery/templates/texts';
+import { newInvite, settingsPatchFromWeb } from '../../src/users/members';
 
 /**
  * IB-021 — the handlers, driven through real grammY `Update` objects.
@@ -40,7 +41,7 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
     consumeInvite: async () => ({ kind: 'refused' }),
     listUsers: async () => Object.values(users),
     updateSettings: async (userId, patch) => { patches.push({ userId, patch: patch as Record<string, unknown> }); return users[member.tgUserId] ?? null; },
-    createInvite: async (code, createdBy, expiresAt) => { invites.push({ code, createdBy, expiresAt }); return { code, createdBy, createdAt: new Date(), expiresAt, usedBy: null, usedAt: null }; },
+    issueInvite: async (createdBy, at, ttlMs) => { const { code, expiresAt } = newInvite(at, ttlMs); invites.push({ code, createdBy, expiresAt }); return { code, createdBy, createdAt: at, expiresAt, usedBy: null, usedAt: null }; },
     setChatId: async () => {},
     ...over,
   };
@@ -349,5 +350,44 @@ describe('chunk', () => {
 
   it('leaves a short message alone', () => {
     expect(chunk('hello')).toEqual(['hello']);
+  });
+});
+
+describe('IB-035 — the site\'s settings PATCH accepts and refuses exactly what /lang and /calendar do', () => {
+  // The bot hands its parser ONE token (the command's first argument), so parity is over single
+  // tokens. A JSON value with a space inside ("en extra") is refused on the site, where the bot
+  // would read only "en": stated, not hidden.
+  const LANGS = ['en', 'EN', 'ru', 'Ru', 'de', 'english', 'рус', '1'];
+  const SWITCHES = ['on', 'ON', 'off', 'вкл', 'выкл', 'да', 'нет', 'yes', 'no', '1', '0', 'true', 'false', 'maybe', 'enable', '2'];
+
+  it.each(LANGS)('/lang %s — same verdict and same value on both paths', async (value) => {
+    const h = harness({}, { 222: member });
+    await h.bot.handleUpdate(text(222, `/lang ${value}`) as never);
+    const bot = h.patches.length === 1 ? { ok: true, lang: h.patches[0].patch.lang } : { ok: false };
+    const web = settingsPatchFromWeb({ lang: value });
+    expect(web.ok ? { ok: true, lang: web.patch.lang } : { ok: false }).toEqual(bot);
+  });
+
+  it.each(SWITCHES)('/calendar %s — same verdict and same value on both paths', async (value) => {
+    const h = harness({}, { 222: member });
+    await h.bot.handleUpdate(text(222, `/calendar ${value}`) as never);
+    const bot = h.patches.length === 1 ? { ok: true, on: h.patches[0].patch.calendarAlerts } : { ok: false };
+    const web = settingsPatchFromWeb({ calendarAlerts: value });
+    expect(web.ok ? { ok: true, on: web.patch.calendarAlerts } : { ok: false }).toEqual(bot);
+  });
+
+  it('a JSON boolean on the site means what /calendar true|false means in the bot', async () => {
+    for (const [flag, word] of [[true, 'true'], [false, 'false']] as const) {
+      const h = harness({}, { 222: member });
+      await h.bot.handleUpdate(text(222, `/calendar ${word}`) as never);
+      const web = settingsPatchFromWeb({ calendarAlerts: flag });
+      expect(web.ok && web.patch.calendarAlerts).toBe(h.patches[0].patch.calendarAlerts);
+    }
+  });
+
+  it('the parity table is not vacuous: each path both accepts and refuses something', () => {
+    const verdicts = [...LANGS.map((v) => settingsPatchFromWeb({ lang: v }).ok), ...SWITCHES.map((v) => settingsPatchFromWeb({ calendarAlerts: v }).ok)];
+    expect(verdicts).toContain(true);
+    expect(verdicts).toContain(false);
   });
 });

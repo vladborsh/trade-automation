@@ -13,6 +13,9 @@ import { CredentialsService } from './auth/credentials.service';
 import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
+import { WebMembersController } from './members/members.controller';
+import { WebMeSettingsController } from './members/me-settings.controller';
+import { UsersModule } from '../users/users.module';
 import { AssetClassifier } from './liquidations/asset-classes';
 import { WebContextController } from './context/context.controller';
 import { WebMarketController } from './market/market.controller';
@@ -68,13 +71,15 @@ export class WebModule {
       // IB-030: the health page reads the live StreamRegistry and the weight gauges, which
       // OpsModule owns and exports — the same instances the admin health page and /metrics report, so the
       // dashboard cannot drift from the ops view by reading a second copy.
-      imports: [AppConfigModule, DbModule, OpsModule],
+      imports: [AppConfigModule, DbModule, OpsModule, UsersModule],
       // No guard decorator on any of these — they are authenticated by the APP_GUARD above,
       // which is the whole point of it being module-wide.
       controllers: [
         WebAuthController, WebHealthController, WebAdminController,
         SeriesController, UniverseController, LiquidationsController, WebContextController,
         CalendarController, WebPushController, WebMarketController,
+        // IB-035: the admin's members page and a member's own settings
+        WebMembersController, WebMeSettingsController,
       ],
       providers: [
         WebAuthService,

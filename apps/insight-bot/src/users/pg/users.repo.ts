@@ -159,3 +159,46 @@ export async function consumeInvite(db: Db, code: string, tgUserId: number, chat
     return { kind: 'joined', user };
   });
 }
+
+/**
+ * IB-035 — what the admin's members page adds to `listUsers`, per user id: the site login, the last
+ * successful sign-in in the journal (kept 90 days) and the live sessions now. One query, so the
+ * members list is the bot's `/users` list plus this, not a second user list.
+ */
+export async function memberActivity(
+  db: DbHandle,
+  now: Date,
+): Promise<Map<number, { login: string | null; lastLoginAt: Date | null; activeSessions: number }>> {
+  const rows = await db.query<{ id: number; login: string | null; last_login: Date | null; sessions: string }>(
+    `select u.id,
+            c.login,
+            (select max(e.at) from web_login_events e where e.user_id = u.id and e.outcome = 'success') as last_login,
+            (select count(*) from web_sessions s where s.user_id = u.id and s.expires_at > $1) as sessions
+       from users u left join web_credentials c on c.user_id = u.id`,
+    [now],
+  );
+  return new Map(rows.map((r) => [r.id, {
+    login: r.login,
+    lastLoginAt: r.last_login === null ? null : new Date(r.last_login),
+    activeSessions: Number(r.sessions),
+  }]));
+}
+
+/** One user by id, for the disable/enable path. `forUpdate` locks the row inside a transaction. */
+export async function findById(db: DbHandle, id: number, forUpdate = false): Promise<User | null> {
+  const rows = await db.query<UserRow>(`select ${COLUMNS} from users where id = $1${forUpdate ? ' for update' : ''}`, [id]);
+  return rows.length > 0 ? toUser(rows[0]) : null;
+}
+
+/**
+ * Admins who are not disabled. Inside the disable transaction every admin row is locked first. Two
+ * admins disabling each other at the same moment then cannot both see "two left" and leave none.
+ */
+export async function countActiveAdmins(db: DbHandle): Promise<number> {
+  const rows = await db.query<{ id: number }>(`select id from users where role = 'admin' and not disabled for update`);
+  return rows.length;
+}
+
+export async function setDisabled(db: DbHandle, id: number, disabled: boolean): Promise<void> {
+  await db.query('update users set disabled = $2 where id = $1', [id, disabled]);
+}
