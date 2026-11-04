@@ -176,3 +176,17 @@ export function conclusionView(line: WebInsightBlockLine | null | undefined, now
   const basis = line.neutral.basis ? basisView(line.neutral.basis, nowSec) : null;
   return { kind: 'neutral', key: `insight.neutral.${line.neutral.reason}` as StringKey, basis };
 }
+
+/**
+ * IB-BUG-022 — which neutral line «Главное сейчас» shows when nothing is sent. An unavailable
+ * period (D14: not a full window of tape yet) is said as that, with its date, and never as
+ * «ничего необычного», which would be a claim about a market nobody looked at. Then thin
+ * history, then «nothing unusual». `basis` is false for the unavailability: there was none.
+ */
+export function neutralLine(
+  unavailableFromDay: string | null, history: boolean,
+): { key: 'insight.neutral.unavailable' | 'insight.neutral.insufficient_history' | 'insight.neutral.nothing_unusual'; date: string | null; basis: boolean } {
+  if (unavailableFromDay !== null) return { key: 'insight.neutral.unavailable', date: unavailableFromDay, basis: false };
+  if (history) return { key: 'insight.neutral.insufficient_history', date: null, basis: true };
+  return { key: 'insight.neutral.nothing_unusual', date: null, basis: true };
+}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WEB_INSIGHT_KEYS, WEB_KPI_IDS } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { basisView, conclusionView, fundingPct, insightView, kpiView, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
+import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedPct } from './market-text';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -115,3 +115,18 @@ describe('conclusionView — D15, one line per block', () => {
     expect(conclusionView(null, 0)).toBeNull();
   });
 });
+
+describe('neutralLine (IB-BUG-022)', () => {
+  it('unavailable beats everything, with its date and no basis; then thin history; then nothing unusual', () => {
+    expect(neutralLine('2026-11-10', false)).toEqual({ key: 'insight.neutral.unavailable', date: '2026-11-10', basis: false });
+    expect(neutralLine('2026-11-10', true).key).toBe('insight.neutral.unavailable');
+    expect(neutralLine(null, true)).toEqual({ key: 'insight.neutral.insufficient_history', date: null, basis: true });
+    expect(neutralLine(null, false)).toEqual({ key: 'insight.neutral.nothing_unusual', date: null, basis: true });
+  });
+
+  it('the unavailability line names the period and the date in both languages', () => {
+    expect(ru['insight.neutral.unavailable']).toBe('За {period} данных пока нет — будут с {date}');
+    expect(en['insight.neutral.unavailable']).toContain('{date}');
+  });
+});
+

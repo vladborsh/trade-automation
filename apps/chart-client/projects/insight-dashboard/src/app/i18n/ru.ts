@@ -366,6 +366,7 @@ export const ru: Strings = {
   'insight.neutral': 'Ничего необычного',
   'insight.neutral.nothing_unusual': 'Ничего необычного за {period}',
   'insight.neutral.insufficient_history': 'Пока мало истории для выводов',
+  'insight.neutral.unavailable': 'За {period} данных пока нет — будут с {date}',
   'insight.side.long': 'лонгов',
   'insight.side.short': 'шортов',
   'insight.quadrant.new_longs': 'набирают лонги',

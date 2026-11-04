@@ -31,7 +31,7 @@ const caps = (period: WebMarketPeriod): WebCapsResponse => ({
 
 interface Call { endpoint: string; period?: WebMarketPeriod }
 
-function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean } = {}) {
+function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean } = {}) {
   const calls: Call[] = [];
   const navigate = vi.fn(async () => true);
   const api = {
@@ -39,7 +39,7 @@ function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean 
     marketKpis: async () => { calls.push({ endpoint: 'kpis' }); return kpisFixture as unknown as WebKpisResponse; },
     marketInsights: (period: WebMarketPeriod) => {
       calls.push({ endpoint: 'insights', period });
-      const body = { ...(insightsFixture as unknown as WebInsightsResponse), period };
+      const body = { ...(insightsFixture as unknown as WebInsightsResponse), period, ...(opts.noStatements ? { top: [] } : {}) };
       return new Promise<WebInsightsResponse>((r) => setTimeout(() => r(body), opts.insightsDelayMs ?? 0));
     },
     marketCards: async () => { calls.push({ endpoint: 'sentiment' }); return null; },
@@ -141,6 +141,22 @@ describe('MarketComponent shell (IB-088)', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(calls.map((c) => c.endpoint).sort()).toEqual(['caps', 'insights', 'kpis', 'liquidations', 'positioning', 'sentiment']);
     vis.mockRestore();
+  });
+
+  it('IB-BUG-022: an UNAVAILABLE period says so with its date, never «nothing unusual»; an available one does', async () => {
+    const week = setup({ p: '7d', noStatements: true }); // the fixture's 7d opens 2026-11-05; now is 2026-11-03
+    await vi.advanceTimersByTimeAsync(0);
+    week.fixture.detectChanges();
+    const text = (f: typeof week.fixture) => (f.nativeElement as HTMLElement).querySelector('#insights .neutral')?.textContent?.trim();
+    expect(text(week.fixture)).toBe('No 7d data yet — available from 2026-11-05');
+    expect((week.fixture.nativeElement as HTMLElement).querySelector('#insights .basis')).toBeNull();
+    TestBed.resetTestingModule();
+
+    const day = setup({ p: '24h', noStatements: true });
+    await vi.advanceTimersByTimeAsync(0);
+    day.fixture.detectChanges();
+    expect(text(day.fixture)).not.toContain('No 24h data');
+    expect(text(day.fixture)).toMatch(/Nothing unusual over 24h|Not enough history/);
   });
 
   it('there is no Refresh button: the page refreshes itself', () => {

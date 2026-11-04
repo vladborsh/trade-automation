@@ -18,7 +18,7 @@ import { BlockScheduler, liveAge, type BlockId } from './shell/block-scheduler';
 import { bindVisibility } from './shell/scheduler-visibility';
 import { InsightsBlockComponent } from './shell/insights-block.component';
 import { KpiStripComponent } from './shell/kpi-strip.component';
-import { parsePeriod } from './shell/market-text';
+import { parsePeriod, periodAvailability } from './shell/market-text';
 import { PeriodSwitchComponent } from './shell/period-switch.component';
 
 /**
@@ -68,6 +68,8 @@ export class MarketComponent {
 
   readonly firstLoad = computed(() => this.cards() === null && !this.blockError('sentiment'));
   readonly nowSec = computed(() => Math.floor(this.nowMs() / 1000));
+  /** IB-BUG-022: the day the page's period becomes available (D14), null when it is. */
+  readonly periodUnavailableFrom = computed(() => periodAvailability(this.liquidations()?.block?.availableFrom, this.period(), this.nowSec()).fromDay);
   readonly age = computed(() => liveAge(this.scheduler.snapshot(), this.nowMs()));
   readonly staleTitle = computed(() => {
     const late = this.age()?.stale ?? [];

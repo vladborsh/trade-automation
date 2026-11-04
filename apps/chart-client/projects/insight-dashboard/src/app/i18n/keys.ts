@@ -367,6 +367,7 @@ export type StringKey =
   | 'insight.neutral'
   | 'insight.neutral.nothing_unusual'
   | 'insight.neutral.insufficient_history'
+  | 'insight.neutral.unavailable'
   | 'insight.side.long'
   | 'insight.side.short'
   | 'insight.quadrant.new_longs'

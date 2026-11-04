@@ -360,6 +360,7 @@ export const en: Strings = {
   'insight.neutral': 'Nothing unusual',
   'insight.neutral.nothing_unusual': 'Nothing unusual over {period}',
   'insight.neutral.insufficient_history': 'Not enough history yet for conclusions',
+  'insight.neutral.unavailable': 'No {period} data yet — available from {date}',
   'insight.side.long': 'longs',
   'insight.side.short': 'shorts',
   'insight.quadrant.new_longs': 'new longs',

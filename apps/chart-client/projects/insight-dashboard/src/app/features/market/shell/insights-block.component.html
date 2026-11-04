@@ -15,13 +15,9 @@
       }
     </ol>
   } @else if (insights()) {
-    <p class="neutral">
-      @if (neutral().history) {
-        {{ t('insight.neutral.insufficient_history') }}
-      } @else {
-        {{ t('insight.neutral.nothing_unusual', { period: periodLabel() }) }}
-      }
-    </p>
-    <p class="basis">{{ basisText(neutral().basis) }}</p>
+    <p class="neutral">{{ neutralText() }}</p>
+    @if (neutralChoice().basis) {
+      <p class="basis">{{ basisText(neutral().basis) }}</p>
+    }
   }
 </section>

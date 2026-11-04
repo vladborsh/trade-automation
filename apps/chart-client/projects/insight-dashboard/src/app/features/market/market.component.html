@@ -17,7 +17,7 @@
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 
-<app-insights-block [insights]="insights()" [period]="period()" />
+<app-insights-block [insights]="insights()" [period]="period()" [unavailableFrom]="periodUnavailableFrom()" />
 @if (blockError('insights'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
