@@ -469,6 +469,8 @@ export const ru: Strings = {
   'insight.dvol_spike': 'Ожидаемая волатильность BTC выросла на {change} пт, до {value} (DVOL)',
   'insight.stablecoin_supply': 'Предложение стейблкоинов по числу монет: {usd} ({pct}) за {days} д',
   'insight.coinbase_premium': 'Премия Coinbase {pct} к доллару держалась {minutes} мин из последнего часа',
+  // IB-113 (R11): the «Вывод:» line of the positioning block when an OI divergence alert is the best statement
+  'insight.oi_divergence': '{symbol} {tf}: расхождение цены и OI {direction} — цена {pricePct}, OI {oiPct}',
   'insight.neutral.insufficient_minutes': 'Мало полных минут для премии Coinbase — вывод не делаем',
   // IB-BUG-028 — a block that could not look names the source
   'insight.neutral.source_unavailable': 'Не смогли проверить: данные не пришли (источники: {sources})',

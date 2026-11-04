@@ -151,6 +151,9 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
   for (const k of ['global', 'top']) if (num(k) !== null) params[k] = (num(k) as number).toFixed(2);
   if (typeof p['side'] === 'string') nested['side'] = `insight.side.${p['side']}` as StringKey;
   if (typeof p['quadrant'] === 'string') nested['quadrant'] = `insight.quadrant.${p['quadrant']}` as StringKey;
+  // IB-113 (R11): the alert's timeframe is an identifier (stays as written); its direction is a word
+  if (typeof p['tf'] === 'string') params['tf'] = p['tf'];
+  if (typeof p['direction'] === 'string') nested['direction'] = `alerts.direction.${p['direction']}` as StringKey;
   nested['fng'] = typeof p['fngBand'] === 'string' ? (`kpi.ctx.fng.${p['fngBand']}` as StringKey) : 'insight.fng.none';
   return {
     key: s.key as StringKey,

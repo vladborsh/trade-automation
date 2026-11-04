@@ -5,7 +5,7 @@ describe('IB-086 contracts', () => {
   it('blocks and sentence keys are closed lists', () => {
     expect([...WEB_INSIGHT_BLOCKS]).toEqual(['liquidations', 'positioning', 'caps', 'flows', 'sentiment']);
     expect(WEB_INSIGHT_KEYS).toContain('insight.neutral');
-    expect(WEB_INSIGHT_KEYS).toHaveLength(11); // IB-091: R8–R10
+    expect(WEB_INSIGHT_KEYS).toHaveLength(12); // IB-091: R8–R10; IB-113: R11
   });
 
   it('a statement whose key is not in the list does not parse', () => {
@@ -67,5 +67,19 @@ describe('IB-107 (D24): a statement carries the series behind it, or says it had
     expect(spark([1, 2, 3], 3)).toBe(false);
     expect(spark([1, 2, 3], -1)).toBe(false);
     expect(spark([1, 2, 3], 1.5)).toBe(false);
+  });
+});
+
+describe('IB-113 (V16): R11, the OI divergence card', () => {
+  it('is a rule and a key; an event carries rarity 1 and still parses', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const s = require('./fixtures/insights.24h.json').top[0];
+    const r11 = {
+      ...s, ruleId: 'R11', block: 'positioning', key: 'insight.oi_divergence', rarity: 1, magnitude: 3.2,
+      params: { symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', pricePct: -1.8, oiPct: 3.2, runLength: 2 },
+      link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: 1_793_790_000 },
+    };
+    expect(WebInsightStatementSchema.safeParse(r11).success).toBe(true);
+    expect(WebInsightStatementSchema.safeParse({ ...r11, ruleId: 'R12' }).success).toBe(false);
   });
 });

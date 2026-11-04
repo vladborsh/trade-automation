@@ -14,8 +14,8 @@ export const WEB_INSIGHT_BLOCKS = ['liquidations', 'positioning', 'caps', 'flows
 export const WebInsightBlockSchema = z.enum(WEB_INSIGHT_BLOCKS);
 export type WebInsightBlock = z.infer<typeof WebInsightBlockSchema>;
 
-/** D5 rule set v1; R8–R10 are phase 2's «Деривативы и потоки» (IB-091). */
-export const WEB_INSIGHT_RULES = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10'] as const;
+/** D5 rule set v1; R8–R10 are phase 2's «Деривативы и потоки» (IB-091); R11 the OI divergence alert (IB-113, V16). */
+export const WEB_INSIGHT_RULES = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11'] as const;
 export const WebInsightRuleSchema = z.enum(WEB_INSIGHT_RULES);
 
 /**
@@ -30,12 +30,13 @@ export const WebInsightRuleSchema = z.enum(WEB_INSIGHT_RULES);
  * - `insight.dvol_spike`       R8 {value, change}                     — BTC implied vol (DVOL) rose unusually over the period
  * - `insight.stablecoin_supply` R9 {usd, pct, days}                  — total stablecoin supply moved unusually in 1 or 7 days
  * - `insight.coinbase_premium` R10 {pct, minutes}                    — Coinbase BTC held a premium / discount most of the last hour
+ * - `insight.oi_divergence`    R11 {symbol, tf, direction, pricePct, oiPct, runLength} — the newest on-time OI divergence alert of the last 24 h (IB-113)
  * - `insight.neutral`          the block line when nothing passes      {} (the reason is a field, not a param)
  */
 export const WEB_INSIGHT_KEYS = [
   'insight.liq_surge', 'insight.liq_coin', 'insight.liq_cascade', 'insight.oi_vs_price',
   'insight.funding_extremes', 'insight.crowd_vs_top', 'insight.breadth',
-  'insight.dvol_spike', 'insight.stablecoin_supply', 'insight.coinbase_premium', 'insight.neutral',
+  'insight.dvol_spike', 'insight.stablecoin_supply', 'insight.coinbase_premium', 'insight.oi_divergence', 'insight.neutral',
 ] as const;
 export const WebInsightKeySchema = z.enum(WEB_INSIGHT_KEYS);
 export type WebInsightKey = z.infer<typeof WebInsightKeySchema>;
@@ -83,7 +84,11 @@ export const WebInsightStatementSchema = z.object({
   block: WebInsightBlockSchema,
   key: WebInsightKeySchema,
   params: z.record(z.string(), z.union([z.number(), z.string(), z.null()])),
-  /** D2: empirical percentile in the rule's own sample; only ≥ 0.90 is ever sent. */
+  /**
+   * D2: empirical percentile in the rule's own sample; only ≥ 0.90 is ever sent. **R11 sends 1**: an
+   * OI divergence is an EVENT, not a percentile (OI divergence design V16) — the 1 only ranks it first,
+   * and the rarity value is never rendered.
+   */
   rarity: z.number().min(0).max(1),
   /** The rule's size for tie-breaking (USD, ×norm, %): ranks after rarity. */
   magnitude: z.number(),

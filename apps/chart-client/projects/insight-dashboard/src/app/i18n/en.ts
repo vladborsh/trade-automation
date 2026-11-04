@@ -463,6 +463,8 @@ export const en: Strings = {
   'insight.dvol_spike': 'BTC implied volatility rose {change} pt to {value} (DVOL)',
   'insight.stablecoin_supply': 'Stablecoin supply by coin count: {usd} ({pct}) in {days} d',
   'insight.coinbase_premium': 'Coinbase premium {pct} against the dollar held {minutes} min of the last hour',
+  // IB-113 (R11): the «Вывод:» line of the positioning block when an OI divergence alert is the best statement
+  'insight.oi_divergence': '{symbol} {tf}: price and OI diverged {direction} — price {pricePct}, OI {oiPct}',
   'insight.neutral.insufficient_minutes': 'Too few complete minutes for the Coinbase premium: no conclusion',
   // IB-BUG-028 — a block that could not look names the source
   'insight.neutral.source_unavailable': 'Could not check: no data arrived (sources: {sources})',

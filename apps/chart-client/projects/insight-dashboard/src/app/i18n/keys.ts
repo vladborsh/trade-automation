@@ -469,6 +469,7 @@ export type StringKey =
   | 'insight.dvol_spike'
   | 'insight.stablecoin_supply'
   | 'insight.coinbase_premium'
+  | 'insight.oi_divergence'
   | 'insight.neutral.insufficient_minutes'
   | 'insight.neutral.source_unavailable'
   | 'insight.source.tape'
