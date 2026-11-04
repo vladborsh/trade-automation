@@ -225,7 +225,8 @@ export class WebModule {
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
-      exports: [WebAuthService, CredentialsService],
+      // IB-112: the OI divergence loop (DeliveryModule) reads klines through the same cached, weight-tracked service
+      exports: [WebAuthService, CredentialsService, CandlesService],
     };
   }
 }

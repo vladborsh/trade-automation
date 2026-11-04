@@ -3,6 +3,7 @@ import { AppConfigModule } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { UsersModule } from '../users/users.module';
 import { CalendarNotifierService } from './calendar-notifier.service';
+import { OiAlertsService } from './oi-alerts.service';
 import { TelegramSender } from './telegram-sender';
 import { TelegramBotService } from './telegram-bot.service';
 import { WebPushSender } from './web-push-sender';
@@ -30,7 +31,8 @@ export class DeliveryModule {
       // IB-062: the calendar DMs live here, beside the bot, because they need the sender and users
       // IB-069: the browser push channel sits beside Telegram in the same notifier
       // IB-035: UsersService comes from UsersModule, shared with the site's members page
-      providers: [TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService],
+      // IB-112: the OI divergence alert loop, beside the calendar DMs (same sender, same DB)
+      providers: [TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService, OiAlertsService],
       exports: [UsersModule, TelegramSender],
     };
   }

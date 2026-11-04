@@ -51,6 +51,9 @@ export const EnvSchema = z.object({
   // while a high-impact event is within ±20 min and through the Sunday feed rollover, and never
   // two requests less than 60 s apart.
   CALENDAR_ENABLED: booleanFlag(true),
+  // IB-112: the OI divergence alert loop (journal always; sending is the admin page's switch, default
+  // off). This only lets a spec or a slot boot without the loop polling Binance klines every bar.
+  OI_ALERTS_LOOP_ENABLED: booleanFlag(true),
   CALENDAR_FEED_BASE_URL: z.string().default('https://nfs.faireconomy.media/ff_calendar_thisweek'),
   // IB-058: how often the collector checks whether today's once-a-day fetch has happened. A
   // check makes no request on a collected day; it only bounds how late the day's fetch can be.
