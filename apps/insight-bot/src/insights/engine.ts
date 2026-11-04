@@ -40,9 +40,16 @@ export function runInsights(rules: readonly Rule[], s: InsightSnapshot): Omit<We
   return { period: s.period, top: passing.slice(0, INSIGHTS_TOP_N), blocks };
 }
 
-/** Rarity first, then the size of the thing — the D2 order. */
+/**
+ * Rarity first, then the size of the thing — the D2 order. IB-113: at EQUAL rarity an event (R11, an
+ * OI divergence alert, rarity 1 by definition — V16) comes before a percentile that also reached 1:
+ * their magnitudes are different units (a count of coins against an OI %), so comparing them would
+ * decide by accident. Found live: R5 at rarity 1 with magnitude 3 outranked R11's 0.23 %.
+ */
+const EVENT_RULES: ReadonlySet<string> = new Set(['R11']);
 export function rank(a: WebInsightStatement, b: WebInsightStatement): number {
-  return b.rarity - a.rarity || Math.abs(b.magnitude) - Math.abs(a.magnitude);
+  const event = (s: WebInsightStatement) => (EVENT_RULES.has(s.ruleId) ? 1 : 0);
+  return b.rarity - a.rarity || event(b) - event(a) || Math.abs(b.magnitude) - Math.abs(a.magnitude);
 }
 
 /** A rule that throws is a bug in one rule, not a page outage: it counts as having said nothing. */

@@ -356,6 +356,14 @@ describe('R11 the OI divergence alert (IB-113, V16)', () => {
   it('no alert in the window → silent (null), not a refusal: the block\'s other rules decide its line', () => {
     expect(R11.run(snapshot())).toBeNull();
   });
+  it('ranks first even against a percentile that ALSO reached 1 with a bigger magnitude (the live case: R5 at 1, three coins)', () => {
+    const rows = [row('TRUMPUSDT', { funding: c(-0.0004, 1, 90) }), row('A', { funding: c(0.002, 1, 90) }), row('B', { funding: c(0.003, 1, 90) })];
+    // the live numbers: OI +0.2 % (magnitude 0.2) against three coins (magnitude 3) — magnitude alone would put R5 first
+    const small = { ...alert, b: { ...alert.b, oi: 1_002 } };
+    const out = runInsights(RULES, snapshot({ positioning: rows, oiDivergence: { alert: small, oiSeries: [1, 2] } }));
+    expect(out.top.map((x) => x.ruleId).slice(0, 2)).toEqual(['R11', 'R5']);
+    expect(out.blocks.find((b) => b.block === 'positioning')?.statement?.ruleId).toBe('R11');
+  });
   it('ranks first in its block over a rare-but-not-certain statement', () => {
     const r4row = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
     const out = runInsights(RULES, snapshot({ positioning: [r4row], oiDivergence: { alert, oiSeries: [1, 2] } }));
