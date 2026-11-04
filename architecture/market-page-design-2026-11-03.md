@@ -311,9 +311,10 @@ Signs and sides choose the variant. Numbers use the existing formatters: `$25M`,
 - *Illustrative:* «ETH: ликвидаций на $16M за 24ч — 4× обычного для монеты».
 
 **R3 `liq_cascade` {side, count, minutes, usd, symbol}**
-- ru: «Каскад: {count} ликвидаций {лонгов|шортов} за {minutes} мин, всего {usd}» / «Крупные ликвидации (от $100k) шли одна за другой, больше всего по {base}. За эти минуты вынесло больше, чем за большинство целых часов недели.»
-- en: «Cascade: {count} {long|short} liquidations in {minutes} min, {usd} in total» / «Large liquidations (from $100k) came one after another, mostly on {base}. These minutes outweighed most whole hours of the week.»
-- *Illustrative (mockup):* «Каскад: 21 ликвидация лонгов за 9 мин, всего $14.4M» → «Открыть BTC в 03:00 UTC».
+- ru: «Каскад ликвидаций {лонгов|шортов} за {minutes} мин: {count}, всего {usd}» / «Крупные ликвидации (от $100k) шли одна за другой, больше всего по {base}. За эти минуты вынесло больше, чем за большинство целых часов недели.»
+- en: «Cascade of {long|short} liquidations in {minutes} min: {count}, {usd} in total» / «Large liquidations (from $100k) came one after another, mostly on {base}. These minutes outweighed most whole hours of the week.»
+- *Illustrative (mockup):* «Каскад ликвидаций лонгов за 9 мин: 21, всего $14M» → «Открыть BTC в 03:00 UTC».
+- *Reworded 2026-11-04 (TL review of IB-107, dev-3):* the count stands after a colon, so no noun has to agree with it (Russian «1 ликвидация / 2 ликвидации / 5 ликвидаций» would need plural forms).
 
 **R4 `oi_vs_price` {symbol, quadrant, oiPct, pricePct}**
 - ru title: «{base}: открытый интерес {oiPct} при цене {pricePct}»
