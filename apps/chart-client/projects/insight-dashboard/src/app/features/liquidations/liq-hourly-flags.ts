@@ -10,10 +10,16 @@ import { formatRatio, formatUsd } from './liquidations.format';
  * ratio to the norm (IB-089: none for a partial bucket, none before the norm exists) — never
  * invented. One flag when the largest bucket IS the last one; none for an empty chart.
  *
+ * TL review: the «now» flag is drawn only when the current bucket is MATERIAL — at least
+ * `NOW_MIN_SHARE` (10 %) of the chart's largest bucket, or `NOW_MIN_RATIO` (×2) its norm once norms
+ * exist. «сейчас · лонги $292» beside a $48M hour drew the eye to nothing.
+ *
  * Geometry: a flag sits BESIDE its bar, never over it — to the bar's left in the right half of the
  * chart, to its right in the left half — at the end of the bar's bigger side, kept inside the chart.
  */
 export const FLAG_H = 26;
+export const NOW_MIN_SHARE = 0.1;
+export const NOW_MIN_RATIO = 2;
 
 export interface HourFlag {
   kind: 'max' | 'now';
@@ -34,7 +40,11 @@ export function hourlyFlags(hourly: WebLiquidationHourly, layout: HourlyLayout, 
   let max = 0;
   for (let i = 1; i < n; i++) if (total(i) > total(max)) max = i;
   const last = n - 1;
-  const picks: Array<{ i: number; kind: HourFlag['kind'] }> = max === last ? [{ i: last, kind: 'now' }] : [{ i: max, kind: 'max' }, { i: last, kind: 'now' }];
+  const ratio = layout.bars[last].ratio;
+  const material = total(last) >= NOW_MIN_SHARE * total(max) || (ratio !== null && ratio >= NOW_MIN_RATIO);
+  const picks: Array<{ i: number; kind: HourFlag['kind'] }> = max === last
+    ? [{ i: last, kind: 'now' }]
+    : [{ i: max, kind: 'max' }, ...(material ? [{ i: last, kind: 'now' as const }] : [])];
   return picks.filter(({ i }) => total(i) > 0).map(({ i, kind }) => flag(hourly, layout, size, i, kind));
 }
 

@@ -2,7 +2,7 @@
 <div class="bar" role="img" [attr.aria-label]="all()" [attr.title]="all()">
   @for (s of segments(); track s.key) {
     <span class="seg" [class.dark]="s.ink === 'dark'" [style.left.%]="s.left" [style.width.%]="s.pct" [style.background]="s.colour">
-      @if (s.inside) {
+      @if (fits(s)) {
         <span class="in num">{{ label(s) }}</span>
       }
     </span>

@@ -562,6 +562,15 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) {
           largeColumns: new Set(lefts.slice(0, 8)).size,
           treemap: box('app-caps-treemap svg'), dominance: box('app-dominance-bar .bar'),
           dominanceLegend: document.querySelectorAll('app-dominance-bar ul').length,
+          // TL review: a segment label is whole inside its segment, or absent — never clipped
+          clipped: [...document.querySelectorAll('app-dominance-bar .seg')].flatMap((seg) => {
+            const label = seg.querySelector('.in') as HTMLElement | null;
+            if (!label) return [];
+            const s = seg.getBoundingClientRect();
+            const l = label.getBoundingClientRect();
+            return l.left >= s.left - 0.5 && l.left + label.scrollWidth <= s.right + 0.5 ? [] : [label.textContent?.trim()];
+          }),
+          segmentLabels: document.querySelectorAll('app-dominance-bar .seg .in').length,
         };
       });
       expect(m.scrollWidth).toBeLessThanOrEqual(width);
@@ -584,6 +593,8 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) {
       expect(m.dominance.top).toBeGreaterThan(m.treemap.bottom);
       expect(Math.abs(m.dominance.width - m.treemap.width)).toBeLessThanOrEqual(2);
       expect(m.dominanceLegend).toBe(0);
+      expect(m.clipped).toEqual([]);
+      expect(m.segmentLabels).toBeGreaterThanOrEqual(1); // BTC's always fits: the check is not vacuous
       if (wide) {
         expect(m.where.top).toBe(m.hourly.top); // «по часам» and «где» share a row
         expect(m.flows.top).toBe(m.fng.top); // Fear & Greed beside «Деривативы и потоки»
@@ -599,9 +610,14 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) {
     test('/positioning: both sections are cards; every quadrant label is a pill', async ({ page }) => {
       await openPositioning(page, '/positioning?p=24h');
       await expect(page.locator('app-positioning-page app-card')).toHaveCount(2);
-      const labels = await page.locator('app-pos-quadrant text.label').count();
+      // the quadrant lays out again once its host is measured (ResizeObserver): count both in ONE read, after that
+      await page.clock.runFor(1_000);
+      const { labels, pills } = await page.evaluate(() => ({
+        labels: document.querySelectorAll('app-pos-quadrant text.label').length,
+        pills: document.querySelectorAll('app-pos-quadrant rect.pill').length,
+      }));
       expect(labels).toBeGreaterThan(0);
-      await expect(page.locator('app-pos-quadrant rect.pill')).toHaveCount(labels);
+      expect(pills).toBe(labels);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     });
   });

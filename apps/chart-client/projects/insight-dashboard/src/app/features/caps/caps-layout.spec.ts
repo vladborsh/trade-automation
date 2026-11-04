@@ -2,7 +2,7 @@ import type { WebCapsCoin, WebCapsDominance } from '@trade-automation/contracts'
 import { describe, expect, it } from 'vitest';
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
-import { bigTile, capsScale, changeColour, changeScale, dominanceSegments, NEUTRAL_TILE, squarify, tileText } from './caps-layout';
+import { bigTile, capsScale, changeColour, changeScale, dominanceSegments, NEUTRAL_TILE, segmentLabelFits, squarify, tileText } from './caps-layout';
 
 /** IB-090 — the caps block's geometry: squarify, the colour scale, the dominance bar. */
 const caps = [1560, 280, 91.7, 81, 55, 20.7, 20.4, 11.8, 8.5, 7.2, 5, 4.4, 3.7, 2.6, 2.3, 2.1, 2, 1.4, 1.1, 0.45];
@@ -97,11 +97,29 @@ describe('dominanceSegments', () => {
     for (const t of [ru, en]) for (const x of s) expect((t as Record<string, string>)[x.key], x.key).toBeTruthy();
   });
 
-  it('IB-108: a label goes inside a segment only from 8 % of the bar, with ink that reads on its fill', () => {
-    const s = dominanceSegments({ ...d, stablesPct: 7.9 });
-    expect(s.map((x) => x.inside)).toEqual([true, true, false, true]);
-    expect(s.map((x) => x.ink)).toEqual(['dark', 'dark', 'light', 'light']);
-    expect(dominanceSegments({ ...d, stablesPct: 8, restPct: 22.1 })[2].inside).toBe(true);
+  it('IB-108: ink that reads on each fill', () => {
+    expect(dominanceSegments(d).map((x) => x.ink)).toEqual(['dark', 'dark', 'light', 'light']);
+  });
+});
+
+describe('segmentLabelFits (IB-108, TL review)', () => {
+  it('the whole label fits the segment at the bar’s width, or there is none — at 390 «стейблкоины 11.0 %» does not', () => {
+    // a phone's bar: 358 px. «BTC 59.5 %» (10 chars → 86 px) in 213 px: fits
+    expect(segmentLabelFits('BTC 59.5 %', 59.5, 358)).toBe(true);
+    // «ETH 10.9 %» needs 86 px, 10.9 % of 358 is 39 px: no — the borderline the review saw
+    expect(segmentLabelFits('ETH 10.9 %', 10.9, 358)).toBe(false);
+    expect(segmentLabelFits('стейблкоины 11.0 %', 11, 358)).toBe(false);
+    expect(segmentLabelFits('остальные 18.6 %', 18.6, 358)).toBe(false);
+    // the same labels on a 1328 px desktop bar all fit
+    for (const [text, pct] of [['ETH 10.9 %', 10.9], ['стейблкоины 11.0 %', 11], ['остальные 18.6 %', 18.6]] as const) {
+      expect(segmentLabelFits(text, pct, 1328)).toBe(true);
+    }
+  });
+
+  it('the edge: exactly the text plus its padding fits; one pixel less does not', () => {
+    const need = 10 * 7.4 + 12; // 86 px
+    expect(segmentLabelFits('BTC 59.5 %', 100, need)).toBe(true);
+    expect(segmentLabelFits('BTC 59.5 %', 100, need - 1)).toBe(false);
   });
 });
 

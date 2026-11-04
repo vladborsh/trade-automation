@@ -141,14 +141,22 @@ export interface DominanceSegment {
   /** Left edge, percent of the bar. */
   left: number;
   colour: string;
-  /** IB-108: the label sits inside the segment when it is wide enough; the bar's title has them all. */
-  inside: boolean;
   /** Text colour on this fill: dark on the light fills, light on the dark ones. */
   ink: 'dark' | 'light';
 }
 
-/** A segment narrower than this share of the bar takes no label inside (it would not fit «ETH 10.6»). */
-export const SEGMENT_LABEL_MIN_PCT = 8;
+/** IB-108 (TL review): a segment label's metrics — 12 px semibold, 6 px in from each edge. */
+export const SEGMENT_CHAR_PX = 7.4;
+export const SEGMENT_LABEL_PAD = 6;
+
+/**
+ * IB-108 (TL review) — the treemap tiles' rule, on the dominance bar: a segment shows its label
+ * («стейблкоины 11.0 %») only when the WHOLE text fits the segment at the bar's measured width;
+ * otherwise none — never «стей» or «остальн». The bar's tooltip carries all four.
+ */
+export function segmentLabelFits(text: string, pct: number, barPx: number): boolean {
+  return text.length * SEGMENT_CHAR_PX + 2 * SEGMENT_LABEL_PAD <= (pct / 100) * barPx;
+}
 
 /** D11: BTC / ETH / stables / everything else, left to right, the four summing to 100. IB-108: the mockup's fills. */
 export function dominanceSegments(d: WebCapsDominance): DominanceSegment[] {
@@ -160,7 +168,7 @@ export function dominanceSegments(d: WebCapsDominance): DominanceSegment[] {
   ];
   let left = 0;
   return parts.map(([key, pct, colour, ink]) => {
-    const seg = { key, pct, left, colour, inside: pct >= SEGMENT_LABEL_MIN_PCT, ink };
+    const seg = { key, pct, left, colour, ink };
     left += pct;
     return seg;
   });

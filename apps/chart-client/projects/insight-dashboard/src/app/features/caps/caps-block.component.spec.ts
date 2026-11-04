@@ -42,7 +42,10 @@ describe('CapsBlockComponent (IB-090)', () => {
     expect(source.textContent?.trim()).toBe('Data: CoinGecko');
     expect(source.getAttribute('href')).toBe('https://www.coingecko.com');
     expect(el.querySelectorAll('app-dominance-bar .seg')).toHaveLength(4);
-    expect(el.textContent).toContain('stablecoins');
+    // IB-108 (TL review): at the test's 342 px a «stablecoins» label does not fit its segment, so it is not
+    // printed there — all four shares are the bar's accessible name and tooltip
+    expect(el.querySelector('app-dominance-bar .bar')?.getAttribute('aria-label')).toMatch(/BTC [\d.]+ % · ETH [\d.]+ % · stablecoins [\d.]+ % · everything else [\d.]+ %$/);
+    expect(el.querySelector('app-dominance-bar .bar')?.getAttribute('title')).toContain('stablecoins');
   });
 
   it('4h: the source publishes no change — neutral tiles and the refusal said in words', () => {
