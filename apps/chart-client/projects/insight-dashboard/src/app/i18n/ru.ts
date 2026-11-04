@@ -179,6 +179,7 @@ export const ru: Strings = {
   'instrument.legend.prevWeek': 'PWH / PWL: максимум и минимум прошлой недели',
   'instrument.legend.usdEvents': 'важное событие по USD',
   'instrument.legend.divergences': 'Дивергенции OI',
+  'instrument.legend.oiContracts': 'OI, контракты',
   'instrument.legend.divergencesToggle': 'Показать или скрыть дивергенции OI',
   'instrument.legend.usClosed': 'выходные / праздник в США',
   'calendar.tooltip.forecast': 'прогноз',

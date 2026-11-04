@@ -7,9 +7,14 @@ import { OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS, type OiDivergenceTf, type WebO
  *   its newest line is drawn;
  * - each line is two strokes, on the price pane (wick low/high at A and B) and on the OI pane (the OI
  *   pivots); bullish teal, bearish red (colour carries the direction), a repeat dashed;
- * - the OI pane plots **USD notional**, the detector works in contracts: each OI end is the pivot's
- *   own contracts × that bar's notional ÷ contracts, so it sits in the pane's unit at the pivot's value.
+ * - **the OI stroke is drawn in CONTRACTS**, the detector's own unit (TL review): the OI pane's main line is
+ *   USD notional, and a USD stroke can point the opposite way to the alert — TRX 1h, OI +0.76 % in contracts
+ *   while price fell 8.4 %, is LOWER at B in USD. So the pane gains a thin «OI, контракты» line on its own
+ *   overlay scale (`OI_CONTRACTS_SCALE`), and the stroke sits on that scale; `sign(end − start) == sign(oiPct)`
+ *   holds by construction, and a spec on the recorded TRX line pins it.
  */
+export const OI_CONTRACTS_SCALE = 'oi-contracts';
+export const OI_CONTRACTS_COLOUR = '#8b949e';
 export const DIVERGENCE_COLOURS = { bullish: '#26a69a', bearish: '#ef5350' } as const;
 
 export interface StrokePoint {
@@ -19,6 +24,8 @@ export interface StrokePoint {
 
 export interface DivergenceStroke {
   pane: 'price' | 'openInterest';
+  /** The price pane's own unit, or OI in contracts on the `OI_CONTRACTS_SCALE` overlay. */
+  unit: 'price' | 'contracts';
   direction: WebOiDivergenceLine['direction'];
   colour: string;
   dashed: boolean;
@@ -45,30 +52,19 @@ export function visibleLines(lines: readonly WebOiDivergenceLine[]): WebOiDiverg
 export const oiBarOf = (t: number, tfSec: number): number => Math.ceil(t / tfSec) * tfSec - tfSec;
 
 /**
- * The strokes for `lines` on a chart of `tf`. `openInterest` is the OI pane's own series (contracts as
- * `value`, USD as `notional`), for the unit; an OI end whose bar has no notional is left out (its price
- * stroke still draws).
+ * The strokes for `lines` on a chart of `tf`: the price stroke at the wicks, the OI stroke at the OI pivots'
+ * bars in contracts (the values the detector compared).
  */
-export function divergenceStrokes(
-  lines: readonly WebOiDivergenceLine[],
-  openInterest: ReadonlyArray<{ time: number; value: number; notional: number | null }>,
-  tf: OiDivergenceTf,
-): DivergenceStroke[] {
+export function divergenceStrokes(lines: readonly WebOiDivergenceLine[], tf: OiDivergenceTf): DivergenceStroke[] {
   const tfSec = OI_DIVERGENCE_TF_SEC[tf];
-  const usdPerContract = new Map<number, number>();
-  for (const p of openInterest) {
-    if (p.notional !== null && p.value > 0) usdPerContract.set(Math.floor(p.time / tfSec) * tfSec, p.notional / p.value);
-  }
   const out: DivergenceStroke[] = [];
   for (const l of visibleLines(lines)) {
     const style = { direction: l.direction, colour: DIVERGENCE_COLOURS[l.direction], dashed: l.repeat !== null };
-    out.push({ pane: 'price', ...style, points: [{ time: l.a.time, value: l.a.price }, { time: l.b.time, value: l.b.price }] });
+    out.push({ pane: 'price', unit: 'price', ...style, points: [{ time: l.a.time, value: l.a.price }, { time: l.b.time, value: l.b.price }] });
     const aBar = oiBarOf(l.a.oiTime, tfSec);
     const bBar = oiBarOf(l.b.oiTime, tfSec);
-    const ka = usdPerContract.get(aBar);
-    const kb = usdPerContract.get(bBar);
-    if (ka !== undefined && kb !== undefined && aBar < bBar) {
-      out.push({ pane: 'openInterest', ...style, points: [{ time: aBar, value: l.a.oi * ka }, { time: bBar, value: l.b.oi * kb }] });
+    if (aBar < bBar) {
+      out.push({ pane: 'openInterest', unit: 'contracts', ...style, points: [{ time: aBar, value: l.a.oi }, { time: bBar, value: l.b.oi }] });
     }
   }
   return out;

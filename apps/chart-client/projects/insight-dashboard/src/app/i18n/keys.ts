@@ -185,6 +185,7 @@ export type StringKey =
   | 'instrument.legend.prevWeek'
   | 'instrument.legend.usdEvents'
   | 'instrument.legend.divergences'
+  | 'instrument.legend.oiContracts'
   | 'instrument.legend.divergencesToggle'
   | 'instrument.legend.usClosed'
   | 'calendar.tooltip.forecast'

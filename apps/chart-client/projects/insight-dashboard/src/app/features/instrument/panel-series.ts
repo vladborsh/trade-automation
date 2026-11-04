@@ -7,7 +7,7 @@ import { daySeparatorTimes, showsDaySeparators } from './day-separators';
 import { futureSlots } from './future-bars';
 import { toLiquidationMarkers } from './liquidation-markers.adapter';
 import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
-import { divergenceStrokes, divergenceTf } from './oi-divergence-lines';
+import { divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, OI_CONTRACTS_SCALE } from './oi-divergence-lines';
 import type { PaneData } from './pane-data';
 import { paneIndexOf, type PanelDef } from './panels.model';
 import { LEVEL_COLOURS, LEVEL_LINES, levelSteps, previousDayLevels, previousWeekLevels } from './prior-levels';
@@ -154,10 +154,20 @@ function drawOpenInterest(chart: IChartApi, data: PaneData, renderers: PanelRend
 function drawDivergences(chart: IChartApi, data: PaneData, which: 'price' | 'openInterest', pane: number): void {
   const tf = data.divergences ? divergenceTf(data.timeframe) : null;
   if (!tf || !data.divergences) return;
-  for (const s of divergenceStrokes(data.divergences, data.openInterest, tf)) {
-    if (s.pane !== which) continue;
+  const strokes = divergenceStrokes(data.divergences, tf).filter((s) => s.pane === which);
+  // TL review: OI strokes are in CONTRACTS, on an overlay scale of their own, over a thin contracts line —
+  // the pane's main line is USD and would point some strokes the wrong way
+  const scale = which === 'openInterest' ? { priceScaleId: OI_CONTRACTS_SCALE } : {};
+  if (which === 'openInterest' && strokes.length > 0) {
+    const contracts = chart.addSeries(LineSeries, {
+      ...scale, color: OI_CONTRACTS_COLOUR, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    }, pane);
+    contracts.setData(asLine(onGrid(data.openInterest, data).map((p) => ({ time: p.time, value: p.value }))));
+    contracts.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0.15 } });
+  }
+  for (const s of strokes) {
     chart.addSeries(LineSeries, {
-      color: s.colour, lineWidth: 2, lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
+      ...scale, color: s.colour, lineWidth: 2, lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true,
       autoscaleInfoProvider: () => null,
     }, pane).setData(s.points as never);

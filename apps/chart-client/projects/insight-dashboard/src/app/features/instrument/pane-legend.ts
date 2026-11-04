@@ -1,4 +1,4 @@
-import { DIVERGENCE_COLOURS } from './oi-divergence-lines';
+import { DIVERGENCE_COLOURS, OI_CONTRACTS_COLOUR } from './oi-divergence-lines';
 import type { StringKey } from '../../i18n/keys';
 import { noAnswerLabel, seriesStartLabel, type CoverageLabel } from './coverage-labels';
 import type { PaneData } from './pane-data';
@@ -40,7 +40,11 @@ export function legendEntries(
   const divergences: LegendEntry[] = data?.divergences !== undefined && (panel.key === 'price' || panel.key === 'openInterest')
     ? [{ label: t('instrument.legend.divergences'), colour: DIVERGENCE_COLOURS.bullish, line: true, toggle: 'divergences', off: divergencesHidden }]
     : [];
-  const own = [...panel.legend.map((e) => ({ label: t(e.labelKey), colour: e.colour, line: false })), ...divergences];
+  // TL review: while OI strokes are drawn, the OI pane also carries the contracts line they sit on
+  const contracts: LegendEntry[] = panel.key === 'openInterest' && !divergencesHidden && (data?.divergences?.length ?? 0) > 0
+    ? [{ label: t('instrument.legend.oiContracts'), colour: OI_CONTRACTS_COLOUR, line: true }]
+    : [];
+  const own = [...panel.legend.map((e) => ({ label: t(e.labelKey), colour: e.colour, line: false })), ...contracts, ...divergences];
   const note = data ? coverageNote(panel.key, data) : null;
   if (note) return [...own, { label: t(note.key, note.params), colour: null, line: false }];
   if (panel.key !== 'price' || !data) return own;

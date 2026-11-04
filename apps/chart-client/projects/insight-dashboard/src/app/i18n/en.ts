@@ -173,6 +173,7 @@ export const en: Strings = {
   'instrument.legend.prevWeek': 'PWH / PWL: previous week high and low',
   'instrument.legend.usdEvents': 'high-impact USD event',
   'instrument.legend.divergences': 'OI divergences',
+  'instrument.legend.oiContracts': 'OI, contracts',
   'instrument.legend.divergencesToggle': 'Show or hide the OI divergences',
   'instrument.legend.usClosed': 'weekend / US holiday',
   'calendar.tooltip.forecast': 'forecast',
