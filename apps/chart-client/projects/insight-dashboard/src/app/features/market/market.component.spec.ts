@@ -131,6 +131,18 @@ describe('MarketComponent shell (IB-088)', () => {
     vis.mockRestore();
   });
 
+  it('IB-BUG-021: LOADED in a background tab it asks nothing until shown, then every block once', async () => {
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    const { calls } = setup();
+    await vi.advanceTimersByTimeAsync(180_000);
+    expect(calls).toEqual([]);
+    vis.mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.map((c) => c.endpoint).sort()).toEqual(['caps', 'insights', 'kpis', 'liquidations', 'positioning', 'sentiment']);
+    vis.mockRestore();
+  });
+
   it('there is no Refresh button: the page refreshes itself', () => {
     const { fixture } = setup();
     const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].map((b) => b.textContent?.trim());

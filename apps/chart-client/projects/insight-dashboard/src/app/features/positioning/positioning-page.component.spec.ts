@@ -37,6 +37,33 @@ async function open(url: string) {
 
 afterEach(() => TestBed.resetTestingModule());
 
+describe('PositioningPageComponent loaded hidden (IB-BUG-021)', () => {
+  it('a /positioning tab opened in the background asks nothing until it is shown', async () => {
+    vi.useFakeTimers();
+    const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    try {
+      const calls: WebMarketPeriod[] = [];
+      TestBed.configureTestingModule({
+        imports: [PositioningPageComponent],
+        providers: [
+          provideRouter([]),
+          { provide: InsightApiClient, useValue: { marketPositioning: async (p: WebMarketPeriod) => (calls.push(p), fixture) } },
+        ],
+      });
+      TestBed.createComponent(PositioningPageComponent).detectChanges();
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(calls).toEqual([]);
+      vis.mockReturnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(calls).toHaveLength(1);
+    } finally {
+      vis.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('PositioningPageComponent (IB-103)', () => {
   it('asks the same endpoint as Market for the URL\'s period, and draws the quadrant and the full table', async () => {
     const { el, calls, tickers } = await open('/positioning?p=4h');

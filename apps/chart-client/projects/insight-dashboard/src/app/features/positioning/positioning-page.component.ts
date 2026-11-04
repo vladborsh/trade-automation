@@ -6,6 +6,7 @@ import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { LoaderComponent } from '../../ui/loader.component';
 import { BlockScheduler } from '../market/shell/block-scheduler';
+import { bindVisibility } from '../market/shell/scheduler-visibility';
 import { parsePeriod } from '../market/shell/market-text';
 import { PeriodSwitchComponent } from '../market/shell/period-switch.component';
 import { PosHeatComponent } from './pos-heat.component';
@@ -58,12 +59,12 @@ export class PositioningPageComponent {
       const r = await this.api.marketPositioning(period);
       if (period === this.period()) this.data.set(r);
     });
+    // IB-BUG-021: the current visibility first, so a page loaded in a background tab stays silent
+    const detachVisibility = bindVisibility(doc, this.scheduler);
     this.scheduler.start();
-    const onVisibility = () => this.scheduler.setVisible(doc.visibilityState !== 'hidden');
-    doc.addEventListener('visibilitychange', onVisibility);
     inject(DestroyRef).onDestroy(() => {
       this.scheduler.stop();
-      doc.removeEventListener('visibilitychange', onVisibility);
+      detachVisibility();
     });
   }
 

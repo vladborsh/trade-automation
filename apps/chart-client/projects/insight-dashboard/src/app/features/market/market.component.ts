@@ -15,6 +15,7 @@ import { BlockConclusionComponent } from './shell/block-conclusion.component';
 import { FearGreedGaugeComponent } from './fear-greed-gauge.component';
 import { fearGreedBand } from './market.adapter';
 import { BlockScheduler, liveAge, type BlockId } from './shell/block-scheduler';
+import { bindVisibility } from './shell/scheduler-visibility';
 import { InsightsBlockComponent } from './shell/insights-block.component';
 import { KpiStripComponent } from './shell/kpi-strip.component';
 import { parsePeriod } from './shell/market-text';
@@ -109,15 +110,15 @@ export class MarketComponent {
       if (period === this.period()) this.caps.set(r);
     });
     this.scheduler.register('sentiment', async () => this.cards.set(await this.api.marketCards()));
+    // IB-BUG-021: the current visibility first, so a page loaded in a background tab stays silent
+    const detachVisibility = bindVisibility(doc, this.scheduler);
     this.scheduler.start();
 
-    const onVisibility = () => this.scheduler.setVisible(doc.visibilityState !== 'hidden');
-    doc.addEventListener('visibilitychange', onVisibility);
     const clock = setInterval(() => this.nowMs.set(Date.now()), 1_000);
     inject(DestroyRef).onDestroy(() => {
       this.scheduler.stop();
       clearInterval(clock);
-      doc.removeEventListener('visibilitychange', onVisibility);
+      detachVisibility();
     });
   }
 
