@@ -1,0 +1,211 @@
+import { detectDivergences, type Bar, type DivergenceInput, type DivergenceParams } from '../../../src/insights/divergence/detector';
+import type { OiPoint } from '../../../src/insights/divergence/oi-per-bar';
+
+/**
+ * IB-109 — the detector's eleven specs (architecture/oi-divergence-design-2026-11-04.md §3), on
+ * hand-built bars. Each is built so it CAN fail: the bars make the rule under test the only thing
+ * deciding the outcome, and where a rule refuses, a control shows the same bars firing once that
+ * rule is relaxed (so the refusal is the rule's, not an accident of the fixture).
+ *
+ * Spec 11, the mirror: every scenario runs as written (bullish, on lows) AND mirrored (bearish, on
+ * highs: price → 200 − price, OI → 2020 − OI), through `both()`.
+ */
+const TF = 900; // 15m
+const T0 = 1_793_000_000 - (1_793_000_000 % TF);
+const P: DivergenceParams = { n: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5 };
+const BASE_LOW = 100;
+const BASE_OI = [1000, 1010]; // alternating: |ΔOI| median 10 → δoi = 5, and equal neighbours make no OI pivot
+
+interface Scene {
+  /** Wick low per bar (high = low + 2, open = close = low + 1, so closes never decide a pivot). */
+  lows: number[];
+  /** Per bar, its three readings (labels open+5m, +10m, +15m); a number means all three equal. */
+  oi: Array<number | [number, number, number]>;
+  /** Readings to drop: [bar, slot 0..2]. */
+  drop?: Array<[number, number]>;
+}
+
+function scene(len: number, set: Record<number, { low?: number; oi?: number | [number, number, number] }> = {}): Scene {
+  const lows = Array.from({ length: len }, (_, i) => set[i]?.low ?? BASE_LOW);
+  const oi = Array.from({ length: len }, (_, i) => set[i]?.oi ?? BASE_OI[i % 2]);
+  return { lows, oi };
+}
+
+function input(s: Scene, mirror: boolean, extra: Partial<DivergenceInput> = {}): DivergenceInput {
+  const px = (v: number) => (mirror ? 200 - v : v);
+  const ox = (v: number) => (mirror ? 2020 - v : v);
+  const bars: Bar[] = s.lows.map((low, i) => {
+    const lo = mirror ? px(low + 2) : low;
+    return { time: T0 + i * TF, open: lo + 1, high: lo + 2, low: lo, close: lo + 1 };
+  });
+  const drop = new Set((s.drop ?? []).map(([b, k]) => `${b}:${k}`));
+  const oi5m: OiPoint[] = s.oi.flatMap((v, i) => {
+    const three = typeof v === 'number' ? [v, v, v] : v;
+    return three.map((x, k) => ({ time: T0 + i * TF + (k + 1) * 300, oi: ox(x) })).filter((_, k) => !drop.has(`${i}:${k}`));
+  });
+  return { tfSec: TF, bars, oi5m, params: P, ...extra };
+}
+
+/** Runs a scenario as bullish (lows) and as its bearish mirror (highs); the check gets the expected direction. */
+function both(s: Scene, check: (r: ReturnType<typeof detectDivergences>, dir: 'bullish' | 'bearish', mirror: boolean) => void, extra?: Partial<DivergenceInput>) {
+  for (const mirror of [false, true]) check(detectDivergences(input(s, mirror, extra)), mirror ? 'bearish' : 'bullish', mirror);
+}
+
+/** A at 40 (low 95, OI 960 at 41), B at 60 (low 93, OI 980): a clean bullish divergence. */
+const A = 40;
+const B = 60;
+const base = () => scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, [B]: { low: 93, oi: 980 } });
+
+describe('detectDivergences — the base case and the mirror (spec 11)', () => {
+  it('a lower low on a higher OI low is one divergence A→B; its mirror is one bearish', () => {
+    both(base(), (r, dir) => {
+      expect(r.divergences).toHaveLength(1);
+      const d = r.divergences[0];
+      expect([d.direction, d.aIndex, d.bIndex, d.runLength, d.runFirstBTime]).toEqual([dir, A, B, 2, null]);
+      expect(d.a.oiTime).toBe(T0 + (A + 1) * TF + 300); // the OI pivot's own reading, a bar after the price pivot
+      expect(d.pricePct).toBeCloseTo(dir === 'bullish' ? -2.105 : (107 / 105 - 1) * 100, 2);
+      expect(r.skips).toEqual([]);
+    });
+  });
+});
+
+describe('detectDivergences — the owner’s rules (design §3)', () => {
+  it('1. a low is ruled on WICKS: closes say no pivot, the wick says pivot', () => {
+    both(base(), (r, _dir, mirror) => {
+      expect(mirror ? r.pivots.highs : r.pivots.lows).toEqual([A, B]);
+    });
+    // Flat closes (every bar opens and closes at the baseline, the wick alone reaches down): a close-based rule
+    // finds nothing here, the wick rule still finds A and B — and the divergence.
+    for (const mirror of [false, true]) {
+      const inp = input(base(), mirror);
+      const flat = { ...inp, bars: inp.bars.map((b) => (mirror
+        ? { ...b, open: 99, close: 99, low: Math.min(b.low, 98) }
+        : { ...b, open: 101, close: 101, high: Math.max(b.high, 102) })) };
+      const r = detectDivergences(flat);
+      expect(mirror ? r.pivots.highs : r.pivots.lows).toEqual([A, B]);
+      expect(r.divergences).toHaveLength(1);
+    }
+  });
+
+  it('2. equal lows: the first is the pivot, the second is not; a double bottom within W still pairs', () => {
+    const s = scene(80, { [A]: { low: 95, oi: 960 }, [A + 1]: { low: 95 }, [B]: { low: 95, oi: 980 } });
+    both(s, (r, _d, mirror) => {
+      expect(mirror ? r.pivots.highs : r.pivots.lows).toEqual([A, B]); // not A+1
+      expect(r.pairs.map((p) => p.price)).toEqual([A, B]); // the double bottom: both bottoms are paired
+      expect(r.divergences).toEqual([]); // equal, not lower: no divergence
+    });
+  });
+
+  it('3. a pivot is not confirmed until bar i+N has closed', () => {
+    for (const mirror of [false, true]) {
+      const full = input(base(), mirror);
+      const cut = (last: number) => detectDivergences({ ...full, bars: full.bars.slice(0, last + 1) });
+      const early = cut(B + P.n - 1); // bar B+5 is the last closed: B is not a pivot yet — not merely an unconfirmed pair
+      expect(mirror ? early.pivots.highs : early.pivots.lows).toEqual([A]);
+      expect(early.divergences).toEqual([]);
+      expect(mirror ? cut(B + P.n).pivots.highs : cut(B + P.n).pivots.lows).toEqual([A, B]);
+      const r = cut(B + P.n);
+      expect(r.divergences.map((d) => d.bIndex)).toEqual([B]);
+      expect(r.divergences[0].confirmedAt).toBe(T0 + (B + P.n + 1) * TF); // the close of bar B+N
+    }
+  });
+
+  it('4. OI per bar is the MIN for lows and the MAX for highs: a bar whose last reading is high, an inner one low', () => {
+    // A's OI bar: readings 1000, 960, 1010 — its min (960) is a pivot, its last reading (1010) is not
+    const s = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: [1000, 960, 1010] }, [B]: { low: 93, oi: 980 } });
+    both(s, (r, dir) => {
+      expect(r.divergences).toHaveLength(1);
+      expect(r.divergences[0].a.oi).toBe(dir === 'bullish' ? 960 : 2020 - 960);
+      expect(r.divergences[0].a.oiTime).toBe(T0 + (A + 1) * TF + 600); // the inner reading's own time
+    });
+  });
+
+  it('5. pairing within ±k: an OI pivot at k+1 does not pair; of two, the nearest wins', () => {
+    const far = scene(80, { [A]: { low: 95 }, [A + P.k + 1]: { oi: 960 }, [B]: { low: 93, oi: 980 } });
+    both(far, (r) => {
+      expect(r.pairs.map((p) => p.price)).toEqual([B]); // A has no OI pivot within ±3: it takes no part
+      expect(r.divergences).toEqual([]);
+    });
+    const atK = scene(80, { [A]: { low: 95 }, [A + P.k]: { oi: 960 }, [B]: { low: 93, oi: 980 } });
+    both(atK, (r) => expect(r.divergences).toHaveLength(1)); // control: at exactly k it pairs
+    // Two OI pivots near A. With N = 6 two pivots within ±3 of one bar cannot both exist (each needs 6 bars of
+    // higher neighbours), so this part runs at N = 2: pivots at −2 and +1 → the nearer (+1); at −2 and +2 → the earlier.
+    const n2 = { params: { ...P, n: 2 } };
+    const nearer = scene(80, { [A - 2]: { oi: 955 }, [A]: { low: 95 }, [A + 1]: { oi: 958 }, [B]: { low: 93, oi: 980 } });
+    both(nearer, (r) => {
+      expect(r.pivots.oiLows.length + r.pivots.oiHighs.length).toBeGreaterThanOrEqual(3); // both OI pivots exist (and B's)
+      expect(r.pairs.find((p) => p.price === A)?.oi).toBe(A + 1);
+    }, n2);
+    const tie = scene(80, { [A - 2]: { oi: 955 }, [A]: { low: 95 }, [A + 2]: { oi: 958 }, [B]: { low: 93, oi: 980 } });
+    both(tie, (r) => expect(r.pairs.find((p) => p.price === A)?.oi).toBe(A - 2), n2);
+  });
+
+  it('6. of several valid A, the FARTHEST wins', () => {
+    // Both A are valid for B = 70: from 30 the lines run 96 → 93 (94.5 at bar 50: the 95 wick is above it) and
+    // 950 → 980 (≈ 965 at bar 51: the 970 OI is above it). 50 also qualifies on its own (93 < 95, 980 > 970).
+    const s = scene(90, { 30: { low: 96 }, 31: { oi: 950 }, 50: { low: 95 }, 51: { oi: 970 }, 70: { low: 93, oi: 980 } });
+    both(s, (r) => {
+      const last = r.divergences.filter((d) => d.bIndex === 70);
+      expect(last).toHaveLength(1);
+      expect(last[0].aIndex).toBe(30);
+    });
+    // control: without the farther one, the nearer A is the one taken — so the choice above was the rule's
+    const near = scene(90, { 50: { low: 95 }, 51: { oi: 970 }, 70: { low: 93, oi: 980 } });
+    both(near, (r) => expect(r.divergences.filter((d) => d.bIndex === 70).map((d) => d.aIndex)).toEqual([50]));
+  });
+
+  it('7. line validity: a wick below the A–B price line refuses A; so does a per-bar OI below the OI line', () => {
+    // the price line runs 95 → 93 over 20 bars: 94 at bar 50. A wick at 93.6 there crosses it.
+    const wick = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, 50: { low: 93.6 }, [B]: { low: 93, oi: 980 } });
+    both(wick, (r) => expect(r.divergences).toEqual([]));
+    const above = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, 50: { low: 94.2 }, [B]: { low: 93, oi: 980 } });
+    both(above, (r) => expect(r.divergences).toHaveLength(1)); // control: the same wick above the line passes
+    // the OI line runs 960 (bar 41) → 980 (bar 60): ≈ 969.5 at bar 50. A per-bar min of 965 there crosses it.
+    const oiDip = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, 50: { oi: [1000, 965, 1000] }, [B]: { low: 93, oi: 980 } });
+    both(oiDip, (r) => expect(r.divergences).toEqual([]));
+    const oiOk = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, 50: { oi: [1000, 975, 1000] }, [B]: { low: 93, oi: 980 } });
+    both(oiOk, (r) => expect(r.divergences).toHaveLength(1));
+  });
+
+  it('8. noise: a lower low by 0.1 × ATR does not fire — and does once the threshold is off', () => {
+    // ATR14 at B ≈ 2.3 (TR 2 per bar; B's own bar reaches 6.2 below the previous close): δp ≈ 0.58. A low 0.2 under A's
+    // (≈ 0.1 × ATR) is inside it.
+    const s = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, [B]: { low: 94.8, oi: 980 } });
+    both(s, (r) => expect(r.divergences).toEqual([]));
+    both(s, (r) => expect(r.divergences).toHaveLength(1), { params: { ...P, atrMult: 0 } });
+    // the OI side: 965 against A's 960 is inside δoi (0.5 × median |ΔOI| 10 = 5) — the comparison is strict
+    const oiNoise = scene(80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, [B]: { low: 93, oi: 965 } });
+    both(oiNoise, (r) => expect(r.divergences).toEqual([]));
+    both(oiNoise, (r) => expect(r.divergences).toHaveLength(1), { params: { ...P, oiMedianMult: 0 } });
+  });
+
+  it('9. a repeat: A, B, C gives two alerts — the second has run length 3 and runs A–C', () => {
+    const s = scene(100, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, [B]: { low: 93, oi: 980 }, 80: { low: 91, oi: 990 } });
+    both(s, (r, dir) => {
+      expect(r.divergences.map((d) => [d.direction, d.aIndex, d.bIndex, d.runLength])).toEqual([
+        [dir, A, B, 2],
+        [dir, A, 80, 3],
+      ]);
+      expect(r.divergences[1].runFirstBTime).toBe(T0 + B * TF);
+    });
+  });
+
+  it('10. a hole in OI inside the window skips the evaluation; a slot the venue did not publish does not', () => {
+    const s = { ...base(), drop: [[30, 1]] as Array<[number, number]> }; // bar 30's second reading is missing
+    const holeSlot = T0 + 30 * TF + 600;
+    both(s, (r) => {
+      expect(r.divergences).toEqual([]);
+      // both evaluations whose window holds the hole are skipped: A's (as a B with no earlier A) and B's
+      expect(r.skips).toEqual([A, B].map((i) => ({ barTime: T0 + i * TF, reason: 'no_oi_data', holeFrom: holeSlot, holeTo: holeSlot })));
+    });
+    both(s, (r) => {
+      expect(r.skips).toEqual([]);
+      expect(r.divergences.map((d) => d.bIndex)).toEqual([B]);
+    }, { venueSilent: [{ from: holeSlot, to: holeSlot }] });
+    // a slot not due yet (the venue's publish lag) is not a hole either: B's window ends at bar B+k+N = 69's close
+    const late = { ...base(), drop: [[69, 2]] as Array<[number, number]> };
+    const lastSlot = T0 + 70 * TF;
+    both(late, (r) => expect(r.skips.map((x) => x.holeFrom)).toEqual([lastSlot]), { oiDueUntil: lastSlot }); // control: due → a hole
+    both(late, (r) => expect(r.skips).toEqual([]), { oiDueUntil: lastSlot - 300 });
+  });
+});
