@@ -1,4 +1,5 @@
 import type { StringKey } from '../../i18n/keys';
+import { noAnswerLabel, seriesStartLabel, type CoverageLabel } from './coverage-labels';
 import type { PaneData } from './pane-data';
 import { PANELS, panelHeading, type PanelDef } from './panels.model';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
@@ -20,12 +21,19 @@ export interface LegendEntry {
   line: boolean;
 }
 
+/** What the legend reads: the timeframe always, and (IB-081) the coverage the server stated. */
+export type LegendData = Pick<PaneData, 'timeframe'> & Partial<Pick<PaneData, 'funding' | 'longShort' | 'openInterestCoverage'>>;
+
+type Translate = (key: StringKey, params?: Record<string, string>) => string;
+
 export function legendEntries(
   panel: PanelDef,
-  data: Pick<PaneData, 'timeframe'> | null,
-  t: (key: StringKey) => string,
+  data: LegendData | null,
+  t: Translate,
 ): LegendEntry[] {
   const own = panel.legend.map((e) => ({ label: t(e.labelKey), colour: e.colour, line: false }));
+  const note = data ? coverageNote(panel.key, data) : null;
+  if (note) return [...own, { label: t(note.key, note.params), colour: null, line: false }];
   if (panel.key !== 'price' || !data) return own;
   const sessions = showsSessions(data.timeframe)
     ? SESSIONS.map((s) => ({ label: t(s.labelKey), colour: s.swatch, line: false }))
@@ -44,12 +52,24 @@ export function legendEntries(
 }
 
 /**
+ * IB-081 — the statement a pane adds about its own data: where the OI or long/short series begins
+ * when that is later than the window, and which venue's funding did not answer. A statement, so no
+ * swatch (`colour: null`). Null when the server said nothing worth saying (`coverage-labels.ts`).
+ */
+function coverageNote(key: PanelDef['key'], data: LegendData): CoverageLabel | null {
+  if (key === 'openInterest') return seriesStartLabel(data.openInterestCoverage);
+  if (key === 'longShort') return seriesStartLabel(data.longShort);
+  if (key === 'funding') return noAnswerLabel(data.funding?.unavailable);
+  return null;
+}
+
+/**
  * Every pane's legend box: its heading, its entries, at its pane's top edge (`paneEdges`), in
  * `PANELS` order. Moved out of the chart component (IB-098) — it is mapping, not wiring.
  */
 export function paneLegends(
-  t: (key: StringKey) => string,
-  data: Pick<PaneData, 'timeframe'> | null,
+  t: Translate,
+  data: LegendData | null,
   symbol: string,
   edges: ReadonlyArray<{ top: number }>,
 ): Array<{ key: PanelDef['key']; heading: string; entries: LegendEntry[]; top: number }> {

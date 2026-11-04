@@ -47,6 +47,7 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     bucket,
     candles,
     openInterest: oi.points,
+    openInterestCoverage: { coverageFrom: oi.coverageFrom, truncated: oi.truncated },
     funding,
     longShort,
     liquidations,

@@ -124,6 +124,8 @@ export const en: Strings = {
   'instrument.legend.delta': 'delta per bar',
   'instrument.legend.settled': 'settled',
   'instrument.legend.predicted': 'predicted',
+  'instrument.coverage.from': 'data from {date}',
+  'instrument.coverage.noAnswer': 'no answer: {venues}',
   'instrument.legend.london': 'London session',
   'instrument.legend.newYork': 'New York session',
   'instrument.legend.prevDay': 'PDH / PDL: previous day high and low',

@@ -50,3 +50,42 @@ describe('paneLegends (moved out of the chart component, IB-098)', () => {
     expect(boxes[0].entries).toEqual(legendEntries(price, { timeframe: '1m' }, t));
   });
 });
+
+describe('IB-081 — the coverage statements on the OI, long/short and funding panes', () => {
+  const oi = PANELS.find((p) => p.key === 'openInterest')!;
+  const longShort = PANELS.find((p) => p.key === 'longShort')!;
+  const fundingPane = PANELS.find((p) => p.key === 'funding')!;
+  const tp = (key: StringKey, params?: Record<string, string>): string =>
+    ((ru as Record<string, string>)[key] ?? `MISSING:${key}`).replace(/\{(\w+)\}/g, (_, n: string) => params?.[n] ?? `{${n}}`);
+  const OCT_5 = Date.UTC(2026, 9, 5) / 1000;
+  const fundingWith = (unavailable?: string[]) =>
+    ({ symbol: 'BTCUSDT', settled: [], predicted: [], downsampled: false, ...(unavailable ? { unavailable } : {}) });
+  const lsWith = (cov: object) => ({ symbol: 'BTCUSDT', kind: 'global_account' as const, points: [], downsampled: false, ...cov });
+
+  it('OI truncated: the pane says where its series begins, as a statement (no swatch)', () => {
+    const last = legendEntries(oi, { timeframe: '1h', openInterestCoverage: { coverageFrom: OCT_5, truncated: true } }, tp).at(-1)!;
+    expect(last).toEqual({ label: 'данные с 2026-10-05', colour: null, line: false });
+  });
+
+  it('long/short truncated: the same statement from its own response', () => {
+    expect(legendEntries(longShort, { timeframe: '1h', longShort: lsWith({ coverageFrom: OCT_5, truncated: true }) }, tp).at(-1)?.label).toBe('данные с 2026-10-05');
+  });
+
+  it('coverageFrom without truncated adds nothing (the spec that can disagree)', () => {
+    expect(legendEntries(oi, { timeframe: '1h', openInterestCoverage: { coverageFrom: OCT_5 } }, tp)).toHaveLength(oi.legend.length);
+    expect(legendEntries(longShort, { timeframe: '1h', longShort: lsWith({ coverageFrom: OCT_5 }) }, tp)).toHaveLength(longShort.legend.length);
+  });
+
+  it('funding: «нет ответа: bybit, okx» when venues failed, nothing when every venue answered', () => {
+    expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith(['bybit', 'okx']) }, tp).at(-1)?.label).toBe('нет ответа: bybit, okx');
+    expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith() }, tp)).toHaveLength(fundingPane.legend.length);
+    expect(legendEntries(fundingPane, { timeframe: '1h', funding: fundingWith([]) }, tp)).toHaveLength(fundingPane.legend.length);
+  });
+
+  it('each statement stays on its own pane: OI truncation does not label long/short or funding', () => {
+    const data = { timeframe: '1h', openInterestCoverage: { coverageFrom: OCT_5, truncated: true }, funding: fundingWith(), longShort: lsWith({}) };
+    expect(legendEntries(longShort, data, tp)).toHaveLength(longShort.legend.length);
+    expect(legendEntries(fundingPane, data, tp)).toHaveLength(fundingPane.legend.length);
+    expect(legendEntries(price, data, tp).map((e) => e.label)).not.toContain('данные с 2026-10-05');
+  });
+});

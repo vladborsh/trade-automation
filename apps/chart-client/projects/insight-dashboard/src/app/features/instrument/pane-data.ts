@@ -2,6 +2,7 @@ import type {
   EconomicEvent, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
   WebLongShortResponse,
 } from '@trade-automation/contracts';
+import type { Coverage } from './coverage-labels';
 
 /**
  * One window of everything the instrument row draws. Lifted out of
@@ -14,6 +15,12 @@ export interface PaneData {
   bucket: string;
   candles: WebCandlesResponse;
   openInterest: Array<{ time: number; value: number; notional: number | null }>;
+  /**
+   * IB-081 — where the OI series begins when that is later than the window (`coverageFrom` /
+   * `truncated` of `/series/oi`). Kept beside the points because `openInterest` is the bare array.
+   * Absent before IB-081 and on a read that reached its whole window.
+   */
+  openInterestCoverage?: Coverage;
   funding: WebFundingResponse;
   longShort: WebLongShortResponse;
   liquidations: WebLiquidationsResponse;

@@ -130,6 +130,8 @@ export const ru: Strings = {
   'instrument.legend.delta': 'дельта за бар',
   'instrument.legend.settled': 'расчётный',
   'instrument.legend.predicted': 'прогнозный',
+  'instrument.coverage.from': 'данные с {date}',
+  'instrument.coverage.noAnswer': 'нет ответа: {venues}',
   'instrument.legend.london': 'сессия Лондона',
   'instrument.legend.newYork': 'сессия Нью-Йорка',
   'instrument.legend.prevDay': 'PDH / PDL: максимум и минимум прошлого дня',

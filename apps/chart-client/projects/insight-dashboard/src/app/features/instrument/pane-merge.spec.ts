@@ -177,3 +177,42 @@ describe('appendLater (IB-066)', () => {
     expect(out.dailyCandles.map((c) => [c.time, c.close])).toEqual([[0, 1], [86_400, 3], [172_800, 4]]);
   });
 });
+
+describe('IB-081 — coverage and unavailable venues survive the joins', () => {
+  const ls = (t: number, cov: { coverageFrom?: number; truncated?: boolean } = {}) =>
+    ({ symbol: 'BTCUSDT', kind: 'global_account' as const, points: [{ time: t, ratio: 1 }], downsampled: false, ...cov });
+
+  it('scrolling left: the joined OI and long/short begin where the EARLIER read begins', () => {
+    const current = window(7_200, { openInterestCoverage: {}, longShort: ls(7_200) });
+    const earlier = window(3_600, { openInterestCoverage: { coverageFrom: 3_000, truncated: true }, longShort: ls(3_600, { coverageFrom: 3_000, truncated: true }) });
+    const out = prependEarlier(current, earlier);
+    // the first DRAWN point is 3 600, so that is where the label must say the series begins
+    expect(out.openInterestCoverage).toEqual({ coverageFrom: 3_600, truncated: true });
+    expect(out.longShort.coverageFrom).toBe(3_600);
+    expect(out.longShort.truncated).toBe(true);
+  });
+
+  it('scrolling left past a truncated window: the earlier read reached its whole window, so the label goes', () => {
+    // the window on screen started late; the earlier one did not, so nothing is missing any more
+    const current = window(7_200, { openInterestCoverage: { coverageFrom: 7_000, truncated: true }, longShort: ls(7_200, { coverageFrom: 7_000, truncated: true }) });
+    const out = prependEarlier(current, window(3_600, { openInterestCoverage: {}, longShort: ls(3_600) }));
+    expect(out.openInterestCoverage).toEqual({});
+    expect('coverageFrom' in out.longShort).toBe(false);
+    expect('truncated' in out.longShort).toBe(false);
+  });
+
+  it('funding: a venue missing from either read stays named; none missing leaves the field absent', () => {
+    const f = (unavailable?: string[]) => ({ ...window(0).funding, ...(unavailable ? { unavailable } : {}) });
+    expect(prependEarlier(window(7_200, { funding: f(['okx']) }), window(3_600, { funding: f(['bybit']) })).funding.unavailable).toEqual(['bybit', 'okx']);
+    expect('unavailable' in prependEarlier(window(7_200), window(3_600)).funding).toBe(false);
+    expect(appendLater(window(7_200, { funding: f() }), { funding: f(['okx']) }).funding.unavailable).toEqual(['okx']);
+    expect('unavailable' in appendLater(window(7_200), { funding: f() }).funding).toBe(false);
+  });
+
+  it('the live tail does not move where the series begins', () => {
+    const current = window(7_200, { longShort: ls(7_200, { coverageFrom: 7_000, truncated: true }) });
+    const out = appendLater(current, { longShort: ls(10_800), openInterest: [{ time: 10_800, value: 1, notional: null }] });
+    expect(out.longShort.coverageFrom).toBe(7_000);
+    expect(out.longShort.truncated).toBe(true);
+  });
+});

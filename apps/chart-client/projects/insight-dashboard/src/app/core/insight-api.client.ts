@@ -1,6 +1,7 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
+  WebOpenInterestResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
   WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
@@ -76,8 +77,9 @@ export class InsightApiClient {
     return this.get<WebFundingResponse>('/series/funding', { symbol, from: fromMs, to: toMs });
   }
 
-  async openInterest(symbol: string, fromMs: number, toMs: number): Promise<{ symbol: string; venue: string; points: Array<{ time: number; value: number; notional: number | null }>; downsampled: boolean }> {
-    return this.get('/series/oi', { symbol, from: fromMs, to: toMs });
+  // IB-081: the contract's type, not a hand-written copy of it — the copy lacked `coverageFrom`/`truncated`
+  async openInterest(symbol: string, fromMs: number, toMs: number): Promise<WebOpenInterestResponse> {
+    return this.get<WebOpenInterestResponse>('/series/oi', { symbol, from: fromMs, to: toMs });
   }
 
   async longShort(symbol: string, fromMs: number, toMs: number, kind: string): Promise<WebLongShortResponse> {

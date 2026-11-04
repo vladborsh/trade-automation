@@ -134,6 +134,9 @@ export type StringKey =
   | 'instrument.legend.delta'
   | 'instrument.legend.settled'
   | 'instrument.legend.predicted'
+  // IB-081: where a series begins, and which venue did not answer
+  | 'instrument.coverage.from'
+  | 'instrument.coverage.noAnswer'
   | 'instrument.legend.london'
   | 'instrument.legend.newYork'
   | 'instrument.legend.prevDay'

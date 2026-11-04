@@ -1,6 +1,7 @@
 import type {
   WebCandle, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse, WebLongShortResponse,
 } from '@trade-automation/contracts';
+import { joinedCoverage, joinedUnavailable, type Coverage } from './coverage-labels';
 import type { PaneData } from './pane-data';
 
 /**
@@ -21,11 +22,16 @@ export function prependEarlier(current: PaneData, earlier: PaneData): PaneData {
       downsampled: current.candles.downsampled || earlier.candles.downsampled,
     },
     openInterest: [...earlier.openInterest, ...current.openInterest],
-    funding: {
+    // IB-081: the joined series begins where the earlier read's does (`joinedCoverage`)
+    openInterestCoverage: joinedCoverage(earlier.openInterestCoverage, (earlier.openInterest[0] ?? current.openInterest[0])?.time),
+    funding: withUnavailable({
       ...current.funding,
       settled: mergeVenues(earlier.funding.settled, current.funding.settled),
-    },
-    longShort: { ...current.longShort, points: [...earlier.longShort.points, ...current.longShort.points] },
+    }, joinedUnavailable(earlier.funding.unavailable, current.funding.unavailable)),
+    longShort: withCoverage(
+      { ...current.longShort, points: [...earlier.longShort.points, ...current.longShort.points] },
+      joinedCoverage(earlier.longShort, (earlier.longShort.points[0] ?? current.longShort.points[0])?.time),
+    ),
     liquidations: {
       ...current.liquidations,
       bars: [...earlier.liquidations.bars, ...current.liquidations.bars],
@@ -78,12 +84,12 @@ export function appendLater(current: PaneData, tail: LaterTail): PaneData {
   }
   if (tail.openInterest) out.openInterest = byTime([...current.openInterest, ...tail.openInterest]);
   if (tail.funding) {
-    out.funding = {
+    out.funding = withUnavailable({
       ...current.funding,
       settled: mergeVenues(current.funding.settled, tail.funding.settled, (points) => byTime(points)),
       predicted: byTime([...current.funding.predicted, ...tail.funding.predicted]),
       downsampled: current.funding.downsampled || tail.funding.downsampled,
-    };
+    }, joinedUnavailable(current.funding.unavailable, tail.funding.unavailable));
   }
   if (tail.longShort) {
     out.longShort = { ...current.longShort, points: byTime([...current.longShort.points, ...tail.longShort.points]) };
@@ -105,6 +111,18 @@ export function appendLater(current: PaneData, tail: LaterTail): PaneData {
 /** True when an earlier read found no candles at all: the venue's history starts after it. */
 export function isBeforeHistory(earlier: PaneData): boolean {
   return earlier.candles.candles.length === 0;
+}
+
+/** IB-081: set or drop `unavailable`, so "every venue answered" stays the field's absence. */
+function withUnavailable(funding: WebFundingResponse, unavailable: string[] | undefined): WebFundingResponse {
+  const { unavailable: _old, ...rest } = funding;
+  return unavailable ? { ...rest, unavailable } : rest;
+}
+
+/** IB-081: replace `coverageFrom` / `truncated`, dropping both when the joined read reached its whole window. */
+function withCoverage(series: WebLongShortResponse, coverage: Coverage): WebLongShortResponse {
+  const { coverageFrom: _f, truncated: _t, ...rest } = series;
+  return { ...rest, ...coverage };
 }
 
 function byTime<T extends { time: number }>(points: readonly T[]): T[] {
