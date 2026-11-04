@@ -14,7 +14,12 @@ import { OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS, type OiDivergenceTf, type WebO
  *   holds by construction, and a spec on the recorded TRX line pins it.
  */
 export const OI_CONTRACTS_SCALE = 'oi-contracts';
-export const OI_CONTRACTS_COLOUR = '#8b949e';
+/**
+ * IB-114 (V21, owner): the contracts line is context, the stroke on it is the signal — so the line is DIM: the
+ * muted token `#8b949e` at 50 % opacity, 1 px, under the USD OI line (2 px, `#58a6ff`). The strokes keep their
+ * full colour (`DIVERGENCE_COLOURS`, opaque).
+ */
+export const OI_CONTRACTS_COLOUR = 'rgba(139, 148, 158, 0.5)';
 export const DIVERGENCE_COLOURS = { bullish: '#26a69a', bearish: '#ef5350' } as const;
 
 export interface StrokePoint {

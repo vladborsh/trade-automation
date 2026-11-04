@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WebOiDivergenceLine } from '@trade-automation/contracts';
-import { DIVERGENCE_COLOURS, divergenceStrokes, divergenceTf, oiBarOf, visibleLines } from './oi-divergence-lines';
+import { DIVERGENCE_COLOURS, divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, oiBarOf, visibleLines } from './oi-divergence-lines';
 import { TRX_1H_LINES, TRX_1H_OI } from './oi-divergence-trx-1h.fixture';
 
 /** IB-110 — what the chart draws from the divergence lines. */
@@ -67,5 +67,13 @@ describe('the OI stroke agrees with the alert (TRX 1h, recorded)', () => {
     const lines = visibleLines(TRX_1H_LINES);
     expect(strokes).toHaveLength(lines.length);
     strokes.forEach((s, i) => expect([s.unit, Math.sign(s.points[1].value - s.points[0].value)]).toEqual(['contracts', Math.sign(lines[i].oiPct)]));
+  });
+});
+
+describe('the «OI, контракты» line is dim, the stroke is not (IB-114, V21)', () => {
+  it('the muted token #8b949e at 50 % opacity; both stroke colours opaque', () => {
+    const rgba = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(OI_CONTRACTS_COLOUR);
+    expect(rgba?.slice(1).map(Number)).toEqual([0x8b, 0x94, 0x9e, 0.5]);
+    for (const c of Object.values(DIVERGENCE_COLOURS)) expect(c).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
