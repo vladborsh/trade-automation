@@ -59,7 +59,7 @@ describe('windowStats', () => {
     }));
 
   const trailing = (symbolId: string | null, usd: number, events = 3): TrailingRow[] => [
-    { symbolId, side: 'long', usdByWindow: { 3600: usd }, eventsByWindow: { 3600: events } },
+    { symbolId, venueKey: symbolId === null ? 'binance:HOTUSDT' : null, side: 'long', usdByWindow: { 3600: usd }, eventsByWindow: { 3600: events } },
   ];
 
   it('divides the trailing hour by the median hour and states the basis', () => {
@@ -84,8 +84,8 @@ describe('windowStats', () => {
       { symbolId: null, side: 'long', bucketMs: NOW - HOUR, usd: 900 },
     ];
     const rows: TrailingRow[] = [
-      { symbolId: 'BTCUSDT', side: 'long', usdByWindow: { 3600: 100 }, eventsByWindow: { 3600: 1 } },
-      { symbolId: null, side: 'long', usdByWindow: { 3600: 900 }, eventsByWindow: { 3600: 1 } },
+      { symbolId: 'BTCUSDT', venueKey: null, side: 'long', usdByWindow: { 3600: 100 }, eventsByWindow: { 3600: 1 } },
+      { symbolId: null, venueKey: 'binance:HOTUSDT', side: 'long', usdByWindow: { 3600: 900 }, eventsByWindow: { 3600: 1 } },
     ];
     const common = { window: '1h' as const, windowSec: 3_600, nowMs: NOW, periodStartMs: PERIOD_START, buckets, trailing: rows, venues };
 

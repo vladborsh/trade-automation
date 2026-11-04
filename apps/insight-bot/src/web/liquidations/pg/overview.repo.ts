@@ -12,14 +12,34 @@ import type { Db } from '../../../db/db.port';
  */
 
 /** `(venue, venue_symbol) → (canonical id, base)`, built from the three per-venue columns. */
-const SYMBOL_MAP = `
-  map as (
+const MAP_ROWS = `
     select id, base, 'binance'::text as venue, binance_perp as sym from symbols where binance_perp is not null
     union all
     select id, base, 'bybit'::text,            bybit_linear       from symbols where bybit_linear is not null
     union all
-    select id, base, 'okx'::text,              okx_swap           from symbols where okx_swap is not null
+    select id, base, 'okx'::text,              okx_swap           from symbols where okx_swap is not null`;
+
+/** IB-BUG-025: a Binance contract counted in a universe coin's row (BTCUSDC → BTCUSDT). */
+export interface SymbolAlias {
+  symbol: string;
+  id: string;
+}
+
+/**
+ * The `map` CTE, with the aliases (if any) as two array parameters appended to `params` — after
+ * every other parameter, so no query's existing `$n` moves. An alias is never a `symbols`
+ * spelling (`aliasTable` guarantees it), so the join stays one row per liquidation.
+ */
+function mapCte(params: unknown[], aliases: readonly SymbolAlias[] | undefined): string {
+  if (!aliases || aliases.length === 0) return `map as (${MAP_ROWS}\n  )`;
+  params.push(aliases.map((a) => a.symbol), aliases.map((a) => a.id));
+  const syms = params.length - 1;
+  return `map as (${MAP_ROWS}
+    union all
+    select s.id, s.base, 'binance'::text, x.sym
+      from unnest($${syms}::text[], $${syms + 1}::text[]) as x(sym, id) join symbols s on s.id = x.id
   )`;
+}
 
 const asDate = (ms: number) => new Date(ms);
 
@@ -77,10 +97,12 @@ export interface BucketRow {
  */
 export async function alignedBuckets(
   db: Db,
-  q: { windowSec: number; fromMs: number; toMs: number; keys?: readonly string[] },
+  q: { windowSec: number; fromMs: number; toMs: number; keys?: readonly string[]; aliases?: readonly SymbolAlias[] },
 ): Promise<BucketRow[]> {
+  const params = keysParams([q.windowSec, asDate(q.fromMs), asDate(q.toMs)], q.keys);
+  const map = mapCte(params, q.aliases);
   const rows = await db.query<{ symbol_id: string | null; side: 'long' | 'short'; bucket: string; usd: string }>(
-    `with ${SYMBOL_MAP}
+    `with ${map}
      select m.id as symbol_id,
             l.side,
             floor(extract(epoch from l.ts) / $1) * $1 as bucket,
@@ -89,7 +111,7 @@ export async function alignedBuckets(
        left join map m on m.venue = l.venue and m.sym = l.symbol
       where l.ts >= $2 and l.ts < $3 ${keysFilter(q.keys, 4)}
       group by 1, 2, 3`,
-    keysParams([q.windowSec, asDate(q.fromMs), asDate(q.toMs)], q.keys),
+    params,
   );
   return rows.map((r) => ({
     symbolId: r.symbol_id,
@@ -101,6 +123,8 @@ export async function alignedBuckets(
 
 export interface TrailingRow {
   symbolId: string | null;
+  /** IB-BUG-025: `venue:symbol` when `symbolId` is null, so the rows of unlisted coins can be told apart. */
+  venueKey: string | null;
   side: 'long' | 'short';
   /** USD in each trailing window, keyed by the window's length in seconds. */
   usdByWindow: Record<number, number>;
@@ -116,7 +140,7 @@ export interface TrailingRow {
  */
 export async function trailingSums(
   db: Db,
-  q: { nowMs: number; windowsSec: readonly number[]; keys?: readonly string[] },
+  q: { nowMs: number; windowsSec: readonly number[]; keys?: readonly string[]; aliases?: readonly SymbolAlias[] },
 ): Promise<TrailingRow[]> {
   const widest = Math.max(...q.windowsSec);
   const params: unknown[] = [asDate(q.nowMs - widest * 1000), asDate(q.nowMs)];
@@ -128,14 +152,18 @@ export async function trailingSums(
   });
 
   const keyFilter = keysFilter(q.keys, params.length + 1);
+  const all = keysParams(params, q.keys);
+  const map = mapCte(all, q.aliases);
   const rows = await db.query<Record<string, string | null>>(
-    `with ${SYMBOL_MAP}
-     select m.id as symbol_id, l.side, ${sums.join(', ')}
+    `with ${map}
+     select m.id as symbol_id, l.side,
+            case when m.id is null then l.venue || ':' || l.symbol end as venue_key,
+            ${sums.join(', ')}
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
       where l.ts >= $1 and l.ts < $2 ${keyFilter}
-      group by 1, 2`,
-    keysParams(params, q.keys),
+      group by 1, 2, 3`,
+    all,
   );
 
   return rows.map((r) => {
@@ -145,7 +173,10 @@ export async function trailingSums(
       usdByWindow[sec] = Number(r[`usd_${sec}`] ?? 0);
       eventsByWindow[sec] = Number(r[`events_${sec}`] ?? 0);
     }
-    return { symbolId: (r.symbol_id as string | null) ?? null, side: r.side as 'long' | 'short', usdByWindow, eventsByWindow };
+    return {
+      symbolId: (r.symbol_id as string | null) ?? null, venueKey: (r.venue_key as string | null) ?? null,
+      side: r.side as 'long' | 'short', usdByWindow, eventsByWindow,
+    };
   });
 }
 
@@ -158,16 +189,18 @@ export async function trailingSums(
  */
 export async function venueFirstSeen(
   db: Db,
-  q: { fromMs: number; toMs: number; keys?: readonly string[] },
+  q: { fromMs: number; toMs: number; keys?: readonly string[]; aliases?: readonly SymbolAlias[] },
 ): Promise<Array<{ symbolId: string | null; venue: string; firstSeenMs: number }>> {
+  const params = keysParams([asDate(q.fromMs), asDate(q.toMs)], q.keys);
+  const map = mapCte(params, q.aliases);
   const rows = await db.query<{ symbol_id: string | null; venue: string; first_seen: Date }>(
-    `with ${SYMBOL_MAP}
+    `with ${map}
      select m.id as symbol_id, l.venue, min(l.ts) as first_seen
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
       where l.ts >= $1 and l.ts < $2 ${keysFilter(q.keys, 3)}
       group by 1, 2`,
-    keysParams([asDate(q.fromMs), asDate(q.toMs)], q.keys),
+    params,
   );
   return rows.map((r) => ({
     symbolId: r.symbol_id,
@@ -191,20 +224,22 @@ export interface FeedRow {
 /** The newest events above the threshold, biggest-first order being the feed's job, not SQL's. */
 export async function feed(
   db: Db,
-  q: { fromMs: number; toMs: number; minUsd: number; limit: number; keys?: readonly string[]; order?: 'newest' | 'oldest' },
+  q: { fromMs: number; toMs: number; minUsd: number; limit: number; keys?: readonly string[]; order?: 'newest' | 'oldest'; aliases?: readonly SymbolAlias[] },
 ): Promise<FeedRow[]> {
+  const params = keysParams([asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.limit], q.keys);
+  const map = mapCte(params, q.aliases);
   const rows = await db.query<{
     ts: Date; symbol_id: string | null; venue_symbol: string; base: string | null;
     side: 'long' | 'short'; notional: string; price: string; venue: string;
   }>(
-    `with ${SYMBOL_MAP}
+    `with ${map}
      select l.ts, m.id as symbol_id, l.symbol as venue_symbol, m.base, l.side, l.notional, l.price, l.venue
        from liquidations l
        left join map m on m.venue = l.venue and m.sym = l.symbol
       where l.ts >= $1 and l.ts < $2 and l.notional >= $3 ${keysFilter(q.keys, 5)}
       order by l.ts ${q.order === 'oldest' ? 'asc' : 'desc'}
       limit $4`,
-    keysParams([asDate(q.fromMs), asDate(q.toMs), q.minUsd, q.limit], q.keys),
+    params,
   );
   return rows.map((r) => ({
     timeSec: Math.floor(new Date(r.ts).getTime() / 1000),

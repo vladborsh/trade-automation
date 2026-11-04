@@ -8,7 +8,7 @@ import { DB, type Db } from '../../db/db.port';
 import { LARGE_LIMIT, LARGE_MIN_USD, LIQUIDATION_BLOCK_CACHE_MS, SERIES_MIN_USD } from '../../insights/thresholds';
 import { IDLE_SWEEP_MS, TtlCache } from '../../venues/ttl-cache';
 import { AssetClassifier } from './asset-classes';
-import { availableFrom, hourly, largeEvents, periodNorm, periodTotals, verdict } from './block.assemble';
+import { availableFrom, hourly, largeEvents, otherCoins, periodNorm, periodTotals, verdict } from './block.assemble';
 import { normPeriodStart } from './norm';
 import { completeWindowStarts, sampleFor, windowStats } from './overview.assemble';
 import * as repo from './pg/overview.repo';
@@ -94,6 +94,13 @@ export class LiquidationsOverviewService {
     });
   }
 
+  /** IB-BUG-025: the coin of an unmapped row's `venue:symbol` (Binance base asset when known). */
+  private coinOfKey(venueKey: string | null): string {
+    if (venueKey === null) return 'unknown';
+    const at = venueKey.indexOf(':');
+    return this.classifier.coinOf(venueKey.slice(0, at), venueKey.slice(at + 1));
+  }
+
   /**
    * IB-085 (D9): per CRYPTO coin, the period's USD and the sample it is rare against — one sum per
    * complete aligned window of the period's length over the norm period, empty windows as 0. `days`
@@ -106,12 +113,13 @@ export class LiquidationsOverviewService {
       if (!db) throw new Error('no database');
       const nowMs = this.now();
       const keys = await this.classKeys(db, nowMs);
+      const aliases = this.classifier.aliases();
       const periodSec = WEB_MARKET_PERIOD_SECONDS[period];
       const capMs = nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000;
       const [firstSeen, trailing, buckets] = await Promise.all([
-        repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
-        repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.crypto }),
-        period === '7d' ? Promise.resolve([]) : repo.alignedBuckets(db, { windowSec: periodSec, fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+        repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: keys.crypto, aliases }),
+        repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.crypto, aliases }),
+        period === '7d' ? Promise.resolve([]) : repo.alignedBuckets(db, { windowSec: periodSec, fromMs: capMs, toMs: nowMs, keys: keys.crypto, aliases }),
       ]);
       const out = new Map<string, { usd: number; sample: number[]; days: number }>();
       const ids = new Set(trailing.map((r) => r.symbolId).concat(firstSeen.map((r) => r.symbolId)).filter((id): id is string => id !== null));
@@ -141,13 +149,14 @@ export class LiquidationsOverviewService {
       if (!db) throw new Error('no database');
       const nowMs = this.now();
       const keys = await this.classKeys(db, nowMs);
+      const aliases = this.classifier.aliases();
       const periodSec = WEB_MARKET_PERIOD_SECONDS[period];
       const capMs = nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000;
       const [firstSeen, trailing, periodBuckets, hourBuckets] = await Promise.all([
-        repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
-        repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.crypto }),
-        period === '7d' ? Promise.resolve([]) : repo.alignedBuckets(db, { windowSec: periodSec, fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
-        repo.alignedBuckets(db, { windowSec: 3_600, fromMs: capMs, toMs: nowMs, keys: keys.crypto }),
+        repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: keys.crypto, aliases }),
+        repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.crypto, aliases }),
+        period === '7d' ? Promise.resolve([]) : repo.alignedBuckets(db, { windowSec: periodSec, fromMs: capMs, toMs: nowMs, keys: keys.crypto, aliases }),
+        repo.alignedBuckets(db, { windowSec: 3_600, fromMs: capMs, toMs: nowMs, keys: keys.crypto, aliases }),
       ]);
       const venues = [...new Set(firstSeen.map((r) => r.venue))];
       const start = normPeriodStart(venues.map((v) => Math.min(...firstSeen.filter((r) => r.venue === v).map((r) => r.firstSeenMs))), nowMs);
@@ -172,6 +181,8 @@ export class LiquidationsOverviewService {
     // D6: every total, norm and rank below is CRYPTO only
     const keys = await this.classKeys(db, nowMs);
     const crypto = keys.crypto;
+    // IB-BUG-025: another quote/form of a universe coin counts in its row (BTCUSDC → BTC)
+    const aliases = this.classifier.aliases();
 
     const widestSec = Math.max(...Object.values(WEB_LIQUIDATION_WINDOW_SECONDS));
     const capMs = nowMs - WEB_LIQUIDATION_NORM_DAYS * 86_400_000;
@@ -179,8 +190,8 @@ export class LiquidationsOverviewService {
     // `venueFirstSeen` is bounded to the cap, so a venue older than the period reports the cap
     // and `normPeriodStart` leaves the period at its full length.
     const [firstSeen, feedRows, present, ranked] = await Promise.all([
-      repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: crypto }),
-      repo.feed(db, { fromMs: nowMs - widestSec * 1000, toMs: nowMs, minUsd: q.feedMinUsd, limit: q.feedLimit, keys: crypto }),
+      repo.venueFirstSeen(db, { fromMs: capMs, toMs: nowMs, keys: crypto, aliases }),
+      repo.feed(db, { fromMs: nowMs - widestSec * 1000, toMs: nowMs, minUsd: q.feedMinUsd, limit: q.feedLimit, keys: crypto, aliases }),
       repo.venuesWithRows(db, { fromMs: nowMs - widestSec * 1000, toMs: nowMs }),
       // D6: ranks are crypto only — TradFi ids are dropped before the top N is cut
       repo.rankedSymbols(db, q.topN + 50).then((rows) => rows.filter((r) => this.classifier.classOfId(r.id) === 'crypto').slice(0, q.topN)),
@@ -214,7 +225,7 @@ export class LiquidationsOverviewService {
     const bucketSec = WEB_LIQUIDATION_BUCKET_SECONDS[q.period];
     const trailingWindows = [...new Set([...WEB_LIQUIDATION_WINDOWS.map((w) => WEB_LIQUIDATION_WINDOW_SECONDS[w]), periodSec])];
     const [trailing, tradfiTrailing, unknownTrailing] = await Promise.all([
-      repo.trailingSums(db, { nowMs, windowsSec: trailingWindows, keys: crypto }),
+      repo.trailingSums(db, { nowMs, windowsSec: trailingWindows, keys: crypto, aliases }),
       repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.tradfi }),
       repo.trailingSums(db, { nowMs, windowsSec: [periodSec], keys: keys.unknown }),
     ]);
@@ -224,7 +235,7 @@ export class LiquidationsOverviewService {
     const bucketsBySize = new Map(await Promise.all(
       sizes.map(async (windowSec) => [
         windowSec,
-        await repo.alignedBuckets(db, { windowSec, fromMs: windowSec === bucketSec ? barsFromMs : periodStartMs, toMs: nowMs, keys: crypto }),
+        await repo.alignedBuckets(db, { windowSec, fromMs: windowSec === bucketSec ? barsFromMs : periodStartMs, toMs: nowMs, keys: crypto, aliases }),
       ] as const),
     ));
     const bucketsByWindow = new Map(WEB_LIQUIDATION_WINDOWS.map((w) => [w, bucketsBySize.get(WEB_LIQUIDATION_WINDOW_SECONDS[w]) ?? []] as const));
@@ -264,7 +275,7 @@ export class LiquidationsOverviewService {
     };
     const marketNorm = scopedNorm(null);
     const candidates = await repo.feed(db, {
-      fromMs: nowMs - periodSec * 1000, toMs: nowMs, minUsd: Math.min(LARGE_MIN_USD, SERIES_MIN_USD), limit: 5_000, keys: crypto, order: 'oldest',
+      fromMs: nowMs - periodSec * 1000, toMs: nowMs, minUsd: Math.min(LARGE_MIN_USD, SERIES_MIN_USD), limit: 5_000, keys: crypto, order: 'oldest', aliases,
     });
     const medianEvent = await repo.medianEventUsd(db, { fromMs: market.periodStartMs, toMs: nowMs, keys: crypto });
     const marketPeriodDays = (nowMs - market.periodStartMs) / 86_400_000;
@@ -286,6 +297,8 @@ export class LiquidationsOverviewService {
         normPeriodDays: marketPeriodDays, minHistoryDays: WEB_LIQUIDATION_MIN_HISTORY_DAYS,
       }),
       largeMinUsd: LARGE_MIN_USD,
+      // IB-BUG-025: the crypto in no row, so rows + this = totals
+      otherCoins: otherCoins(trailing, periodSec, new Set(ranked.map((c) => c.id)), (r) => r.symbolId ?? this.coinOfKey(r.venueKey)),
       tradfi: periodTotals(tradfiTrailing, periodSec),
       unknown: periodTotals(unknownTrailing, periodSec),
       // the 30-day cap bounds `firstSeen`; a box older than that is long past every period anyway

@@ -25,6 +25,20 @@ export function periodTotals(rows: readonly TrailingRow[], periodSec: number, sy
   return { usd: long + short, long, short, events: scoped.reduce((n, r) => n + (r.eventsByWindow[periodSec] ?? 0), 0) };
 }
 
+/**
+ * IB-BUG-025: the crypto in the period that is in NO shown coin row — universe coins below the
+ * rows, and coins the universe does not list — summed from the rows themselves (never total minus
+ * rows), with the distinct coins it holds. `coinOf` names a row's coin (universe id, or Binance's
+ * base asset for an unlisted contract, so BTCUSDC and BTCUSDT would be one coin). Pure.
+ */
+export function otherCoins(
+  rows: readonly TrailingRow[], periodSec: number, shown: ReadonlySet<string>, coinOf: (row: TrailingRow) => string,
+): { totals: WebLiquidationPeriodTotals; coins: number } {
+  const other = rows.filter((r) => r.symbolId === null || !shown.has(r.symbolId));
+  const coins = new Set(other.filter((r) => (r.eventsByWindow[periodSec] ?? 0) > 0).map(coinOf));
+  return { totals: periodTotals(other, periodSec), coins: coins.size };
+}
+
 export interface PeriodNorm {
   long: WebLiquidationSideStats;
   short: WebLiquidationSideStats;

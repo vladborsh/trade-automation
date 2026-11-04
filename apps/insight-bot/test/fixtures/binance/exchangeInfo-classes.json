@@ -1,5 +1,5 @@
 {
- "_captured": "2026-11-03 ~14:45 UTC, GET fapi.binance.com/fapi/v1/exchangeInfo (weight 1, one probe; IB-084). Trimmed to the fields the classifier reads, every universe symbol, and one symbol of each (contractType, underlyingType) seen.",
+ "_captured": "2026-11-03 ~14:45 UTC, GET fapi.binance.com/fapi/v1/exchangeInfo (weight 1, one probe; IB-084). Trimmed to the fields the classifier reads, every universe symbol, and one symbol of each (contractType, underlyingType) seen. IB-BUG-025 appended 5 real records from GET exchangeInfo 2026-11-04 ~02:00 UTC (ETHUSDC, 1000PEPEUSDC, BTCUSD1, HOTUSDT, SPCXUSD1): other-quote spellings of universe coins seen on the box, a non-universe coin, a TradFi USD1 contract.",
  "symbols": [
   {
    "symbol": "BTCUSDT",
@@ -664,6 +664,69 @@
    "underlyingType": "PREMARKET",
    "underlyingSubType": [
     "Pre-Market"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "ETHUSDC",
+   "pair": "ETHUSDC",
+   "baseAsset": "ETH",
+   "quoteAsset": "USDC",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "USDC",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "1000PEPEUSDC",
+   "pair": "1000PEPEUSDC",
+   "baseAsset": "1000PEPE",
+   "quoteAsset": "USDC",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "USDC",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "BTCUSD1",
+   "pair": "BTCUSD1",
+   "baseAsset": "BTC",
+   "quoteAsset": "USD1",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "HOTUSDT",
+   "pair": "HOTUSDT",
+   "baseAsset": "HOT",
+   "quoteAsset": "USDT",
+   "contractType": "PERPETUAL",
+   "underlyingType": "COIN",
+   "underlyingSubType": [
+    "Storage",
+    "Crypto"
+   ],
+   "status": "TRADING"
+  },
+  {
+   "symbol": "SPCXUSD1",
+   "pair": "SPCXUSD1",
+   "baseAsset": "SPCX",
+   "quoteAsset": "USD1",
+   "contractType": "TRADIFI_PERPETUAL",
+   "underlyingType": "EQUITY",
+   "underlyingSubType": [
+    "TradFi"
    ],
    "status": "TRADING"
   }

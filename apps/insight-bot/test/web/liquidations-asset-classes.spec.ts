@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { classOf, classTable } from '../../src/venues/binance/exchange-info';
+import { aliasTable, baseTable, classOf, classTable } from '../../src/venues/binance/exchange-info';
 import { classify, universeClasses } from '../../src/web/liquidations/asset-classes';
 import { stubClassifier } from './liquidations-test-classifier';
 
@@ -61,5 +61,37 @@ describe('classify (universe first, then Binance, else unknown)', () => {
     expect(c.classify('binance', 'DOGEUSDT')).toBe('unknown'); // not loaded yet
     await c.ready();
     expect(c.classify('binance', 'DOGEUSDT')).toBe('crypto');
+  });
+});
+
+describe('IB-BUG-025 aliasTable: another quote or form of a universe coin, from the pinned exchangeInfo', () => {
+  const universe = ['BTCUSDT', 'ETHUSDT', '1000PEPEUSDT', 'SOLUSDT', 'XAUUSDT'].map((id) => ({ id, binance_perp: id }));
+  const aliases = aliasTable(fixture, universe);
+
+  it('maps the real spellings seen on the box to their coin, by the venue base asset', () => {
+    expect(aliases.get('BTCUSDC')).toBe('BTCUSDT');
+    expect(aliases.get('BTCUSD1')).toBe('BTCUSDT');
+    expect(aliases.get('BTCUSDT_261225')).toBe('BTCUSDT'); // a quarterly is still BTC
+    expect(aliases.get('ETHUSDC')).toBe('ETHUSDT');
+    expect(aliases.get('1000PEPEUSDC')).toBe('1000PEPEUSDT'); // 1000PEPE = 1000PEPE, never PEPE
+  });
+
+  it('never aliases a universe spelling, TradFi, an index, or a coin the universe does not list', () => {
+    for (const own of universe.map((u) => u.binance_perp)) expect(aliases.has(own)).toBe(false);
+    expect(aliases.has('SPCXUSD1')).toBe(false); // TradFi in USD1
+    expect(aliases.has('DEFIUSDT')).toBe(false); // index: unknown
+    expect(aliases.has('HOTUSDT')).toBe(false); // a coin, but not ours: otherCoins
+    expect([...aliases.keys()].sort()).toEqual(['1000PEPEUSDC', 'BTCUSD1', 'BTCUSDC', 'BTCUSDT_261225', 'BTCUSDT_270326', 'ETHUSDC']);
+  });
+
+  it('a universe TradFi contract lends its base to nothing (XAU is not a coin)', () => {
+    expect([...aliases.values()]).not.toContain('XAUUSDT');
+  });
+
+  it('baseTable reads the venue base asset, the key coins are counted by', () => {
+    const bases = baseTable(fixture);
+    expect(bases.get('BTCUSDC')).toBe('BTC');
+    expect(bases.get('1000PEPEUSDC')).toBe('1000PEPE');
+    expect(bases.get('HOTUSDT')).toBe('HOT');
   });
 });

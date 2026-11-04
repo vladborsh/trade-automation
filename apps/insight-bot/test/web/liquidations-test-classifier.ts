@@ -7,7 +7,7 @@ import { AssetClassifier } from '../../src/web/liquidations/asset-classes';
  */
 export function stubClassifier(
   symbols: readonly UniverseSymbol[] = [],
-  binance: Array<{ symbol: string; contractType?: string; underlyingType?: string }> = [],
+  binance: Array<{ symbol: string; contractType?: string; underlyingType?: string; baseAsset?: string }> = [],
 ): AssetClassifier {
   return new AssetClassifier({
     symbols,

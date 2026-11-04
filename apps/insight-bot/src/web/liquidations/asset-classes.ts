@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { WebAssetClass } from '@trade-automation/contracts';
 import type { UniverseSymbol } from '../../config/universe.schema';
-import { classTable } from '../../venues/binance/exchange-info';
+import { aliasTable, baseTable, classTable } from '../../venues/binance/exchange-info';
 
 /**
  * IB-084 (market-page design D6) — the asset class of a stored liquidation row, keyed by what the
@@ -61,6 +61,9 @@ export class AssetClassifier {
   private readonly logger = new Logger(AssetClassifier.name);
   private readonly universe: Map<ClassKey, WebAssetClass>;
   private binance: Map<string, WebAssetClass> | null = null;
+  /** IB-BUG-025: Binance symbol → universe id for another quote/form of a universe coin; base assets. */
+  private aliasMap = new Map<string, string>();
+  private bases = new Map<string, string>();
   private nextRefreshAt = 0;
   private inFlight: Promise<void> | null = null;
   private readonly now: () => number;
@@ -81,6 +84,22 @@ export class AssetClassifier {
     return classify(venue, symbol, this.universe, this.binance);
   }
 
+  /**
+   * IB-BUG-025: Binance contracts counted in a universe coin's row (`exchange-info.ts` `aliasTable`).
+   * Empty until `exchangeInfo` has loaded — then those rows stay in `otherCoins`, never guessed.
+   */
+  aliases(): Array<{ symbol: string; id: string }> {
+    return [...this.aliasMap].map(([symbol, id]) => ({ symbol, id }));
+  }
+
+  /** IB-BUG-025: which coin a row is, for counting distinct coins: the universe id, else Binance's base asset, else the venue symbol. */
+  coinOf(venue: string, symbol: string): string {
+    const column = venue === 'binance' ? 'binance_perp' : venue === 'bybit' ? 'bybit_linear' : venue === 'okx' ? 'okx_swap' : null;
+    const u = column === null ? undefined : this.options.symbols.find((s) => s[column] === symbol);
+    if (u) return u.id;
+    return (venue === 'binance' ? this.bases.get(symbol) : undefined) ?? `${venue}:${symbol}`;
+  }
+
   /** The class of a canonical universe id (`symbols.id`), or unknown for an id not in the file. */
   classOfId(id: string): WebAssetClass {
     return this.options.symbols.find((s) => s.id === id)?.asset_class ?? 'unknown';
@@ -93,7 +112,11 @@ export class AssetClassifier {
       const header = response.headers.get('x-mbx-used-weight-1m');
       this.options.onWeight?.(header === null ? null : Number(header));
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      this.binance = classTable(await response.json());
+      const body: unknown = await response.json();
+      this.binance = classTable(body);
+      // the same body, no further call: aliases and base assets (IB-BUG-025)
+      this.aliasMap = aliasTable(body, this.options.symbols);
+      this.bases = baseTable(body);
       this.nextRefreshAt = this.now() + EXCHANGE_INFO_TTL_MS;
     } catch (error) {
       this.logger.warn(`exchangeInfo failed (${(error as Error).message}); non-universe Binance symbols count as unknown, retrying in 5 min`);
