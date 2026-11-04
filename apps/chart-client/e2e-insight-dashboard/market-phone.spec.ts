@@ -240,12 +240,12 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(widest).toBeLessThanOrEqual(390);
   });
 
-  test('IB-089 phone: large cards stop at 5 with «show all»; the old list and table are gone', async ({ page }) => {
+  test('IB-089 / IB-108 phone: large cards fold at 8 (IB-101\'s rule, §7.6) with «show all»; the old list and table are gone', async ({ page }) => {
     await openMarket(page);
     const cards = page.locator('app-liq-large li');
     const total = overview.block.large.length;
-    expect(total).toBeGreaterThan(5);
-    await expect(cards.filter({ visible: true })).toHaveCount(5);
+    expect(total).toBeGreaterThan(10); // more than 8 + IB-101's minimum of 3 hidden: the fold applies
+    await expect(cards.filter({ visible: true })).toHaveCount(8);
     await page.getByRole('button', { name: `Show all (${total})` }).click();
     await page.clock.runFor(100); // the page's timers are faked: let Angular render
     await expect(cards.filter({ visible: true })).toHaveCount(total);
@@ -360,7 +360,9 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
 
   test('one column: every card starts at the same left edge', async ({ page }) => {
     await openMarket(page);
-    const lefts = await page.locator('app-market div.cards > *').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    // IB-108: every block is an app-card now (the KPI tiles beside them); the old .cards grid is gone
+    const lefts = await page.locator('app-market app-card, app-market app-kpi-strip .tile').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    expect(lefts.length).toBeGreaterThanOrEqual(12); // 6 tiles + 7 cards: the selector found the page
     expect(new Set(lefts).size).toBe(1);
   });
 
@@ -426,7 +428,8 @@ test.describe('market page — desktop 1440×900 (IB-088)', () => {
     await info.attach('desktop-1440.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     expect(m.scrollWidth).toBeLessThanOrEqual(1440);
     expect(m.small).toEqual([]);
-    // desktop shows every large card: the limit is a phone rule
+    // IB-108: the fold is 8 at every width, so a block of up to 10 shows every card (IB-101's minimum of 3 hidden)
+    expect(normBlock.large.length).toBeLessThanOrEqual(10);
     await expect(page.locator('app-liq-large li').filter({ visible: true })).toHaveCount(normBlock.large.length);
   });
 });
@@ -524,6 +527,82 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
       await expect(strip.locator('[data-kpi="btc_oi"] h3')).toHaveAttribute('title', 'source: Binance');
       // the fonts are ours: served from /fonts, and actually in use
       expect(await page.evaluate(() => document.fonts.check('600 24px "IBM Plex Mono"') && document.fonts.check('14px "IBM Plex Sans"'))).toBe(true);
+    });
+  });
+}
+
+/**
+ * IB-108 (market-page design §7.6, D26): every block below the KPI strip on the §7.2 card, the
+ * layout the mockup gives each one, and a «Вывод:» closing every block. Geometry and words, read
+ * from the page; the look itself is the report's mockup-vs-live images.
+ */
+for (const [width, height] of [[1440, 900], [390, 844]] as const) {
+  const wide = width === 1440;
+  test.describe(`IB-108 blocks — ${width}`, () => {
+    test.use({ viewport: { width, height } });
+
+    test(`every block a card ending with «Takeaway:»; ${wide ? 'pairs side by side, four large cards a row' : 'one column'}; no page scroll`, async ({ page }) => {
+      await openMarket(page);
+      await page.clock.runFor(2_000);
+      const m = await page.evaluate(() => {
+        const box = (sel: string) => { const r = document.querySelector(sel)!.getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), bottom: Math.round(r.bottom), width: Math.round(r.width) }; };
+        const cards = [...document.querySelectorAll('app-market app-card')];
+        const conclusions = cards.filter((c) => c.querySelector('app-block-conclusion'));
+        const svg = document.querySelector('app-liq-hourly svg')!.getBoundingClientRect();
+        const lefts = [...document.querySelectorAll('app-liq-large li')].map((li) => Math.round(li.getBoundingClientRect().left));
+        return {
+          scrollWidth: document.documentElement.scrollWidth,
+          cards: cards.length,
+          // D26: the conclusion is the LAST thing in its card, and starts with the bold prefix
+          closing: conclusions.map((c) => ({ last: c.lastElementChild?.tagName.toLowerCase(), prefix: c.querySelector('app-block-conclusion .prefix')?.textContent?.trim() })),
+          hourly: box('app-card.hourly'), where: box('app-card.where'), fng: box('#sentiment'), flows: box('app-flows-block'),
+          svgH: Math.round(svg.height),
+          flagsInside: [...document.querySelectorAll('app-liq-hourly .flag')].map((f) => { const r = f.getBoundingClientRect(); return r.left >= svg.left - 1 && r.right <= svg.right + 1 && r.top >= svg.top - 1 && r.bottom <= svg.bottom + 1; }),
+          whereRows: [...document.querySelectorAll('app-liq-where li.row')].map((r) => ({ side: !!r.querySelector('.side'), title: r.getAttribute('title') ?? '', amounts: !!r.querySelector('.amounts') })),
+          largeColumns: new Set(lefts.slice(0, 8)).size,
+          treemap: box('app-caps-treemap svg'), dominance: box('app-dominance-bar .bar'),
+          dominanceLegend: document.querySelectorAll('app-dominance-bar ul').length,
+        };
+      });
+      expect(m.scrollWidth).toBeLessThanOrEqual(width);
+      // hourly, where, large, positioning, caps, Fear & Greed, flows
+      expect(m.cards).toBe(7);
+      expect(m.closing).toHaveLength(5); // liquidations, positioning, caps, sentiment, flows
+      for (const c of m.closing) expect(c).toEqual({ last: 'app-block-conclusion', prefix: 'Takeaway:' });
+      // hourly: 240 px, the callouts beside their bars and inside the chart
+      expect(m.svgH).toBe(240);
+      expect(m.flagsInside.length).toBeGreaterThanOrEqual(1);
+      expect(m.flagsInside.every(Boolean)).toBe(true);
+      // where: a verdict on every row, the amounts in the row's tooltip, not printed
+      expect(m.whereRows.length).toBeGreaterThan(0);
+      for (const r of m.whereRows) {
+        expect(r.side).toBe(true);
+        expect(r.amounts).toBe(false);
+        expect(r.title).toMatch(/longs \$[\d.]+[KMB]? · shorts \$[\d.]+[KMB]?/);
+      }
+      // caps: the dominance bar beneath the treemap, as wide as it, no side legend
+      expect(m.dominance.top).toBeGreaterThan(m.treemap.bottom);
+      expect(Math.abs(m.dominance.width - m.treemap.width)).toBeLessThanOrEqual(2);
+      expect(m.dominanceLegend).toBe(0);
+      if (wide) {
+        expect(m.where.top).toBe(m.hourly.top); // «по часам» and «где» share a row
+        expect(m.flows.top).toBe(m.fng.top); // Fear & Greed beside «Деривативы и потоки»
+        expect(m.fng.width).toBeLessThan(m.flows.width); // F&G sized to its content, not full width
+        expect(m.largeColumns).toBe(4);
+      } else {
+        expect(m.where.top).toBeGreaterThan(m.hourly.bottom);
+        expect(m.flows.top).toBeGreaterThan(m.fng.bottom);
+        expect(m.largeColumns).toBe(1);
+      }
+    });
+
+    test('/positioning: both sections are cards; every quadrant label is a pill', async ({ page }) => {
+      await openPositioning(page, '/positioning?p=24h');
+      await expect(page.locator('app-positioning-page app-card')).toHaveCount(2);
+      const labels = await page.locator('app-pos-quadrant text.label').count();
+      expect(labels).toBeGreaterThan(0);
+      await expect(page.locator('app-pos-quadrant rect.pill')).toHaveCount(labels);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     });
   });
 }

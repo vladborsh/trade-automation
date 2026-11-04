@@ -1,12 +1,11 @@
-<div class="bar" role="img" [attr.aria-label]="t('caps.dominance.title')">
+<p class="total">{{ total() }}</p>
+<div class="bar" role="img" [attr.aria-label]="all()" [attr.title]="all()">
   @for (s of segments(); track s.key) {
-    <span class="seg" [style.left.%]="s.left" [style.width.%]="s.pct" [style.background]="s.colour"></span>
+    <span class="seg" [class.dark]="s.ink === 'dark'" [style.left.%]="s.left" [style.width.%]="s.pct" [style.background]="s.colour">
+      @if (s.inside) {
+        <span class="in num">{{ label(s) }}</span>
+      }
+    </span>
   }
 </div>
-<ul class="legend">
-  @for (s of segments(); track s.key) {
-    <li><span class="swatch" [style.background]="s.colour"></span>{{ t(s.key) }} <strong>{{ pct(s.pct) }}</strong></li>
-  }
-</ul>
-<p class="muted">{{ total() }}</p>
 <p class="muted">{{ t('caps.dominance.stablesCounted', { count: dominance().stablesCounted }) }}</p>

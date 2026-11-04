@@ -1,5 +1,6 @@
 <header class="head">
   <h1>{{ t('positioning.title') }}</h1>
+  <span class="spacer"></span>
   <app-period-switch [period]="period()" (periodChange)="onPeriodChange($event)" />
 </header>
 <p class="intro">{{ t('positioning.page.intro') }}</p>
@@ -7,14 +8,13 @@
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 @if (data(); as d) {
-  <section class="panel">
-    <h2>{{ t('positioning.quadrant.title') }}</h2>
+  <!-- IB-108 (§7.6): the same card, tokens and heading row as Market -->
+  <app-card [heading]="t('positioning.quadrant.title')">
     <app-pos-quadrant [rows]="d.rows" [maxHeight]="quadrantMaxHeight" />
-  </section>
-  <section class="panel">
-    <h2>{{ t('positioning.table.title') }}</h2>
+  </app-card>
+  <app-card [heading]="t('positioning.table.title')">
     <app-pos-heat [rows]="d.rows" [sort]="sort()" (sortChange)="onSortChange($event)" />
-  </section>
+  </app-card>
 } @else if (!error()) {
   <app-loader variant="block" [label]="t('market.loading')" />
 }

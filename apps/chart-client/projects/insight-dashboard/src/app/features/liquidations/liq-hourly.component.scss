@@ -1,14 +1,33 @@
-/* Dark-terminal palette (AGENTS.md). A long liquidated is price falling: red; a short: green. */
+/* §7.2 tokens. A long liquidated is price falling: red; a short: teal (IB-031's rule). */
 :host { display: block; min-width: 0; }
+.plot { position: relative; }
 .chart { display: block; overflow: visible; }
-.short { fill: #26a69a; }
-.long { fill: #ef5350; }
+.short { fill: var(--color-up); }
+.long { fill: var(--color-down); }
 .hit { fill: transparent; cursor: pointer; }
 .bucket.partial .short, .bucket.partial .long { opacity: 0.45; }
 .bucket.selected .hit { fill: rgb(201 209 217 / 8%); }
-.axis { stroke: #30363d; stroke-width: 1; }
-.norm { stroke: #c9d1d9; stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
-.callout { fill: #d29922; font-size: 12px; text-anchor: middle; }
-.tick { fill: #8b949e; font-size: 12px; text-anchor: middle; }
-p { margin: 4px 0 0; font-size: 12px; }
-.muted { color: #8b949e; }
+.axis { stroke: var(--card-border); stroke-width: 1; }
+.norm { stroke: var(--color-text); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
+.callout { fill: var(--color-warning); font-size: 12px; text-anchor: middle; }
+.tick { fill: var(--color-text-muted); font-size: 12px; text-anchor: middle; }
+/* the mockup's callouts: a boxed line in the side's colour, beside its bar */
+.flag {
+  position: absolute; box-sizing: border-box; height: 26px; display: inline-flex; align-items: center;
+  padding: 0 8px; border: 1px solid; border-radius: var(--radius-md); background: var(--color-bg);
+  font: var(--type-small); color: var(--color-text-strong); white-space: nowrap; pointer-events: none;
+}
+.flag[data-side='short'] { border-color: var(--color-up); }
+.flag[data-side='long'] { border-color: var(--color-down); }
+p { margin: 8px 0 0; font: var(--type-small); }
+.muted { color: var(--color-text-muted); }
+.detail { color: var(--color-text); }
+.sums { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; color: var(--color-text); }
+.sum { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.sw.short { background: var(--color-up); }
+.sw.long { background: var(--color-down); }
+/* a phone: the callouts would crowd a 326 px chart and can be wider than half of it — they wrap */
+@media (max-width: 480px) {
+  .flag { height: auto; min-height: 26px; white-space: normal; max-width: 60%; padding: 2px 6px; }
+}

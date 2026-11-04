@@ -1,9 +1,7 @@
 @if (view(); as v) {
+  <!-- IB-108 (D26): a bold «Вывод:», the block's line at 13 px; its basis is the tooltip (and read out) -->
   <div class="conclusion" [class.neutral]="v.kind === 'neutral'">
-    <p class="sentence">{{ sentence() }}</p>
-    @if (basis(); as b) {
-      <p class="basis">{{ b }}</p>
-    }
+    <p class="sentence" [attr.title]="basis()"><strong class="prefix">{{ t('market.conclusion') }}</strong> {{ sentence() }}@if (basis(); as b) {<span class="basis sr-only"> {{ b }}</span>}</p>
     @if (v.kind === 'statement' && 'commands' in v.view.link) {
       <a class="link" [routerLink]="v.view.link.commands" [queryParams]="v.view.link.queryParams">{{ t('insight.open') }}</a>
     }

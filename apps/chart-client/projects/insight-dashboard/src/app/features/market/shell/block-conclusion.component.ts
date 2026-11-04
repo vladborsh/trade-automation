@@ -6,8 +6,9 @@ import type { StringKey } from '../../../i18n/keys';
 import { conclusionView, wordInsight, sourceNames } from './market-text';
 
 /**
- * IB-089 (D15) — the one conclusion line a block ends with: the server's best statement for that
+ * IB-089 (D15) — the one conclusion line a block ends with: the server’s best statement for that
  * block, or the neutral line with its reason and basis. Same words as «Главное сейчас», one engine.
+ * IB-108 (D26): it sits in the card's «Вывод» slot — a bold «Вывод:» prefix, the basis in its tooltip.
  */
 @Component({
   selector: 'app-block-conclusion',

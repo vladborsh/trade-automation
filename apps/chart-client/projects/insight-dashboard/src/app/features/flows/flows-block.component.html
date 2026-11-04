@@ -1,12 +1,11 @@
-<section class="block" id="flows">
-  <h2>{{ t('flows.title') }}</h2>
+<app-card id="flows" [heading]="t('flows.title')">
   <div class="tiles">
     @for (tile of tiles(); track tile.id) {
       <article class="tile" [attr.data-tile]="tile.id">
         <h3>{{ t(tile.title) }}</h3>
         @if (tile.value !== null) {
-          <p class="value" [class.up]="tile.tone === 'up'" [class.down]="tile.tone === 'down'">
-            {{ tile.value }}
+          <p class="value">
+            <span class="num" [class.up]="tile.tone === 'up'" [class.down]="tile.tone === 'down'">{{ tile.value }}</span>
             @if (tile.unusual) {
               <span class="badge">{{ t('flows.unusual') }}</span>
             }
@@ -26,5 +25,5 @@
     }
   </div>
   <p class="source">{{ t('flows.source', { names: sources() }) }}</p>
-  <app-block-conclusion [line]="line()" [period]="period()" />
-</section>
+  <app-block-conclusion cardConclusion [line]="line()" [period]="period()" />
+</app-card>

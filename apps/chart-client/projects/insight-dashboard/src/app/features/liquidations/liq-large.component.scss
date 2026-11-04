@@ -1,57 +1,41 @@
-/* Dark-terminal palette (AGENTS.md). A long liquidated is price falling: red; a short: green. */
+/* §7.2 tokens. A long liquidated is price falling: red; a short: teal. */
 :host { display: block; min-width: 0; }
-h3 { margin: 0 0 6px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-h3 .muted { text-transform: none; letter-spacing: 0; font-weight: normal; }
-p { margin: 4px 0 0; font-size: 12px; }
-.muted { color: #8b949e; }
-.chart { display: block; }
-.axis { stroke: #30363d; }
-circle { cursor: pointer; fill-opacity: 0.55; stroke-width: 1; }
-circle.long { fill: #ef5350; stroke: #ef5350; }
-circle.short { fill: #26a69a; stroke: #26a69a; }
-.tick { fill: #8b949e; font-size: 12px; text-anchor: middle; }
+p { margin: 8px 0 0; font: var(--type-small); }
+.muted { color: var(--color-text-muted); }
+.chart { display: block; border-top: 1px solid var(--card-border); border-bottom: 1px solid var(--card-border); }
+.axis { stroke: var(--card-border); }
+circle { cursor: pointer; fill-opacity: 0.85; stroke-width: 1; }
+circle.long { fill: var(--color-down); stroke: var(--color-down); }
+circle.short { fill: var(--color-up); stroke: var(--color-up); }
+.tick { fill: var(--color-text-muted); font-size: 12px; text-anchor: middle; }
 
 .cards {
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 6px;
+  list-style: none; margin: 12px 0 0; padding: 0;
+  /* §7.6: minmax(240px, 1fr), at most four across (the mockup's row) */
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 3 * var(--card-gap)) / 4)), 1fr)); gap: var(--card-gap);
 }
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 40px;
-  padding: 6px 8px;
-  border: 1px solid #30363d;
-  color: #c9d1d9;
-  text-decoration: none;
-  font-size: 13px;
+  display: flex; align-items: flex-start; gap: 10px; min-height: var(--touch-min); box-sizing: border-box; height: 100%;
+  padding: 10px 12px; border: 1px solid var(--card-border); border-radius: var(--radius-md);
+  color: var(--color-text); text-decoration: none; font: var(--type-note);
 }
-.card:hover { border-color: #8b949e; }
-.card[data-side='long'] .side, .card[data-side='long'] .amount { color: #ef5350; }
-.card[data-side='short'] .side, .card[data-side='short'] .amount { color: #26a69a; }
-.meta, .ctx { font-size: 12px; color: #8b949e; }
-.series { color: #d29922; }
+.card:hover { border-color: var(--color-border-strong); }
+.dot { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; }
+.card[data-side='long'] .dot { background: var(--color-down); }
+.card[data-side='short'] .dot { background: var(--color-up); }
+.text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.head { color: var(--color-text); }
+.amount { color: var(--color-text-strong); font-weight: 600; }
+.meta { font-size: 12px; color: var(--color-text-muted); }
+.ctx { font-size: 12px; color: var(--color-warning); }
 
 .more {
-  display: none;
-  margin-top: 6px;
-  min-height: 40px;
-  padding: 0 12px;
-  background: #0d1117;
-  color: #c9d1d9;
-  border: 1px solid #30363d;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
+  margin-top: 10px; min-height: var(--touch-min); padding: 0 14px;
+  background: transparent; color: var(--color-text); border: 1px solid var(--seg-border); border-radius: var(--seg-radius);
+  font: var(--type-note); cursor: pointer;
 }
-
-/* D16 phone + TL 2026-11-03: the first PHONE_CARD_LIMIT cards, the rest behind «показать все». */
+.more:hover { border-color: var(--color-border-strong); }
 @media (max-width: 767px) {
   .cards { grid-template-columns: minmax(0, 1fr); }
-  .cards:not(.expanded) li.extra { display: none; }
-  .more { display: block; width: 100%; }
+  .more { width: 100%; }
 }

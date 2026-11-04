@@ -2,7 +2,7 @@ import type { WebCapsCoin, WebCapsDominance } from '@trade-automation/contracts'
 import { describe, expect, it } from 'vitest';
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
-import { capsScale, changeColour, changeScale, dominanceSegments, NEUTRAL_TILE, squarify, tileText } from './caps-layout';
+import { bigTile, capsScale, changeColour, changeScale, dominanceSegments, NEUTRAL_TILE, squarify, tileText } from './caps-layout';
 
 /** IB-090 — the caps block's geometry: squarify, the colour scale, the dominance bar. */
 const caps = [1560, 280, 91.7, 81, 55, 20.7, 20.4, 11.8, 8.5, 7.2, 5, 4.4, 3.7, 2.6, 2.3, 2.1, 2, 1.4, 1.1, 0.45];
@@ -61,15 +61,25 @@ describe('colour — symmetric around 0', () => {
     expect(strength(up) / strength(changeColour(4, 4))).toBeCloseTo(strength(down) / strength(changeColour(-4, 4)), 1);
     expect([changeColour(0, 4), changeColour(null, 4)]).toEqual([NEUTRAL_TILE, NEUTRAL_TILE]);
     expect(changeColour(9, 4)).toBe(changeColour(4, 4)); // clipped at the scale's end
-    expect(changeColour(4, 4)).toBe('rgb(38, 166, 154)');
-    expect(changeColour(-4, 4)).toBe('rgb(239, 83, 80)');
-    expect(changeColour(0.02, 1)).toBe('rgb(33, 41, 47)'); // a non-move stays next to neutral
+    expect(changeColour(4, 4)).toBe('rgb(31, 138, 126)'); // IB-108: the mockup's #1f8a7e
+    expect(changeColour(-4, 4)).toBe('rgb(179, 48, 44)'); // IB-108: the mockup's #b3302c
+    expect(changeColour(0.02, 1)).toBe('rgb(33, 40, 47)'); // a non-move stays next to neutral
   });
 
   it('the scale is ±max |change|, whole percent, at least 1 %; stablecoins do not set it', () => {
     expect([changeScale([0.2, -0.4]), changeScale([2.3, -4.1, null]), changeScale([])]).toEqual([1, 5, 1]);
     const coin = (changePct: number, stable = false) => ({ changePct, stable }) as WebCapsCoin;
     expect(capsScale([coin(1.5), coin(-6, true)])).toBe(2);
+  });
+
+  it('IB-108: by the label itself — the whole ticker and change, the ticker alone, or nothing; never a cut text', () => {
+    const label = { symbol: 'HYPE', change: '−2.63 %' }; // ticker 32.8 px, change 51.1 px, 6 px each side
+    expect(tileText({ x: 0, y: 0, w: 64, h: 40 }, label)).toBe('full');
+    expect(tileText({ x: 0, y: 0, w: 62, h: 40 }, label)).toBe('ticker'); // the change would be cut
+    expect(tileText({ x: 0, y: 0, w: 64, h: 39 }, label)).toBe('ticker'); // no second line's height
+    expect(tileText({ x: 0, y: 0, w: 46, h: 22 }, label)).toBe('ticker');
+    expect(tileText({ x: 0, y: 0, w: 70, h: 30 }, { symbol: 'FIGR_HELOC', change: '−0.83 %' })).toBe('none'); // 82 px of ticker
+    expect(tileText({ x: 0, y: 0, w: 40, h: 21 }, label)).toBe('none');
   });
 
   it('a tile shows ticker and change, ticker only, or nothing, by its size', () => {
@@ -85,5 +95,21 @@ describe('dominanceSegments', () => {
     expect(s.map((x) => x.left)).toEqual([0, 59.3, 69.9, 77.8].map((v) => expect.closeTo(v, 6)));
     expect(s.at(-1)!.left + s.at(-1)!.pct).toBeCloseTo(100, 6);
     for (const t of [ru, en]) for (const x of s) expect((t as Record<string, string>)[x.key], x.key).toBeTruthy();
+  });
+
+  it('IB-108: a label goes inside a segment only from 8 % of the bar, with ink that reads on its fill', () => {
+    const s = dominanceSegments({ ...d, stablesPct: 7.9 });
+    expect(s.map((x) => x.inside)).toEqual([true, true, false, true]);
+    expect(s.map((x) => x.ink)).toEqual(['dark', 'dark', 'light', 'light']);
+    expect(dominanceSegments({ ...d, stablesPct: 8, restPct: 22.1 })[2].inside).toBe(true);
+  });
+});
+
+describe('bigTile (IB-108)', () => {
+  it('the two largest coins, and only when the tile has room for the big label', () => {
+    const roomy = { x: 0, y: 0, w: 200, h: 120 };
+    expect([0, 1, 2].map((i) => bigTile(i, roomy))).toEqual([true, true, false]);
+    expect(bigTile(0, { x: 0, y: 0, w: 109, h: 120 })).toBe(false);
+    expect(bigTile(1, { x: 0, y: 0, w: 200, h: 71 })).toBe(false);
   });
 });

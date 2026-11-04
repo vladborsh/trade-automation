@@ -55,7 +55,10 @@ describe('LiquidationsBlockComponent (IB-089)', () => {
     }));
     expect(el.querySelectorAll('app-liq-hourly line.norm')).toHaveLength(0);
     expect(el.querySelector('app-liq-hourly text.callout')).toBeNull();
-    expect(el.querySelector('app-liq-where')?.textContent).not.toContain('×');
+    // no ratio to a norm that does not exist yet (IB-108: the side verdict «longs ×2.7» is a different number and stays)
+    expect(el.querySelector('app-liq-where .norm')).toBeNull();
+    expect(el.querySelector('app-liq-where')?.textContent).not.toContain('of the norm');
+    expect(el.querySelector('app-liq-where .side')).not.toBeNull();
     expect(el.querySelector('app-liq-hourly')?.textContent).toContain('normal appears on 2026-11-10');
     expect(el.querySelector('app-liq-large')?.textContent).toContain('normal appears on 2026-11-10');
   });

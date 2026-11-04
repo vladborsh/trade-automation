@@ -29,46 +29,26 @@ h1 { font: var(--type-h1); color: var(--color-text-strong); margin: 0; }
 .live-age.stale .dot { background: var(--stale-dot); }
 .spacer { flex: 1 1 auto; }
 
-h2 { font-size: 12px; margin: 0 0 0.5rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-  align-items: start;
-}
-
-.card {
-  border: 1px solid #30363d;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 13px;
-}
-
-.card p { margin: 0; }
-.card.wide { grid-column: 1 / -1; }
-
-/* The figure a reader came for: large, and the only large thing on the card. */
-.value { font-size: 2rem; line-height: 1.1; }
-.label { font-size: 1rem; }
-.muted { color: #8b949e; font-size: 12px; }
-/* The basis sits last on every card, after the sentences, so the cards line up when read down. */
-.source { margin-top: auto; padding-top: 0.35rem; }
+/* IB-108 (§7.6): Fear & Greed sized to its content beside «Деривативы и потоки» when both fit */
+.pair { display: flex; flex-wrap: wrap; gap: var(--card-gap); align-items: stretch; }
+.fng { flex: 1 1 380px; }
+.flows { flex: 999 1 560px; min-width: 0; }
+.fg-line { margin: 8px 0 0; font: var(--type-note); color: var(--color-text-muted); }
+.muted { margin: 0; color: var(--color-text-muted); font: var(--type-small); }
 
 .error {
   margin: 0;
   padding: 8px 10px;
-  border: 1px solid #ef5350;
-  color: #ef5350;
+  border: 1px solid var(--color-down);
+  border-radius: var(--card-radius);
+  color: var(--color-down);
   font-size: 13px;
 }
 
 
 /* D16 phone: one column under 768 px, every card full width, nothing wider than the screen. */
 @media (max-width: 767px) {
-  .cards { grid-template-columns: minmax(0, 1fr); }
+  .fng, .flows { flex-basis: 100%; }
 }
 @media (max-width: 480px) {
   :host { padding: calc(var(--page-pad-phone) - var(--shell-pad)) 0; }

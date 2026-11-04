@@ -2,12 +2,16 @@
    shorts building red, closings muted versions of the side that is leaving. */
 :host { display: block; min-width: 0; }
 .chart { display: block; }
-.axis { stroke: #30363d; }
+.axis { stroke: var(--card-border); }
 .corner { fill: #8b949e; font-size: 12px; }
 .corner.end { text-anchor: end; }
 .tick { fill: #8b949e; font-size: 12px; text-anchor: end; }
 .tick.start { text-anchor: start; }
-.label { fill: #c9d1d9; font-size: 12px; pointer-events: none; }
+/* IB-108: pills — teal for new longs, red for new shorts, grey for the closings and flat */
+.label { fill: var(--color-bg); font-size: 12px; font-weight: 600; pointer-events: none; }
+.pill { pointer-events: none; fill: var(--gray-400); }
+.pill.new_longs { fill: var(--color-up); }
+.pill.new_shorts { fill: var(--color-down); }
 circle { cursor: pointer; fill-opacity: 0.6; stroke-width: 1; }
 circle.new_longs { fill: #26a69a; stroke: #26a69a; }
 circle.new_shorts { fill: #ef5350; stroke: #ef5350; }
@@ -15,5 +19,5 @@ circle.long_closing { fill: #8b949e; stroke: #ef5350; }
 circle.short_closing { fill: #8b949e; stroke: #26a69a; }
 circle.flat { fill: #6e7681; stroke: #6e7681; }
 circle.selected { stroke: #c9d1d9; stroke-width: 2; }
-p { margin: 4px 0 0; font-size: 12px; }
+p { margin: 6px 0 0; font: var(--type-small); }
 .muted { color: #8b949e; }

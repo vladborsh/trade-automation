@@ -30,9 +30,9 @@
 @if (liquidations(); as liq) {
   <app-liquidations-block [overview]="liq" [period]="period()" [line]="insightLine('liquidations')" [nowSec]="nowSec()" />
 } @else if (!blockError('liquidations')) {
-  <section class="card wide">
+  <app-card [heading]="t('liq.hourly.title')">
     <app-loader variant="block" [label]="t('market.loadingLiquidations')" />
-  </section>
+  </app-card>
 }
 @if (blockError('liquidations'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
@@ -42,9 +42,9 @@
 @if (positioning(); as pos) {
   <app-positioning-block [positioning]="pos" [period]="period()" [line]="insightLine('positioning')" />
 } @else if (!blockError('positioning')) {
-  <section class="card wide">
+  <app-card [heading]="t('positioning.cardTitle')">
     <app-loader variant="block" [label]="t('market.loading')" />
-  </section>
+  </app-card>
 }
 @if (blockError('positioning'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
@@ -53,46 +53,46 @@
 @if (caps(); as c) {
   <app-caps-block [caps]="c" [period]="period()" [line]="insightLine('caps')" />
 } @else if (!blockError('caps')) {
-  <section class="card wide">
+  <app-card [heading]="t('caps.title')">
     <app-loader variant="block" [label]="t('market.loading')" />
-  </section>
+  </app-card>
 }
 @if (blockError('caps'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 
-<div class="cards" id="sentiment">
+<!-- IB-108 (§7.6): Fear & Greed and «Деривативы и потоки» share a row when both fit -->
+<div class="pair">
   <!-- Fear & Greed. The big figure is the index; the words under it are the band, and the venue's
        own classification stays beside it verbatim (§11) so the two can never disagree. -->
-  <section class="card">
-    <h2>{{ t('market.fg.title') }}</h2>
+  <app-card class="fng" id="sentiment" [heading]="t('market.fg.title')">
     @if (firstLoad()) {
       <app-loader variant="skeleton" [lines]="4" [label]="t('market.loading')" />
     } @else if (fearGreed(); as fg) {
       <app-fear-greed-gauge [card]="fg" />
       @if (fg.previous; as prev) {
-        <p>{{ t('market.fg.wasYesterday', { day: prev.day, value: prev.value, band: t(band(prev.value).key) }) }}</p>
+        <p class="fg-line">{{ t('market.fg.wasYesterday', { day: prev.day, value: prev.value, band: t(band(prev.value).key) }) }}</p>
       }
       @if (fg.weekAgo; as week) {
-        <p>{{ t('market.fg.wasWeek', { value: week.value, band: t(band(week.value).key) }) }}</p>
+        <p class="fg-line">{{ t('market.fg.wasWeek', { value: week.value, band: t(band(week.value).key) }) }}</p>
       }
     } @else {
       <p class="muted">{{ t('market.fg.none') }}</p>
     }
-  </section>
+    <app-block-conclusion cardConclusion [line]="insightLine('sentiment')" [period]="period()" />
+  </app-card>
+
+  <!-- IB-091: phase 2 — «Деривативы и потоки» (DVOL, put/call, stablecoins, Coinbase premium per D18), every 5 min -->
+  @if (flows(); as f) {
+    <app-flows-block class="flows" [flows]="f" [period]="period()" [line]="insightLine('flows')" />
+  } @else if (!blockError('flows')) {
+    <app-card class="flows" [heading]="t('flows.title')">
+      <app-loader variant="block" [label]="t('market.loading')" />
+    </app-card>
+  }
 </div>
-<app-block-conclusion [line]="insightLine('sentiment')" [period]="period()" />
 @if (blockError('sentiment'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
-}
-
-<!-- IB-091: phase 2 — «Деривативы и потоки» (DVOL, put/call, stablecoins, Coinbase premium per D18), every 5 min -->
-@if (flows(); as f) {
-  <app-flows-block [flows]="f" [period]="period()" [line]="insightLine('flows')" />
-} @else if (!blockError('flows')) {
-  <section class="card wide">
-    <app-loader variant="block" [label]="t('market.loading')" />
-  </section>
 }
 @if (blockError('flows'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>

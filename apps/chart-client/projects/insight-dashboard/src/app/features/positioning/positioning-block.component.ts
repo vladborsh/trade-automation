@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core
 import { RouterLink } from '@angular/router';
 import type { WebInsightBlockLine, WebMarketPeriod, WebPositioningResponse } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
+import type { StringKey } from '../../i18n/keys';
+import { CardComponent } from '../../ui/card.component';
 import { BlockConclusionComponent } from '../market/shell/block-conclusion.component';
 import { PosHeatComponent } from './pos-heat.component';
 
@@ -13,11 +15,12 @@ export const MARKET_HEAT_ROWS = 5;
  * heat table, the block's one conclusion (D15) and a link to the full page (/positioning, same
  * period). The quadrant moved to that page: on a phone it took the screen and, without its labels,
  * did not read. Same `app-pos-heat` component as the page, with a row limit: no second copy.
+ * IB-108 (§7.6): in an `app-card` titled «Кто набирает позиции», the «Вывод:» in its slot.
  */
 @Component({
   selector: 'app-positioning-block',
   standalone: true,
-  imports: [PosHeatComponent, BlockConclusionComponent, RouterLink],
+  imports: [CardComponent, PosHeatComponent, BlockConclusionComponent, RouterLink],
   templateUrl: './positioning-block.component.html',
   styleUrl: './positioning-block.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -30,4 +33,8 @@ export class PositioningBlockComponent {
   readonly period = input.required<WebMarketPeriod>();
   readonly line = input<WebInsightBlockLine | null>(null);
   readonly rows = MARKET_HEAT_ROWS;
+
+  subtitle(): string {
+    return this.t('positioning.cardSubtitle', { count: this.rows, period: this.t(`market.period.${this.period()}` as StringKey) });
+  }
 }

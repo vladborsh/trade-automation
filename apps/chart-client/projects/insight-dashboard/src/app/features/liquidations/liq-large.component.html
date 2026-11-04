@@ -1,4 +1,3 @@
-<h3>{{ t('liq.large.title') }} <span class="muted">{{ t('liq.large.threshold', { usd: usd(minUsd()) }) }}</span></h3>
 @if (cards().length === 0) {
   <p class="muted">{{ t('liq.large.empty', { usd: usd(minUsd()) }) }}</p>
 } @else {
@@ -12,28 +11,30 @@
       </circle>
     }
     @for (tick of l.ticks; track tick.time) {
-      <text class="tick" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
+      <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
     }
   </svg>
-  <p class="muted">{{ t('liq.large.legend') }}</p>
-  <ol class="cards" [class.expanded]="expanded()">
-    @for (card of cards(); track card.event.time + card.event.symbol + card.event.venue + card.event.usd; let i = $index) {
-      <li [class.extra]="i >= limit">
+  <ol class="cards">
+    @for (card of visible(); track card.event.time + card.event.symbol + card.event.venue + card.event.usd) {
+      <li>
         <a class="card" [routerLink]="card.link.commands" [queryParams]="card.link.queryParams" [attr.data-side]="card.event.side">
-          <span class="head"><strong>{{ card.event.base }}</strong> · <span class="side">{{ side(card.event) }}</span> · <strong class="amount">{{ usd(card.event.usd) }}</strong></span>
-          <span class="meta">{{ time(card.event) }} · {{ card.venue }}</span>
-          @if (card.xMedian; as x) {
-            <span class="ctx">{{ word(x) }}</span>
-          }
-          @if (card.series; as s) {
-            <span class="ctx series">{{ word(s) }}</span>
-          }
+          <i class="dot" aria-hidden="true"></i>
+          <span class="text">
+            <span class="head"><strong class="amount num">{{ usd(card.event.usd) }}</strong> · {{ card.event.base }} <span class="side">{{ side(card.event) }}</span></span>
+            <span class="meta num">{{ time(card.event) }} · {{ card.venue }}</span>
+            @if (card.xMedian; as x) {
+              <span class="ctx">{{ word(x) }}</span>
+            }
+            @if (card.series; as s) {
+              <span class="ctx">{{ word(s) }}</span>
+            }
+          </span>
         </a>
       </li>
     }
   </ol>
-  @if (cards().length > limit) {
-    <button type="button" class="more" (click)="expanded.set(!expanded())">
+  @if (collapsed().hiddenCount > 0) {
+    <button type="button" class="more" [attr.aria-expanded]="expanded()" (click)="expanded.set(!expanded())">
       {{ expanded() ? t('liq.large.showFewer') : t('liq.large.showAll', { count: cards().length }) }}
     </button>
   }

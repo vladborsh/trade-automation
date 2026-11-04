@@ -7,6 +7,7 @@ import type {
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
+import { CardComponent } from '../../ui/card.component';
 import { LoaderComponent } from '../../ui/loader.component';
 import { CapsBlockComponent } from '../caps/caps-block.component';
 import { FlowsBlockComponent } from '../flows/flows-block.component';
@@ -41,7 +42,7 @@ import { PeriodSwitchComponent } from './shell/period-switch.component';
   selector: 'app-market',
   standalone: true,
   imports: [
-    LiquidationsBlockComponent, PositioningBlockComponent, CapsBlockComponent, BlockConclusionComponent, LoaderComponent,
+    CardComponent, LiquidationsBlockComponent, PositioningBlockComponent, CapsBlockComponent, BlockConclusionComponent, LoaderComponent,
     PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent, FearGreedGaugeComponent, FlowsBlockComponent,
   ],
   templateUrl: './market.component.html',

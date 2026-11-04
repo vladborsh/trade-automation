@@ -3,6 +3,7 @@ import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { WebMarketPeriod, WebPositioningResponse } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
+import { CardComponent } from '../../ui/card.component';
 import { I18nService } from '../../i18n/i18n.service';
 import { LoaderComponent } from '../../ui/loader.component';
 import { BlockScheduler } from '../market/shell/block-scheduler';
@@ -28,7 +29,7 @@ export const PAGE_QUADRANT_MAX_HEIGHT = 520;
 @Component({
   selector: 'app-positioning-page',
   standalone: true,
-  imports: [PeriodSwitchComponent, PosQuadrantComponent, PosHeatComponent, LoaderComponent],
+  imports: [CardComponent, PeriodSwitchComponent, PosQuadrantComponent, PosHeatComponent, LoaderComponent],
   templateUrl: './positioning-page.component.html',
   styleUrl: './positioning-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

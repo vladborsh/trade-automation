@@ -83,9 +83,10 @@ export function changeScale(changes: readonly (number | null)[]): number {
 }
 
 export const NEUTRAL_TILE = '#21262d';
-const UP = [38, 166, 154];   // #26a69a
-const DOWN = [239, 83, 80];  // #ef5350
-const BASE = [33, 38, 45];   // NEUTRAL_TILE
+// IB-108 (§7.6): the mockup's deep endpoints — the scale (its half-range, its linearity) is unchanged
+const UP = [31, 138, 126];   // #1f8a7e
+const DOWN = [179, 48, 44];  // #b3302c
+const BASE = [33, 38, 45];   // NEUTRAL_TILE = --gray-800
 
 /**
  * Symmetric around 0: +x % and −x % are the same distance from neutral, green and red. A null
@@ -101,11 +102,37 @@ export function changeColour(change: number | null, scale: number): string {
   return change === 0 ? NEUTRAL_TILE : `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 }
 
-/** Which labels fit in a tile: ticker and change, ticker only, or nothing (the title still has it). */
-export function tileText(t: Rect): 'full' | 'ticker' | 'none' {
-  if (t.w >= 46 && t.h >= 34) return 'full';
-  if (t.w >= 30 && t.h >= 16) return 'ticker';
+/** IB-108: label metrics — 13 px semibold ticker and 12 px mono change, 6 px in from the tile's edge. */
+export const TICKER_CHAR_PX = 8.2;
+export const CHANGE_CHAR_PX = 7.3;
+export const TILE_TEXT_PAD = 6;
+
+/**
+ * Which labels fit in a tile: ticker and change, ticker only, or nothing (the title still has it).
+ * IB-108: measured against the label itself — a tile shows a text only when the whole of it fits,
+ * so «−2.63 %» is never cut to «−2.63 9» by its neighbour. Without a label: the old size rule.
+ */
+export function tileText(t: Rect, label?: { symbol: string; change: string }): 'full' | 'ticker' | 'none' {
+  if (!label) {
+    if (t.w >= 46 && t.h >= 34) return 'full';
+    if (t.w >= 30 && t.h >= 16) return 'ticker';
+    return 'none';
+  }
+  const room = t.w - 2 * TILE_TEXT_PAD;
+  const ticker = label.symbol.length * TICKER_CHAR_PX;
+  const change = label.change.length * CHANGE_CHAR_PX;
+  if (t.h >= 40 && room >= Math.max(ticker, change)) return 'full';
+  if (t.h >= 22 && room >= ticker) return 'ticker';
   return 'none';
+}
+
+/**
+ * IB-108 (§7.6): the two largest coins (the server sends them first) get the big label — the
+ * ticker at `--type-h2` and «$cap · change» at the tile's foot — when the tile has room for it.
+ */
+export const BIG_TILES = 2;
+export function bigTile(index: number, t: Rect): boolean {
+  return index < BIG_TILES && t.w >= 110 && t.h >= 72;
 }
 
 export interface DominanceSegment {
@@ -114,19 +141,26 @@ export interface DominanceSegment {
   /** Left edge, percent of the bar. */
   left: number;
   colour: string;
+  /** IB-108: the label sits inside the segment when it is wide enough; the bar's title has them all. */
+  inside: boolean;
+  /** Text colour on this fill: dark on the light fills, light on the dark ones. */
+  ink: 'dark' | 'light';
 }
 
-/** D11: BTC / ETH / stables / everything else, left to right, the four summing to 100. */
+/** A segment narrower than this share of the bar takes no label inside (it would not fit «ETH 10.6»). */
+export const SEGMENT_LABEL_MIN_PCT = 8;
+
+/** D11: BTC / ETH / stables / everything else, left to right, the four summing to 100. IB-108: the mockup's fills. */
 export function dominanceSegments(d: WebCapsDominance): DominanceSegment[] {
-  const parts: Array<[StringKey, number, string]> = [
-    ['caps.dominance.btc', d.btcPct, '#f0b90b'],
-    ['caps.dominance.eth', d.ethPct, '#8957e5'],
-    ['caps.dominance.stables', d.stablesPct, '#2f81f7'],
-    ['caps.dominance.rest', d.restPct, '#6e7681'],
+  const parts: Array<[StringKey, number, string, DominanceSegment['ink']]> = [
+    ['caps.dominance.btc', d.btcPct, 'var(--amber-500)', 'dark'],
+    ['caps.dominance.eth', d.ethPct, 'var(--blue-400)', 'dark'],
+    ['caps.dominance.stables', d.stablesPct, 'var(--gray-500)', 'light'],
+    ['caps.dominance.rest', d.restPct, 'var(--gray-700)', 'light'],
   ];
   let left = 0;
-  return parts.map(([key, pct, colour]) => {
-    const seg = { key, pct, left, colour };
+  return parts.map(([key, pct, colour, ink]) => {
+    const seg = { key, pct, left, colour, inside: pct >= SEGMENT_LABEL_MIN_PCT, ink };
     left += pct;
     return seg;
   });

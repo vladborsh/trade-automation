@@ -4,14 +4,16 @@ import type { WebLiquidationLargeEvent } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
 import { hostWidth } from '../../ui/host-width';
-import { bubbleLayout, largeCards, PHONE_CARD_LIMIT, tickLabel, type LargeCard } from './liq-layout';
+import { bubbleLayout, largeCards, tickLabel, type LargeCard } from './liq-layout';
+import { collapseRows } from './liq-where-collapse';
 import { formatUsd } from './liquidations.format';
 
 /**
  * IB-089 (D8c) — the period's large liquidations: a bubble timeline (radius ∝ √USD, shorts above,
  * longs below) and cards with «× медианы» and the series. A bubble or a card opens the instrument
  * at that minute — IB-088's link format, `/instrument/<sym>?at=<sec>`.
- * On a phone the cards stop at PHONE_CARD_LIMIT with «показать все» (TL 2026-11-03).
+ * IB-108 (§7.6): the cards four across (`minmax(240px, 1fr)`), folded at 8 at every width with
+ * IB-101's `collapseRows` and «Показать все (N)»; IB-089's context lines stay on each card.
  */
 @Component({
   selector: 'app-liq-large',
@@ -38,8 +40,9 @@ export class LiqLargeComponent {
   readonly width = hostWidth(342);
   readonly layout = computed(() => bubbleLayout(this.large(), { from: this.from(), to: this.to() }, { width: this.width(), height: this.height }));
   readonly cards = computed(() => largeCards(this.large()));
-  readonly limit = PHONE_CARD_LIMIT;
+  readonly collapsed = computed(() => collapseRows(this.cards().map((card) => ({ ...card, usd: card.event.usd }))));
   readonly expanded = signal(false);
+  readonly visible = computed(() => (this.expanded() ? this.cards() : this.collapsed().shown));
   readonly usd = formatUsd;
 
   label(time: number): string {

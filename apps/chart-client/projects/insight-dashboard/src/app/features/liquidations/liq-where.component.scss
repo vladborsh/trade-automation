@@ -1,49 +1,45 @@
-/* Dark-terminal palette (AGENTS.md). Longs (price falling) red to the left, shorts green to the right. */
+/* §7.2 tokens. Longs (price falling) red to the left, shorts teal to the right; the verdict last. */
 :host { display: block; min-width: 0; }
-h3 { margin: 0 0 6px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-p { margin: 0; font-size: 12px; }
-.muted, .legend { color: #8b949e; }
-.legend { text-align: center; margin-bottom: 4px; }
-.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.row {
+p { margin: 0; font: var(--type-small); }
+.muted { color: var(--color-text-muted); }
+.head, .row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: 'coin left right' 'coin amounts amounts';
-  column-gap: 2px;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) minmax(96px, auto);
+  column-gap: 4px;
   align-items: center;
 }
-.coin { grid-area: coin; color: #c9d1d9; text-decoration: none; font-size: 13px; }
-.coin:hover { color: #26a69a; text-decoration: underline; }
-.track { height: 12px; display: flex; background: rgb(48 54 61 / 35%); }
-.track.left { grid-area: left; justify-content: flex-end; }
-.track.right { grid-area: right; justify-content: flex-start; }
-.bar { display: block; height: 100%; }
-.bar.long { background: #ef5350; }
-.bar.short { background: #26a69a; }
-.amounts { grid-area: amounts; text-align: center; color: #8b949e; font-variant-numeric: tabular-nums; }
-.long-text { color: #ef5350; }
-.short-text { color: #26a69a; }
-.verdict { margin-left: 6px; font-weight: 600; }
+.head { font: var(--type-small); margin-bottom: 4px; }
+.head .long-text { text-align: right; }
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.coin { color: var(--color-text-strong); text-decoration: none; font-size: 13px; font-weight: 600; }
+.coin:hover { color: var(--color-up); }
+.track { height: 14px; display: flex; }
+.track.left { justify-content: flex-end; }
+.track.right { justify-content: flex-start; }
+.bar { display: block; height: 100%; border-radius: 2px; }
+.bar.long { background: var(--color-down); }
+.bar.short { background: var(--color-up); }
+.verdict { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 6px; padding-left: 8px; text-align: right; }
+.side { font-size: 13px; color: var(--color-text-muted); }
+.norm { color: var(--color-warning); }
+.long-text { color: var(--color-down); }
+.short-text { color: var(--color-up); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* IB-101: the fold line and its button, centred under the bars */
-.fold { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; margin-top: 6px; }
+.fold { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; margin-top: 8px; }
 .fold-toggle {
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  background: #0d1117;
-  color: #c9d1d9;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+  min-height: 32px; padding: 0 12px; border: 1px solid var(--seg-border); border-radius: var(--seg-radius);
+  background: transparent; color: var(--color-text); font: var(--type-small); cursor: pointer;
 }
-.fold-toggle:hover { border-color: #8b949e; }
-/* IB-BUG-025: the crypto in no row — after the rows, outside the fold, a dashed rule above it so it reads as beside the list */
-.other { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed #30363d; color: #8b949e; font-size: 12px; text-align: center; }
+.fold-toggle:hover { border-color: var(--color-border-strong); }
+/* IB-BUG-025: the crypto in no row — after the rows, outside the fold, a dashed rule above it */
+.other { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--card-border); color: var(--color-text-muted); text-align: center; }
+p + p, .rows + p { margin-top: 6px; }
 
-/* D16 phone: the coin link is a ≥ 40 px touch target. */
+/* D16 phone: the coin link is a ≥ 40 px touch target; the verdict column narrows */
 @media (max-width: 767px) {
-  .coin { display: inline-flex; align-items: center; min-height: 40px; min-width: 40px; }
-  .fold-toggle { min-height: 40px; }
+  .head, .row { grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1fr) minmax(76px, auto); }
+  .coin { display: inline-flex; align-items: center; min-height: var(--touch-min); min-width: var(--touch-min); }
+  .fold-toggle { min-height: var(--touch-min); }
 }

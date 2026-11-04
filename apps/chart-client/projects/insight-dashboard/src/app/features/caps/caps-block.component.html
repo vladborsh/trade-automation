@@ -1,26 +1,20 @@
 @let c = caps();
-<section class="block" id="caps">
-  <h2>{{ t('caps.title') }}</h2>
-  <div class="charts">
-    <div class="panel">
-      @if (c.coinsUnavailable; as reason) {
-        <p class="warn">{{ refusal(reason) }}</p>
-      } @else {
-        <app-caps-treemap [coins]="c.coins" [period]="c.period" />
-      }
-      @if (c.changeUnavailable; as reason) {
-        <p class="warn">{{ refusal(reason) }}</p>
-      }
-    </div>
-    <div class="panel">
-      <h3>{{ t('caps.dominance.title') }}</h3>
-      @if (c.dominance; as d) {
-        <app-dominance-bar [dominance]="d" />
-      } @else if (c.dominanceUnavailable; as reason) {
-        <p class="warn">{{ refusal(reason) }}</p>
-      }
-    </div>
+<app-card id="caps" [heading]="t('caps.title')" [subtitle]="subtitle()">
+  @if (c.coinsUnavailable; as reason) {
+    <p class="warn">{{ refusal(reason) }}</p>
+  } @else {
+    <app-caps-treemap [coins]="c.coins" [period]="c.period" />
+  }
+  @if (c.changeUnavailable; as reason) {
+    <p class="warn">{{ refusal(reason) }}</p>
+  }
+  <div class="dominance">
+    @if (c.dominance; as d) {
+      <app-dominance-bar [dominance]="d" />
+    } @else if (c.dominanceUnavailable; as reason) {
+      <p class="warn">{{ refusal(reason) }}</p>
+    }
   </div>
   <a class="source" [href]="c.source.url" target="_blank" rel="noopener">{{ t('caps.source', { name: c.source.name }) }}</a>
-  <app-block-conclusion [line]="line()" [period]="period()" />
-</section>
+  <app-block-conclusion cardConclusion [line]="line()" [period]="period()" />
+</app-card>

@@ -239,8 +239,11 @@ export function largeCards(large: readonly WebLiquidationLargeEvent[]): LargeCar
   }));
 }
 
-/** On a phone the cards stop at this many, with «показать все» (TL 2026-11-03: the 4 900 px page). */
-export const PHONE_CARD_LIMIT = 5;
+/**
+ * IB-108 (§7.6) replaced the phone-only limit of 5 (TL 2026-11-03: the 4 900 px page) with IB-101's
+ * fold at every width: the first `WHERE_TOP_N` (8) cards, the rest behind «показать все»
+ * (`liq-where-collapse.ts`, the same rule and the same minimum of 3 hidden).
+ */
 
 export interface NormNote {
   key: StringKey;

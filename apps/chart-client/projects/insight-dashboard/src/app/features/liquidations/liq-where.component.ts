@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSign
 import { RouterLink } from '@angular/router';
 import type { WebLiquidationBlock, WebLiquidationCoinPeriod, WebMarketPeriod } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
-import { whereRows } from './liq-layout';
+import { whereRows, type WhereRow } from './liq-layout';
+import { sideVerdict } from './liq-side-verdict';
 import { collapseRows } from './liq-where-collapse';
 import { otherLine } from './liq-where-other';
 import { formatUsd } from './liquidations.format';
@@ -16,6 +17,10 @@ import { formatUsd } from './liquidations.format';
  * button. The fold is applied after `whereRows`, so ranking, bar scale and verdicts are over every
  * coin. Unfolding is this component's own state: not in the URL, not stored, and a new period
  * folds the block again.
+ *
+ * IB-108 (§7.6): «лонги» / «шорты» column heads, bars without $ labels (the amounts are each row's
+ * tooltip), and a verdict column — the bigger side over the smaller (`sideVerdict`). IB-089's
+ * verdict against the coin's own norm stays beside it, quieter, whenever the server has a norm.
  */
 @Component({
   selector: 'app-liq-where',
@@ -41,10 +46,15 @@ export class LiqWhereComponent {
   /** Reset to folded whenever the period changes: the source is the period, the value is always false. */
   readonly expanded = linkedSignal({ source: this.period, computation: () => false });
   readonly otherView = computed(() => otherLine(this.other()));
-  readonly visibleRows = computed(() => (this.expanded() ? this.view().rows : this.collapsed().shown));
+  readonly visibleRows = computed(() => (this.expanded() ? this.view().rows : this.collapsed().shown)
+    .map((row) => ({ ...row, side: sideVerdict(row.long, row.short) })));
 
   toggle(): void {
     this.expanded.update((open) => !open);
   }
   readonly usd = formatUsd;
+
+  rowTitle(row: WhereRow): string {
+    return this.t('liq.where.rowTitle', { coin: row.base, long: formatUsd(row.long), short: formatUsd(row.short) });
+  }
 }

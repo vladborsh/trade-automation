@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import type { WebLiquidationHourly } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
 import { hostWidth } from '../../ui/host-width';
+import { hourlyFlags, type HourFlag } from './liq-hourly-flags';
 import { hourlyLayout, tickLabel, type HourBarView } from './liq-layout';
 import { formatRatio, formatUsd } from './liquidations.format';
 
@@ -9,6 +10,8 @@ import { formatRatio, formatUsd } from './liquidations.format';
  * IB-089 (D8a) — market-wide crypto liquidations per bucket as mirrored bars: shorts up, longs
  * down, the per-bucket norm as a dashed line per side, «×» over the outliers. A tap on a bar
  * (hover has no phone equivalent, D16) states its numbers under the chart.
+ * IB-108 (§7.6): 240 px tall, two callouts beside their bars (`liq-hourly-flags.ts`), a `.num` axis,
+ * the period's sums as the legend; «нажмите на столбец» is the chart's tooltip.
  */
 @Component({
   selector: 'app-liq-hourly',
@@ -24,10 +27,13 @@ export class LiqHourlyComponent {
   readonly hourly = input.required<WebLiquidationHourly>();
   /** Why there is no norm line, or what the norm is — in words, under the chart. */
   readonly note = input<string | null>(null);
+  /** The period's sums, already formatted (the block's totals): the legend under the chart. */
+  readonly totals = input<{ usd: string; long: string; short: string; events: number } | null>(null);
 
-  readonly height = 160;
+  readonly height = 240;
   readonly width = hostWidth(342);
   readonly layout = computed(() => hourlyLayout(this.hourly(), { width: this.width(), height: this.height }));
+  readonly flags = computed(() => hourlyFlags(this.hourly(), this.layout(), { width: this.width(), height: this.height }));
   readonly selected = signal<number | null>(null);
   readonly detail = computed(() => {
     const time = this.selected();
@@ -37,6 +43,10 @@ export class LiqHourlyComponent {
 
   label(time: number): string {
     return tickLabel(time, this.hourly().bucketSec);
+  }
+
+  flagText(f: HourFlag): string {
+    return this.t(f.key, { ...f.params, time: this.label(f.params.time), side: this.t(f.params.sideKey) });
   }
 
   pick(time: number): void {

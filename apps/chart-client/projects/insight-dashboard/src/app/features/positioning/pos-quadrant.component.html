@@ -15,7 +15,9 @@
       <title>{{ d.row.base }}</title>
     </circle>
     @if (d.label; as lb) {
-      <text class="label" [attr.x]="lb.x" [attr.y]="lb.y" [attr.text-anchor]="lb.anchor">{{ d.row.base }}</text>
+      <!-- IB-108 (§7.6): the label as the mockup's pill, in its quadrant's colour; the dot keeps OI's size -->
+      <rect [class]="'pill ' + (d.row.quadrant ?? 'flat')" [attr.x]="lb.box.x - 3" [attr.y]="lb.box.y - 1" [attr.width]="lb.box.w + 6" [attr.height]="lb.box.h + 2" rx="8" />
+      <text class="label num" [attr.x]="lb.x" [attr.y]="lb.y" [attr.text-anchor]="lb.anchor">{{ d.row.base }}</text>
     }
   }
 </svg>

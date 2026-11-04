@@ -1,9 +1,12 @@
-/* Dark-terminal palette (AGENTS.md). Tiles are separated by the page background, not borders. */
+/* §7.2 tokens. Tiles are separated by the card's fill, not borders. */
 :host { display: block; min-width: 0; }
 .chart { display: block; }
-rect { stroke: #0d1117; stroke-width: 1; cursor: pointer; }
-g.selected rect { stroke: #c9d1d9; stroke-width: 2; }
-.sym { fill: #f0f6fc; font-size: 12px; font-weight: 600; pointer-events: none; }
-.chg { fill: #f0f6fc; font-size: 12px; pointer-events: none; opacity: 0.9; }
-p { margin: 4px 0 0; font-size: 12px; }
-.muted { color: #8b949e; }
+rect { stroke: var(--card-bg); stroke-width: 3; cursor: pointer; }
+g.selected rect { stroke: var(--color-text); stroke-width: 2; }
+text { fill: #f0f6fc; pointer-events: none; }
+.sym { font-size: 13px; font-weight: 600; }
+.sym.big { font: var(--type-h2); font-size: 18px; }
+.chg { font-size: 12px; opacity: 0.9; }
+.foot { font-size: 13px; }
+p { margin: 8px 0 0; font: var(--type-small); }
+.detail { color: var(--color-text); }

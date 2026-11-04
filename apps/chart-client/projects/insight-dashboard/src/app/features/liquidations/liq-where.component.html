@@ -1,20 +1,24 @@
-<h3>{{ t('liq.where.title') }}</h3>
 @if (view().rows.length === 0) {
   <p class="muted">{{ t('liq.empty') }}</p>
 } @else {
-  <p class="legend">{{ t('liq.where.legend') }}</p>
-  <ul class="rows">
+  <div class="head" aria-hidden="true">
+    <span></span><span class="long-text">{{ t('liq.where.headLongs') }}</span><span class="short-text">{{ t('liq.where.headShorts') }}</span><span></span>
+  </div>
+  <ul class="rows" [attr.aria-label]="t('liq.where.legend')">
     @for (row of visibleRows(); track row.symbol) {
-      <li class="row">
-        <a class="coin" [routerLink]="['/instrument', row.symbol]">{{ row.base }}</a>
+      <li class="row" [attr.title]="rowTitle(row)">
+        <a class="coin num" [routerLink]="['/instrument', row.symbol]">{{ row.base }}</a>
         <div class="track left"><span class="bar long" [style.width.%]="row.longPct"></span></div>
         <div class="track right"><span class="bar short" [style.width.%]="row.shortPct"></span></div>
-        <p class="amounts">
-          <span class="long-text">{{ usd(row.long) }}</span> · <span class="short-text">{{ usd(row.short) }}</span>
+        <p class="verdict">
+          @if (row.side; as s) {
+            <span class="side num" [class.long-text]="s.side === 'long'" [class.short-text]="s.side === 'short'">{{ t(s.key, s.params) }}</span>
+          }
           @if (row.verdict; as v) {
-            <strong class="verdict" [class.long-text]="v.key === 'liq.verdict.long'" [class.short-text]="v.key === 'liq.verdict.short'">{{ t(v.key, v.params) }}</strong>
+            <span class="norm">{{ t(v.key, v.params) }}</span>
           }
         </p>
+        <span class="sr-only">{{ rowTitle(row) }}</span>
       </li>
     }
   </ul>
