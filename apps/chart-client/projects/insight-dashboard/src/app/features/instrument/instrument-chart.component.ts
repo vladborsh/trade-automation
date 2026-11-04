@@ -10,10 +10,8 @@ import { markAt } from './calendar-marks';
 import { liquidationScopeLabel } from './liquidation-scope';
 import { createPanelRenderers, drawPanel, eventMarks, redrawPanels, type PanelRenderers } from './panel-series';
 import type { PaneData } from './pane-data';
-import {
-  DEFAULT_PANE_HEIGHTS, browserStore, loadPaneHeights, paneEdges, resizePane, savePaneHeights, totalPaneHeight,
-  type PaneHeights, type PaneKey,
-} from './pane-heights';
+import { browserStore, loadPaneHeights, paneEdges, totalPaneHeight, type PaneHeights } from './pane-heights';
+import { PaneDrag } from './pane-drag';
 import { paneLegends } from './pane-legend';
 import {
   PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, showWholeWindow,
@@ -96,10 +94,10 @@ export class InstrumentChartComponent implements OnDestroy {
   private observer: ResizeObserver | null = null;
   private frame = 0;
   private readonly store = browserStore();
-  /** The pane being dragged, with where the drag started. */
-  private drag: { key: PaneKey; startY: number; startHeight: number } | null = null;
 
   readonly heights = signal<PaneHeights>(loadPaneHeights(this.store));
+  /** Dragging a pane's lower edge, and «reset heights» (`pane-drag.ts`). */
+  readonly drag = new PaneDrag(this.heights, this.store);
 
   /** Panes and the 1 px separators between them; the time axis is the sticky strip below. */
   readonly chartHeight = computed(() => totalPaneHeight(this.heights()) + (PANELS.length - 1));
@@ -140,30 +138,6 @@ export class InstrumentChartComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.teardown();
-  }
-
-  /** Back to the default heights, and remembered as such. */
-  resetHeights(): void {
-    this.heights.set({ ...DEFAULT_PANE_HEIGHTS });
-    savePaneHeights(this.store, this.heights());
-  }
-
-  startDrag(event: PointerEvent, key: PaneKey): void {
-    event.preventDefault();
-    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
-    this.drag = { key, startY: event.clientY, startHeight: this.heights()[key] };
-  }
-
-  moveDrag(event: PointerEvent): void {
-    const drag = this.drag;
-    if (!drag) return;
-    this.heights.set(resizePane(this.heights(), drag.key, drag.startHeight, event.clientY - drag.startY));
-  }
-
-  endDrag(): void {
-    if (!this.drag) return;
-    this.drag = null;
-    savePaneHeights(this.store, this.heights());
   }
 
   /**

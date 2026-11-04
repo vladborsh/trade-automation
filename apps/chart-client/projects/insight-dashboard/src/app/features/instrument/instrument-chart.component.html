@@ -1,4 +1,4 @@
-<div class="chart" [style.height.px]="chartHeight()" (pointermove)="moveDrag($event)" (pointerup)="endDrag()" (pointercancel)="endDrag()">
+<div class="chart" [style.height.px]="chartHeight()" (pointermove)="drag.move($event)" (pointerup)="drag.end()" (pointercancel)="drag.end()">
   <div #chartHost class="chart-host"></div>
   @for (legend of legends(); track legend.key) {
     <div class="pane-legend" [attr.data-pane]="legend.key" [style.top.px]="legend.top">
@@ -23,7 +23,7 @@
       [attr.aria-label]="t('instrument.resizeHandle')"
       [attr.data-pane]="handle.key"
       [style.top.px]="handle.bottom"
-      (pointerdown)="startDrag($event, handle.key)"
+      (pointerdown)="drag.start($event, handle.key)"
     ></div>
   }
 </div>
@@ -39,5 +39,5 @@
     <p class="edge-note">{{ note }}</p>
   }
   <p class="hint">{{ t('instrument.resizeHint') }}</p>
-  <button type="button" class="reset" (click)="resetHeights()">{{ t('instrument.resetHeights') }}</button>
+  <button type="button" class="reset" (click)="drag.reset()">{{ t('instrument.resetHeights') }}</button>
 </div>
