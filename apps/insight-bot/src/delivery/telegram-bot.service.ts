@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import { Bot } from 'grammy';
 import { AppConfigService } from '../config/config.service';
 import { UsersService } from '../users/users.service';
@@ -6,6 +6,8 @@ import { WebAuthService } from '../web/auth/web-auth.service';
 import { CredentialsService } from '../web/auth/credentials.service';
 import { LOGIN_TOKEN_TTL_MS } from '../web/auth/session-cookie';
 import { registerHandlers } from './bot-handlers';
+import { DB, type Db } from '../db/db.port';
+import { PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
 
 /**
  * IB-021 — the member bot (design §8.6, D11): grammY **long polling**, so the instance opens no
@@ -26,6 +28,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
     private readonly users: UsersService,
     private readonly webAuth: WebAuthService,
     private readonly credentials: CredentialsService,
+    @Optional() @Inject(DB) private readonly db?: Db | null,
   ) {}
 
   get enabled(): boolean {
@@ -49,6 +52,8 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
         loginTokenTtlMs: LOGIN_TOKEN_TTL_MS,
       },
       botUsername: this.config.env.get('TELEGRAM_BOT_USERNAME'),
+      // IB-112 (V13): /oialerts is shown to members only while the admin page's members_visible is on
+      ...(this.db ? { oiAlerts: new PgOiAlertsVisibility(this.db) } : {}),
       logger: { warn: (m) => this.logger.warn(m) },
     });
 

@@ -14,7 +14,8 @@ import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
 import { WebMembersController } from './members/members.controller';
-import { WebMeSettingsController } from './members/me-settings.controller';
+import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
 import { UsersModule } from '../users/users.module';
 import { AssetClassifier } from './liquidations/asset-classes';
 import { WebContextController } from './context/context.controller';
@@ -215,6 +216,12 @@ export class WebModule {
                 flows: (period) => flows.flows(period),
               },
             }),
+        },
+        {
+          // IB-112 (V13): /me/settings shows members the OI alerts toggle only while members_visible is on
+          provide: OI_ALERTS_VISIBILITY,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new PgOiAlertsVisibility(db) : { membersVisible: async () => false }),
         },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],

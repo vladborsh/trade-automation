@@ -17,6 +17,8 @@ export interface User {
   dexAlerts: boolean;
   /** IB-062: calendar digest and pre-event reminders in the member's DM. */
   calendarAlerts: boolean;
+  /** IB-112 (OI divergence design V13): OI divergence alerts in the DM. Migration 025: on for admins, off for members. */
+  oiAlerts: boolean;
   invitedBy: number | null;
   disabled: boolean;
   createdAt: Date;

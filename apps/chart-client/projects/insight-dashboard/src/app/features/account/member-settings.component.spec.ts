@@ -7,9 +7,9 @@ import { I18nService } from '../../i18n/i18n.service';
 import { MemberSettingsComponent } from './member-settings.component';
 
 /** IB-035 — the account page's settings: the bot's /lang and /calendar, on the site. */
-async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMemberSettings>) {
+async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMemberSettings>, initial: Partial<WebMemberSettings> = {}) {
   const patches: WebMemberSettingsPatch[] = [];
-  let stored: WebMemberSettings = { lang: 'ru', calendarAlerts: true };
+  let stored: WebMemberSettings = { lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, ...initial };
   TestBed.configureTestingModule({
     imports: [MemberSettingsComponent],
     providers: [{
@@ -19,7 +19,7 @@ async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMembe
         updateMemberSettings: async (p: WebMemberSettingsPatch) => {
           patches.push(p);
           if (patchImpl) return patchImpl(p);
-          stored = { lang: (p.lang as 'ru' | 'en') ?? stored.lang, calendarAlerts: typeof p.calendarAlerts === 'boolean' ? p.calendarAlerts : stored.calendarAlerts };
+          stored = { ...stored, lang: (p.lang as 'ru' | 'en') ?? stored.lang, calendarAlerts: typeof p.calendarAlerts === 'boolean' ? p.calendarAlerts : stored.calendarAlerts, oiAlerts: typeof p.oiAlerts === 'boolean' ? p.oiAlerts : stored.oiAlerts };
           return stored;
         },
       },
@@ -67,5 +67,18 @@ describe('MemberSettingsComponent (IB-035)', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(cmp.status()).toBe('settings.saveFailed');
     expect(i18n.lang()).toBe('ru');
+  });
+
+  it('IB-112: the OI alerts switch is absent unless the server says it is visible; when shown it sends exactly oiAlerts', async () => {
+    const hidden = await setup();
+    expect(hidden.el.textContent).not.toContain('Сигналы OI');
+    expect(hidden.el.querySelectorAll('input[type=checkbox]')).toHaveLength(1);
+    TestBed.resetTestingModule();
+    const shown = await setup(undefined, { oiAlertsVisible: true });
+    expect(shown.el.textContent).toContain('Сигналы OI в Telegram');
+    shown.cmp.setOiAlerts(true);
+    await shown.fixture.whenStable();
+    expect(shown.patches).toEqual([{ oiAlerts: true }]);
+    expect(shown.cmp.settings()?.oiAlerts).toBe(true);
   });
 });

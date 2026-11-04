@@ -103,6 +103,7 @@ export type StringKey =
   | 'settings.lang.ru'
   | 'settings.lang.en'
   | 'settings.calendar'
+  | 'settings.oiAlerts'
   | 'settings.hint'
   | 'settings.saved'
   | 'settings.saveFailed'

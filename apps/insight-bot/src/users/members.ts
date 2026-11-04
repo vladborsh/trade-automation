@@ -15,8 +15,8 @@ import { INVITE_TTL_MS, type User } from './user.model';
  * `parseOnOff` already knows (`'true'`/`'false'`).
  */
 export function settingsPatchFromWeb(
-  body: { lang?: string; calendarAlerts?: boolean | string },
-): { ok: true; patch: SettingsPatch } | { ok: false; field: 'lang' | 'calendarAlerts' } {
+  body: { lang?: string; calendarAlerts?: boolean | string; oiAlerts?: boolean | string },
+): { ok: true; patch: SettingsPatch } | { ok: false; field: 'lang' | 'calendarAlerts' | 'oiAlerts' } {
   const patch: SettingsPatch = {};
   if (body.lang !== undefined) {
     const lang = parseLang(body.lang);
@@ -27,6 +27,11 @@ export function settingsPatchFromWeb(
     const on = parseOnOff(String(body.calendarAlerts));
     if (!on.ok) return { ok: false, field: 'calendarAlerts' };
     patch.calendarAlerts = on.value;
+  }
+  if (body.oiAlerts !== undefined) {
+    const on = parseOnOff(String(body.oiAlerts));
+    if (!on.ok) return { ok: false, field: 'oiAlerts' };
+    patch.oiAlerts = on.value;
   }
   return { ok: true, patch };
 }
@@ -46,4 +51,12 @@ export function disableRefusal(actorId: number, target: Pick<User, 'id' | 'role'
 /** A new invite's code and expiry, the same for the bot's `/invite` and the site's button. */
 export function newInvite(now: Date, ttlMs = INVITE_TTL_MS): { code: string; expiresAt: Date } {
   return { code: generateInviteCode(), expiresAt: new Date(now.getTime() + ttlMs) };
+}
+
+/**
+ * IB-112 (OI divergence design V13): who may see and change the OI alerts toggle — an admin always,
+ * a member only while the admin page's `members_visible` is on. The same rule on the site and in the bot.
+ */
+export function oiAlertsVisible(user: Pick<User, 'role'>, membersVisible: boolean): boolean {
+  return user.role === 'admin' || membersVisible;
 }

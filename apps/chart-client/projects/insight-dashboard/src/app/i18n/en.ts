@@ -92,6 +92,7 @@ export const en: Strings = {
   'settings.lang.ru': 'Russian',
   'settings.lang.en': 'English',
   'settings.calendar': 'US calendar reminders in Telegram',
+  'settings.oiAlerts': 'OI alerts in Telegram: price made a new low or high and open interest did not',
   'settings.hint': 'The same settings as /lang and /calendar in the bot: a change here applies there too.',
   'settings.saved': 'Saved.',
   'settings.saveFailed': 'Not saved. Please try again.',

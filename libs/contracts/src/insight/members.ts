@@ -58,6 +58,14 @@ export const WebMemberSettingsSchema = z.object({
   lang: z.enum(['ru', 'en']),
   /** The calendar digest and pre-event reminders in Telegram. */
   calendarAlerts: z.boolean(),
+  /** IB-112 (V13): OI divergence alerts in Telegram (`users.oi_alerts`). Admins start on, members off. */
+  oiAlerts: z.boolean(),
+  /**
+   * Whether this member may see and change `oiAlerts`: always for an admin; for a member only while
+   * the admin page's `members_visible` is on. Hidden is not refused silently: a PATCH of `oiAlerts`
+   * while this is false answers 403 `{ code: 'SETTING_NOT_AVAILABLE', field: 'oiAlerts' }`.
+   */
+  oiAlertsVisible: z.boolean(),
 });
 export type WebMemberSettings = z.infer<typeof WebMemberSettingsSchema>;
 
@@ -70,5 +78,7 @@ export type WebMemberSettings = z.infer<typeof WebMemberSettingsSchema>;
 export const WebMemberSettingsPatchSchema = z.object({
   lang: z.string().optional(),
   calendarAlerts: z.union([z.boolean(), z.string()]).optional(),
+  /** IB-112: parsed like `calendarAlerts` (the bot's `parseOnOff`). */
+  oiAlerts: z.union([z.boolean(), z.string()]).optional(),
 }).strict();
 export type WebMemberSettingsPatch = z.infer<typeof WebMemberSettingsPatchSchema>;

@@ -70,17 +70,22 @@ export function settings(user: {
   lang: Lang;
   /** IB-062; optional so callers from before the calendar still render. */
   calendarAlerts?: boolean;
+  /** IB-112; present only when the user may see the OI alerts toggle. */
+  oiAlerts?: boolean;
 }): Texts {
   const hasCalendar = user.calendarAlerts !== undefined;
+  const hasOi = user.oiAlerts !== undefined;
   return {
     ru: 'Ваши настройки\n'
       + (hasCalendar ? `• Календарь США: ${user.calendarAlerts ? 'включён' : 'выключен'}\n` : '')
+      + (hasOi ? `• Сигналы OI: ${user.oiAlerts ? 'включены' : 'выключены'}\n` : '')
       + `• Язык: ${user.lang}\n\n`
-      + `Изменить: ${hasCalendar ? '/calendar, ' : ''}/lang en`,
+      + `Изменить: ${hasCalendar ? '/calendar, ' : ''}${hasOi ? '/oialerts, ' : ''}/lang en`,
     en: 'Your settings\n'
       + (hasCalendar ? `• US calendar: ${user.calendarAlerts ? 'on' : 'off'}\n` : '')
+      + (hasOi ? `• OI alerts: ${user.oiAlerts ? 'on' : 'off'}\n` : '')
       + `• Language: ${user.lang}\n\n`
-      + `Change with: ${hasCalendar ? '/calendar, ' : ''}/lang ru`,
+      + `Change with: ${hasCalendar ? '/calendar, ' : ''}${hasOi ? '/oialerts, ' : ''}/lang ru`,
   };
 }
 

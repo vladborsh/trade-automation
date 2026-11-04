@@ -18,7 +18,7 @@ import type { User } from '../../src/users/user.model';
 
 const member: User = {
   id: 2, tgUserId: 222, chatId: 222, role: 'member', lang: 'ru', deposit: 1000, riskPct: 1,
-  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, invitedBy: 1, disabled: false, createdAt: new Date(),
+  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, oiAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date(),
 };
 const admin: User = { ...member, id: 1, tgUserId: 111, role: 'admin' };
 

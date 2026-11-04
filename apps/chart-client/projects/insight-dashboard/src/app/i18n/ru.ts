@@ -98,6 +98,7 @@ export const ru: Strings = {
   'settings.lang.ru': 'русский',
   'settings.lang.en': 'английский',
   'settings.calendar': 'Напоминания календаря США в Telegram',
+  'settings.oiAlerts': 'Сигналы OI в Telegram: цена обновила минимум или максимум, а открытый интерес — нет',
   'settings.hint': 'Те же настройки, что /lang и /calendar в боте: меняются и тут, и там.',
   'settings.saved': 'Сохранено.',
   'settings.saveFailed': 'Не сохранилось. Попробуйте ещё раз.',

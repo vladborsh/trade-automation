@@ -12,6 +12,12 @@
       <input type="checkbox" [checked]="s.calendarAlerts" (change)="setCalendar($any($event.target).checked)" [disabled]="busy()" />
       <span>{{ t('settings.calendar') }}</span>
     </label>
+    @if (s.oiAlertsVisible) {
+      <label class="row">
+        <input type="checkbox" [checked]="s.oiAlerts" (change)="setOiAlerts($any($event.target).checked)" [disabled]="busy()" />
+        <span>{{ t('settings.oiAlerts') }}</span>
+      </label>
+    }
     <p class="muted hint">{{ t('settings.hint') }}</p>
   }
   @if (status(); as key) {

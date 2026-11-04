@@ -17,6 +17,8 @@ import { inviteLink, isWellFormedCode } from '../users/invite-code';
 import { parseCommand, parseLang, parseOnOff } from '../users/settings';
 import type { ConsumeResult, SettingsPatch } from '../users/pg/users.repo';
 import * as T from './templates/texts';
+import { oiAlertsToggled } from './templates/oi-divergence.texts';
+import { oiAlertsVisible } from '../users/members';
 
 export interface UsersPort {
   findByTgUserId(tgUserId: number): Promise<User | null>;
@@ -45,6 +47,8 @@ export interface WebAuthPort {
 export interface HandlerDeps {
   users: UsersPort;
   web?: WebAuthPort;
+  /** IB-112 (V13): whether members see the OI alerts toggle. Absent → members do not; admins always do. */
+  oiAlerts?: { membersVisible(): Promise<boolean> };
   botUsername: string;
   now?: () => Date;
   inviteTtlMs?: number;
@@ -160,9 +164,12 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
     switch (command) {
       case 'start':
         return;
-      case 'settings':
-        await reply(ctx, T.settings(user), lang);
+      case 'settings': {
+        // IB-112: the OI alerts line only for someone who may change it
+        const oi = oiAlertsVisible(user, (await deps.oiAlerts?.membersVisible()) ?? false);
+        await reply(ctx, T.settings({ lang: user.lang, calendarAlerts: user.calendarAlerts, ...(oi ? { oiAlerts: user.oiAlerts } : {}) }), lang);
         return;
+      }
       // WD-013: /deposit, /risk, /limit and /dex are gone with the signal pipeline they configured
       // (nothing read those settings after the wind-down). Typed now, they get UNKNOWN_COMMAND below.
       case 'lang': {
@@ -183,6 +190,20 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         }
         await deps.users.updateSettings(user.id, { calendarAlerts: value });
         await reply(ctx, T.calendarToggled(value), lang);
+        return;
+      }
+      case 'oialerts': {
+        // IB-112 (V13): hidden from a member until the admin page's members_visible — then it answers
+        // exactly like a command that does not exist, so a hidden feature is not advertised
+        if (!oiAlertsVisible(user, (await deps.oiAlerts?.membersVisible()) ?? false)) { await reply(ctx, T.UNKNOWN_COMMAND, lang); return; }
+        let value = !user.oiAlerts;
+        if (args[0] !== undefined) {
+          const parsed = parseOnOff(args[0]);
+          if (!parsed.ok) { await reply(ctx, T.BAD_ON_OFF, lang); return; }
+          value = parsed.value;
+        }
+        await deps.users.updateSettings(user.id, { oiAlerts: value });
+        await reply(ctx, oiAlertsToggled(value), lang);
         return;
       }
       case 'invite': {

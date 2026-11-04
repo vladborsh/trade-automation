@@ -70,3 +70,10 @@ export function oiDivergenceAlert(a: OiDivergenceAlertText, webBaseUrl: string):
   const link = alertLink(webBaseUrl, a);
   return { ru: `${ru}\n${link}`, en: `${en}\n${link}` };
 }
+
+/** `/oialerts`: what changed, and how to change it back. */
+export function oiAlertsToggled(on: boolean): Texts {
+  return on
+    ? { ru: 'Сигналы OI включены: сообщение, когда цена обновляет минимум или максимум, а открытый интерес — нет. Выключить: /oialerts', en: 'OI alerts on: a message when price makes a new low or high and open interest does not. Turn off: /oialerts' }
+    : { ru: 'Сигналы OI выключены. Включить: /oialerts', en: 'OI alerts off. Turn on: /oialerts' };
+}

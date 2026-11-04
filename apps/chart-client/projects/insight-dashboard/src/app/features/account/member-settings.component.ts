@@ -7,7 +7,8 @@ import { I18nService } from '../../i18n/i18n.service';
 
 /**
  * IB-035 — a member's own settings on the site: the language and the calendar reminders in Telegram
- * (owner, 2026-11-04: they stay). Exactly the bot's `/lang` and `/calendar`. They share one column,
+ * (owner, 2026-11-04: they stay), and (IB-112) the OI alerts when the server says they are visible.
+ * Exactly the bot's `/lang`, `/calendar` and `/oialerts`. They share one column,
  * so a change here changes the bot's answers too. A language change switches the interface at once.
  */
 @Component({
@@ -37,6 +38,11 @@ export class MemberSettingsComponent {
 
   setCalendar(on: boolean): void {
     void this.save({ calendarAlerts: on });
+  }
+
+  /** IB-112 (V13): OI divergence alerts in Telegram — offered only while the server says this member may see it. */
+  setOiAlerts(on: boolean): void {
+    void this.save({ oiAlerts: on });
   }
 
   private async save(patch: WebMemberSettingsPatch): Promise<void> {

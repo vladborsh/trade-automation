@@ -11,7 +11,8 @@ import * as users from '../../src/users/pg/users.repo';
 import { UsersService } from '../../src/users/users.service';
 import { WebAuthGuard } from '../../src/web/auth/web-auth.guard';
 import { WebAuthService } from '../../src/web/auth/web-auth.service';
-import { WebMeSettingsController } from '../../src/web/members/me-settings.controller';
+import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from '../../src/web/members/me-settings.controller';
+import { PgOiAlertsVisibility } from '../../src/alerts/oi-divergence/pg/oi-alerts.repo';
 import { WebMembersController } from '../../src/web/members/members.controller';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
 
@@ -73,6 +74,7 @@ maybeDescribe('IB-035 members admin against a real database', () => {
         { provide: DB, useValue: db },
         { provide: AppConfigService, useValue: config },
         UsersService, WebAuthService,
+        { provide: OI_ALERTS_VISIBILITY, useFactory: () => new PgOiAlertsVisibility(db) },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
     })
@@ -96,18 +98,42 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     expect((await call('POST', '/api/web/admin/members/1/disable', t)).status).toBe(403);
     const me = await call('GET', '/api/web/me/settings', t);
     expect(me.status).toBe(200);
-    expect(await me.json()).toEqual({ lang: 'ru', calendarAlerts: true });
+    expect(await me.json()).toEqual({ lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false });
   });
 
   it('the settings PATCH writes the same column the bot reads; an unknown field or a bad value is 400', async () => {
     const t = await session(memberId);
     const ok = await call('PATCH', '/api/web/me/settings', t, { lang: 'EN', calendarAlerts: 'выкл' });
-    expect(await ok.json()).toEqual({ lang: 'en', calendarAlerts: false });
+    expect(await ok.json()).toEqual({ lang: 'en', calendarAlerts: false, oiAlerts: false, oiAlertsVisible: false });
     expect((await users.findByTgUserId(db, 222))).toMatchObject({ lang: 'en', calendarAlerts: false });
     expect((await call('PATCH', '/api/web/me/settings', t, { deposit: 1000 })).status).toBe(400);
     const bad = await call('PATCH', '/api/web/me/settings', t, { lang: 'de' });
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({ code: 'INVALID_SETTING', field: 'lang' });
+  });
+
+  it('IB-112: the OI alerts toggle — hidden from a member until members_visible (403 when changed hidden); an admin always; an admin may always change it', async () => {
+    const member = await session(memberId);
+    const adm = await session(adminId);
+    // migration 025 turns oi_alerts on for admins that EXIST when it runs (the box's owner); this admin was
+    // bootstrapped after it, so starts off like any new user (V13 as written — reported, not changed here)
+    expect(await (await call('GET', '/api/web/me/settings', adm)).json()).toMatchObject({ oiAlerts: false, oiAlertsVisible: true });
+    expect(await (await call('PATCH', '/api/web/me/settings', adm, { oiAlerts: true })).json()).toMatchObject({ oiAlerts: true });
+    const hidden = await call('PATCH', '/api/web/me/settings', member, { oiAlerts: 'on' });
+    expect(hidden.status).toBe(403);
+    expect(await hidden.json()).toMatchObject({ code: 'SETTING_NOT_AVAILABLE', field: 'oiAlerts' });
+    expect((await users.findByTgUserId(db, 222))?.oiAlerts).toBe(false);
+    expect(await (await call('PATCH', '/api/web/me/settings', adm, { oiAlerts: false })).json()).toMatchObject({ oiAlerts: false });
+    await db.query('update alert_settings set members_visible = true where id = 1');
+    try {
+      const shown = await call('PATCH', '/api/web/me/settings', member, { oiAlerts: 'вкл' });
+      expect(await shown.json()).toMatchObject({ oiAlerts: true, oiAlertsVisible: true });
+      expect((await users.findByTgUserId(db, 222))?.oiAlerts).toBe(true);
+      expect((await call('PATCH', '/api/web/me/settings', member, { oiAlerts: 'maybe' })).status).toBe(400);
+    } finally {
+      await db.query('update alert_settings set members_visible = false where id = 1');
+      await db.query('update users set oi_alerts = (role = \'admin\')');
+    }
   });
 
   it('the members list: login null without a password, live sessions counted, no invite code anywhere', async () => {

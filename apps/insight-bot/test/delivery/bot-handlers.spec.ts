@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 import { registerHandlers, chunk, type UsersPort } from '../../src/delivery/bot-handlers';
 import type { User } from '../../src/users/user.model';
 import * as T from '../../src/delivery/templates/texts';
+import { oiAlertsToggled } from '../../src/delivery/templates/oi-divergence.texts';
 import { newInvite, settingsPatchFromWeb } from '../../src/users/members';
 
 /**
@@ -24,13 +25,13 @@ const BOT_INFO = {
 
 const member: User = {
   id: 2, tgUserId: 222, chatId: 222, role: 'member', lang: 'ru', deposit: null, riskPct: 1,
-  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, invitedBy: 1, disabled: false, createdAt: new Date('2026-09-01'),
+  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, oiAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date('2026-09-01'),
 };
 const admin: User = { ...member, id: 1, tgUserId: 111, chatId: 111, role: 'admin' };
 
 const CODE = 'abcdefghjkmnpqrs'; // 16 chars from the code alphabet
 
-function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}) {
+function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}, oi: { membersVisible: boolean } | null = null) {
   const sent: string[] = [];
   const calls: Array<{ method: string; payload: Record<string, unknown> }> = [];
   const patches: Array<{ userId: number; patch: Record<string, unknown> }> = [];
@@ -61,6 +62,7 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
   });
   registerHandlers(bot, {
     users: port, botUsername: 'insight_test_bot', now: () => new Date('2026-09-28T12:00:00Z'),
+    ...(oi ? { oiAlerts: { membersVisible: async () => oi.membersVisible } } : {}),
     web: {
       createCredentialsLink: (id) => (web ? web.createCredentialsLink(id) : Promise.resolve(null)),
       hasCredentials: async () => web?.hasCredentials ?? false,
@@ -195,6 +197,36 @@ describe('member settings', () => {
     await h.bot.handleUpdate(text(222, '/settings') as never);
     expect(h.sent[0]).toContain('Календарь США: включён');
     expect(h.sent[0]).toContain('/calendar');
+  });
+
+  it('IB-112 /oialerts: hidden from a member until members_visible — answered like an unknown command, nothing written', async () => {
+    const h = harness({}, { 222: member }, { membersVisible: false });
+    await h.bot.handleUpdate(text(222, '/oialerts on') as never);
+    await h.bot.handleUpdate(text(222, '/settings') as never);
+    expect(h.patches).toEqual([]);
+    expect(h.sent[0]).toBe(T.UNKNOWN_COMMAND.ru);
+    expect(h.sent[1]).not.toContain('Сигналы OI');
+    expect(h.sent[1]).not.toContain('/oialerts');
+  });
+
+  it('IB-112 /oialerts: visible to members → toggles and sets like /calendar; /settings shows the line', async () => {
+    const h = harness({}, { 222: member }, { membersVisible: true });
+    await h.bot.handleUpdate(text(222, '/oialerts') as never);
+    await h.bot.handleUpdate(text(222, '/oialerts off') as never);
+    await h.bot.handleUpdate(text(222, '/oialerts maybe') as never);
+    expect(h.patches).toEqual([{ userId: 2, patch: { oiAlerts: true } }, { userId: 2, patch: { oiAlerts: false } }]);
+    expect(h.sent).toEqual([oiAlertsToggled(true).ru, oiAlertsToggled(false).ru, T.BAD_ON_OFF.ru]);
+    await h.bot.handleUpdate(text(222, '/settings') as never);
+    expect(h.sent[3]).toContain('Сигналы OI: выключены');
+    expect(h.sent[3]).toContain('/oialerts');
+  });
+
+  it('IB-112 /oialerts: an admin always has it, members_visible or not; no visibility port at all hides it from members', async () => {
+    const h = harness({}, { 111: admin, 222: member });
+    await h.bot.handleUpdate(text(111, '/oialerts on') as never);
+    await h.bot.handleUpdate(text(222, '/oialerts on') as never);
+    expect(h.patches).toEqual([{ userId: 1, patch: { oiAlerts: true } }]);
+    expect(h.sent[1]).toBe(T.UNKNOWN_COMMAND.ru);
   });
 
   it('an unknown command from a MEMBER is answered, unlike a stranger\'s', async () => {
