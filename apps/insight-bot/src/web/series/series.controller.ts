@@ -2,7 +2,7 @@ import { Controller, Get, HttpException, Inject, Optional, Query, Res } from '@n
 import type { Response } from 'express';
 import {
   WEB_MAX_CANDLE_BARS, WEB_MAX_LIQUIDATION_EVENTS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebMarketSchema,
-  WebTimeframeSchema, WebVenueFilterSchema, type WebTimeframe,
+  WebTimeframeSchema, WebVenueFilterSchema, type WebTimeframe, OiDivergenceTfSchema, type WebOiDivergenceSeriesResponse,
   type WebCandlesResponse, type WebFundingResponse, type WebLiquidationEventsResponse,
   type WebLiquidationsResponse, type WebLongShortResponse, type WebOpenInterestResponse, type WebTopLiquidation,
 } from '@trade-automation/contracts';
@@ -13,6 +13,7 @@ import { barsTouched, checkRange, gridOffsetMs, thin, timeframeMs } from './rang
 import * as repo from './pg/liquidations.repo';
 import { FundingService } from '../market/funding.service';
 import { OiLsService } from '../market/oi-ls.service';
+import { OiDivergenceService } from '../market/oi-divergence.service';
 
 /** The venues whose liquidations a symbol can have: one per spelling `venueSpellings` resolves. */
 const LIQUIDATION_VENUES = WebVenueFilterSchema.options.filter((v) => v !== 'all').length;
@@ -33,6 +34,7 @@ export class SeriesController {
     @Optional() private readonly candlesService?: CandlesService,
     @Optional() private readonly fundingService?: FundingService,
     @Optional() private readonly oiLsService?: OiLsService,
+    @Optional() private readonly oiDivergence?: OiDivergenceService,
   ) {}
 
   private get required(): Db {
@@ -122,6 +124,19 @@ export class SeriesController {
     const answer = await this.oiLsService.openInterest(symbol, fromMs, toMs);
     const { rows: points, downsampled } = thin(answer.points);
     return { ...answer, points, downsampled };
+  }
+
+  /**
+   * IB-110 (OI divergence design V11): the divergence lines of any coin with OI, on the TF asked
+   * (15m | 1h | 4h), computed on open over the coin's OI history with the current params.
+   */
+  @Get('oi-divergences')
+  async oiDivergences(@Query('symbol') symbol: string, @Query('tf') tf: string): Promise<WebOiDivergenceSeriesResponse> {
+    const parsedTf = OiDivergenceTfSchema.safeParse(tf);
+    if (!parsedTf.success) throw new HttpException({ code: 'BAD_REQUEST', message: 'tf must be 15m, 1h or 4h' }, 400);
+    if (!/^[A-Z0-9]{2,30}$/.test(symbol ?? '')) throw new HttpException({ code: 'BAD_REQUEST', message: 'unknown symbol' }, 400);
+    if (!this.oiDivergence) throw notConfigured('OI divergences');
+    return this.oiDivergence.series(symbol, parsedTf.data);
   }
 
   /** WD-009: Binance long-short ratios from `/futures/data` on demand; ~30 days back. */

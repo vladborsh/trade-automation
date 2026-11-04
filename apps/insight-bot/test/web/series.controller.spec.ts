@@ -265,3 +265,25 @@ describe('WD-009: funding, OI and long-short come from the venues, not the tape'
     }
   });
 });
+
+describe('SeriesController.oiDivergences (IB-110)', () => {
+  const series = { series: jest.fn(async (symbol: string, tf: string) => ({ symbol, tf })) };
+  const controller = () => new SeriesController(null, undefined, undefined, undefined, series as never);
+  const status = async (p: Promise<unknown>) => p.then(() => 200, (e: { getStatus?: () => number }) => e.getStatus?.() ?? 500);
+
+  it('passes symbol and tf through for 15m, 1h and 4h', async () => {
+    for (const tf of ['15m', '1h', '4h']) await expect(controller().oiDivergences('TRXUSDT', tf)).resolves.toEqual({ symbol: 'TRXUSDT', tf });
+  });
+
+  it('refuses another TF and a malformed symbol with 400, without reading anything', async () => {
+    series.series.mockClear();
+    expect(await status(controller().oiDivergences('BTCUSDT', '5m'))).toBe(400);
+    expect(await status(controller().oiDivergences('btc/usdt', '1h'))).toBe(400);
+    expect(await status(controller().oiDivergences(undefined as never, '1h'))).toBe(400);
+    expect(series.series).not.toHaveBeenCalled();
+  });
+
+  it('503 when the service is not configured', async () => {
+    expect(await status(new SeriesController(null).oiDivergences('BTCUSDT', '1h'))).toBe(503);
+  });
+});

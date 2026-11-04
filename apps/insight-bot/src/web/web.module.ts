@@ -32,6 +32,7 @@ import { MetricsService } from '../ops/metrics.service';
 import { UniverseSummaryService } from './market/universe-summary.service';
 import { FundingService } from './market/funding.service';
 import { OiLsService } from './market/oi-ls.service';
+import { OiDivergenceService } from './market/oi-divergence.service';
 import { DB, type Db } from '../db/db.port';
 import { oiLsStoredReader } from './series/pg/oi-ls-stored.repo';
 import { PositioningService } from './market/positioning/positioning.service';
@@ -158,6 +159,14 @@ export class WebModule {
           inject: [FuturesDataClient, TtlCache, BinanceWeightTracker, DB],
           useFactory: (client: FuturesDataClient, cache: TtlCache, weight: BinanceWeightTracker, db: Db | null) =>
             new OiLsService({ client, cache, weight, stored: db ? oiLsStoredReader(db) : null }),
+        },
+        {
+          // IB-110 (OI divergence V11): lines computed on open — candles, our OI (the venue's for a coin we
+          // do not store), the detector; cached one bar per (symbol, tf)
+          provide: OiDivergenceService,
+          inject: [DB, CandlesService, FuturesDataClient, TtlCache],
+          useFactory: (db: Db | null, candles: CandlesService, client: FuturesDataClient, cache: TtlCache) =>
+            new OiDivergenceService({ db, candles, client, cache }),
         },
         {
           // IB-085 (D9): positioning — every read through the services above, none of its own
