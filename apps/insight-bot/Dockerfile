@@ -76,6 +76,13 @@ COPY apps/insight-bot/migrations apps/insight-bot/migrations
 WORKDIR /workspace/apps/insight-bot
 RUN chown -R insightbot:insightbot /workspace
 
+# IB-115 (design V27): the commit this image was built from, 12 hex, stamped on every OI research row.
+# push-image.sh and the CI workflow pass --build-arg BUILD_SHA=<commit 12>. Without the arg it is
+# empty, and the bot refuses to boot in production (env.schema.ts) rather than write rows with no build.
+# Declared last, so a new commit does not invalidate the npm install layers above.
+ARG BUILD_SHA=
+ENV BUILD_SHA=${BUILD_SHA}
+
 USER insightbot
 EXPOSE 3005
 # IB-096: an explicit V8 heap cap sized for the 1 GB box — the arithmetic is in

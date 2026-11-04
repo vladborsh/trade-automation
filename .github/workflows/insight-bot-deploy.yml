@@ -47,6 +47,7 @@ jobs:
           sha=$(git rev-parse HEAD)
           echo "sha=$sha" >>"$GITHUB_OUTPUT"
           echo "tag=sha-${sha:0:12}" >>"$GITHUB_OUTPUT"
+          echo "build=${sha:0:12}" >>"$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -84,6 +85,8 @@ jobs:
           push: true
           provenance: false
           labels: org.opencontainers.image.revision=${{ steps.rev.outputs.sha }}
+          # IB-115 (V27): the bot stamps this on its OI research rows and refuses to boot in production without it
+          build-args: BUILD_SHA=${{ steps.rev.outputs.build }}
           tags: ${{ steps.ecr.outputs.registry }}/insight-bot:${{ steps.rev.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

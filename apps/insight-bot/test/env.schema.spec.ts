@@ -82,4 +82,15 @@ describe('validateEnv', () => {
     // an empty line in .env (`WEB_PUSH_VAPID_SUBJECT=`) is "not set", not a malformed subject
     expect(validateEnv({ WEB_PUSH_VAPID_SUBJECT: '' }).WEB_PUSH_VAPID_PUBLIC).toBeUndefined();
   });
+
+  it('IB-115 (V27): BUILD_SHA — production refuses to boot without it; a slot without it is «dev»', () => {
+    expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(/BUILD_SHA is required in production/);
+    expect(() => validateEnv({ NODE_ENV: 'production', BUILD_SHA: '' })).toThrow(/BUILD_SHA is required in production/); // a build without the arg
+    expect(() => validateEnv({ NODE_ENV: 'production', BUILD_SHA: 'dev' })).toThrow(/BUILD_SHA is required in production/);
+    expect(validateEnv({ NODE_ENV: 'production', BUILD_SHA: 'b49cd48d4ab4' }).BUILD_SHA).toBe('b49cd48d4ab4');
+    expect(validateEnv({}).BUILD_SHA).toBe('dev');
+    expect(validateEnv({ BUILD_SHA: '' }).BUILD_SHA).toBe('dev');
+    expect(() => validateEnv({ BUILD_SHA: 'sha-b49cd48d4ab4' })).toThrow(/12 hex/); // the tag, not the commit
+    expect(() => validateEnv({ BUILD_SHA: 'b49cd48d4ab4a78f' })).toThrow(/12 hex/);
+  });
 });

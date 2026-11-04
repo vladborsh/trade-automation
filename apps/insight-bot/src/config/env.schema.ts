@@ -54,6 +54,12 @@ export const EnvSchema = z.object({
   // IB-112: the OI divergence alert loop (journal always; sending is the admin page's switch, default
   // off). This only lets a spec or a slot boot without the loop polling Binance klines every bar.
   OI_ALERTS_LOOP_ENABLED: booleanFlag(true),
+  // IB-115 (design V27): the image's commit, 12 hex — stamped on every OI divergence journal, control and
+  // near-miss row, so the statistics split by the code that produced them. The Dockerfile sets it from the
+  // `BUILD_SHA` build arg (push-image.sh and the CI workflow pass it). In production a missing one is a boot
+  // failure (below): a row must never claim a build it was not made by. In a slot, absent means `dev`. An
+  // empty value (a Docker build without the arg) counts as absent.
+  BUILD_SHA: z.preprocess((v) => (v === '' ? undefined : v), z.string().regex(/^([0-9a-f]{12}|dev)$/, '12 hex characters of the commit').default('dev')),
   CALENDAR_FEED_BASE_URL: z.string().default('https://nfs.faireconomy.media/ff_calendar_thisweek'),
   // IB-058: how often the collector checks whether today's once-a-day fetch has happened. A
   // check makes no request on a collected day; it only bounds how late the day's fetch can be.
@@ -106,6 +112,13 @@ export const EnvSchema = z.object({
   WEB_PUSH_VAPID_PRIVATE: z.string().optional(),
   WEB_PUSH_VAPID_SUBJECT: z.string().regex(/^$|^(mailto:|https:\/\/)/, 'mailto:… or https://…').optional(),
 }).superRefine((env, ctx) => {
+  if (env.NODE_ENV === 'production' && env.BUILD_SHA === 'dev') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['BUILD_SHA'],
+      message: 'BUILD_SHA is required in production (the image build passes --build-arg BUILD_SHA=<commit 12>)',
+    });
+  }
   const vapid = [env.WEB_PUSH_VAPID_PUBLIC, env.WEB_PUSH_VAPID_PRIVATE, env.WEB_PUSH_VAPID_SUBJECT];
   const set = vapid.filter((v) => typeof v === 'string' && v.length > 0).length;
   if (set !== 0 && set !== 3) {

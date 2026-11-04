@@ -10,6 +10,8 @@
 #   this checkout (node_modules, .env files, dist) can reach the image. LOCAL_IMAGE skips the build
 #   and pushes an image built earlier, but only if its org.opencontainers.image.revision label is
 #   exactly that commit and it is linux/arm64.
+# - Passes --build-arg BUILD_SHA=<first 12 of the commit> (IB-115, V27): the bot stamps it on its research
+#   rows and refuses to boot in production without it. A LOCAL_IMAGE must carry the same BUILD_SHA.
 # - Tags `sha-<first 12 of the commit>` only (E2: immutable tags, no latest). Refuses when the tag
 #   already exists in ECR rather than letting the push fail half way.
 # - After a successful push, writes the tag to SSM /insight-bot/IMAGE_TAG (E10): the next
@@ -48,6 +50,13 @@ if [ -n "${LOCAL_IMAGE:-}" ]; then
     echo "push-image.sh: ${LOCAL_IMAGE} is labelled revision '${rev}', not ${COMMIT}" >&2
     exit 1
   fi
+  # IB-115 (V27): the bot refuses to boot in production without BUILD_SHA; an image built without the
+  # arg would be pushed, deployed and then fail its health check. Refuse it here instead.
+  build_sha="$(docker image inspect "$LOCAL_IMAGE" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^BUILD_SHA=//p')"
+  if [ "$build_sha" != "${COMMIT:0:12}" ]; then
+    echo "push-image.sh: ${LOCAL_IMAGE} has BUILD_SHA '${build_sha}', not ${COMMIT:0:12} (build it with --build-arg BUILD_SHA=${COMMIT:0:12})" >&2
+    exit 1
+  fi
   SOURCE="$LOCAL_IMAGE"
 else
   work="$(mktemp -d)"
@@ -57,6 +66,7 @@ else
   SOURCE="insight-bot:${TAG}"
   docker buildx build --platform linux/arm64 --load \
     --label "org.opencontainers.image.revision=${COMMIT}" \
+    --build-arg "BUILD_SHA=${COMMIT:0:12}" \
     -f "$work/apps/insight-bot/Dockerfile" -t "$SOURCE" "$work"
 fi
 
