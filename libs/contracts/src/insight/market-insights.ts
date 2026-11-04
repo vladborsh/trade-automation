@@ -67,6 +67,17 @@ export const WebInsightLinkSchema = z.union([
   z.object({ anchor: WebInsightBlockSchema }),
 ]);
 
+/**
+ * IB-107 (market-page design D24, §7.3) — the series behind a statement, for the card's mini-chart:
+ * numbers the rule already read, never a fetch of its own. `highlight` is the index of the bar the
+ * statement is about (the cascade's hour, "now"), or null; it must point inside `values`.
+ */
+export const WebInsightSparkSchema = z.object({
+  values: z.array(z.number()).min(2).max(30),
+  highlight: z.number().int().nonnegative().nullable(),
+}).refine((s) => s.highlight === null || s.highlight < s.values.length, { message: 'highlight points past the last value', path: ['highlight'] });
+export type WebInsightSpark = z.infer<typeof WebInsightSparkSchema>;
+
 export const WebInsightStatementSchema = z.object({
   ruleId: WebInsightRuleSchema,
   block: WebInsightBlockSchema,
@@ -78,8 +89,10 @@ export const WebInsightStatementSchema = z.object({
   magnitude: z.number(),
   basis: WebInsightBasisSchema,
   link: WebInsightLinkSchema,
+  /** D24: null is honest — the rule had no series in hand. No rule fetches anything for a spark. */
+  spark: WebInsightSparkSchema.nullable(),
 });
-export type WebInsightStatement = z.infer<typeof WebInsightStatementSchema>;
+export type WebInsightStatement =z.infer<typeof WebInsightStatementSchema>;
 
 /**
  * D15: one line per block — its best statement, or a neutral line saying WHY there is none:

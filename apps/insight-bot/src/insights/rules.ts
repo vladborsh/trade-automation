@@ -68,6 +68,7 @@ export const R1: Rule = {
       ruleId: 'R1', block: 'liquidations', key: 'insight.liq_surge',
       params: { side: top.side, usd: top.usd, ratio: top.ratio },
       rarity: top.r, magnitude: top.ratio ?? top.usd, basis: liqBasis(s, l[top.side].sample), link: { anchor: 'liquidations' },
+      spark: null,
     };
   },
 };
@@ -91,6 +92,7 @@ export const R2: Rule = {
       params: { symbol: best.symbol, usd: best.c.usd, ratio: m && m > 0 ? best.c.usd / m : null },
       rarity: best.r, magnitude: best.c.usd, basis: liqBasis(s, best.c.sample),
       link: { route: 'instrument', symbol: best.symbol, timeSec: null },
+      spark: null,
     };
   },
 };
@@ -118,6 +120,7 @@ export const R3: Rule = {
       params: { side: top.side, count: top.count, minutes: Math.max(1, Math.ceil(top.spanSec / 60)), usd: top.usd, symbol: top.symbol },
       rarity: rarity(top.usd, l.hourly) ?? 0, magnitude: top.usd, basis: liqBasis(s, l.hourly),
       link: { route: 'instrument', symbol: top.symbol, timeSec: top.start },
+      spark: null,
     };
   },
 };
@@ -149,6 +152,7 @@ export const R4: Rule = {
       // IB-BUG-023: a change over the period has no single moment — it links to the period's start
       basis: cellBasis(s, best.oiChangePct.sample),
       link: { route: 'instrument', symbol: best.symbol, timeSec: Math.floor(s.nowMs / 1000) - WEB_MARKET_PERIOD_SECONDS[s.period] },
+      spark: null,
     };
   },
 };
@@ -167,6 +171,7 @@ export const R5: Rule = {
       params: { count: extreme.length, total: rows.length, symbol: top.symbol, rate: top.fundingRate.value },
       rarity: top.fundingRate.rarity as number, magnitude: extreme.length,
       basis: cellBasis(s, top.fundingRate.sample), link: { anchor: 'positioning' },
+      spark: null,
     };
   },
 };
@@ -187,6 +192,7 @@ export const R6: Rule = {
       params: { symbol: r.symbol, global: r.lsGlobal.value, top: r.lsTopPosition.value },
       rarity: rar, magnitude: Math.abs(Math.log((r.lsGlobal.value as number) / (r.lsTopPosition.value as number))),
       basis: cellBasis(s, Math.min(r.lsGlobal.sample, r.lsTopPosition.sample)), link: { route: 'instrument', symbol: r.symbol, timeSec: null },
+      spark: null,
     };
   },
 };
@@ -204,6 +210,7 @@ export const R7: Rule = {
       ruleId: 'R7', block: 'sentiment', key: 'insight.breadth',
       params: { upPct: Math.round(b.upShare * 100), altGapPct: Math.round(b.altGapPct * 100) / 100, fngBand: s.fng === null ? null : fngBand(s.fng) },
       rarity: Math.max(rUp, rGap), magnitude: Math.abs(b.altGapPct), basis, link: { anchor: 'sentiment' },
+      spark: null,
     };
   },
 };
@@ -228,6 +235,7 @@ export const R8: Rule = {
       ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike',
       params: { value: t.value, change: t.change.value },
       rarity: t.change.rarity, magnitude: t.change.value, basis, link: { anchor: 'flows' },
+      spark: null,
     };
   },
 };
@@ -245,6 +253,7 @@ export const R9: Rule = {
       ruleId: 'R9', block: 'flows', key: 'insight.stablecoin_supply',
       params: { usd: t.changeUsd.value, pct: t.changePct, days: t.changeDays },
       rarity: t.changeUsd.rarity, magnitude: Math.abs(t.changeUsd.value), basis, link: { anchor: 'flows' },
+      spark: null,
     };
   },
 };
@@ -267,6 +276,7 @@ export const R10: Rule = {
       ruleId: 'R10', block: 'flows', key: 'insight.coinbase_premium',
       params: { pct: t.premiumPct.value, minutes: t.sameSignMinutes },
       rarity: t.premiumPct.rarity, magnitude: Math.abs(t.premiumPct.value), basis, link: { anchor: 'flows' },
+      spark: null,
     };
   },
 };

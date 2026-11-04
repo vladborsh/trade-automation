@@ -1,4 +1,4 @@
-import { WEB_INSIGHT_BLOCKS, WEB_INSIGHT_KEYS, WEB_INSIGHT_SOURCES, WebInsightBlockLineSchema, WebInsightStatementSchema, WebInsightsResponseSchema } from '../src/insight';
+import { WEB_INSIGHT_BLOCKS, WEB_INSIGHT_KEYS, WEB_INSIGHT_SOURCES, WebInsightBlockLineSchema, WebInsightSparkSchema, WebInsightStatementSchema, WebInsightsResponseSchema } from '../src/insight';
 
 /** IB-086 — «Главное сейчас» (design D1–D5, D15). Fixtures are what IB-088 builds against. */
 describe('IB-086 contracts', () => {
@@ -47,3 +47,25 @@ describe('IB-BUG-028: a block line that could not look says so, and names the so
   });
 });
 
+
+describe('IB-107 (D24): a statement carries the series behind it, or says it had none', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const s = require('./fixtures/insights.24h.json').top[0];
+  const spark = (values: number[], highlight: number | null) => WebInsightSparkSchema.safeParse({ values, highlight }).success;
+
+  it('spark is required on the wire and may be null', () => {
+    expect(WebInsightStatementSchema.safeParse({ ...s, spark: null }).success).toBe(true);
+    const { spark: _omitted, ...without } = s;
+    expect(WebInsightStatementSchema.safeParse(without).success).toBe(false);
+  });
+
+  it('2 to 30 values; highlight is an index inside them, or null', () => {
+    expect(spark([1, 2], null)).toBe(true);
+    expect(spark(Array.from({ length: 30 }, (_, i) => i), 29)).toBe(true);
+    expect(spark([1], null)).toBe(false);
+    expect(spark(Array.from({ length: 31 }, (_, i) => i), null)).toBe(false);
+    expect(spark([1, 2, 3], 3)).toBe(false);
+    expect(spark([1, 2, 3], -1)).toBe(false);
+    expect(spark([1, 2, 3], 1.5)).toBe(false);
+  });
+});
