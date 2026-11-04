@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
-import { OI_DIVERGENCE_DEFAULT_PARAMS, OiDivergenceParamsSchema } from '@trade-automation/contracts';
 import { runMigrations } from '../../src/db/migration-runner';
 import { PgDatabase } from '../../src/db/pg/pg-database';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
@@ -18,6 +17,15 @@ if (!DATABASE_URL) {
 const maybeDescribe = DATABASE_URL ? describe : describe.skip;
 
 const TABLES = ['alert_symbols', 'alert_settings', 'oi_divergence_alerts', 'oi_divergence_skips'];
+/**
+ * 025's seed, as round 1 ruled it. A literal, not OI_DIVERGENCE_DEFAULT_PARAMS: 025 is MD5-frozen, and the
+ * defaults moved on in IB-114 (migration 026, whose spec compares the END of the chain with the contract).
+ */
+const ROUND_1_SEED = {
+  perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } },
+  atrMult: 0.25,
+  oiMedianMult: 0.5,
+};
 const T0 = new Date(Date.UTC(2026, 10, 1, 12));
 const T1 = new Date(Date.UTC(2026, 10, 2, 12));
 
@@ -55,7 +63,7 @@ maybeDescribe('IB-109 migration 025: alert list, settings, journal, skips, users
     db = new PgDatabase(url);
     await db.query(`insert into users (id, tg_user_id, role) values (1, 101, 'admin'), (2, 102, 'member')`, []);
     expect(await exists('alert_symbols')).toBe(false); // 024 is the base: the tables below are 025's
-    await runMigrations({ connectionString: url });
+    await runMigrations({ connectionString: url, target: '025' });
   }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -74,11 +82,11 @@ maybeDescribe('IB-109 migration 025: alert list, settings, journal, skips, users
     expect(await fails(`insert into alert_symbols (symbol, base) values ('trx/usdt', 'TRX')`)).toMatch(/check constraint/);
   });
 
-  it('one settings row, both switches OFF, params equal to the contracts’ defaults', async () => {
+  it('one settings row, both switches OFF, params exactly round 1’s seed', async () => {
     const [s] = await db.query<{ enabled: boolean; members_visible: boolean; params: unknown }>('select enabled, members_visible, params from alert_settings', []);
     expect(s.enabled).toBe(false);
     expect(s.members_visible).toBe(false);
-    expect(OiDivergenceParamsSchema.parse(s.params)).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
+    expect(s.params).toEqual(ROUND_1_SEED);
     expect(await fails(`insert into alert_settings (id, params) values (2, '{}')`)).toMatch(/check constraint/);
     expect(await fails(`insert into alert_settings (params) values ('{}')`)).toMatch(/duplicate key/);
   });
@@ -113,7 +121,7 @@ maybeDescribe('IB-109 migration 025: alert list, settings, journal, skips, users
     for (const table of TABLES) expect([table, await exists(table)]).toEqual([table, false]);
     const [c] = await db.query<{ n: number }>(`select count(*)::int n from information_schema.columns where table_name = 'users' and column_name = 'oi_alerts'`, []);
     expect(c.n).toBe(0);
-    await runMigrations({ connectionString: url });
+    await runMigrations({ connectionString: url, target: '025' });
     const [n] = await db.query<{ n: number }>('select count(*)::int n from alert_symbols', []);
     expect(n.n).toBe(5);
   }, DB_HOOK_TIMEOUT_MS);

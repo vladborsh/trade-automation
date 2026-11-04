@@ -1,5 +1,6 @@
 import { OI_DIVERGENCE_DEFAULT_PARAMS, OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS } from '@trade-automation/contracts';
 import { ATR_PERIOD, barsForEvaluation, detectDivergences, OI_MEDIAN_BARS, type Bar, type DivergenceInput, type DivergenceParams } from '../../../src/insights/divergence/detector';
+import { detectorParams } from '../../../src/insights/divergence/params';
 import type { OiPoint } from '../../../src/insights/divergence/oi-per-bar';
 
 /**
@@ -13,7 +14,8 @@ import type { OiPoint } from '../../../src/insights/divergence/oi-per-bar';
  */
 const TF = 900; // 15m
 const T0 = 1_793_000_000 - (1_793_000_000 % TF);
-const P: DivergenceParams = { n: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5 };
+/** Line tolerances 0: the §3 specs below are round 1's rule, unchanged (V18: «0 restores the round-1 rule exactly»). */
+const P: DivergenceParams = { n: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 };
 const BASE_LOW = 100;
 const BASE_OI = [1000, 1010]; // alternating: |ΔOI| median 10 → δoi = 5, and equal neighbours make no OI pivot
 
@@ -160,7 +162,7 @@ describe('detectDivergences — the owner’s rules (design §3)', () => {
     both(near, (r) => expect(r.divergences.filter((d) => d.bIndex === O + 70).map((d) => d.aIndex)).toEqual([O + 50]));
   });
 
-  it('7. line validity: a wick below the A–B price line refuses A; so does a per-bar OI below the OI line', () => {
+  it('7. line validity (tolerance 0 = round 1): a wick below the A–B price line refuses A; so does a per-bar OI below the OI line', () => {
     // the price line runs 95 → 93 over 20 bars: 94 at bar 50. A wick at 93.6 there crosses it.
     const wick = scene(O + 80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, [A + 10]: { low: 93.6 }, [B]: { low: 93, oi: 980 } });
     both(wick, (r) => expect(r.divergences).toEqual([]));
@@ -171,6 +173,12 @@ describe('detectDivergences — the owner’s rules (design §3)', () => {
     both(oiDip, (r) => expect(r.divergences).toEqual([]));
     const oiOk = scene(O + 80, { [A]: { low: 95 }, [A + 1]: { oi: 960 }, [A + 10]: { oi: [1000, 975, 1000] }, [B]: { low: 93, oi: 980 } });
     both(oiOk, (r) => expect(r.divergences).toHaveLength(1));
+    // V18 control: the same crossings are within the round-2 default tolerances (0.4 under the line vs 0.25 × ATR14
+    // ≈ 0.74 there; 4.5 under the OI line vs 0.5 × median 10 = 5), so with them A is accepted — what refused it
+    // above is the tolerance being 0, nothing else in the fixture
+    const round2 = { params: { ...P, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 } };
+    both(wick, (r) => expect(r.divergences).toHaveLength(1), round2);
+    both(oiDip, (r) => expect(r.divergences).toHaveLength(1), round2);
   });
 
   it('8. noise: a lower low by 0.1 × ATR does not fire — and does once the threshold is off', () => {
@@ -217,25 +225,73 @@ describe('detectDivergences — the owner’s rules (design §3)', () => {
 });
 
 /**
+ * IB-114 (V18) — line tolerances, at their boundary, for both lines and both sides (`both()` mirrors every scene).
+ * The numbers are chosen so the boundary is exact in floating point, so «on the boundary passes» (strict `<`) is
+ * decidable:
+ * - price: A low 74 at bar 20, B low 70 at bar 60 → the line is exactly 72 at bar 40. ATR14 AT BAR 40 is
+ *   (13 × 2 + TR) / 14 where its own TR = 101 − low (a drop from the previous close 101); at a low of 71 that is
+ *   (26 + 30) / 14 = 4 → tolerance 0.25 × 4 = 1 → boundary 71. ATR14 at B is (26 + 31) / 14 ≈ 4.07, so a
+ *   tolerance taken at B (not at the crossing bar, as ruled) would admit 70.99 — the «just outside» case;
+ * - OI: OI pivots 960 at A and 980 at B → the OI line is exactly 970 at bar 40; the median |ΔOI| is 10 → tolerance
+ *   0.5 × 10 = 5 → boundary 965.
+ */
+describe('detectDivergences — V18 line tolerances (round 2)', () => {
+  const A2 = O + 20;
+  const B2 = O + 60;
+  const J = O + 40;
+  const R2: Partial<DivergenceInput> = { params: { ...P, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 } };
+  const priceScene = (wick: number) => scene(O + 80, { [A2]: { low: 74, oi: 960 }, [J]: { low: wick }, [B2]: { low: 70, oi: 980 } });
+  const oiScene = (dip: number) => scene(O + 80, { [A2]: { low: 74, oi: 960 }, [J]: { oi: [1000, dip, 1000] }, [B2]: { low: 70, oi: 980 } });
+  const found = (r: ReturnType<typeof detectDivergences>) => r.divergences.map((d) => [d.aIndex, d.bIndex]);
+
+  it('price: a wick inside the tolerance passes, ON it passes, just beyond it does not; tolerance 0 is round 1', () => {
+    both(priceScene(71.5), (r) => expect(found(r)).toEqual([[A2, B2]]), R2); // 0.5 under the line
+    both(priceScene(71), (r) => expect(found(r)).toEqual([[A2, B2]]), R2); // exactly 1 = 0.25 × ATR14(bar 40) under it
+    both(priceScene(70.99), (r) => expect(found(r)).toEqual([]), R2); // 1.01 under it; ATR there 4.0007 → tolerance 1.0002
+    both(priceScene(71.5), (r) => expect(found(r)).toEqual([]), { params: { ...P, oiLineTolMedianMult: 0.5 } }); // price tolerance 0
+    both(priceScene(72), (r) => expect(found(r)).toEqual([[A2, B2]]), { params: P }); // control: ON the line is not a crossing
+  });
+
+  it('OI: a per-bar OI inside the tolerance passes, ON it passes, just beyond it does not; tolerance 0 is round 1', () => {
+    both(oiScene(967), (r) => expect(found(r)).toEqual([[A2, B2]]), R2);
+    both(oiScene(965), (r) => expect(found(r)).toEqual([[A2, B2]]), R2); // exactly 5 = 0.5 × median 10 under the line
+    both(oiScene(964.99), (r) => expect(found(r)).toEqual([]), R2);
+    both(oiScene(967), (r) => expect(found(r)).toEqual([]), { params: { ...P, priceLineTolAtrMult: 0.25 } }); // OI tolerance 0
+    both(oiScene(970), (r) => expect(found(r)).toEqual([[A2, B2]]), { params: P });
+  });
+
+  it('each tolerance is its own line’s: a generous OI tolerance does not let a wick through, nor the reverse', () => {
+    both(priceScene(70.99), (r) => expect(found(r)).toEqual([]), { params: { ...P, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 5 } });
+    both(oiScene(964.99), (r) => expect(found(r)).toEqual([]), { params: { ...P, priceLineTolAtrMult: 5, oiLineTolMedianMult: 0.5 } });
+  });
+});
+
+/**
  * TL 2026-11-04 (V10): the bars a caller must fetch, from the constants. On each TF's defaults, the scene puts
  * the newest B the window can confirm (its OI pivot k bars AFTER it, then N to confirm) and its A exactly W bars
  * back. With `barsForEvaluation(params)` bars B is judged and found; with ONE bar fewer it is not — so the
  * number is the minimum, not a guess on either side.
  */
 describe('barsForEvaluation — the minimum closed bars for a full evaluation of the newest B', () => {
-  it('derives 112 / 136 / 111 for 15m / 1h / 4h from OI_MEDIAN_BARS, ATR_PERIOD and W, N, k', () => {
-    expect(OI_DIVERGENCE_TFS.map((tf) => barsForEvaluation(OI_DIVERGENCE_DEFAULT_PARAMS.perTf[tf]))).toEqual([112, 136, 111]);
-    expect(OI_MEDIAN_BARS + 1).toBeGreaterThan(ATR_PERIOD); // the median, not ATR, is the binding constraint before B
+  it('derives 113 / 185 / 111 for 15m / 1h / 4h from OI_MEDIAN_BARS, ATR_PERIOD and W, N, k — weight 2 each', () => {
+    const counts = OI_DIVERGENCE_TFS.map((tf) => barsForEvaluation(OI_DIVERGENCE_DEFAULT_PARAMS.perTf[tf]));
+    expect(counts).toEqual([113, 185, 111]); // IB-114: 1h W 168 (V19), and ATR14 at a line's crossing bar (V18)
+    expect(counts.every((c) => c >= 100 && c < 500)).toBe(true); // Binance klines: limit 100–499 is weight 2
+    expect(OI_MEDIAN_BARS + 1).toBeGreaterThan(ATR_PERIOD); // at B, the median, not ATR, is the binding constraint
   });
 
   it.each(OI_DIVERGENCE_TFS)('%s: exactly that many bars finds B; one fewer does not', (tf) => {
     const tfSec = OI_DIVERGENCE_TF_SEC[tf];
-    const p = { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf[tf], atrMult: 0.25, oiMedianMult: 0.5 };
+    const p = detectorParams(OI_DIVERGENCE_DEFAULT_PARAMS, tf);
     const len = barsForEvaluation(p);
     const b = len - 1 - p.k - p.n; // B's OI pivot k bars after it, confirmed N bars later = the last bar
     const a = b - p.w;
+    // V18: the first bar that CAN cross the line (A + N + 1) dips 0.3 under it — inside 0.25 × its ATR14 (≈ 0.72),
+    // so it passes only while that bar's ATR history is in the window
+    const j = a + p.n + 1;
+    const lineJ = 95 + ((93 - 95) * (j - a)) / (b - a);
     const t0 = 1_793_000_000 - (1_793_000_000 % 14_400);
-    const lowAt = (i: number) => (i === a ? 95 : i === b ? 93 : 100);
+    const lowAt = (i: number) => (i === a ? 95 : i === b ? 93 : i === j ? lineJ - 0.3 : 100);
     const oiAt = (i: number) => (i === a ? 960 : i === b + p.k ? 980 : 1000 + 10 * (i % 2));
     const bars = Array.from({ length: len }, (_, i) => ({ time: t0 + i * tfSec, open: lowAt(i) + 1, high: lowAt(i) + 2, low: lowAt(i), close: lowAt(i) + 1 }));
     const per = tfSec / 300;
@@ -243,6 +299,6 @@ describe('barsForEvaluation — the minimum closed bars for a full evaluation of
     const found = (from: number) => detectDivergences({ tfSec, bars: bars.slice(from), oi5m, params: p })
       .divergences.filter((d) => d.b.time === bars[b].time && d.a.time === bars[a].time);
     expect(found(0)).toHaveLength(1);
-    expect(found(1)).toEqual([]); // the oldest bar gone: A loses a left neighbour or B a noise bar
+    expect(found(1)).toEqual([]); // the oldest bar gone: the crossing bar loses its ATR14 (15m, 1h) or B a noise bar (4h)
   });
 });

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OI_DIVERGENCE_DEFAULT_PARAMS } from '@trade-automation/contracts';
 import { detectDivergences, type Bar } from '../../../src/insights/divergence/detector';
+import { detectorParams } from '../../../src/insights/divergence/params';
 
 /**
  * IB-109 — the design's positive control on real data (§3): two divergences the detector found in
@@ -23,7 +24,7 @@ interface Fixture {
   oi5m: Array<{ time: number; oi: number }>;
 }
 const load = (name: string): Fixture => JSON.parse(readFileSync(join(__dirname, '..', '..', 'fixtures', 'binance', name), 'utf8'));
-const params = { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'], atrMult: OI_DIVERGENCE_DEFAULT_PARAMS.atrMult, oiMedianMult: OI_DIVERGENCE_DEFAULT_PARAMS.oiMedianMult };
+const params = detectorParams(OI_DIVERGENCE_DEFAULT_PARAMS, '1h'); // the round-2 defaults (IB-114): W 168, tolerances 0.25 / 0.5
 
 describe.each([
   ['oi-divergence-ethusdt-1h-bullish.json', 'ETHUSDT 1h, 16.10 17:00 → 17.10 21:00: price −1.55 %, OI +0.42 %'],

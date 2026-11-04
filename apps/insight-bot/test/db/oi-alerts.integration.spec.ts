@@ -112,6 +112,21 @@ describeDb('IB-112 OI alerts against a real database', () => {
     expect(await store.recentSkips()).toEqual([{ symbol: 'TRXUSDT', tf: '1h', barTime: 7_200, reason: 'no_oi_data', holeFrom: 3_600, holeTo: 3_900, at: 8_000 }]);
   });
 
+  it('V20 (IB-114): a journal row written before 026 (no tolerances) reads as tolerance 0 through the store; a new row keeps its own', async () => {
+    const { priceLineTolAtrMult: _p, oiLineTolMedianMult: _o, ...round1 } = OI_DIVERGENCE_DEFAULT_PARAMS;
+    await db.query(
+      `insert into oi_divergence_alerts (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, params, confirmed_at)
+       values ('BTCUSDT', '1h', 'bullish', to_timestamp(1000), 100, to_timestamp(1000), 1000, to_timestamp(9000), 98, to_timestamp(9000), 1050, $1, to_timestamp(20000))`,
+      [JSON.stringify(round1)]);
+    await store.insertAlert({
+      symbol: 'ETHUSDT', tf: '1h', direction: 'bullish', a: { time: 1_000, price: 10, oiTime: 1_000, oi: 5 }, b: { time: 9_000, price: 9, oiTime: 9_000, oi: 6 },
+      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 30_000, late: false,
+    });
+    const bySymbol = Object.fromEntries((await store.recentAlerts()).map((r) => [r.symbol, r.params]));
+    expect(bySymbol.BTCUSDT).toEqual({ ...round1, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }); // not the new 0.25 / 0.5
+    expect(bySymbol.ETHUSDT).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
+  });
+
   it('recipients (V13): oi_alerts on, not disabled, chat known — in their language', async () => {
     await db.query('update users set oi_alerts = (id = $1)', [memberId]);
     try {

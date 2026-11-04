@@ -33,6 +33,10 @@ export interface DivergenceParams {
   atrMult: number;
   /** δoi = oiMedianMult × median |ΔOI per bar| over the 100 bars before B. */
   oiMedianMult: number;
+  /** V18: a wick in (A, B) may cross the price line by up to this × ATR14 at THAT bar. 0 = round 1 (none). */
+  priceLineTolAtrMult: number;
+  /** V18: a per-bar OI in (oiA, oiB) may cross the OI line by up to this × δoi's median (at B). 0 = round 1. */
+  oiLineTolMedianMult: number;
 }
 
 export interface DivergenceInput {
@@ -107,16 +111,21 @@ export const OI_MEDIAN_BARS = 100;
 export const OI_MEDIAN_MIN = 20;
 
 /**
- * IB-110 (TL 2026-11-04, V10) — how many CLOSED bars a caller must hand the detector so that the newest B it can
- * confirm is judged on full context, derived from the constants, never typed by hand:
+ * IB-110 (TL 2026-11-04, V10), re-derived in IB-114 (V18) — how many CLOSED bars a caller must hand the detector
+ * so that the newest B it can confirm is judged on full context, derived from the constants, never typed by hand:
  * - its farthest A (W bars back) must itself be a pivot: N bars before A → B ≥ W + N;
+ * - V18's price tolerance needs ATR14 at the crossing bar j, i.e. j ≥ ATR_PERIOD. A bar within N after A cannot
+ *   cross: A is the lowest of them (V5) and the line falls from A (the price is worse at B), so the first bar that
+ *   can cross is A + N + 1 → A ≥ ATR_PERIOD − N − 1 → B ≥ W + ATR_PERIOD − N − 1 (binding only while N < 7);
  * - the noise floor's 100 moves end at B's previous bar and start at bar B − OI_MEDIAN_BARS − 1 → B ≥ OI_MEDIAN_BARS + 1;
- *   ATR14 needs B ≥ ATR_PERIOD, always the smaller;
+ *   ATR14 at B needs B ≥ ATR_PERIOD, always the smaller;
  * - after B: its OI pivot up to k bars later, then N bars to confirm → k + N bars, plus B's own bar.
- * Defaults: 15m 112, 1h 136, 4h 111. The spec checks that one bar fewer loses the evaluation.
+ * Defaults: 15m 113, 1h 185, 4h 111 (was 112 / 136 / 111: W 168 on 1h, V19, and the crossing bar's ATR, V18).
+ * Counted whatever the tolerance: at 0 the extra ≤ 7 bars are unused, never missing. The spec checks that one
+ * bar fewer loses the evaluation.
  */
 export function barsForEvaluation(p: Pick<DivergenceParams, 'n' | 'k' | 'w'>): number {
-  return Math.max(p.w + p.n, OI_MEDIAN_BARS + 1, ATR_PERIOD) + p.k + p.n + 1;
+  return Math.max(p.w + Math.max(p.n, ATR_PERIOD - p.n - 1), OI_MEDIAN_BARS + 1, ATR_PERIOD) + p.k + p.n + 1;
 }
 
 export function detectDivergences(input: DivergenceInput): DivergenceResult {
@@ -151,7 +160,7 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
       if (noise === null) continue;
       const candidates = sidePairs.filter((a) => a.price < b.price && a.price >= b.price - params.w
         && a.confirmIndex <= b.confirmIndex && a.oi < b.oi
-        && diverges(side, bars, series, a, b, noise));
+        && diverges(side, bars, series, a, b, noise, params));
       if (candidates.length === 0) continue;
       const a = candidates.reduce((far, c) => (c.price < far.price ? c : far)); // V7: the farthest A
       const d = divergence(side, bars, series, seriesTime, a, b, input.tfSec);
@@ -190,16 +199,25 @@ function pair(price: readonly number[], oi: readonly number[], side: Side, p: Di
 interface Noise {
   dp: number;
   doi: number;
+  /** V18: the OI line's tolerance, from δoi's own median — one number per evaluation. */
+  oiLineTol: number;
 }
 
-/** V7: δp from ATR14 at B, δoi from the median per-bar OI move over the 100 bars before B. Null: not enough history to judge. */
-function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: number, p: DivergenceParams): Noise | null {
-  if (i < ATR_PERIOD || i < OI_MEDIAN_BARS + 1) return null;
+/** ATR14 at bar i, i.e. over bars i − 13 … i (each true range needs the bar before). Null before bar ATR_PERIOD. */
+function atrAt(bars: readonly Bar[], i: number): number | null {
+  if (i < ATR_PERIOD) return null;
   let tr = 0;
   for (let t = i - ATR_PERIOD + 1; t <= i; t++) {
     const prevClose = bars[t - 1].close;
     tr += Math.max(bars[t].high - bars[t].low, Math.abs(bars[t].high - prevClose), Math.abs(bars[t].low - prevClose));
   }
+  return tr / ATR_PERIOD;
+}
+
+/** V7: δp from ATR14 at B, δoi from the median per-bar OI move over the 100 bars before B. Null: not enough history to judge. */
+function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: number, p: DivergenceParams): Noise | null {
+  const atr = atrAt(bars, i);
+  if (atr === null || i < OI_MEDIAN_BARS + 1) return null;
   const deltas: number[] = [];
   for (let t = Math.max(1, i - OI_MEDIAN_BARS); t < i; t++) {
     const a = series[t - 1];
@@ -207,7 +225,8 @@ function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: 
     if (a !== null && b !== null) deltas.push(Math.abs(b - a));
   }
   if (deltas.length < OI_MEDIAN_MIN) return null;
-  return { dp: p.atrMult * (tr / ATR_PERIOD), doi: p.oiMedianMult * median(deltas) };
+  const med = median(deltas);
+  return { dp: p.atrMult * atr, doi: p.oiMedianMult * med, oiLineTol: p.oiLineTolMedianMult * med };
 }
 
 function median(values: number[]): number {
@@ -216,8 +235,10 @@ function median(values: number[]): number {
   return s.length % 2 === 1 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** V7's four conditions, mirrored for highs. */
-function diverges(side: Side, bars: readonly Bar[], series: ReadonlyArray<number | null>, a: PivotPair, b: PivotPair, noise: Noise): boolean {
+/** V7's four conditions, mirrored for highs; conditions 3–4 with V18's tolerances. */
+function diverges(
+  side: Side, bars: readonly Bar[], series: ReadonlyArray<number | null>, a: PivotPair, b: PivotPair, noise: Noise, p: DivergenceParams,
+): boolean {
   const price = (t: number) => (side === 'low' ? bars[t].low : bars[t].high);
   const pA = price(a.price);
   const pB = price(b.price);
@@ -227,12 +248,20 @@ function diverges(side: Side, bars: readonly Bar[], series: ReadonlyArray<number
   const priceWorse = side === 'low' ? pB < pA - noise.dp : pB > pA + noise.dp;
   const oiBetter = side === 'low' ? oB > oA + noise.doi : oB < oA - noise.doi;
   if (!priceWorse || !oiBetter) return false;
-  // (3) no wick between A and B crosses the price line, (4) no per-bar OI crosses the OI line
-  const crosses = (v: number, line: number) => (side === 'low' ? v < line : v > line);
-  for (let t = a.price + 1; t < b.price; t++) if (crosses(price(t), lineAt(a.price, pA, b.price, pB, t))) return false;
+  // (3) no wick between A and B crosses the price line, (4) no per-bar OI crosses the OI line — by MORE than the
+  // tolerance (V18): `beyond` is strict, so a crossing of exactly the tolerance passes, and tolerance 0 is round 1.
+  const beyond = (v: number, line: number, tol: number) => (side === 'low' ? v < line - tol : v > line + tol);
+  for (let t = a.price + 1; t < b.price; t++) {
+    const line = lineAt(a.price, pA, b.price, pB, t);
+    if (!beyond(price(t), line, 0)) continue;
+    // ATR14 at the crossing bar t itself, as ruled — not at B. Without its history (t < ATR_PERIOD) the tolerance
+    // is 0: never admit what round 1 refused on a guess. barsForEvaluation counts the bars that make it known.
+    const tol = p.priceLineTolAtrMult === 0 ? 0 : p.priceLineTolAtrMult * (atrAt(bars, t) ?? 0);
+    if (beyond(price(t), line, tol)) return false;
+  }
   for (let t = a.oi + 1; t < b.oi; t++) {
     const v = series[t];
-    if (v !== null && crosses(v, lineAt(a.oi, oA, b.oi, oB, t))) return false;
+    if (v !== null && beyond(v, lineAt(a.oi, oA, b.oi, oB, t), noise.oiLineTol)) return false;
   }
   return true;
 }

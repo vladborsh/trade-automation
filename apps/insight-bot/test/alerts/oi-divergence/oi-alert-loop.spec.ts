@@ -151,14 +151,17 @@ describe('IB-112: the OI divergence loop on the real ETHUSDT 1h divergence', () 
     expect(r).toMatchObject({ journalled: 1, skips: 0 });
   });
 
-  it('reads exactly barsForEvaluation closed bars (136 on 1h), ending at the due close; too few → not evaluated', async () => {
+  it('reads barsForEvaluation + W closed bars (185 + 168 = 353 on 1h, round-2 defaults), ending at the due close; fewer than barsForEvaluation → not evaluated', async () => {
     const store = new MemoryStore();
     const { loop: l, klineCalls } = loop(store);
     await l.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
-    expect(klineCalls).toEqual([['ETHUSDT', '1h', CONFIRMED - 136 * H, CONFIRMED]]);
+    expect(klineCalls).toEqual([['ETHUSDT', '1h', CONFIRMED - 353 * H, CONFIRMED]]);
     const young = new MemoryStore();
-    const short = loop(young, { klines: async (_s, _tf, from, to) => F.bars.filter((b) => b.time >= from + 10 * H && b.time < to) });
+    const short = loop(young, { klines: async (_s, _tf, _from, to) => F.bars.filter((b) => b.time >= to - 184 * H && b.time < to) });
     expect(await short.loop.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60)).toMatchObject({ journalled: 0, failed: [] });
+    // a coin with exactly barsForEvaluation bars (younger than the + W) is evaluated: the venue has no earlier run
+    const exact = loop(new MemoryStore(), { klines: async (_s, _tf, _from, to) => F.bars.filter((b) => b.time >= to - 185 * H && b.time < to) });
+    expect(await exact.loop.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60)).toMatchObject({ journalled: 1, failed: [] });
   });
 
   it('the coin list is re-read each evaluation, and a failing coin does not stop the others', async () => {

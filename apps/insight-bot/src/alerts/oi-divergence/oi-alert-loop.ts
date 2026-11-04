@@ -1,7 +1,8 @@
 import { OI_DIVERGENCE_TFS, OI_DIVERGENCE_TF_SEC, type OiDivergenceTf } from '@trade-automation/contracts';
 import { detectDivergences, type Bar, type DivergenceParams } from '../../insights/divergence/detector';
+import { detectorParams } from '../../insights/divergence/params';
 import { oiDivergenceAlert } from '../../delivery/templates/oi-divergence.texts';
-import { barsToFetch, fullBasisIndex, hasFullBasis } from './basis';
+import { barsToFetch, fullBasisIndex, hasFullBasis, minBarsToEvaluate } from './basis';
 import { dueBarClose, isLate } from './timing';
 import type { OiAlertStore } from './pg/oi-alerts.repo';
 
@@ -10,9 +11,9 @@ import type { OiAlertStore } from './pg/oi-alerts.repo';
  * loop, as plain logic over ports (the Nest service in delivery/ only schedules it):
  *
  * 1. On each TF, once its bar close + 6 min is due, for every enabled coin of `alert_symbols`
- *    (re-read every evaluation: no deploy to change the list): the last `barsForEvaluation(params)`
- *    CLOSED bars (2 weight per call), the stored 5 m OI over them with the venue's silences (dev-1's
- *    OiWindowReader), and the detector.
+ *    (re-read every evaluation: no deploy to change the list): the last `barsForEvaluation(params) + W`
+ *    CLOSED bars (2 weight per call; the + W gives a repeat's earlier lines their own basis, basis.ts),
+ *    the stored 5 m OI over them with the venue's silences (dev-1's OiWindowReader), and the detector.
  * 2. Every divergence whose B has its full basis in the window is journalled — **always**, whatever
  *    the switch says. The unique key absorbs a re-evaluation or a restart (V8). One confirmed more
  *    than one bar + 10 min ago is journalled `late` and never sent (V10).
@@ -86,28 +87,29 @@ export class OiAlertLoop {
     const tfSec = OI_DIVERGENCE_TF_SEC[tf];
     const report: EvaluationReport = { tf, barClose, journalled: 0, late: 0, sent: 0, skips: 0, failed: [] };
     const settings = await store.settings();
-    const params: DivergenceParams = { ...settings.params.perTf[tf], atrMult: settings.params.atrMult, oiMedianMult: settings.params.oiMedianMult };
+    const params: DivergenceParams = detectorParams(settings.params, tf);
     const count = barsToFetch(params);
+    const need = minBarsToEvaluate(params);
     const symbols = await store.enabledSymbols();
     for (const symbol of symbols) {
       try {
         const bars = (await this.ports.klines(symbol, tf, barClose - count * tfSec, barClose)).filter((b) => b.time + tfSec <= barClose).slice(-count);
-        if (bars.length < count) {
+        if (bars.length < need) {
           // a coin listed recently on the venue: not enough history to judge any B on a full basis
-          this.ports.log?.warn(`oi alerts ${symbol} ${tf}: ${bars.length} closed bars, need ${count} — not evaluated`);
+          this.ports.log?.warn(`oi alerts ${symbol} ${tf}: ${bars.length} closed bars, need ${need} — not evaluated`);
           continue;
         }
         const from = bars[0].time;
         const to = (bars[bars.length - 1] as Bar).time + tfSec;
         const window = await this.ports.oiWindow(symbol, from, to);
         const result = detectDivergences({ tfSec, bars, oi5m: window.oi5m, venueSilent: window.venueSilent, params });
-        const guardFrom = bars[fullBasisIndex(params)]?.time ?? Number.POSITIVE_INFINITY;
+        const guardFrom = bars[fullBasisIndex(params, bars.length)]?.time ?? Number.POSITIVE_INFINITY;
         for (const skip of result.skips) {
           if (skip.barTime < guardFrom) continue; // that B is judged on a full basis by an earlier evaluation
           if (await store.insertSkip({ symbol, tf, barTime: skip.barTime, holeFrom: skip.holeFrom, holeTo: skip.holeTo, at: nowSec })) report.skips++;
         }
         for (const d of result.divergences) {
-          if (!hasFullBasis(d.bIndex, params) || d.confirmedAt > to) continue;
+          if (!hasFullBasis(d.bIndex, params, bars.length) || d.confirmedAt > to) continue;
           const late = isLate(d.confirmedAt, nowSec, tfSec);
           const runOf = d.runFirstBTime === null ? null : await store.runFirstId(symbol, tf, d.direction, d.runFirstBTime);
           const id = await store.insertAlert({

@@ -6,6 +6,7 @@ import type { Db } from '../../db/db.port';
 import { detectDivergences, type Bar, type Divergence } from '../../insights/divergence/detector';
 import type { OiPoint } from '../../insights/divergence/oi-per-bar';
 import { OiWindowReader } from '../../insights/divergence/oi-window.reader';
+import { detectorParams } from '../../insights/divergence/params';
 import { RETENTION_MS, type FuturesDataClient } from '../../venues/binance/futures-data.client';
 import type { TtlCache } from '../../venues/ttl-cache';
 import type { CandlesService } from './candles.service';
@@ -71,7 +72,7 @@ export class OiDivergenceService {
 
     const r = detectDivergences({
       tfSec, bars, oi5m, venueSilent,
-      params: { ...params.perTf[tf], atrMult: params.atrMult, oiMedianMult: params.oiMedianMult },
+      params: detectorParams(params, tf),
       oiDueUntil: Math.floor(now / 1000) - 6 * 60, // V9: the venue's publish lag is not a hole
     });
     const fired = await this.fired(symbol, tf);

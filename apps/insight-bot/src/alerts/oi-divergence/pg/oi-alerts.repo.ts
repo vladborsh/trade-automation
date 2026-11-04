@@ -1,5 +1,5 @@
 import {
-  OiDivergenceParamsSchema, type OiDivergenceDirection, type OiDivergenceParams, type OiDivergenceTf, type WebAlertSettings,
+  OiDivergenceJournalParamsSchema, OiDivergenceParamsSchema, type OiDivergenceDirection, type OiDivergenceParams, type OiDivergenceTf, type WebAlertSettings,
   type WebAlertSymbol, type WebOiDivergenceAlert, type WebOiDivergenceSkipRow,
 } from '@trade-automation/contracts';
 import type { Db } from '../../../db/db.port';
@@ -81,7 +81,7 @@ export const toWebAlert = (r: AlertRow): WebOiDivergenceAlert => ({
   a: { time: sec(r.a_time) as number, price: Number(r.a_price), oiTime: sec(r.a_oi_time) as number, oi: Number(r.a_oi) },
   b: { time: sec(r.b_time) as number, price: Number(r.b_price), oiTime: sec(r.b_oi_time) as number, oi: Number(r.b_oi) },
   runOf: r.run_of === null ? null : Number(r.run_of), runLength: r.run_length,
-  params: OiDivergenceParamsSchema.parse(r.params),
+  params: OiDivergenceJournalParamsSchema.parse(r.params), // V20: a row from before 026 has tolerance 0
   confirmedAt: sec(r.confirmed_at) as number, firedAt: sec(r.fired_at), late: r.late, recipients: r.recipients,
   priceAtFire: num(r.price_at_fire), price4h: num(r.price_4h), price24h: num(r.price_24h), outcomeAt: sec(r.outcome_at),
 });
