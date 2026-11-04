@@ -338,7 +338,7 @@ describe('IB-107 sparks: each rule draws its mini-chart from the series it alrea
 
 describe('R11 the OI divergence alert (IB-113, V16)', () => {
   const alert = {
-    id: 9, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
+    id: 9, source: 'live' as const, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
     a: { time: NOW / 1000 - 30 * 3_600, price: 100, oiTime: NOW / 1000 - 30 * 3_600, oi: 1_000 },
     b: { time: NOW / 1000 - 8 * 3_600, price: 98.2, oiTime: NOW / 1000 - 8 * 3_600, oi: 1_032 },
     runOf: null, runLength: 2, params: { perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }, // a round-1 row as read (V20)

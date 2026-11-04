@@ -61,7 +61,7 @@ maybeDescribe('IB-115 migration 027: build stamp, controls, near-misses, paths',
     db = new PgDatabase(url);
     expect(await exists('oi_divergence_controls')).toBe(false); // 026 is the base: the tables below are 027's
     await db.query(`insert into oi_divergence_alerts (${ALERT_COLS}) values ('ETHUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, '{}', $2)`, [T0, T1]);
-    await runMigrations({ connectionString: url });
+    await runMigrations({ connectionString: url, target: '027' }); // 027's schema: 028 (IB-116) adds a required source
   }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -149,7 +149,7 @@ maybeDescribe('IB-115 migration 027: build stamp, controls, near-misses, paths',
     for (const table of TABLES) expect([table, await exists(table)]).toEqual([table, false]);
     const [c] = await db.query<{ n: number }>(`select count(*)::int n from information_schema.columns where table_name = 'oi_divergence_alerts' and column_name = 'build'`, []);
     expect(c.n).toBe(0);
-    await runMigrations({ connectionString: url });
+    await runMigrations({ connectionString: url, target: '027' });
     const rows = await db.query<{ build: string }>('select distinct build from oi_divergence_alerts', []);
     expect(rows).toEqual([{ build: 'pre-027' }]);
   }, DB_HOOK_TIMEOUT_MS);

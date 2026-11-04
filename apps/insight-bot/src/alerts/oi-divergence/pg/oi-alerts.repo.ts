@@ -1,9 +1,9 @@
 import {
   OiDivergenceJournalParamsSchema, OiDivergenceParamsSchema, type OiDivergenceDirection, type OiDivergenceParams, type OiDivergenceTf, type WebAlertSettings,
   type WebAlertSymbol, type WebOiDivergenceAlert, type WebOiDivergenceSkipRow,
-  OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC, type OiControlKind, type OiNearMissRule, type OiNearMissUnit, type OiResearchWindow,
+  OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC, type OiControlKind, type OiJournalSource, type OiNearMissRule, type OiNearMissUnit, type OiResearchWindow,
 } from '@trade-automation/contracts';
-import type { Db } from '../../../db/db.port';
+import type { Db, DbHandle } from '../../../db/db.port';
 import { PATH_SETTLE_SEC, type PathMeasurement } from '../research/path';
 import type { Lang } from '../../../users/user.model';
 
@@ -11,6 +11,16 @@ import type { Lang } from '../../../users/user.model';
  * IB-112 — what the OI divergence alert loop and its admin page read and write (migration 025's
  * tables, IB-109). A port, so the loop is specced with an in-memory store; this is the Postgres side.
  * Times cross this boundary as unix SECONDS (the contracts' convention), as timestamptz inside.
+ *
+ * **IB-116 (design V30, V32): every journal, control and near-miss row says who wrote it, `live` or
+ * `backfill`, and every write passes it explicitly (the column has no default since 028).**
+ *
+ * >>> READ THIS BEFORE ADDING A STATISTICS QUERY HERE (V32, guard at the point of temptation) <<<
+ * Backfilled rows are IN-SAMPLE: round 2's params were tuned on exactly the month they cover (IB-111,
+ * IB-114), so they fit by construction and would flatter any rate. A hit rate, a count of «worked», a
+ * comparison with the controls — anything aggregated over these tables — groups by `source` and
+ * reports `live` and `backfill` SEPARATELY. Never pool them; never filter only one silently either:
+ * say which population a number is about (§6's open item decides "worked" and the baseline first).
  */
 export interface OiAlertRecipient {
   userId: number;
@@ -20,6 +30,8 @@ export interface OiAlertRecipient {
 
 /** One journal row to write (V12). */
 export interface NewOiAlert {
+  /** V30: `live` (the loop) or `backfill` (IB-116's one-off run). No default in the database. */
+  source: OiJournalSource;
   symbol: string;
   tf: OiDivergenceTf;
   direction: OiDivergenceDirection;
@@ -36,6 +48,7 @@ export interface NewOiAlert {
 
 /** IB-115 (V25): one control row. */
 export interface NewOiControl {
+  source: OiJournalSource;
   symbol: string;
   tf: OiDivergenceTf;
   kind: OiControlKind;
@@ -48,6 +61,7 @@ export interface NewOiControl {
 
 /** IB-115 (V26): one near-miss row. */
 export interface NewOiNearMiss {
+  source: OiJournalSource;
   symbol: string;
   tf: OiDivergenceTf;
   direction: OiDivergenceDirection;
@@ -101,10 +115,10 @@ export interface OiAlertStore {
   settings(): Promise<WebAlertSettings>;
   /** The coins the loop evaluates: enabled rows of `alert_symbols`, re-read every tick (no deploy to change). */
   enabledSymbols(): Promise<string[]>;
-  /** Writes the row; null when (symbol, tf, direction, a_time, b_time) is already journalled (V8). */
+  /** Writes the row; null when (source, symbol, tf, direction, a_time, b_time) is already journalled (V8, V30). */
   insertAlert(row: NewOiAlert): Promise<number | null>;
-  /** The journal row of a run's first line (V8: `run_of`), by its B time. */
-  runFirstId(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<number | null>;
+  /** The journal row of a run's first line (V8: `run_of`), by its B time — among rows of the same source (V31). */
+  runFirstId(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<number | null>;
   markFired(id: number, firedAt: number, recipients: number, priceAtFire: number | null): Promise<void>;
   /** False when that (symbol, tf, bar) skip is already logged. */
   insertSkip(row: NewOiSkip): Promise<boolean>;
@@ -113,16 +127,20 @@ export interface OiAlertStore {
   /** Sent alerts whose +4 h or +24 h close is due and missing. */
   outcomesDue(nowSec: number): Promise<OutcomeDue[]>;
   setOutcome(id: number, field: 'price_4h' | 'price_24h', price: number, completeAt: number | null): Promise<void>;
-  /** IB-115: whether the journal holds an alert with this B (any A) — «whose evaluation produced no alert». */
-  hasAlert(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<boolean>;
+  /** IB-115: whether the journal holds an alert with this B (any A) — «whose evaluation produced no alert»; per source (V31). */
+  hasAlert(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<boolean>;
   /** Null when that control is already recorded (a re-evaluation or a restart). */
   insertControl(row: NewOiControl): Promise<number | null>;
   /** Null when B already has its near-miss. */
   insertNearMiss(row: NewOiNearMiss): Promise<number | null>;
   /** One row per window (4h / 24h / 72h); an existing one is kept. */
   insertPaths(subject: PathSubjectRef, spec: NewPaths): Promise<void>;
-  /** Unmeasured paths whose window closed by `nowSec`; a failed one waits `retryAfterSec` before it is tried again. */
-  pathsDue(nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]>;
+  /**
+   * Unmeasured paths whose window closed by `nowSec`; a failed one waits `retryAfterSec` before it is tried again.
+   * Only paths of `source` subjects (V31): the live loop never measures the backfill's backlog, the backfill run
+   * measures its own.
+   */
+  pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]>;
   setPath(id: number, m: PathMeasurement, measuredAt: number): Promise<void>;
   pathFailed(id: number, at: number): Promise<void>;
 }
@@ -132,14 +150,14 @@ const at = (s: number): Date => new Date(s * 1000);
 const num = (v: string | number | null): number | null => (v === null ? null : Number(v));
 
 interface AlertRow {
-  id: string; symbol: string; tf: OiDivergenceTf; direction: OiDivergenceDirection;
+  id: string; source: OiJournalSource; symbol: string; tf: OiDivergenceTf; direction: OiDivergenceDirection;
   a_time: Date; a_price: string; a_oi_time: Date; a_oi: string; b_time: Date; b_price: string; b_oi_time: Date; b_oi: string;
   run_of: string | null; run_length: number; params: unknown; confirmed_at: Date; fired_at: Date | null; late: boolean; recipients: number;
   price_at_fire: string | null; price_4h: string | null; price_24h: string | null; outcome_at: Date | null;
 }
 
 export const toWebAlert = (r: AlertRow): WebOiDivergenceAlert => ({
-  id: Number(r.id), symbol: r.symbol, tf: r.tf, direction: r.direction,
+  id: Number(r.id), source: r.source, symbol: r.symbol, tf: r.tf, direction: r.direction,
   a: { time: sec(r.a_time) as number, price: Number(r.a_price), oiTime: sec(r.a_oi_time) as number, oi: Number(r.a_oi) },
   b: { time: sec(r.b_time) as number, price: Number(r.b_price), oiTime: sec(r.b_oi_time) as number, oi: Number(r.b_oi) },
   runOf: r.run_of === null ? null : Number(r.run_of), runLength: r.run_length,
@@ -149,7 +167,7 @@ export const toWebAlert = (r: AlertRow): WebOiDivergenceAlert => ({
 });
 
 export class PgOiAlertStore implements OiAlertStore {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbHandle) {}
 
   async settings(): Promise<WebAlertSettings> {
     const [r] = await this.db.query<{ enabled: boolean; members_visible: boolean; params: unknown; updated_by: number | null; updated_at: Date }>(
@@ -167,19 +185,19 @@ export class PgOiAlertStore implements OiAlertStore {
   async insertAlert(x: NewOiAlert): Promise<number | null> {
     const rows = await this.db.query<{ id: string }>(
       `insert into oi_divergence_alerts
-         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, run_of, run_length, params, confirmed_at, late, build)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, run_of, run_length, params, confirmed_at, late, build, source)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        on conflict on constraint oi_divergence_alerts_once do nothing returning id`,
       [x.symbol, x.tf, x.direction, at(x.a.time), x.a.price, at(x.a.oiTime), x.a.oi, at(x.b.time), x.b.price, at(x.b.oiTime), x.b.oi,
-        x.runOf, x.runLength, JSON.stringify(x.params), at(x.confirmedAt), x.late, x.build],
+        x.runOf, x.runLength, JSON.stringify(x.params), at(x.confirmedAt), x.late, x.build, x.source],
     );
     return rows.length > 0 ? Number(rows[0].id) : null;
   }
 
-  async runFirstId(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<number | null> {
+  async runFirstId(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<number | null> {
     const rows = await this.db.query<{ id: string }>(
-      `select id from oi_divergence_alerts where symbol = $1 and tf = $2 and direction = $3 and b_time = $4 order by id limit 1`,
-      [symbol, tf, direction, at(bTime)],
+      `select id from oi_divergence_alerts where source = $5 and symbol = $1 and tf = $2 and direction = $3 and b_time = $4 order by id limit 1`,
+      [symbol, tf, direction, at(bTime), source],
     );
     return rows.length > 0 ? Number(rows[0].id) : null;
   }
@@ -222,17 +240,18 @@ export class PgOiAlertStore implements OiAlertStore {
 
   // ------------------------------------------------------------------ the research journal (IB-115, V23–V27)
 
-  async hasAlert(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<boolean> {
+  async hasAlert(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<boolean> {
     const rows = await this.db.query(
-      'select 1 from oi_divergence_alerts where symbol = $1 and tf = $2 and direction = $3 and b_time = $4 limit 1', [symbol, tf, direction, at(bTime)]);
+      'select 1 from oi_divergence_alerts where source = $5 and symbol = $1 and tf = $2 and direction = $3 and b_time = $4 limit 1',
+      [symbol, tf, direction, at(bTime), source]);
     return rows.length > 0;
   }
 
   async insertControl(x: NewOiControl): Promise<number | null> {
     const rows = await this.db.query<{ id: string }>(
-      `insert into oi_divergence_controls (symbol, tf, kind, direction, bar_time, stop_price, params, build)
-       values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict on constraint oi_divergence_controls_once do nothing returning id`,
-      [x.symbol, x.tf, x.kind, x.direction, at(x.barTime), x.stopPrice, JSON.stringify(x.params), x.build],
+      `insert into oi_divergence_controls (symbol, tf, kind, direction, bar_time, stop_price, params, build, source)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict on constraint oi_divergence_controls_once do nothing returning id`,
+      [x.symbol, x.tf, x.kind, x.direction, at(x.barTime), x.stopPrice, JSON.stringify(x.params), x.build, x.source],
     );
     return rows.length > 0 ? Number(rows[0].id) : null;
   }
@@ -240,11 +259,11 @@ export class PgOiAlertStore implements OiAlertStore {
   async insertNearMiss(x: NewOiNearMiss): Promise<number | null> {
     const rows = await this.db.query<{ id: string }>(
       `insert into oi_divergence_near_misses
-         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build, source)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        on conflict on constraint oi_divergence_near_misses_once do nothing returning id`,
       [x.symbol, x.tf, x.direction, at(x.a.time), x.a.price, at(x.a.oiTime), x.a.oi, at(x.b.time), x.b.price, at(x.b.oiTime), x.b.oi,
-        x.rule, x.miss, x.unit, JSON.stringify(x.params), at(x.confirmedAt), x.build],
+        x.rule, x.miss, x.unit, JSON.stringify(x.params), at(x.confirmedAt), x.build, x.source],
     );
     return rows.length > 0 ? Number(rows[0].id) : null;
   }
@@ -259,14 +278,19 @@ export class PgOiAlertStore implements OiAlertStore {
     );
   }
 
-  async pathsDue(nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]> {
+  async pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]> {
+    // the subject's source: exactly one of the three ids is set (027's check), so the coalesce picks it
     const rows = await this.db.query<{ id: string; symbol: string; win: OiResearchWindow; direction: OiDivergenceDirection | null; t0: Date; atr14: string; stop_price: string | null }>(
-      `select id, symbol, win, direction, t0, atr14, stop_price from oi_divergence_paths
-        where measured_at is null
-          and t0 + (case win when '4h' then $4::int when '24h' then $5::int else $6::int end) * interval '1 second' + $7 * interval '1 second' <= $1
-          and (tried_at is null or tried_at + $3 * interval '1 second' <= $1)
-        order by tried_at nulls first, t0, id limit $2`,
-      [at(nowSec), limit, retryAfterSec, OI_RESEARCH_WINDOW_SEC['4h'], OI_RESEARCH_WINDOW_SEC['24h'], OI_RESEARCH_WINDOW_SEC['72h'], PATH_SETTLE_SEC],
+      `select p.id, p.symbol, p.win, p.direction, p.t0, p.atr14, p.stop_price from oi_divergence_paths p
+          left join oi_divergence_alerts a on a.id = p.alert_id
+          left join oi_divergence_controls c on c.id = p.control_id
+          left join oi_divergence_near_misses n on n.id = p.near_miss_id
+        where p.measured_at is null
+          and coalesce(a.source, c.source, n.source) = $8
+          and p.t0 + (case p.win when '4h' then $4::int when '24h' then $5::int else $6::int end) * interval '1 second' + $7 * interval '1 second' <= $1
+          and (p.tried_at is null or p.tried_at + $3 * interval '1 second' <= $1)
+        order by p.tried_at nulls first, p.t0, p.id limit $2`,
+      [at(nowSec), limit, retryAfterSec, OI_RESEARCH_WINDOW_SEC['4h'], OI_RESEARCH_WINDOW_SEC['24h'], OI_RESEARCH_WINDOW_SEC['72h'], PATH_SETTLE_SEC, source],
     );
     return rows.map((r) => ({
       id: Number(r.id), symbol: r.symbol, win: r.win, direction: r.direction, t0: sec(r.t0) as number,
@@ -305,11 +329,12 @@ export class PgOiAlertStore implements OiAlertStore {
   /**
    * IB-113 (V16): the newest ON-TIME alert confirmed in the 24 h before `nowSec`, on a coin that is on
    * the list and enabled — what the «Главное сейчас» card shows. Late rows (never sent) are not news.
+   * IB-116 (V33): LIVE rows only — a backfilled row is history, never a fresh signal, however recent.
    */
   async latestOnTime(nowSec: number): Promise<WebOiDivergenceAlert | null> {
     const rows = await this.db.query<AlertRow>(
       `select a.* from oi_divergence_alerts a join alert_symbols s on s.symbol = a.symbol and s.enabled
-        where not a.late and a.confirmed_at > $1::timestamptz - interval '24 hours' and a.confirmed_at <= $1::timestamptz
+        where a.source = 'live' and not a.late and a.confirmed_at > $1::timestamptz - interval '24 hours' and a.confirmed_at <= $1::timestamptz
         order by a.confirmed_at desc, a.id desc limit 1`,
       [at(nowSec)],
     );

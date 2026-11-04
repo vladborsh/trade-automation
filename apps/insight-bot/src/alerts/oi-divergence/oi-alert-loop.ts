@@ -1,4 +1,4 @@
-import { OI_DIVERGENCE_TFS, OI_DIVERGENCE_TF_SEC, type OiDivergenceParams, type OiDivergenceTf } from '@trade-automation/contracts';
+import { OI_DIVERGENCE_TFS, OI_DIVERGENCE_TF_SEC, type OiDivergenceParams, type OiDivergenceTf, type OiJournalSource } from '@trade-automation/contracts';
 import { atrAt, detectDivergences, type Bar, type DivergenceInput, type DivergenceParams } from '../../insights/divergence/detector';
 import { diagnose } from '../../insights/divergence/diagnose';
 import { detectorParams } from '../../insights/divergence/params';
@@ -33,6 +33,13 @@ import type { OiAlertStore } from './pg/oi-alerts.repo';
  *      klines call each at weight 1 / 2 / 5.
  *
  * A coin that fails (venue down, no OI yet) is logged and skipped; the others still run.
+ *
+ * 7. IB-116 (V30, V31): the same loop replays history. `source` says who is running it:
+ *    - `live` (the Nest service): everything above;
+ *    - `backfill` (the one-off history run, `backfill/`): the same evaluation, so the same detections, runs,
+ *      controls and near-misses — but every row is stamped `backfill`, its run and «produced an alert» are
+ *      looked up among backfill rows only, nothing is ever late or sent, and skips are counted, not written
+ *      (the skips table has no source; a month-old hole is not news for `/admin/alerts`).
  */
 export interface OiAlertLoopPorts {
   store: OiAlertStore;
@@ -50,6 +57,8 @@ export interface OiAlertLoopPorts {
   build: string;
   /** IB-115 (V24): `limit` CLOSED 5 m klines from `fromSec`, one request at exactly that limit. */
   klines5m(symbol: string, fromSec: number, limit: number): Promise<Bar[]>;
+  /** IB-116 (V30): who writes — the live service passes `live`, the history run `backfill`. No default. */
+  source: OiJournalSource;
   log?: { warn(message: string): void; log?(message: string): void };
 }
 
@@ -65,6 +74,8 @@ export interface EvaluationReport {
   controls: number;
   nearMisses: number;
   failed: string[];
+  /** IB-116: in a backfill, the (symbol, tf, bar) skips seen — counted here instead of written. */
+  skipKeys?: string[];
 }
 
 export interface PathRunReport {
@@ -120,7 +131,8 @@ export class OiAlertLoop {
     const { store } = this.ports;
     const tfSec = OI_DIVERGENCE_TF_SEC[tf];
     const report: EvaluationReport = { tf, barClose, journalled: 0, late: 0, sent: 0, skips: 0, coins: 0, controls: 0, nearMisses: 0, failed: [] };
-    const { build } = this.ports;
+    const { build, source } = this.ports;
+    const backfill = source === 'backfill';
     const settings = await store.settings();
     const params: DivergenceParams = detectorParams(settings.params, tf);
     const count = barsToFetch(params);
@@ -143,14 +155,16 @@ export class OiAlertLoop {
         const guardFrom = bars[fullBasisIndex(params, bars.length)]?.time ?? Number.POSITIVE_INFINITY;
         for (const skip of result.skips) {
           if (skip.barTime < guardFrom) continue; // that B is judged on a full basis by an earlier evaluation
+          if (backfill) { (report.skipKeys ??= []).push(`${symbol}|${tf}|${skip.barTime}`); report.skips++; continue; }
           if (await store.insertSkip({ symbol, tf, barTime: skip.barTime, holeFrom: skip.holeFrom, holeTo: skip.holeTo, at: nowSec })) report.skips++;
         }
         for (const d of result.divergences) {
           if (!hasFullBasis(d.bIndex, params, bars.length) || d.confirmedAt > to) continue;
-          const late = isLate(d.confirmedAt, nowSec, tfSec);
-          const runOf = d.runFirstBTime === null ? null : await store.runFirstId(symbol, tf, d.direction, d.runFirstBTime);
+          // V30: a backfilled row was never sent, so it cannot have been sent late either (the database refuses it)
+          const late = !backfill && isLate(d.confirmedAt, nowSec, tfSec);
+          const runOf = d.runFirstBTime === null ? null : await store.runFirstId(source, symbol, tf, d.direction, d.runFirstBTime);
           const id = await store.insertAlert({
-            symbol, tf, direction: d.direction, a: d.a, b: d.b, runOf, runLength: d.runLength,
+            source, symbol, tf, direction: d.direction, a: d.a, b: d.b, runOf, runLength: d.runLength,
             params: settings.params, confirmedAt: d.confirmedAt, late, build,
           });
           if (id === null) continue; // already journalled: a re-evaluation or a restart (V8)
@@ -158,6 +172,7 @@ export class OiAlertLoop {
           // V23: sent or not, late or not, the same t0 — so the switch does not change what is measured
           await store.insertPaths({ alertId: id }, { symbol, direction: d.direction, t0: entryT0(d.confirmedAt), atr14: atrAt(bars, d.bIndex) ?? 0, stopPrice: d.b.price });
           if (late) { report.late++; continue; }
+          if (backfill) continue; // V33: history is never sent
           if (!settings.enabled) continue; // V13: the journal runs either way; nothing is sent while off
           const recipients = await store.recipients();
           const texts = oiDivergenceAlert({
@@ -185,16 +200,16 @@ export class OiAlertLoop {
     symbol: string, tf: OiDivergenceTf, input: DivergenceInput, result: ReturnType<typeof detectDivergences>,
     params: OiDivergenceParams, report: EvaluationReport,
   ): Promise<void> {
-    const { store, build } = this.ports;
+    const { store, build, source } = this.ports;
     const { bars, params: p, tfSec } = input;
     const picks: ControlPick[] = [];
     for (const pick of pivotControlPicks(input, result)) {
-      if (!(await store.hasAlert(symbol, tf, pick.direction as 'bullish' | 'bearish', pick.barTime))) picks.push(pick);
+      if (!(await store.hasAlert(source, symbol, tf, pick.direction as 'bullish' | 'bearish', pick.barTime))) picks.push(pick);
     }
     const random = randomControlPick(symbol, tf, bars, tfSec);
     if (random) picks.push(random);
     for (const c of picks) {
-      const id = await store.insertControl({ symbol, tf, kind: c.kind, direction: c.direction, barTime: c.barTime, stopPrice: c.stopPrice, params, build });
+      const id = await store.insertControl({ source, symbol, tf, kind: c.kind, direction: c.direction, barTime: c.barTime, stopPrice: c.stopPrice, params, build });
       if (id === null) continue;
       report.controls++;
       await store.insertPaths({ controlId: id }, { symbol, direction: c.direction, t0: c.t0, atr14: c.atr14, stopPrice: c.stopPrice });
@@ -204,9 +219,9 @@ export class OiAlertLoop {
     const decided = bars.length - (2 * p.k + p.n + 1); // the newest B whose OI pivot may lie 2k after it, confirmed
     for (const m of diagnose(input, result)) {
       if (m.bIndex !== decided) continue;
-      if (await store.hasAlert(symbol, tf, m.direction, m.b.time)) continue;
+      if (await store.hasAlert(source, symbol, tf, m.direction, m.b.time)) continue;
       const id = await store.insertNearMiss({
-        symbol, tf, direction: m.direction, a: m.a, b: m.b, rule: m.rule, miss: m.miss, unit: m.unit, params, confirmedAt: m.confirmedAt, build,
+        source, symbol, tf, direction: m.direction, a: m.a, b: m.b, rule: m.rule, miss: m.miss, unit: m.unit, params, confirmedAt: m.confirmedAt, build,
       });
       if (id === null) continue;
       report.nearMisses++;
@@ -214,13 +229,18 @@ export class OiAlertLoop {
     }
   }
 
-  /** IB-115 (V24): measures the windows that have closed — one klines call each, oldest first, failed ones last. */
-  async measurePaths(nowSec: number): Promise<PathRunReport> {
-    const { store } = this.ports;
+  /**
+   * IB-115 (V24): measures the windows that have closed — one klines call each, oldest first, failed ones last.
+   * Only this loop's own source (IB-116, V31): the live tick never takes the backfill's backlog. `beforeCall`
+   * lets the backfill pace each call (≤ 200 weight a minute); `limit` its batch.
+   */
+  async measurePaths(nowSec: number, opts: { limit?: number; beforeCall?: (weight: number) => Promise<void> } = {}): Promise<PathRunReport> {
+    const { store, source } = this.ports;
     const out: PathRunReport = { measured: 0, failed: 0, weight: 0 };
-    for (const due of await store.pathsDue(nowSec, PATHS_PER_TICK, PATH_RETRY_SEC)) {
+    for (const due of await store.pathsDue(source, nowSec, opts.limit ?? PATHS_PER_TICK, PATH_RETRY_SEC)) {
       const limit = windowBars(due.win);
       try {
+        await opts.beforeCall?.(klinesWeight(limit));
         out.weight += klinesWeight(limit);
         const klines = await this.ports.klines5m(due.symbol, due.t0, limit);
         await store.setPath(due.id, measurePath(klines, due), nowSec);

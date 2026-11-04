@@ -45,6 +45,8 @@ export class OiAlertsService implements OnApplicationBootstrap, OnModuleDestroy 
       webBaseUrl: String(config.env.get('WEB_BASE_URL') ?? ''),
       // IB-115 (V27): production refuses to boot without it (env.schema.ts); a slot writes 'dev'
       build: config.env.get('BUILD_SHA'),
+      // IB-116 (V30): this is the live loop; the history run (alerts/oi-divergence/backfill) passes 'backfill'
+      source: 'live',
       // IB-115 (V24): one uncached call per research window, at exactly its limit (weight 1 / 2 / 5)
       klines5m: async (symbol, from, limit) => candles.closedKlines(symbol, '5m', from * 1000, limit),
       log: { warn: (m) => this.logger.warn(m), log: (m) => this.logger.log(m) },
