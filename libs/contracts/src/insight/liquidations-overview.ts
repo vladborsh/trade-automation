@@ -282,12 +282,12 @@ export const WebLiquidationsOverviewResponseSchema = z.object({
    */
   venues: z.object({ present: z.array(z.string()), missing: z.array(z.string()) }),
   /**
-   * Events in the widest window (24h) whose venue symbol maps to no universe coin, OF EVERY CLASS:
-   * Binance's all-market stream carries hundreds of symbols the universe does not list (TradFi and
-   * crypto alike), so this is thousands a day, not 0 — the "normally 0" this comment used to say
-   * stopped being true with IB-084 (IB-BUG-025: 12 475 on the box for one 24h, 2026-11-04). Their
-   * crypto part is in `block.otherCoins`; TradFi in `block.tradfi`. Kept as a number because the
-   * alternative — a join quietly dropping rows — looks exactly like a quieter market.
+   * CRYPTO events in the widest window (24h) whose venue symbol maps to no universe coin. Binance's
+   * all-market stream carries hundreds of coins the universe does not list, so this is thousands a
+   * day, not 0 — the "normally 0" this comment used to say stopped being true with IB-084
+   * (IB-BUG-025: 9 772 on the box for one 24h, 2026-11-04). Their USD is in `block.otherCoins`.
+   * Kept as a number because the alternative — a join quietly dropping rows — looks exactly like
+   * a quieter market.
    */
   unmappedRows: z.number().int().nonnegative(),
   /** IB-084: the market page's block for the requested `?period=` (default 24h). */
