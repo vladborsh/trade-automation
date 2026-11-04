@@ -20,7 +20,7 @@ import {
 } from './panels.model';
 import { TimeAxisStrip } from './time-axis-strip';
 import { keepView } from './carried-view';
-import type { FocusView } from './focus-at';
+import { focusLabelKey, type FocusView } from './focus-at';
 import { ChartOverlays } from './chart-overlays';
 import { FocusMarker } from './focus-marker';
 import { futureSlots } from './future-bars';
@@ -190,7 +190,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const focus = this.focus()?.timeframe === data.timeframe ? this.focus() : null;
     if (focus) FocusMarker.open(chart, focus); else showWholeWindow(chart, data);
     this.overlays = new ChartOverlays(chart, host.parentElement as HTMLElement, {
-      focus, focusLabel: this.t('instrument.focus.marker'), marks: this.marks(), onBadge: (b) => this.badge.set(b),
+      focus, focusLabel: this.t(focusLabelKey(focus)), marks: this.marks(), onBadge: (b) => this.badge.set(b),
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => this.onRange(range));
     chart.subscribeCrosshairMove((p: MouseEventParams) =>

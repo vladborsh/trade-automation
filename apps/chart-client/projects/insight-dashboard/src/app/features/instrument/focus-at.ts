@@ -1,4 +1,5 @@
 import type { WebTimeframe } from '@trade-automation/contracts';
+import type { StringKey } from '../../i18n/keys';
 import { windowFor } from './time-range';
 
 /**
@@ -81,4 +82,15 @@ export function barAtOrBefore(times: readonly number[], atSec: number): number |
     if (times[mid] <= atSec) lo = mid; else hi = mid - 1;
   }
   return times[lo];
+}
+
+/** `?at=` from the URL → the view to open on, or null for an absent or unusable link. */
+export function focusFromQuery(atRaw: string | null | undefined, nowMs: number): FocusView | null {
+  const at = parseAt(atRaw, nowMs);
+  return at === null ? null : focusView(at, nowMs);
+}
+
+/** The marker's words for a view. */
+export function focusLabelKey(_focus: FocusView | null): StringKey {
+  return 'instrument.focus.marker';
 }

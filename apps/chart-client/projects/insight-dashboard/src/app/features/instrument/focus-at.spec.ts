@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barAtOrBefore, FOCUS_BARS, focusView, parseAt } from './focus-at';
+import { barAtOrBefore, FOCUS_BARS, focusFromQuery, focusLabelKey, focusView, parseAt } from './focus-at';
 import { windowFor } from './time-range';
 
 /** IB-098 — `?at=` from an insight link: which moments are accepted, and the view around one. */
@@ -59,3 +59,17 @@ describe('barAtOrBefore — the marker lands on a drawn bar', () => {
     expect(barAtOrBefore([], 5)).toBeNull();
   });
 });
+
+describe('focusFromQuery / focusLabelKey (extracted from the components, behaviour unchanged)', () => {
+  const NOW = Date.UTC(2026, 10, 3, 15, 0, 0);
+  it('is parseAt then focusView; a bad or absent link is null', () => {
+    const at = Math.floor(NOW / 1000) - 3_600;
+    expect(focusFromQuery(String(at), NOW)).toEqual(focusView(at, NOW));
+    expect(focusFromQuery('banana', NOW)).toBeNull();
+    expect(focusFromQuery(null, NOW)).toBeNull();
+  });
+  it('a moment from a link is labelled as one', () => {
+    expect(focusLabelKey(focusFromQuery(String(Math.floor(NOW / 1000) - 60), NOW))).toBe('instrument.focus.marker');
+  });
+});
+

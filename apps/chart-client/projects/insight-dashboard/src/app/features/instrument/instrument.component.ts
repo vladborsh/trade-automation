@@ -12,7 +12,7 @@ import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
 import { instrumentTailJobs } from './instrument-tail';
 import { loadLegendsHidden, saveLegendsHidden } from './chart-prefs';
-import { focusView, parseAt, type FocusView } from './focus-at';
+import { focusFromQuery, type FocusView } from './focus-at';
 import { browserStore } from './pane-heights';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
@@ -116,8 +116,7 @@ export class InstrumentComponent {
   constructor() {
     const fromRoute = this.route.snapshot.paramMap.get('symbol');
     if (fromRoute) this.symbol.set(fromRoute.toUpperCase());
-    const at = parseAt(this.route.snapshot.queryParamMap.get('at'), Date.now());
-    if (at !== null) this.focus.set(focusView(at, Date.now()));
+    this.focus.set(focusFromQuery(this.route.snapshot.queryParamMap.get('at'), Date.now()));
     this.timeframe.set(this.focus()?.timeframe ?? this.timeframe());
     void this.loadUniverse();
     void this.loadFigures();
