@@ -59,9 +59,10 @@ export class OiAlertsService implements OnApplicationBootstrap, OnModuleDestroy 
     this.timer = null;
   }
 
-  private async tick(): Promise<void> {
+  /** One check; `nowMs` is the seam (production passes nothing). */
+  async tick(nowMs = Date.now()): Promise<void> {
     try {
-      for (const r of (await this.loop?.tick(Math.floor(Date.now() / 1000))) ?? []) {
+      for (const r of (await this.loop?.tick(Math.floor(nowMs / 1000))) ?? []) {
         if (r.journalled > 0 || r.skips > 0 || r.failed.length > 0) {
           this.logger.log(`oi alerts ${r.tf} @${new Date(r.barClose * 1000).toISOString()}: journalled ${r.journalled} (late ${r.late}), sent ${r.sent}, skips ${r.skips}${r.failed.length ? `, failed ${r.failed.join(',')}` : ''}`);
         }

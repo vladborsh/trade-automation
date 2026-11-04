@@ -98,7 +98,9 @@ maybeDescribe('IB-078 password login against a real database', () => {
     db = new PgDatabase(url.toString());
 
     const now = new Date();
-    adminId = (await users.bootstrapAdmin(db, 111)).id;
+    // plain SQL at schema 020: the users repo reads columns later migrations add (025's oi_alerts), and
+    // this admin must exist BEFORE 021 runs
+    adminId = (await db.query<{ id: number }>(`insert into users (tg_user_id, role) values (111, 'admin') returning id`))[0]!.id;
     await db.query(
       `insert into web_login_tokens (token_hash, user_id, expires_at, used_at) values ($1, $3, $4, null), ($2, $3, $4, $5)`,
       [sha256Hex('pre-deploy-unused'), sha256Hex('pre-deploy-used'), adminId, new Date(now.getTime() + 600_000), now],
