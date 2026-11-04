@@ -164,9 +164,21 @@ export const WebAlertSettingsSchema = z.object({
 });
 export type WebAlertSettings = z.infer<typeof WebAlertSettingsSchema>;
 
+/**
+ * IB-116 (design V30, V32): who wrote a journal, control or near-miss row. `live` = the alert loop as it ran;
+ * `backfill` = the one-off run over stored history (never sent, never late). Round 2's params were tuned on
+ * exactly the backfilled month, so those rows are IN-SAMPLE: any statistic reports the two separately and
+ * never pools them into one hit rate.
+ */
+export const OI_JOURNAL_SOURCES = ['live', 'backfill'] as const;
+export const OiJournalSourceSchema = z.enum(OI_JOURNAL_SOURCES);
+export type OiJournalSource = z.infer<typeof OiJournalSourceSchema>;
+
 /** V12: one journal row, late ones included (`late = true` were never sent). */
 export const WebOiDivergenceAlertSchema = z.object({
   id: z.number().int().positive(),
+  /** V30, V33: `backfill` rows are shown «из истории» and never sent, never late, never on R11. */
+  source: OiJournalSourceSchema,
   symbol: z.string().min(1),
   tf: OiDivergenceTfSchema,
   direction: OiDivergenceDirectionSchema,

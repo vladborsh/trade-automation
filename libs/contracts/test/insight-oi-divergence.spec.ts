@@ -54,7 +54,7 @@ describe('OI divergence contracts (IB-109)', () => {
   });
 
   it('a journal row: run length ≥ 2, params kept with it; an alert symbol is a venue symbol, not a base', () => {
-    const row = { id: 1, symbol: 'BTCUSDT', tf: '15m', direction: 'bearish', a: line.a, b: line.b, runOf: null, runLength: 2,
+    const row = { id: 1, source: 'live', symbol: 'BTCUSDT', tf: '15m', direction: 'bearish', a: line.a, b: line.b, runOf: null, runLength: 2,
       params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 1, firedAt: null, late: true, recipients: 0,
       priceAtFire: null, price4h: null, price24h: null, outcomeAt: null };
     expect(WebOiDivergenceAlertSchema.safeParse(row).success).toBe(true);
@@ -63,5 +63,16 @@ describe('OI divergence contracts (IB-109)', () => {
     expect(WebOiDivergenceAlertSchema.parse({ ...row, params: round1 }).params).toMatchObject({ priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 });
     expect(WebAlertSymbolSchema.safeParse({ symbol: 'TRXUSDT', base: 'TRX', enabled: true, addedAt: 1, addedBy: null }).success).toBe(true);
     expect(WebAlertSymbolSchema.safeParse({ symbol: 'trx/usdt', base: 'TRX', enabled: true, addedAt: 1, addedBy: null }).success).toBe(false);
+  });
+
+  it('IB-116 (V30): a journal row says who wrote it — live or backfill; absent or anything else is refused', () => {
+    const row = { id: 1, source: 'backfill', symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', a: { time: 1, price: 2, oiTime: 1, oi: 3 }, b: { time: 2, price: 1, oiTime: 2, oi: 4 },
+      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 3, firedAt: null, late: false, recipients: 0,
+      priceAtFire: null, price4h: null, price24h: null, outcomeAt: null };
+    expect(WebOiDivergenceAlertSchema.parse(row).source).toBe('backfill');
+    expect(WebOiDivergenceAlertSchema.safeParse({ ...row, source: 'live' }).success).toBe(true);
+    const { source: _s, ...noSource } = row;
+    expect(WebOiDivergenceAlertSchema.safeParse(noSource).success).toBe(false);
+    expect(WebOiDivergenceAlertSchema.safeParse({ ...row, source: 'history' }).success).toBe(false);
   });
 });
