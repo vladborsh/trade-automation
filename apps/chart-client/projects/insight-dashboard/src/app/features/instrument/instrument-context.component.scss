@@ -77,3 +77,6 @@ h2 {
 [data-sign='-1'] {
   color: var(--color-down);
 }
+
+/* IB-110: a coin whose liquidations are not collected says so, quietly */
+.not-collected { margin: 6px 0 0; font: var(--type-small); color: var(--color-text-muted); }

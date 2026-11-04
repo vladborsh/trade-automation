@@ -1,6 +1,6 @@
 import { WEB_MARKET_PERIODS, type WebMarketPeriod, type WebTimeframe } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
-import { windowFor } from './time-range';
+import { TIMEFRAMES, windowFor } from './time-range';
 
 /**
  * IB-098 — the instrument page opened from an insight or a large liquidation: `?at=<unix sec>`
@@ -51,13 +51,25 @@ export interface FocusView {
   to: number;
 }
 
-/** The view for a moment: the finest frame that holds it, and the range around it. */
-export function focusView(atSec: number, nowMs: number): FocusView {
+/**
+ * IB-110: `?tf=` — one of the page's timeframes, or null (absent, or not one we offer). A divergence
+ * alert's link carries the frame its lines are on (`?at=<B>&tf=1h`).
+ */
+export function parseTf(raw: string | null | undefined): WebTimeframe | null {
+  return (TIMEFRAMES as readonly string[]).includes(raw ?? '') ? (raw as WebTimeframe) : null;
+}
+
+/**
+ * The view for a moment: the frame asked for (`tf`, IB-110) when its window holds the moment, else the
+ * finest frame that holds it with room around it; and the range around it.
+ */
+export function focusView(atSec: number, nowMs: number, tf: WebTimeframe | null = null): FocusView {
   const nowSec = Math.floor(nowMs / 1000);
   const half = FOCUS_BARS / 2;
-  const timeframe = FOCUS_TIMEFRAMES.find((tf) => {
-    const fromSec = windowFor(tf, nowMs).fromMs / 1000;
-    return atSec - half * TF_SEC[tf] >= fromSec;
+  const asked = tf !== null && FOCUS_TIMEFRAMES.includes(tf) && atSec >= windowFor(tf, nowMs).fromMs / 1000 ? tf : null;
+  const timeframe = asked ?? FOCUS_TIMEFRAMES.find((f) => {
+    const fromSec = windowFor(f, nowMs).fromMs / 1000;
+    return atSec - half * TF_SEC[f] >= fromSec;
   }) ?? '4h';
   const step = TF_SEC[timeframe];
   const barSec = Math.floor(atSec / step) * step;
@@ -103,12 +115,12 @@ export function periodStartView(atSec: number, span: WebMarketPeriod, nowMs: num
   return { kind: 'periodStart', atSec, timeframe, barSec, from: Math.max(windowFrom, barSec - PERIOD_START_LEAD_BARS * step), to: nowSec };
 }
 
-/** `?at=` (and `?span=`) from the URL → the view to open on, or null for an absent or unusable link. */
-export function focusFromQuery(atRaw: string | null | undefined, nowMs: number, spanRaw: string | null = null): FocusView | null {
+/** `?at=` (with `?span=` or `?tf=`) from the URL → the view to open on, or null for an absent or unusable link. */
+export function focusFromQuery(atRaw: string | null | undefined, nowMs: number, spanRaw: string | null = null, tfRaw: string | null = null): FocusView | null {
   const at = parseAt(atRaw, nowMs);
   if (at === null) return null;
   const span = (WEB_MARKET_PERIODS as readonly string[]).includes(spanRaw ?? '') ? (spanRaw as WebMarketPeriod) : null;
-  return span === null ? focusView(at, nowMs) : periodStartView(at, span, nowMs);
+  return span === null ? focusView(at, nowMs, parseTf(tfRaw)) : periodStartView(at, span, nowMs);
 }
 
 /** The marker's words for a view: «момент из ссылки», or «начало периода». */

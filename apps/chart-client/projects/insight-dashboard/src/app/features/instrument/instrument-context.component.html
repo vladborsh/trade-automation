@@ -61,6 +61,12 @@
     [narrow]="true"
     titleKey="instrument.liq.summaryTitle"
   />
+} @else if (notCollected(); as base) {
+  <!-- IB-110: a coin on the alert list but not in the universe: candles, OI and lines, but no liquidation tape -->
+  <section class="block">
+    <h2>{{ t('instrument.liq.summaryTitle') }}</h2>
+    <p class="muted not-collected">{{ t('instrument.liq.notCollected', { base }) }}</p>
+  </section>
 }
 
 <section class="block" aria-labelledby="market-title">

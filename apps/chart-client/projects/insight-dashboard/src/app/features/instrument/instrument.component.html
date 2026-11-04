@@ -29,7 +29,7 @@
       <app-fullscreen-button class="fs-button" [target]="chartColumn" />
       <!-- IB-105: the legend switch sits ON the chart, at the price legend's corner (it owns the state) -->
       <app-legend-toggle #legendToggle class="legend-button" />
-      @if (panes(); as data) {
+      @if (chartData(); as data) {
         <app-instrument-chart
           [data]="data"
           [symbol]="symbol()"
@@ -53,6 +53,7 @@
       [liqCoin]="liqCoin()"
       [liqVenues]="liqVenues()"
       [loading]="loading()"
+      [collected]="universe()"
     />
   </div>
   @if (panes()) {

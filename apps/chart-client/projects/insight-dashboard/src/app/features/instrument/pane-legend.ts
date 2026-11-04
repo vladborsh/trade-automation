@@ -1,3 +1,4 @@
+import { DIVERGENCE_COLOURS } from './oi-divergence-lines';
 import type { StringKey } from '../../i18n/keys';
 import { noAnswerLabel, seriesStartLabel, type CoverageLabel } from './coverage-labels';
 import type { PaneData } from './pane-data';
@@ -19,10 +20,13 @@ export interface LegendEntry {
   colour: string | null;
   /** Drawn as a short line rather than a block: the entry keys a line series. */
   line: boolean;
+  /** IB-110: the entry is a switch for what it keys (the divergence lines); `off` when they are hidden. */
+  toggle?: 'divergences';
+  off?: boolean;
 }
 
 /** What the legend reads: the timeframe always, and (IB-081) the coverage the server stated. */
-export type LegendData = Pick<PaneData, 'timeframe'> & Partial<Pick<PaneData, 'funding' | 'longShort' | 'openInterestCoverage'>>;
+export type LegendData = Pick<PaneData, 'timeframe'> & Partial<Pick<PaneData, 'funding' | 'longShort' | 'openInterestCoverage' | 'divergences'>>;
 
 type Translate = (key: StringKey, params?: Record<string, string>) => string;
 
@@ -30,8 +34,13 @@ export function legendEntries(
   panel: PanelDef,
   data: LegendData | null,
   t: Translate,
+  divergencesHidden = false,
 ): LegendEntry[] {
-  const own = panel.legend.map((e) => ({ label: t(e.labelKey), colour: e.colour, line: false }));
+  // IB-110: on the two panes the lines are drawn on, whenever this frame has them (an empty list included)
+  const divergences: LegendEntry[] = data?.divergences !== undefined && (panel.key === 'price' || panel.key === 'openInterest')
+    ? [{ label: t('instrument.legend.divergences'), colour: DIVERGENCE_COLOURS.bullish, line: true, toggle: 'divergences', off: divergencesHidden }]
+    : [];
+  const own = [...panel.legend.map((e) => ({ label: t(e.labelKey), colour: e.colour, line: false })), ...divergences];
   const note = data ? coverageNote(panel.key, data) : null;
   if (note) return [...own, { label: t(note.key, note.params), colour: null, line: false }];
   if (panel.key !== 'price' || !data) return own;
@@ -72,11 +81,12 @@ export function paneLegends(
   data: LegendData | null,
   symbol: string,
   edges: ReadonlyArray<{ top: number }>,
+  divergencesHidden = false,
 ): Array<{ key: PanelDef['key']; heading: string; entries: LegendEntry[]; top: number }> {
   return PANELS.map((panel, i) => ({
     key: panel.key,
     heading: panelHeading(t, panel, symbol),
-    entries: legendEntries(panel, data, t),
+    entries: legendEntries(panel, data, t, divergencesHidden),
     top: edges[i].top,
   }));
 }

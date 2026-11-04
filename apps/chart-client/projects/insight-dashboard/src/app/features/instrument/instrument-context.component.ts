@@ -33,6 +33,15 @@ export class InstrumentContextComponent {
   readonly liqVenues = input<WebLiquidationsOverviewResponse['venues']>({ present: [], missing: [] });
   /** The page is fetching this coin's window: the "now" tiles are about to change, so they show skeletons. */
   readonly loading = input(false);
+  /**
+   * IB-110: the coins whose liquidations we collect — the universe (the picker's list, the whole of it). A coin
+   * outside it (TRX, on the alert list only) says so in words instead of showing no liquidation block at all.
+   */
+  readonly collected = input<ReadonlyArray<{ id: string }>>([]);
+  readonly notCollected = computed(() => {
+    const list = this.collected();
+    return list.length > 0 && !list.some((s) => s.id === this.symbol()) ? this.symbol().replace(/USDT$/, '') : null;
+  });
 
   private readonly api = inject(InsightApiClient);
   private readonly i18n = inject(I18nService);

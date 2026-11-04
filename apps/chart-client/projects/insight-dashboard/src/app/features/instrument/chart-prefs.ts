@@ -24,3 +24,24 @@ export function saveLegendsHidden(store: KeyValueStore | null, hidden: boolean):
     // blocked storage: the choice lasts until the page is closed
   }
 }
+
+/** IB-110: whether the OI divergence lines are hidden (the «Дивергенции OI» legend entry). Same store, same rules. */
+export const DIVERGENCES_HIDDEN_KEY = 'insight.instrument.divergencesHidden';
+
+export function loadDivergencesHidden(store: KeyValueStore | null): boolean {
+  if (!store) return false;
+  try {
+    return store.getItem(DIVERGENCES_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveDivergencesHidden(store: KeyValueStore | null, hidden: boolean): void {
+  if (!store) return;
+  try {
+    store.setItem(DIVERGENCES_HIDDEN_KEY, hidden ? '1' : '0');
+  } catch {
+    // blocked storage: the choice lasts until the page is closed
+  }
+}

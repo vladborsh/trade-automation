@@ -2,7 +2,7 @@ import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
   WebInviteResponse, WebMemberResponse, WebMemberSettings, WebMemberSettingsPatch, WebMembersResponse,
-  WebOpenInterestResponse,
+  WebOpenInterestResponse, OiDivergenceTf, WebOiDivergenceSeriesResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
   WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebFlowsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
@@ -79,6 +79,11 @@ export class InsightApiClient {
   }
 
   // IB-081: the contract's type, not a hand-written copy of it — the copy lacked `coverageFrom`/`truncated`
+  /** IB-110 (V11): the OI divergence lines of a coin on 15m, 1h or 4h, computed by the server on open. */
+  async oiDivergences(symbol: string, tf: OiDivergenceTf): Promise<WebOiDivergenceSeriesResponse> {
+    return this.get<WebOiDivergenceSeriesResponse>('/series/oi-divergences', { symbol, tf });
+  }
+
   async openInterest(symbol: string, fromMs: number, toMs: number): Promise<WebOpenInterestResponse> {
     return this.get<WebOpenInterestResponse>('/series/oi', { symbol, from: fromMs, to: toMs });
   }

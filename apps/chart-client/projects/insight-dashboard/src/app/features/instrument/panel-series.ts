@@ -7,6 +7,7 @@ import { daySeparatorTimes, showsDaySeparators } from './day-separators';
 import { futureSlots } from './future-bars';
 import { toLiquidationMarkers } from './liquidation-markers.adapter';
 import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
+import { divergenceStrokes, divergenceTf } from './oi-divergence-lines';
 import type { PaneData } from './pane-data';
 import { paneIndexOf, type PanelDef } from './panels.model';
 import { LEVEL_COLOURS, LEVEL_LINES, levelSteps, previousDayLevels, previousWeekLevels } from './prior-levels';
@@ -67,6 +68,7 @@ function drawPrice(chart: IChartApi, data: PaneData, renderers: PanelRenderers, 
   // IB-067: whitespace bars past the last candle, so the week's upcoming events have slots to sit on
   price.setData([...toCandleData(data.candles.candles), ...futureSlots(data).map((time) => ({ time }))] as never);
   drawLevels(chart, data, pane);
+  drawDivergences(chart, data, 'price', pane);
 
   // IB-039 §12.5 — liquidations as bubbles ON the price, bucketed to the bar on screen so a
   // cascade reads as one big circle rather than a smear of overlapping dots.
@@ -141,6 +143,25 @@ function drawOpenInterest(chart: IChartApi, data: PaneData, renderers: PanelRend
   // would draw each bar as a flat dash. Attached as '1m' because that is what selects the line.
   if (!renderers.oi.series) renderers.oi.attach(chart, '1m', pane);
   renderers.oi.setData(toOpenInterestPoints(onGrid(data.openInterest, data), data.instrument, data.timeframe));
+  drawDivergences(chart, data, 'openInterest', pane);
+}
+
+/**
+ * IB-110 (V15): the OI divergence lines on the price and OI panes (`oi-divergence-lines.ts`): two points
+ * each, teal bullish / red bearish, a repeat dashed. Out of the autoscale like the levels — a line is
+ * between two values the pane already shows, and must never rescale it.
+ */
+function drawDivergences(chart: IChartApi, data: PaneData, which: 'price' | 'openInterest', pane: number): void {
+  const tf = data.divergences ? divergenceTf(data.timeframe) : null;
+  if (!tf || !data.divergences) return;
+  for (const s of divergenceStrokes(data.divergences, data.openInterest, tf)) {
+    if (s.pane !== which) continue;
+    chart.addSeries(LineSeries, {
+      color: s.colour, lineWidth: 2, lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true,
+      autoscaleInfoProvider: () => null,
+    }, pane).setData(s.points as never);
+  }
 }
 
 function drawDelta(chart: IChartApi, data: PaneData, _renderers: PanelRenderers, pane: number): void {

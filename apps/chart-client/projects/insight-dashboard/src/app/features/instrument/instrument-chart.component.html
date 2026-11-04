@@ -4,12 +4,20 @@
     <div class="pane-legend" [attr.data-pane]="legend.key" [style.top.px]="legend.top">
       <span class="pane-title">{{ legend.heading }}</span>
       @for (entry of legend.entries; track entry.label) {
-        <span class="entry">
-          @if (entry.colour) {
-            <span class="swatch" [class.line]="entry.line" [style.background]="entry.colour"></span>
-          }
-          {{ entry.label }}
-        </span>
+        @if (entry.toggle) {
+          <!-- IB-110: a switch for what it keys; struck through while the lines are hidden -->
+          <button type="button" class="entry toggle" [class.off]="entry.off" [attr.aria-pressed]="!entry.off"
+                  [attr.title]="t('instrument.legend.divergencesToggle')" (click)="divergencePrefs.toggle()">
+            <span class="swatch line" [style.background]="entry.colour"></span><span class="swatch line bear"></span>{{ entry.label }}
+          </button>
+        } @else {
+          <span class="entry">
+            @if (entry.colour) {
+              <span class="swatch" [class.line]="entry.line" [style.background]="entry.colour"></span>
+            }
+            {{ entry.label }}
+          </span>
+        }
       }
     </div>
   }

@@ -1,6 +1,6 @@
 import type {
   EconomicEvent, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
-  WebLongShortResponse,
+  WebLongShortResponse, WebOiDivergenceLine,
 } from '@trade-automation/contracts';
 import type { Coverage } from './coverage-labels';
 
@@ -41,6 +41,13 @@ export interface PaneData {
    * drop out, not the chart.
    */
   calendarEvents: readonly EconomicEvent[];
+  /**
+   * IB-110 — the OI divergence lines for this window's timeframe (15m/1h/4h), from
+   * `/series/oi-divergences`. Absent on other frames, while loading, or when the read failed: the chart
+   * draws none and its legend lists none. EMPTY when the reader hid them: none drawn, but the legend
+   * keeps its entry, which is how they are shown again.
+   */
+  divergences?: readonly WebOiDivergenceLine[];
   /**
    * True when this is the previous window with earlier history prepended (scrolling left), so the
    * chart keeps the reader's view instead of jumping to the whole window. Absent on a fresh load.

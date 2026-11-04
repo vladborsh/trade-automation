@@ -12,7 +12,9 @@ import { InstrumentChartComponent, type PaneData } from './instrument-chart.comp
 import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
 import { instrumentTailJobs } from './instrument-tail';
-import { focusFromQuery, type FocusView } from './focus-at';
+import { focusFromQuery, parseTf, type FocusView } from './focus-at';
+import { DivergenceOverlay } from './divergence-overlay';
+import { DivergencePrefs } from './divergence-prefs';
 import { LegendToggleComponent } from './legend-toggle.component';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
@@ -58,6 +60,9 @@ export class InstrumentComponent {
   readonly summaryFailed = signal(false);
 
   readonly panes = signal<PaneData | null>(null);
+  /** IB-110: the OI divergence lines, merged into what the chart draws (`divergence-overlay.ts`). */
+  private readonly divergences = new DivergenceOverlay(this.api, inject(DivergencePrefs));
+  readonly chartData = computed(() => this.divergences.merge(this.panes()));
   readonly top = signal<WebTopLiquidation[]>([]);
   /**
    * IB-039 — this instrument's row out of IB-038's overview, for the summary under the chart.
@@ -114,8 +119,9 @@ export class InstrumentComponent {
   constructor() {
     const fromRoute = this.route.snapshot.paramMap.get('symbol');
     if (fromRoute) this.symbol.set(fromRoute.toUpperCase());
-    this.focus.set(focusFromQuery(this.route.snapshot.queryParamMap.get('at'), Date.now(), this.route.snapshot.queryParamMap.get('span')));
-    this.timeframe.set(this.focus()?.timeframe ?? this.timeframe());
+    const q = this.route.snapshot.queryParamMap;
+    this.focus.set(focusFromQuery(q.get('at'), Date.now(), q.get('span'), q.get('tf')));
+    this.timeframe.set(this.focus()?.timeframe ?? parseTf(q.get('tf')) ?? this.timeframe());
     void this.loadUniverse();
     void this.loadFigures();
     void this.load();
@@ -159,7 +165,8 @@ export class InstrumentComponent {
   chooseTimeframe(tf: WebTimeframe): void {
     this.timeframe.set(tf);
     // the moment belonged to the link: off the screen and off the URL, so a reload does not jump back
-    if (this.focus()) void this.router.navigate([], { queryParams: { at: null, span: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    // IB-110: the frame is in the URL (shareable, as an alert's link is); the moment was the link's alone
+    void this.router.navigate([], { queryParams: { at: null, span: null, tf }, queryParamsHandling: 'merge', replaceUrl: true });
     this.focus.set(null);
     void this.load();
   }
@@ -174,6 +181,7 @@ export class InstrumentComponent {
     const { fromMs, toMs } = windowFor(tf, Date.now());
     const symbol = this.symbol();
     const bucket = bucketFor(tf);
+    void this.divergences.load(symbol, tf); // IB-110: beside the window, never holding it up
 
     try {
       const [panes, top] = await Promise.all([

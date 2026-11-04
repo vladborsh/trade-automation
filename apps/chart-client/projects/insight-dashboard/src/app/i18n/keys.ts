@@ -184,6 +184,8 @@ export type StringKey =
   | 'instrument.legend.prevDay'
   | 'instrument.legend.prevWeek'
   | 'instrument.legend.usdEvents'
+  | 'instrument.legend.divergences'
+  | 'instrument.legend.divergencesToggle'
   | 'instrument.legend.usClosed'
   | 'calendar.tooltip.forecast'
   | 'calendar.tooltip.previous'
@@ -280,6 +282,7 @@ export type StringKey =
   | 'instrument.liq.scopeUndercounted'
   | 'instrument.liq.noVenues'
   | 'instrument.liq.summaryTitle'
+  | 'instrument.liq.notCollected'
   | 'instrument.liq.total24h'
   // IB-037 — the market-context page (§10)
   | 'market.title'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barAtOrBefore, FOCUS_BARS, focusFromQuery, focusLabelKey, focusView, parseAt, PERIOD_START_TIMEFRAME, periodStartView } from './focus-at';
+import { barAtOrBefore, FOCUS_BARS, focusFromQuery, focusLabelKey, focusView, parseAt, parseTf, PERIOD_START_TIMEFRAME, periodStartView } from './focus-at';
 import { windowFor } from './time-range';
 
 /** IB-098 — `?at=` from an insight link: which moments are accepted, and the view around one. */
@@ -104,3 +104,27 @@ describe('periodStartView — an R4 link opens on the whole period, its start ma
   });
 });
 
+
+describe('?tf= (IB-110) — a divergence alert opens on its own frame', () => {
+  it('parseTf: the page’s frames, nothing else', () => {
+    expect(['1m', '15m', '1h', '4h', '1d', '1w'].map(parseTf)).toEqual(['1m', '15m', '1h', '4h', '1d', '1w']);
+    expect([null, undefined, '', '2h', '1H', '15'].map((x) => parseTf(x as string))).toEqual([null, null, null, null, null, null]);
+  });
+
+  it('?at=<B>&tf=1h: opens on 1h at B — not on the finest frame that holds a two-hour-old moment (1m)', () => {
+    const at = NOW - 2 * 3_600;
+    expect(focusFromQuery(String(at), NOW_MS)!.timeframe).toBe('1m'); // control: without tf, the finest
+    const v = focusFromQuery(String(at), NOW_MS, null, '1h')!;
+    expect([v.kind, v.timeframe, v.barSec]).toEqual(['moment', '1h', at - (at % 3_600)]);
+  });
+
+  it('a tf whose window does not hold the moment is not honoured (1m cannot show 20 days ago); 1d/1w never focus', () => {
+    const old = NOW - 20 * 86_400;
+    expect(focusFromQuery(String(old), NOW_MS, null, '1m')!.timeframe).toBe(focusView(old, NOW_MS).timeframe);
+    expect(focusFromQuery(String(NOW - 3_600), NOW_MS, null, '1d')!.timeframe).toBe('1m');
+  });
+
+  it('?span= still wins over ?tf= (an R4 link is a period start)', () => {
+    expect(focusFromQuery(String(NOW - 3_600), NOW_MS, '24h', '4h')!.kind).toBe('periodStart');
+  });
+});

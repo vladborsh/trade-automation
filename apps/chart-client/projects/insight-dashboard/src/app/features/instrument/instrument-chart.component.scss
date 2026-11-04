@@ -49,6 +49,24 @@
   gap: 4px;
 }
 
+/* IB-110: «Дивергенции OI» is a switch inside a legend that otherwise lets the pointer through */
+.entry.toggle {
+  position: relative;
+  pointer-events: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  &.off { text-decoration: line-through; opacity: 0.6; }
+  &:focus-visible { outline: 1px solid var(--color-focus); outline-offset: 2px; }
+  .bear { background: var(--color-down); }
+}
+@media (max-width: 767px) {
+  .entry.toggle::before { content: ''; position: absolute; inset: -14px -6px; } /* a ≥ 40 px target, not a bigger legend */
+}
+
 .swatch {
   display: inline-block;
   width: 8px;
