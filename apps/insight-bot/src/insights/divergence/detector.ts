@@ -182,7 +182,7 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
 }
 
 /** V6: each price pivot with the nearest OI pivot of the same kind within ±k (the earlier on a tie); none, no pair. */
-function pair(price: readonly number[], oi: readonly number[], side: Side, p: DivergenceParams): PivotPair[] {
+export function pair(price: readonly number[], oi: readonly number[], side: Side, p: DivergenceParams): PivotPair[] {
   const out: PivotPair[] = [];
   for (const i of price) {
     let best: number | null = null;
@@ -196,15 +196,17 @@ function pair(price: readonly number[], oi: readonly number[], side: Side, p: Di
   return out;
 }
 
-interface Noise {
+export interface Noise {
   dp: number;
   doi: number;
   /** V18: the OI line's tolerance, from δoi's own median — one number per evaluation. */
   oiLineTol: number;
+  /** The median |ΔOI per bar| itself — the unit the OI line's near-miss is counted in (IB-115, V26). */
+  med: number;
 }
 
 /** ATR14 at bar i, i.e. over bars i − 13 … i (each true range needs the bar before). Null before bar ATR_PERIOD. */
-function atrAt(bars: readonly Bar[], i: number): number | null {
+export function atrAt(bars: readonly Bar[], i: number): number | null {
   if (i < ATR_PERIOD) return null;
   let tr = 0;
   for (let t = i - ATR_PERIOD + 1; t <= i; t++) {
@@ -215,7 +217,7 @@ function atrAt(bars: readonly Bar[], i: number): number | null {
 }
 
 /** V7: δp from ATR14 at B, δoi from the median per-bar OI move over the 100 bars before B. Null: not enough history to judge. */
-function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: number, p: DivergenceParams): Noise | null {
+export function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: number, p: DivergenceParams): Noise | null {
   const atr = atrAt(bars, i);
   if (atr === null || i < OI_MEDIAN_BARS + 1) return null;
   const deltas: number[] = [];
@@ -226,7 +228,7 @@ function noiseAt(bars: readonly Bar[], series: ReadonlyArray<number | null>, i: 
   }
   if (deltas.length < OI_MEDIAN_MIN) return null;
   const med = median(deltas);
-  return { dp: p.atrMult * atr, doi: p.oiMedianMult * med, oiLineTol: p.oiLineTolMedianMult * med };
+  return { dp: p.atrMult * atr, doi: p.oiMedianMult * med, oiLineTol: p.oiLineTolMedianMult * med, med };
 }
 
 function median(values: number[]): number {
@@ -266,7 +268,7 @@ function diverges(
   return true;
 }
 
-function lineAt(x0: number, y0: number, x1: number, y1: number, x: number): number {
+export function lineAt(x0: number, y0: number, x1: number, y1: number, x: number): number {
   return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
 }
 
@@ -297,7 +299,7 @@ function divergence(
  * already due. The window `(from, to]` matches `oiPerBar`'s ownership: a bar owns `open < t ≤ close`.
  * Returns the first hole's contiguous range, or null.
  */
-function holeFinder(input: DivergenceInput): (from: number, to: number) => { from: number; to: number } | null {
+export function holeFinder(input: DivergenceInput): (from: number, to: number) => { from: number; to: number } | null {
   const have = new Set(input.oi5m.map((p) => p.time));
   const silent = input.venueSilent ?? [];
   const lastClose = input.bars.length > 0 ? input.bars[input.bars.length - 1].time + input.tfSec : 0;
