@@ -238,6 +238,30 @@ it is a live queue, not a log, and is described under "Task backlog" above.)
   actually happened (update backlog status alongside logging a result, not
   just the log).
 
+## Lost reports
+
+Agents' reports live in `~/.claude/jobs/0028abca/tmp/reports/`, **outside git**. In October 2026 that
+directory was wiped with the job's `tmp` (the same mechanism that destroyed the declared AWS state
+backup), and nothing was archived: **every report written before then is gone**, from the repository
+and from any archive. The directory exists again and holds the reports written since, but it is still
+outside git and can be lost the same way.
+
+Ten references in committed files point at lost reports (WD-014 counted them on 2026-11-04; the 41
+`reports/*` references inside task rows in `tasks/*.jsonl` are not counted here):
+
+| Lost report | Cited from |
+|---|---|
+| `dev-2-BUG-022.md` | `AGENTS.md` (the repetition rule for venue numbers), `architecture/insight-bot-system-design.md` |
+| `dev-1-IB-010.md`, `dev-1-IB-010-escalation.md`, `dev-1-IB-014-disagreement.md` | `architecture/insight-bot-system-design.md`; the last also `apps/signal-server/src/market-data/ingestion.service.ts` |
+| `dev-2-IB-003.md`, `dev-2-IB-004.md`, `dev-2-IB-007.md`, `dev3-IB-013-probe-escalation.md` | `architecture/insight-bot-system-design.md` |
+| `dev-2-IB-009.md` | `architecture/insight-bot-system-design.md`, `knowledge/venue-contract-specs.md` |
+| `zinc-raven-instrument-layout.md` | `apps/chart-client/.../instrument/panels.model.ts` |
+
+The references are left in place, deliberately: removing them would hide that the evidence existed and
+is gone. Where a finding still matters, its summary usually survives in the task row's description
+(`tasks/insight-bot.jsonl`, `tasks.jsonl`); a rule that cited a lost report (AGENTS.md's) is stated on
+its own terms and stands without it.
+
 ## Knowledge base
 
 Durable domain concepts — market mechanisms, indicator definitions, jargon

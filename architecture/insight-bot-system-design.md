@@ -20,6 +20,35 @@ sequencing.
 
 ---
 
+> **PARTIALLY CANCELLED — status as of 2026-11-04 (WD-014).** The wind-down and the storage ruling
+> (`architecture/storage-ruling-2026-11-03.md`; owner: «на сервере хранить только кеш; писать сбор
+> level2 данных в базу») and the member-access design (`architecture/member-access-design-2026-10-31.md`)
+> changed what this system is. Read this document as history, except where noted.
+>
+> **No longer describes the system:**
+> - §3.3, the candle and funding tape: `candles_1m`, `candles_agg`, `mark_funding_1m` and `funding_settlements`
+>   were dropped by migration 024 (WD-006). Charts and funding are read from the venue on demand.
+> - §3.4 in full: features, context, playbooks, signals and cooldowns (dropped by migration 024).
+> - §4.1's kline and mark-price streams, §4.2 (the Binance spot collector) and §5 (the archive backfill).
+>   All went in WD-010.
+> - §6.2's daily gap report (WD-011), and §6's stage-0 exit criterion.
+> - §8 and §9, the stage-1 pipeline (feature frame, regime, playbook engine, gate, tracker), and §10's
+>   later stages, except §8.6 Delivery.
+>
+> **Still describes the system:**
+> - the liquidation collectors (Binance `forceOrder`, Bybit, OKX) and their gap and uptime records;
+> - the Binance OI / long-short poller;
+> - the economic calendar;
+> - the users and invites;
+> - §8.6 Delivery: the Telegram bot for account, `/password` and calendar reminders;
+> - the watchdog (§6.2, minus the gap report).
+>
+> **Changed:**
+> - §6.1: ops liveness is `GET /healthz` → `{status}` only (WD-011); `/health` is the dashboard's admin page.
+> - §7 hosting is current in `infra/insight-bot/` (RUNBOOK, COST-PLAN, LIVE-RESOURCES).
+>
+> The `reports/*` links below point at reports that are lost (PROJECT.md «Lost reports»).
+
 ## 0. What is being built, in one paragraph
 
 A second NestJS app, `apps/insight-bot`, with its own Postgres database

@@ -1,12 +1,23 @@
 # insight-bot
 
-Crypto insight bot: venue collectors → features → playbooks → Telegram.
-Design: [`architecture/insight-bot-system-design.md`](../../architecture/insight-bot-system-design.md);
-settled product brief: `architecture/crypto-insight-bot-2026-09-28.md`.
+## What it is now (2026-11-04, after the wind-down)
 
-IB-003 scaffolded it (env, universe, database, `/health`, `/metrics`, image), IB-004 added the
-partitioned time-series schema and the writers, IB-007 the first collector. The rest of the
-pipeline and the bot itself arrive with the later IB tasks (`tasks/insight-bot.jsonl`).
+The members' crypto dashboard and its Telegram bot, on one small AWS box (`infra/insight-bot/`).
+- **Stored** (the storage ruling, `architecture/storage-ruling-2026-11-03.md`): liquidations from
+  Binance, Bybit and OKX with their gap and uptime records, Binance OI and long/short every 5 min,
+  the US economic calendar, news, and users and sessions.
+- **Read from the venues on demand, cached in memory:** candles, funding, market context, Fear & Greed.
+- **The web:** `/market`, `/positioning`, `/instrument/:symbol`, admin pages (`src/web`, the
+  dashboard is `apps/chart-client/projects/insight-dashboard`).
+- **The bot:** `/start` with an invite, `/invite`, `/password` and `/web` for the site, `/calendar` reminders, `/settings` and
+  `/lang` (`src/delivery`).
+- **Ops:** `GET /healthz` (liveness, `{status}` only), `/metrics` (404 from outside), the watchdog.
+
+**Gone since the original design:** the candle/funding tape, the archive backfill, the spot
+collector, features, playbooks and signals, and the daily gap report (WD-006/010/011/013). The
+sections below that describe them are history, kept so the code's comments still have context.
+Design: [`architecture/insight-bot-system-design.md`](../../architecture/insight-bot-system-design.md)
+(partially cancelled; its header says which sections still hold).
 
 ## Your slot's port and database
 
@@ -130,9 +141,8 @@ not a warning. The keys that matter here:
 | `UNIVERSE_FILE` | `config/universe.yaml` | §2.3 |
 | `LOG_LEVEL` | `info` | pino |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_SERVICE_CHAT_ID` | none | supplied by the user; one test bot per slot, one production bot. Never committed |
-| `BINANCE_FUTURES_*`, `BINANCE_SPOT_*`, `BINANCE_ARCHIVE_BASE_URL`, `BYBIT_WS_URL`, `OKX_WS_URL` | the public endpoints | overridable for a probe or a stand-in |
+| `BINANCE_FUTURES_*`, `BINANCE_SPOT_REST_BASE_URL`, `BYBIT_WS_URL`, `OKX_WS_URL`, `OKX_REST_BASE_URL` | the public endpoints | overridable for a probe or a stand-in |
 | `WATCHDOG_SILENCE_MIN` | `3` | §6.2 |
-| `ALERTS_PER_DAY` | `3` | §8.5 |
 
 **Never commit a `.env`**: it holds the slot's Telegram token and its `DATABASE_URL`.
 
@@ -384,7 +394,7 @@ payload, so the two cannot quietly converge.
 A disabled member's session is deleted the moment it is next presented, so revoking access ends
 the dashboard session too rather than leaving a 30-day cookie live.
 
-## The historical backfill (IB-012)
+## The historical backfill (IB-012) — removed (WD-010), kept as history
 
 `npm run backfill -- --symbols BTCUSDT,ETHUSDT,SOLUSDT [--from 2024-01] [--force]`
 

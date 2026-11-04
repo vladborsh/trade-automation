@@ -1,4 +1,4 @@
-import { validateEnv } from '../src/config/env.schema';
+import { EnvSchema, validateEnv } from '../src/config/env.schema';
 
 describe('validateEnv', () => {
   it('IB-078 H6: CLIENT_IP_HEADER has no default (socket address) and is kept as given when set', () => {
@@ -26,7 +26,7 @@ describe('validateEnv', () => {
     expect(validateEnv({ DB_MIGRATE_ON_BOOT: '0' }).DB_MIGRATE_ON_BOOT).toBe(false);
   });
 
-  it('defaults the universe file, the venue endpoints and the two operating limits', () => {
+  it('defaults the universe file, the venue endpoints and the watchdog threshold', () => {
     const env = validateEnv({});
     expect(env.UNIVERSE_FILE).toBe('config/universe.yaml');
     expect(env.BINANCE_FUTURES_WS_BASE_URL).toBe('wss://fstream.binance.com');
@@ -34,7 +34,30 @@ describe('validateEnv', () => {
     expect(env.BYBIT_WS_URL).toContain('bybit.com');
     expect(env.OKX_WS_URL).toContain('okx.com');
     expect(env.WATCHDOG_SILENCE_MIN).toBe(3);
-    expect(env.ALERTS_PER_DAY).toBe(3);
+  });
+
+  /**
+   * WD-014: three keys left the schema. A box or slot whose .env still sets them must boot, and Nest
+   * hands validateEnv the whole process.env anyway (PATH, HOME, …): unknown keys are stripped, never
+   * an error. Pinned, because `.strict()` here would turn a forgotten line into a failed deploy.
+   */
+  it('a key the schema dropped (or never knew) is stripped, not a boot failure', () => {
+    const env = validateEnv({
+      ALERTS_PER_DAY: '3',
+      BINANCE_SPOT_WS_BASE_URL: 'wss://stream.binance.com:9443',
+      BINANCE_ARCHIVE_BASE_URL: 'https://example.invalid',
+      SOMETHING_ELSE_ENTIRELY: 'x',
+      PORT: '3015',
+    }) as Record<string, unknown>;
+    expect(env.PORT).toBe(3015);
+    for (const gone of ['ALERTS_PER_DAY', 'BINANCE_SPOT_WS_BASE_URL', 'BINANCE_ARCHIVE_BASE_URL', 'SOMETHING_ELSE_ENTIRELY']) {
+      expect(gone in env).toBe(false);
+    }
+  });
+
+  it('the three dropped keys are really gone from the schema', () => {
+    const keys = Object.keys(EnvSchema.innerType().shape);
+    for (const gone of ['ALERTS_PER_DAY', 'BINANCE_SPOT_WS_BASE_URL', 'BINANCE_ARCHIVE_BASE_URL']) expect(keys).not.toContain(gone);
   });
 
   it('leaves the Telegram keys optional — the app boots without a bot token', () => {

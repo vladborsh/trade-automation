@@ -41,9 +41,6 @@ export const EnvSchema = z.object({
   // A HOST: the perp collector appends Binance's `/market` route itself (IB-BUG-012) and refuses a path.
   BINANCE_FUTURES_WS_BASE_URL: z.string().default('wss://fstream.binance.com'),
   BINANCE_SPOT_REST_BASE_URL: z.string().default('https://api.binance.com'),
-  BINANCE_SPOT_WS_BASE_URL: z.string().default('wss://stream.binance.com:9443'),
-  // §5 — data.binance.vision, served from the S3 bucket in ap-northeast-1.
-  BINANCE_ARCHIVE_BASE_URL: z.string().default('https://s3-ap-northeast-1.amazonaws.com/data.binance.vision'),
   BYBIT_WS_URL: z.string().default('wss://stream.bybit.com/v5/public/linear'),
   OKX_WS_URL: z.string().default('wss://ws.okx.com:8443/ws/v5/public'),
   // §4.3 — settled funding history (`/api/v5/public/funding-rate-history`), IB-009.
@@ -75,8 +72,9 @@ export const EnvSchema = z.object({
   // explicitly true; when false it logs what it would have sent (WD-011 deleted the daily gap report). Detection and
   // storage are unchanged. The calendar notifier is not behind this switch (it shares only the sender).
   OPS_TELEGRAM_ALERTS: booleanFlag(false),
-  // brief §1 — the per-user daily alert budget the gate enforces (§8.5).
-  ALERTS_PER_DAY: z.coerce.number().int().positive().default(3),
+  // WD-014 removed BINANCE_SPOT_WS_BASE_URL, BINANCE_ARCHIVE_BASE_URL and ALERTS_PER_DAY: no reader
+  // in src/ since the spot collector, the archive backfill and the signal gate went. A machine that
+  // still sets them boots fine: z.object strips keys it does not know (test/env.schema.spec.ts).
 
   // IB-021, §8.6 — the member bot. Without a token the bot does not start at all (the app still
   // collects and serves /healthz); tokens are the user's to issue, never an agent's.

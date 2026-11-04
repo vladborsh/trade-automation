@@ -78,7 +78,8 @@ client was found with inline `template:` / `styles:` (a 656-line `chart.componen
   edge, a retention window, a lag, a rate — goes into a code comment, a task or an architecture
   note, say how many times you observed it and when (≥ 5 repetitions per boundary, on two
   occasions minutes apart: these drift, which is how a single-probe retention claim got into
-  design text on 2026-09-28 and was wrong, `reports/dev-2-BUG-022.md`). One probe is a note
+  design text on 2026-09-28 and was wrong; the evidence, `reports/dev-2-BUG-022.md`, is **lost**,
+  see PROJECT.md «Lost reports»: the rule stands on its own). One probe is a note
   marked as such.
   **This does not bind payload shapes or field names.** Pin those with a committed fixture that
   a spec parses: that fails the build the day the venue changes, rather than the next time

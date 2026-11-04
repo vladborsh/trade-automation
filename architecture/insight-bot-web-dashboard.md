@@ -145,6 +145,8 @@ at 1m (400 `RANGE_TOO_WIDE`), so a page cannot pull a year of 1m rows on a
 > **Cancelled 2026-10-31.** The owner ruled for a domain and member login (product rulings
 > 2026-10-31); reach is now `architecture/member-access-design-2026-10-31.md` M4 — a Cloudflare
 > named tunnel on the owner's domain (IB-074 replaces IB-032). The text below is kept for history.
+> **Update 2026-11-03** (`architecture/https-without-domain-2026-11-03.md`): still no domain; members
+> reach the site over https on `<a-b-c-d>.sslip.io` behind Caddy, with password login (IB-078).
 
 The user declined a domain. Reach is therefore W4's SSM port-forward mode
 (admin only) until a companion needs the web; then the quick tunnel (no
