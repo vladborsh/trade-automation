@@ -427,3 +427,75 @@ test.describe('market page — desktop 1440×900 (IB-088)', () => {
     await expect(page.locator('app-liq-large li').filter({ visible: true })).toHaveCount(normBlock.large.length);
   });
 });
+
+/**
+ * IB-106 (market-page design §7.2, §7.5): the header and the KPI strip as the mockup lays them out.
+ * Geometry and words, read from the page; the look itself is the report's mockup-vs-live images.
+ */
+/** A funding figure whose side word cannot sit beside it in a 1440 tile: the figure row wraps in ONE tile. */
+async function withWrappingFunding(page: Page): Promise<void> {
+  await page.route('**/api/web/market/kpis**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    ...kpis, tiles: kpis.tiles.map((t) => (t.id === 'btc_funding' ? { ...t, value: -0.000123, context: { key: 'kpi.ctx.funding_side', params: { side: 'shorts_pay' } } } : t)),
+  }) }));
+}
+
+for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const) {
+  test.describe(`IB-106 header + KPI strip — ${width}`, () => {
+    test.use({ viewport: { width, height } });
+
+    test(`«Main now» before the KPIs; ${columns === 6 ? 'six tiles in one row' : 'one column'}; notes from the contract; Plex for words, mono for figures`, async ({ page }) => {
+      await openMarket(page, withWrappingFunding);
+      const m = await page.evaluate(() => {
+        const ins = document.querySelector('app-insights-block')!;
+        const kpi = document.querySelector('app-kpi-strip')!;
+        const tiles = [...kpi.querySelectorAll('.tile')].map((t) => t.getBoundingClientRect());
+        const b7 = [...document.querySelectorAll('app-period-switch button')].at(-1) as HTMLButtonElement;
+        const desc = b7.getAttribute('aria-describedby');
+        return {
+          insightsFirst: !!(ins.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING),
+          tiles: tiles.length,
+          columns: new Set(tiles.map((r) => Math.round(r.x))).size,
+          bars: [...kpi.querySelectorAll('.bar')].map((b) => Math.round(b.getBoundingClientRect().y)),
+          fundingWraps: (() => {
+            const f = kpi.querySelector('[data-kpi="btc_funding"]')!;
+            return f.querySelector('.inline')!.getBoundingClientRect().top >= f.querySelector('.value')!.getBoundingClientRect().bottom - 2;
+          })(),
+          scrollWidth: document.documentElement.scrollWidth,
+          weekDisabled: b7.disabled,
+          weekDesc: desc ? document.getElementById(desc)?.textContent ?? null : null,
+          visibleWeekLines: [...document.querySelectorAll('app-period-switch p')].length,
+          bodyFont: getComputedStyle(document.body).fontFamily,
+          valueFont: getComputedStyle(kpi.querySelector('.value')!).fontFamily,
+        };
+      });
+      expect(m.insightsFirst).toBe(true);
+      expect(m.tiles).toBe(6);
+      expect(m.columns).toBe(columns);
+      if (columns === 6) {
+        // the funding figure wraps («−0.0123 %» over «shorts pay») — so the check below can disagree —
+        expect(m.fundingWraps).toBe(true);
+        // and the strip's subgrid still puts every tile's bar at the same height
+        expect(new Set(m.bars).size).toBe(1);
+      }
+      expect(m.scrollWidth).toBeLessThanOrEqual(width);
+      // «7d: available from …» is the 7d button's description, not a visible line
+      expect(m.weekDisabled).toBe(true);
+      expect(m.weekDesc).toMatch(/^7d: available from \d{4}-\d{2}-\d{2}$/);
+      expect(m.visibleWeekLines).toBe(0);
+      expect(m.bodyFont).toMatch(/^"IBM Plex Sans"/);
+      expect(m.valueFont).toMatch(/^"IBM Plex Mono"/);
+      await page.clock.runFor(2_000); // the pill words the age on the page's tick
+      await expect(page.locator('app-market .live-age')).toHaveText(/^\s*Live · updated \d+ s ago\s*$/);
+      const strip = page.locator('app-kpi-strip');
+      await expect(strip.locator('[data-kpi="btc_dominance"] .note')).toHaveText('ETH 10.6 %');
+      await expect(strip.locator('[data-kpi="fear_greed"] .note')).toHaveText('yesterday 37 · a week ago 48');
+      await expect(strip.locator('[data-kpi="btc_funding"] .note')).toHaveText('long/short by accounts 2.62');
+      await expect(strip.locator('[data-kpi="btc_oi"] .note')).toHaveText('Binance, over 24h');
+      // visible credit only where the terms ask: alternative.me and CoinGecko; Binance in the tooltip
+      await expect(strip.locator('.credit')).toHaveText(['CoinGecko', 'CoinGecko', 'alternative.me']);
+      await expect(strip.locator('[data-kpi="btc_oi"] h3')).toHaveAttribute('title', 'source: Binance');
+      // the fonts are ours: served from /fonts, and actually in use
+      expect(await page.evaluate(() => document.fonts.check('600 24px "IBM Plex Mono"') && document.fonts.check('14px "IBM Plex Sans"'))).toBe(true);
+    });
+  });
+}

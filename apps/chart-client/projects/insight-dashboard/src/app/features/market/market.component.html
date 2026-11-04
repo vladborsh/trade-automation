@@ -1,24 +1,28 @@
-<header>
+<!-- IB-106 (§7.2): title, the live pill, then the period switch at the right -->
+<header class="page-head">
   <h1>{{ t('market.title') }}</h1>
+  <!-- D13 (TL 2026-11-03): the newest update's age; amber, with the late blocks named, when any is past 2× its cadence -->
+  <p class="live-age" [class.stale]="staleTitle() !== null" [attr.title]="staleTitle()" aria-live="off">
+    <span class="dot" aria-hidden="true"></span>
+    @if (age(); as a) { {{ t('market.liveAge', { seconds: a.seconds }) }} } @else { {{ t('market.liveWaiting') }} }
+  </p>
+  <span class="spacer"></span>
   <app-period-switch
     [period]="period()"
     [availableFrom]="liquidations()?.block?.availableFrom ?? null"
     [nowSec]="nowSec()"
     (periodChange)="onPeriodChange($event)"
   />
-  <!-- D13 (TL 2026-11-03): the newest update's age; amber, with the late blocks named, when any is past 2× its cadence -->
-  <p class="live-age" [class.stale]="staleTitle() !== null" [attr.title]="staleTitle()" aria-live="off">
-    @if (age(); as a) { {{ t('market.liveAge', { seconds: a.seconds }) }} } @else { {{ t('market.liveWaiting') }} }
-  </p>
 </header>
 
-<app-kpi-strip id="kpis" [kpis]="kpis()" />
-@if (blockError('kpis'); as message) {
+<!-- IB-106 (§7.2): «Главное сейчас» first, then the KPI strip (the mockup's order) -->
+<app-insights-block [insights]="insights()" [period]="period()" [unavailableFrom]="periodUnavailableFrom()" />
+@if (blockError('insights'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 
-<app-insights-block [insights]="insights()" [period]="period()" [unavailableFrom]="periodUnavailableFrom()" />
-@if (blockError('insights'); as message) {
+<app-kpi-strip id="kpis" [kpis]="kpis()" />
+@if (blockError('kpis'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
 

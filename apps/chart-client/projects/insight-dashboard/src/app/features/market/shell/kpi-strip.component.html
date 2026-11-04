@@ -1,23 +1,38 @@
 <div class="strip">
   @for (tile of tiles(); track tile.id) {
-    <section class="tile">
-      <h3>{{ t(tile.view.labelKey) }}</h3>
-      @if (tile.view.value; as value) {
-        <p class="value">{{ value }}</p>
-      } @else {
-        <p class="value muted">{{ t('kpi.unavailable') }}</p>
-      }
-      @if (tile.view.delta; as delta) {
-        <p class="delta" [class.up]="delta.tone === 'up'" [class.down]="delta.tone === 'down'">{{ delta.text }} <span class="over">{{ t(delta.overKey) }}</span></p>
-      }
-      @if (tile.view.context; as ctx) {
-        <p class="ctx">{{ t(ctx.key, ctx.params) }}</p>
-      }
-      @if (tile.view.source.url; as url) {
-        <a class="source" [href]="url" target="_blank" rel="noopener">{{ t('kpi.source', { name: tile.view.source.name }) }}</a>
-      } @else {
-        <p class="source">{{ t('kpi.source', { name: tile.view.source.name }) }}</p>
-      }
+    <section class="tile" [attr.data-kpi]="tile.id">
+      <h3 [attr.title]="t('kpi.source', { name: tile.sourceName })">{{ t(tile.labelKey) }}</h3>
+      <div class="figure">
+        @if (tile.value; as value) {
+          <span class="value num">{{ value }}</span>
+        } @else {
+          <span class="value missing">{{ t('kpi.unavailable') }}</span>
+        }
+        @if (tile.inline; as i) {
+          @if (i.text !== null) {
+            <span class="inline num" [class.up]="i.tone === 'up'" [class.down]="i.tone === 'down'"
+                  [attr.title]="i.overKey ? t(i.overKey) : null">{{ i.text }}@if (i.overKey) {<span class="sr-only"> {{ t(i.overKey) }}</span>}</span>
+          } @else if (i.key) {
+            <span class="inline" [class.muted]="i.tone === 'muted'" [style.color]="i.colour">{{ t(i.key) }}</span>
+          }
+        }
+      </div>
+      <div class="bar" aria-hidden="true">
+        @for (seg of tile.bar; track $index) {
+          <span [style.width.%]="seg.pct" [style.background]="seg.colour"></span>
+        }
+      </div>
+      <!-- always five rows (empty ones too): the strip's subgrid lines every tile's bar and note up -->
+      <p class="note">@if (tile.note; as n) { {{ t(n.key, n.params) }} }</p>
+      <div class="credit-row">
+        @if (tile.attribution; as a) {
+          @if (a.url) {
+            <a class="credit" [href]="a.url" target="_blank" rel="noopener" [attr.title]="t('kpi.source', { name: a.name })">{{ a.name }}</a>
+          } @else {
+            <span class="credit">{{ a.name }}</span>
+          }
+        }
+      </div>
     </section>
   }
 </div>

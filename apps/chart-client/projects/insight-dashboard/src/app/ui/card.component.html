@@ -1,0 +1,9 @@
+<div class="head">
+  <h2 [id]="headingId">{{ heading() }}</h2>
+  @if (subtitle(); as sub) {
+    <p class="sub">{{ sub }}</p>
+  }
+  <div class="actions"><ng-content select="[cardActions]" /></div>
+</div>
+<div class="body"><ng-content /></div>
+<ng-content select="[cardConclusion]" />

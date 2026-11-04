@@ -1,15 +1,17 @@
-.switch { display: flex; gap: 4px; }
+// IB-106 (§7.2): a segmented control — one bordered group, hairlines between, the active one filled
+.switch { display: inline-flex; border: 1px solid var(--seg-border); border-radius: var(--seg-radius); overflow: hidden; }
 button {
-  min-height: 40px; // phone acceptance: touch targets ≥ 40 px
+  min-height: var(--touch-min); // phone acceptance: touch targets ≥ 40 px (IB-088), not the mockup's 36
   min-width: 48px;
-  padding: 0 12px;
+  padding: var(--seg-pad);
   background: transparent;
-  border: 1px solid #30363d;
-  color: #8b949e;
+  border: 0;
+  color: var(--color-text-muted);
   font: inherit;
   cursor: pointer;
 }
-button.active { color: #c9d1d9; border-color: #8b949e; }
+button + button { border-left: 1px solid var(--seg-border); }
+button.active { background: var(--seg-active-bg); color: var(--color-text); font-weight: 600; }
 button:disabled { opacity: 0.45; cursor: default; }
-.note { margin: 4px 0 0; font-size: 12px; }
-.muted { color: #8b949e; }
+button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

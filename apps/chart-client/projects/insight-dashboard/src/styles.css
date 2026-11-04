@@ -2,15 +2,23 @@
    Palette and the --bg/--border/--text/--muted/--up/--down aliases come from the shared token
    file (architecture/design-system.md); nothing is defined here twice. */
 @import '../../../src/design-tokens.css';
+/* IB-106 (D22): the dashboard's own aliases and fonts, after the shared file and redefining nothing in it */
+@import './dashboard-tokens.css';
 
 html, body {
   margin: 0;
   padding: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-mono);
+  /* IB-106 (D23): sans for words; tabular figures everywhere, so every page keeps aligned digit
+     columns with no per-page edit. Headline figures add the global .num (mono) below. */
+  font-family: var(--font-sans);
   font-size: var(--font-size-base);
+  font-variant-numeric: tabular-nums;
 }
+
+/* D23: headline figures only — KPI values, insight-title figures, table cells, axis labels, large-card amounts */
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 
 /* IB-099 item 3: the full-screen fallback layer (iOS Safari refuses element fullscreen). Global
    because the expanded element belongs to the page, not to the button that expands it. */

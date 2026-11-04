@@ -1,17 +1,32 @@
-// six tiles: 3 per row on desktop, 2 on a phone (390 px) — never a horizontal page scroll
-.strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
-.tile { border: 1px solid #30363d; padding: 10px; min-width: 0; }
-h3 { margin: 0 0 4px; font-size: 12px; font-weight: normal; color: #8b949e; }
-.value { margin: 0; font-size: 18px; color: #c9d1d9; overflow-wrap: anywhere; }
-.delta { margin: 2px 0 0; font-size: 13px; color: #8b949e; }
-.delta.up { color: #26a69a; }
-.delta.down { color: #ef5350; }
-.ctx { margin: 2px 0 0; font-size: 12px; color: #c9d1d9; }
-.source { display: block; margin-top: 4px; font-size: 12px; color: #8b949e; }
-.over { color: #8b949e; font-size: 12px; }
-.muted { color: #8b949e; }
+// IB-106 (§7.5): tiles fill the row — six across at 1360, one column at 390 — on the §7.2 tokens
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--card-gap); }
+// subgrid: a tile's five rows (label, figure, bar, note, credit) are the strip's rows, so a value
+// whose word wraps («0.0100 % платят лонги») moves its row for the whole strip, not one tile's bar
+.tile {
+  display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 6px; align-content: start; min-width: 0;
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--tile-pad);
+}
+h3 { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
+.figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
+.value { font: var(--type-kpi); color: var(--color-text-strong); overflow-wrap: anywhere; }
+.value.missing { font: var(--type-h2); color: var(--color-text-muted); }
+.inline { font-size: 13px; color: var(--color-text-muted); }
+.inline.up { color: var(--color-up); }
+.inline.down { color: var(--color-down); }
+.bar { align-self: center; display: flex; height: var(--bar-h); border-radius: var(--bar-radius); overflow: hidden; background: var(--bar-track); }
+.note { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
+.credit-row { display: flex; min-height: 0; }
+// §7.2 says --type-micro (11px) for attribution; IB-088's guard is text ≥ 12px on the page, so the credit is --type-small
+.credit { font: var(--type-small); color: var(--color-text-muted); text-decoration: none; align-self: flex-start; }
+a.credit:hover { color: var(--link-hover); }
+a.credit:focus-visible { text-decoration: underline; outline: 1px solid var(--color-focus); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+// one column: nothing to line up across tiles, so a tile is a plain column and its empty rows go
+@media (max-width: 480px) {
+  .tile { display: flex; flex-direction: column; gap: 6px; }
+  .note:empty, .credit-row:empty { display: none; }
+}
 @media (max-width: 767px) {
-  .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* the source link is a touch target: ≥ 40 px tall on a phone */
-  a.source { display: flex; align-items: center; min-height: 40px; margin-top: 0; }
+  // the credit link is a touch target: ≥ 40 px tall on a phone (IB-088), without growing its text
+  a.credit { display: inline-flex; align-items: center; min-height: var(--touch-min); margin: -10px 0; }
 }

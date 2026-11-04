@@ -6,7 +6,8 @@ import { periodAvailability } from './market-text';
 
 /**
  * IB-088 (D14) — the page-wide period switch. A period whose block has no full window of tape yet is
- * disabled and says from when (`availableFrom`). Buttons are ≥ 40 px tall (phone acceptance).
+ * disabled and says from when (`availableFrom`) in its tooltip. Buttons are ≥ 40 px tall (phone acceptance).
+ * IB-106: a segmented control at the header's right (§7.2).
  */
 @Component({
   selector: 'app-period-switch',
@@ -25,6 +26,8 @@ export class PeriodSwitchComponent {
   readonly periodChange = output<WebMarketPeriod>();
 
   readonly periods = WEB_MARKET_PERIODS;
+  /** The 7д button's description (aria-describedby): one switch per page, so one id. */
+  readonly weekNoteId = 'period-7d-available';
 
   label(p: WebMarketPeriod): string {
     return this.t(`market.period.${p}` as StringKey);
@@ -40,7 +43,7 @@ export class PeriodSwitchComponent {
     return day ? this.t('market.period.availableFrom', { date: day }) : null;
   }
 
-  /** The one visible line, for 7d only: the period a first-week reader will reach for. */
+  /** For 7d only — the period a first-week reader will reach for: its description, read with the button. */
   readonly weekNote = computed(() => {
     const a = this.availability('7d');
     return a.available ? null : `${this.label('7d')}: ${this.t('market.period.availableFrom', { date: a.fromDay ?? '' })}`;

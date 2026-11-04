@@ -1,0 +1,11 @@
+// IB-106 (§7.2): every block's box. Tokens only — no colour or size is chosen here.
+:host {
+  display: flex; flex-direction: column; gap: var(--card-inner-gap); min-width: 0; box-sizing: border-box;
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad);
+}
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+h2 { margin: 0; font: var(--type-h2); color: var(--color-text-strong); }
+.sub { margin: 0; font: var(--type-note); color: var(--color-text-muted); }
+.actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.actions:empty { display: none; }
+.body { min-width: 0; }
