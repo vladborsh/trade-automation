@@ -1,4 +1,4 @@
-import { MEM_ABORT_AFTER_MS, MEM_FLOOR_MB, MEM_RECHECK_MS, MemoryGuard, memoryDecision, parseMemAvailableMb } from '../../../src/alerts/oi-divergence/backfill/memory-guard';
+import { MEM_ABORT_AFTER_MS, MEM_FLOOR_MB, MEM_RECHECK_MS, MEM_START_FLOOR_MB, MemoryGuard, memoryDecision, parseMemAvailableMb, startGateDecision } from '../../../src/alerts/oi-divergence/backfill/memory-guard';
 
 /** IB-116 (TL memory condition): the history run steps back when the box's MemAvailable is low. */
 describe('memoryDecision', () => {
@@ -9,6 +9,15 @@ describe('memoryDecision', () => {
     expect(memoryDecision(80, 1_000, 1_000 + MEM_ABORT_AFTER_MS)).toBe('abort');
     expect(memoryDecision(200, 1_000, 1_000 + 10 * MEM_ABORT_AFTER_MS)).toBe('go'); // recovered: go, however long it waited
     expect(memoryDecision(null, 1_000, 1_000 + 10 * MEM_ABORT_AFTER_MS)).toBe('go');
+  });
+});
+
+describe('startGateDecision (TL ruling: 170 MB to begin a phase)', () => {
+  it('170 goes, 169 is refused; unknown memory goes', () => {
+    expect(MEM_START_FLOOR_MB).toBe(170);
+    expect(startGateDecision(170)).toBe('go');
+    expect(startGateDecision(169)).toBe('refuse');
+    expect(startGateDecision(null)).toBe('go');
   });
 });
 
@@ -75,5 +84,15 @@ describe('MemoryGuard', () => {
     await x.g.check('b');
     expect(x.lines).toEqual(['memory guard: MemAvailable unreadable (no /proc/meminfo) — not guarding']);
     expect(x.g.minSeenMb).toBeNull();
+  });
+
+  it('gate: refuses a phase below 170 MB without waiting, and starts one at 170 with a line; the reading counts toward the minimum', async () => {
+    const low = guard([169]);
+    await expect(low.g.gate('path measuring')).rejects.toThrow(/MemAvailable 169 MB < 170 MB — not starting path measuring/);
+    expect(low.slept).toEqual([]);
+    expect(low.g.minSeenMb).toBe(169);
+    const ok = guard([170]);
+    await ok.g.gate('the replay');
+    expect(ok.lines).toEqual(['memory gate: 170 MB available — starting the replay']);
   });
 });

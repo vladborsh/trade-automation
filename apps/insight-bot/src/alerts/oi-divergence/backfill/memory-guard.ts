@@ -9,6 +9,13 @@
  * Where `/proc/meminfo` cannot be read (a Mac slot), the guard says so once and lets the run go.
  */
 export const MEM_FLOOR_MB = 120;
+/**
+ * TL ruling (option A): a phase may only BEGIN with this much available. The CLI's own growth (~30 MB above its
+ * module load, measured 109 MB peak on Linux) happens inside the first chunk, between two guard checks — so the
+ * start needs the floor plus that growth plus margin. Checked before the replay and again before path measuring
+ * (the long phase).
+ */
+export const MEM_START_FLOOR_MB = 170;
 export const MEM_RECHECK_MS = 10_000;
 export const MEM_ABORT_AFTER_MS = 5 * 60_000;
 /** While measuring paths, the guard is consulted at most this often. */
@@ -24,6 +31,11 @@ export function memoryDecision(availableMb: number | null, waitingSinceMs: numbe
   if (availableMb === null || availableMb >= MEM_FLOOR_MB) return 'go';
   if (waitingSinceMs !== null && nowMs - waitingSinceMs >= MEM_ABORT_AFTER_MS) return 'abort';
   return 'wait';
+}
+
+/** The start gate, pure: refuse below MEM_START_FLOOR_MB; unknown availability (no /proc, a Mac slot) is go. */
+export function startGateDecision(availableMb: number | null): 'go' | 'refuse' {
+  return availableMb === null || availableMb >= MEM_START_FLOOR_MB ? 'go' : 'refuse';
 }
 
 /** MemAvailable in MB from the text of /proc/meminfo; null when the line is absent or malformed. */
@@ -74,6 +86,16 @@ export class MemoryGuard {
       }
       await this.ports.sleep(MEM_RECHECK_MS);
     }
+  }
+
+  /** The start gate before a phase: throws (nothing started) below MEM_START_FLOOR_MB. */
+  async gate(phase: string): Promise<void> {
+    const available = await this.ports.availableMb();
+    if (available !== null) this.minSeenMb = Math.min(this.minSeenMb ?? available, available);
+    if (startGateDecision(available) === 'refuse') {
+      throw new Error(`memory gate: MemAvailable ${available} MB < ${MEM_START_FLOOR_MB} MB — not starting ${phase}; run it at a quieter hour (a rerun continues where this stopped)`);
+    }
+    this.ports.log(`memory gate: ${available ?? 'unreadable'} MB available — starting ${phase}`);
   }
 
   /** Checks when the last check is at least MEM_CHECK_EVERY_MS old (inside the path-measuring loop). */

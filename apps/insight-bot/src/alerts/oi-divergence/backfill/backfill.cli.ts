@@ -11,6 +11,11 @@
  * - `--write`: the replay, committed row by row (idempotent: a rerun writes 0), then the paths of every closed
  *   window, paced at ≤ 200 weight a minute. A rerun after the last 72 h window closes measures the rest.
  *
+ * On the box (TL ruling, option A; 109 MB peak RSS measured on Linux):
+ *   node --max-old-space-size=40 --max-semi-space-size=1 --optimize-for-size dist/alerts/oi-divergence/backfill/backfill.cli.js --dry-run
+ * It refuses to start the replay or the path measuring below 170 MB MemAvailable, and pauses / aborts below
+ * 120 MB while running (memory-guard.ts).
+ *
  * The environment is the bot's own (`validateEnv`): DATABASE_URL, BUILD_SHA (production refuses `dev`), the
  * Binance base URL. Exit 0 when the run completed, whatever it found; 1 on a failure.
  */
@@ -90,6 +95,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
     if (mode === 'dry-run') {
       try {
         await db.transaction(async (tx) => {
+          await guard.gate('the replay');
           const report = await replayHistory(portsOn(tx), Math.floor(now() / 1000));
           throw new DryRunRollback({ report, counts: await new PgBackfillReads(tx).backfillCounts() });
         });
@@ -100,10 +106,12 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
       }
     } else {
       const ports = portsOn(db);
+      await guard.gate('the replay');
       const report = await replayHistory(ports, Math.floor(now() / 1000));
       const reads = new PgBackfillReads(db);
       printReport(report, await reads.backfillCounts(), pacer.total);
       const barsWeight = pacer.total;
+      await guard.gate('path measuring');
       const paths = await measureBackfillPaths(
         { store: ports.store, build: env.BUILD_SHA, log: say,
           klines5m: async (symbol, from, limit) => candles.closedKlines(symbol, '5m', from * 1000, limit) },
