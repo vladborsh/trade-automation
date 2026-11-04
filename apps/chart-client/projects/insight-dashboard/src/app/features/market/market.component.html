@@ -81,3 +81,15 @@
 @if (blockError('sentiment'); as message) {
   <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
 }
+
+<!-- IB-091: phase 2 — «Деривативы и потоки» (DVOL, put/call, stablecoins, Coinbase premium per D18), every 5 min -->
+@if (flows(); as f) {
+  <app-flows-block [flows]="f" [period]="period()" [line]="insightLine('flows')" />
+} @else if (!blockError('flows')) {
+  <section class="card wide">
+    <app-loader variant="block" [label]="t('market.loading')" />
+  </section>
+}
+@if (blockError('flows'); as message) {
+  <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+}

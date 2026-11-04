@@ -5,7 +5,7 @@ import type {
   WebOpenInterestResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
-  WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
+  WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebFlowsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
 } from '@trade-automation/contracts';
@@ -177,6 +177,11 @@ export class InsightApiClient {
   /** D11: treemap coins and the dominance bar (server cache 120 s; 4h is refused by the source). */
   async marketCaps(period: WebMarketPeriod): Promise<WebCapsResponse> {
     return this.get<WebCapsResponse>('/market/caps', { period });
+  }
+
+  /** IB-091: «Деривативы и потоки» — DVOL, put/call, stablecoin supply, Coinbase premium (server cache 60 s, sources 1–60 min). */
+  async marketFlows(period: WebMarketPeriod): Promise<WebFlowsResponse> {
+    return this.get<WebFlowsResponse>('/market/flows', { period });
   }
 
   // ------------------------------------------------------ IB-079, login + password (IB-078's server)

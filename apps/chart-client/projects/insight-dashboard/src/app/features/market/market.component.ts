@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signa
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import type {
-  WebCapsResponse, WebInsightBlock, WebInsightBlockLine, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebLiquidationsOverviewResponse, WebMarketCardsResponse, WebMarketPeriod,
+  WebCapsResponse, WebFlowsResponse, WebInsightBlock, WebInsightBlockLine, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebLiquidationsOverviewResponse, WebMarketCardsResponse, WebMarketPeriod,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import type { StringKey } from '../../i18n/keys';
 import { LoaderComponent } from '../../ui/loader.component';
 import { CapsBlockComponent } from '../caps/caps-block.component';
+import { FlowsBlockComponent } from '../flows/flows-block.component';
 import { LiquidationsBlockComponent } from '../liquidations/liquidations-block.component';
 import { PositioningBlockComponent } from '../positioning/positioning-block.component';
 import { BlockConclusionComponent } from './shell/block-conclusion.component';
@@ -41,7 +42,7 @@ import { PeriodSwitchComponent } from './shell/period-switch.component';
   standalone: true,
   imports: [
     LiquidationsBlockComponent, PositioningBlockComponent, CapsBlockComponent, BlockConclusionComponent, LoaderComponent,
-    PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent, FearGreedGaugeComponent
+    PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent, FearGreedGaugeComponent, FlowsBlockComponent,
   ],
   templateUrl: './market.component.html',
   styleUrl: './market.component.scss',
@@ -61,6 +62,8 @@ export class MarketComponent {
   readonly insights = signal<WebInsightsResponse | null>(null);
   readonly positioning = signal<WebPositioningResponse | null>(null);
   readonly caps = signal<WebCapsResponse | null>(null);
+  /** IB-091: «Деривативы и потоки», every 5 min (D13). */
+  readonly flows = signal<WebFlowsResponse | null>(null);
   /** Ticks every second so the live indicator's age moves without a request. */
   readonly nowMs = signal(Date.now());
   /** The scheduler's per-block state, re-read whenever it changes. */
@@ -112,6 +115,11 @@ export class MarketComponent {
       if (period === this.period()) this.caps.set(r);
     });
     this.scheduler.register('sentiment', async () => this.cards.set(await this.api.marketCards()));
+    this.scheduler.register('flows', async () => {
+      const period = this.period();
+      const r = await this.api.marketFlows(period);
+      if (period === this.period()) this.flows.set(r);
+    });
     // IB-BUG-021: the current visibility first, so a page loaded in a background tab stays silent
     const detachVisibility = bindVisibility(doc, this.scheduler);
     this.scheduler.start();
@@ -128,7 +136,7 @@ export class MarketComponent {
   onPeriodChange(p: WebMarketPeriod): void {
     this.period.set(p);
     void this.router.navigate([], { relativeTo: this.route, queryParams: { p }, queryParamsHandling: 'merge', replaceUrl: true });
-    for (const id of ['liquidations', 'insights', 'positioning', 'caps'] as const) this.scheduler.refresh(id);
+    for (const id of ['liquidations', 'insights', 'positioning', 'caps', 'flows'] as const) this.scheduler.refresh(id);
   }
 
   /** D15: that block's one conclusion line from the insights response. */

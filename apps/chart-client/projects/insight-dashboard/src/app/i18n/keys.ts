@@ -418,7 +418,28 @@ export type StringKey =
   | 'insight.fng.none'
   | 'insight.basis'
   | 'insight.basis.none'
-  | 'insight.open';
+  | 'insight.open'
+  | 'flows.title'
+  | 'flows.dvol.title'
+  | 'flows.dvol.note'
+  | 'flows.dvol.change'
+  | 'flows.putCall.title'
+  | 'flows.putCall.note'
+  | 'flows.stable.title'
+  | 'flows.stable.note'
+  | 'flows.stable.change'
+  | 'flows.premium.title'
+  | 'flows.premium.note'
+  | 'flows.premium.minutes'
+  | 'flows.reason.source_unavailable'
+  | 'flows.reason.insufficient_history'
+  | 'flows.reason.insufficient_minutes'
+  | 'flows.unusual'
+  | 'flows.source'
+  | 'insight.dvol_spike'
+  | 'insight.stablecoin_supply'
+  | 'insight.coinbase_premium'
+  | 'insight.neutral.insufficient_minutes';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

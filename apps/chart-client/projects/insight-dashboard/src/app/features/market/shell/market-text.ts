@@ -132,6 +132,11 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
   if (num('usd') !== null) params['usd'] = formatUsd(num('usd') as number);
   if ('ratio' in p) params['ratio'] = num('ratio') === null ? '—' : `×${(num('ratio') as number).toFixed(1)}`;
   for (const k of ['oiPct', 'pricePct', 'altGapPct']) if (num(k) !== null) params[k] = signedPct(num(k)) as string;
+  // IB-091 (R8–R10): DVOL points, a % change or premium, a number of days
+  if (num('value') !== null) params['value'] = (num('value') as number).toFixed(1);
+  if (num('change') !== null) params['change'] = `${(num('change') as number) > 0 ? '+' : ''}${(num('change') as number).toFixed(1)}`;
+  if (num('pct') !== null) params['pct'] = signedPct(num('pct'), Math.abs(num('pct') as number) < 0.1 ? 3 : 2) as string;
+  if (num('days') !== null) params['days'] = num('days') as number;
   if (num('rate') !== null) params['rate'] = fundingPct(num('rate')) as string;
   for (const k of ['count', 'total', 'minutes', 'upPct']) if (num(k) !== null) params[k] = num(k) as number;
   for (const k of ['global', 'top']) if (num(k) !== null) params[k] = (num(k) as number).toFixed(2);

@@ -1,0 +1,30 @@
+<section class="block" id="flows">
+  <h2>{{ t('flows.title') }}</h2>
+  <div class="tiles">
+    @for (tile of tiles(); track tile.id) {
+      <article class="tile" [attr.data-tile]="tile.id">
+        <h3>{{ t(tile.title) }}</h3>
+        @if (tile.value !== null) {
+          <p class="value" [class.up]="tile.tone === 'up'" [class.down]="tile.tone === 'down'">
+            {{ tile.value }}
+            @if (tile.unusual) {
+              <span class="badge">{{ t('flows.unusual') }}</span>
+            }
+          </p>
+        }
+        @if (tile.detail; as d) {
+          <p class="detail">{{ say(d) }}</p>
+        }
+        @if (tile.reason; as r) {
+          <p class="warn">{{ say(r) }}</p>
+        }
+        @if (tile.series.length > 1) {
+          <app-mini-chart [series]="tile.series" [colour]="tile.lineColour" />
+        }
+        <p class="note">{{ say(tile.note) }}</p>
+      </article>
+    }
+  </div>
+  <p class="source">{{ t('flows.source', { names: sources() }) }}</p>
+  <app-block-conclusion [line]="line()" [period]="period()" />
+</section>

@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import type { WebCapsResponse, WebInsightsResponse, WebKpisResponse, WebPositioningResponse, WebLiquidationBlock, WebLiquidationsOverviewResponse, WebMarketPeriod } from '@trade-automation/contracts';
+import type { WebCapsResponse, WebFlowsResponse, WebInsightsResponse, WebKpisResponse, WebPositioningResponse, WebLiquidationBlock, WebLiquidationsOverviewResponse, WebMarketPeriod } from '@trade-automation/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import insightsFixture from '../../../../../../../../libs/contracts/test/fixtures/insights.24h.json';
 import kpisFixture from '../../../../../../../../libs/contracts/test/fixtures/kpis.json';
 import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
 import positioningFixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
+import flowsFixture from '../../../../../../../../libs/contracts/test/fixtures/flows.24h.json';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { MarketComponent } from './market.component';
@@ -45,6 +46,7 @@ function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean;
     marketCards: async () => { calls.push({ endpoint: 'sentiment' }); return null; },
     marketPositioning: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'positioning', period }); return { ...(positioningFixture as unknown as WebPositioningResponse), period }; },
     marketCaps: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'caps', period }); if (opts.capsFail) throw new Error('502 from CoinGecko'); return caps(period); },
+    marketFlows: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'flows', period }); return { ...(flowsFixture as unknown as WebFlowsResponse), period }; },
   };
   TestBed.configureTestingModule({
     imports: [MarketComponent],
@@ -72,8 +74,9 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(calls).toEqual(expect.arrayContaining([
       { endpoint: 'liquidations', period: '4h' }, { endpoint: 'insights', period: '4h' }, { endpoint: 'kpis' },
       { endpoint: 'positioning', period: '4h' }, { endpoint: 'caps', period: '4h' }, { endpoint: 'sentiment' },
+      { endpoint: 'flows', period: '4h' }, // IB-091
     ]));
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(7);
   });
 
   it('an unknown ?p= is 24h, not an error', async () => {
@@ -100,7 +103,7 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(cmp.insights()?.period).toBe('1h');
     expect(calls.filter((c) => c.endpoint === 'insights').map((c) => c.period)).toEqual(['24h', '1h']);
     expect(cmp.liquidations()?.block.period).toBe('1h');
-    expect([cmp.positioning()?.period, cmp.caps()?.period]).toEqual(['1h', '1h']); // IB-090: both blocks follow the period
+    expect([cmp.positioning()?.period, cmp.caps()?.period, cmp.flows()?.period]).toEqual(['1h', '1h', '1h']); // IB-090, IB-091: they follow the period
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { p: '1h' }, replaceUrl: true }));
   });
 
@@ -127,7 +130,7 @@ describe('MarketComponent shell (IB-088)', () => {
     vis.mockReturnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(0);
-    expect(calls.length).toBe(before + 6);
+    expect(calls.length).toBe(before + 7); // IB-091: + flows
     vis.mockRestore();
   });
 
@@ -139,7 +142,7 @@ describe('MarketComponent shell (IB-088)', () => {
     vis.mockReturnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(0);
-    expect(calls.map((c) => c.endpoint).sort()).toEqual(['caps', 'insights', 'kpis', 'liquidations', 'positioning', 'sentiment']);
+    expect(calls.map((c) => c.endpoint).sort()).toEqual(['caps', 'flows', 'insights', 'kpis', 'liquidations', 'positioning', 'sentiment']);
     vis.mockRestore();
   });
 

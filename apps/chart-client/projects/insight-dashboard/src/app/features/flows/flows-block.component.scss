@@ -1,0 +1,23 @@
+/* Dark-terminal palette (AGENTS.md), the caps block's frame. */
+:host { display: block; min-width: 0; }
+.block { border: 1px solid #30363d; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: #0d1117; color: #c9d1d9; }
+h2 { margin: 0; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
+h3 { margin: 0; font-size: 11px; color: #8b949e; font-weight: 600; letter-spacing: 0.03em; }
+p { margin: 0; font-size: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { min-width: 0; border: 1px solid #30363d; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.value { font-size: 20px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.value.up { color: #26a69a; }
+.value.down { color: #ef5350; }
+.badge { font-size: 11px; font-weight: 600; color: #0d1117; background: #d29922; padding: 0 5px; border-radius: 3px; }
+.detail { color: #c9d1d9; }
+.warn { color: #d29922; }
+.note { color: #8b949e; font-size: 11px; }
+.source { color: #8b949e; font-size: 12px; }
+
+/* D16: two columns on a tablet, one on a phone. */
+@media (max-width: 1100px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 767px) {
+  .block { padding: 10px; }
+  .tiles { grid-template-columns: minmax(0, 1fr); }
+}
