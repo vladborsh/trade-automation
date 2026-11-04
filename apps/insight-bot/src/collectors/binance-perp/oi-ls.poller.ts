@@ -265,10 +265,9 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
       const from = now - RETENTION_MS + SLOT_MS;
       await this.partitions.ensureRange(new Date(from), new Date(now));
       const stale = await this.staleSymbols(now, fresh);
-      const started = Date.now();
       const done = await this.backfillSymbols(stale, from, now);
       if (stale.length > 0) {
-        this.logger.log(`OI/LS backfill for newly listed ${stale.join(', ')}: ${done.oi} OI rows, ${done.longShort} long/short rows in ${Math.round((Date.now() - started) / 100) / 10} s.`);
+        this.logger.log(`OI/LS backfill for newly listed ${stale.join(', ')}: ${done.oi} OI rows, ${done.longShort} long/short rows.`);
       }
     }).catch((err) => this.logger.error(`OI/LS backfill for ${fresh.join(', ')} failed: ${(err as Error).message}`));
     return this.backfillQueue;

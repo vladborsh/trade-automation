@@ -76,7 +76,10 @@ maybeDescribe('IB-BUG-020 OI/LS gap ledger against a real database', () => {
     await dropLeftovers(admin, prefix);
     await admin.query(`create database ${name}`);
     await runMigrations({ connectionString: url.toString() });
+    // IB-109: migration 025 seeds five alert-list coins, and the poller collects universe ∪ that list. This
+    // spec pins the gap ledger for ITS symbols; the union has its own spec (oi-ls.poller.spec.ts).
     db = new PgDatabase(url.toString());
+    await db.query('delete from alert_symbols', []);
     await new PartitionMaintenanceService(db).ensureRange(new Date(NOW - 40 * 86_400_000), new Date(NOW + 86_400_000));
     await db.query(
       `insert into symbols (id, base, quote, binance_perp, listed_perp, active) values ($1, 'XPT', 'USDT', $1, '2026-01-30', true)`,
