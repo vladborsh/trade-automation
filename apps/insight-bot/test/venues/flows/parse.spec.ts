@@ -20,10 +20,18 @@ describe('the real answers parse, oldest first', () => {
     expect(() => parsePutCall({ code: '50011', msg: 'Too Many Requests', data: [] })).toThrow('code "50011"');
   });
 
-  it('DefiLlama: the USD-pegged total in USD, daily since 2017', () => {
-    const s = parseStablecoinTotals(fx('defillama/stablecoincharts-all.json').rows);
-    expect(s[0]).toEqual({ timeSec: 1511913600, value: 110105 });
-    expect(s.at(-1)?.value).toBeCloseTo(295_076_471_836.72, 2);
+  it('DefiLlama: the USD-pegged supply IN COINS (totalCirculating), not coins × price, daily since 2017', () => {
+    const rows = fx('defillama/stablecoincharts-all.json').rows;
+    const s = parseStablecoinTotals(rows);
+    expect(s[0]).toEqual({ timeSec: 1511913600, value: 109970 });
+    expect(s.at(-1)?.value).toBeCloseTo(296_228_298_548.12, 2);
+    expect(rows.at(-1).totalCirculatingUSD.peggedUSD).toBeCloseTo(295_076_471_836.72, 2); // the priced figure, not read
+  });
+
+  it('A DE-PEG IS NOT A BURN: the price falls 5 % with the coins unchanged → no change in supply', () => {
+    const day = (i: number, priced: number) => ({ date: String(1_793_000_000 + i * 86_400), totalCirculating: { peggedUSD: 300e9 }, totalCirculatingUSD: { peggedUSD: priced } });
+    const s = parseStablecoinTotals([day(0, 300e9), day(1, 285e9)]);
+    expect(s[1].value - s[0].value).toBe(0);
   });
 
   it('Coinbase: [time, LOW, HIGH, OPEN, CLOSE, v] — and a swapped column throws instead of inverting', () => {

@@ -63,7 +63,11 @@ export const WebFlowsPutCallSchema = tile({
   series: z.array(WebFlowsPointSchema),
 });
 
-/** Total stablecoin supply (USD) and its change over 1 day or 7 days (7 days for the 7d page). */
+/**
+ * Total supply of USD-pegged stablecoins IN COINS (each counted at its $1 peg — DefiLlama
+ * `totalCirculating`, not coins × price: a de-peg must never read as a burn, TL 2026-11-04) and its
+ * change over 1 day or 7 days (7 days for the 7d page).
+ */
 export const WebFlowsStablecoinsSchema = tile({
   supplyUsd: z.number().nonnegative().nullable(),
   /** 1 or 7: which change this is. */

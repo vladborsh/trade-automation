@@ -53,12 +53,17 @@ export function parsePutCall(body: unknown): PutCallDay[] {
   }));
 }
 
-/** DefiLlama `stablecoincharts/all`: `[{ date, totalCirculatingUSD: { peggedUSD } }]` → daily USD-pegged supply in USD. */
+/**
+ * DefiLlama `stablecoincharts/all` → the daily supply of USD-pegged stablecoins **in coins**
+ * (`totalCirculating.peggedUSD`), NOT `totalCirculatingUSD` (coins × price). TL ruling 2026-11-04,
+ * after the R9 check: «предложение» is a number of coins, so a de-peg must never read as a burn —
+ * in the checked week 12 % of the priced fall was coins trading just under $1, nothing burned.
+ */
 export function parseStablecoinTotals(body: unknown): TimedValue[] {
   if (!Array.isArray(body)) throw new Error('DefiLlama: the chart is not an array');
-  return ascending(body.map((r: { date?: unknown; totalCirculatingUSD?: { peggedUSD?: unknown } }) => ({
+  return ascending(body.map((r: { date?: unknown; totalCirculating?: { peggedUSD?: unknown } }) => ({
     timeSec: num(r?.date, 'DefiLlama date'),
-    value: num(r?.totalCirculatingUSD?.peggedUSD, 'DefiLlama totalCirculatingUSD.peggedUSD'),
+    value: num(r?.totalCirculating?.peggedUSD, 'DefiLlama totalCirculating.peggedUSD'),
   })));
 }
 

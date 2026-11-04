@@ -420,7 +420,7 @@ export const en: Strings = {
   'flows.putCall.title': 'Put/call by open interest (BTC)',
   'flows.putCall.note': 'OKX options, {date}: above 1 means more puts than calls; by volume {volume}',
   'flows.stable.title': 'Stablecoin supply',
-  'flows.stable.note': 'all USD stablecoins together: growth means money coming into crypto',
+  'flows.stable.note': 'by coin count, all USD stablecoins together: growth means money coming into crypto',
   'flows.stable.change': '{usd} ({pct}) in {days} d',
   'flows.premium.title': 'Coinbase premium (BTC)',
   'flows.premium.note': 'against the dollar, USDT corrected',
@@ -431,7 +431,7 @@ export const en: Strings = {
   'flows.unusual': 'unusual',
   'flows.source': 'Data: {names}',
   'insight.dvol_spike': 'BTC implied volatility rose {change} pt to {value} (DVOL)',
-  'insight.stablecoin_supply': 'Stablecoin supply: {usd} ({pct}) in {days} d',
+  'insight.stablecoin_supply': 'Stablecoin supply by coin count: {usd} ({pct}) in {days} d',
   'insight.coinbase_premium': 'Coinbase premium {pct} against the dollar held {minutes} min of the last hour',
   'insight.neutral.insufficient_minutes': 'Too few complete minutes for the Coinbase premium: no conclusion',
 };

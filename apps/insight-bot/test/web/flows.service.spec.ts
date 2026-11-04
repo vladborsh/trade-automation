@@ -31,7 +31,7 @@ describe('FlowsService (IB-091)', () => {
     const r = WebFlowsResponseSchema.parse(await service(fakeFetch(routes())).flows('24h'));
     expect(r.dvol.value).toBe(39.74);
     expect(r.putCall).toMatchObject({ oiRatio: 0.9924, volumeRatio: 1.7916, unavailable: null });
-    expect(r.stablecoins.supplyUsd).toBeCloseTo(295_076_471_836.72, 2);
+    expect(r.stablecoins.supplyUsd).toBeCloseTo(296_228_298_548.12, 2); // in coins, not coins × price
     expect(r.coinbasePremium.minutes).toBe(60);
     expect(Math.abs(r.coinbasePremium.premiumPct?.value ?? 1)).toBeLessThan(0.05);
     expect(r.coinbasePremium.premiumPct?.rarity).toBeNull(); // no 20 days of hourly history here (D3)

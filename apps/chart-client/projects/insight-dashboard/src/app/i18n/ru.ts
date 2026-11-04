@@ -426,7 +426,7 @@ export const ru: Strings = {
   'flows.putCall.title': 'Пут/колл по открытому интересу (BTC)',
   'flows.putCall.note': 'опционы OKX, на {date}: выше 1 — путов больше, чем коллов; по объёму {volume}',
   'flows.stable.title': 'Предложение стейблкоинов',
-  'flows.stable.note': 'все долларовые стейблкоины вместе: рост — в крипту приходят деньги',
+  'flows.stable.note': 'по числу монет, все долларовые стейблкоины вместе: рост — в крипту приходят деньги',
   'flows.stable.change': '{usd} ({pct}) за {days} д',
   'flows.premium.title': 'Премия Coinbase (BTC)',
   'flows.premium.note': 'к доллару, с поправкой на USDT',
@@ -437,7 +437,7 @@ export const ru: Strings = {
   'flows.unusual': 'необычно',
   'flows.source': 'Данные: {names}',
   'insight.dvol_spike': 'Ожидаемая волатильность BTC выросла на {change} пт, до {value} (DVOL)',
-  'insight.stablecoin_supply': 'Предложение стейблкоинов: {usd} ({pct}) за {days} д',
+  'insight.stablecoin_supply': 'Предложение стейблкоинов по числу монет: {usd} ({pct}) за {days} д',
   'insight.coinbase_premium': 'Премия Coinbase {pct} к доллару держалась {minutes} мин из последнего часа',
   'insight.neutral.insufficient_minutes': 'Мало полных минут для премии Coinbase — вывод не делаем',
 };
