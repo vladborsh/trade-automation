@@ -537,6 +537,14 @@ export const en: Strings = {
   'card.coinbase_premium.title.above': 'BTC on Coinbase above Binance: {pct}',
   'card.coinbase_premium.title.below': 'BTC on Coinbase below Binance: {pct}',
   'card.coinbase_premium.expl': 'It held for {minutes} of the last 60 minutes. Coinbase is where US buyers, funds included, trade; the gap is measured against the dollar with USDT taken out. A premium like this is rare for recent weeks.',
+  // IB-113 — R11, the OI divergence card (D20: what happened, never what comes next)
+  'card.oi_divergence.title.bullish': '{base} {tf}: price below the previous low ({pricePct}), OI higher ({oiPct})',
+  'card.oi_divergence.title.bearish': '{base} {tf}: price above the previous high ({pricePct}), OI lower ({oiPct})',
+  'card.oi_divergence.expl.bullish': 'Price made a new low while open positions grew: positions are being opened into the drop.',
+  'card.oi_divergence.expl.bearish': 'Price made a new high while open positions shrank: the rise comes without new positions.',
+  'card.oi_divergence.repeat.bullish': 'A repeat — lows in a row: {count}.',
+  'card.oi_divergence.repeat.bearish': 'A repeat — highs in a row: {count}.',
+  'card.basis.tip_event': 'A bot alert: an event, not a comparison with a norm.',
   // IB-112 — /admin/alerts
   'alerts.title': 'OI alerts: price and open interest diverging',
   'alerts.intro': 'The bot compares new price lows and highs with open interest and messages Telegram when they diverge. Coins, parameters and the journal are here. Admins only.',

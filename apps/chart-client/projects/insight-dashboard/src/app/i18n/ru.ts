@@ -543,6 +543,14 @@ export const ru: Strings = {
   'card.coinbase_premium.title.above': 'BTC на Coinbase дороже, чем на Binance: {pct}',
   'card.coinbase_premium.title.below': 'BTC на Coinbase дешевле, чем на Binance: {pct}',
   'card.coinbase_premium.expl': 'Держалось {minutes} мин из последнего часа. Coinbase — главная площадка покупателей из США, в том числе фондов; разницу считаем к доллару, убрав курс USDT. Такая премия — редкость за последние недели.',
+  // IB-113 — R11, the OI divergence card (D20: what happened, never what comes next)
+  'card.oi_divergence.title.bullish': '{base} {tf}: цена ниже прошлого минимума ({pricePct}), OI выше ({oiPct})',
+  'card.oi_divergence.title.bearish': '{base} {tf}: цена выше прошлого максимума ({pricePct}), OI ниже ({oiPct})',
+  'card.oi_divergence.expl.bullish': 'Цена обновила минимум, а открытых позиций стало больше: на падении набирают позиции.',
+  'card.oi_divergence.expl.bearish': 'Цена обновила максимум, а открытых позиций стало меньше: рост идёт без новых позиций.',
+  'card.oi_divergence.repeat.bullish': 'Повторное — минимумов подряд: {count}.',
+  'card.oi_divergence.repeat.bearish': 'Повторное — максимумов подряд: {count}.',
+  'card.basis.tip_event': 'Сигнал бота: событие, а не сравнение с нормой.',
   // IB-112 — /admin/alerts
   'alerts.title': 'Сигналы OI: расхождение цены и открытого интереса',
   'alerts.intro': 'Бот сравнивает новые минимумы и максимумы цены с открытым интересом и пишет в Telegram, когда они расходятся. Здесь — монеты, параметры, журнал. Только для админа.',

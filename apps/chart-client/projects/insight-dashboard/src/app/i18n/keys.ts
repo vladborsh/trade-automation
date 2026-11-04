@@ -541,6 +541,14 @@ export type StringKey =
   | 'card.coinbase_premium.title.above'
   | 'card.coinbase_premium.title.below'
   | 'card.coinbase_premium.expl'
+  // IB-113 — R11, the OI divergence card
+  | 'card.oi_divergence.title.bullish'
+  | 'card.oi_divergence.title.bearish'
+  | 'card.oi_divergence.expl.bullish'
+  | 'card.oi_divergence.expl.bearish'
+  | 'card.oi_divergence.repeat.bullish'
+  | 'card.oi_divergence.repeat.bearish'
+  | 'card.basis.tip_event'
   // IB-112 — /admin/alerts (OI divergence alerts)
   | 'alerts.title'
   | 'alerts.intro'

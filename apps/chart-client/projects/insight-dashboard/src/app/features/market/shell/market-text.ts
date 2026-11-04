@@ -127,7 +127,10 @@ const PERIOD_START_RULES: ReadonlySet<string> = new Set(['R4']);
 
 function linkQuery(s: WebInsightStatement, timeSec: number | null): Record<string, number | string> | null {
   if (timeSec === null) return null;
-  return PERIOD_START_RULES.has(s.ruleId) ? { at: timeSec, span: s.basis.window } : { at: timeSec };
+  if (PERIOD_START_RULES.has(s.ruleId)) return { at: timeSec, span: s.basis.window };
+  // IB-113 (R11): the alert's own timeframe, as the Telegram link opens it (V14: ?at=…&tf=…)
+  if (s.ruleId === 'R11' && typeof s.params['tf'] === 'string') return { at: timeSec, tf: s.params['tf'] };
+  return { at: timeSec };
 }
 
 /** D4: a statement → the key, its params formatted, its basis line and its link. */

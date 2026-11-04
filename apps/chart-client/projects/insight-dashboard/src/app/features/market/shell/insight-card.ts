@@ -66,7 +66,7 @@ export function chipOf(s: Pick<WebInsightStatement, 'block' | 'params'>): CardVi
 }
 
 /** §7.3's spark per rule: OI (R4), global L/S (R6), DVOL (R8) and stablecoin supply (R9) are levels. */
-const LEVEL_SERIES = new Set(['R4', 'R6', 'R8', 'R9']);
+const LEVEL_SERIES = new Set(['R4', 'R6', 'R8', 'R9', 'R11']); // R11: OI per bar from A to B (IB-113)
 export const sparkScaleOf = (ruleId: string): SparkScale => (LEVEL_SERIES.has(ruleId) ? 'range' : 'zero');
 
 /** The statements whose link time is the START of the period they measure (IB-BUG-023): their «when» is the window. */
@@ -224,6 +224,23 @@ export function wordingOf(s: WebInsightStatement): { title: Phrase; figures: str
         explanation: [phrase('card.coinbase_premium.expl', { minutes: num('minutes') ?? 0 })],
       };
     }
+    case 'insight.oi_divergence': {
+      // IB-113 (OI divergence design V16, D20): what happened at B against A, never what comes next
+      const bull = p['direction'] !== 'bearish';
+      const price = signedPct(num('pricePct'), 1) ?? '—';
+      const oi = signedPct(num('oiPct'), 1) ?? '—';
+      const tf = typeof p['tf'] === 'string' ? p['tf'] : '';
+      const run = num('runLength') ?? 2;
+      return {
+        title: phrase(`card.oi_divergence.title.${bull ? 'bullish' : 'bearish'}`, { base, tf, pricePct: price, oiPct: oi }),
+        figures: [price, oi],
+        explanation: [
+          phrase(`card.oi_divergence.expl.${bull ? 'bullish' : 'bearish'}`),
+          // the count after a colon: it agrees with no noun («подряд: 3»)
+          ...(run > 2 ? [phrase(`card.oi_divergence.repeat.${bull ? 'bullish' : 'bearish'}`, { count: run })] : []),
+        ],
+      };
+    }
     default:
       // a key this build does not word (the contract is closed; this is the type's exhaustiveness net)
       return { title: phrase(s.key), figures: [], explanation: [] };
@@ -231,7 +248,9 @@ export function wordingOf(s: WebInsightStatement): { title: Phrase; figures: str
 }
 
 export function cardView(s: WebInsightStatement, nowSec: number): CardView {
-  const { basis, tip } = basisOf(s.basis);
+  const { basis, tip: normTip } = basisOf(s.basis);
+  // IB-113: an alert is an event with no norm to compare against — the tooltip says so, not «норма: 0 окон»
+  const tip = s.ruleId === 'R11' ? phrase('card.basis.tip_event') : normTip;
   return {
     chip: chipOf(s),
     when: whenOf(s, nowSec),

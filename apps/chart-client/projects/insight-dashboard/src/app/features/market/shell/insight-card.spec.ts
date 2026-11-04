@@ -156,6 +156,42 @@ describe('R8–R10 flows', () => {
   });
 });
 
+describe('R11 oi_divergence (IB-113) — the alert, worded as what happened', () => {
+  const r11 = (direction: string, runLength = 2) => st({
+    ruleId: 'R11', block: 'positioning', key: 'insight.oi_divergence', rarity: 1,
+    params: { symbol: 'BTCUSDT', tf: '1h', direction, pricePct: direction === 'bullish' ? -1.8 : 1.2, oiPct: direction === 'bullish' ? 3.2 : -0.8, runLength },
+    basis: { window: '24h', venues: ['binance'], sampleWindows: 0, observedWindows: 0, from: null },
+    link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: TODAY_3AM },
+  });
+  it('bullish: «BTC 1h: цена ниже прошлого минимума (−1.8 %), OI выше (+3.2 %)» and what it means', () => {
+    const w = words(r11('bullish'));
+    expect(w.title).toBe('BTC 1h: цена ниже прошлого минимума (−1.8 %), OI выше (+3.2 %)');
+    expect(w.expl).toBe('Цена обновила минимум, а открытых позиций стало больше: на падении набирают позиции.');
+    expect(w.chip.tone).toBe('pos');
+    expect(w.when).toBe('сегодня 03:00 UTC');
+    expect(w.link).toBe('Открыть BTC в 03:00 UTC →');
+    expect(words(r11('bullish'), 'en').title).toBe('BTC 1h: price below the previous low (−1.8 %), OI higher (+3.2 %)');
+  });
+  it('bearish mirrors it', () => {
+    const w = words(r11('bearish'));
+    expect(w.title).toBe('BTC 1h: цена выше прошлого максимума (+1.2 %), OI ниже (−0.8 %)');
+    expect(w.expl).toBe('Цена обновила максимум, а открытых позиций стало меньше: рост идёт без новых позиций.');
+  });
+  it('a repeat says its run with the count after a colon («подряд: 3» — no noun agreement)', () => {
+    expect(words(r11('bullish', 3)).expl).toMatch(/Повторное — минимумов подряд: 3\.$/);
+    expect(words(r11('bearish', 4), 'en').expl).toMatch(/A repeat — highs in a row: 4\.$/);
+    expect(words(r11('bullish')).expl).not.toContain('Повторное');
+  });
+  it('the tooltip says it is an event, not «норма: 0 окон»; the OI spark scales as a level', () => {
+    const w = words(r11('bullish'));
+    expect(w.tip).toBe('Сигнал бота: событие, а не сравнение с нормой.');
+    expect(sparkScaleOf('R11')).toBe('range');
+  });
+  it('the link opens the chart at B on the alert\'s timeframe (as the Telegram message does)', () => {
+    expect(cardView(r11('bullish'), NOW).link.target).toEqual({ commands: ['/instrument', 'BTCUSDT'], queryParams: { at: TODAY_3AM, tf: '1h' } });
+  });
+});
+
 describe('the parts every card shares', () => {
   it('base: the quote suffix goes, a bare ticker stays', () => {
     expect(['BTCUSDT', 'PEPEUSDC', 'XAUUSD', '1000PEPEUSDT', 'USDT'].map(baseOf)).toEqual(['BTC', 'PEPE', 'XAU', '1000PEPE', 'USDT']);
