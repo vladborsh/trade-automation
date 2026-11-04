@@ -23,7 +23,9 @@ import { CandlesService, PERP_PAGE_WEIGHT } from '../../../web/market/candles.se
 import { PgBackfillReads } from '../pg/backfill-reads';
 import { PgOiAlertStore } from '../pg/oi-alerts.repo';
 import { measureBackfillPaths, replayHistory, type BackfillReport, type HistoryBackfillPorts } from './history-backfill';
+import { MemoryGuard, parseMemAvailableMb } from './memory-guard';
 import { WeightPacer } from './weight-pacer';
+import { readFile } from 'node:fs/promises';
 
 /** V31: the run's own budget, well under the 2 400 a minute the IP has (≈ 8 % while it runs). */
 export const BACKFILL_WEIGHT_PER_MIN = 200;
@@ -49,6 +51,12 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
   const weight = new BinanceWeightTracker();
   const candles = new CandlesService({ futuresBaseUrl: env.BINANCE_FUTURES_REST_BASE_URL, spotBaseUrl: env.BINANCE_SPOT_REST_BASE_URL, weight });
   const pacer = new WeightPacer(BACKFILL_WEIGHT_PER_MIN, now);
+  // TL condition: the live bot shares the box — step back when MemAvailable is low (memory-guard.ts)
+  const guard = new MemoryGuard({
+    availableMb: async () => readFile('/proc/meminfo', 'utf8').then(parseMemAvailableMb, () => null),
+    now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: say,
+  });
+  const paced = { take: async (w: number) => { await guard.every30s('path measuring'); await pacer.take(w); } };
   const reader = new OiWindowReader(db);
   const started = now();
   say(`oi backfill ${mode}: build ${env.BUILD_SHA}, budget ${BACKFILL_WEIGHT_PER_MIN} weight/min`);
@@ -74,6 +82,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
       liveStart: () => reads.liveStart(),
       build: env.BUILD_SHA,
       log: say,
+      beforeChunk: (label) => guard.check(label),
     };
   };
 
@@ -98,7 +107,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
       const paths = await measureBackfillPaths(
         { store: ports.store, build: env.BUILD_SHA, log: say,
           klines5m: async (symbol, from, limit) => candles.closedKlines(symbol, '5m', from * 1000, limit) },
-        pacer, now,
+        paced, now,
       );
       const left = await reads.unmeasuredBackfillPaths();
       paths.left = left.count;
@@ -106,7 +115,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
         + `left ${left.count}${left.lastCloses ? ` (the last window closes ${new Date(left.lastCloses * 1000).toISOString()}; a rerun after it measures them)` : ''}`);
       say(`total weight ${barsWeight + paths.weight} (bars ${barsWeight}, paths ${paths.weight})`);
     }
-    say(`done in ${Math.round((now() - started) / 1000)} s`);
+    say(`done in ${Math.round((now() - started) / 1000)} s; lowest MemAvailable seen by the guard: ${guard.minSeenMb ?? 'unreadable'} MB`);
   } finally {
     await db.end();
   }

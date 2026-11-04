@@ -41,11 +41,13 @@ export interface HistoryBackfillPorts {
   liveStart(): Promise<number | null>;
   build: string;
   log?: (line: string) => void;
+  /** Called before each coin × TF chunk is read (the CLI's memory guard waits or aborts here). */
+  beforeChunk?: (label: string) => Promise<void>;
 }
 
 export interface BackfillTfReport {
   tf: OiDivergenceTf;
-  /** Bar closes evaluated, first and last (unix seconds). */
+  /** Evaluations (coin × bar close), and the first and last close evaluated on any coin (unix seconds). */
   closes: number;
   firstClose: number | null;
   lastClose: number | null;
@@ -63,7 +65,7 @@ export interface BackfillReport {
   perTf: BackfillTfReport[];
   /** Path rows written (3 per new subject) and the klines weight to measure them; split by whether the window has closed at `nowSec`. */
   paths: { rows: number; dueNow: number; dueNowWeight: number; open: number; lastWindowCloses: number | null };
-  /** Warnings the evaluations logged, by kind, with how often (a young window is expected at each coin's start). */
+  /** Warnings the evaluations logged, with how often (none expected: each coin starts at its own first full basis). */
   warnings: Record<string, number>;
 }
 
@@ -81,91 +83,71 @@ export async function replayHistory(ports: HistoryBackfillPorts, nowSec: number)
   // the params and the coin list in force, read once: the whole run is made with one set (V31)
   const settings = await ports.store.settings();
   const symbols = await ports.store.enabledSymbols();
-  const counted = countingStore(ports.store, settings, symbols);
-
   const warnings: Record<string, number> = {};
   const report: BackfillReport = {
     liveStart, coins: [], perTf: [], warnings,
     paths: { rows: 0, dueNow: 0, dueNowWeight: 0, open: 0, lastWindowCloses: null },
   };
+  // the coin being replayed: the loop evaluates `enabledSymbols`, so a chunk is one coin (IB-116, TL memory condition)
+  const current = { symbols: [] as string[] };
+  const store = countingStore(ports.store, settings, current, report.paths, nowSec);
 
-  const firstOi = new Map<string, number>();
-  for (const symbol of symbols) {
-    const first = await ports.firstStoredOi(symbol);
-    if (first !== null) firstOi.set(symbol, first);
-  }
-
-  // one read per coin and TF, one OI read per coin; the evaluation's ports slice them
-  const barsBy = new Map<string, Bar[]>();
-  const oiBy = new Map<string, OiWindow>();
-  const lastCloseBy = new Map<OiDivergenceTf, number>();
-  for (const tf of OI_DIVERGENCE_TFS) lastCloseBy.set(tf, dueBarClose(liveStart, OI_DIVERGENCE_TF_SEC[tf]) - OI_DIVERGENCE_TF_SEC[tf]);
-  for (const symbol of symbols) {
-    const first = firstOi.get(symbol);
-    const counts = { '15m': 0, '1h': 0, '4h': 0 } as Record<OiDivergenceTf, number>;
-    report.coins.push({ symbol, firstOi: first ?? null, bars: counts });
-    if (first === undefined) continue;
-    for (const tf of OI_DIVERGENCE_TFS) {
-      const tfSec = OI_DIVERGENCE_TF_SEC[tf];
-      const to = lastCloseBy.get(tf) as number;
-      const from = Math.ceil(first / tfSec) * tfSec;
-      const bars = from < to ? (await ports.bars(symbol, tf, from, to)).filter((b) => b.time >= from && b.time + tfSec <= to) : [];
-      barsBy.set(`${symbol}|${tf}`, bars);
-      counts[tf] = bars.length;
-    }
-    oiBy.set(symbol, await ports.oiWindow(symbol, first - 300, Math.max(...[...lastCloseBy.values()])));
-  }
-
-  const loopPorts: OiAlertLoopPorts = {
-    store: counted.store,
-    klines: async (symbol, tf, from, to) => (barsBy.get(`${symbol}|${tf}`) ?? []).filter((b) => b.time >= from && b.time < to),
-    oiWindow: async (symbol, from, to) => sliceOiWindow(oiBy.get(symbol) ?? { oi5m: [], venueSilent: [] }, from, to),
+  // one chunk = one coin × TF: its bars and its OI are read, replayed and dropped before the next (the month
+  // of 5 m OI per coin is the largest thing held). Coins are independent — run, «produced an alert», controls
+  // and near-misses are all per (symbol, tf) — so the order across coins does not change a row.
+  let chunk: { bars: Bar[]; oi: OiWindow } = { bars: [], oi: { oi5m: [], venueSilent: [] } };
+  const loop = new OiAlertLoop({
+    store,
+    klines: async (_symbol, _tf, from, to) => chunk.bars.filter((b) => b.time >= from && b.time < to),
+    oiWindow: async (_symbol, from, to) => sliceOiWindow(chunk.oi, from, to),
     closeAt: async () => { throw new Error('the history run never reads outcomes (nothing is sent)'); },
     send: async () => { throw new Error('the history run never sends'); },
     webBaseUrl: '',
     build: ports.build,
     klines5m: async () => { throw new Error('paths are measured by measureBackfillPaths, paced'); },
     source: 'backfill',
-    log: {
-      warn: (m) => {
-        const kind = / closed bars, need /.test(m) ? 'young window (fewer than barsForEvaluation bars)' : m;
-        warnings[kind] = (warnings[kind] ?? 0) + 1;
-      },
-    },
-  };
-  const loop = new OiAlertLoop(loopPorts);
+    log: { warn: (m) => { warnings[m] = (warnings[m] ?? 0) + 1; } },
+  });
+
+  const coinBars = new Map<string, Record<OiDivergenceTf, number>>();
+  for (const symbol of symbols) {
+    const first = await ports.firstStoredOi(symbol);
+    const counts = { '15m': 0, '1h': 0, '4h': 0 } as Record<OiDivergenceTf, number>;
+    coinBars.set(symbol, counts);
+    report.coins.push({ symbol, firstOi: first, bars: counts });
+  }
 
   for (const tf of OI_DIVERGENCE_TFS) {
     const tfSec = OI_DIVERGENCE_TF_SEC[tf];
     const need = minBarsToEvaluate(detectorParams(settings.params, tf));
-    const starts = [...firstOi.values()].map((f) => firstCloseFor(f, tf, need));
-    const last = lastCloseBy.get(tf) as number;
+    const last = dueBarClose(liveStart, tfSec) - tfSec; // the close before the live loop's first on this TF
     const r: BackfillTfReport = { tf, closes: 0, firstClose: null, lastClose: null, alerts: 0, controls: 0, nearMisses: 0, skips: 0, failed: 0 };
     report.perTf.push(r);
-    if (starts.length === 0) continue;
     const skipKeys = new Set<string>();
-    for (let close = Math.min(...starts); close <= last; close += tfSec) {
-      const e = await loop.evaluate(tf, close, close + EVALUATE_AFTER_CLOSE_SEC);
-      r.closes++;
-      r.firstClose ??= close;
-      r.lastClose = close;
-      r.alerts += e.journalled;
-      r.controls += e.controls;
-      r.nearMisses += e.nearMisses;
-      r.failed += e.failed.length;
-      for (const k of e.skipKeys ?? []) skipKeys.add(k);
+    for (const coin of report.coins) {
+      if (coin.firstOi === null) continue;
+      await ports.beforeChunk?.(`${coin.symbol} ${tf}`);
+      const from = Math.ceil(coin.firstOi / tfSec) * tfSec; // bars open at or after the first reading (V11)
+      const bars = from < last ? (await ports.bars(coin.symbol, tf, from, last)).filter((b) => b.time >= from && b.time + tfSec <= last) : [];
+      (coinBars.get(coin.symbol) as Record<OiDivergenceTf, number>)[tf] = bars.length;
+      if (bars.length < need) continue;
+      chunk = { bars, oi: await ports.oiWindow(coin.symbol, from - tfSec, last) };
+      current.symbols = [coin.symbol];
+      for (let close = firstCloseFor(coin.firstOi, tf, need); close <= last; close += tfSec) {
+        const e = await loop.evaluate(tf, close, close + EVALUATE_AFTER_CLOSE_SEC);
+        r.closes++;
+        r.firstClose = Math.min(r.firstClose ?? close, close);
+        r.lastClose = Math.max(r.lastClose ?? close, close);
+        r.alerts += e.journalled;
+        r.controls += e.controls;
+        r.nearMisses += e.nearMisses;
+        r.failed += e.failed.length;
+        for (const k of e.skipKeys ?? []) skipKeys.add(k);
+      }
+      chunk = { bars: [], oi: { oi5m: [], venueSilent: [] } };
     }
     r.skips = skipKeys.size;
-    ports.log?.(`backfill ${tf}: ${r.closes} closes, ${r.alerts} alerts, ${r.controls} controls, ${r.nearMisses} near-misses, ${r.skips} skips, ${r.failed} failed`);
-  }
-
-  for (const p of counted.paths) {
-    for (const win of OI_RESEARCH_WINDOWS) {
-      report.paths.rows++;
-      const closes = p.t0 + OI_RESEARCH_WINDOW_SEC[win];
-      if (closes + 60 <= nowSec) { report.paths.dueNow++; report.paths.dueNowWeight += klinesWeight(windowBars(win)); } else report.paths.open++;
-      report.paths.lastWindowCloses = Math.max(report.paths.lastWindowCloses ?? closes, closes);
-    }
+    ports.log?.(`backfill ${tf}: ${r.closes} evaluations, ${r.alerts} alerts, ${r.controls} controls, ${r.nearMisses} near-misses, ${r.skips} skips, ${r.failed} failed`);
   }
   return report;
 }
@@ -181,13 +163,26 @@ export function sliceOiWindow(all: OiWindow, fromSec: number, toSec: number): Oi
   };
 }
 
-/** The store as the loop sees it in a backfill: settings and coins frozen for the run; new subjects' paths recorded. */
-function countingStore(store: OiAlertStore, settings: Awaited<ReturnType<OiAlertStore['settings']>>, symbols: string[]) {
-  const paths: NewPaths[] = [];
-  const wrapped: OiAlertStore = {
+/**
+ * The store as the loop sees it in a backfill: settings frozen for the run, the coin list = the chunk's coin;
+ * new subjects' path windows tallied into the report (counts only — nothing kept per subject).
+ */
+function countingStore(
+  store: OiAlertStore, settings: Awaited<ReturnType<OiAlertStore['settings']>>, current: { symbols: string[] },
+  tally: BackfillReport['paths'], nowSec: number,
+): OiAlertStore {
+  return {
     settings: async () => settings,
-    enabledSymbols: async () => symbols,
-    insertPaths: async (subject: PathSubjectRef, spec: NewPaths) => { paths.push(spec); await store.insertPaths(subject, spec); },
+    enabledSymbols: async () => current.symbols,
+    insertPaths: async (subject: PathSubjectRef, spec: NewPaths) => {
+      await store.insertPaths(subject, spec);
+      for (const win of OI_RESEARCH_WINDOWS) {
+        tally.rows++;
+        const closes = spec.t0 + OI_RESEARCH_WINDOW_SEC[win];
+        if (closes + 60 <= nowSec) { tally.dueNow++; tally.dueNowWeight += klinesWeight(windowBars(win)); } else tally.open++;
+        tally.lastWindowCloses = Math.max(tally.lastWindowCloses ?? closes, closes);
+      }
+    },
     insertAlert: (row) => store.insertAlert(row),
     runFirstId: (...a) => store.runFirstId(...a),
     markFired: (...a) => store.markFired(...a),
@@ -202,7 +197,6 @@ function countingStore(store: OiAlertStore, settings: Awaited<ReturnType<OiAlert
     setPath: (...a) => store.setPath(...a),
     pathFailed: (...a) => store.pathFailed(...a),
   };
-  return { store: wrapped, paths };
 }
 
 export interface PathMeasureReport {

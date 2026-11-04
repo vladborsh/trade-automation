@@ -134,6 +134,31 @@ describe('IB-116: the history run is the live loop, replayed', () => {
     expect(r.perTf.find((t) => t.tf === '1h')?.firstClose).toBe((STRETCH[0] as Bar).time + 185 * H); // barsForEvaluation on 1h = 185
   });
 
+  it('goes one coin × TF at a time: the guard is asked before each chunk, and each chunk’s bars are read once', async () => {
+    const labels: string[] = [];
+    const asked: string[] = [];
+    const store = new MemoryStore();
+    store.symbols = ['ETHUSDT', 'BTCUSDT'];
+    await replayHistory(backfillPorts(store, {
+      beforeChunk: async (l) => { labels.push(l); },
+      bars: async (s, tf, from, to) => { asked.push(`${s} ${tf}`); return barsFor(tf, from, to); },
+    }), LIVE_START);
+    expect(labels).toEqual(['ETHUSDT 15m', 'BTCUSDT 15m', 'ETHUSDT 1h', 'BTCUSDT 1h', 'ETHUSDT 4h', 'BTCUSDT 4h']);
+    expect(asked).toEqual(labels);
+    // two coins on the same data: each journals its own copy, as two independent coins
+    expect(store.alerts.filter((a) => a.symbol === 'ETHUSDT').map((a) => [a.a.time, a.b.time]))
+      .toEqual(store.alerts.filter((a) => a.symbol === 'BTCUSDT').map((a) => [a.a.time, a.b.time]));
+  });
+
+  it('a guard that aborts stops the run before the chunk is read', async () => {
+    const asked: string[] = [];
+    await expect(replayHistory(backfillPorts(new MemoryStore(), {
+      beforeChunk: async (l) => { if (l === 'ETHUSDT 1h') throw new Error('memory guard: aborting'); },
+      bars: async (s, tf, from, to) => { asked.push(`${s} ${tf}`); return barsFor(tf, from, to); },
+    }), LIVE_START)).rejects.toThrow(/memory guard/);
+    expect(asked).toEqual(['ETHUSDT 15m']);
+  });
+
   it('refuses to run before the live research journal exists (nothing would bound it)', async () => {
     await expect(replayHistory(backfillPorts(new MemoryStore(), { liveStart: async () => null }), LIVE_START)).rejects.toThrow(/live research journal has not started/);
   });
