@@ -103,7 +103,10 @@ IB-110 and IB-112 can run in parallel within WIP 2. Migration **025** is the nex
 - per-member watchlists (V2 makes them a single table later);
 - browser push;
 - quiet hours (owner);
-- hit rates in any text (V12: after 1–2 months of journal);
+- hit rates in any text (V12: after 1–2 months of journal). **Open item, before any hit-rate text is written** (coordinator, 2026-11-04), two definitions must be decided and written here first:
+  - **what "worked" means:** direction only (bullish: `price_4h > price_at_fire`), or a minimum move in the signal's direction, e.g. ≥ 0.5 × ATR14 of that TF at +4 h / +24 h. The journal stores the two closes, not the ATR at fire. Both are recomputable from venue klines (V12), so neither definition needs a schema change now;
+  - **the baseline** the rate is compared with: the same coins and TF at random bar closes, or all confirmed pivots of the same kind with no divergence. Without one, a rate near 50 % (or a trending month) cannot be told from chance. The baseline is computed from klines and stored OI, with nothing new stored.
+  Owner of the decision: the owner, from a short options note when the journal has 1–2 months. No task until then;
 - divergence on non-Binance OI;
 - an alert for coins not on the list.
 
