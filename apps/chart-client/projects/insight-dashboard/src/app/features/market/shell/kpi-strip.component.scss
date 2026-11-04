@@ -13,7 +13,9 @@ h3 { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 .inline { font-size: 13px; color: var(--color-text-muted); }
 .inline.up { color: var(--color-up); }
 .inline.down { color: var(--color-down); }
-.bar { align-self: center; display: flex; height: var(--bar-h); border-radius: var(--bar-radius); overflow: hidden; background: var(--bar-track); }
+// width 100%: in the subgrid `align-self: center` centres the bar in its row; in the phone's flex
+// column the same property centres it ACROSS and shrinks it to its content — 0px (TL review, 390)
+.bar { align-self: center; width: 100%; display: flex; height: var(--bar-h); border-radius: var(--bar-radius); overflow: hidden; background: var(--bar-track); }
 .note { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 .credit-row { display: flex; min-height: 0; }
 // §7.2 says --type-micro (11px) for attribution; IB-088's guard is text ≥ 12px on the page, so the credit is --type-small

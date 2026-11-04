@@ -432,10 +432,16 @@ test.describe('market page — desktop 1440×900 (IB-088)', () => {
  * IB-106 (market-page design §7.2, §7.5): the header and the KPI strip as the mockup lays them out.
  * Geometry and words, read from the page; the look itself is the report's mockup-vs-live images.
  */
-/** A funding figure whose side word cannot sit beside it in a 1440 tile: the figure row wraps in ONE tile. */
+/**
+ * A funding figure whose side word cannot sit beside it in a 1440 tile (the figure row wraps in ONE
+ * tile), and a dominance delta. The capture has none: the live path cannot compute one
+ * (`liveDominance`, CoinGecko's free /global has no history), so it is test data here — the template
+ * must show it the day the server sends one.
+ */
 async function withWrappingFunding(page: Page): Promise<void> {
   await page.route('**/api/web/market/kpis**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
-    ...kpis, tiles: kpis.tiles.map((t) => (t.id === 'btc_funding' ? { ...t, value: -0.000123, context: { key: 'kpi.ctx.funding_side', params: { side: 'shorts_pay' } } } : t)),
+    ...kpis, tiles: kpis.tiles.map((t) => (t.id === 'btc_funding' ? { ...t, value: -0.000123, context: { key: 'kpi.ctx.funding_side', params: { side: 'shorts_pay' } } }
+      : t.id === 'btc_dominance' ? { ...t, delta: 0.4 } : t)),
   }) }));
 }
 
@@ -456,6 +462,13 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
           tiles: tiles.length,
           columns: new Set(tiles.map((r) => Math.round(r.x))).size,
           bars: [...kpi.querySelectorAll('.bar')].map((b) => Math.round(b.getBoundingClientRect().y)),
+          // TL review: every tile's bar is drawn — the track, and the filled part where the tile has one
+          barBoxes: [...kpi.querySelectorAll('.tile')].map((t) => {
+            const r = t.querySelector('.bar')!.getBoundingClientRect();
+            const fill = [...t.querySelectorAll('.bar span')].reduce((w, s) => w + s.getBoundingClientRect().width, 0);
+            return { id: t.getAttribute('data-kpi'), w: Math.round(r.width), h: Math.round(r.height), fill: Math.round(fill) };
+          }),
+          tileInner: Math.round(kpi.querySelector('.tile')!.getBoundingClientRect().width) - 34,
           fundingWraps: (() => {
             const f = kpi.querySelector('[data-kpi="btc_funding"]')!;
             return f.querySelector('.inline')!.getBoundingClientRect().top >= f.querySelector('.value')!.getBoundingClientRect().bottom - 2;
@@ -478,6 +491,14 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
         expect(new Set(m.bars).size).toBe(1);
       }
       expect(m.scrollWidth).toBeLessThanOrEqual(width);
+      for (const bar of m.barBoxes) {
+        expect(bar.h, `${bar.id} bar height`).toBe(6);
+        expect(bar.w, `${bar.id} bar spans the tile`).toBeGreaterThanOrEqual(m.tileInner - 2);
+      }
+      const fill = Object.fromEntries(m.barBoxes.map((b) => [b.id, b.fill / b.w]));
+      expect(fill['btc_dominance']).toBeCloseTo(0.592, 1); // 59.25 % of the track, amber
+      expect(fill['fear_greed']).toBeCloseTo(0.26, 1); // 26 of 100, zone colour
+      expect(fill['liquidations_24h']).toBeCloseTo(1, 1); // the long/short split fills the track
       // «7d: available from …» is the 7d button's description, not a visible line
       expect(m.weekDisabled).toBe(true);
       expect(m.weekDesc).toMatch(/^7d: available from \d{4}-\d{2}-\d{2}$/);
@@ -488,6 +509,10 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
       await expect(page.locator('app-market .live-age')).toHaveText(/^\s*Live · updated \d+ s ago\s*$/);
       const strip = page.locator('app-kpi-strip');
       await expect(strip.locator('[data-kpi="btc_dominance"] .note')).toHaveText('ETH 10.6 %');
+      // TL review: the delta beside the value, for every tile whose payload carries one (dominance 0.4 pp as set above; cap and OI as captured)
+      await expect(strip.locator('[data-kpi="btc_dominance"] .inline')).toHaveText(/^\+0\.40 pp/);
+      await expect(strip.locator('[data-kpi="market_cap"] .inline')).toHaveText(/^−2\.49 %/);
+      await expect(strip.locator('[data-kpi="btc_oi"] .inline')).toHaveText(/^[+−]\d+\.\d{2} %/);
       await expect(strip.locator('[data-kpi="fear_greed"] .note')).toHaveText('yesterday 37 · a week ago 48');
       await expect(strip.locator('[data-kpi="btc_funding"] .note')).toHaveText('long/short by accounts 2.62');
       await expect(strip.locator('[data-kpi="btc_oi"] .note')).toHaveText('Binance, over 24h');
