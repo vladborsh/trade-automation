@@ -418,11 +418,11 @@ Binance USD-M**, nothing is stored. That is the on-demand direction of `tasks/wi
 |---|---|---|
 | `GET /fapi/v1/ticker/24hr` (all symbols) | 40 | 1 |
 | `GET /fapi/v1/premiumIndex` (all symbols) | 10 | 1 |
-| `GET /futures/data/openInterestHist?period=1h&limit=25` | 1, no weight header | 20 |
+| `GET /futures/data/openInterestHist?period=1h&limit=25` | **0** (own limit 1 000 req / 5 min; amended 2026-11-04, IB-BUG-030) | 20 |
 
 Cached 60 s server-side with one shared in-flight read, so the venue sees at most one refresh a
 minute however many tabs are open: about 50 `fapi` weight a minute (about 2 % of 2,400) plus 20
-calls against the separate `/futures/data` limit. Above 1,800 used weight the endpoint refuses
+calls (weight 0) against `/futures/data`'s separate limit of 1 000 requests / 5 min per endpoint. Above 1,800 used weight the endpoint refuses
 with 503 `VENUE_UNAVAILABLE` instead of adding load. One coin whose OI call fails shows a dash
 in its row; a failure of either all-symbol call fails the request. The three response shapes are
 pinned by fixtures captured 2026-10-24 (`apps/insight-bot/test/fixtures/binance/`).

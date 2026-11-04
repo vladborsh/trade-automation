@@ -42,10 +42,11 @@ writes its outages there as stream `binance-perp:oi-ls-5m`), `symbols`, partitio
 ## 3. Weight and disk (arithmetic from the code, not measured)
 
 - **Weight.** The universe has 40 symbols (30 crypto + 10 TradFi, `config/universe.yaml`), so steady
-  state is 5 calls × 40 symbols per 5 min. That averages 40 weight/min, and inside one pass's minute
-  it is ~200 (the poller header documents this pattern for 30). The boot backfill, which only runs
+  state is 5 calls × 40 symbols per 5 min, i.e. 40 requests per endpoint per 5 min. **Amended 2026-11-04
+  (IB-BUG-030): that is weight 0 on the 2400;** `/futures/data/*` has its own limit of 1 000 requests / 5 min
+  per endpoint, so the steady pass is 4 % of it (was written as 40 weight/min, ~200 in the pass minute). The boot backfill, which only runs
   on missing slots, is at most 5 × 18 × 40 = 3 600 calls paced at 120 ms. That is ~500/min for about
-  7 minutes, below `WEIGHT_CEILING_1M` = 1 800 (on-demand reads refuse above that). IB-080 adds
+  7 minutes, i.e. ≈ 500 per endpoint per 5 min, **50 % of the 1 000 / 5 min limit** (arithmetic, not measured; amended 2026-11-04, was compared with `WEIGHT_CEILING_1M`, which it does not touch). IB-080 adds
   **0** venue calls.
 - **Rows.** 40 symbols × 288 slots/day × 5 series = 57 600 rows/day ≈ 21 M/year. **Bytes per row are
   not known.** WD-010 measures them: the boot backfill writes 30 days at once, so `pg_total_relation_size`

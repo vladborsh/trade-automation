@@ -62,7 +62,7 @@ hidden tab.
 | `premiumIndex` + `ticker/24hr` (existing universe summary, now shared with positioning and KPIs) | Binance fapi | 50 per min (unchanged) |
 | Funding history baseline, 40 coins, refreshed every 8 h | Binance fapi `fundingRate` | ≈ 0.1 / min averaged |
 | Klines 1h × 720 for price baselines, 40 coins, hourly | Binance fapi | 40 × 5 / 60 ≈ 3.3 / min |
-| OI/LS baselines (IB-080 joined read, 1h period), 40 coins × 3 series, hourly | Binance `/futures/data` (separate limit) | ≈ 2 calls / min |
+| OI/LS baselines (IB-080 joined read, 1h period), 40 coins × 3 series, hourly | Binance `/futures/data`: weight 0, own limit 1 000 req / 5 min per endpoint (IB-BUG-030) | ≈ 2 calls / min |
 | `/coins/markets` + `/global` | CoinGecko (existing gate) | ≤ 1 call / min |
 | Phase 2: Deribit DVOL (15 min) — book summary dropped with max pain/skew (owner, 2026-11-03) | Deribit public | < 0.1 / min |
 | Phase 2: put/call by OI, daily series (60 min) | OKX rubik (public) | < 0.1 / min |
@@ -86,7 +86,7 @@ survey's own figures are single probes. Each server task states its measured fig
 
 **Reconciliation:** two summary fetches a minute is ≈ 100. The trailing-minute header sometimes holds one fetch (≈ 50) and sometimes two (≈ 100), depending on how the 60 s timers fall. That fits the measured median of 90 and the 40–102 range. This is a prediction from code, not an attribution: one sample per minute cannot separate endpoints. **The check:** count `ticker/24hr` calls per minute on the box (log or `recordCall` per path). The arithmetic predicts 2.
 
-**Same cause, outside the gauge:** each summary refresh also makes one `/futures/data/openInterestHist` call per listed symbol (31 per Market minute pair, ≈ 62 / min). This is against the separate `/futures/data` limit, alongside the OI/LS poller's average of 40 / min and positioning's ≈ 18 / min.
+**Same cause, outside the gauge:** each summary refresh also makes one `/futures/data/openInterestHist` call per listed symbol (31 per Market minute pair, ≈ 62 / min). This is against the separate `/futures/data` limit, alongside the OI/LS poller's average of 40 / min and positioning's ≈ 18 / min. **Amended 2026-11-04 (IB-BUG-030):** these calls cost weight **0**; the limit is **1 000 requests / 5 min per IP for each endpoint** (Binance docs, plus 8 clean runs on two occasions). Per endpoint, `openInterestHist` is the busy one: summary ≈ 150 / 5 min after IB-BUG-026 (one call per distinct symbol a minute), poller 30, the boot backfill ≈ 500 by arithmetic. That is ≈ 70–80 % in the worst case (backfill with a Market tab open), inside the limit, so no design change. It is the place to look first on a 429/418 from `/futures/data`.
 
 **Fix (filed by the Tech Lead from this note):** cache the symbol-less venue reads (`ticker/24hr`, `premiumIndex`) once per 60 s, independent of the list, and assemble each caller's rows from them. Cache the per-symbol OI by symbol. Expected after the fix, by arithmetic: fapi ≈ 50 / min median, which is the original design figure. `/futures/data` drops by ≈ 31 / min. A spec that can disagree: two callers with different lists within 60 s give exactly **one** `ticker/24hr` call. **Budget verdict either way:** 90 is 3.75 % of 2 400 and far under `WEIGHT_CEILING_1M` (1 800), so this is waste, not danger. Until the fix lands, IB-096's "weight must not rise" baseline is the measured 90, not 54.
 

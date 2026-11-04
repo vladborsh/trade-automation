@@ -86,7 +86,7 @@ them into `libs/`; signal-server keeps running its own ingestion unchanged.
 | D12 | Idempotency by natural keys everywhere: candles `(venue, market, symbol, open_time)`, signals `(playbook, symbol, trigger_ts, arm)`. Restart = gap repair from the last stored row, never a duplicate. | §3, §4.4 |
 | D13 | Universe = `config/universe.yaml`, a static top-30 list with per-venue symbol mapping, hand-revised monthly. Stage-1 signal set BTC/ETH/SOL is a config flag, not code. | §2.3 |
 | D14 | Hosting: EC2 `t4g.small` (arm64) in `ap-northeast-1`, docker compose (Postgres 16 + insight-bot), daily `pg_dump` to S3, secrets from SSM Parameter Store, no SSH keys (Session Manager). The **first** thing DevOps does on the box is a connectivity probe of all three venues' public WS. | §7 |
-| D15 | Binance REST weight budget for the whole app in steady state: **≈ 32 weight/min ≈ 1.3 % of 2400** (§4.5). Backfill is throttled to ≤ 600/min and reads the used-weight header. | §4.5, §5 |
+| D15 | Binance REST weight budget for the collectors in steady state: **≈ 0.1 weight/min, ≈ 0 % of 2400** (§4.5). The OI/LS poller costs **0** weight: `/futures/data/*` is on a separate limit of 1 000 requests / 5 min per endpoint, where the steady pass is 30 per endpoint (3 %) (amended 2026-11-04, IB-BUG-030: Binance docs list `/futures/data/*` at «IP Weight 0» with its own limit of 1 000 requests / 5 min per IP per endpoint; dev-3 measured 8 clean runs on two occasions with the header unmoved and 0 of 150 responses carrying it). Was ≈ 32 ≈ 1.3 %, counting the poller at weight 1. Backfill is throttled to ≤ 600/min and reads the used-weight header. | §4.5, §5 |
 | D16 | Stage-2/3/4 consumers are described here but **not decomposed**; their tasks are written when stage 1 is confirmed. Stage-2 **collection** (news, DEX pools) is decomposed now because it is ungated. | §10, §14 |
 
 ---
@@ -409,11 +409,13 @@ funding) simply resume; the hole is recorded in `collector_gaps` with
 
 | Loop | Weight/min |
 |---|---|
-| OI + 4 × L/S, 30 symbols per 5 min | 30 averaged (≈ 150 during the pass minute) |
+| OI + 4 × L/S, 30 symbols per 5 min | **0** (was counted 30; see below) |
 | funding settlement fetch, 30 per 8 h | ≈ 0.06 |
 | gap repair | 0 in steady state; 5 per repaired ≤ 1500-bar range |
 | markPrice, forceOrder, klines | 0 (WS) |
-| **total** | **≈ 32 ≈ 1.3 %** |
+| **total** | **≈ 0.1 ≈ 0 %** (was ≈ 32 ≈ 1.3 %) |
+
+**`/futures/data/*` has its own budget** (amended 2026-11-04, IB-BUG-030: Binance docs list `/futures/data/*` at «IP Weight 0» with its own limit of 1 000 requests / 5 min per IP per endpoint; dev-3 measured 8 clean runs on two occasions with the header unmoved and 0 of 150 responses carrying it): weight 0 on the 2400, and **1 000 requests / 5 min per IP for each endpoint**. The steady pass is 30 symbols × 1 call per endpoint per 5 min = **30 / 1 000 (3 %)**. The boot backfill, paced at 120 ms, is ≈ 500 calls/min over the 5 endpoints, so **≈ 500 per endpoint per 5 min (50 %)**: arithmetic from the pacing constant, not measured, and the only figure near any limit. `openInterestHist` also carries the web reads (universe summary, one call per distinct symbol a minute while Market is open, ≈ 150 / 5 min for 30 coins; the instrument page's OI/LS), so a backfill with a Market tab open is the case to look at first if a 429/418 ever shows on `/futures/data`. Not built: a gauge for this limit (IB-BUG-030 option B), until such a refusal is seen.
 
 Spot REST: repair only, against spot's own 6000/min budget, reported on
 `ib_binance_spot_weight_used_1m` (never added to the futures gauge). Bybit/OKX
@@ -1074,7 +1076,7 @@ re-measured rule (both parameters validated, drifting edge, empty page past
 the data) is in §4.1, and both apps' pagers end on `-1130` or an empty page.
 My error too: I ratified a single measurement into design text. (3) `limit=3` per poll, idempotent re-write —
 ratified. (4) The retention edge is not a gap — ratified. (5) 30 weight/min
-is an average, ≈ 150 instantaneous — §4.5 states both. Also ratified: the
+is an average, ≈ 150 instantaneous — §4.5 states both. **Superseded 2026-11-04 (IB-BUG-030): the weight is 0, the 150 are requests against `/futures/data`'s own 1 000 / 5 min per endpoint; §4.5.** Also ratified: the
 poller registering inside IB-005's `CollectorsModule.register()` (one switch,
 `DATABASE_URL`), and the one-line dependency change in `binance-perp.service`
 that makes both loops share the tracker.
