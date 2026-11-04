@@ -35,3 +35,5 @@ export * from './members';
 export * from './market-flows';
 // IB-BUG-032 — one spelling of every venue and data provider, for the bot's credits and the dashboard's basis lines.
 export * from './venue-names';
+// IB-109 — price vs OI divergence alerts: params, chart lines, journal, admin (design V1–V17).
+export * from './oi-divergence';
