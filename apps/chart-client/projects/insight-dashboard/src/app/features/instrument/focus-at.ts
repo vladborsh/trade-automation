@@ -1,4 +1,4 @@
-import type { WebTimeframe } from '@trade-automation/contracts';
+import { WEB_MARKET_PERIODS, type WebMarketPeriod, type WebTimeframe } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 import { windowFor } from './time-range';
 
@@ -39,6 +39,8 @@ export function parseAt(raw: string | null | undefined, nowMs: number): number |
 }
 
 export interface FocusView {
+  /** IB-BUG-023: a moment of its own, or the start of a period the link describes as a whole. */
+  kind: 'moment' | 'periodStart';
   /** The moment, as the link gave it. */
   atSec: number;
   timeframe: WebTimeframe;
@@ -65,7 +67,7 @@ export function focusView(atSec: number, nowMs: number): FocusView {
   let to = barSec + half * step;
   if (to > nowSec) { from -= to - nowSec; to = nowSec; }
   if (from < windowFrom) { to += windowFrom - from; from = windowFrom; }
-  return { atSec, timeframe, barSec, from, to: Math.min(to, nowSec) };
+  return { kind: 'moment', atSec, timeframe, barSec, from, to: Math.min(to, nowSec) };
 }
 
 /**
@@ -84,13 +86,32 @@ export function barAtOrBefore(times: readonly number[], atSec: number): number |
   return times[lo];
 }
 
-/** `?at=` from the URL → the view to open on, or null for an absent or unusable link. */
-export function focusFromQuery(atRaw: string | null | undefined, nowMs: number): FocusView | null {
-  const at = parseAt(atRaw, nowMs);
-  return at === null ? null : focusView(at, nowMs);
+/**
+ * IB-BUG-023 (TL ruling) — `?span=<period>` with `?at=<its start>`: the frame that shows the whole
+ * period (1h → 1m, 4h → 5m, 24h → 15m, 7d → 4h), the view from just before the start to now.
+ */
+export const PERIOD_START_TIMEFRAME: Readonly<Record<WebMarketPeriod, WebTimeframe>> = { '1h': '1m', '4h': '5m', '24h': '15m', '7d': '4h' };
+/** Bars shown before the period's start, so the marker is not on the chart's very edge. */
+const PERIOD_START_LEAD_BARS = 3;
+
+export function periodStartView(atSec: number, span: WebMarketPeriod, nowMs: number): FocusView {
+  const nowSec = Math.floor(nowMs / 1000);
+  const timeframe = PERIOD_START_TIMEFRAME[span];
+  const step = TF_SEC[timeframe];
+  const barSec = Math.floor(atSec / step) * step;
+  const windowFrom = Math.ceil(windowFor(timeframe, nowMs).fromMs / 1000);
+  return { kind: 'periodStart', atSec, timeframe, barSec, from: Math.max(windowFrom, barSec - PERIOD_START_LEAD_BARS * step), to: nowSec };
 }
 
-/** The marker's words for a view. */
-export function focusLabelKey(_focus: FocusView | null): StringKey {
-  return 'instrument.focus.marker';
+/** `?at=` (and `?span=`) from the URL → the view to open on, or null for an absent or unusable link. */
+export function focusFromQuery(atRaw: string | null | undefined, nowMs: number, spanRaw: string | null = null): FocusView | null {
+  const at = parseAt(atRaw, nowMs);
+  if (at === null) return null;
+  const span = (WEB_MARKET_PERIODS as readonly string[]).includes(spanRaw ?? '') ? (spanRaw as WebMarketPeriod) : null;
+  return span === null ? focusView(at, nowMs) : periodStartView(at, span, nowMs);
+}
+
+/** The marker's words for a view: «момент из ссылки», or «начало периода». */
+export function focusLabelKey(focus: FocusView | null): StringKey {
+  return focus?.kind === 'periodStart' ? 'instrument.focus.periodStart' : 'instrument.focus.marker';
 }

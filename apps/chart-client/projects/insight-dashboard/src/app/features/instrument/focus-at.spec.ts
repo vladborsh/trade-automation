@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barAtOrBefore, FOCUS_BARS, focusFromQuery, focusLabelKey, focusView, parseAt } from './focus-at';
+import { barAtOrBefore, FOCUS_BARS, focusFromQuery, focusLabelKey, focusView, parseAt, PERIOD_START_TIMEFRAME, periodStartView } from './focus-at';
 import { windowFor } from './time-range';
 
 /** IB-098 — `?at=` from an insight link: which moments are accepted, and the view around one. */
@@ -70,6 +70,37 @@ describe('focusFromQuery / focusLabelKey (extracted from the components, behavio
   });
   it('a moment from a link is labelled as one', () => {
     expect(focusLabelKey(focusFromQuery(String(Math.floor(NOW / 1000) - 60), NOW))).toBe('instrument.focus.marker');
+  });
+});
+
+describe('periodStartView — an R4 link opens on the whole period, its start marked (IB-BUG-023)', () => {
+  const NOW = Date.UTC(2026, 10, 3, 15, 7, 0);
+  const nowSec = NOW / 1000;
+  const SPAN = { '1h': 3_600, '4h': 14_400, '24h': 86_400, '7d': 604_800 } as const;
+
+  it('the TL\'s frames, and the start sits inside the window that frame already loads (no extra read)', () => {
+    expect(PERIOD_START_TIMEFRAME).toEqual({ '1h': '1m', '4h': '5m', '24h': '15m', '7d': '4h' });
+    for (const [span, sec] of Object.entries(SPAN) as Array<[keyof typeof SPAN, number]>) {
+      const v = periodStartView(nowSec - sec, span, NOW);
+      expect(v.kind).toBe('periodStart');
+      expect(v.timeframe).toBe(PERIOD_START_TIMEFRAME[span]);
+      expect(v.barSec).toBeGreaterThanOrEqual(windowFor(v.timeframe, NOW).fromMs / 1000);
+      expect(v.from).toBeLessThan(v.barSec); // a few bars of lead, the marker is not on the edge
+      expect(v.to).toBe(nowSec); // the whole period, to now
+    }
+  });
+
+  it('?span= turns a link into a period start; a junk span leaves it a moment', () => {
+    const at = String(nowSec - 86_400);
+    expect(focusFromQuery(at, NOW, '24h')?.kind).toBe('periodStart');
+    expect(focusFromQuery(at, NOW, '24h')?.timeframe).toBe('15m');
+    expect(focusFromQuery(at, NOW, 'banana')?.kind).toBe('moment');
+    expect(focusFromQuery(at, NOW)?.kind).toBe('moment');
+  });
+
+  it('the marker says «начало периода» for a period start, «момент из ссылки» otherwise', () => {
+    expect(focusLabelKey(periodStartView(nowSec - 3_600, '1h', NOW))).toBe('instrument.focus.periodStart');
+    expect(focusLabelKey(focusView(nowSec - 3_600, NOW))).toBe('instrument.focus.marker');
   });
 });
 

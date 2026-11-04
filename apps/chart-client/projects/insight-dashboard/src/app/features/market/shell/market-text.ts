@@ -107,7 +107,19 @@ export interface InsightView {
   /** Keys whose translation goes INTO a param (a side, a quadrant, a band) — resolved by the caller. */
   nested: Record<string, StringKey>;
   basis: { key: StringKey; params: Record<string, string | number> };
-  link: { commands: string[]; queryParams: Record<string, number> | null } | { anchor: string };
+  link: { commands: string[]; queryParams: Record<string, number | string> | null } | { anchor: string };
+}
+
+/**
+ * IB-BUG-023: the statements whose link is the START of the period they measure, not a moment of
+ * their own (R4 — OI against price over the period). Their link adds `span=<period>`, so the
+ * instrument page shows the whole period and marks its start as such.
+ */
+const PERIOD_START_RULES: ReadonlySet<string> = new Set(['R4']);
+
+function linkQuery(s: WebInsightStatement, timeSec: number | null): Record<string, number | string> | null {
+  if (timeSec === null) return null;
+  return PERIOD_START_RULES.has(s.ruleId) ? { at: timeSec, span: s.basis.window } : { at: timeSec };
 }
 
 /** D4: a statement → the key, its params formatted, its basis line and its link. */
@@ -133,7 +145,7 @@ export function insightView(s: WebInsightStatement, nowSec: number): InsightView
     basis: basisView(s.basis, nowSec),
     link: 'anchor' in s.link
       ? { anchor: s.link.anchor }
-      : { commands: ['/instrument', s.link.symbol], queryParams: s.link.timeSec === null ? null : { at: s.link.timeSec } },
+      : { commands: ['/instrument', s.link.symbol], queryParams: linkQuery(s, s.link.timeSec) },
   };
 }
 

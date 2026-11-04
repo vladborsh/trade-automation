@@ -89,6 +89,12 @@ describe('R4 OI vs price', () => {
     const r = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
     expect(shown(R4.run(snapshot({ positioning: [r] })))).toMatchObject({ params: { symbol: 'SOLUSDT', quadrant: 'new_longs', oiPct: 26 } });
   });
+  it('IB-BUG-023: links to the START of the period it measures (a change has no single moment), per period', () => {
+    const r = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
+    for (const [period, sec] of [['1h', 3_600], ['4h', 14_400], ['24h', 86_400]] as const) {
+      expect(shown(R4.run(snapshot({ period, positioning: [r] })))?.link).toEqual({ route: 'instrument', symbol: 'SOLUSDT', timeSec: NOW / 1000 - sec });
+    }
+  });
   it('SILENT when price is rare too (that is a price story, not an OI one)', () => {
     expect(shown(R4.run(snapshot({ positioning: [row('SOLUSDT', { oi: c(26, 0.99), price: c(9, 0.98) })] })))).toBeNull();
   });

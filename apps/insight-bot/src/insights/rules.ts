@@ -1,4 +1,4 @@
-import type { WebInsightBasis, WebInsightStatement, WebPositioningRow } from '@trade-automation/contracts';
+import { WEB_MARKET_PERIOD_SECONDS, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow } from '@trade-automation/contracts';
 import { levelRarity, rarity } from './rarity';
 import { fngBand } from './sentiment';
 import { LIQ_RULE_MIN_DAYS, R2_MIN_USD, RARITY_SHOW, VENUE_RULE_MIN_DAYS } from './thresholds';
@@ -141,7 +141,9 @@ export const R4: Rule = {
       ruleId: 'R4', block: 'positioning', key: 'insight.oi_vs_price',
       params: { symbol: best.symbol, quadrant: best.quadrant, oiPct: best.oiChangePct.value, pricePct: best.priceChangePct.value },
       rarity: best.oiChangePct.rarity as number, magnitude: Math.abs(best.oiChangePct.value ?? 0),
-      basis: cellBasis(s, best.oiChangePct.sample), link: { route: 'instrument', symbol: best.symbol, timeSec: null },
+      // IB-BUG-023: a change over the period has no single moment — it links to the period's start
+      basis: cellBasis(s, best.oiChangePct.sample),
+      link: { route: 'instrument', symbol: best.symbol, timeSec: Math.floor(s.nowMs / 1000) - WEB_MARKET_PERIOD_SECONDS[s.period] },
     };
   },
 };

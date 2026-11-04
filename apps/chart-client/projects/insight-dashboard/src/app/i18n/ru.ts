@@ -159,6 +159,7 @@ export const ru: Strings = {
   'instrument.resizeHandle': 'Изменить высоту панели над линией',
   'instrument.loadingEarlier': 'Загружаю более раннюю историю…',
   'instrument.focus.marker': 'момент из ссылки',
+  'instrument.focus.periodStart': 'начало периода',
   'instrument.view': 'Вид',
   'instrument.legends.hide': 'Скрыть легенду',
   'instrument.legends.show': 'Показать легенду',

@@ -96,3 +96,38 @@ test.describe('instrument page — phone 390×844 (IB-099)', () => {
     }
   });
 });
+
+test.describe('an R4 statement opens the whole period (IB-BUG-023)', () => {
+  test.use({ viewport: { width: 1440, height: 1000 } });
+
+  test('click → /instrument/BTCUSDT?at=<period start>&span=1h, on 1m, the start marked «period start»', async ({ page }) => {
+    const nowSec = Math.floor(recorded.fixedTimeMs / 1000);
+    const at = nowSec - 3_600; // the 1h period's start: its 1m frame is the window recorded
+    const basis = { window: '1h', venues: ['binance'], sampleWindows: 720, observedWindows: 720, from: nowSec - 30 * 86_400 };
+    const statement = {
+      ruleId: 'R4', block: 'positioning', key: 'insight.oi_vs_price', rarity: 0.95, magnitude: 2.2, basis,
+      params: { symbol: 'BTCUSDT', quadrant: 'new_longs', oiPct: 2.2, pricePct: 0.4 },
+      link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: at },
+    };
+    const neutral = (block: string) => ({ block, statement: null, neutral: { key: 'insight.neutral', reason: 'nothing_unusual', basis } });
+    const insights = { period: '1h', asOf: nowSec, top: [statement], blocks: ['liquidations', 'positioning', 'caps', 'flows', 'sentiment'].map(neutral) };
+    await page.clock.setFixedTime(recorded.fixedTimeMs);
+    await page.route('**/api/web/**', (route) => {
+      const u = new URL(route.request().url());
+      const path = u.pathname.replace('/api/web', '');
+      if (path === '/market/insights') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(insights) });
+      const hit = responses[path + u.search];
+      return route.fulfill({ status: hit?.status ?? 404, contentType: 'application/json', body: JSON.stringify(hit?.body ?? { code: 'NOT_RECORDED', message: path }) });
+    });
+    await page.goto('/market?p=1h');
+    const link = page.locator('#insights a.link').first();
+    await expect(link).toHaveAttribute('href', `/instrument/BTCUSDT?at=${at}&span=1h`, { timeout: 30_000 });
+    await link.click();
+    await expect(page).toHaveURL(new RegExp(`/instrument/BTCUSDT\\?at=${at}&span=1h$`));
+    const marker = page.locator('.focus-marker');
+    await expect(marker).toHaveAttribute('data-at', String(at), { timeout: 30_000 });
+    await expect(marker).toContainText('period start');
+    await expect(page.getByRole('button', { name: '1m', exact: true })).toHaveClass(/active/);
+  });
+});
+

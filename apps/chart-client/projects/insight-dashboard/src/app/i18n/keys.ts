@@ -165,6 +165,7 @@ export type StringKey =
   | 'instrument.resizeHandle'
   | 'instrument.loadingEarlier'
   | 'instrument.focus.marker'
+  | 'instrument.focus.periodStart'
   | 'instrument.view'
   | 'instrument.legends.hide'
   | 'instrument.legends.show'

@@ -116,7 +116,7 @@ export class InstrumentComponent {
   constructor() {
     const fromRoute = this.route.snapshot.paramMap.get('symbol');
     if (fromRoute) this.symbol.set(fromRoute.toUpperCase());
-    this.focus.set(focusFromQuery(this.route.snapshot.queryParamMap.get('at'), Date.now()));
+    this.focus.set(focusFromQuery(this.route.snapshot.queryParamMap.get('at'), Date.now(), this.route.snapshot.queryParamMap.get('span')));
     this.timeframe.set(this.focus()?.timeframe ?? this.timeframe());
     void this.loadUniverse();
     void this.loadFigures();
@@ -166,7 +166,7 @@ export class InstrumentComponent {
   chooseTimeframe(tf: WebTimeframe): void {
     this.timeframe.set(tf);
     // the moment belonged to the link: off the screen and off the URL, so a reload does not jump back
-    if (this.focus()) void this.router.navigate([], { queryParams: { at: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    if (this.focus()) void this.router.navigate([], { queryParams: { at: null, span: null }, queryParamsHandling: 'merge', replaceUrl: true });
     this.focus.set(null);
     void this.load();
   }

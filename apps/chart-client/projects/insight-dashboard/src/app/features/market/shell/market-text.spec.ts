@@ -130,3 +130,18 @@ describe('neutralLine (IB-BUG-022)', () => {
   });
 });
 
+describe('insight links (IB-BUG-023)', () => {
+  const basis = { window: '24h' as const, venues: ['binance'], sampleWindows: 697, observedWindows: 697, from: 1_791_157_260 };
+  const st = (ruleId: 'R3' | 'R4', timeSec: number | null) => ({
+    ruleId, block: 'positioning' as const, key: 'insight.oi_vs_price' as const, params: { symbol: 'TRUMPUSDT' }, rarity: 0.92, magnitude: 7,
+    basis, link: { route: 'instrument' as const, symbol: 'TRUMPUSDT', timeSec },
+  });
+  it('an R4 link carries span=<its period>: the page opens on the whole period with its start marked', () => {
+    expect(insightView(st('R4', 1_793_670_000), 1_793_756_400).link).toEqual({ commands: ['/instrument', 'TRUMPUSDT'], queryParams: { at: 1_793_670_000, span: '24h' } });
+  });
+  it('a moment (R3) stays a moment; no time stays no query', () => {
+    expect(insightView(st('R3', 1_793_670_000), 1_793_756_400).link).toEqual({ commands: ['/instrument', 'TRUMPUSDT'], queryParams: { at: 1_793_670_000 } });
+    expect(insightView(st('R4', null), 1_793_756_400).link).toEqual({ commands: ['/instrument', 'TRUMPUSDT'], queryParams: null });
+  });
+});
+
