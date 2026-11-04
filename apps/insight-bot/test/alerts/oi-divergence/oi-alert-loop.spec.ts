@@ -3,7 +3,11 @@ import { join } from 'node:path';
 import { OI_DIVERGENCE_DEFAULT_PARAMS, type OiDivergenceDirection, type OiDivergenceTf, type WebAlertSettings } from '@trade-automation/contracts';
 import { oiDivergenceAlert } from '../../../src/delivery/templates/oi-divergence.texts';
 import { OiAlertLoop, type OiAlertLoopPorts } from '../../../src/alerts/oi-divergence/oi-alert-loop';
-import type { NewOiAlert, NewOiSkip, OiAlertRecipient, OiAlertStore, OutcomeDue } from '../../../src/alerts/oi-divergence/pg/oi-alerts.repo';
+import type {
+  NewOiAlert, NewOiControl, NewOiNearMiss, NewOiSkip, NewPaths, OiAlertRecipient, OiAlertStore, OutcomeDue, PathDue, PathSubjectRef,
+} from '../../../src/alerts/oi-divergence/pg/oi-alerts.repo';
+import type { PathMeasurement } from '../../../src/alerts/oi-divergence/research/path';
+import { OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC } from '@trade-automation/contracts';
 import type { Bar } from '../../../src/insights/divergence/detector';
 
 /**
@@ -53,6 +57,38 @@ class MemoryStore implements OiAlertStore {
     if (field === 'price_4h') a.price4h = price; else a.price24h = price;
     if (completeAt !== null) a.outcomeAt = completeAt;
   }
+  // IB-115 — migration 027's once-keys, enforced as the database does
+  controls: Array<NewOiControl & { id: number }> = [];
+  nearMisses: Array<NewOiNearMiss & { id: number }> = [];
+  paths: Array<NewPaths & { id: number; subject: PathSubjectRef; win: (typeof OI_RESEARCH_WINDOWS)[number]; m: PathMeasurement | null; triedAt: number | null }> = [];
+  async hasAlert(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number) {
+    return this.alerts.some((a) => a.symbol === symbol && a.tf === tf && a.direction === direction && a.b.time === bTime);
+  }
+  async insertControl(x: NewOiControl) {
+    if (this.controls.some((c) => c.symbol === x.symbol && c.tf === x.tf && c.kind === x.kind && c.direction === x.direction && c.barTime === x.barTime)) return null;
+    const id = this.controls.length + 1;
+    this.controls.push({ ...x, id });
+    return id;
+  }
+  async insertNearMiss(x: NewOiNearMiss) {
+    if (this.nearMisses.some((c) => c.symbol === x.symbol && c.tf === x.tf && c.direction === x.direction && c.b.time === x.b.time)) return null;
+    const id = this.nearMisses.length + 1;
+    this.nearMisses.push({ ...x, id });
+    return id;
+  }
+  async insertPaths(subject: PathSubjectRef, x: NewPaths) {
+    for (const win of OI_RESEARCH_WINDOWS) {
+      if (this.paths.some((p) => JSON.stringify(p.subject) === JSON.stringify(subject) && p.win === win)) continue;
+      this.paths.push({ ...x, id: this.paths.length + 1, subject, win, m: null, triedAt: null });
+    }
+  }
+  async pathsDue(now: number, limit: number, retry: number): Promise<PathDue[]> {
+    return this.paths.filter((p) => p.m === null && p.t0 + OI_RESEARCH_WINDOW_SEC[p.win] + 60 <= now && (p.triedAt === null || p.triedAt + retry <= now))
+      .sort((a, b) => (a.triedAt ?? -1) - (b.triedAt ?? -1) || a.t0 - b.t0 || a.id - b.id).slice(0, limit)
+      .map((p) => ({ id: p.id, symbol: p.symbol, win: p.win, direction: p.direction, t0: p.t0, atr14: p.atr14, stopPrice: p.stopPrice }));
+  }
+  async setPath(id: number, m: PathMeasurement) { (this.paths[id - 1] as (typeof this.paths)[number]).m = m; }
+  async pathFailed(id: number, at: number) { (this.paths[id - 1] as (typeof this.paths)[number]).triedAt = at; }
 }
 
 function loop(store: MemoryStore, over: Partial<OiAlertLoopPorts> = {}) {
@@ -66,6 +102,8 @@ function loop(store: MemoryStore, over: Partial<OiAlertLoopPorts> = {}) {
     closeAt: async (_s, at) => 2_000 + (at % 7),
     send: async (chatId, text) => { sent.push({ chatId, text }); return chatId !== 999; },
     webBaseUrl: 'https://box.example',
+    build: 'b49cd48d4ab4',
+    klines5m: async () => [],
     ...over,
   };
   return { loop: new OiAlertLoop(ports), sent, klineCalls };
@@ -151,11 +189,11 @@ describe('IB-112: the OI divergence loop on the real ETHUSDT 1h divergence', () 
     expect(r).toMatchObject({ journalled: 1, skips: 0 });
   });
 
-  it('reads barsForEvaluation + W closed bars (185 + 168 = 353 on 1h, round-2 defaults), ending at the due close; fewer than barsForEvaluation → not evaluated', async () => {
+  it('reads the near-miss basis + W closed bars (272 + 168 = 440 on 1h, IB-115), ending at the due close; fewer than barsForEvaluation → not evaluated', async () => {
     const store = new MemoryStore();
     const { loop: l, klineCalls } = loop(store);
     await l.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
-    expect(klineCalls).toEqual([['ETHUSDT', '1h', CONFIRMED - 353 * H, CONFIRMED]]);
+    expect(klineCalls).toEqual([['ETHUSDT', '1h', CONFIRMED - 440 * H, CONFIRMED]]);
     const young = new MemoryStore();
     const short = loop(young, { klines: async (_s, _tf, _from, to) => F.bars.filter((b) => b.time >= to - 184 * H && b.time < to) });
     expect(await short.loop.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60)).toMatchObject({ journalled: 0, failed: [] });
@@ -214,5 +252,150 @@ describe('IB-112: scheduling and outcomes', () => {
     await l.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
     await l.fillOutcomes(CONFIRMED + 30 * H);
     expect(calls).toBe(0);
+  });
+});
+
+/**
+ * IB-115 — the research journal, from the same evaluation: paths for every journalled alert, the two control
+ * groups, near-misses, the build on every row, and the path measurer.
+ */
+describe('IB-115: the research journal in the loop', () => {
+  const ETH5M = JSON.parse(readFileSync(join(__dirname, '..', '..', 'fixtures', 'binance', 'fapi-klines-5m-ethusdt-path.json'), 'utf8')) as { klines: Array<[number, string, string, string, string]> };
+  const eth5m: Bar[] = ETH5M.klines.map((r) => ({ time: r[0] / 1000, open: Number(r[1]), high: Number(r[2]), low: Number(r[3]), close: Number(r[4]) }));
+  /** Every hourly evaluation the 238-bar fixture can feed (≥ barsForEvaluation = 185 closed bars). */
+  const replay = async (store: MemoryStore, over: Partial<OiAlertLoopPorts> = {}) => {
+    const { loop: l } = loop(store, over);
+    const first = F.bars[184] as Bar;
+    const last = F.bars.at(-1) as Bar;
+    for (let close = first.time + H; close <= last.time + H; close += H) await l.evaluate('1h', close, close + 6 * 60);
+  };
+
+  it('a journalled alert gets 3 paths: t0 = confirmation + 6 min up to 5 m, its stop at B’s low, ATR14 at B; the row carries the build', async () => {
+    const store = new MemoryStore();
+    await loop(store).loop.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
+    expect(store.alerts[0]?.build).toBe('b49cd48d4ab4');
+    expect(store.paths.filter((p) => 'alertId' in p.subject).map((p) => [p.win, p.direction, p.t0, p.stopPrice, Number(p.atr14.toFixed(3))])).toEqual(
+      OI_RESEARCH_WINDOWS.map((w) => [w, 'bullish', CONFIRMED + 600, 2355, 13.855]));
+  });
+
+  it('a LATE alert is measured from the same t0 as an on-time one (V23: sending does not change what is measured)', async () => {
+    const store = new MemoryStore();
+    await loop(store).loop.evaluate('1h', CONFIRMED, CONFIRMED + H + 10 * 60 + 1);
+    expect(store.alerts[0]?.late).toBe(true);
+    expect(store.paths.filter((p) => 'alertId' in p.subject).map((p) => p.t0)).toEqual([CONFIRMED + 600, CONFIRMED + 600, CONFIRMED + 600]);
+  });
+
+  it('pivot controls: every decided price pivot without an alert — the alert’s own B is NOT one; with an empty journal it would be', async () => {
+    const store = new MemoryStore();
+    await replay(store);
+    const pivots = store.controls.filter((c) => c.kind === 'pivot');
+    expect(pivots.length).toBeGreaterThan(3);
+    expect(pivots.every((c) => c.build === 'b49cd48d4ab4' && c.stopPrice !== null && c.direction !== null)).toBe(true);
+    expect(pivots.some((c) => c.direction === 'bullish' && c.barTime === F.expected.bTime)).toBe(false);
+    // control: the same replay with a journal that never answers «alerted» — B is then a pivot control
+    const blind = new MemoryStore();
+    blind.hasAlert = async () => false;
+    await replay(blind);
+    expect(blind.controls.some((c) => c.kind === 'pivot' && c.direction === 'bullish' && c.barTime === F.expected.bTime)).toBe(true);
+    // each has its 3 paths, measured from bar i + N's close + 6 min
+    const b = blind.controls.find((c) => c.kind === 'pivot' && c.barTime === F.expected.bTime) as NewOiControl & { id: number };
+    expect(blind.paths.filter((p) => 'controlId' in p.subject && p.subject.controlId === b.id).map((p) => p.t0)).toEqual(
+      [1, 2, 3].map(() => F.expected.bTime + 7 * H + 600));
+  });
+
+  it('random controls: 2 per day on the hash-picked closes; a replay (new process, same store) adds nothing', async () => {
+    const store = new MemoryStore();
+    await replay(store);
+    const random = store.controls.filter((c) => c.kind === 'random');
+    expect(random.length).toBeGreaterThan(0);
+    expect(random.every((c) => c.direction === null && c.stopPrice === null)).toBe(true);
+    const days = new Map<number, number>();
+    for (const c of random) days.set(Math.floor(c.barTime / 86_400), (days.get(Math.floor(c.barTime / 86_400)) ?? 0) + 1);
+    expect([...days.values()].every((n) => n <= 2)).toBe(true);
+    const before = store.controls.length;
+    await replay(store);
+    expect(store.controls.length).toBe(before);
+  });
+
+  it('measures a closed window with one klines call at its limit, and only once it has closed', async () => {
+    const store = new MemoryStore();
+    const calls: Array<[string, number, number]> = [];
+    const { loop: l } = loop(store, { klines5m: async (s, from, limit) => { calls.push([s, from, limit]); return eth5m; } });
+    await l.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
+    const t0 = CONFIRMED + 600;
+    expect(await l.measurePaths(t0 + 4 * H + 59)).toEqual({ measured: 0, failed: 0, weight: 0 });
+    expect(await l.measurePaths(t0 + 4 * H + 60)).toEqual({ measured: 1, failed: 0, weight: 1 });
+    expect(calls).toEqual([['ETHUSDT', t0, 48]]);
+    const p4h = store.paths.find((p) => 'alertId' in p.subject && p.win === '4h');
+    expect(p4h?.m).toMatchObject({ bars: 48, entryPrice: 2421.81, high: 2422.75, low: 2405.3, stopAt: null, orderAmbiguous: false });
+    expect(await l.measurePaths(t0 + 4 * H + 120)).toEqual({ measured: 0, failed: 0, weight: 0 }); // measured once
+  });
+
+  it('a failing fetch is retried after 15 min, behind windows never tried — one bad coin cannot starve the queue', async () => {
+    const store = new MemoryStore();
+    let fail = true;
+    const { loop: l } = loop(store, { klines5m: async () => { if (fail) throw new Error('venue 503'); return eth5m; } });
+    await l.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
+    const t0 = CONFIRMED + 600;
+    expect(await l.measurePaths(t0 + 4 * H + 60)).toMatchObject({ measured: 0, failed: 1 });
+    expect(await l.measurePaths(t0 + 4 * H + 120)).toMatchObject({ measured: 0, failed: 0 }); // waiting out its retry
+    fail = false;
+    expect(await l.measurePaths(t0 + 4 * H + 60 + 15 * 60)).toMatchObject({ measured: 1, failed: 0 });
+  });
+
+  it('a 4h path costs 1, 24h 2, 72h 5: 8 per subject (V24)', async () => {
+    const store = new MemoryStore();
+    const { loop: l } = loop(store, { klines5m: async () => eth5m });
+    await l.evaluate('1h', CONFIRMED, CONFIRMED + 6 * 60);
+    expect((await l.measurePaths(CONFIRMED + 600 + 72 * H + 60)).weight).toBe(8);
+  });
+});
+
+describe('IB-115: near-misses in the loop (synthetic 15m)', () => {
+  const TF = 900;
+  const P15 = OI_DIVERGENCE_DEFAULT_PARAMS.perTf['15m']; // n 6, k 3, w 96
+  const LEN = 260; // what the loop reads on 15m: barsForEvaluation(near-miss reach) 164 + W 96
+  const T0 = 1_793_000_000 - (1_793_000_000 % 14_400);
+  const B = LEN - (2 * P15.k + P15.n + 1); // the B a near-miss is decided at
+  const A = B - 20;
+  /** B’s OI pivot k + 1 bars after it: a k near-miss, miss 1. */
+  const lowAt = (i: number) => (i === A ? 95 : i === B ? 93 : 100);
+  const oiAt = (i: number) => (i === A + 1 ? 960 : i === B + P15.k + 1 ? 980 : 1000 + 10 * (i % 2));
+  const bars: Bar[] = Array.from({ length: LEN + 20 }, (_, i) => ({ time: T0 + i * TF, open: lowAt(i) + 1, high: lowAt(i) + 2, low: lowAt(i), close: lowAt(i) + 1 }));
+  const oi5m = bars.flatMap((b, i) => [1, 2, 3].map((s) => ({ time: b.time + s * 300, oi: oiAt(i) })));
+  const ports = (): Partial<OiAlertLoopPorts> => ({
+    klines: async (_s, tf, from, to) => (tf === '15m' ? bars.filter((b) => b.time >= from && b.time < to) : []),
+    oiWindow: async (_s, from, to) => ({ oi5m: oi5m.filter((o) => o.time > from && o.time <= to), venueSilent: [] }),
+  });
+  const close = T0 + LEN * TF; // the window then ends at bar LEN − 1
+
+  it('the B the reach decides gets ONE near-miss row (rule k, miss 1 bar), with the build and 3 paths; the next evaluation adds none', async () => {
+    const store = new MemoryStore();
+    const { loop: l } = loop(store, ports());
+    const r = await l.evaluate('15m', close, close + 6 * 60);
+    expect(r).toMatchObject({ journalled: 0, nearMisses: 1, failed: [] });
+    expect(store.nearMisses.map((m) => [m.direction, m.rule, m.miss, m.unit, m.a.time, m.b.time, m.build])).toEqual([
+      ['bullish', 'k', 1, 'bars', T0 + A * TF, T0 + B * TF, 'b49cd48d4ab4'],
+    ]);
+    const confirmedAt = T0 + (B + P15.k + 1 + P15.n) * TF + TF;
+    expect(store.nearMisses[0]?.confirmedAt).toBe(confirmedAt);
+    expect(store.paths.filter((p) => 'nearMissId' in p.subject).map((p) => [p.win, p.t0, p.stopPrice])).toEqual(
+      OI_RESEARCH_WINDOWS.map((w) => [w, confirmedAt + 600, 93]));
+    const next = await l.evaluate('15m', close + TF, close + TF + 6 * 60);
+    expect(next.nearMisses).toBe(0);
+    expect(store.nearMisses).toHaveLength(1);
+  });
+
+  it('an evaluation one bar EARLIER does not decide it yet (its OI pivot could still be within 2k)', async () => {
+    const store = new MemoryStore();
+    const { loop: l } = loop(store, ports());
+    expect((await l.evaluate('15m', close - TF, close - TF + 6 * 60)).nearMisses).toBe(0);
+  });
+
+  it('a B the journal holds an alert for gets no near-miss', async () => {
+    const store = new MemoryStore();
+    store.hasAlert = async (_s, _tf, _d, bTime) => bTime === T0 + B * TF;
+    const { loop: l } = loop(store, ports());
+    expect((await l.evaluate('15m', close, close + 6 * 60)).nearMisses).toBe(0);
   });
 });

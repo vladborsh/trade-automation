@@ -1,4 +1,5 @@
 import { barsForEvaluation, type DivergenceParams } from '../../insights/divergence/detector';
+import { nearMissReach } from '../../insights/divergence/diagnose';
 
 type Reach = Pick<DivergenceParams, 'n' | 'k' | 'w'>;
 
@@ -8,7 +9,8 @@ type Reach = Pick<DivergenceParams, 'n' | 'k' | 'w'>;
  * max(W + max(N, ATR_PERIOD − N − 1), OI_MEDIAN_BARS + 1, ATR_PERIOD) + k + N + 1 (113 / 185 / 111 on
  * 15m / 1h / 4h with the round-2 defaults). Never a typed number.
  *
- * **What it reads: `barsForEvaluation + W`** (209 / 353 / 201; 100–499 bars is 2 weight per kline call, as
+ * **What it reads: `barsForEvaluation + W`** (209 / 353 / 201 in IB-114; IB-115 widens the basis to the near-miss
+ * reach, `barsToFetch` below → 260 / 440 / 245; 100–499 bars is 2 weight per kline call, as
  * before). `barsForEvaluation` alone judges the newest B on a full basis, but not its RUN (V8): a repeat's
  * earlier B′ lies between A and B, i.e. up to W bars before B, and the detector only knows A–B′ was a line if
  * B′ itself was judged — which needs `barsForEvaluation` bars before B′. With fewer, the window called B a first
@@ -24,7 +26,17 @@ type Reach = Pick<DivergenceParams, 'n' | 'k' | 'w'>;
  * Older Bs in the window were the newest at an earlier evaluation; the journal's unique key absorbs repeats.
  */
 export function barsToFetch(p: Reach): number {
-  return barsForEvaluation(p) + p.w;
+  return Math.max(barsForEvaluation(p), barsForEvaluation(nearMissReach(p))) + p.w;
+}
+
+/**
+ * IB-115 (V26): near-misses reach farther — A up to ⌊1.5 W⌋ back, an OI pivot up to 2k away — so the BASIS is
+ * `barsForEvaluation(nearMissReach(p))` (164 / 272 / 155). The repeat tail stays the alert's + W (V10, TL
+ * 2026-11-04): near-misses need no repeat replay of their own, and a 1.5 W tail would put 1h at ≈ 524 bars,
+ * weight 5. So the loop reads 260 / 440 / 245 bars, all weight 2 (limit < 500).
+ */
+export function minBarsForNearMisses(p: Reach): number {
+  return barsForEvaluation(nearMissReach(p));
 }
 
 export function minBarsToEvaluate(p: Reach): number {

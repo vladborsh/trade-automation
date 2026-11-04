@@ -1,6 +1,8 @@
 import { OI_RESEARCH_WINDOW_SEC, type OiDivergenceDirection, type OiResearchWindow } from '@trade-automation/contracts';
 import type { Bar } from '../../../insights/divergence/detector';
 import { EVALUATE_AFTER_CLOSE_SEC } from '../timing';
+/** Binance's documented `/fapi/v1/klines` weight by `limit` — one definition (news/reaction-prices.ts). One call per window: 48 → 1, 288 → 2, 864 → 5, so 8 per subject. */
+export { klinesWeight } from '../../../news/reaction-prices';
 
 /**
  * IB-115 (architecture/oi-divergence-design-2026-11-04.md V23, V24) — the price path of one measured row
@@ -22,17 +24,6 @@ export function entryT0(confirmingCloseSec: number): number {
 /** 5 m klines in a window: 48 / 288 / 864. */
 export function windowBars(win: OiResearchWindow): number {
   return OI_RESEARCH_WINDOW_SEC[win] / PATH_BAR_SEC;
-}
-
-/**
- * `/fapi/v1/klines` weight by `limit` (Binance docs, USD-M «Kline/Candlestick Data»): [1, 100) 1,
- * [100, 500) 2, [500, 1000] 5, above 10. One call per window: 48 → 1, 288 → 2, 864 → 5, so 8 per subject.
- */
-export function klinesWeight(limit: number): number {
-  if (limit < 100) return 1;
-  if (limit < 500) return 2;
-  if (limit <= 1000) return 5;
-  return 10;
 }
 
 /** The window is measurable once its last 5 m bar has closed and the venue has had a minute to settle it. */

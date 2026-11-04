@@ -1,5 +1,5 @@
 import { OI_DIVERGENCE_DEFAULT_PARAMS, OI_DIVERGENCE_TF_SEC, type OiDivergenceTf } from '@trade-automation/contracts';
-import { barsToFetch, fullBasisIndex, hasFullBasis, minBarsToEvaluate } from '../../../src/alerts/oi-divergence/basis';
+import { barsToFetch, fullBasisIndex, hasFullBasis, minBarsForNearMisses, minBarsToEvaluate } from '../../../src/alerts/oi-divergence/basis';
 import { barsForEvaluation, detectDivergences, type Bar, type DivergenceParams } from '../../../src/insights/divergence/detector';
 import { detectorParams } from '../../../src/insights/divergence/params';
 
@@ -11,13 +11,15 @@ const params = (tf: OiDivergenceTf): DivergenceParams => detectorParams(OI_DIVER
 const TFS = ['15m', '1h', '4h'] as const;
 
 describe('bars the loop reads', () => {
-  it('evaluates from the detector\'s barsForEvaluation (113 / 185 / 111) and reads W more (209 / 353 / 201) — weight 2 each, never typed', () => {
+  it('evaluates from the detector\'s barsForEvaluation (113 / 185 / 111); reads the near-miss basis (164 / 272 / 155, IB-115) + the alert W (260 / 440 / 245) — weight 2 each, never typed', () => {
     expect(TFS.map((tf) => minBarsToEvaluate(P[tf]))).toEqual(TFS.map((tf) => barsForEvaluation(P[tf])));
     expect(TFS.map((tf) => minBarsToEvaluate(P[tf]))).toEqual([113, 185, 111]);
-    expect(TFS.map((tf) => barsToFetch(P[tf]))).toEqual([209, 353, 201]);
+    expect(TFS.map((tf) => minBarsForNearMisses(P[tf]))).toEqual([164, 272, 155]);
+    expect(TFS.map((tf) => barsToFetch(P[tf]))).toEqual(TFS.map((tf) => minBarsForNearMisses(P[tf]) + P[tf].w)); // the tail is W, not 1.5 W
+    expect(TFS.map((tf) => barsToFetch(P[tf]))).toEqual([260, 440, 245]);
     expect(TFS.every((tf) => barsToFetch(P[tf]) >= 100 && barsToFetch(P[tf]) < 500)).toBe(true); // klines limit 100–499: weight 2
     // the guard is the newest confirmable position of whatever the window holds, never before the full-basis index
-    expect(TFS.map((tf) => fullBasisIndex(P[tf], barsToFetch(P[tf])))).toEqual([199, 343, 191]);
+    expect(TFS.map((tf) => fullBasisIndex(P[tf], barsToFetch(P[tf])))).toEqual([250, 430, 235]);
     expect(TFS.map((tf) => fullBasisIndex(P[tf], minBarsToEvaluate(P[tf])))).toEqual([103, 175, 101]);
   });
 });
@@ -101,7 +103,7 @@ describe('the window agrees with long history for every guarded B (real detector
       const key = (d: { direction: string; a: { time: number }; b: { time: number }; runLength: number }) => `${d.direction} ${d.a.time} ${d.b.time} ${d.runLength}`;
       let compared = 0;
       let repeats = 0;
-      for (let seed = 1; seed <= 20; seed++) {
+      for (let seed = 1; seed <= 30; seed++) {
         const { bars, oi5m } = walk(seed, count + 600, tfSec); // 600 window ends past the first full window
         const long = detectDivergences({ tfSec, bars, oi5m, params: p });
         // slide the loop's window over the history: each end position is one evaluation
@@ -125,8 +127,10 @@ describe('the window agrees with long history for every guarded B (real detector
         }
       }
       // the comparison ran on real cases, not on nothing — and on runs, which are what a short window gets wrong
-      expect(compared).toBeGreaterThanOrEqual(10); // measured 12 / 20 / 25 on 15m / 1h / 4h
+      // measured 12 / 20 / 25 on 15m / 1h / 4h over 20 walks; IB-115's wider window (near-miss basis) moves the
+      // sampled ends, so 30 walks now: 15 / 36 / 30
+      expect(compared).toBeGreaterThanOrEqual(10);
       expect(repeats).toBeGreaterThan(0);
-    });
+    }, 120_000); // ~4 / 17 / 30 s measured (IB-115): above the 30 s default per test, and the cost grows with the window
   }
 });

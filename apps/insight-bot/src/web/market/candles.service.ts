@@ -9,6 +9,8 @@ import {
   packCandles, pageKey, pageSpanMs, pagesFor, reachesFormingBar, unpackCandles, type CachedPage,
 } from './candle-pages';
 import { WEIGHT_CEILING_1M } from './universe-summary.service';
+import { timeframeMs } from '../series/range';
+import { klinesWeight } from '../../news/reaction-prices';
 
 /**
  * IB-063 — the instrument chart's candles, read from Binance on demand instead of from the local
@@ -127,6 +129,24 @@ export class CandlesService {
       }
     }
     return out;
+  }
+
+  /**
+   * IB-115 (design V24): `limit` CLOSED perp klines from `fromMs`, as ONE request at exactly that limit, at
+   * the weight Binance documents for it (`klinesWeight`: 48 → 1, 288 → 2, 864 → 5) — not the 1 500-row page
+   * (weight 10) the chart's path uses. Not cached: each window is read once, after it has closed. An
+   * unknown symbol is an empty answer; anything else throws (the caller retries later).
+   */
+  async closedKlines(symbol: string, tf: WebTimeframe, fromMs: number, limit: number): Promise<WebCandle[]> {
+    this.refuseAboveCeiling('perp');
+    const toMs = fromMs + limit * timeframeMs(tf);
+    try {
+      const rows = await this.fetchKlinePage('perp', symbol, tf, fromMs, toMs - 1, limit, klinesWeight(limit));
+      return rows.map(toWebCandle).filter((c) => c.time * 1000 >= fromMs && c.time * 1000 < toMs && (c.time * 1000 + timeframeMs(tf)) <= this.now());
+    } catch (error) {
+      if (error instanceof BinanceHttpError && error.status === 400 && error.venueCode === INVALID_SYMBOL) return [];
+      throw error;
+    }
   }
 
   /** IB-066: true when `[fromMs, toMs)` holds the bar still forming, by this service's clock. */

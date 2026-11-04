@@ -1,8 +1,10 @@
 import {
   OiDivergenceJournalParamsSchema, OiDivergenceParamsSchema, type OiDivergenceDirection, type OiDivergenceParams, type OiDivergenceTf, type WebAlertSettings,
   type WebAlertSymbol, type WebOiDivergenceAlert, type WebOiDivergenceSkipRow,
+  OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC, type OiControlKind, type OiNearMissRule, type OiNearMissUnit, type OiResearchWindow,
 } from '@trade-automation/contracts';
 import type { Db } from '../../../db/db.port';
+import { PATH_SETTLE_SEC, type PathMeasurement } from '../research/path';
 import type { Lang } from '../../../users/user.model';
 
 /**
@@ -28,6 +30,54 @@ export interface NewOiAlert {
   params: OiDivergenceParams;
   confirmedAt: number;
   late: boolean;
+  /** V27: the image's commit (12 hex) or 'dev'. NOT NULL with no default since 027: never omitted. */
+  build: string;
+}
+
+/** IB-115 (V25): one control row. */
+export interface NewOiControl {
+  symbol: string;
+  tf: OiDivergenceTf;
+  kind: OiControlKind;
+  direction: OiDivergenceDirection | null;
+  barTime: number;
+  stopPrice: number | null;
+  params: OiDivergenceParams;
+  build: string;
+}
+
+/** IB-115 (V26): one near-miss row. */
+export interface NewOiNearMiss {
+  symbol: string;
+  tf: OiDivergenceTf;
+  direction: OiDivergenceDirection;
+  a: { time: number; price: number; oiTime: number; oi: number };
+  b: { time: number; price: number; oiTime: number; oi: number };
+  rule: OiNearMissRule;
+  miss: number;
+  unit: OiNearMissUnit;
+  params: OiDivergenceParams;
+  confirmedAt: number;
+  build: string;
+}
+
+/** IB-115 (V24): what a subject's paths measure — written with the subject, measured once each window closes. */
+export type PathSubjectRef = { alertId: number } | { controlId: number } | { nearMissId: number };
+export interface NewPaths {
+  symbol: string;
+  direction: OiDivergenceDirection | null;
+  t0: number;
+  atr14: number;
+  stopPrice: number | null;
+}
+export interface PathDue {
+  id: number;
+  symbol: string;
+  win: OiResearchWindow;
+  direction: OiDivergenceDirection | null;
+  t0: number;
+  atr14: number;
+  stopPrice: number | null;
 }
 
 export interface NewOiSkip {
@@ -63,6 +113,18 @@ export interface OiAlertStore {
   /** Sent alerts whose +4 h or +24 h close is due and missing. */
   outcomesDue(nowSec: number): Promise<OutcomeDue[]>;
   setOutcome(id: number, field: 'price_4h' | 'price_24h', price: number, completeAt: number | null): Promise<void>;
+  /** IB-115: whether the journal holds an alert with this B (any A) — «whose evaluation produced no alert». */
+  hasAlert(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<boolean>;
+  /** Null when that control is already recorded (a re-evaluation or a restart). */
+  insertControl(row: NewOiControl): Promise<number | null>;
+  /** Null when B already has its near-miss. */
+  insertNearMiss(row: NewOiNearMiss): Promise<number | null>;
+  /** One row per window (4h / 24h / 72h); an existing one is kept. */
+  insertPaths(subject: PathSubjectRef, spec: NewPaths): Promise<void>;
+  /** Unmeasured paths whose window closed by `nowSec`; a failed one waits `retryAfterSec` before it is tried again. */
+  pathsDue(nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]>;
+  setPath(id: number, m: PathMeasurement, measuredAt: number): Promise<void>;
+  pathFailed(id: number, at: number): Promise<void>;
 }
 
 const sec = (d: Date | string | null): number | null => (d === null ? null : Math.floor(new Date(d).getTime() / 1000));
@@ -105,11 +167,11 @@ export class PgOiAlertStore implements OiAlertStore {
   async insertAlert(x: NewOiAlert): Promise<number | null> {
     const rows = await this.db.query<{ id: string }>(
       `insert into oi_divergence_alerts
-         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, run_of, run_length, params, confirmed_at, late)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, run_of, run_length, params, confirmed_at, late, build)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        on conflict on constraint oi_divergence_alerts_once do nothing returning id`,
       [x.symbol, x.tf, x.direction, at(x.a.time), x.a.price, at(x.a.oiTime), x.a.oi, at(x.b.time), x.b.price, at(x.b.oiTime), x.b.oi,
-        x.runOf, x.runLength, JSON.stringify(x.params), at(x.confirmedAt), x.late],
+        x.runOf, x.runLength, JSON.stringify(x.params), at(x.confirmedAt), x.late, x.build],
     );
     return rows.length > 0 ? Number(rows[0].id) : null;
   }
@@ -156,6 +218,74 @@ export class PgOiAlertStore implements OiAlertStore {
   async setOutcome(id: number, field: 'price_4h' | 'price_24h', price: number, completeAt: number | null): Promise<void> {
     const column = field === 'price_4h' ? 'price_4h' : 'price_24h';
     await this.db.query(`update oi_divergence_alerts set ${column} = $2, outcome_at = coalesce($3, outcome_at) where id = $1`, [id, price, completeAt === null ? null : at(completeAt)]);
+  }
+
+  // ------------------------------------------------------------------ the research journal (IB-115, V23–V27)
+
+  async hasAlert(symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number): Promise<boolean> {
+    const rows = await this.db.query(
+      'select 1 from oi_divergence_alerts where symbol = $1 and tf = $2 and direction = $3 and b_time = $4 limit 1', [symbol, tf, direction, at(bTime)]);
+    return rows.length > 0;
+  }
+
+  async insertControl(x: NewOiControl): Promise<number | null> {
+    const rows = await this.db.query<{ id: string }>(
+      `insert into oi_divergence_controls (symbol, tf, kind, direction, bar_time, stop_price, params, build)
+       values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict on constraint oi_divergence_controls_once do nothing returning id`,
+      [x.symbol, x.tf, x.kind, x.direction, at(x.barTime), x.stopPrice, JSON.stringify(x.params), x.build],
+    );
+    return rows.length > 0 ? Number(rows[0].id) : null;
+  }
+
+  async insertNearMiss(x: NewOiNearMiss): Promise<number | null> {
+    const rows = await this.db.query<{ id: string }>(
+      `insert into oi_divergence_near_misses
+         (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       on conflict on constraint oi_divergence_near_misses_once do nothing returning id`,
+      [x.symbol, x.tf, x.direction, at(x.a.time), x.a.price, at(x.a.oiTime), x.a.oi, at(x.b.time), x.b.price, at(x.b.oiTime), x.b.oi,
+        x.rule, x.miss, x.unit, JSON.stringify(x.params), at(x.confirmedAt), x.build],
+    );
+    return rows.length > 0 ? Number(rows[0].id) : null;
+  }
+
+  async insertPaths(subject: PathSubjectRef, x: NewPaths): Promise<void> {
+    const [column, id] = 'alertId' in subject ? ['alert_id', subject.alertId] : 'controlId' in subject ? ['control_id', subject.controlId] : ['near_miss_id', subject.nearMissId];
+    await this.db.query(
+      `insert into oi_divergence_paths (${column}, win, symbol, direction, t0, atr14, stop_price)
+       select $1, w, $3, $4, $5, $6, $7 from unnest($2::text[]) as w
+       on conflict do nothing`,
+      [id, [...OI_RESEARCH_WINDOWS], x.symbol, x.direction, at(x.t0), x.atr14, x.stopPrice],
+    );
+  }
+
+  async pathsDue(nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]> {
+    const rows = await this.db.query<{ id: string; symbol: string; win: OiResearchWindow; direction: OiDivergenceDirection | null; t0: Date; atr14: string; stop_price: string | null }>(
+      `select id, symbol, win, direction, t0, atr14, stop_price from oi_divergence_paths
+        where measured_at is null
+          and t0 + (case win when '4h' then $4::int when '24h' then $5::int else $6::int end) * interval '1 second' + $7 * interval '1 second' <= $1
+          and (tried_at is null or tried_at + $3 * interval '1 second' <= $1)
+        order by tried_at nulls first, t0, id limit $2`,
+      [at(nowSec), limit, retryAfterSec, OI_RESEARCH_WINDOW_SEC['4h'], OI_RESEARCH_WINDOW_SEC['24h'], OI_RESEARCH_WINDOW_SEC['72h'], PATH_SETTLE_SEC],
+    );
+    return rows.map((r) => ({
+      id: Number(r.id), symbol: r.symbol, win: r.win, direction: r.direction, t0: sec(r.t0) as number,
+      atr14: Number(r.atr14), stopPrice: num(r.stop_price),
+    }));
+  }
+
+  async setPath(id: number, m: PathMeasurement, measuredAt: number): Promise<void> {
+    const t = (v: number | null) => (v === null ? null : at(v));
+    await this.db.query(
+      `update oi_divergence_paths set measured_at = $2, bars = $3, entry_at = $4, entry_price = $5, high = $6, high_at = $7, low = $8, low_at = $9,
+              stop_at = $10, fav_05_at = $11, fav_1_at = $12, fav_2_at = $13, order_ambiguous = $14 where id = $1 and measured_at is null`,
+      [id, at(measuredAt), m.bars, t(m.entryAt), m.entryPrice, m.high, t(m.highAt), m.low, t(m.lowAt),
+        t(m.stopAt), t(m.fav05At), t(m.fav1At), t(m.fav2At), m.orderAmbiguous],
+    );
+  }
+
+  async pathFailed(id: number, nowSec: number): Promise<void> {
+    await this.db.query('update oi_divergence_paths set tried_at = $2 where id = $1', [id, at(nowSec)]);
   }
 
   // ------------------------------------------------------------------ the admin page (V17)

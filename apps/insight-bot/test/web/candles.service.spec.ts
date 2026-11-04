@@ -490,3 +490,38 @@ describe('CandlesService — IB-066 live tail', () => {
     expect(venue.calls[0].params.get('limit')).toBe('99');
   });
 });
+
+/**
+ * IB-115 (design V24) — the research path's read: ONE request per window at exactly its limit (48 / 288 / 864
+ * 5 m bars), at the weight Binance documents for that limit (1 / 2 / 5), never through the 1 500-row page
+ * (weight 10), never cached; only closed bars come back.
+ */
+describe('closedKlines — one exact-limit, uncached read per research window (IB-115)', () => {
+  it.each([[48, 1], [288, 2], [864, 5]])('%i bars: limit %i on the wire, weight %i, no cache', async (limit, w) => {
+    const { service, venue, weight } = setup();
+    const from = NOW - 4 * DAY;
+    const rows = await service.closedKlines('BTCUSDT', '5m', from, limit);
+    expect(venue.calls).toHaveLength(1);
+    const call = venue.calls[0] as Call;
+    expect([call.path, call.params.get('interval'), Number(call.params.get('startTime')), Number(call.params.get('limit'))]).toEqual(['/fapi/v1/klines', '5m', from, limit]);
+    expect(Number(call.params.get('endTime'))).toBe(from + limit * 300_000 - 1);
+    expect(rows).toHaveLength(limit);
+    expect(weight.used1m(NOW)).toBe(w);
+    await service.closedKlines('BTCUSDT', '5m', from, limit);
+    expect(venue.calls).toHaveLength(2); // read once per window in production; nothing kept to be read twice
+  });
+
+  it('the bar still forming is not returned', async () => {
+    const { service } = setup();
+    const from = Math.floor(NOW / 300_000) * 300_000 - 10 * 300_000; // 10 closed bars, then the forming one
+    const rows = await service.closedKlines('BTCUSDT', '5m', from, 48);
+    expect(rows).toHaveLength(10);
+  });
+
+  it('an unknown symbol is an empty answer; a venue failure throws (the measurer retries later)', async () => {
+    const bad = setup({ status: () => ({ status: 400, body: FAPI_INVALID_SYMBOL }) });
+    expect(await bad.service.closedKlines('NOPEUSDT', '5m', NOW - DAY, 48)).toEqual([]);
+    const down = setup({ status: () => ({ status: 503, body: null }) });
+    await expect(down.service.closedKlines('BTCUSDT', '5m', NOW - DAY, 48)).rejects.toThrow();
+  });
+});

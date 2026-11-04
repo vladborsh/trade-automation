@@ -1,8 +1,11 @@
-import { OI_DIVERGENCE_TFS, OI_DIVERGENCE_TF_SEC, type OiDivergenceTf } from '@trade-automation/contracts';
-import { detectDivergences, type Bar, type DivergenceParams } from '../../insights/divergence/detector';
+import { OI_DIVERGENCE_TFS, OI_DIVERGENCE_TF_SEC, type OiDivergenceParams, type OiDivergenceTf } from '@trade-automation/contracts';
+import { atrAt, detectDivergences, type Bar, type DivergenceInput, type DivergenceParams } from '../../insights/divergence/detector';
+import { diagnose } from '../../insights/divergence/diagnose';
 import { detectorParams } from '../../insights/divergence/params';
 import { oiDivergenceAlert } from '../../delivery/templates/oi-divergence.texts';
-import { barsToFetch, fullBasisIndex, hasFullBasis, minBarsToEvaluate } from './basis';
+import { barsToFetch, fullBasisIndex, hasFullBasis, minBarsForNearMisses, minBarsToEvaluate } from './basis';
+import { pivotControlPicks, randomControlPick, type ControlPick } from './research/controls';
+import { entryT0, klinesWeight, measurePath, windowBars } from './research/path';
 import { dueBarClose, isLate } from './timing';
 import type { OiAlertStore } from './pg/oi-alerts.repo';
 
@@ -21,6 +24,13 @@ import type { OiAlertStore } from './pg/oi-alerts.repo';
  *    every user with `oi_alerts`, in their language, through the Telegram sender.
  * 4. Skips (a hole in OI the venue did not cause, V9) are logged once per (symbol, TF, bar).
  * 5. Hourly: the +4 h and +24 h closes of sent alerts (1 m kline close, 1 weight each, V12).
+ * 6. IB-115, the research journal (V23–V27), from the same bars — no extra bar fetch:
+ *    - every journalled alert gets its price paths (4h / 24h / 72h from t0, V24);
+ *    - controls (V25): the price pivot this evaluation decides for good, if its B produced no alert; and the
+ *      newest bar when it is one of its day's 2 hash-picked closes;
+ *    - near-misses (V26): `diagnose` beside the detector, at the B its wider reach decides for good;
+ *    - every row carries the build (V27); each tick measures up to `PATHS_PER_TICK` closed windows, one
+ *      klines call each at weight 1 / 2 / 5.
  *
  * A coin that fails (venue down, no OI yet) is logged and skipped; the others still run.
  */
@@ -36,6 +46,10 @@ export interface OiAlertLoopPorts {
   send(chatId: number, text: string): Promise<boolean>;
   /** WEB_BASE_URL, for the link in the message. */
   webBaseUrl: string;
+  /** IB-115 (V27): the image's commit (12 hex) or 'dev' — stamped on every journal, control and near-miss row. */
+  build: string;
+  /** IB-115 (V24): `limit` CLOSED 5 m klines from `fromSec`, one request at exactly that limit. */
+  klines5m(symbol: string, fromSec: number, limit: number): Promise<Bar[]>;
   log?: { warn(message: string): void; log?(message: string): void };
 }
 
@@ -46,8 +60,24 @@ export interface EvaluationReport {
   late: number;
   sent: number;
   skips: number;
+  /** IB-115: coins evaluated, controls and near-misses recorded. */
+  coins: number;
+  controls: number;
+  nearMisses: number;
   failed: string[];
 }
+
+export interface PathRunReport {
+  measured: number;
+  failed: number;
+  /** Documented klines weight of the calls made (V24: 1 / 2 / 5 per window). */
+  weight: number;
+}
+
+/** IB-115: paths measured per tick at most — a backlog after downtime drains at ≤ 10 calls a minute (≤ 50 weight). */
+export const PATHS_PER_TICK = 10;
+/** A window whose fetch failed is retried after this long, behind the ones never tried (no starvation). */
+export const PATH_RETRY_SEC = 15 * 60;
 
 const HOUR = 3_600;
 
@@ -75,6 +105,10 @@ export class OiAlertLoop {
         await this.fillOutcomes(nowSec);
         this.lastOutcomeRun = nowSec;
       }
+      const paths = await this.measurePaths(nowSec);
+      if (paths.measured > 0 || paths.failed > 0) {
+        this.ports.log?.log?.(`oi research paths: measured ${paths.measured}, failed ${paths.failed}, weight ${paths.weight}`);
+      }
       return reports;
     } finally {
       this.running = false;
@@ -85,12 +119,14 @@ export class OiAlertLoop {
   async evaluate(tf: OiDivergenceTf, barClose: number, nowSec: number): Promise<EvaluationReport> {
     const { store } = this.ports;
     const tfSec = OI_DIVERGENCE_TF_SEC[tf];
-    const report: EvaluationReport = { tf, barClose, journalled: 0, late: 0, sent: 0, skips: 0, failed: [] };
+    const report: EvaluationReport = { tf, barClose, journalled: 0, late: 0, sent: 0, skips: 0, coins: 0, controls: 0, nearMisses: 0, failed: [] };
+    const { build } = this.ports;
     const settings = await store.settings();
     const params: DivergenceParams = detectorParams(settings.params, tf);
     const count = barsToFetch(params);
     const need = minBarsToEvaluate(params);
     const symbols = await store.enabledSymbols();
+    report.coins = symbols.length;
     for (const symbol of symbols) {
       try {
         const bars = (await this.ports.klines(symbol, tf, barClose - count * tfSec, barClose)).filter((b) => b.time + tfSec <= barClose).slice(-count);
@@ -102,7 +138,8 @@ export class OiAlertLoop {
         const from = bars[0].time;
         const to = (bars[bars.length - 1] as Bar).time + tfSec;
         const window = await this.ports.oiWindow(symbol, from, to);
-        const result = detectDivergences({ tfSec, bars, oi5m: window.oi5m, venueSilent: window.venueSilent, params });
+        const input: DivergenceInput = { tfSec, bars, oi5m: window.oi5m, venueSilent: window.venueSilent, params };
+        const result = detectDivergences(input);
         const guardFrom = bars[fullBasisIndex(params, bars.length)]?.time ?? Number.POSITIVE_INFINITY;
         for (const skip of result.skips) {
           if (skip.barTime < guardFrom) continue; // that B is judged on a full basis by an earlier evaluation
@@ -114,10 +151,12 @@ export class OiAlertLoop {
           const runOf = d.runFirstBTime === null ? null : await store.runFirstId(symbol, tf, d.direction, d.runFirstBTime);
           const id = await store.insertAlert({
             symbol, tf, direction: d.direction, a: d.a, b: d.b, runOf, runLength: d.runLength,
-            params: settings.params, confirmedAt: d.confirmedAt, late,
+            params: settings.params, confirmedAt: d.confirmedAt, late, build,
           });
           if (id === null) continue; // already journalled: a re-evaluation or a restart (V8)
           report.journalled++;
+          // V23: sent or not, late or not, the same t0 — so the switch does not change what is measured
+          await store.insertPaths({ alertId: id }, { symbol, direction: d.direction, t0: entryT0(d.confirmedAt), atr14: atrAt(bars, d.bIndex) ?? 0, stopPrice: d.b.price });
           if (late) { report.late++; continue; }
           if (!settings.enabled) continue; // V13: the journal runs either way; nothing is sent while off
           const recipients = await store.recipients();
@@ -129,12 +168,70 @@ export class OiAlertLoop {
           await store.markFired(id, nowSec, delivered, (bars[bars.length - 1] as Bar).close);
           report.sent += delivered;
         }
+        await this.research(symbol, tf, input, result, settings.params, report);
       } catch (error) {
         report.failed.push(symbol);
         this.ports.log?.warn(`oi alerts ${symbol} ${tf}: ${(error as Error).message}`);
       }
     }
     return report;
+  }
+
+  /**
+   * IB-115 (V25, V26): the controls and the near-miss this evaluation decides, from the bars it already read.
+   * Both exclude a B the journal holds an alert for — the journal, not this window, is what «produced an alert» means.
+   */
+  private async research(
+    symbol: string, tf: OiDivergenceTf, input: DivergenceInput, result: ReturnType<typeof detectDivergences>,
+    params: OiDivergenceParams, report: EvaluationReport,
+  ): Promise<void> {
+    const { store, build } = this.ports;
+    const { bars, params: p, tfSec } = input;
+    const picks: ControlPick[] = [];
+    for (const pick of pivotControlPicks(input, result)) {
+      if (!(await store.hasAlert(symbol, tf, pick.direction as 'bullish' | 'bearish', pick.barTime))) picks.push(pick);
+    }
+    const random = randomControlPick(symbol, tf, bars, tfSec);
+    if (random) picks.push(random);
+    for (const c of picks) {
+      const id = await store.insertControl({ symbol, tf, kind: c.kind, direction: c.direction, barTime: c.barTime, stopPrice: c.stopPrice, params, build });
+      if (id === null) continue;
+      report.controls++;
+      await store.insertPaths({ controlId: id }, { symbol, direction: c.direction, t0: c.t0, atr14: c.atr14, stopPrice: c.stopPrice });
+    }
+
+    if (bars.length < minBarsForNearMisses(p)) return; // a young coin: the reach's basis is not there yet
+    const decided = bars.length - (2 * p.k + p.n + 1); // the newest B whose OI pivot may lie 2k after it, confirmed
+    for (const m of diagnose(input, result)) {
+      if (m.bIndex !== decided) continue;
+      if (await store.hasAlert(symbol, tf, m.direction, m.b.time)) continue;
+      const id = await store.insertNearMiss({
+        symbol, tf, direction: m.direction, a: m.a, b: m.b, rule: m.rule, miss: m.miss, unit: m.unit, params, confirmedAt: m.confirmedAt, build,
+      });
+      if (id === null) continue;
+      report.nearMisses++;
+      await store.insertPaths({ nearMissId: id }, { symbol, direction: m.direction, t0: entryT0(m.confirmedAt), atr14: atrAt(bars, m.bIndex) ?? 0, stopPrice: m.b.price });
+    }
+  }
+
+  /** IB-115 (V24): measures the windows that have closed — one klines call each, oldest first, failed ones last. */
+  async measurePaths(nowSec: number): Promise<PathRunReport> {
+    const { store } = this.ports;
+    const out: PathRunReport = { measured: 0, failed: 0, weight: 0 };
+    for (const due of await store.pathsDue(nowSec, PATHS_PER_TICK, PATH_RETRY_SEC)) {
+      const limit = windowBars(due.win);
+      try {
+        out.weight += klinesWeight(limit);
+        const klines = await this.ports.klines5m(due.symbol, due.t0, limit);
+        await store.setPath(due.id, measurePath(klines, due), nowSec);
+        out.measured++;
+      } catch (error) {
+        out.failed++;
+        await store.pathFailed(due.id, nowSec);
+        this.ports.log?.warn(`oi research path ${due.id} ${due.symbol} ${due.win}: ${(error as Error).message}`);
+      }
+    }
+    return out;
   }
 
   /** V12: the +4 h and +24 h closes of sent alerts; `outcome_at` once both are in. */

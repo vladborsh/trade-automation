@@ -53,6 +53,9 @@ describeDb('IB-112 OI alerts against a real database', () => {
   }, DB_HOOK_TIMEOUT_MS);
 
   beforeEach(async () => {
+    await db.query('delete from oi_divergence_paths');
+    await db.query('delete from oi_divergence_controls');
+    await db.query('delete from oi_divergence_near_misses');
     await db.query('delete from oi_divergence_alerts');
     await db.query('delete from oi_divergence_skips');
     await db.query('update alert_settings set enabled = false, members_visible = false where id = 1');
@@ -79,6 +82,8 @@ describeDb('IB-112 OI alerts against a real database', () => {
       closeAt: async () => null,
       send: async (chatId) => { sent.push(chatId); return true; },
       webBaseUrl: 'https://box.example',
+      build: 'dev',
+      klines5m: async () => [],
     });
     await db.query(`update alert_symbols set enabled = (symbol = 'ETHUSDT')`);
     try {
@@ -98,7 +103,7 @@ describeDb('IB-112 OI alerts against a real database', () => {
     const row = {
       symbol: 'TRXUSDT', tf: '15m' as const, direction: 'bearish' as const,
       a: { time: 1_000, price: 0.3, oiTime: 1_300, oi: 10 }, b: { time: 9_000, price: 0.31, oiTime: 9_300, oi: 9 },
-      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 20_000, late: false,
+      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 20_000, late: false, build: 'dev',
     };
     const id = await store.insertAlert(row);
     expect(id).not.toBeNull();
@@ -115,12 +120,12 @@ describeDb('IB-112 OI alerts against a real database', () => {
   it('V20 (IB-114): a journal row written before 026 (no tolerances) reads as tolerance 0 through the store; a new row keeps its own', async () => {
     const { priceLineTolAtrMult: _p, oiLineTolMedianMult: _o, ...round1 } = OI_DIVERGENCE_DEFAULT_PARAMS;
     await db.query(
-      `insert into oi_divergence_alerts (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, params, confirmed_at)
-       values ('BTCUSDT', '1h', 'bullish', to_timestamp(1000), 100, to_timestamp(1000), 1000, to_timestamp(9000), 98, to_timestamp(9000), 1050, $1, to_timestamp(20000))`,
+      `insert into oi_divergence_alerts (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, params, confirmed_at, build)
+       values ('BTCUSDT', '1h', 'bullish', to_timestamp(1000), 100, to_timestamp(1000), 1000, to_timestamp(9000), 98, to_timestamp(9000), 1050, $1, to_timestamp(20000), 'pre-027')`, // 027 stamps such a row
       [JSON.stringify(round1)]);
     await store.insertAlert({
       symbol: 'ETHUSDT', tf: '1h', direction: 'bullish', a: { time: 1_000, price: 10, oiTime: 1_000, oi: 5 }, b: { time: 9_000, price: 9, oiTime: 9_000, oi: 6 },
-      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 30_000, late: false,
+      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 30_000, late: false, build: 'dev',
     });
     const bySymbol = Object.fromEntries((await store.recentAlerts()).map((r) => [r.symbol, r.params]));
     expect(bySymbol.BTCUSDT).toEqual({ ...round1, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }); // not the new 0.25 / 0.5
@@ -142,7 +147,7 @@ describeDb('IB-112 OI alerts against a real database', () => {
     const fired = 100_000;
     const id = (await store.insertAlert({
       symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', a: { time: 1, price: 1, oiTime: 1, oi: 1 }, b: { time: 2, price: 1, oiTime: 2, oi: 2 },
-      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: fired - 360, late: false,
+      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: fired - 360, late: false, build: 'dev',
     })) as number;
     expect(await store.outcomesDue(fired + 5 * 3_600)).toEqual([]); // not sent: no outcome
     await store.markFired(id, fired, 1, 50_000);
@@ -177,7 +182,7 @@ describeDb('IB-112 OI alerts against a real database', () => {
     const H = 3_600;
     const put = (symbol: string, confirmedAt: number, late: boolean, bTime: number) => store.insertAlert({
       symbol, tf: '1h', direction: 'bullish', a: { time: bTime - 20 * H, price: 1, oiTime: bTime - 20 * H, oi: 1 },
-      b: { time: bTime, price: 0.98, oiTime: bTime, oi: 1.03 }, runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt, late,
+      b: { time: bTime, price: 0.98, oiTime: bTime, oi: 1.03 }, runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt, late, build: 'dev',
     });
     await put('BTCUSDT', now - 25 * H, false, now - 32 * H); // older than 24 h
     expect(await store.latestOnTime(now)).toBeNull();
@@ -194,5 +199,89 @@ describeDb('IB-112 OI alerts against a real database', () => {
     } finally {
       await db.query('update alert_symbols set enabled = true');
     }
+  });
+
+  // ------------------------------------------------------------------ IB-115: the research journal
+
+  const nm = (bTime: number) => ({
+    symbol: 'ETHUSDT', tf: '1h' as const, direction: 'bullish' as const,
+    a: { time: bTime - 20 * 3_600, price: 100, oiTime: bTime - 20 * 3_600, oi: 1_000 }, b: { time: bTime, price: 98, oiTime: bTime, oi: 1_010 },
+    rule: 'k' as const, miss: 1, unit: 'bars' as const, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: bTime + 10 * 3_600, build: 'b49cd48d4ab4',
+  });
+
+  it('IB-115: the loop writes the build on the journal row and 3 unmeasured paths at t0; the real ETH run records controls with the build', async () => {
+    const loop = new OiAlertLoop({
+      store,
+      klines: async (_s, tf, from, to) => (tf === '1h' ? F.bars.filter((b) => b.time >= from && b.time < to) : []),
+      oiWindow: async (_s, from, to) => ({ oi5m: F.oi5m.filter((o) => o.time > from && o.time <= to), venueSilent: [] }),
+      closeAt: async () => null, send: async () => true, webBaseUrl: '', build: 'b49cd48d4ab4', klines5m: async () => [],
+    });
+    await db.query(`update alert_symbols set enabled = (symbol = 'ETHUSDT')`);
+    try {
+      for (let close = (F.bars[184] as Bar).time + 3_600; close <= (F.bars.at(-1) as Bar).time + 3_600; close += 3_600) await loop.evaluate('1h', close, close + 360);
+      const [a] = await db.query<{ id: string; build: string }>('select id, build from oi_divergence_alerts', []);
+      expect(a.build).toBe('b49cd48d4ab4');
+      const paths = await db.query<{ win: string; t0: Date; stop_price: string; measured_at: Date | null }>(
+        'select win, t0, stop_price, measured_at from oi_divergence_paths where alert_id = $1 order by win', [a.id]);
+      expect(paths.map((p) => [p.win, p.t0.getTime() / 1000, Number(p.stop_price), p.measured_at])).toEqual(
+        [['24h', CONFIRMED + 600, 2355, null], ['4h', CONFIRMED + 600, 2355, null], ['72h', CONFIRMED + 600, 2355, null]]);
+      const controls = await db.query<{ kind: string; n: number; builds: string[] }>(
+        'select kind, count(*)::int n, array_agg(distinct build) builds from oi_divergence_controls group by kind order by kind', []);
+      expect(controls.map((c) => c.kind)).toEqual(['pivot', 'random']);
+      expect(controls.every((c) => c.n > 0 && c.builds.join() === 'b49cd48d4ab4')).toBe(true);
+      const [{ n }] = await db.query<{ n: number }>(
+        `select count(*)::int n from oi_divergence_paths p join oi_divergence_controls c on c.id = p.control_id`, []);
+      expect(n).toBe(3 * controls.reduce((s, c) => s + c.n, 0));
+    } finally {
+      await db.query('update alert_symbols set enabled = true');
+    }
+  });
+
+  it('IB-115: controls and near-misses are once per key; paths once per window', async () => {
+    const control = { symbol: 'ETHUSDT', tf: '1h' as const, kind: 'random' as const, direction: null, barTime: 1_792_000_800, stopPrice: null, params: OI_DIVERGENCE_DEFAULT_PARAMS, build: 'dev' };
+    const id = await store.insertControl(control);
+    expect(id).not.toBeNull();
+    expect(await store.insertControl(control)).toBeNull();
+    const m = await store.insertNearMiss(nm(1_792_000_800));
+    expect(m).not.toBeNull();
+    expect(await store.insertNearMiss({ ...nm(1_792_000_800), rule: 'w', miss: 3 })).toBeNull();
+    const spec = { symbol: 'ETHUSDT', direction: null, t0: 1_792_004_400 + 600, atr14: 12.5, stopPrice: null };
+    await store.insertPaths({ controlId: id as number }, spec);
+    await store.insertPaths({ controlId: id as number }, spec);
+    await store.insertPaths({ nearMissId: m as number }, { ...spec, direction: 'bullish', stopPrice: 98 });
+    const [{ n }] = await db.query<{ n: number }>('select count(*)::int n from oi_divergence_paths', []);
+    expect(n).toBe(6);
+  });
+
+  it('IB-115: pathsDue — only closed windows (+ 1 min), never-tried before retried, a failed one waits; setPath writes every field once', async () => {
+    const id = (await store.insertControl({ symbol: 'BTCUSDT', tf: '1h', kind: 'pivot', direction: 'bullish', barTime: 1_792_000_800, stopPrice: 95, params: OI_DIVERGENCE_DEFAULT_PARAMS, build: 'dev' })) as number;
+    const t0 = 1_792_008_000;
+    await store.insertPaths({ controlId: id }, { symbol: 'BTCUSDT', direction: 'bullish', t0, atr14: 10, stopPrice: 95 });
+    expect(await store.pathsDue(t0 + 4 * 3_600 + 59, 10, 900)).toEqual([]);
+    const due = await store.pathsDue(t0 + 4 * 3_600 + 60, 10, 900);
+    expect(due).toEqual([expect.objectContaining({ symbol: 'BTCUSDT', win: '4h', direction: 'bullish', t0, atr14: 10, stopPrice: 95 })]);
+    const four = due[0] as { id: number };
+    await store.pathFailed(four.id, t0 + 4 * 3_600 + 60);
+    expect(await store.pathsDue(t0 + 4 * 3_600 + 120, 10, 900)).toEqual([]);
+    const later = t0 + 24 * 3_600 + 60;
+    expect((await store.pathsDue(later, 10, 900)).map((d) => d.win)).toEqual(['24h', '4h']); // the never-tried first
+    await store.setPath(four.id, {
+      bars: 48, entryAt: t0, entryPrice: 100, high: 106, highAt: t0 + 300, low: 94, lowAt: t0 + 300,
+      stopAt: t0 + 300, fav05At: t0 + 300, fav1At: null, fav2At: null, orderAmbiguous: true,
+    }, later);
+    const [r] = await db.query<Record<string, unknown>>('select bars, entry_price, high, low, stop_at, fav_05_at, fav_1_at, order_ambiguous, measured_at from oi_divergence_paths where id = $1', [four.id]);
+    expect([r.bars, Number(r.entry_price), Number(r.high), Number(r.low), (r.stop_at as Date).getTime() / 1000, (r.fav_05_at as Date).getTime() / 1000, r.fav_1_at, r.order_ambiguous, (r.measured_at as Date).getTime() / 1000])
+      .toEqual([48, 100, 106, 94, t0 + 300, t0 + 300, null, true, later]);
+    expect((await store.pathsDue(later, 10, 900)).map((d) => d.win)).toEqual(['24h']);
+  });
+
+  it('IB-115 (V27): a journal write without a build is refused by the database (NOT NULL, no default)', async () => {
+    const row = {
+      symbol: 'TRXUSDT', tf: '15m' as const, direction: 'bearish' as const,
+      a: { time: 1_000, price: 0.3, oiTime: 1_300, oi: 10 }, b: { time: 9_000, price: 0.31, oiTime: 9_300, oi: 9 },
+      runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 20_000, late: false,
+    };
+    await expect(store.insertAlert({ ...row, build: undefined as unknown as string })).rejects.toThrow(/null value in column "build"/);
+    await expect(store.insertNearMiss({ ...nm(1_792_000_800), build: undefined as unknown as string })).rejects.toThrow(/null value in column "build"/);
   });
 });
