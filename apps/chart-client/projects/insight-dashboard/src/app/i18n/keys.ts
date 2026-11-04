@@ -217,6 +217,7 @@ export type StringKey =
   | 'liq.where.legend'
   | 'liq.where.quiet'
   | 'liq.where.more'
+  | 'liq.where.other'
   | 'liq.where.showAll'
   | 'liq.where.collapse'
   | 'liq.verdict.long'

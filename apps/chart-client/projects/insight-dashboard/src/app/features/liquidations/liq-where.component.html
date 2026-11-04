@@ -29,6 +29,9 @@
     </div>
   }
 }
+@if (otherView(); as o) {
+  <p class="other">{{ t('liq.where.other', { count: o.coins, usd: usd(o.usd) }) }}</p>
+}
 @if (view().quiet > 0) {
   <p class="muted">{{ t('liq.where.quiet', { count: view().quiet }) }}</p>
 }

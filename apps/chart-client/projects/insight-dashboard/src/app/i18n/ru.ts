@@ -212,6 +212,7 @@ export const ru: Strings = {
   'liq.where.legend': '← лонги · шорты →',
   'liq.where.quiet': 'Монет без ликвидаций за период: {count}',
   'liq.where.more': 'Ещё монет: {count} · {usd}',
+  'liq.where.other': 'Прочие монеты ({count}): {usd} · не в списке',
   'liq.where.showAll': 'Показать все ({count})',
   'liq.where.collapse': 'Свернуть',
   'liq.verdict.long': 'лонги {ratio}',

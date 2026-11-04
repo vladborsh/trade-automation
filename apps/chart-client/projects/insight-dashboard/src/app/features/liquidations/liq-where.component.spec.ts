@@ -80,3 +80,25 @@ describe('LiqWhereComponent — folded to the top 8 (IB-101)', () => {
     expect(el.textContent).toContain('Coins with nothing in this period: 4');
   });
 });
+
+describe('LiqWhereComponent — «Other coins» (IB-BUG-025)', () => {
+  it('states the crypto in no row after the rows, folded AND unfolded, and apart from «more coins»', () => {
+    const { f, el, button } = render(coins(11));
+    f.componentRef.setInput('other', { totals: { usd: 6_900_000, long: 4_000_000, short: 2_900_000, events: 9_772 }, coins: 491 });
+    f.detectChanges();
+    const other = () => el.querySelector('p.other')?.textContent?.trim();
+    expect(other()).toBe('Other coins (491): $6.9M · not listed');
+    expect(el.textContent).toContain('3 more coins · $6M'); // the fold's line is still the folded rows only
+    button()?.click();
+    f.detectChanges();
+    expect(other()).toBe('Other coins (491): $6.9M · not listed');
+  });
+
+  it('no line when nothing is outside the rows', () => {
+    const { f, el } = render(coins(5));
+    f.componentRef.setInput('other', { totals: { usd: 0, long: 0, short: 0, events: 0 }, coins: 0 });
+    f.detectChanges();
+    expect(el.querySelector('p.other')).toBeNull();
+  });
+});
+

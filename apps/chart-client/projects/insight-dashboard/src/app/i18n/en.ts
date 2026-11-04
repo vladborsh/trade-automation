@@ -206,6 +206,7 @@ export const en: Strings = {
   'liq.where.legend': '← longs · shorts →',
   'liq.where.quiet': 'Coins with nothing in this period: {count}',
   'liq.where.more': '{count} more coins · {usd}',
+  'liq.where.other': 'Other coins ({count}): {usd} · not listed',
   'liq.where.showAll': 'Show all ({count})',
   'liq.where.collapse': 'Show fewer',
   'liq.verdict.long': 'longs {ratio}',

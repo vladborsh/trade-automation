@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { WebLiquidationCoinPeriod, WebMarketPeriod } from '@trade-automation/contracts';
+import type { WebLiquidationBlock, WebLiquidationCoinPeriod, WebMarketPeriod } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
 import { whereRows } from './liq-layout';
 import { collapseRows } from './liq-where-collapse';
+import { otherLine } from './liq-where-other';
 import { formatUsd } from './liquidations.format';
 
 /**
@@ -32,11 +33,14 @@ export class LiqWhereComponent {
   readonly note = input<string | null>(null);
   /** Only so a new period folds the block again (IB-101). */
   readonly period = input<WebMarketPeriod | null>(null);
+  /** IB-BUG-025: the crypto in no row, stated after the rows and outside the fold. */
+  readonly other = input<WebLiquidationBlock['otherCoins'] | null>(null);
 
   readonly view = computed(() => whereRows(this.perCoin()));
   readonly collapsed = computed(() => collapseRows(this.view().rows));
   /** Reset to folded whenever the period changes: the source is the period, the value is always false. */
   readonly expanded = linkedSignal({ source: this.period, computation: () => false });
+  readonly otherView = computed(() => otherLine(this.other()));
   readonly visibleRows = computed(() => (this.expanded() ? this.view().rows : this.collapsed().shown));
 
   toggle(): void {
