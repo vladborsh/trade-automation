@@ -1,6 +1,6 @@
 import type { WebFlowsResponse, WebInsightStatement, WebPositioningCell, WebPositioningRow } from '@trade-automation/contracts';
 import { neutralReason, rank, runInsights } from '../../src/insights/engine';
-import { R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, RULES } from '../../src/insights/rules';
+import { R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, RULES } from '../../src/insights/rules';
 import { isRefusal, type InsightSnapshot } from '../../src/insights/types';
 
 /**
@@ -28,6 +28,7 @@ function snapshot(over: Partial<InsightSnapshot> = {}): InsightSnapshot {
     breadth: { upShare: 0.5, altGapPct: 0.1, upShareSample: Array.from({ length: 696 }, (_, i) => 0.3 + (i % 5) * 0.1), altGapSample: Array.from({ length: 696 }, (_, i) => (i % 7) - 3), days: 30, coins: 30 },
     fng: 50,
     flows: null,
+    oiDivergence: null,
     ...over,
   };
 }
@@ -332,5 +333,33 @@ describe('IB-107 sparks: each rule draws its mini-chart from the series it alrea
     const empty = series([], [], []);
     expect(shown(R4.run(snapshot({ positioning: [r], positioningSeries: empty })))).toMatchObject({ key: 'insight.oi_vs_price', spark: null });
     expect(shown(R8.run(snapshot({ flows: flows({ dvol: { change: ch(6.5, 0.97), series: [] } }) })))).toMatchObject({ key: 'insight.dvol_spike', spark: null });
+  });
+});
+
+describe('R11 the OI divergence alert (IB-113, V16)', () => {
+  const alert = {
+    id: 9, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
+    a: { time: NOW / 1000 - 30 * 3_600, price: 100, oiTime: NOW / 1000 - 30 * 3_600, oi: 1_000 },
+    b: { time: NOW / 1000 - 8 * 3_600, price: 98.2, oiTime: NOW / 1000 - 8 * 3_600, oi: 1_032 },
+    runOf: null, runLength: 2, params: { perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5 },
+    confirmedAt: NOW / 1000 - 3_600, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null,
+  };
+  it('shows the journal\'s alert: B against A, an EVENT (rarity 1, ranks first), the chart at B, the OI series as its spark', () => {
+    const out = R11.run(snapshot({ oiDivergence: { alert, oiSeries: [1_000, 990, 1_010, 1_032] } })) as WebInsightStatement;
+    expect(out).toMatchObject({ ruleId: 'R11', block: 'positioning', key: 'insight.oi_divergence', rarity: 1, link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: alert.b.time } });
+    expect(out.params).toMatchObject({ symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', runLength: 2 });
+    expect(out.params['pricePct'] as number).toBeCloseTo(-1.8, 6);
+    expect(out.params['oiPct'] as number).toBeCloseTo(3.2, 6);
+    expect(out.spark).toEqual({ values: [1_000, 990, 1_010, 1_032], highlight: 3 });
+    expect(shown(out)).not.toBeNull(); // the 0.90 gate lets an event through
+  });
+  it('no alert in the window → silent (null), not a refusal: the block\'s other rules decide its line', () => {
+    expect(R11.run(snapshot())).toBeNull();
+  });
+  it('ranks first in its block over a rare-but-not-certain statement', () => {
+    const r4row = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
+    const out = runInsights(RULES, snapshot({ positioning: [r4row], oiDivergence: { alert, oiSeries: [1, 2] } }));
+    expect(out.blocks.find((b) => b.block === 'positioning')?.statement?.ruleId).toBe('R11');
+    expect(out.top[0]?.ruleId).toBe('R11');
   });
 });

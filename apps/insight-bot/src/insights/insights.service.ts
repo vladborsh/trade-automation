@@ -17,6 +17,8 @@ export interface InsightPorts {
   positioning?: (period: WebMarketPeriod) => Promise<InsightSnapshot['positioning']>;
   /** IB-107 (D24): the positioning baselines' tails for R4/R5/R6's sparks — the same cached read. */
   positioningSeries?: () => Promise<InsightSnapshot['positioningSeries']>;
+  /** IB-113 (V16): the OI divergence journal's newest on-time alert of the last 24 h, with its OI series. */
+  oiDivergence?: (nowMs: number) => Promise<InsightSnapshot['oiDivergence']>;
   breadth?: (period: WebMarketPeriod) => Promise<InsightSnapshot['breadth']>;
   fng?: () => Promise<number | null>;
   /** IB-091: «Деривативы и потоки» for R8–R10. */
@@ -50,15 +52,16 @@ export class InsightsService {
         }
       };
       const p = this.options.ports;
-      const [liquidations, positioning, positioningSeries, breadth, fng, flows] = await Promise.all([
+      const [liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence] = await Promise.all([
         soft('liquidations', p.liquidations && (() => (p.liquidations as NonNullable<InsightPorts['liquidations']>)(period))),
         soft('positioning', p.positioning && (() => (p.positioning as NonNullable<InsightPorts['positioning']>)(period))),
         soft('positioning series', p.positioningSeries),
         soft('breadth', p.breadth && (() => (p.breadth as NonNullable<InsightPorts['breadth']>)(period))),
         soft('fng', p.fng),
         soft('flows', p.flows && (() => (p.flows as NonNullable<InsightPorts['flows']>)(period))),
+        soft('oi divergence', p.oiDivergence && (() => (p.oiDivergence as NonNullable<InsightPorts['oiDivergence']>)(nowMs))),
       ]);
-      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, positioningSeries, breadth, fng, flows };
+      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence };
       return { ...runInsights(RULES, snapshot), asOf: Math.floor(nowMs / 1000) };
     });
   }

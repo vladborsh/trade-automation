@@ -17,6 +17,9 @@ import { WebMembersController } from './members/members.controller';
 import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
 import { PgOiAlertStore, PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
 import { AlertsAdmin, cachedExchangeInfo } from '../alerts/oi-divergence/alerts-admin';
+import { cardOiSeries } from '../alerts/oi-divergence/card-series';
+import { OiWindowReader } from '../insights/divergence/oi-window.reader';
+import { OI_DIVERGENCE_TF_SEC } from '@trade-automation/contracts';
 import { ALERTS_ADMIN, WebAlertsAdminController } from './admin/alerts.controller';
 import { UsersModule } from '../users/users.module';
 import { AssetClassifier } from './liquidations/asset-classes';
@@ -198,9 +201,9 @@ export class WebModule {
         {
           // IB-086 (D1): the insight engine lives in src/insights/; it reads these services through ports
           provide: InsightsService,
-          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService, FlowsService],
+          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService, FlowsService, DB],
           useFactory: (cache: TtlCache, liquidations: LiquidationsOverviewService, positioning: PositioningService, cards: MarketCardsService,
-            flows: FlowsService) =>
+            flows: FlowsService, db: Db | null) =>
             new InsightsService({
               cache,
               ports: {
@@ -215,6 +218,15 @@ export class WebModule {
                 },
                 positioning: async (period) => (await positioning.positioning(period)).rows,
                 positioningSeries: () => positioning.sparkSeries(),
+                // IB-113 (V16): the journal's newest on-time alert of 24 h, its OI per bar from our DB — no venue call
+                oiDivergence: async (nowMs) => {
+                  if (!db) return null;
+                  const alert = await new PgOiAlertStore(db).latestOnTime(Math.floor(nowMs / 1000));
+                  if (!alert) return null;
+                  const tfSec = OI_DIVERGENCE_TF_SEC[alert.tf];
+                  const { oi5m } = await new OiWindowReader(db).read(alert.symbol, alert.a.time, alert.b.time + tfSec);
+                  return { alert, oiSeries: cardOiSeries(alert, oi5m) };
+                },
                 breadth: (period) => positioning.breadth(period),
                 fng: async () => (await cards.cards([])).fearGreed?.now.value ?? null,
                 flows: (period) => flows.flows(period),

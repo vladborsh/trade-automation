@@ -302,4 +302,30 @@ export const R10: Rule = {
   },
 };
 
-export const RULES: readonly Rule[] = [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10];
+/**
+ * R11 (IB-113, OI divergence design V16) — the newest on-time OI divergence ALERT of the last 24 h on
+ * a listed coin, read from the journal (the alert loop already judged it; this rule only shows it). It
+ * makes no venue call. **An event, not a percentile:** rarity 1 ranks it first and is never rendered;
+ * magnitude is |OI change| for the tie-break. No alert in the window → null (ran, nothing to say): the
+ * positioning block's other rules still speak.
+ */
+export const R11: Rule = {
+  id: 'R11', block: 'positioning', sources: ['binance'],
+  run(s) {
+    const d = s.oiDivergence;
+    if (!d) return null;
+    const a = d.alert;
+    const pricePct = (a.b.price / a.a.price - 1) * 100;
+    const oiPct = (a.b.oi / a.a.oi - 1) * 100;
+    return {
+      ruleId: 'R11', block: 'positioning', key: 'insight.oi_divergence',
+      params: { symbol: a.symbol, tf: a.tf, direction: a.direction, pricePct, oiPct, runLength: a.runLength },
+      rarity: 1, magnitude: Math.abs(oiPct),
+      basis: { window: '24h', venues: ['binance'], sampleWindows: 0, observedWindows: 0, from: null },
+      link: { route: 'instrument', symbol: a.symbol, timeSec: a.b.time },
+      spark: lastLit(d.oiSeries, SPARK.flows),
+    };
+  },
+};
+
+export const RULES: readonly Rule[] = [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11];

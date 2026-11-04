@@ -156,4 +156,28 @@ describeDb('IB-112 OI alerts against a real database', () => {
     expect(await store.settings()).toMatchObject({ membersVisible: true, params });
     await store.updateSettings({ params: OI_DIVERGENCE_DEFAULT_PARAMS, membersVisible: false }, adminId);
   });
+
+  it('IB-113 latestOnTime: the newest on-time alert of the last 24 h on an enabled listed coin — late never, older than 24 h never', async () => {
+    const now = 1_800_000_000;
+    const H = 3_600;
+    const put = (symbol: string, confirmedAt: number, late: boolean, bTime: number) => store.insertAlert({
+      symbol, tf: '1h', direction: 'bullish', a: { time: bTime - 20 * H, price: 1, oiTime: bTime - 20 * H, oi: 1 },
+      b: { time: bTime, price: 0.98, oiTime: bTime, oi: 1.03 }, runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt, late,
+    });
+    await put('BTCUSDT', now - 25 * H, false, now - 32 * H); // older than 24 h
+    expect(await store.latestOnTime(now)).toBeNull();
+    await put('ETHUSDT', now - 2 * H, true, now - 9 * H); // late: never sent, not news
+    expect(await store.latestOnTime(now)).toBeNull();
+    await put('SOLUSDT', now - 20 * H, false, now - 27 * H);
+    await put('BNBUSDT', now - 3 * H, false, now - 10 * H);
+    expect((await store.latestOnTime(now))?.symbol).toBe('BNBUSDT'); // two in 24 h → the newest
+    await put('TRXUSDT', now + H, false, now - 6 * H); // confirmed after "now": not yet
+    expect((await store.latestOnTime(now))?.symbol).toBe('BNBUSDT');
+    await db.query(`update alert_symbols set enabled = false where symbol = 'BNBUSDT'`);
+    try {
+      expect((await store.latestOnTime(now))?.symbol).toBe('SOLUSDT'); // a paused coin is not on the card
+    } finally {
+      await db.query('update alert_symbols set enabled = true');
+    }
+  });
 });

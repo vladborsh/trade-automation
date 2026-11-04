@@ -1,5 +1,5 @@
 import type {
-  WebFlowsResponse, WebInsightBasis, WebInsightBlock, WebInsightSource, WebInsightStatement, WebLiquidationLargeEvent, WebMarketPeriod, WebPositioningRow,
+  WebFlowsResponse, WebInsightBasis, WebOiDivergenceAlert, WebInsightBlock, WebInsightSource, WebInsightStatement, WebLiquidationLargeEvent, WebMarketPeriod, WebPositioningRow,
 } from '@trade-automation/contracts';
 
 /**
@@ -37,6 +37,11 @@ export interface InsightSnapshot {
    * the row's server-side twin, NOT on `WebPositioningRow`. R4/R6/R5 draw their spark from them.
    */
   positioningSeries: Map<string, PositioningSeries> | null;
+  /**
+   * IB-113 (OI divergence design V16): the newest on-time OI divergence alert of the last 24 h on a
+   * listed coin, from the journal, with its per-bar OI from A to B (our DB, no venue). Null: none.
+   */
+  oiDivergence: { alert: WebOiDivergenceAlert; oiSeries: number[] } | null;
   breadth: {
     upShare: number; altGapPct: number; upShareSample: number[]; altGapSample: number[]; days: number; coins: number;
   } | null;

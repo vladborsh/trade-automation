@@ -172,6 +172,20 @@ export class PgOiAlertStore implements OiAlertStore {
     return rows.map(toWebAlert);
   }
 
+  /**
+   * IB-113 (V16): the newest ON-TIME alert confirmed in the 24 h before `nowSec`, on a coin that is on
+   * the list and enabled — what the «Главное сейчас» card shows. Late rows (never sent) are not news.
+   */
+  async latestOnTime(nowSec: number): Promise<WebOiDivergenceAlert | null> {
+    const rows = await this.db.query<AlertRow>(
+      `select a.* from oi_divergence_alerts a join alert_symbols s on s.symbol = a.symbol and s.enabled
+        where not a.late and a.confirmed_at > $1::timestamptz - interval '24 hours' and a.confirmed_at <= $1::timestamptz
+        order by a.confirmed_at desc, a.id desc limit 1`,
+      [at(nowSec)],
+    );
+    return rows.length > 0 ? toWebAlert(rows[0] as AlertRow) : null;
+  }
+
   async recentSkips(limit = 50): Promise<WebOiDivergenceSkipRow[]> {
     const rows = await this.db.query<{ symbol: string; tf: OiDivergenceTf; bar_time: Date; reason: 'no_oi_data'; hole_from: Date; hole_to: Date; at: Date }>(
       'select symbol, tf, bar_time, reason, hole_from, hole_to, at from oi_divergence_skips order by at desc, id desc limit $1', [limit],
