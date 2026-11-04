@@ -21,9 +21,25 @@ import {
  * | `GET /fapi/v1/premiumIndex` (all symbols) | 10 | 1 |
  * | `GET /futures/data/openInterestHist?period=1h&limit=25` | 1 | one per symbol (up to 60, `SUMMARY_MAX`) |
  *
- * So about 50 `fapi` weight plus one `/futures/data` call per listed symbol (40 since IB-070) per refresh. The answer is cached for
- * `CACHE_TTL_MS`, so however many tabs are open the venue sees at most one refresh a minute:
- * about 2 % of the 2,400/min ceiling, plus 40 calls against the separate `/futures/data` limit.
+ * So about 50 `fapi` weight plus one `/futures/data` call per listed symbol (40 since IB-070) per refresh.
+ *
+ * **IB-BUG-026 — what is cached, and why not the answer.** Until 2026-11-04 this held ONE answer keyed by
+ * the symbol list. Market asks with two lists a minute (positioning's 30 coins, the KPIs' `[BTC]`), and
+ * the instrument picker with a third. Each request evicted the other's answer, so the venue was asked
+ * twice a minute: measured on the slot, 2 `ticker/24hr` and 2 `premiumIndex` in each of 5 minutes, ≈ 100
+ * fapi weight. Now:
+ * - the two all-symbol reads are ONE snapshot per `CACHE_TTL_MS`, whatever list is asked. They do not
+ *   depend on the list, so there is nothing to key them by. Concurrent first callers share one request.
+ * - open interest is cached PER SYMBOL for the same TTL, a failed symbol included. Two lists sharing BTC
+ *   ask the venue for BTC once, and a failing coin is not retried by every caller.
+ * - each caller's rows are assembled from those, which is cheap and pure (`assembleSummary`).
+ *
+ * So however many tabs and lists, the venue sees at most one snapshot a minute (50 fapi weight, about 2 %
+ * of the 2,400/min ceiling) and one OI call per distinct symbol a minute against the `/futures/data` limit.
+ * Memory: the snapshot holds every USD-M symbol (804 tickers and 945 premium rows on 2026-11-04). The
+ * schemas pass every venue field through, which measured ~490 KB of heap as parsed. So the snapshot
+ * keeps only the fields `assembleSummary` reads (`slimTicker` / `slimPremium` / `slimOi`): ≈ 280 KB of heap,
+ * measured 3 times with live venue rows. The per-symbol OI cache adds 25 small rows per universe symbol.
  */
 export const CACHE_TTL_MS = 60_000;
 /** WD-008's ceiling: above this much of the 2,400/min budget, live reads answer 503. */
@@ -53,8 +69,11 @@ export class UniverseSummaryService {
   private readonly weight: BinanceWeightTracker;
   private readonly futuresData: FuturesDataClient;
   private readonly now: () => number;
-  private cached: { key: string; at: number; value: WebUniverseSummaryResponse } | null = null;
-  private inFlight: { key: string; promise: Promise<WebUniverseSummaryResponse> } | null = null;
+  private snapshot: { at: number; tickers: Ticker24hRow[]; premium: PremiumIndexSummaryRow[] } | null = null;
+  private snapshotInFlight: Promise<{ at: number; tickers: Ticker24hRow[]; premium: PremiumIndexSummaryRow[] }> | null = null;
+  /** Per symbol: the rows, or null when the call failed (a dash, cached as long as a success). */
+  private readonly oiCache = new Map<string, { at: number; rows: OiHistRow[] | null }>();
+  private readonly oiInFlight = new Map<string, Promise<OiHistRow[] | null>>();
 
   constructor(private readonly options: UniverseSummaryOptions) {
     this.fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as ReturnType<FetchLike>);
@@ -67,24 +86,34 @@ export class UniverseSummaryService {
     });
   }
 
-  /** The summary for these symbols, from cache when it is fresh. */
+  /** The summary for these symbols, assembled from the shared snapshot and the per-symbol OI cache. */
   async summary(symbols: readonly SummarySymbol[]): Promise<WebUniverseSummaryResponse> {
-    const key = symbols.map((s) => s.id).join(',');
-    const now = this.now();
-    if (this.cached && this.cached.key === key && now - this.cached.at < CACHE_TTL_MS) return this.cached.value;
-    if (this.inFlight && this.inFlight.key === key) return this.inFlight.promise;
+    const snap = await this.venueSnapshot();
+    // Open interest is per symbol and optional: a symbol whose call fails shows a dash.
+    const listed = new Set(snap.tickers.map((t) => t.symbol));
+    const oiBySymbol = await this.openInterest(symbols.filter((s) => listed.has(s.id)).map((s) => s.id));
+    return {
+      asOfMs: snap.at,
+      venue: 'binance-perp',
+      rows: assembleSummary(symbols, snap.tickers, snap.premium, oiBySymbol),
+    };
+  }
 
-    const promise = this.read(symbols).then((value) => {
-      this.cached = { key, at: this.now(), value };
-      return value;
+  /** IB-BUG-026: the two all-symbol reads, once per TTL for every caller and every list. */
+  private async venueSnapshot(): Promise<{ at: number; tickers: Ticker24hRow[]; premium: PremiumIndexSummaryRow[] }> {
+    if (this.snapshot && this.now() - this.snapshot.at < CACHE_TTL_MS) return this.snapshot;
+    if (this.snapshotInFlight) return this.snapshotInFlight;
+    const promise = this.readSnapshot().then((snap) => {
+      this.snapshot = snap;
+      return snap;
     }).finally(() => {
-      if (this.inFlight?.promise === promise) this.inFlight = null;
+      if (this.snapshotInFlight === promise) this.snapshotInFlight = null;
     });
-    this.inFlight = { key, promise };
+    this.snapshotInFlight = promise;
     return promise;
   }
 
-  private async read(symbols: readonly SummarySymbol[]): Promise<WebUniverseSummaryResponse> {
+  private async readSnapshot(): Promise<{ at: number; tickers: Ticker24hRow[]; premium: PremiumIndexSummaryRow[] }> {
     if (this.weight.used1m(this.now()) > WEIGHT_CEILING_1M) {
       throw new VenueUnavailableError(`Binance weight above ${WEIGHT_CEILING_1M}/min; not adding to it`);
     }
@@ -93,14 +122,7 @@ export class UniverseSummaryService {
       this.getArray('/fapi/v1/ticker/24hr', TICKER_WEIGHT, (row) => Ticker24hRowSchema.parse(row)),
       this.getArray('/fapi/v1/premiumIndex', PREMIUM_WEIGHT, (row) => PremiumIndexSummaryRowSchema.parse(row)),
     ]) as [Ticker24hRow[], PremiumIndexSummaryRow[]];
-    // Open interest is per symbol and optional: a symbol whose call fails shows a dash.
-    const listed = new Set(tickers.map((t) => t.symbol));
-    const oiBySymbol = await this.openInterest(symbols.filter((s) => listed.has(s.id)).map((s) => s.id));
-    return {
-      asOfMs: this.now(),
-      venue: 'binance-perp',
-      rows: assembleSummary(symbols, tickers, premium, oiBySymbol),
-    };
+    return { at: this.now(), tickers: tickers.map(slimTicker), premium: premium.map(slimPremium) };
   }
 
   private async getArray<T>(path: string, weight: number, parse: (row: unknown) => T): Promise<T[]> {
@@ -120,21 +142,58 @@ export class UniverseSummaryService {
     return body.map(parse);
   }
 
+  /** Per-symbol OI, from the cache when fresh; the misses fetched `OI_CONCURRENCY` at a time. */
   private async openInterest(ids: readonly string[]): Promise<Map<string, OiHistRow[]>> {
     const out = new Map<string, OiHistRow[]>();
+    const now = this.now();
+    const misses: string[] = [];
+    const waits: Array<Promise<void>> = [];
+    for (const id of ids) {
+      const hit = this.oiCache.get(id);
+      if (hit && now - hit.at < CACHE_TTL_MS) {
+        if (hit.rows) out.set(id, hit.rows);
+        continue;
+      }
+      const pending = this.oiInFlight.get(id);
+      if (pending) waits.push(pending.then((rows) => { if (rows) out.set(id, rows); }));
+      else misses.push(id);
+    }
     let next = 0;
     const worker = async (): Promise<void> => {
-      while (next < ids.length) {
-        const id = ids[next++];
+      while (next < misses.length) {
+        const id = misses[next++];
+        const promise = this.fetchOi(id);
+        this.oiInFlight.set(id, promise);
         try {
-          const rows = await this.futuresData.fetchPage<unknown>({ endpoint: 'openInterestHist', symbol: id, period: '1h', limit: 25 });
-          out.set(id, rows.map((row) => OiHistRowSchema.parse(row)));
-        } catch {
-          // one coin's dash, not the list's failure
+          const rows = await promise;
+          this.oiCache.set(id, { at: this.now(), rows });
+          if (rows) out.set(id, rows);
+        } finally {
+          this.oiInFlight.delete(id);
         }
       }
     };
-    await Promise.all(Array.from({ length: Math.min(OI_CONCURRENCY, ids.length) }, worker));
+    await Promise.all([...Array.from({ length: Math.min(OI_CONCURRENCY, misses.length) }, worker), ...waits]);
     return out;
   }
+
+  private async fetchOi(id: string): Promise<OiHistRow[] | null> {
+    try {
+      const rows = await this.futuresData.fetchPage<unknown>({ endpoint: 'openInterestHist', symbol: id, period: '1h', limit: 25 });
+      return rows.map((row) => slimOi(OiHistRowSchema.parse(row)));
+    } catch {
+      return null; // one coin's dash, not the list's failure
+    }
+  }
+}
+
+/** IB-BUG-026: only what `assembleSummary` reads, so the minute-long snapshot holds no unused venue fields. */
+export function slimTicker(t: Ticker24hRow): Ticker24hRow {
+  return { symbol: t.symbol, lastPrice: t.lastPrice, priceChangePercent: t.priceChangePercent };
+}
+export function slimPremium(p: PremiumIndexSummaryRow): PremiumIndexSummaryRow {
+  return { symbol: p.symbol, lastFundingRate: p.lastFundingRate, nextFundingTime: p.nextFundingTime };
+}
+export function slimOi(o: OiHistRow): OiHistRow {
+  return { symbol: o.symbol, sumOpenInterest: o.sumOpenInterest, timestamp: o.timestamp };
 }

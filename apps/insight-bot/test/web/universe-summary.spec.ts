@@ -235,3 +235,98 @@ describe('GET /api/web/universe/summary', () => {
     expect(SUMMARY_MAX).toBeGreaterThanOrEqual(40);
   });
 });
+
+describe('UniverseSummaryService — one snapshot for every list (IB-BUG-026)', () => {
+  const BASE = 'https://fapi.example.test';
+  const POSITIONING = SYMBOLS.slice(0, 2); // BTC, ETH — positioning's list, shortened
+  const KPIS = [{ id: 'BTCUSDT', base: 'BTC', volumeRank: 1 }]; // the KPIs' [BTC]
+  const PICKER = [{ id: 'SOLUSDT', base: 'SOL', volumeRank: 1 }]; // the instrument picker, a third list
+  const count = (calls: string[], part: string) => calls.filter((c) => c.includes(part)).length;
+  const clock = () => { let t = 1_000; return { now: () => t, advance: (ms: number) => { t += ms; } }; };
+
+  it('two callers with DIFFERENT lists inside 60 s: exactly ONE ticker/24hr and ONE premiumIndex call', async () => {
+    // Red on master: its one cache slot was keyed by the list, so each list evicted the other.
+    const { impl, calls } = fakeFetch(venueRoutes());
+    const c = clock();
+    const service = new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: impl, now: c.now });
+    await service.summary(POSITIONING);
+    c.advance(10_000);
+    await service.summary(KPIS);
+    c.advance(10_000);
+    await service.summary(POSITIONING);
+    await service.summary(PICKER);
+    expect(count(calls, '/ticker/24hr')).toBe(1);
+    expect(count(calls, '/premiumIndex')).toBe(1);
+  });
+
+  it('OI is cached per symbol: a symbol in two lists is asked once, a new symbol only for itself', async () => {
+    const { impl, calls } = fakeFetch(venueRoutes());
+    const c = clock();
+    const service = new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: impl, now: c.now });
+    await service.summary(POSITIONING); // BTC, ETH
+    await service.summary(KPIS); // BTC again: cached
+    await service.summary(PICKER); // SOL: new
+    expect(calls.filter((u) => u.includes('openInterestHist')).map((u) => new URL(u).searchParams.get('symbol')).sort())
+      .toEqual(['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
+  });
+
+  it('each caller gets exactly the rows it would have got alone (no list leaks into another)', async () => {
+    const shared = fakeFetch(venueRoutes());
+    const c = clock();
+    const service = new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: shared.impl, now: c.now });
+    const positioning = await service.summary(POSITIONING);
+    const kpis = await service.summary(KPIS);
+    const alone = async (list: typeof KPIS) =>
+      new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: fakeFetch(venueRoutes()).impl, now: () => 1_000 }).summary(list);
+    expect(kpis).toEqual(await alone(KPIS));
+    expect(positioning).toEqual(await alone(POSITIONING));
+    expect(kpis.rows.map((r) => r.id)).toEqual(['BTCUSDT']);
+  });
+
+  it('after the TTL the snapshot is read again, once', async () => {
+    const { impl, calls } = fakeFetch(venueRoutes());
+    const c = clock();
+    const service = new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: impl, now: c.now });
+    await service.summary(KPIS);
+    c.advance(CACHE_TTL_MS);
+    await service.summary(POSITIONING);
+    await service.summary(KPIS);
+    expect(count(calls, '/ticker/24hr')).toBe(2);
+  });
+
+  it('concurrent first callers with different lists share one snapshot request', async () => {
+    const { impl, calls } = fakeFetch(venueRoutes());
+    const service = new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: impl, now: () => 1_000 });
+    await Promise.all([service.summary(POSITIONING), service.summary(KPIS), service.summary(PICKER)]);
+    expect(count(calls, '/ticker/24hr')).toBe(1);
+    expect(count(calls, 'openInterestHist')).toBe(3); // BTC once, though two lists asked for it at once
+  });
+
+  it('a symbol whose OI call failed is a dash for the TTL, not retried by every caller', async () => {
+    const { impl, calls } = fakeFetch(venueRoutes({
+      '/futures/data/openInterestHist': (url: string) => (new URL(url).searchParams.get('symbol') === 'ETHUSDT'
+        ? { status: 500, body: {} }
+        : { body: (OI_1H as Array<{ symbol: string }>).map((r) => ({ ...r, symbol: 'BTCUSDT' })) }),
+    }));
+    const service = new UniverseSummaryService({ futuresBaseUrl: BASE, fetchImpl: impl, now: () => 1_000 });
+    const first = await service.summary(POSITIONING);
+    const second = await service.summary(POSITIONING);
+    expect(first.rows.find((r) => r.id === 'ETHUSDT')?.oiChangePct24h).toBeNull();
+    expect(second).toEqual(first);
+    expect(calls.filter((u) => u.includes('symbol=ETHUSDT'))).toHaveLength(1);
+  });
+});
+
+describe('UniverseSummaryService — the slim snapshot loses nothing a caller reads (IB-BUG-026)', () => {
+  it('rows equal assembleSummary over the FULL, untrimmed venue rows', async () => {
+    // The service keeps only the fields assembleSummary reads; this pins that no read field was dropped.
+    const { impl } = fakeFetch(venueRoutes());
+    const service = new UniverseSummaryService({ futuresBaseUrl: 'https://fapi.example.test', fetchImpl: impl, now: () => 1_000 });
+    const got = await service.summary(SYMBOLS);
+    const oi = new Map(['BTCUSDT', 'ETHUSDT'].map((id) => [id, (OI_1H as Array<{ symbol: string }>).map((r) => OiHistRowSchema.parse({ ...r, symbol: id }))]));
+    const full = assembleSummary(SYMBOLS, TICKERS.map((r) => Ticker24hRowSchema.parse(r)), PREMIUM.map((r) => PremiumIndexSummaryRowSchema.parse(r)), oi);
+    expect(got.rows).toEqual(full);
+    expect(got.rows[0].changePct24h).not.toBeNull();
+    expect(got.rows[0].nextFundingTimeMs).not.toBeNull();
+  });
+});
