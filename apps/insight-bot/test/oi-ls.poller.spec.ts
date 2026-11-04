@@ -278,3 +278,89 @@ describe('OiLsPoller.backfill', () => {
     expect(written.gaps).toHaveLength(0);
   });
 });
+
+describe('OiLsPoller.backfill — a hole is registered once, and repaired when it arrives (IB-BUG-020)', () => {
+  const now = SLOT_TS + 20_000;
+  /** A db that also remembers `collector_gaps` across boots: what one boot writes, the next one reads. */
+  class LedgerDb extends FakeDb {
+    gaps: Array<{ id: string; detected_at: Date; gap_from: Date; gap_to: Date; expected: number; repaired: number }> = [];
+    updates: unknown[][] = [];
+    constructor(private storedNow: () => Date[]) { super({ STALEUSDT: null }); }
+    async query<T>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
+      if (sql.includes('select ts from open_interest_5m')) return this.storedNow().map((ts) => ({ ts })) as T[];
+      if (sql.includes('from collector_gaps')) return this.gaps as T[];
+      if (sql.startsWith('update collector_gaps')) {
+        this.updates.push([...params]);
+        const g = this.gaps.find((x) => x.id === params[0]);
+        if (g) g.repaired = params[2] as number;
+        return [] as T[];
+      }
+      return super.query<T>(sql, params);
+    }
+  }
+  /** One boot over the same db; the gaps it writes are added to the db as the writer would. */
+  async function boot(db: LedgerDb) {
+    const { poller, written, streams } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+    for (const g of written.gaps as t.CollectorGapRow[]) {
+      db.gaps.push({ id: String(db.gaps.length + 1), detected_at: g.detectedAt, gap_from: g.gapFrom, gap_to: g.gapTo, expected: g.expected, repaired: g.repaired ?? 0 });
+    }
+    return { written: written.gaps as t.CollectorGapRow[], open: streams.snapshot().find((s) => s.id === STREAM_ID)?.gapsOpen };
+  }
+  // the venue serves :00, :05, :15 — the :10 slot never comes (a closed TradFi session)
+  const withHole = () => [new Date(SLOT_TS - 3 * SLOT), new Date(SLOT_TS - 2 * SLOT), new Date(SLOT_TS)];
+
+  it('a venue that answers empty for a slot: ONE row over three boots, not one per boot', async () => {
+    const db = new LedgerDb(withHole);
+    const counts: number[] = [];
+    for (let i = 0; i < 3; i += 1) counts.push((await boot(db)).written.length);
+    expect(counts).toEqual([1, 0, 0]);
+    expect(db.gaps).toHaveLength(1);
+    expect(db.gaps[0].repaired).toBe(0);
+  });
+
+  it('health counts that hole as open on every boot, including the ones that wrote nothing', async () => {
+    const db = new LedgerDb(withHole);
+    expect((await boot(db)).open).toBe(1);
+    expect((await boot(db)).open).toBe(1);
+  });
+
+  it('a venue that LATER returns the slot: the row is repaired and health shows it closed', async () => {
+    let stored = withHole();
+    const db = new LedgerDb(() => stored);
+    await boot(db);
+    stored = [...stored, new Date(SLOT_TS - SLOT)]; // the :10 slot arrives
+    const second = await boot(db);
+    expect(second.written).toHaveLength(0);
+    expect(db.updates).toEqual([['1', db.gaps[0].detected_at, 1]]);
+    expect(db.gaps[0].repaired).toBe(1);
+    expect(second.open).toBe(0);
+  });
+});
+
+describe('OiLsPoller.backfill — the trailing edge (IB-BUG-020)', () => {
+  const now = SLOT_TS + 20_000;
+  const grid = (firstSlot: number, lastSlot: number) => {
+    const out: Date[] = [];
+    for (let ts = firstSlot; ts <= lastSlot; ts += SLOT) out.push(new Date(ts));
+    return out;
+  };
+
+  it('the newest POLL_LIMIT slots not yet published at boot are NOT a gap: the 5-minute loop fetches them', async () => {
+    // the venue's newest row is two slots behind `now`'s slot: its publication lag (QQQUSDT 18:00 on the box)
+    const db = new FakeDb({ STALEUSDT: null }, grid(SLOT_TS - 40 * SLOT, SLOT_TS - 2 * SLOT));
+    const { poller, written } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+    expect(written.gaps).toHaveLength(0);
+  });
+
+  it('a symbol the venue stopped serving well before that IS still reported, up to the poll\'s reach', async () => {
+    const db = new FakeDb({ STALEUSDT: null }, grid(SLOT_TS - 40 * SLOT, SLOT_TS - 10 * SLOT));
+    const { poller, written } = build({ symbols: ['STALEUSDT'], db });
+    await poller.backfill(now);
+    const gaps = written.gaps as t.CollectorGapRow[];
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].gapFrom.getTime()).toBe(SLOT_TS - 9 * SLOT);
+    expect(gaps[0].gapTo.getTime()).toBe(SLOT_TS - POLL_LIMIT * SLOT);
+  });
+});

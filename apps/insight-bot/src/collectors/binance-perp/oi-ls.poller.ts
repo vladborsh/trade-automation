@@ -18,7 +18,8 @@ import {
   TakerRatioRow,
   VENUE,
 } from '../../venues/binance/oi-ls.mapper';
-import { missingRanges, nextPollAt, SLOT_MS, slotForPoll } from './slot-grid';
+import { GapRange, planGaps, RegisteredGap } from './gap-ledger';
+import { missingRanges, nextPollAt, SLOT_MS, slotForPoll, slotOf } from './slot-grid';
 
 export const STREAM_ID = 'binance-perp:oi-ls-5m';
 const PERIOD = '5m';
@@ -201,6 +202,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     const stale = await this.staleSymbols(now);
     let oi = 0;
     let longShort = 0;
+    let open = 0;
 
     for (const symbol of stale) {
       const oiRaw = await this.client.fetchBackward<OpenInterestHistRow>(
@@ -223,8 +225,11 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
       // Whatever the venue did not return inside the window is a gap, recorded per symbol so
       // §6.2's daily report can count it rather than silently showing a complete grid.
       const stored = await this.storedSlots(symbol, from, now);
-      await this.recordMissing(symbol, from, now, stored);
+      open += await this.recordMissing(symbol, from, now, stored);
     }
+    // IB-BUG-020: the distinct windows still open over every backfilled symbol. It was the last
+    // symbol's count alone, each symbol overwriting the one before.
+    if (stale.length > 0) this.streams.setGapsOpen(STREAM_ID, open);
 
     this.logger.log(`OI/LS backfill: ${stale.length} symbol(s), ${oi} OI rows, ${longShort} long/short rows.`);
     return { symbols: stale.length, oi, longShort };
@@ -268,15 +273,47 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
    * **nothing at all** has no edge to anchor to and is recorded as one gap over the whole window,
    * which is a real failure and must stay visible.
    */
-  private async recordMissing(symbol: string, from: number, to: number, stored: readonly Date[]): Promise<void> {
+  private async recordMissing(symbol: string, from: number, to: number, stored: readonly Date[]): Promise<number> {
+    const storedMs = stored.map((ts) => ts.getTime());
+    let found: GapRange[];
+    let error: string;
     if (stored.length === 0) {
-      await this.writeGaps([{ from, to, expected: Math.round((to - from) / SLOT_MS) + 1 }], symbol, 'the venue returned no rows for this symbol');
-      return;
+      found = [{ from, to, expected: Math.round((to - from) / SLOT_MS) + 1 }];
+      error = 'the venue returned no rows for this symbol';
+    } else {
+      // IB-BUG-020: the trailing edge, as the retention edge above. The newest POLL_LIMIT slots may
+      // not be published yet at boot (the venue's per-symbol lag); the 5-minute loop asks for exactly
+      // those. Recording them was a phantom gap per boot (QQQUSDT 18:00 on the box, stored minutes
+      // later). A symbol the venue stopped serving earlier than that is still reported.
+      const pollReach = slotOf(to) - POLL_LIMIT * SLOT_MS;
+      found = missingRanges(Math.min(...storedMs), Math.max(Math.max(...storedMs), pollReach), stored);
+      error = 'not returned by the venue inside its retention window';
     }
-    const oldestServed = Math.min(...stored.map((ts) => ts.getTime()));
-    const ranges = missingRanges(oldestServed, to, stored);
-    if (ranges.length === 0) return;
-    await this.writeGaps(ranges, symbol, 'not returned by the venue inside its retention window');
+    // IB-BUG-020: written once, repaired when the slots arrive (`gap-ledger.ts`)
+    const plan = planGaps(found, await this.registeredGaps(symbol, from, to), storedMs);
+    for (const r of plan.repairs) {
+      await this.db.query('update collector_gaps set repaired = $3 where id = $1 and detected_at = $2', [r.id, r.detectedAt, r.repaired]);
+    }
+    await this.writeGaps(plan.insert, symbol, error);
+    return plan.open;
+  }
+
+  /**
+   * IB-BUG-020 — this stream's rows for `symbol` that touch the window. `detected_at >= from` is
+   * exact, not a guess: a gap ending inside the window was detected after it ended. It also lets
+   * Postgres skip the older monthly partitions (`collector_gaps` is partitioned by `detected_at`).
+   */
+  private async registeredGaps(symbol: string, from: number, to: number): Promise<RegisteredGap[]> {
+    const rows = await this.db.query<{ id: string; detected_at: Date; gap_from: Date; gap_to: Date; expected: number; repaired: number }>(
+      `select id, detected_at, gap_from, gap_to, expected, repaired
+         from collector_gaps
+        where stream = $1 and symbol = $2 and detected_at >= $3 and gap_to >= $3 and gap_from <= $4`,
+      [STREAM_ID, symbol, new Date(from), new Date(to)],
+    );
+    return rows.map((r) => ({
+      id: String(r.id), detectedAt: new Date(r.detected_at), gapFrom: new Date(r.gap_from).getTime(),
+      gapTo: new Date(r.gap_to).getTime(), expected: Number(r.expected), repaired: Number(r.repaired),
+    }));
   }
 
   /** One `collector_gaps` row per range, counted on the metric and reflected in the admin health page (`/api/web/health/streams`). */
@@ -300,7 +337,6 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     }));
     await this.writers.collectorGaps.write(gaps);
     gaps.forEach(() => this.metrics.gapsDetected.inc({ stream: STREAM_ID }));
-    this.streams.setGapsOpen(STREAM_ID, ranges.length);
   }
 
   private async recordGaps(from: number, to: number, symbols: readonly string[], error: string): Promise<void> {
