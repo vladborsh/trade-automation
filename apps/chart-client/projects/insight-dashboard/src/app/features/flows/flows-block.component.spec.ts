@@ -41,4 +41,12 @@ describe('FlowsBlockComponent (IB-091)', () => {
     expect(tile(el, 'putCall').querySelector('.value')).toBeNull();
     expect(tile(el, 'putCall').querySelector('.warn')?.textContent?.trim()).toBe('the source did not answer');
   });
+
+  it('IB-138: the help is one collapsed line at the top of the card, above the tiles', () => {
+    const el = render(base);
+    const help = el.querySelector('app-flows-help') as HTMLElement;
+    expect(help.querySelector('details')?.open).toBe(false);
+    expect(help.querySelector('summary')?.textContent?.trim()).toBe('Как читать эти показатели?');
+    expect(help.compareDocumentPosition(el.querySelector('.tiles') as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

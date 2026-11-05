@@ -242,8 +242,11 @@ describe('the string tables', () => {
      * Ruled by the Tech Lead on 2026-10-07 reviewing IB-BUG-009: exempt it, because it is **the
      * venues' own term** and the brief's literal title. So this entry is settled, not pending —
      * if it ever changes it changes in `ru.ts`, and this line goes with it.
+     *
+     * IB-138: «DVOL», the lead of the flows help's first row (market-round3 design §5) — the name of
+     * Deribit's index, an identifier like a ticker, the same word in both tables.
      */
-    const TERMS_OF_ART: readonly StringKey[] = ['instrument.panel.longShort'];
+    const TERMS_OF_ART: readonly StringKey[] = ['instrument.panel.longShort', 'flows.help.dvol.lead'];
     const exempt = new Set<StringKey>([SWITCH, ...TERMS_OF_ART]);
     const keys = (Object.keys(ru) as StringKey[]).filter((key) => !exempt.has(key));
 

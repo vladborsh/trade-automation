@@ -1,4 +1,5 @@
 <app-card id="flows" [heading]="t('flows.title')">
+  <app-flows-help class="flows-help" />
   <div class="tiles">
     @for (tile of tiles(); track tile.id) {
       <article class="tile" [attr.data-tile]="tile.id">

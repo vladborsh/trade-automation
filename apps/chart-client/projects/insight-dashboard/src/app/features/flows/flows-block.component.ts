@@ -4,6 +4,7 @@ import { I18nService } from '../../i18n/i18n.service';
 import { CardComponent } from '../../ui/card.component';
 import { BlockConclusionComponent } from '../market/shell/block-conclusion.component';
 import { flowsTiles, sourceNames, type Words } from './flows-layout';
+import { FlowsHelpComponent } from './flows-help.component';
 import { MiniChartComponent } from './mini-chart.component';
 
 /**
@@ -13,11 +14,12 @@ import { MiniChartComponent } from './mini-chart.component';
  * source is credited under the tiles; the block ends with its conclusion line (R8–R10).
  * IB-108 (§7.6): an `app-card`; the four tiles as the KPI strip's sub-tiles — value `.num`, the
  * mini-chart from each tile's own `series`, the meaning muted — and «Вывод:» in the card's slot.
+ * IB-138 (market-round3 §5): the collapsed help line above the tiles.
  */
 @Component({
   selector: 'app-flows-block',
   standalone: true,
-  imports: [CardComponent, MiniChartComponent, BlockConclusionComponent],
+  imports: [CardComponent, FlowsHelpComponent, MiniChartComponent, BlockConclusionComponent],
   templateUrl: './flows-block.component.html',
   styleUrl: './flows-block.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

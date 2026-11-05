@@ -1,0 +1,8 @@
+<app-help-block [title]="t('flows.help.title')" storageKey="flows" [openOnFirstVisit]="false">
+  <ul class="help-list">
+    @for (r of rows; track r.lead) {
+      <li><b>{{ t(r.lead) }}</b> {{ t(r.text) }}</li>
+    }
+    <li>{{ t('flows.help.forecast') }}</li>
+  </ul>
+</app-help-block>

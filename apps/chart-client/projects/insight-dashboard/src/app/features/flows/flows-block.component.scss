@@ -2,6 +2,8 @@
 :host { display: block; min-width: 0; }
 h3 { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 p { margin: 0; font: var(--type-small); }
+/* IB-138: the help above the tiles, 12 px apart as the heat help above its table */
+.flows-help { margin-bottom: 12px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--card-gap); }
 .tile {
   min-width: 0; display: flex; flex-direction: column; gap: 6px;

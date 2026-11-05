@@ -930,3 +930,39 @@ for (const { width, height, phone } of STICKY_SIZES) {
     });
   });
 }
+
+/**
+ * IB-138 (market-round3 §5): the flows help — one collapsed line on Market that opens on a tap, and
+ * open it fits the page: no horizontal scroll at phone widths, ru (the longer text) and en. The card
+ * is pictured collapsed and open at each width (the task's acceptance screenshots).
+ */
+for (const width of [1240, 390, 320]) {
+  test.describe(`IB-138 Market ${width}: the flows help`, () => {
+    test.use(width < 768 ? { viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width, height: 900 } });
+
+    for (const lang of ['ru', 'en'] as const) test(`(${lang}) collapsed until tapped; open, it stays inside a ${width} px page`, async ({ page }, info) => {
+      // not openMarket: it waits for an English insight line, and half of these pages are Russian
+      await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
+      await mockApi(page);
+      await page.route('**/api/web/auth/me', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ user: { ...MEMBER.user, lang } }) }));
+      await page.goto('/market?p=24h');
+      await page.clock.runFor(2_000);
+      const card = page.locator('app-flows-block');
+      await expect(card.locator('article.tile')).toHaveCount(4);
+      await page.clock.runFor(100); // the mini-charts' re-render at their box width (see IB-BUG-041 above)
+      const details = card.locator('app-flows-help details');
+      await expect(details).not.toHaveAttribute('open');
+      await expect(card.locator('app-flows-help summary')).toHaveText(lang === 'ru' ? 'Как читать эти показатели?' : 'How to read these figures?');
+      await card.scrollIntoViewIfNeeded();
+      await info.attach(`flows-${width}-${lang}-collapsed.png`, { body: await card.screenshot(), contentType: 'image/png' });
+      await card.locator('app-flows-help summary').click();
+      await expect(details).toHaveAttribute('open', '');
+      await expect(card.locator('app-flows-help li')).toHaveCount(5);
+      await page.clock.runFor(100);
+      await info.attach(`flows-${width}-${lang}-open.png`, { body: await card.screenshot(), contentType: 'image/png' });
+      const m = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      expect(m.innerWidth).toBe(width);
+      expect(m.scrollWidth).toBe(width);
+    });
+  });
+}

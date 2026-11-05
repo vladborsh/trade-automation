@@ -1,0 +1,5 @@
+/* IB-138: the list as the heat table's help (pos-heat-help.component.scss) draws it. */
+:host { display: block; min-width: 0; }
+.help-list { margin: 0; padding-left: 18px; }
+.help-list li { margin: 4px 0; }
+.help-list b { color: var(--color-text-strong); }
