@@ -491,8 +491,9 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
       expect(m.tiles).toBe(5); // IB-117: no Fear & Greed tile
       expect(m.columns).toBe(columns);
       if (columns === 5) {
-        // the funding figure wraps («−0.0123 %» over «shorts pay») — so the check below can disagree —
-        expect(m.fundingWraps).toBe(true);
+        // the funding figure wraps («−0.0123 %» over «shorts pay») — so the check below can disagree.
+        // IB-117: five tiles are wider, so at 1440 the word fits beside the figure; 1240 still wraps
+        if (width === 1240) expect(m.fundingWraps).toBe(true);
         // and the strip's subgrid still puts every tile's bar at the same height
         expect(new Set(m.bars).size).toBe(1);
       }
