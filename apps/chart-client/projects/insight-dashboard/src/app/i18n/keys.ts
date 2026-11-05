@@ -528,6 +528,8 @@ export type StringKey =
   | 'card.oi_vs_price.q.short_closing'
   | 'card.funding_extremes.title.neg'
   | 'card.funding_extremes.title.pos'
+  | 'card.funding_extremes.title_interval.neg'
+  | 'card.funding_extremes.title_interval.pos'
   | 'card.funding_extremes.expl.neg'
   | 'card.funding_extremes.expl.pos'
   | 'card.funding_extremes.more'

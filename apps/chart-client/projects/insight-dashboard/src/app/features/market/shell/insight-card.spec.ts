@@ -103,6 +103,13 @@ describe('R5 funding_extremes — the coin is the subject; the sign says who pay
     expect(w.link).toBe('Все монеты →');
     expect(w.chip.tone).toBe('pos');
   });
+  it('IB-135 (TL): a coin that does not settle every 8 h says its period; 8 h and unknown stay as they were', () => {
+    const at = (intervalH: number | null) => st({ ruleId: 'R5', block: 'positioning', key: 'insight.funding_extremes', params: { count: 1, total: 30, symbol: 'TRUMPUSDT', rate: -0.000315, intervalH } });
+    expect(words(at(4)).title).toBe('TRUMP: шорты доплачивают лонгам −0.0315 % за 4 ч — необычно много');
+    expect(words(at(4), 'en').title).toBe('TRUMP: shorts pay longs −0.0315 % per 4 h — unusually high');
+    expect(words(at(8)).title).toBe('TRUMP: шорты доплачивают лонгам −0.0315 % — необычно много');
+    expect(words(at(null)).title).toBe('TRUMP: шорты доплачивают лонгам −0.0315 % — необычно много');
+  });
   it('positive: longs pay; alone, no «ещё у»', () => {
     const w = words(r5(0.0011, 1));
     expect(w.title).toBe('TRUMP: лонги доплачивают шортам 0.1100 % — необычно много');

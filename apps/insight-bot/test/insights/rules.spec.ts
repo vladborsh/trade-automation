@@ -131,8 +131,10 @@ describe('R5 funding extremes', () => {
   });
   it('IB-135: a 4 h coin is normalised to 8 h with the snapshot\'s interval; unknown counts as 8 h', () => {
     const rows = [row('HYPEUSDT', { funding: c(0.00016, 0.95, 180) })];
-    expect(shown(R5.run(snapshot({ positioning: rows, fundingIntervalH: new Map([['HYPEUSDT', 4]]) })))).toMatchObject({ params: { count: 1, symbol: 'HYPEUSDT', rate: 0.00016 } });
+    expect(shown(R5.run(snapshot({ positioning: rows, fundingIntervalH: new Map([['HYPEUSDT', 4]]) })))).toMatchObject({ params: { count: 1, symbol: 'HYPEUSDT', rate: 0.00016, intervalH: 4 } });
     expect(R5.run(snapshot({ positioning: rows }))).toBeNull();
+    // unknown interval: the card is not told one (it then prints the rate as it does for 8 h)
+    expect(shown(R5.run(snapshot({ positioning: [row('A', { funding: c(0.001, 0.97, 90) })] })))?.params['intervalH']).toBeNull();
   });
   it('IB-135: ties on rarity go to the larger rate PER 8 H, not the larger raw rate', () => {
     const rows = [row('E8', { funding: c(0.0004, 1, 90) }), row('E4', { funding: c(0.00025, 1, 180) })];

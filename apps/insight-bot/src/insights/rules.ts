@@ -173,7 +173,8 @@ export const R5: Rule = {
     if (!top) return null;
     return {
       ruleId: 'R5', block: 'positioning', key: 'insight.funding_extremes',
-      params: { count: extreme.length, total: rows.length, symbol: top.symbol, rate: top.fundingRate.value },
+      // IB-135 (TL): the venue's raw rate, and its interval when known, so the card can say «за 4 ч»
+      params: { count: extreme.length, total: rows.length, symbol: top.symbol, rate: top.fundingRate.value, intervalH: intervalH(top) },
       rarity: top.fundingRate.rarity as number, magnitude: extreme.length,
       basis: cellBasis(s, top.fundingRate.sample), link: { anchor: 'positioning' },
       chart: null,

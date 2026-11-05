@@ -192,8 +192,13 @@ export function wordingOf(s: WebInsightStatement): { title: Phrase; figures: str
       const sign = rate < 0 ? 'neg' : 'pos';
       const rateText = fundingPct(rate) ?? '—';
       const count = num('count') ?? 1;
+      // IB-135 (TL): the raw rate is per the coin's own interval; say it when that is not the usual 8 h
+      const h = num('intervalH');
+      const perInterval = h !== null && h !== 8;
       return {
-        title: phrase(`card.funding_extremes.title.${sign}`, { base, rate: rateText }),
+        title: perInterval
+          ? phrase(`card.funding_extremes.title_interval.${sign}`, { base, rate: rateText, h })
+          : phrase(`card.funding_extremes.title.${sign}`, { base, rate: rateText }),
         figures: [rateText],
         explanation: [
           phrase(`card.funding_extremes.expl.${sign}`, { base }),
