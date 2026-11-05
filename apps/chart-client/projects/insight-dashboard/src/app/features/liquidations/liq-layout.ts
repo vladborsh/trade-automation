@@ -164,12 +164,41 @@ export function whereRows(perCoin: readonly WebLiquidationCoinPeriod[]): { rows:
 export const BUBBLE_R_MIN = 3;
 export const BUBBLE_R_MAX = 18;
 export const BUBBLE_PAD_X = 20;
+/**
+ * IB-BUG-036 — the circles carry a 1 px stroke, half of it outside the radius: the outermost bubble
+ * of a column stops this far from the edge (top) or the label band (bottom), so it is never cut.
+ */
+export const BUBBLE_EDGE_PAD = 1;
+/** A time label's glyph advance: the axis font is IBM Plex Mono 12 px, 600/1000 em a glyph. */
+export const TICK_CHAR_PX = 7.2;
+/**
+ * The least empty space between two neighbouring labels. A 390 px phone gives the chart 324–332 px
+ * (measured 2026-11-05, IB-BUG-036), a day 41 px: 7d labels every other day there, one a day at 1240.
+ */
+export const TICK_AIR_PX = 8;
 
 export interface BubbleView<E extends WebLiquidationFeedEvent = WebLiquidationFeedEvent> {
   event: E;
   cx: number;
   cy: number;
   r: number;
+}
+
+export interface BubbleTick {
+  /** The label's centre (`text-anchor: middle`). */
+  x: number;
+  time: number;
+  label: string;
+}
+
+/** The member's clock, as seconds east of UTC at an instant. A spec passes a fixed one. */
+export type UtcOffset = (timeSec: number) => number;
+export const LOCAL_OFFSET: UtcOffset = (t) => -new Date(t * 1000).getTimezoneOffset() * 60;
+
+export interface BubbleAxis {
+  /** IB-BUG-036: the 7d chart labels days (`DD/MM`, one per local midnight), not `DD/MM HH:MM`. */
+  days: boolean;
+  offset: UtcOffset;
 }
 
 /**
@@ -181,7 +210,8 @@ export function bubbleLayout<E extends WebLiquidationFeedEvent>(
   large: readonly E[],
   window: { from: number; to: number },
   size: Size,
-): { axisY: number; bubbles: Array<BubbleView<E>>; ticks: Array<{ x: number; time: number }> } {
+  axis: BubbleAxis = { days: false, offset: LOCAL_OFFSET },
+): { axisY: number; bubbles: Array<BubbleView<E>>; ticks: BubbleTick[] } {
   const axisY = (size.height - HOURLY_PAD_BOTTOM) / 2;
   const span = Math.max(1, window.to - window.from);
   const plotW = Math.max(0, size.width - 2 * BUBBLE_PAD_X);
@@ -198,18 +228,62 @@ export function bubbleLayout<E extends WebLiquidationFeedEvent>(
     for (const p of placed) {
       if (p.up === up && Math.abs(p.cx - cx) < p.r + r) offset = Math.max(offset, p.offset + p.r + r + 1);
     }
+    // Room on this side, from the axis to the top edge (shorts) or to the label band (longs).
     const room = up ? axisY : size.height - HOURLY_PAD_BOTTOM - axisY;
-    offset = Math.min(offset, Math.max(r, room - r));
+    offset = Math.min(offset, Math.max(r, room - r - BUBBLE_EDGE_PAD));
     placed.push({ event, cx, cy: up ? axisY - offset : axisY + offset, r, offset, up });
   }
 
-  const tickCount = Math.max(1, Math.floor(plotW / (TICK_MIN_GAP_PX * 1.6)));
-  const tickTimes = Array.from({ length: tickCount + 1 }, (_, i) => Math.round(window.from + (span * i) / tickCount));
+  const times = axis.days
+    ? localMidnights(window, axis.offset)
+    : evenTimes(window, Math.max(1, Math.floor(plotW / (TICK_MIN_GAP_PX * 1.6))));
   return {
     axisY,
     bubbles: placed.map(({ event, cx, cy, r }) => ({ event, cx, cy, r })),
-    ticks: tickTimes.map((time) => ({ time, x: xOf(time) })),
+    ticks: spacedTicks(times.map((time) => ({ time, x: xOf(time), label: axisLabel(time, axis) }))),
   };
+}
+
+function evenTimes(window: { from: number; to: number }, count: number): number[] {
+  const span = Math.max(1, window.to - window.from);
+  return Array.from({ length: count + 1 }, (_, i) => Math.round(window.from + (span * i) / count));
+}
+
+/** Every local midnight inside the window: the instants a day label belongs to. */
+function localMidnights(window: { from: number; to: number }, offset: UtcOffset): number[] {
+  const out: number[] = [];
+  let off = offset(window.from);
+  for (let day = Math.floor((window.from + off) / 86_400) + 1; ; day++) {
+    off = offset(day * 86_400 - off);
+    const t = day * 86_400 - off;
+    if (t > window.to) return out;
+    if (t >= window.from) out.push(t);
+  }
+}
+
+/** `HH:MM`, or `DD/MM` on the day axis — on the member's clock. */
+function axisLabel(time: number, axis: BubbleAxis): string {
+  const d = new Date((time + axis.offset(time)) * 1000);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return axis.days
+    ? `${two(d.getUTCDate())}/${two(d.getUTCMonth() + 1)}`
+    : `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+}
+
+/**
+ * IB-BUG-036: walking back from the newest, a label too close to the one kept after it is dropped.
+ * Edge labels need no nudging: `BUBBLE_PAD_X` (20 px) holds half of a 5-glyph label (18 px), and the
+ * spec fails the day a longer format (the old `DD/MM HH:MM`, cut at both ends) comes back.
+ */
+function spacedTicks(ticks: BubbleTick[]): BubbleTick[] {
+  const half = (t: BubbleTick) => (t.label.length * TICK_CHAR_PX) / 2;
+  const kept: BubbleTick[] = [];
+  for (let i = ticks.length - 1; i >= 0; i--) {
+    const t = ticks[i];
+    const next = kept[0];
+    if (next === undefined || next.x - half(next) - (t.x + half(t)) >= TICK_AIR_PX) kept.unshift(t);
+  }
+  return kept;
 }
 
 /** The instrument at an event's minute: IB-088's link format, `/instrument/<sym>?at=<unix sec>`. */

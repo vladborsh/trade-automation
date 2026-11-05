@@ -4,8 +4,10 @@ import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/l
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
 import {
+  BUBBLE_EDGE_PAD,
   BUBBLE_R_MAX,
   BUBBLE_R_MIN,
+  type BubbleTick,
   blockView,
   bubbleLayout,
   HOURLY_PAD_BOTTOM,
@@ -13,6 +15,8 @@ import {
   hourlyLayout,
   largeCards,
   normNote,
+  TICK_AIR_PX,
+  TICK_CHAR_PX,
   tickLabel,
   whereRows,
 } from './liq-layout';
@@ -124,6 +128,70 @@ describe('bubbleLayout — large liquidations over the period', () => {
       expect(b.cx - b.r).toBeGreaterThanOrEqual(0);
       expect(b.cx + b.r).toBeLessThanOrEqual(358);
       expect(b.cy - b.r).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('bubbleLayout — nothing cut at the edges (IB-BUG-036)', () => {
+  const ev = (time: number, usd: number, side: 'long' | 'short'): WebLiquidationLargeEvent => ({
+    time, usd, side, symbol: 'BTCUSDT', base: 'BTC', price: 1, venue: 'binance', xMedian: null, seriesId: null, seriesCount: 0, seriesSpanSec: 0,
+  });
+  const STROKE_HALF = 0.5;
+  const asOf = Date.UTC(2026, 10, 5, 13, 33) / 1000; // the IB-118 shot: 05/11 13:33 UTC
+  const week = { from: asOf - 7 * 86_400, to: asOf };
+  const day = { from: asOf - 86_400, to: asOf };
+  const plus3 = { days: true, offset: () => 3 * 3600 };
+  const half = (t: BubbleTick) => (t.label.length * TICK_CHAR_PX) / 2;
+  const expectFitted = (ticks: BubbleTick[], width: number) => {
+    for (const t of ticks) {
+      expect(t.x - half(t)).toBeGreaterThanOrEqual(0);
+      expect(t.x + half(t)).toBeLessThanOrEqual(width);
+    }
+    for (let i = 1; i < ticks.length; i++) {
+      expect(ticks[i].x - half(ticks[i]) - (ticks[i - 1].x + half(ticks[i - 1]))).toBeGreaterThanOrEqual(TICK_AIR_PX);
+    }
+  };
+
+  it('a column taller than its side squeezes, but the outermost bubble and its stroke stay inside — both sides, 390 px', () => {
+    const height = 140;
+    const column = [0, 1, 2, 3, 4].flatMap((i) => [ev(day.to - 600 + i, 4e6 - i, 'short'), ev(day.to - 600 + i, 4e6 - i, 'long')]);
+    const { bubbles } = bubbleLayout(column, day, { width: 324, height });
+    for (const b of bubbles) {
+      expect(b.cy - b.r - STROKE_HALF).toBeGreaterThanOrEqual(0);
+      expect(b.cy + b.r + STROKE_HALF).toBeLessThanOrEqual(height - HOURLY_PAD_BOTTOM);
+    }
+    expect(Math.min(...bubbles.map((b) => b.cy - b.r))).toBeCloseTo(BUBBLE_EDGE_PAD); // squeezed to the edge, not left far below it
+  });
+
+  // The chart's width as measured live on 2026-11-05: 1158 px at a 1240 viewport, 324 px at 390.
+  it('7d at 1240: one DD/MM label per local midnight, no time', () => {
+    for (const width of [1158]) {
+      const { ticks } = bubbleLayout([], week, { width, height: 140 }, plus3);
+      expect(ticks.map((t) => t.label)).toEqual(['30/10', '31/10', '01/11', '02/11', '03/11', '04/11', '05/11']);
+      for (const t of ticks) expect((t.time + 3 * 3600) % 86_400).toBe(0); // the member's midnight, not UTC's
+      expectFitted(ticks, width);
+    }
+  });
+
+  it('7d on the member\'s clock: the same window in UTC puts each day label 3 h later', () => {
+    const local = bubbleLayout([], week, { width: 1158, height: 140 }, plus3).ticks;
+    const utc = bubbleLayout([], week, { width: 1158, height: 140 }, { days: true, offset: () => 0 }).ticks;
+    expect(utc.map((t) => t.time - 3 * 3600)).toEqual(local.map((t) => t.time));
+  });
+
+  it('7d at 390 (a 324 px chart, too narrow for a label a day): every other day, today kept, no overlap', () => {
+    const { ticks } = bubbleLayout([], week, { width: 324, height: 140 }, plus3);
+    expect(ticks.map((t) => t.label)).toEqual(['30/10', '01/11', '03/11', '05/11']);
+    expectFitted(ticks, 324);
+  });
+
+  it('24h: HH:MM labels, the first and last whole, at 1240 and 390', () => {
+    for (const width of [1158, 324]) {
+      const { ticks } = bubbleLayout([], day, { width, height: 140 }, { days: false, offset: () => 0 });
+      expect(ticks.length).toBeGreaterThan(2);
+      for (const t of ticks) expect(t.label).toMatch(/^\d\d:\d\d$/);
+      expect(ticks.at(-1)!.label).toBe('13:33');
+      expectFitted(ticks, width);
     }
   });
 });

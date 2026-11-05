@@ -8,6 +8,6 @@
     </circle>
   }
   @for (tick of l.ticks; track tick.time) {
-    <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
+    <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ tick.label }}</text>
   }
 </svg>

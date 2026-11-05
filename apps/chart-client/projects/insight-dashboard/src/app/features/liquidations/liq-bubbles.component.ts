@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import type { WebLiquidationFeedEvent } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
 import { hostWidth } from '../../ui/host-width';
-import { bubbleLayout, instrumentLink, tickLabel } from './liq-layout';
+import { bubbleLayout, instrumentLink, LOCAL_OFFSET, tickLabel } from './liq-layout';
 import { formatUsd } from './liquidations.format';
 
 /**
@@ -31,12 +31,14 @@ export class LiqBubblesComponent {
 
   readonly height = 140;
   readonly width = hostWidth(342);
-  readonly layout = computed(() => bubbleLayout(this.events(), { from: this.from(), to: this.to() }, { width: this.width(), height: this.height }));
+  /** 4-hour buckets mean the 7d period, whose axis labels days only (IB-BUG-036). */
+  readonly layout = computed(() => bubbleLayout(
+    this.events(),
+    { from: this.from(), to: this.to() },
+    { width: this.width(), height: this.height },
+    { days: this.bucketSec() > 3_600, offset: LOCAL_OFFSET },
+  ));
   readonly usd = formatUsd;
-
-  label(time: number): string {
-    return tickLabel(time, this.bucketSec());
-  }
 
   time(event: WebLiquidationFeedEvent): string {
     return tickLabel(event.time, 60);
