@@ -11,6 +11,7 @@ import { bindVisibility } from '../market/shell/scheduler-visibility';
 import { parsePeriod } from '../market/shell/market-text';
 import { PeriodSwitchComponent } from '../market/shell/period-switch.component';
 import { PosHeatComponent } from './pos-heat.component';
+import { PosHeatHelpComponent } from './pos-heat-help.component';
 import { PosQuadrantComponent } from './pos-quadrant.component';
 import { parseSort, sortQuery, type SortState } from './pos-sort';
 
@@ -29,7 +30,7 @@ export const PAGE_QUADRANT_MAX_HEIGHT = 520;
 @Component({
   selector: 'app-positioning-page',
   standalone: true,
-  imports: [CardComponent, PeriodSwitchComponent, PosQuadrantComponent, PosHeatComponent, LoaderComponent],
+  imports: [CardComponent, PeriodSwitchComponent, PosQuadrantComponent, PosHeatComponent, PosHeatHelpComponent, LoaderComponent],
   templateUrl: './positioning-page.component.html',
   styleUrl: './positioning-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -13,6 +13,7 @@
     <app-pos-quadrant [rows]="d.rows" [maxHeight]="quadrantMaxHeight" />
   </app-card>
   <app-card [heading]="t('positioning.table.title')">
+    <app-pos-heat-help class="heat-help" />
     <app-pos-heat [rows]="d.rows" [sort]="sort()" (sortChange)="onSortChange($event)" />
   </app-card>
 } @else if (!error()) {

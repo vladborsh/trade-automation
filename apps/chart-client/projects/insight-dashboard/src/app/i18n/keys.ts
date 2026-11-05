@@ -656,7 +656,34 @@ export type StringKey =
   | 'liqPage.truncated'
   | 'liqPage.count'
   | 'liqPage.empty'
-  | 'liqPage.marketLink';
+  | 'liqPage.marketLink'
+  // IB-121: the heat table's help (Market and /positioning)
+  | 'positioning.help.title'
+  | 'positioning.help.titleShort'
+  | 'positioning.help.colour.lead'
+  | 'positioning.help.colour.text'
+  | 'positioning.help.level.notable'
+  | 'positioning.help.level.unusual'
+  | 'positioning.help.level.extreme'
+  | 'positioning.help.level.none'
+  | 'positioning.help.priceOi.lead'
+  | 'positioning.help.priceOi.text'
+  | 'positioning.help.oi.lead'
+  | 'positioning.help.oi.text'
+  | 'positioning.help.funding.text'
+  | 'positioning.help.lsGlobal.text'
+  | 'positioning.help.lsTop.text'
+  | 'positioning.help.liq.text'
+  | 'positioning.help.oiUsd.text'
+  | 'positioning.help.signal.lead'
+  | 'positioning.help.signal.squeeze'
+  | 'positioning.help.signal.capitulation'
+  | 'positioning.help.signal.crowded'
+  | 'positioning.help.signal.crowdedText'
+  | 'positioning.help.signal.quiet'
+  | 'positioning.help.signal.empty'
+  | 'positioning.help.signal.emptyText'
+  | 'positioning.help.forecast';
 
 /** Both tables must cover every key, or the project does not compile. */
 export type Strings = Record<StringKey, string>;

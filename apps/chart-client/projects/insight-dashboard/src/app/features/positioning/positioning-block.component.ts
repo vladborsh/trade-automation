@@ -6,6 +6,7 @@ import type { StringKey } from '../../i18n/keys';
 import { CardComponent } from '../../ui/card.component';
 import { BlockConclusionComponent } from '../market/shell/block-conclusion.component';
 import { PosHeatComponent } from './pos-heat.component';
+import { PosHeatHelpComponent } from './pos-heat-help.component';
 
 /** IB-103: the Market tab's compact table: the five most unusual coins answer «who is unusual now». */
 export const MARKET_HEAT_ROWS = 5;
@@ -20,7 +21,7 @@ export const MARKET_HEAT_ROWS = 5;
 @Component({
   selector: 'app-positioning-block',
   standalone: true,
-  imports: [CardComponent, PosHeatComponent, BlockConclusionComponent, RouterLink],
+  imports: [CardComponent, PosHeatComponent, PosHeatHelpComponent, BlockConclusionComponent, RouterLink],
   templateUrl: './positioning-block.component.html',
   styleUrl: './positioning-block.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

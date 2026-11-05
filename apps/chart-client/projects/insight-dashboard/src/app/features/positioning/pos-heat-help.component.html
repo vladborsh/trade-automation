@@ -1,0 +1,32 @@
+<app-help-block [title]="title()" storageKey="positioning-heat" [openOnFirstVisit]="!compact()">
+  <ul class="help-list">
+    <li>
+      <b>{{ t('positioning.help.colour.lead') }}</b> {{ t('positioning.help.colour.text') }}
+      <span class="levels">
+        @for (l of levels; track l.heat) {
+          <span class="level"><span class="sw" [attr.data-heat]="l.heat"></span> {{ t(l.key) }} </span>
+        }
+      </span>
+    </li>
+    <li>
+      <b>{{ t('positioning.help.priceOi.lead') }}</b> {{ t('positioning.help.priceOi.text') }}
+      <b>{{ t('positioning.help.oi.lead') }}</b> {{ t('positioning.help.oi.text') }}
+    </li>
+    <li><b>{{ t('positioning.col.fundingRate') }}</b> {{ t('positioning.help.funding.text') }}</li>
+    <li>
+      <b>{{ t('positioning.col.lsGlobal') }}</b> {{ t('positioning.help.lsGlobal.text') }}
+      <b>{{ t('positioning.col.lsTopPosition') }}</b> {{ t('positioning.help.lsTop.text') }}
+    </li>
+    <li>
+      <b>{{ t('positioning.col.liqUsd') }}</b> {{ t('positioning.help.liq.text') }}
+      <b>{{ t('positioning.col.oi') }}</b> {{ t('positioning.help.oiUsd.text') }}
+    </li>
+    <li>
+      <b>{{ t('positioning.help.signal.lead') }}</b>&ngsp;
+      @for (s of signals; track s.label) {
+        <span class="signal-help"><i>{{ t(s.label) }}</i> {{ t(s.text) }} </span>
+      }
+    </li>
+    <li>{{ t('positioning.help.forecast') }}</li>
+  </ul>
+</app-help-block>

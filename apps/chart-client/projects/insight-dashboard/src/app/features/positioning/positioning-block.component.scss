@@ -6,3 +6,5 @@
 @media (max-width: 767px) {
   .full { min-height: var(--touch-min); }
 }
+/* IB-121: the help sits above the table, the mockup's 12 px apart */
+.heat-help { margin-bottom: 12px; }

@@ -1,0 +1,14 @@
+@use './heat';
+
+/* market-round2 mockup §5. The swatch fills are the heat table's own rules (_heat.scss). */
+:host { display: block; min-width: 0; }
+.help-list { margin: 0; padding-left: 18px; }
+.help-list li { margin: 4px 0; }
+.help-list b { color: var(--color-text-strong); }
+.levels { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
+.level { white-space: nowrap; }
+.sw {
+  display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px;
+  border: 1px solid #30363d;
+  @include heat.fills;
+}

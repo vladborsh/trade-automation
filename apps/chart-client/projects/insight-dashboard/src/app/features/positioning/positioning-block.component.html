@@ -1,5 +1,6 @@
 <app-card id="positioning" [heading]="t('positioning.cardTitle')" [subtitle]="subtitle()">
   <a cardActions class="full" routerLink="/positioning" [queryParams]="{ p: period() }">{{ t('positioning.fullTable') }}</a>
+  <app-pos-heat-help class="heat-help" [compact]="true" />
   <app-pos-heat [rows]="positioning().rows" [limit]="rows" />
   <app-block-conclusion cardConclusion [line]="line()" [period]="period()" />
 </app-card>

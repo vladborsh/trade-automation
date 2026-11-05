@@ -14,3 +14,5 @@ h1 { margin: 0; font: var(--type-h1); color: var(--color-text-strong); }
 @media (max-width: 480px) {
   :host { padding: calc(var(--page-pad-phone) - var(--shell-pad)) 0; }
 }
+/* IB-121: the help sits above the table, the mockup's 12 px apart */
+.heat-help { margin-bottom: 12px; }
