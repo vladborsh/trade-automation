@@ -1,3 +1,6 @@
+import { LIQ_ALERTS_ADMIN, WebLiqAlertsAdminController } from '../../src/web/admin/liq-alerts.controller';
+import { LiqAlertsAdmin } from '../../src/alerts/liquidations/liq-alerts-admin';
+import { PgLiqAlertStore } from '../../src/alerts/liquidations/pg/liq-alerts.repo';
 import { randomUUID } from 'crypto';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
@@ -62,12 +65,13 @@ describeDb('IB-112 alerts admin API against a real database', () => {
     memberId = ((await users.consumeInvite(db, 'aaaaaaaaaaaaaaaa', 222, 222, new Date())) as { user: { id: number } }).user.id;
     const config = { env: { get: () => undefined } } as unknown as AppConfigService;
     @Module({
-      controllers: [WebAlertsAdminController],
+      controllers: [WebAlertsAdminController, WebLiqAlertsAdminController],
       providers: [
         { provide: DB, useValue: db },
         { provide: AppConfigService, useValue: config },
         UsersService, WebAuthService,
         { provide: ALERTS_ADMIN, useFactory: () => new AlertsAdmin(new PgOiAlertStore(db), async () => { infoCalls++; if (!venueUp) throw new Error('503'); return INFO; }) },
+        { provide: LIQ_ALERTS_ADMIN, useFactory: () => new LiqAlertsAdmin(new PgLiqAlertStore(db)) },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
     })
@@ -148,5 +152,23 @@ describeDb('IB-112 alerts admin API against a real database', () => {
     const changed = await json(call('PATCH', '/api/web/admin/alerts/settings', t, { params: p }));
     expect(changed.settings).toMatchObject({ enabled: true, params: p });
     await call('PATCH', '/api/web/admin/alerts/settings', t, { enabled: false, params: OI_DIVERGENCE_DEFAULT_PARAMS });
+  });
+
+  it('IB-122: /admin/alerts/liq — admin only; strict body; a coin edit merges; an unlisted coin is 404', async () => {
+    const m = await session(memberId);
+    expect((await call('GET', '/api/web/admin/alerts/liq', m)).status).toBe(403);
+    expect((await call('PATCH', '/api/web/admin/alerts/liq', m, { enabled: true })).status).toBe(403);
+    const t = await session(adminId);
+    const page = await json(call('GET', '/api/web/admin/alerts/liq', t));
+    expect(page.settings).toMatchObject({ enabled: false, membersVisible: false });
+    expect(page.coins.map((c: { symbol: string; thresholdUsd: number | null }) => `${c.symbol}:${c.thresholdUsd}`)).toEqual(
+      expect.arrayContaining(['BTCUSDT:5000000', 'TRXUSDT:300000']));
+    expect((await call('PATCH', '/api/web/admin/alerts/liq', t, {})).status).toBe(400);
+    expect((await call('PATCH', '/api/web/admin/alerts/liq', t, { perCoin: { TRXUSDT: { enabled: true, thresholdUsd: -1 } } })).status).toBe(400);
+    expect((await call('PATCH', '/api/web/admin/alerts/liq', t, { perCoin: { NOPEUSDT: { enabled: true, thresholdUsd: 1 } } })).status).toBe(404);
+    const changed = await json(call('PATCH', '/api/web/admin/alerts/liq', t, { perCoin: { TRXUSDT: { enabled: true, thresholdUsd: 400_000 } } }));
+    expect(changed.settings.params.perCoin.TRXUSDT).toEqual({ enabled: true, thresholdUsd: 400_000 });
+    expect(changed.settings.params.perCoin.BTCUSDT).toEqual({ enabled: true, thresholdUsd: 5_000_000 });
+    await call('PATCH', '/api/web/admin/alerts/liq', t, { perCoin: { TRXUSDT: { enabled: true, thresholdUsd: 300_000 } } });
   });
 });

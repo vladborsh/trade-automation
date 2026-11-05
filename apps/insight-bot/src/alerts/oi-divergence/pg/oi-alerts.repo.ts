@@ -279,14 +279,18 @@ export class PgOiAlertStore implements OiAlertStore {
   }
 
   async pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]> {
-    // the subject's source: exactly one of the three ids is set (027's check), so the coalesce picks it
+    // the subject's source: exactly one of the five ids is set (027's check, widened by 031 for the IB-122
+    // market alerts and controls), so the coalesce picks it. One queue, one measurer: liquidation paths are
+    // measured by this loop's tick, inside its PATHS_PER_TICK budget.
     const rows = await this.db.query<{ id: string; symbol: string; win: OiResearchWindow; direction: OiDivergenceDirection | null; t0: Date; atr14: string; stop_price: string | null }>(
       `select p.id, p.symbol, p.win, p.direction, p.t0, p.atr14, p.stop_price from oi_divergence_paths p
           left join oi_divergence_alerts a on a.id = p.alert_id
           left join oi_divergence_controls c on c.id = p.control_id
           left join oi_divergence_near_misses n on n.id = p.near_miss_id
+          left join market_alerts ma on ma.id = p.market_alert_id
+          left join market_alert_controls mc on mc.id = p.market_control_id
         where p.measured_at is null
-          and coalesce(a.source, c.source, n.source) = $8
+          and coalesce(a.source, c.source, n.source, ma.source, mc.source) = $8
           and p.t0 + (case p.win when '4h' then $4::int when '24h' then $5::int else $6::int end) * interval '1 second' + $7 * interval '1 second' <= $1
           and (p.tried_at is null or p.tried_at + $3 * interval '1 second' <= $1)
         order by p.tried_at nulls first, p.t0, p.id limit $2`,

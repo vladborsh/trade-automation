@@ -22,6 +22,7 @@ interface UserRow {
   dex_alerts: boolean;
   calendar_alerts: boolean;
   oi_alerts: boolean;
+  liq_alerts: boolean;
   invited_by: number | null;
   disabled: boolean;
   created_at: Date;
@@ -40,13 +41,14 @@ const toUser = (r: UserRow): User => ({
   dexAlerts: r.dex_alerts,
   calendarAlerts: r.calendar_alerts,
   oiAlerts: r.oi_alerts,
+  liqAlerts: r.liq_alerts,
   invitedBy: r.invited_by,
   disabled: r.disabled,
   createdAt: new Date(r.created_at),
 });
 
 const COLUMNS = `id, tg_user_id, chat_id, role, lang, deposit, risk_pct, daily_loss_limit_pct,
-                 dex_alerts, calendar_alerts, oi_alerts, invited_by, disabled, created_at`;
+                 dex_alerts, calendar_alerts, oi_alerts, liq_alerts, invited_by, disabled, created_at`;
 
 export async function findByTgUserId(db: DbHandle, tgUserId: number): Promise<User | null> {
   const rows = await db.query<UserRow>(`select ${COLUMNS} from users where tg_user_id = $1`, [tgUserId]);
@@ -82,11 +84,12 @@ export async function setChatId(db: DbHandle, userId: number, chatId: number): P
  * commands. Their columns stay (dropping them is a migration of its own) and are still READ into
  * `User`, but nothing writes them any more.
  */
-export type SettingsPatch = Partial<Pick<User, 'calendarAlerts' | 'oiAlerts' | 'lang'>>;
+export type SettingsPatch = Partial<Pick<User, 'calendarAlerts' | 'oiAlerts' | 'liqAlerts' | 'lang'>>;
 
 const SETTING_COLUMN: Record<keyof SettingsPatch, string> = {
   calendarAlerts: 'calendar_alerts',
   oiAlerts: 'oi_alerts',
+  liqAlerts: 'liq_alerts',
   lang: 'lang',
 };
 

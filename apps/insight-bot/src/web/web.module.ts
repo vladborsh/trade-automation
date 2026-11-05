@@ -14,7 +14,10 @@ import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
 import { WebMembersController } from './members/members.controller';
-import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { LIQ_ALERTS_ADMIN, WebLiqAlertsAdminController } from './admin/liq-alerts.controller';
+import { LiqAlertsAdmin } from '../alerts/liquidations/liq-alerts-admin';
+import { PgLiqAlertStore, PgLiqAlertsVisibility } from '../alerts/liquidations/pg/liq-alerts.repo';
 import { PgOiAlertStore, PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
 import { AlertsAdmin, cachedExchangeInfo } from '../alerts/oi-divergence/alerts-admin';
 import { OiWindowReader } from '../insights/divergence/oi-window.reader';
@@ -94,6 +97,7 @@ export class WebModule {
         WebMembersController, WebMeSettingsController,
         // IB-112: the OI divergence alerts admin page
         WebAlertsAdminController,
+        WebLiqAlertsAdminController,
         // IB-120: the /liquidations page
         LiquidationsLargeController,
         // IB-133: the /liquidations page as «episodes»
@@ -291,6 +295,18 @@ export class WebModule {
               return response.json();
             }));
           },
+        },
+        {
+          // IB-122 (liq design §1): the «Ликвидации» section of /admin/alerts
+          provide: LIQ_ALERTS_ADMIN,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new LiqAlertsAdmin(new PgLiqAlertStore(db)) : null),
+        },
+        {
+          // IB-122: the liquidation alerts toggle, behind alert_type_settings('liq').members_visible
+          provide: LIQ_ALERTS_VISIBILITY,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new PgLiqAlertsVisibility(db) : { membersVisible: async () => false }),
         },
         {
           // IB-112 (V13): /me/settings shows members the OI alerts toggle only while members_visible is on

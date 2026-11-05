@@ -150,3 +150,31 @@ describe('BybitSocket', () => {
     }
   });
 });
+
+describe('IB-122 (L5): a new coin joins the open socket without a reconnect', () => {
+  it('setTopics sends only the difference as subscribe / unsubscribe frames on the SAME socket', () => {
+    const h = harness(['tickers.BTCUSDT', 'allLiquidation.BTCUSDT']);
+    h.socket.open();
+    h.made[0].emit('open');
+    const change = h.socket.setTopics(['tickers.BTCUSDT', 'allLiquidation.BTCUSDT', 'allLiquidation.TRXUSDT']);
+    expect(change).toEqual({ added: ['allLiquidation.TRXUSDT'], removed: [] });
+    expect(h.made).toHaveLength(1); // no reconnect
+    expect(JSON.parse(h.made[0].sent[h.made[0].sent.length - 1])).toEqual({ op: 'subscribe', args: ['allLiquidation.TRXUSDT'] });
+    h.socket.setTopics(['tickers.BTCUSDT', 'allLiquidation.TRXUSDT']);
+    expect(JSON.parse(h.made[0].sent[h.made[0].sent.length - 1])).toEqual({ op: 'unsubscribe', args: ['allLiquidation.BTCUSDT'] });
+    // the unsubscribe ack is not data
+    h.made[0].emit('message', JSON.stringify({ success: true, ret_msg: '', op: 'unsubscribe' }));
+    expect(h.data).toEqual([]);
+    h.socket.stop();
+  });
+
+  it('before the socket is open nothing is sent; the next open subscribes the new set', () => {
+    const h = harness(['tickers.BTCUSDT', 'allLiquidation.BTCUSDT']);
+    h.socket.open();
+    h.socket.setTopics(['tickers.BTCUSDT', 'allLiquidation.BTCUSDT', 'allLiquidation.TRXUSDT']);
+    expect(h.made[0].sent).toEqual([]);
+    h.made[0].emit('open');
+    expect(JSON.parse(h.made[0].sent[0])).toEqual({ op: 'subscribe', args: ['tickers.BTCUSDT', 'allLiquidation.BTCUSDT', 'allLiquidation.TRXUSDT'] });
+    h.socket.stop();
+  });
+});

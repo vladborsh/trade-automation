@@ -1,5 +1,7 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import { AppConfigService } from '../../config/config.service';
+import { DB, type Db } from '../../db/db.port';
+import { LiquidationTracking, TRACK_REFRESH_MS } from '../liquidation-tracking/pg/liquidation-tracking.repo';
 import { MetricsService } from '../../ops/metrics.service';
 import { StreamRegistry } from '../../ops/stream-registry';
 import { UptimeRecorder } from '../uptime/uptime.recorder';
@@ -32,6 +34,8 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
   private collector: OkxCollector | null = null;
   private socket: OkxSocket | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private trackTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly tracking: LiquidationTracking;
 
   constructor(
     private readonly config: AppConfigService,
@@ -39,10 +43,14 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly registry: StreamRegistry,
     private readonly metrics: MetricsService,
     private readonly uptime: UptimeRecorder,
-  ) {}
+    @Optional() @Inject(DB) db?: Db | null,
+  ) {
+    this.tracking = new LiquidationTracking(db ?? null, config.symbols, { warn: (m) => this.logger.warn(m) });
+  }
 
   async onApplicationBootstrap(): Promise<void> {
-    const instIds = this.config.symbols.map((s) => s.okx_swap).filter((id): id is string => typeof id === 'string');
+    // the universe's okx_swap ids and (IB-122, L5) the enabled alert coins as `{BASE}-USDT-SWAP`
+    const instIds = await this.tracking.symbols('okx');
     if (instIds.length === 0) {
       this.logger.warn('no universe symbols carry an okx_swap mapping — OKX collector idle');
       return;
@@ -69,6 +77,22 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
     // the heartbeat that makes the next such window measurable.
     await this.uptime.begin([{ stream: STREAM_LIQUIDATION, venue: VENUE, market: 'perp' }]);
     this.startClock();
+    // IB-122 (L5): the alert list is re-read every 5 min; the filter widens without touching the socket
+    this.trackTimer = setInterval(() => void this.refreshInstIds(specs), TRACK_REFRESH_MS);
+    this.trackTimer.unref?.();
+  }
+
+  async refreshInstIds(specs: ReadonlyMap<string, unknown>): Promise<void> {
+    try {
+      const change = this.collector?.setInstIds(await this.tracking.symbols('okx'));
+      if (change && change.added.length + change.removed.length > 0) {
+        this.logger.log(`OKX liquidation filter: +${change.added.join(',') || '—'} −${change.removed.join(',') || '—'}`);
+        const unsized = change.added.filter((id) => !specs.has(id));
+        if (unsized.length > 0) this.logger.warn(`no contract size for ${unsized.join(', ')}: their liquidations are skipped, not guessed`);
+      }
+    } catch (error) {
+      this.logger.warn(`OKX symbol refresh failed: ${(error as Error).message}`);
+    }
   }
 
   private subscriptions(instIds: readonly string[]): OkxSubscription[] {
@@ -120,6 +144,8 @@ export class OkxService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    if (this.trackTimer !== null) clearInterval(this.trackTimer);
+    this.trackTimer = null;
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
     this.socket?.close();

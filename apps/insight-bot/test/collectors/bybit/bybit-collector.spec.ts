@@ -32,6 +32,12 @@ function harness(over: Partial<BybitCollectorPorts> = {}) {
       const state = { opened: 0, stopped: 0, silenceChecks: 0, topics };
       sockets.push(state);
       return {
+        setTopics: (next) => {
+          const added = next.filter((t) => !state.topics.includes(t));
+          const removed = state.topics.filter((t) => !next.includes(t));
+          state.topics = [...next];
+          return { added, removed };
+        },
         open: () => void state.opened++,
         stop: () => void state.stopped++,
         checkSilence: () => (state.silenceChecks++, false),
@@ -109,5 +115,24 @@ describe('BybitCollector — liquidations (§4.3)', () => {
 describe('IB-BUG-018: only USDT-linear symbols can be subscribed', () => {
   it('a non-USDT universe symbol (an inverse BTCUSD) is refused at construction', () => {
     expect(() => harness({ symbols: ['BTCUSDT', 'BTCUSD'] })).toThrow(/non-USDT-linear symbols BTCUSD/);
+  });
+});
+
+describe('IB-122 (L5): the tracked set changes without a deploy', () => {
+  it('a coin added to the alert list is subscribed on the same socket; the liveness topic stays', () => {
+    const h = harness();
+    h.collector.start();
+    const change = h.collector.setSymbols(['BTCUSDT', 'XRPUSDT', 'TRXUSDT']);
+    expect(change).toEqual({ added: ['allLiquidation.TRXUSDT'], removed: [] });
+    expect(h.sockets).toHaveLength(1);
+    expect(h.sockets[0].topics).toEqual(['tickers.BTCUSDT', 'allLiquidation.BTCUSDT', 'allLiquidation.XRPUSDT', 'allLiquidation.TRXUSDT']);
+  });
+
+  it('a non-USDT symbol in the new set is refused and logged, never subscribed', () => {
+    const h = harness();
+    h.collector.start();
+    h.collector.setSymbols(['BTCUSDT', 'XRPUSDT', 'BTCUSD_PERP']);
+    expect(h.sockets[0].topics).not.toContain('allLiquidation.BTCUSD_PERP');
+    expect(h.warnings.some((w) => w.includes('BTCUSD_PERP'))).toBe(true);
   });
 });

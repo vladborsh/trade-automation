@@ -33,6 +33,20 @@ describe('the universe filter', () => {
   });
 });
 
+describe('IB-122 (L5): the filter widens without a deploy', () => {
+  it('a coin added to the alert list is stored from the next message on; a removed one is dropped', () => {
+    const collector = new OkxCollector({ instIds: [BTC], contractSpecs: SPECS });
+    collector.acceptLiquidation(liquidation(ZEC, 'long', '5'));
+    expect(collector.drain().liquidations).toHaveLength(0);
+    expect(collector.setInstIds([BTC, ZEC])).toEqual({ added: [ZEC], removed: [] });
+    collector.acceptLiquidation(liquidation(ZEC, 'long', '5'));
+    expect(collector.drain().liquidations.map((r) => r.symbol)).toEqual([ZEC]);
+    expect(collector.setInstIds([ZEC])).toEqual({ added: [], removed: [BTC] });
+    collector.acceptLiquidation(liquidation(BTC, 'long', '5'));
+    expect(collector.drain().liquidations).toHaveLength(0);
+  });
+});
+
 describe('liquidations', () => {
   it('writes one row per detail, in base units, for a tracked instrument', () => {
     const collector = build();

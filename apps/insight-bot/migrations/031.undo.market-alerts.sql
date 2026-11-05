@@ -1,0 +1,12 @@
+drop table if exists liquidation_tracked;
+delete from oi_divergence_paths where market_alert_id is not null or market_control_id is not null;
+alter table oi_divergence_paths drop constraint if exists oi_divergence_paths_market_control_once;
+alter table oi_divergence_paths drop constraint if exists oi_divergence_paths_market_alert_once;
+alter table oi_divergence_paths drop constraint oi_divergence_paths_subject;
+alter table oi_divergence_paths add constraint oi_divergence_paths_subject check (num_nonnulls(alert_id, control_id, near_miss_id) = 1);
+alter table oi_divergence_paths drop column market_control_id;
+alter table oi_divergence_paths drop column market_alert_id;
+alter table users drop column liq_alerts;
+drop table market_alert_controls;
+drop table market_alerts;
+drop table alert_type_settings;

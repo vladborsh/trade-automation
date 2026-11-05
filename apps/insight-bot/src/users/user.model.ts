@@ -19,6 +19,8 @@ export interface User {
   calendarAlerts: boolean;
   /** IB-112 (OI divergence design V13): OI divergence alerts in the DM. Migration 025: on for admins, off for members. */
   oiAlerts: boolean;
+  /** IB-122 (liq design §1): large-liquidation alerts in the DM. Migration 031: on for admins, off for members. */
+  liqAlerts: boolean;
   invitedBy: number | null;
   disabled: boolean;
   createdAt: Date;

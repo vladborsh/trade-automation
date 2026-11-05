@@ -26,11 +26,20 @@ export interface OkxDrain {
 }
 
 export class OkxCollector {
-  private readonly universe: Set<string>;
+  private universe: Set<string>;
   private out: OkxDrain = { liquidations: [] };
 
   constructor(private readonly options: OkxCollectorOptions) {
     this.universe = new Set(options.instIds);
+  }
+
+  /** IB-122 (L5): the tracked set changed (universe ∪ enabled alert coins); the shared channel is filtered to it. */
+  setInstIds(instIds: readonly string[]): { added: string[]; removed: string[] } {
+    const next = new Set(instIds);
+    const added = [...next].filter((id) => !this.universe.has(id));
+    const removed = [...this.universe].filter((id) => !next.has(id));
+    this.universe = next;
+    return { added, removed };
   }
 
   /** True for an instrument this collector stores liquidations for. */

@@ -54,6 +54,9 @@ export const EnvSchema = z.object({
   // IB-112: the OI divergence alert loop (journal always; sending is the admin page's switch, default
   // off). This only lets a spec or a slot boot without the loop polling Binance klines every bar.
   OI_ALERTS_LOOP_ENABLED: booleanFlag(true),
+  // IB-122: the large-liquidation alert loop, every 30 s (journal always; sending is the admin page's
+  // 'liq' switch, default off). Venue weight 0: it reads our own tape.
+  LIQ_ALERTS_LOOP_ENABLED: booleanFlag(true),
   // IB-115 (design V27): the image's commit, 12 hex — stamped on every OI divergence journal, control and
   // near-miss row, so the statistics split by the code that produced them. The Dockerfile sets it from the
   // `BUILD_SHA` build arg (push-image.sh and the CI workflow pass it). In production a missing one is a boot

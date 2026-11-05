@@ -15,8 +15,8 @@ import { INVITE_TTL_MS, type User } from './user.model';
  * `parseOnOff` already knows (`'true'`/`'false'`).
  */
 export function settingsPatchFromWeb(
-  body: { lang?: string; calendarAlerts?: boolean | string; oiAlerts?: boolean | string },
-): { ok: true; patch: SettingsPatch } | { ok: false; field: 'lang' | 'calendarAlerts' | 'oiAlerts' } {
+  body: { lang?: string; calendarAlerts?: boolean | string; oiAlerts?: boolean | string; liqAlerts?: boolean | string },
+): { ok: true; patch: SettingsPatch } | { ok: false; field: 'lang' | 'calendarAlerts' | 'oiAlerts' | 'liqAlerts' } {
   const patch: SettingsPatch = {};
   if (body.lang !== undefined) {
     const lang = parseLang(body.lang);
@@ -32,6 +32,11 @@ export function settingsPatchFromWeb(
     const on = parseOnOff(String(body.oiAlerts));
     if (!on.ok) return { ok: false, field: 'oiAlerts' };
     patch.oiAlerts = on.value;
+  }
+  if (body.liqAlerts !== undefined) {
+    const on = parseOnOff(String(body.liqAlerts));
+    if (!on.ok) return { ok: false, field: 'liqAlerts' };
+    patch.liqAlerts = on.value;
   }
   return { ok: true, patch };
 }

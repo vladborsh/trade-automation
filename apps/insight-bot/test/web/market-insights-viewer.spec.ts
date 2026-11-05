@@ -6,7 +6,7 @@ import { WebMarketController } from '../../src/web/market/market.controller';
 /** IB-113 (TL review) — the joint: the signed-in user's ROLE reaches the insights read (R11 is owner-first). */
 const user = (role: 'admin' | 'member'): User => ({
   id: 1, tgUserId: 111, chatId: null, role, lang: 'ru', deposit: null, riskPct: 1, dailyLossLimitPct: null, dexAlerts: false,
-  calendarAlerts: true, oiAlerts: false, invitedBy: null, disabled: false, createdAt: new Date(0),
+  calendarAlerts: true, oiAlerts: false, liqAlerts: false, invitedBy: null, disabled: false, createdAt: new Date(0),
 });
 
 describe('GET /market/insights passes the viewer\'s role', () => {

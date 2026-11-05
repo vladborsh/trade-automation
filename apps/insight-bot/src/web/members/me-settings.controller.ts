@@ -10,6 +10,8 @@ export const OI_ALERTS_VISIBILITY = Symbol('OI_ALERTS_VISIBILITY');
 export interface OiAlertsVisibility {
   membersVisible(): Promise<boolean>;
 }
+/** IB-122: reads `alert_type_settings('liq').members_visible`, the same way. */
+export const LIQ_ALERTS_VISIBILITY = Symbol('LIQ_ALERTS_VISIBILITY');
 
 /**
  * IB-035 — a member's own settings on the site: exactly the bot's `/lang`, `/calendar` and (IB-112)
@@ -23,14 +25,19 @@ export class WebMeSettingsController {
   constructor(
     private readonly users: UsersService,
     @Optional() @Inject(OI_ALERTS_VISIBILITY) private readonly oiVisibility?: OiAlertsVisibility,
+    @Optional() @Inject(LIQ_ALERTS_VISIBILITY) private readonly liqVisibility?: OiAlertsVisibility,
   ) {}
 
-  private async visible(user: User): Promise<boolean> {
-    return oiAlertsVisible(user, (await this.oiVisibility?.membersVisible()) ?? false);
+  /** Who sees each hidden-by-default toggle: an admin always, a member while that type's `members_visible` is on. */
+  private async visible(user: User): Promise<{ oi: boolean; liq: boolean }> {
+    return {
+      oi: oiAlertsVisible(user, (await this.oiVisibility?.membersVisible()) ?? false),
+      liq: oiAlertsVisible(user, (await this.liqVisibility?.membersVisible()) ?? false),
+    };
   }
 
-  private view(u: User, visible: boolean): WebMemberSettings {
-    return { lang: u.lang, calendarAlerts: u.calendarAlerts, oiAlerts: u.oiAlerts, oiAlertsVisible: visible };
+  private view(u: User, visible: { oi: boolean; liq: boolean }): WebMemberSettings {
+    return { lang: u.lang, calendarAlerts: u.calendarAlerts, oiAlerts: u.oiAlerts, oiAlertsVisible: visible.oi, liqAlerts: u.liqAlerts, liqAlertsVisible: visible.liq };
   }
 
   @Get('settings')
@@ -44,7 +51,8 @@ export class WebMeSettingsController {
     // strict: a field the site has no setting for (deposit, riskPct…) is refused, never ignored
     if (!shape.success) throw new BadRequestException({ code: 'INVALID_SETTING', field: null });
     const visible = await this.visible(user);
-    if (shape.data.oiAlerts !== undefined && !visible) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'oiAlerts' });
+    if (shape.data.oiAlerts !== undefined && !visible.oi) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'oiAlerts' });
+    if (shape.data.liqAlerts !== undefined && !visible.liq) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'liqAlerts' });
     const parsed = settingsPatchFromWeb(shape.data);
     if (!parsed.ok) throw new BadRequestException({ code: 'INVALID_SETTING', field: parsed.field });
     const updated = Object.keys(parsed.patch).length > 0 ? await this.users.updateSettings(user.id, parsed.patch) : user;

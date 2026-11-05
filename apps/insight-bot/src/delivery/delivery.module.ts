@@ -4,6 +4,7 @@ import { DbModule } from '../db/db.module';
 import { UsersModule } from '../users/users.module';
 import { CalendarNotifierService } from './calendar-notifier.service';
 import { OiAlertsService } from './oi-alerts.service';
+import { LiqAlertsService } from './liq-alerts.service';
 import { TelegramSender } from './telegram-sender';
 import { TelegramBotService } from './telegram-bot.service';
 import { WebPushSender } from './web-push-sender';
@@ -32,7 +33,8 @@ export class DeliveryModule {
       // IB-069: the browser push channel sits beside Telegram in the same notifier
       // IB-035: UsersService comes from UsersModule, shared with the site's members page
       // IB-112: the OI divergence alert loop, beside the calendar DMs (same sender, same DB)
-      providers: [TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService, OiAlertsService],
+      // IB-122: the large-liquidation alert loop, beside it
+      providers: [TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService, OiAlertsService, LiqAlertsService],
       exports: [UsersModule, TelegramSender],
     };
   }

@@ -62,6 +62,9 @@ export class BybitSocket {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
   private lastMessageAt: number | null = null;
+  /** IB-122 (L5): the topics to (re)subscribe; `setTopics` changes them on a live socket without a reconnect. */
+  private topics: string[];
+  private subscribed = false;
   private readonly factory: (url: string) => WebSocketLike;
   private readonly now: () => number;
   readonly pingMs: number;
@@ -72,6 +75,28 @@ export class BybitSocket {
     this.now = options.now ?? Date.now;
     this.pingMs = options.pingMs ?? PING_MS;
     this.silenceMs = options.silenceMs ?? SILENCE_MS;
+    this.topics = [...options.topics];
+  }
+
+  /**
+   * IB-122 (L5): a new topic set. On an open socket the difference is sent as `subscribe` / `unsubscribe`
+   * frames — no reconnect, so nothing in flight on the other topics is lost; a closed socket takes the new
+   * set on its next open.
+   */
+  setTopics(next: readonly string[]): { added: string[]; removed: string[] } {
+    const added = next.filter((t) => !this.topics.includes(t));
+    const removed = this.topics.filter((t) => !next.includes(t));
+    this.topics = [...next];
+    const socket = this.socket;
+    if (socket && this.subscribed) {
+      for (const chunk of chunkTopics(added)) socket.send(JSON.stringify({ op: 'subscribe', args: chunk }));
+      for (const chunk of chunkTopics(removed)) socket.send(JSON.stringify({ op: 'unsubscribe', args: chunk }));
+    }
+    return { added, removed };
+  }
+
+  get currentTopics(): readonly string[] {
+    return this.topics;
   }
 
   open(): void {
@@ -83,9 +108,10 @@ export class BybitSocket {
     socket.on('open', (() => {
       this.backoffMs = INITIAL_BACKOFF_MS;
       this.lastMessageAt = this.now();
-      for (const chunk of chunkTopics(this.options.topics)) {
+      for (const chunk of chunkTopics(this.topics)) {
         socket.send(JSON.stringify({ op: 'subscribe', args: chunk }));
       }
+      this.subscribed = true;
       this.startPing();
       this.options.handlers.onOpen();
     }) as never);
@@ -103,12 +129,13 @@ export class BybitSocket {
         this.options.handlers.onSubscribeFailed(ack.ret_msg ?? 'subscribe refused');
         return;
       }
-      if (ack?.op === 'ping' || ack?.op === 'pong' || ack?.op === 'subscribe') return; // acks are not data
+      if (ack?.op === 'ping' || ack?.op === 'pong' || ack?.op === 'subscribe' || ack?.op === 'unsubscribe') return; // acks are not data
       this.options.handlers.onMessage(parsed);
     }) as never);
 
     socket.on('close', ((code: number) => {
       this.socket = null;
+      this.subscribed = false;
       this.stopPing();
       this.options.handlers.onClose(typeof code === 'number' ? code : 0);
       this.scheduleReconnect();

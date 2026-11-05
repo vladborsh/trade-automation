@@ -11,7 +11,8 @@ import * as users from '../../src/users/pg/users.repo';
 import { UsersService } from '../../src/users/users.service';
 import { WebAuthGuard } from '../../src/web/auth/web-auth.guard';
 import { WebAuthService } from '../../src/web/auth/web-auth.service';
-import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from '../../src/web/members/me-settings.controller';
+import { OI_ALERTS_VISIBILITY, WebMeSettingsController, LIQ_ALERTS_VISIBILITY } from '../../src/web/members/me-settings.controller';
+import { PgLiqAlertsVisibility } from '../../src/alerts/liquidations/pg/liq-alerts.repo';
 import { PgOiAlertsVisibility } from '../../src/alerts/oi-divergence/pg/oi-alerts.repo';
 import { WebMembersController } from '../../src/web/members/members.controller';
 import { DB_HOOK_TIMEOUT_MS, dropLeftovers, dropOwn, scratchPrefix } from './scratch-db';
@@ -75,6 +76,7 @@ maybeDescribe('IB-035 members admin against a real database', () => {
         { provide: AppConfigService, useValue: config },
         UsersService, WebAuthService,
         { provide: OI_ALERTS_VISIBILITY, useFactory: () => new PgOiAlertsVisibility(db) },
+        { provide: LIQ_ALERTS_VISIBILITY, useFactory: () => new PgLiqAlertsVisibility(db) },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
     })
@@ -98,13 +100,13 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     expect((await call('POST', '/api/web/admin/members/1/disable', t)).status).toBe(403);
     const me = await call('GET', '/api/web/me/settings', t);
     expect(me.status).toBe(200);
-    expect(await me.json()).toEqual({ lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false });
+    expect(await me.json()).toEqual({ lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false });
   });
 
   it('the settings PATCH writes the same column the bot reads; an unknown field or a bad value is 400', async () => {
     const t = await session(memberId);
     const ok = await call('PATCH', '/api/web/me/settings', t, { lang: 'EN', calendarAlerts: 'выкл' });
-    expect(await ok.json()).toEqual({ lang: 'en', calendarAlerts: false, oiAlerts: false, oiAlertsVisible: false });
+    expect(await ok.json()).toEqual({ lang: 'en', calendarAlerts: false, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false });
     expect((await users.findByTgUserId(db, 222))).toMatchObject({ lang: 'en', calendarAlerts: false });
     expect((await call('PATCH', '/api/web/me/settings', t, { deposit: 1000 })).status).toBe(400);
     const bad = await call('PATCH', '/api/web/me/settings', t, { lang: 'de' });
@@ -133,6 +135,29 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     } finally {
       await db.query('update alert_settings set members_visible = false where id = 1');
       await db.query('update users set oi_alerts = (role = \'admin\')');
+    }
+  });
+
+  it('IB-122: the liquidation alerts toggle — the same rule, behind alert_type_settings(liq).members_visible', async () => {
+    const member = await session(memberId);
+    const adm = await session(adminId);
+    expect(await (await call('GET', '/api/web/me/settings', adm)).json()).toMatchObject({ liqAlertsVisible: true });
+    expect(await (await call('GET', '/api/web/me/settings', member)).json()).toMatchObject({ liqAlerts: false, liqAlertsVisible: false });
+    const hidden = await call('PATCH', '/api/web/me/settings', member, { liqAlerts: 'on' });
+    expect(hidden.status).toBe(403);
+    expect(await hidden.json()).toMatchObject({ code: 'SETTING_NOT_AVAILABLE', field: 'liqAlerts' });
+    // the OI switch does not open the liquidation toggle
+    await db.query('update alert_settings set members_visible = true where id = 1');
+    try {
+      expect((await call('PATCH', '/api/web/me/settings', member, { liqAlerts: 'on' })).status).toBe(403);
+      await db.query(`update alert_type_settings set members_visible = true where type = 'liq'`);
+      const shown = await call('PATCH', '/api/web/me/settings', member, { liqAlerts: 'вкл' });
+      expect(await shown.json()).toMatchObject({ liqAlerts: true, liqAlertsVisible: true });
+      expect((await users.findByTgUserId(db, 222))?.liqAlerts).toBe(true);
+    } finally {
+      await db.query('update alert_settings set members_visible = false where id = 1');
+      await db.query(`update alert_type_settings set members_visible = false where type = 'liq'`);
+      await db.query('update users set liq_alerts = (role = \'admin\')');
     }
   });
 
