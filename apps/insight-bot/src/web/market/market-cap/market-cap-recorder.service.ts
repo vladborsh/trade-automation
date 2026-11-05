@@ -9,7 +9,7 @@ export const MARKET_CAP_RECORD_MS = 10 * 60_000;
 
 /**
  * IB-118 (market round 2 §2, owner ruling 2026-11-05 «записываем сами») — writes the total market cap
- * into `market_cap_total` every 10 min, **whether or not anyone is viewing**, so the cap tile has a
+ * (and, since IB-130, BTC's and ETH's dominance from the same payload) into `market_cap_total` every 10 min, **whether or not anyone is viewing**, so the cap tile has a
  * 7-day line that keyless CoinGecko cannot give back.
  *
  * Reads `MarketCardsService.global()`, the 120 s slot the cards and the caps block already share, so
@@ -71,11 +71,24 @@ export class MarketCapRecorderService implements OnApplicationBootstrap, OnModul
   }
 }
 
-/** The row a `/global` payload gives, or null when it lacks the time or a positive, finite total. */
+/**
+ * The row a `/global` payload gives, or null when it lacks the time or a positive, finite total.
+ *
+ * IB-130: BTC's and ETH's dominance ride along from the same payload (`market_cap_percentage`, already
+ * PERCENT). Each is null on its own when absent, non-finite or outside 0..100 — the cap rule does not
+ * move: a valid total writes the row with whatever shares came with it, and shares without a valid
+ * total write nothing.
+ */
 export function marketCapObservation(payload: GlobalPayload | null): MarketCapRow | null {
   const usd = payload?.data.total_market_cap['usd'];
   const updatedAt = payload?.data.updated_at;
   if (typeof usd !== 'number' || !Number.isFinite(usd) || usd <= 0) return null;
   if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt) || updatedAt <= 0) return null;
-  return { tsMs: Math.round(updatedAt * 1000), totalUsd: usd };
+  const shares = payload?.data.market_cap_percentage;
+  return { tsMs: Math.round(updatedAt * 1000), totalUsd: usd, btcPct: percent(shares?.['btc']), ethPct: percent(shares?.['eth']) };
+}
+
+/** A share in percent, or null when it is not a finite number within 0..100 (the column's own check). */
+function percent(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
 }

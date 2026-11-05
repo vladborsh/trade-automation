@@ -7,7 +7,7 @@ import {
 const H = 3_600_000;
 const T0 = Date.UTC(2026, 10, 5, 0);
 const rows = (n: number, stepMs: number, f: (i: number) => number = (i) => 2.6e12 + i * 1e9) =>
-  Array.from({ length: n }, (_, i) => ({ tsMs: T0 + i * stepMs, totalUsd: f(i) }));
+  Array.from({ length: n }, (_, i) => ({ tsMs: T0 + i * stepMs, totalUsd: f(i), btcPct: null, ethPct: null }));
 
 describe('capHistory — our own table, 6 h before a chart', () => {
   it('no rows: no chart, «копим историю: 0 ч»', () => {

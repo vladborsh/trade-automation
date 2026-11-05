@@ -61,7 +61,8 @@ maybeDescribe('IB-118 migration 029: market_cap_total', () => {
   it('the table: ts primary key, total_usd numeric NOT NULL, fetched_at NOT NULL; not partitioned; market_cap_global not revived', async () => {
     const cols = await db.query<{ column_name: string; data_type: string; is_nullable: string }>(
       `select column_name, data_type, is_nullable from information_schema.columns where table_name = 'market_cap_total' order by ordinal_position`);
-    expect(cols).toEqual([
+    // 029's own three, first; 030 (IB-130) appends btc_pct / eth_pct — the migration 030 spec checks those
+    expect(cols.slice(0, 3)).toEqual([
       { column_name: 'ts', data_type: 'timestamp with time zone', is_nullable: 'NO' },
       { column_name: 'total_usd', data_type: 'numeric', is_nullable: 'NO' },
       { column_name: 'fetched_at', data_type: 'timestamp with time zone', is_nullable: 'NO' },
@@ -85,7 +86,7 @@ maybeDescribe('IB-118 migration 029: market_cap_total', () => {
   });
 
   it('two polls of the same CoinGecko refresh are ONE row, the first observation standing', async () => {
-    const row = { tsMs: T0, totalUsd: 2.68e12 };
+    const row = { tsMs: T0, totalUsd: 2.68e12, btcPct: null, ethPct: null };
     expect(await recordMarketCap(db, row, new Date(T0 + 60_000))).toBe(true);
     expect(await recordMarketCap(db, row, new Date(T0 + 660_000))).toBe(false);
     const rows = await db.query<{ n: number; fetched: Date }>(`select count(*)::int n, min(fetched_at) fetched from market_cap_total`);
@@ -93,12 +94,12 @@ maybeDescribe('IB-118 migration 029: market_cap_total', () => {
   });
 
   it('marketCapSince: rows strictly after the bound, oldest first, as numbers', async () => {
-    for (const i of [3, 1, 0, 2]) await recordMarketCap(db, { tsMs: T0 + i * 600_000, totalUsd: 2.6e12 + i }, new Date(T0));
-    expect(await marketCapSince(db, T0)).toEqual([1, 2, 3].map((i) => ({ tsMs: T0 + i * 600_000, totalUsd: 2.6e12 + i })));
+    for (const i of [3, 1, 0, 2]) await recordMarketCap(db, { tsMs: T0 + i * 600_000, totalUsd: 2.6e12 + i, btcPct: null, ethPct: null }, new Date(T0));
+    expect(await marketCapSince(db, T0)).toEqual([1, 2, 3].map((i) => ({ tsMs: T0 + i * 600_000, totalUsd: 2.6e12 + i, btcPct: null, ethPct: null })));
   });
 
   it('a day of rows (144, one per 10 min): pg_total_relation_size, measured', async () => {
-    for (let i = 0; i < 144; i += 1) await recordMarketCap(db, { tsMs: T0 + i * 600_000, totalUsd: 2680123456789.12 + i * 1e6 }, new Date(T0 + i * 600_000 + 5_000));
+    for (let i = 0; i < 144; i += 1) await recordMarketCap(db, { tsMs: T0 + i * 600_000, totalUsd: 2680123456789.12 + i * 1e6, btcPct: null, ethPct: null }, new Date(T0 + i * 600_000 + 5_000));
     const [s] = await db.query<{ total: number; heap: number; idx: number; fsm: number; vm: number }>(
       `select pg_total_relation_size('market_cap_total')::int total, pg_relation_size('market_cap_total')::int heap,
               pg_indexes_size('market_cap_total')::int idx, pg_relation_size('market_cap_total', 'fsm')::int fsm,
@@ -113,6 +114,6 @@ maybeDescribe('IB-118 migration 029: market_cap_total', () => {
     const [gone] = await db.query<{ t: string | null }>(`select to_regclass('public.market_cap_total')::text t`);
     expect(gone.t).toBeNull();
     await runMigrations({ connectionString: url });
-    expect(await recordMarketCap(db, { tsMs: T0, totalUsd: 1 }, new Date(T0))).toBe(true);
+    expect(await recordMarketCap(db, { tsMs: T0, totalUsd: 1, btcPct: null, ethPct: null }, new Date(T0))).toBe(true);
   }, DB_HOOK_TIMEOUT_MS);
 });

@@ -238,7 +238,7 @@ describe('IB-118: KpisService — the three charts, each its own soft read', () 
   const byId = async (k: KpisService) => Object.fromEntries((await k.kpis()).tiles.map((t) => [t.id, t]));
   const capRows = (n: number) => async (sinceMs: number) => {
     expect(sinceMs).toBe(NOW - 7 * 24 * H);
-    return Array.from({ length: n }, (_, i) => ({ tsMs: NOW - (n - 1 - i) * 600_000, totalUsd: 2.6e12 + i * 1e9 }));
+    return Array.from({ length: n }, (_, i) => ({ tsMs: NOW - (n - 1 - i) * 600_000, totalUsd: 2.6e12 + i * 1e9, btcPct: null, ethPct: null }));
   };
 
   it('OI: ONE 7-day read at a 1 h floor, 168 USD points; the 24 h tile value and delta still from its own read', async () => {

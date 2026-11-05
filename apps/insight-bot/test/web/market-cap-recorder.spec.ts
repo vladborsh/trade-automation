@@ -9,7 +9,8 @@ import { WebModule } from '../../src/web/web.module';
  * collapses two polls) is the migration 029 spec.
  */
 const NOW = Date.UTC(2026, 10, 5, 12);
-const payload = (usd: unknown, updatedAt: unknown) => ({ data: { total_market_cap: { usd }, market_cap_percentage: {}, updated_at: updatedAt } });
+const payload = (usd: unknown, updatedAt: unknown, shares: Record<string, unknown> = {}) =>
+  ({ data: { total_market_cap: { usd }, market_cap_percentage: shares, updated_at: updatedAt } });
 
 function fakeDb(opts: { fail?: boolean } = {}) {
   const inserts: unknown[][] = [];
@@ -32,7 +33,39 @@ afterEach(() => {
 
 describe('marketCapObservation', () => {
   it('the row: CoinGecko updated_at (s → ms) and total_market_cap.usd', () => {
-    expect(marketCapObservation(payload(2.68e12, 1_793_800_000) as never)).toEqual({ tsMs: 1_793_800_000_000, totalUsd: 2.68e12 });
+    expect(marketCapObservation(payload(2.68e12, 1_793_800_000) as never)).toEqual({ tsMs: 1_793_800_000_000, totalUsd: 2.68e12, btcPct: null, ethPct: null });
+  });
+
+  // IB-130: dominance rides along from the same payload, each share on its own; the cap rule does not move
+  it('both shares: market_cap_percentage.btc and .eth, as the percent they already are', () => {
+    expect(marketCapObservation(payload(2.68e12, 1_793_800_000, { btc: 57.31, eth: 11.42, usdt: 4.6 }) as never))
+      .toEqual({ tsMs: 1_793_800_000_000, totalUsd: 2.68e12, btcPct: 57.31, ethPct: 11.42 });
+  });
+
+  it('no ETH share: the cap and BTC are still written, ETH null (and the mirror: no BTC, ETH kept)', () => {
+    expect(marketCapObservation(payload(2.68e12, 1_793_800_000, { btc: 57.31 }) as never))
+      .toEqual({ tsMs: 1_793_800_000_000, totalUsd: 2.68e12, btcPct: 57.31, ethPct: null });
+    expect(marketCapObservation(payload(2.68e12, 1_793_800_000, { eth: 11.42 }) as never))
+      .toEqual({ tsMs: 1_793_800_000_000, totalUsd: 2.68e12, btcPct: null, ethPct: 11.42 });
+  });
+
+  it('a share outside 0..100, non-finite or not a number is null on its own; the bounds themselves are kept', () => {
+    const shares = (btc: unknown, eth: unknown) => {
+      const row = marketCapObservation(payload(2.68e12, 1_793_800_000, { btc, eth }) as never);
+      return row && [row.btcPct, row.ethPct];
+    };
+    expect(shares(100.01, 11.42)).toEqual([null, 11.42]);
+    expect(shares(57.31, -0.01)).toEqual([57.31, null]);
+    expect(shares(Number.NaN, Number.POSITIVE_INFINITY)).toEqual([null, null]);
+    expect(shares('57.31', null)).toEqual([null, null]);
+    expect(shares(0, 100)).toEqual([0, 100]);
+  });
+
+  it('shares without a valid total, or without updated_at, write nothing', () => {
+    const shares = { btc: 57.31, eth: 11.42 };
+    expect(marketCapObservation(payload(undefined, 1_793_800_000, shares) as never)).toBeNull();
+    expect(marketCapObservation(payload(0, 1_793_800_000, shares) as never)).toBeNull();
+    expect(marketCapObservation(payload(2.68e12, undefined, shares) as never)).toBeNull();
   });
 
   it('no updated_at, no positive finite usd, or nothing ever read: no row', () => {
@@ -45,11 +78,11 @@ describe('marketCapObservation', () => {
 });
 
 describe('recordOnce', () => {
-  it('writes the observation with its fetched_at', async () => {
+  it('writes the observation with its fetched_at — the cap and both shares in one row', async () => {
     const { db, inserts } = fakeDb();
-    const svc = new MarketCapRecorderService(db, { global: async () => payload(2.68e12, 1_793_800_000) } as never);
+    const svc = new MarketCapRecorderService(db, { global: async () => payload(2.68e12, 1_793_800_000, { btc: 57.31, eth: 11.42 }) } as never);
     expect(await svc.recordOnce(NOW)).toBe('recorded');
-    expect(inserts).toEqual([[new Date(1_793_800_000_000), 2.68e12, new Date(NOW)]]);
+    expect(inserts).toEqual([[new Date(1_793_800_000_000), 2.68e12, 57.31, 11.42, new Date(NOW)]]);
   });
 
   it('a failed read writes NOTHING and resolves; warns once per run of failures, again after a success', async () => {
