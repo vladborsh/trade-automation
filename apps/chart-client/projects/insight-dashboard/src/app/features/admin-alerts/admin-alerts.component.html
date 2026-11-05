@@ -69,12 +69,13 @@
       <p class="note">{{ t('alerts.paramsNote') }}</p>
       <div class="scroll">
         <table class="params">
-          <thead><tr><th></th><th>{{ t('alerts.param.n') }}</th><th>{{ t('alerts.param.k') }}</th><th>{{ t('alerts.param.w') }}</th></tr></thead>
+          <thead><tr><th></th><th>{{ t('alerts.param.nLeft') }}</th><th>{{ t('alerts.param.nRight') }}</th><th>{{ t('alerts.param.k') }}</th><th>{{ t('alerts.param.w') }}</th></tr></thead>
           <tbody>
             @for (tf of tfs; track tf) {
               <tr>
                 <td>{{ tf }}</td>
-                <td><input inputmode="numeric" [value]="f.perTf[tf].n" (input)="editParam(tf, 'n', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.n')" /></td>
+                <td><input inputmode="numeric" [value]="f.perTf[tf].nLeft" (input)="editParam(tf, 'nLeft', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.nLeft')" /></td>
+                <td><input inputmode="numeric" [value]="f.perTf[tf].nRight" (input)="editParam(tf, 'nRight', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.nRight')" /></td>
                 <td><input inputmode="numeric" [value]="f.perTf[tf].k" (input)="editParam(tf, 'k', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.k')" /></td>
                 <td><input inputmode="numeric" [value]="f.perTf[tf].w" (input)="editParam(tf, 'w', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.w')" /></td>
               </tr>

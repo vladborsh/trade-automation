@@ -1,5 +1,7 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
-  WEB_INSIGHT_CHART_MAX_POINTS, WebInsightChartSchema, WebInsightsResponseSchema, type WebFlowsResponse, type WebInsightChart, type WebInsightStatement,
+  OiDivergenceJournalParamsSchema, WEB_INSIGHT_CHART_MAX_POINTS, WebInsightChartSchema, WebInsightsResponseSchema, type WebFlowsResponse, type WebInsightChart, type WebInsightStatement,
   type WebPositioningCell, type WebPositioningRow,
 } from '@trade-automation/contracts';
 import { levelBand, pctFromFirst, thin, upperBand } from '../../../src/insights/charts/chart-math';
@@ -328,35 +330,44 @@ describe('R8 / R9 / R10: the flows payload\'s own series', () => {
   });
 });
 
+/** Live alert #393 as the box's journal holds it (one n per TF, from before migration 032). */
+const box393 = JSON.parse(readFileSync(join(__dirname, '../../../../../libs/contracts/test/fixtures/oi-divergence-alert-393.box.json'), 'utf8')) as { params: unknown };
+
 describe('R11 OI divergence: price and OI (contracts) as % from A − 2 bars, ref 0, A and B marked', () => {
   const alert = {
     id: 9, source: 'live' as const, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
     a: { time: Math.floor(NOW_S / 3_600) * 3_600 - 30 * 3_600, price: 40, oiTime: 0, oi: 1_000 },
     b: { time: Math.floor(NOW_S / 3_600) * 3_600 - 8 * 3_600, price: 38, oiTime: 0, oi: 1_032 },
-    runOf: null, runLength: 2, params: { perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 168 }, '4h': { n: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 },
+    runOf: null, runLength: 2, params: { perTf: { '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 7, nRight: 4, k: 3, w: 168 }, '4h': { nLeft: 6, nRight: 2, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 },
     confirmedAt: NOW_S - 3_600, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null,
   };
-  it('one klines call at exactly A − 2 … B + N (weight ≤ 2), the detector\'s series (lows and per-bar MIN OI for bullish)', async () => {
+  // IB-141 (V35): unequal sides on the alert's own TF, so B + nLeft (or another TF's reach) would fail here
+  it('one klines call at exactly A − 2 … B + nRight (weight ≤ 2), the detector\'s series (lows and per-bar MIN OI for bullish)', async () => {
     const s = snapshot({ oiDivergence: { alert } });
     const readings = ramp(31 * 12, 0).map((i) => ({ time: alert.a.time - 2 * 3_600 + (i + 1) * 300, oi: 2_000 + (i % 12) }));
     const { r, calls } = reads({ oiReadings: async () => readings });
     const chart = valid(await chartFor(said(R11, s), s, r, cache()));
     const bars = r11Bars(alert, NOW) as { fromMs: number; limit: number };
-    expect(bars).toMatchObject({ fromMs: (alert.a.time - 2 * 3_600) * 1000, limit: 2 + 22 + 6 + 1 });
-    expect(calls).toEqual([`klines:BTCUSDT:1h:${bars.fromMs}:31`]);
+    expect(bars).toMatchObject({ fromMs: (alert.a.time - 2 * 3_600) * 1000, limit: 2 + 22 + 4 + 1 });
+    expect(calls).toEqual([`klines:BTCUSDT:1h:${bars.fromMs}:29`]);
     expect(chart).toMatchObject({ kind: 'lines', unit: 'pct', ref: 0, marks: [alert.a.time, alert.b.time], highlight: { from: alert.a.time, to: alert.b.time } });
     expect(keys(chart)).toEqual(['price', 'oi']);
     expect(chart.series[0]?.points[1]?.value).toBeCloseTo((41 / 40 - 1) * 100, 9); // lows: 40, 41, …
     expect(chart.series[1]?.points.every((p) => p.value === 0)).toBe(true); // per-bar MIN is 2 000 in every bar
   });
-  it('B + N is capped at the last closed bar', () => {
+  it('a journal row from before 032 (one n) reaches B + n: it was confirmed with n bars on the right (V34)', () => {
+    const old = { ...alert, tf: '4h' as const, params: OiDivergenceJournalParamsSchema.parse(box393.params) };
+    const bars = r11Bars({ ...old, a: { ...old.a, time: 0 }, b: { ...old.b, time: 20 * 14_400 } }, NOW) as { fromMs: number; limit: number };
+    expect(bars.limit).toBe(2 + 20 + 6 + 1);
+  });
+  it('B + nRight is capped at the last closed bar', () => {
     const late = { ...alert, b: { ...alert.b, time: Math.floor(NOW_S / 3_600) * 3_600 - 2 * 3_600 } };
     const bars = r11Bars(late, NOW) as { fromMs: number; limit: number };
     expect(bars.fromMs / 1000 + (bars.limit - 1) * 3_600).toBe(Math.floor(NOW_S / 3_600) * 3_600 - 3_600);
   });
-  it('the limit stays under 500 (weight 2) for the widest window W + N + 3 on 1h', () => {
+  it('the limit stays under 500 (weight 2) for the widest window W + nRight + 3 on 1h', () => {
     const wide = { ...alert, a: { ...alert.a, time: alert.b.time - 168 * 3_600 } };
-    expect(r11Bars(wide, NOW + 10 * 86_400_000)?.limit).toBe(168 + 6 + 3);
+    expect(r11Bars(wide, NOW + 10 * 86_400_000)?.limit).toBe(168 + 4 + 3);
   });
 });
 

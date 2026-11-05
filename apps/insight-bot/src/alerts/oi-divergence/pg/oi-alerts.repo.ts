@@ -21,6 +21,11 @@ import type { Lang } from '../../../users/user.model';
  * comparison with the controls — anything aggregated over these tables — groups by `source` and
  * reports `live` and `backfill` SEPARATELY. Never pool them; never filter only one silently either:
  * say which population a number is about (§6's open item decides "worked" and the baseline first).
+ *
+ * The same goes for the **pivot rule (IB-141, V37)**: on 4h, rows confirmed at 6/6 and at 6/2 are different
+ * detectors. Each row's `params` records which (no extra column); split before / after with
+ *   coalesce(params#>>'{perTf,4h,nRight}', params#>>'{perTf,4h,n}')
+ * — a row from before migration 032 carries one `n` for both sides (V34; read as nLeft = nRight = n).
  */
 export interface OiAlertRecipient {
   userId: number;

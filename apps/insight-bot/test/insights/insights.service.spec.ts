@@ -66,7 +66,7 @@ describe('IB-113: R11 is owner-first (members_visible)', () => {
     id: 9, source: 'live' as const, symbol: 'ETHUSDT', tf: '15m' as const, direction: 'bearish' as const,
     a: { time: now - 30 * H, price: 100, oiTime: now - 30 * H, oi: 1_000 },
     b: { time: now - 8 * H, price: 100.42, oiTime: now - 8 * H, oi: 997.7 },
-    runOf: null, runLength: 2, params: { perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }, // a round-1 row as read (V20)
+    runOf: null, runLength: 2, params: { perTf: { '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 120 }, '4h': { nLeft: 6, nRight: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }, // a round-1 row as read (V20)
     confirmedAt: now - 7 * H, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null,
   };
   // the live case: R5 at rarity 1 with three coins beside R11

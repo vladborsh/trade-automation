@@ -216,7 +216,7 @@ export class OiAlertLoop {
     }
 
     if (bars.length < minBarsForNearMisses(p)) return; // a young coin: the reach's basis is not there yet
-    const decided = bars.length - (2 * p.k + p.n + 1); // the newest B whose OI pivot may lie 2k after it, confirmed
+    const decided = bars.length - (2 * p.k + p.nRight + 1); // the newest B whose OI pivot may lie 2k after it, then nRight to confirm
     for (const m of diagnose(input, result)) {
       if (m.bIndex !== decided) continue;
       if (await store.hasAlert(source, symbol, tf, m.direction, m.b.time)) continue;

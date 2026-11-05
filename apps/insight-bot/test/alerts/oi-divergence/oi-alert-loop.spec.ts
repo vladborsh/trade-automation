@@ -7,6 +7,7 @@ import type { NewOiControl } from '../../../src/alerts/oi-divergence/pg/oi-alert
 import { OI_RESEARCH_WINDOWS } from '@trade-automation/contracts';
 import { MemoryStore } from './memory-store';
 import type { Bar } from '../../../src/insights/divergence/detector';
+import { barsToFetch } from '../../../src/alerts/oi-divergence/basis';
 
 /**
  * IB-112 — the alert loop on REAL data: dev-1's positive control (ETHUSDT 1h, Binance's own bars and
@@ -280,12 +281,19 @@ describe('IB-115: the research journal in the loop', () => {
   });
 });
 
-describe('IB-115: near-misses in the loop (synthetic 15m)', () => {
+/**
+ * Run twice: on the 15m default (6/6) and with 15m set to 6 left / 2 right (IB-141, V35) — the decided index
+ * length − (2k + nRight + 1), the read count and the confirmation each fail there if a side is swapped.
+ */
+describe.each([
+  ['6/6, the 15m default', OI_DIVERGENCE_DEFAULT_PARAMS.perTf['15m']],
+  ['6/2, unequal sides (IB-141)', { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['15m'], nRight: 2 }],
+])('IB-115: near-misses in the loop (synthetic 15m, %s)', (_name, P15) => {
   const TF = 900;
-  const P15 = OI_DIVERGENCE_DEFAULT_PARAMS.perTf['15m']; // n 6, k 3, w 96
-  const LEN = 260; // what the loop reads on 15m: barsForEvaluation(near-miss reach) 164 + W 96
+  const PARAMS = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '15m': P15 } };
+  const LEN = barsToFetch(P15); // what the loop reads on 15m: barsForEvaluation(near-miss reach) + W (260 at 6/6, 256 at 6/2)
   const T0 = 1_793_000_000 - (1_793_000_000 % 14_400);
-  const B = LEN - (2 * P15.k + P15.n + 1); // the B a near-miss is decided at
+  const B = LEN - (2 * P15.k + P15.nRight + 1); // the B a near-miss is decided at
   const A = B - 20;
   /** B’s OI pivot k + 1 bars after it: a k near-miss, miss 1. */
   const lowAt = (i: number) => (i === A ? 95 : i === B ? 93 : 100);
@@ -297,16 +305,21 @@ describe('IB-115: near-misses in the loop (synthetic 15m)', () => {
     oiWindow: async (_s, from, to) => ({ oi5m: oi5m.filter((o) => o.time > from && o.time <= to), venueSilent: [] }),
   });
   const close = T0 + LEN * TF; // the window then ends at bar LEN − 1
+  const storeWith = () => {
+    const store = new MemoryStore();
+    store.settingsRow = { ...store.settingsRow, params: PARAMS };
+    return store;
+  };
 
   it('the B the reach decides gets ONE near-miss row (rule k, miss 1 bar), with the build and 3 paths; the next evaluation adds none', async () => {
-    const store = new MemoryStore();
+    const store = storeWith();
     const { loop: l } = loop(store, ports());
     const r = await l.evaluate('15m', close, close + 6 * 60);
     expect(r).toMatchObject({ journalled: 0, nearMisses: 1, failed: [] });
     expect(store.nearMisses.map((m) => [m.direction, m.rule, m.miss, m.unit, m.a.time, m.b.time, m.build])).toEqual([
       ['bullish', 'k', 1, 'bars', T0 + A * TF, T0 + B * TF, 'b49cd48d4ab4'],
     ]);
-    const confirmedAt = T0 + (B + P15.k + 1 + P15.n) * TF + TF;
+    const confirmedAt = T0 + (B + P15.k + 1 + P15.nRight) * TF + TF;
     expect(store.nearMisses[0]?.confirmedAt).toBe(confirmedAt);
     expect(store.paths.filter((p) => 'nearMissId' in p.subject).map((p) => [p.win, p.t0, p.stopPrice])).toEqual(
       OI_RESEARCH_WINDOWS.map((w) => [w, confirmedAt + 600, 93]));
@@ -316,13 +329,13 @@ describe('IB-115: near-misses in the loop (synthetic 15m)', () => {
   });
 
   it('an evaluation one bar EARLIER does not decide it yet (its OI pivot could still be within 2k)', async () => {
-    const store = new MemoryStore();
+    const store = storeWith();
     const { loop: l } = loop(store, ports());
     expect((await l.evaluate('15m', close - TF, close - TF + 6 * 60)).nearMisses).toBe(0);
   });
 
   it('a B the journal holds an alert for gets no near-miss', async () => {
-    const store = new MemoryStore();
+    const store = storeWith();
     store.hasAlert = async (_src, _s, _tf, _d, bTime) => bTime === T0 + B * TF;
     const { loop: l } = loop(store, ports());
     expect((await l.evaluate('15m', close, close + 6 * 60)).nearMisses).toBe(0);

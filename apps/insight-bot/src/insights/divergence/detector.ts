@@ -23,8 +23,10 @@ export interface Bar {
 }
 
 export interface DivergenceParams {
-  /** Pivot reach: bars each side (V5). */
-  n: number;
+  /** Pivot reach on the left: how far back a pivot looks (V5, V34). */
+  nLeft: number;
+  /** Pivot reach on the right: how many closed bars confirm a pivot (V5, V34). 4h: 2 since IB-141. */
+  nRight: number;
   /** Pairing reach: an OI pivot within ±k bars of the price pivot (V6). */
   k: number;
   /** Lookback: A's price pivot within W bars of B's (V7). */
@@ -41,7 +43,7 @@ export interface DivergenceParams {
 
 export interface DivergenceInput {
   tfSec: number;
-  /** CLOSED bars only, ascending and contiguous. A pivot's confirmation is bar i+N being in here. */
+  /** CLOSED bars only, ascending and contiguous. A pivot's confirmation is bar i + nRight being in here. */
   bars: readonly Bar[];
   oi5m: readonly OiPoint[];
   params: DivergenceParams;
@@ -49,6 +51,12 @@ export interface DivergenceInput {
   venueSilent?: ReadonlyArray<{ from: number; to: number }>;
   /** Slots after this moment are not due yet (the venue's publish lag): not holes. Default: the last bar's close. */
   oiDueUntil?: number;
+  /**
+   * V36: which earlier pivot may be A. `full` (the default, and the only rule the server uses): A's price and OI
+   * pivots also hold with max(nLeft, nRight) bars on the right. `fast` drops that check — it exists for V39's
+   * history run (IB-141), which reports what the rule removes. Production code never passes it.
+   */
+  aRule?: 'full' | 'fast';
 }
 
 export type Direction = 'bullish' | 'bearish';
@@ -58,7 +66,7 @@ export interface PivotPair {
   /** Bar index of the price pivot, and of the OI pivot paired with it. */
   price: number;
   oi: number;
-  /** The bar whose close confirms the pair: max(price, oi) + N. */
+  /** The bar whose close confirms the pair: max(price, oi) + nRight (V6, V35). */
   confirmIndex: number;
 }
 
@@ -111,31 +119,37 @@ export const OI_MEDIAN_BARS = 100;
 export const OI_MEDIAN_MIN = 20;
 
 /**
- * IB-110 (TL 2026-11-04, V10), re-derived in IB-114 (V18) — how many CLOSED bars a caller must hand the detector
- * so that the newest B it can confirm is judged on full context, derived from the constants, never typed by hand:
- * - its farthest A (W bars back) must itself be a pivot: N bars before A → B ≥ W + N;
- * - V18's price tolerance needs ATR14 at the crossing bar j, i.e. j ≥ ATR_PERIOD. A bar within N after A cannot
- *   cross: A is the lowest of them (V5) and the line falls from A (the price is worse at B), so the first bar that
- *   can cross is A + N + 1 → A ≥ ATR_PERIOD − N − 1 → B ≥ W + ATR_PERIOD − N − 1 (binding only while N < 7);
+ * IB-110 (TL 2026-11-04, V10), re-derived in IB-114 (V18) and IB-141 (V35) — how many CLOSED bars a caller must hand
+ * the detector so that the newest B it can confirm is judged on full context, derived from the constants, never
+ * typed by hand. Before B the terms take `nLeft`, after B `nRight`:
+ * - its farthest A (W bars back) must itself be a pivot: nLeft bars before A → B ≥ W + nLeft;
+ * - V18's price tolerance needs ATR14 at the crossing bar j, i.e. j ≥ ATR_PERIOD. A bar within A's right reach
+ *   cannot cross: A is the lowest of them (V5) and the line falls from A (the price is worse at B). V36 holds A to
+ *   max(nLeft, nRight) bars on the right, so the first bar that can cross is A + max(nLeft, nRight) + 1 →
+ *   B ≥ W + ATR_PERIOD − max(nLeft, nRight) − 1 (binding only while that max is < 7). (`aRule: 'fast'` holds A to
+ *   nRight only; the history run's W keeps this term below the OI one on 4h, so the count is unchanged there.)
  * - the noise floor's 100 moves end at B's previous bar and start at bar B − OI_MEDIAN_BARS − 1 → B ≥ OI_MEDIAN_BARS + 1;
  *   ATR14 at B needs B ≥ ATR_PERIOD, always the smaller;
- * - after B: its OI pivot up to k bars later, then N bars to confirm → k + N bars, plus B's own bar.
- * Defaults: 15m 113, 1h 185, 4h 111 (was 112 / 136 / 111: W 168 on 1h, V19, and the crossing bar's ATR, V18).
- * Counted whatever the tolerance: at 0 the extra ≤ 7 bars are unused, never missing. The spec checks that one
- * bar fewer loses the evaluation.
+ * - after B: its OI pivot up to k bars later, then nRight bars to confirm → k + nRight bars, plus B's own bar.
+ * Defaults: 15m 113, 1h 185, 4h **107** (was 111 at 6/6: nRight 2, V34). Counted whatever the tolerance: at 0 the
+ * extra ≤ 7 bars are unused, never missing. The spec checks that one bar fewer loses the evaluation.
  */
-export function barsForEvaluation(p: Pick<DivergenceParams, 'n' | 'k' | 'w'>): number {
-  return Math.max(p.w + Math.max(p.n, ATR_PERIOD - p.n - 1), OI_MEDIAN_BARS + 1, ATR_PERIOD) + p.k + p.n + 1;
+export function barsForEvaluation(p: Pick<DivergenceParams, 'nLeft' | 'nRight' | 'k' | 'w'>): number {
+  const aRight = Math.max(p.nLeft, p.nRight);
+  return Math.max(p.w + Math.max(p.nLeft, ATR_PERIOD - aRight - 1), OI_MEDIAN_BARS + 1, ATR_PERIOD) + p.k + p.nRight + 1;
 }
 
 export function detectDivergences(input: DivergenceInput): DivergenceResult {
   const { bars, params } = input;
   const opens = bars.map((b) => b.time);
   const oi = oiPerBar(opens, input.oi5m, input.tfSec);
-  const lows = pivots(bars.map((b) => b.low), params.n, 'low');
-  const highs = pivots(bars.map((b) => b.high), params.n, 'high');
-  const oiLows = pivots(oi.min, params.n, 'low');
-  const oiHighs = pivots(oi.max, params.n, 'high');
+  const lowValues = bars.map((b) => b.low);
+  const highValues = bars.map((b) => b.high);
+  const lows = pivots(lowValues, params.nLeft, params.nRight, 'low');
+  const highs = pivots(highValues, params.nLeft, params.nRight, 'high');
+  const oiLows = pivots(oi.min, params.nLeft, params.nRight, 'low');
+  const oiHighs = pivots(oi.max, params.nLeft, params.nRight, 'high');
+  const canBeA = aEligibility(params, { low: lowValues, high: highValues }, { low: oi.min, high: oi.max }, input.aRule ?? 'full');
 
   const pairs = [...pair(lows, oiLows, 'low', params), ...pair(highs, oiHighs, 'high', params)]
     .filter((p) => p.confirmIndex < bars.length);
@@ -149,8 +163,8 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
     const seriesTime = side === 'low' ? oi.minTime : oi.maxTime;
     const found: Divergence[] = [];
     for (const b of sidePairs) {
-      const lo = Math.max(0, b.price - params.w - params.n);
-      const hi = Math.min(bars.length - 1, b.price + params.k + params.n);
+      const lo = Math.max(0, b.price - params.w - params.nLeft);
+      const hi = Math.min(bars.length - 1, b.price + params.k + params.nRight);
       const hole = holes(bars[lo].time, bars[hi].time + input.tfSec);
       if (hole) {
         skips.push({ barTime: bars[b.price].time, reason: 'no_oi_data', holeFrom: hole.from, holeTo: hole.to });
@@ -159,7 +173,7 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
       const noise = noiseAt(bars, series, b.price, params);
       if (noise === null) continue;
       const candidates = sidePairs.filter((a) => a.price < b.price && a.price >= b.price - params.w
-        && a.confirmIndex <= b.confirmIndex && a.oi < b.oi
+        && a.confirmIndex <= b.confirmIndex && a.oi < b.oi && canBeA(a, b.confirmIndex)
         && diverges(side, bars, series, a, b, noise, params));
       if (candidates.length === 0) continue;
       const a = candidates.reduce((far, c) => (c.price < far.price ? c : far)); // V7: the farthest A
@@ -191,9 +205,33 @@ export function pair(price: readonly number[], oi: readonly number[], side: Side
       if (d > p.k) continue;
       if (best === null || d < Math.abs(best - i) || (d === Math.abs(best - i) && j < best)) best = j;
     }
-    if (best !== null) out.push({ side, price: i, oi: best, confirmIndex: Math.max(i, best) + p.n });
+    if (best !== null) out.push({ side, price: i, oi: best, confirmIndex: Math.max(i, best) + p.nRight });
   }
   return out;
+}
+
+/**
+ * V36 (IB-141) — "fast B, full A". With unequal sides two pivots of a kind can be nRight + 1 bars apart, so a 6/2
+ * low that a lower low contradicts 3–6 bars later could serve as A for that lower low: a «divergence» across two
+ * bars between a false bottom and the real one. So a pair may be **A** only if its price pivot AND its OI pivot
+ * also hold with max(nLeft, nRight) bars on the right — judged only on bars up to B's confirmation
+ * (`max(price, oi) + max(nLeft, nRight) ≤ bConfirmIndex`): the loop deciding B and a replay over later bars (the
+ * chart) then admit the same A. B keeps the fast nRight. With equal sides this is exactly `a.confirmIndex ≤
+ * b.confirmIndex`, which both callers already require: a no-op on 15m and 1h.
+ */
+export function aEligibility(
+  p: Pick<DivergenceParams, 'nLeft' | 'nRight'>,
+  price: Record<Side, ReadonlyArray<number | null>>, oi: Record<Side, ReadonlyArray<number | null>>, rule: 'full' | 'fast',
+): (a: PivotPair, bConfirmIndex: number) => boolean {
+  const reach = Math.max(p.nLeft, p.nRight);
+  if (rule === 'fast' || reach === p.nRight) return () => true;
+  const full = (values: ReadonlyArray<number | null>, side: Side) => new Set(pivots(values, p.nLeft, reach, side));
+  const sets = {
+    low: { price: full(price.low, 'low'), oi: full(oi.low, 'low') },
+    high: { price: full(price.high, 'high'), oi: full(oi.high, 'high') },
+  };
+  return (a, bConfirmIndex) => sets[a.side].price.has(a.price) && sets[a.side].oi.has(a.oi)
+    && Math.max(a.price, a.oi) + reach <= bConfirmIndex;
 }
 
 export interface Noise {

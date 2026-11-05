@@ -45,7 +45,7 @@ describe('oiPerBar', () => {
     readings.push({ time: OPEN + 2 * TF, oi: 900 }); // replaces nothing: an extra, lower reading at 2's open
     const min = oiPerBar(opens, readings, TF).min;
     expect(min).toEqual([1000, 900, 1000, 1000, 1000]);
-    expect(pivots(min, 1, 'low')).toEqual([1]); // bar 1, not bar 2
+    expect(pivots(min, 1, 1, 'low')).toEqual([1]); // bar 1, not bar 2
   });
 });
 

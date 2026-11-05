@@ -16,7 +16,7 @@ export interface ControlPick {
   barTime: number;
   stopPrice: number | null;
   atr14: number;
-  /** V23: the confirming bar's close + 6 min, up to 5 m. Pivot: bar i + N; random: the bar itself. */
+  /** V23: the confirming bar's close + 6 min, up to 5 m. Pivot: bar i + nRight; random: the bar itself. */
   t0: number;
 }
 
@@ -37,25 +37,25 @@ export function randomControlBars(symbol: string, tf: OiDivergenceTf, tfSec: num
 }
 
 /**
- * `pivot`: the price pivot(s) at the one bar this evaluation decides for good — index length − (k + N + 1),
- * the newest B whose every pairing (OI pivot up to k after it, then N to confirm) is in the window.
- * A pivot whose window [i − W − N, i + k + N] has a hole in OI is not a control: it was not judged (the hole
+ * `pivot`: the price pivot(s) at the one bar this evaluation decides for good — index length − (k + nRight + 1),
+ * the newest B whose every pairing (OI pivot up to k after it, then nRight to confirm) is in the window.
+ * A pivot whose window [i − W − nLeft, i + k + nRight] has a hole in OI is not a control: it was not judged (the hole
  * can hide the OI pivot it would have paired with — the detector skips paired ones, V9; this also covers the
  * unpaired). Whether it produced an alert is the journal's to say: the caller filters on it.
  * Direction from the kind: low → bullish, high → bearish.
  */
 export function pivotControlPicks(input: DivergenceInput, result: DivergenceResult): ControlPick[] {
   const { bars, params: p, tfSec } = input;
-  const i = bars.length - (p.k + p.n + 1);
-  if (i < 0 || i + p.n >= bars.length) return [];
+  const i = bars.length - (p.k + p.nRight + 1);
+  if (i < 0 || i + p.nRight >= bars.length) return [];
   const isLow = result.pivots.lows.includes(i);
   const isHigh = result.pivots.highs.includes(i);
   if (!isLow && !isHigh) return [];
   const atr = atrAt(bars, i);
   if (atr === null) return [];
-  const lo = Math.max(0, i - p.w - p.n);
+  const lo = Math.max(0, i - p.w - p.nLeft);
   if (holeFinder(input)(bars[lo].time, bars[bars.length - 1].time + tfSec) !== null) return [];
-  const t0 = entryT0(bars[i + p.n].time + tfSec);
+  const t0 = entryT0(bars[i + p.nRight].time + tfSec); // confirmed the way B is (V37): 6/2 on 4h
   const out: ControlPick[] = [];
   if (isLow) out.push({ kind: 'pivot', direction: 'bullish', barTime: bars[i].time, stopPrice: bars[i].low, atr14: atr, t0 });
   if (isHigh) out.push({ kind: 'pivot', direction: 'bearish', barTime: bars[i].time, stopPrice: bars[i].high, atr14: atr, t0 });

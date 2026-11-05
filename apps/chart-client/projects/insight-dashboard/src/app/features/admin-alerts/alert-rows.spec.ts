@@ -48,6 +48,11 @@ describe('the params form', () => {
   it('round-trips the defaults', () => {
     expect(formToParams(paramsToForm(OI_DIVERGENCE_DEFAULT_PARAMS))).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
   });
+  it('IB-141: each side is its own field — 4h shows 6 left and 2 right, and an edited side goes back on that side only', () => {
+    const f = paramsToForm(OI_DIVERGENCE_DEFAULT_PARAMS);
+    expect(f.perTf['4h']).toEqual({ nLeft: '6', nRight: '2', k: '3', w: '90' });
+    expect(formToParams({ ...f, perTf: { ...f.perTf, '1h': { ...f.perTf['1h'], nRight: '3' } } })?.perTf['1h']).toEqual({ nLeft: 6, nRight: 3, k: 3, w: 168 });
+  });
   it('a comma decimal is a decimal; an empty field is not zero; out of range is refused by the contract', () => {
     const f = paramsToForm(OI_DIVERGENCE_DEFAULT_PARAMS);
     expect(formToParams({ ...f, atrMult: '0,3' })?.atrMult).toBe(0.3);
@@ -56,7 +61,8 @@ describe('the params form', () => {
     expect(formToParams({ ...f, oiLineTolMedianMult: '0,75' })?.oiLineTolMedianMult).toBe(0.75);
     expect(formToParams({ ...f, priceLineTolAtrMult: '' })).toBeNull();
     expect(formToParams({ ...f, oiLineTolMedianMult: '5.5' })).toBeNull(); // V18: max 5
-    expect(formToParams({ ...f, perTf: { ...f.perTf, '4h': { ...f.perTf['4h'], n: '0' } } })).toBeNull();
+    expect(formToParams({ ...f, perTf: { ...f.perTf, '4h': { ...f.perTf['4h'], nLeft: '0' } } })).toBeNull();
+    expect(formToParams({ ...f, perTf: { ...f.perTf, '4h': { ...f.perTf['4h'], nRight: '51' } } })).toBeNull();
     expect(formToParams({ ...f, perTf: { ...f.perTf, '15m': { ...f.perTf['15m'], k: 'abc' } } })).toBeNull();
     expect(formToParams({ ...f, perTf: { ...f.perTf, '1h': { ...f.perTf['1h'], w: '7.5' } } })).toBeNull(); // whole bars only
   });

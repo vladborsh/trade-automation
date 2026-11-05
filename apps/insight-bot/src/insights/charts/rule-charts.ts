@@ -210,12 +210,13 @@ export function flowsChart(st: WebInsightStatement, s: InsightSnapshot): WebInsi
 }
 
 /**
- * R11: the bars from A − 2 to B + N (the alert's own N, capped at the last closed bar) — one klines
- * call at exactly that count (W + N + 3 at most → weight ≤ 2).
+ * R11: the bars from A − 2 to B + nRight (the alert's own right reach — what confirmed B; a row from before 032
+ * reads n as both sides, V34 — capped at the last closed bar) — one klines call at exactly that count
+ * (W + nRight + 3 at most → weight ≤ 2).
  */
 export function r11Bars(alert: Pick<WebOiDivergenceAlert, 'tf' | 'a' | 'b' | 'params'>, nowMs: number): { fromMs: number; limit: number; tfSec: number } | null {
   const tfSec = OI_DIVERGENCE_TF_SEC[alert.tf];
-  const n = alert.params.perTf[alert.tf].n;
+  const n = alert.params.perTf[alert.tf].nRight;
   const lastClosedOpen = Math.floor(nowMs / 1000 / tfSec) * tfSec - tfSec;
   const from = alert.a.time - R11_BARS_BEFORE_A * tfSec;
   const to = Math.min(alert.b.time + n * tfSec, lastClosedOpen);

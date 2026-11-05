@@ -1,6 +1,6 @@
 import { OI_NEAR_MISS_UNIT, type OiNearMissRule, type OiNearMissUnit } from '@trade-automation/contracts';
 import {
-  atrAt, holeFinder, lineAt, noiseAt, pair, type Bar, type Direction, type DivergenceEnd, type DivergenceInput, type DivergenceParams,
+  aEligibility, atrAt, holeFinder, lineAt, noiseAt, pair, type Bar, type Direction, type DivergenceEnd, type DivergenceInput, type DivergenceParams,
   type DivergenceResult, type Noise, type PivotPair,
 } from './detector';
 import { oiPerBar } from './oi-per-bar';
@@ -33,13 +33,13 @@ export interface NearMiss {
   rule: OiNearMissRule;
   miss: number;
   unit: OiNearMissUnit;
-  /** B's pairing confirmed: the close of max(B, B's OI pivot) + N. */
+  /** B's pairing confirmed: the close of max(B, B's OI pivot) + nRight. */
   confirmedAt: number;
 }
 
 /** V26's reach on k and W: what the bar count must cover (`barsForEvaluation(nearMissReach(p))`). */
-export function nearMissReach(p: Pick<DivergenceParams, 'n' | 'k' | 'w'>): Pick<DivergenceParams, 'n' | 'k' | 'w'> {
-  return { n: p.n, k: 2 * p.k, w: Math.floor(1.5 * p.w) };
+export function nearMissReach(p: Pick<DivergenceParams, 'nLeft' | 'nRight' | 'k' | 'w'>): Pick<DivergenceParams, 'nLeft' | 'nRight' | 'k' | 'w'> {
+  return { nLeft: p.nLeft, nRight: p.nRight, k: 2 * p.k, w: Math.floor(1.5 * p.w) };
 }
 
 interface Failure {
@@ -54,6 +54,8 @@ export function diagnose(input: DivergenceInput, result: DivergenceResult): Near
   const reach = nearMissReach(p);
   const oi = oiPerBar(bars.map((b) => b.time), input.oi5m, input.tfSec);
   const holes = holeFinder(input);
+  // V36: the same «full A» as the detector — a near-miss must be a line the detector could have drawn
+  const canBeA = aEligibility(p, { low: bars.map((b) => b.low), high: bars.map((b) => b.high) }, { low: oi.min, high: oi.max }, input.aRule ?? 'full');
   const out: NearMiss[] = [];
 
   for (const side of ['low', 'high'] as const) {
@@ -68,14 +70,14 @@ export function diagnose(input: DivergenceInput, result: DivergenceResult): Near
 
     for (const b of wide) {
       if (detected.has(b.price)) continue;
-      const lo = Math.max(0, b.price - reach.w - p.n);
-      const hi = Math.min(bars.length - 1, b.price + reach.k + p.n);
+      const lo = Math.max(0, b.price - reach.w - p.nLeft);
+      const hi = Math.min(bars.length - 1, b.price + reach.k + p.nRight);
       if (holes(bars[lo].time, bars[hi].time + input.tfSec)) continue;
       const noise = noiseAt(bars, series, b.price, p);
       if (noise === null) continue;
       let best: { a: PivotPair; f: Failure } | null = null;
       for (const a of wide) {
-        if (!(a.price < b.price && b.price - a.price <= reach.w && a.confirmIndex <= b.confirmIndex && a.oi < b.oi)) continue;
+        if (!(a.price < b.price && b.price - a.price <= reach.w && a.confirmIndex <= b.confirmIndex && a.oi < b.oi && canBeA(a, b.confirmIndex))) continue;
         const failed = failures(side, bars, series, a, b, noise, p, reach);
         if (failed.length !== 1 || !failed[0].inReach) continue;
         const f = failed[0];

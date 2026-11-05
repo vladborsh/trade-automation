@@ -63,6 +63,17 @@ describe('AdminAlertsComponent (IB-112)', () => {
     expect(text(el)).toContain('on lows');
   });
 
+  it('IB-141: the params table has N left and N right per TF — 4h shows 6 and 2', async () => {
+    const { el } = await setup();
+    expect([...el.querySelectorAll('table.params thead th')].map((th) => th.textContent?.trim())).toEqual([
+      '', 'N left, candles before', 'N right, candles to confirm', 'k, candles to the pair', 'window, candles',
+    ]);
+    const row4h = [...el.querySelectorAll('table.params tbody tr')].find((r) => r.querySelector('td')?.textContent?.trim() === '4h') as HTMLElement;
+    expect([...row4h.querySelectorAll('input')].map((i) => [i.getAttribute('aria-label'), i.value])).toEqual([
+      ['4h N left, candles before', '6'], ['4h N right, candles to confirm', '2'], ['4h k, candles to the pair', '3'], ['4h window, candles', '90'],
+    ]);
+  });
+
   it('IB-116 (V33): a backfilled row is listed with a visible «from history» / «из истории» marker', async () => {
     const backfill: WebOiDivergenceAlert = { ...ALERT, id: 8, source: 'backfill', firedAt: null, recipients: 0 };
     const { el } = await setup({ alertsAdmin: async () => ({ ...PAGE, alerts: [ALERT, backfill] }) });
@@ -115,12 +126,17 @@ describe('AdminAlertsComponent (IB-112)', () => {
     await cmp.saveParams();
     expect(sent).toEqual([]);
     cmp.editParam('1h', 'k', '2');
+    cmp.editParam('4h', 'nRight', '3'); // IB-141: the right side alone
     cmp.editParam(null, 'priceLineTolAtrMult', '0'); // IB-114 (V18): 0 = the round-1 rule, a value, not «empty»
     expect(cmp.paramsChanged()).toBe(true);
     await cmp.saveParams();
     expect(sent).toEqual([['settings', { params: {
       ...OI_DIVERGENCE_DEFAULT_PARAMS, priceLineTolAtrMult: 0,
-      perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'], k: 2 } },
+      perTf: {
+        ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf,
+        '1h': { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'], k: 2 },
+        '4h': { nLeft: 6, nRight: 3, k: 3, w: 90 },
+      },
     } }]]);
   });
 });

@@ -144,7 +144,7 @@ describeDb('IB-112 alerts admin API against a real database', () => {
     const t = await session(adminId);
     expect((await call('PATCH', '/api/web/admin/alerts/settings', t, {})).status).toBe(400);
     expect((await call('PATCH', '/api/web/admin/alerts/settings', t, { enabled: 'yes' })).status).toBe(400);
-    const badN = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { n: 0, k: 3, w: 120 } } };
+    const badN = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 0, nRight: 6, k: 3, w: 120 } } };
     expect((await call('PATCH', '/api/web/admin/alerts/settings', t, { params: badN })).status).toBe(400);
     const on = await json(call('PATCH', '/api/web/admin/alerts/settings', t, { enabled: true }));
     expect(on.settings).toMatchObject({ enabled: true, membersVisible: false, updatedBy: adminId });

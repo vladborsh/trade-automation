@@ -14,7 +14,7 @@ import type { OiPoint } from '../../../src/insights/divergence/oi-per-bar';
  */
 const TF = 900;
 const T0 = 1_793_000_000 - (1_793_000_000 % TF);
-const P: DivergenceParams = { n: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 };
+const P: DivergenceParams = { nLeft: 6, nRight: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 };
 const O = 60;
 
 type OiCell = number | [number, number, number];
@@ -192,11 +192,11 @@ describe('diagnose on real data changes no detection', () => {
  * With exactly that many bars it is found; with one fewer it is not.
  */
 describe('barsForEvaluation(nearMissReach) — the minimum bars for the farthest near-miss', () => {
-  it('derives 164 / 272 / 155 (+ the alert W tail: 260 / 440 / 245 fetched, weight 2)', () => {
+  it('derives 164 / 272 / 151 (+ the alert W tail: 260 / 440 / 241 fetched, weight 2; 4h 6/2 since IB-141)', () => {
     const counts = OI_DIVERGENCE_TFS.map((tf) => barsForEvaluation(nearMissReach(OI_DIVERGENCE_DEFAULT_PARAMS.perTf[tf])));
-    expect(counts).toEqual([164, 272, 155]);
+    expect(counts).toEqual([164, 272, 151]);
     const fetched = OI_DIVERGENCE_TFS.map((tf, i) => counts[i] + OI_DIVERGENCE_DEFAULT_PARAMS.perTf[tf].w);
-    expect(fetched).toEqual([260, 440, 245]);
+    expect(fetched).toEqual([260, 440, 241]);
     expect(fetched.every((c) => c >= 100 && c < 500)).toBe(true);
   });
 
@@ -205,9 +205,10 @@ describe('barsForEvaluation(nearMissReach) — the minimum bars for the farthest
     const p = detectorParams(OI_DIVERGENCE_DEFAULT_PARAMS, tf);
     const reach = nearMissReach(p);
     const len = barsForEvaluation(reach);
-    const b = len - 1 - reach.k - p.n;
+    const b = len - 1 - reach.k - p.nRight;
     const a = b - reach.w;
-    const j = a + p.n + 1;
+    const j = a + Math.max(p.nLeft, p.nRight) + 1; // V36: A holds max(nLeft, nRight) bars on its right
+
     const lineJ = 95 + ((93 - 95) * (j - a)) / (b - a);
     const t0 = 1_793_000_000 - (1_793_000_000 % 14_400);
     const lowAt = (i: number) => (i === a ? 95 : i === b ? 93 : i === j ? lineJ - 0.3 : 100);
@@ -221,5 +222,28 @@ describe('barsForEvaluation(nearMissReach) — the minimum bars for the farthest
     };
     expect(found(0).map((m) => [m.rule, m.miss])).toEqual([['w', reach.w - p.w]]);
     expect(found(1)).toEqual([]);
+  });
+});
+
+/**
+ * IB-141 (V35): the near-miss hole window is [B − ⌊1.5 W⌋ − nLeft, B + 2k + nRight], on sides that differ (6/2), so a
+ * swapped side moves an edge by 4 bars. The scene: B (low 93, OI 962) fails only δoi against A (95, 960) — a near-miss.
+ */
+describe('diagnose — the hole window with unequal sides (IB-141)', () => {
+  const P62: DivergenceParams = { ...P, nRight: 2 };
+  const NB = 200;
+  const NA = NB - 20;
+  const judged = (holeBar: number) => {
+    const s = scene(NB + 30, { [NA]: { low: 95 }, [NA + 1]: { oi: 960 }, [NB]: { low: 93, oi: 962 } });
+    const inp = input(s, false, P62);
+    const cut = { ...inp, oi5m: inp.oi5m.filter((x) => x.time !== T0 + holeBar * TF + 600) };
+    return diagnose(cut, detectDivergences(cut)).filter((m) => m.bIndex === NB).map((m) => m.rule);
+  };
+  it('control: with no hole, B is the oi_delta near-miss', () => expect(judged(-1)).toEqual(['oi_delta']));
+  it('the far edge: a hole in bar B − ⌊1.5 W⌋ − nLeft voids it, one bar earlier does not', () => {
+    expect([judged(NB - 144 - 6), judged(NB - 144 - 6 - 1)]).toEqual([[], ['oi_delta']]);
+  });
+  it('the near edge: a hole in bar B + 2k + nRight voids it, one bar later does not', () => {
+    expect([judged(NB + 6 + 2), judged(NB + 6 + 2 + 1)]).toEqual([[], ['oi_delta']]);
   });
 });

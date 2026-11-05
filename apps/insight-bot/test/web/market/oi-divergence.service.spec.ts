@@ -111,7 +111,7 @@ describe('OiDivergenceService.series (IB-110, V11)', () => {
 
   it('the admin’s params are used (W = 10 bars loses this 28-bar line); an invalid row falls back to the defaults', async () => {
     const short = build();
-    short.db.params = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { n: 6, k: 3, w: 10 } } };
+    short.db.params = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 6, nRight: 6, k: 3, w: 10 } } };
     const r = await short.service.series('ETHUSDT', '1h');
     expect(theLine(r)).toEqual([]);
     expect(r.params.perTf['1h'].w).toBe(10);

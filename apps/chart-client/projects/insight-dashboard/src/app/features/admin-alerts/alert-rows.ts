@@ -79,7 +79,7 @@ export function toSkipRow(s: WebOiDivergenceSkipRow): SkipRow {
 
 /** The params form: every number as the admin typed it (a string), so a half-typed value is not lost. */
 export interface ParamsForm {
-  perTf: Record<OiDivergenceTf, { n: string; k: string; w: string }>;
+  perTf: Record<OiDivergenceTf, { nLeft: string; nRight: string; k: string; w: string }>;
   atrMult: string;
   oiMedianMult: string;
   priceLineTolAtrMult: string;
@@ -87,7 +87,10 @@ export interface ParamsForm {
 }
 
 export function paramsToForm(p: OiDivergenceParams): ParamsForm {
-  const perTf = Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => [tf, { n: String(p.perTf[tf].n), k: String(p.perTf[tf].k), w: String(p.perTf[tf].w) }])) as ParamsForm['perTf'];
+  const perTf = Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => {
+    const x = p.perTf[tf];
+    return [tf, { nLeft: String(x.nLeft), nRight: String(x.nRight), k: String(x.k), w: String(x.w) }];
+  })) as ParamsForm['perTf'];
   return {
     perTf, atrMult: String(p.atrMult), oiMedianMult: String(p.oiMedianMult),
     priceLineTolAtrMult: String(p.priceLineTolAtrMult), oiLineTolMedianMult: String(p.oiLineTolMedianMult),
@@ -102,7 +105,10 @@ export function paramsToForm(p: OiDivergenceParams): ParamsForm {
 export function formToParams(f: ParamsForm): OiDivergenceParams | null {
   const num = (s: string): number => (s.trim() === '' ? Number.NaN : Number(s.trim().replace(',', '.')));
   const candidate = {
-    perTf: Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => [tf, { n: num(f.perTf[tf].n), k: num(f.perTf[tf].k), w: num(f.perTf[tf].w) }])),
+    perTf: Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => {
+      const x = f.perTf[tf];
+      return [tf, { nLeft: num(x.nLeft), nRight: num(x.nRight), k: num(x.k), w: num(x.w) }];
+    })),
     atrMult: num(f.atrMult),
     oiMedianMult: num(f.oiMedianMult),
     priceLineTolAtrMult: num(f.priceLineTolAtrMult),

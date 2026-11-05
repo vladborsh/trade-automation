@@ -15,7 +15,7 @@ import type { OiPoint } from '../../../src/insights/divergence/oi-per-bar';
 const TF = 900; // 15m
 const T0 = 1_793_000_000 - (1_793_000_000 % TF);
 /** Line tolerances 0: the §3 specs below are round 1's rule, unchanged (V18: «0 restores the round-1 rule exactly»). */
-const P: DivergenceParams = { n: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 };
+const P: DivergenceParams = { nLeft: 6, nRight: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 };
 const BASE_LOW = 100;
 const BASE_OI = [1000, 1010]; // alternating: |ΔOI| median 10 → δoi = 5, and equal neighbours make no OI pivot
 
@@ -104,17 +104,17 @@ describe('detectDivergences — the owner’s rules (design §3)', () => {
     });
   });
 
-  it('3. a pivot is not confirmed until bar i+N has closed', () => {
+  it('3. a pivot is not confirmed until bar i+N has closed (equal sides here; unequal: pivot-sides.spec.ts)', () => {
     for (const mirror of [false, true]) {
       const full = input(base(), mirror);
       const cut = (last: number) => detectDivergences({ ...full, bars: full.bars.slice(0, last + 1) });
-      const early = cut(B + P.n - 1); // bar B+5 is the last closed: B is not a pivot yet — not merely an unconfirmed pair
+      const early = cut(B + P.nRight - 1); // bar B+5 is the last closed: B is not a pivot yet — not merely an unconfirmed pair
       expect(mirror ? early.pivots.highs : early.pivots.lows).toEqual([A]);
       expect(early.divergences).toEqual([]);
-      expect(mirror ? cut(B + P.n).pivots.highs : cut(B + P.n).pivots.lows).toEqual([A, B]);
-      const r = cut(B + P.n);
+      expect(mirror ? cut(B + P.nRight).pivots.highs : cut(B + P.nRight).pivots.lows).toEqual([A, B]);
+      const r = cut(B + P.nRight);
       expect(r.divergences.map((d) => d.bIndex)).toEqual([B]);
-      expect(r.divergences[0].confirmedAt).toBe(T0 + (B + P.n + 1) * TF); // the close of bar B+N
+      expect(r.divergences[0].confirmedAt).toBe(T0 + (B + P.nRight + 1) * TF); // the close of bar B+N
     }
   });
 
@@ -138,7 +138,7 @@ describe('detectDivergences — the owner’s rules (design §3)', () => {
     both(atK, (r) => expect(r.divergences).toHaveLength(1)); // control: at exactly k it pairs
     // Two OI pivots near A. With N = 6 two pivots within ±3 of one bar cannot both exist (each needs 6 bars of
     // higher neighbours), so this part runs at N = 2: pivots at −2 and +1 → the nearer (+1); at −2 and +2 → the earlier.
-    const n2 = { params: { ...P, n: 2 } };
+    const n2 = { params: { ...P, nLeft: 2, nRight: 2 } };
     const nearer = scene(O + 80, { [A - 2]: { oi: 955 }, [A]: { low: 95 }, [A + 1]: { oi: 958 }, [B]: { low: 93, oi: 980 } });
     both(nearer, (r) => {
       expect(r.pivots.oiLows.length + r.pivots.oiHighs.length).toBeGreaterThanOrEqual(3); // both OI pivots exist (and B's)
@@ -273,22 +273,45 @@ describe('detectDivergences — V18 line tolerances (round 2)', () => {
  * number is the minimum, not a guess on either side.
  */
 describe('barsForEvaluation — the minimum closed bars for a full evaluation of the newest B', () => {
-  it('derives 113 / 185 / 111 for 15m / 1h / 4h from OI_MEDIAN_BARS, ATR_PERIOD and W, N, k — weight 2 each', () => {
+  it('derives 113 / 185 / 107 for 15m / 1h / 4h from OI_MEDIAN_BARS, ATR_PERIOD and W, nLeft, nRight, k — weight 2 each', () => {
     const counts = OI_DIVERGENCE_TFS.map((tf) => barsForEvaluation(OI_DIVERGENCE_DEFAULT_PARAMS.perTf[tf]));
-    expect(counts).toEqual([113, 185, 111]); // IB-114: 1h W 168 (V19), and ATR14 at a line's crossing bar (V18)
+    // IB-114: 1h W 168 (V19), and ATR14 at a line's crossing bar (V18); IB-141: 4h 6/2 confirms 4 bars sooner (was 111)
+    expect(counts).toEqual([113, 185, 107]);
     expect(counts.every((c) => c >= 100 && c < 500)).toBe(true); // Binance klines: limit 100–499 is weight 2
     expect(OI_MEDIAN_BARS + 1).toBeGreaterThan(ATR_PERIOD); // at B, the median, not ATR, is the binding constraint
   });
 
   it.each(OI_DIVERGENCE_TFS)('%s: exactly that many bars finds B; one fewer does not', (tf) => {
-    const tfSec = OI_DIVERGENCE_TF_SEC[tf];
     const p = detectorParams(OI_DIVERGENCE_DEFAULT_PARAMS, tf);
+    expect(minimalBasisFound(p, OI_DIVERGENCE_TF_SEC[tf])).toEqual([1, 0]);
+  });
+
+  // IB-141 (V35): sides that differ, chosen so each term binds and a term on the wrong side miscounts
+  it.each([
+    // A's nLeft binds (W + 9): counting nRight before B would give W + max(2, 4) — too few
+    ['nLeft 9 / nRight 2', { nLeft: 9, nRight: 2, k: 3, w: 120 }, 120 + 9 + 3 + 2 + 1],
+    // the crossing bar's ATR binds: A's right reach is max(2, 4) = 4 → W + 14 − 4 − 1; with nLeft there, two too many
+    ['nLeft 2 / nRight 4', { nLeft: 2, nRight: 4, k: 3, w: 120 }, 120 + 9 + 3 + 4 + 1],
+  ])('unequal sides, %s: the count is exact — that many finds B, one fewer does not', (_name, tfp, count) => {
+    const p: DivergenceParams = { ...P, ...tfp, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 };
+    expect(barsForEvaluation(p)).toBe(count);
+    expect(minimalBasisFound(p, 900)).toEqual([1, 0]);
+  });
+});
+
+/**
+ * The newest B a window can confirm (its OI pivot k bars AFTER it, then nRight to confirm = the last bar) with its
+ * A exactly W bars back, on exactly `barsForEvaluation(p)` bars; returns how many A–B lines are found with all of
+ * them and with the oldest bar dropped.
+ */
+function minimalBasisFound(p: DivergenceParams, tfSec: number): [number, number] {
+  {
     const len = barsForEvaluation(p);
-    const b = len - 1 - p.k - p.n; // B's OI pivot k bars after it, confirmed N bars later = the last bar
+    const b = len - 1 - p.k - p.nRight;
     const a = b - p.w;
-    // V18: the first bar that CAN cross the line (A + N + 1) dips 0.3 under it — inside 0.25 × its ATR14 (≈ 0.72),
-    // so it passes only while that bar's ATR history is in the window
-    const j = a + p.n + 1;
+    // V18: the first bar that CAN cross the line (A + max(nLeft, nRight) + 1, V36's right reach) dips 0.3 under it —
+    // inside 0.25 × its ATR14 (≈ 0.72), so it passes only while that bar's ATR history is in the window
+    const j = a + Math.max(p.nLeft, p.nRight) + 1;
     const lineJ = 95 + ((93 - 95) * (j - a)) / (b - a);
     const t0 = 1_793_000_000 - (1_793_000_000 % 14_400);
     const lowAt = (i: number) => (i === a ? 95 : i === b ? 93 : i === j ? lineJ - 0.3 : 100);
@@ -298,7 +321,7 @@ describe('barsForEvaluation — the minimum closed bars for a full evaluation of
     const oi5m = Array.from({ length: len }, (_, i) => Array.from({ length: per }, (_, j) => ({ time: t0 + i * tfSec + (j + 1) * 300, oi: oiAt(i) }))).flat();
     const found = (from: number) => detectDivergences({ tfSec, bars: bars.slice(from), oi5m, params: p })
       .divergences.filter((d) => d.b.time === bars[b].time && d.a.time === bars[a].time);
-    expect(found(0)).toHaveLength(1);
-    expect(found(1)).toEqual([]); // the oldest bar gone: the crossing bar loses its ATR14 (15m, 1h) or B a noise bar (4h)
-  });
-});
+    // the oldest bar gone: the crossing bar loses its ATR14 (15m, 1h), B a noise bar (4h), or A its left side
+    return [found(0).length, found(1).length];
+  }
+}

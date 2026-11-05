@@ -11,12 +11,13 @@ const params = (tf: OiDivergenceTf): DivergenceParams => detectorParams(OI_DIVER
 const TFS = ['15m', '1h', '4h'] as const;
 
 describe('bars the loop reads', () => {
-  it('evaluates from the detector\'s barsForEvaluation (113 / 185 / 111); reads the near-miss basis (164 / 272 / 155, IB-115) + the alert W (260 / 440 / 245) — weight 2 each, never typed', () => {
+  // IB-141: 4h is 6 left / 2 right — its tail (k + nRight + 1 = 6, not k + nLeft + 1 = 10) pins the side of every 4h number
+  it('evaluates from the detector\'s barsForEvaluation (113 / 185 / 107); reads the near-miss basis (164 / 272 / 151, IB-115) + the alert W (260 / 440 / 241) — weight 2 each, never typed', () => {
     expect(TFS.map((tf) => minBarsToEvaluate(P[tf]))).toEqual(TFS.map((tf) => barsForEvaluation(P[tf])));
-    expect(TFS.map((tf) => minBarsToEvaluate(P[tf]))).toEqual([113, 185, 111]);
-    expect(TFS.map((tf) => minBarsForNearMisses(P[tf]))).toEqual([164, 272, 155]);
+    expect(TFS.map((tf) => minBarsToEvaluate(P[tf]))).toEqual([113, 185, 107]);
+    expect(TFS.map((tf) => minBarsForNearMisses(P[tf]))).toEqual([164, 272, 151]);
     expect(TFS.map((tf) => barsToFetch(P[tf]))).toEqual(TFS.map((tf) => minBarsForNearMisses(P[tf]) + P[tf].w)); // the tail is W, not 1.5 W
-    expect(TFS.map((tf) => barsToFetch(P[tf]))).toEqual([260, 440, 245]);
+    expect(TFS.map((tf) => barsToFetch(P[tf]))).toEqual([260, 440, 241]);
     expect(TFS.every((tf) => barsToFetch(P[tf]) >= 100 && barsToFetch(P[tf]) < 500)).toBe(true); // klines limit 100–499: weight 2
     // the guard is the newest confirmable position of whatever the window holds, never before the full-basis index
     expect(TFS.map((tf) => fullBasisIndex(P[tf], barsToFetch(P[tf])))).toEqual([250, 430, 235]);
@@ -28,7 +29,7 @@ describe('the newest B the loop must catch: full basis from exactly barsForEvalu
   for (const tf of TFS) {
     it(tf, () => {
       const p = P[tf];
-      const newestB = (count: number) => count - 1 - p.k - p.n;
+      const newestB = (count: number) => count - 1 - p.k - p.nRight;
       for (const len of [minBarsToEvaluate(p), barsToFetch(p)]) expect([len, hasFullBasis(newestB(len), p, len)]).toEqual([len, true]);
       const short = minBarsToEvaluate(p) - 1;
       expect(hasFullBasis(newestB(short), p, short)).toBe(false);
@@ -36,7 +37,7 @@ describe('the newest B the loop must catch: full basis from exactly barsForEvalu
     });
   }
   it('111 bars on 15m (the first hand-typed count) is short', () => {
-    expect(hasFullBasis(111 - 1 - P['15m'].k - P['15m'].n, P['15m'], 111)).toBe(false);
+    expect(hasFullBasis(111 - 1 - P['15m'].k - P['15m'].nRight, P['15m'], 111)).toBe(false);
   });
 });
 
@@ -52,7 +53,7 @@ describe('a repeat\'s earlier line needs its own basis: the + W', () => {
     const p = params(tf);
     const t0 = 1_793_000_000 - (1_793_000_000 % 14_400);
     const runLengthAtB = (len: number): number | undefined => {
-      const b = len - 1 - p.n; // OI pivot on B itself: confirmed N bars later, by the last bar
+      const b = len - 1 - p.nRight; // OI pivot on B itself: confirmed nRight bars later, by the last bar
       const a = b - p.w;
       const mid = a + p.w / 2; // W is even on every TF
       const lowAt = (i: number) => (i === a ? 95 : i === mid ? 93 : i === b ? 91 : 100);

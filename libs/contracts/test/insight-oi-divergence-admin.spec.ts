@@ -20,7 +20,7 @@ describe('IB-112 admin alert writes', () => {
     expect(WebAlertSettingsPatchSchema.safeParse({ membersVisible: false, params: OI_DIVERGENCE_DEFAULT_PARAMS }).success).toBe(true);
     expect(WebAlertSettingsPatchSchema.safeParse({}).success).toBe(false);
     expect(WebAlertSettingsPatchSchema.safeParse({ updatedBy: 1 }).success).toBe(false);
-    const badN = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { n: 0, k: 3, w: 120 } } };
+    const badN = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 0, nRight: 6, k: 3, w: 120 } } };
     expect(WebAlertSettingsPatchSchema.safeParse({ params: badN }).success).toBe(false);
   });
 

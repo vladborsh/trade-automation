@@ -53,7 +53,8 @@ describe('random controls (V25)', () => {
 describe('pivot controls (V25)', () => {
   const TF = 900;
   const T0 = 1_793_000_000 - (1_793_000_000 % TF);
-  const P: DivergenceParams = { n: 6, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 };
+  // IB-141 (V35, V37): unequal sides as on 4h — the decided index, t0 and the hole window each fail if the side is swapped
+  const P: DivergenceParams = { nLeft: 6, nRight: 2, k: 3, w: 96, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 };
   const make = (len: number, lows: Record<number, number>, highs: Record<number, number> = {}) => {
     const bars: Bar[] = Array.from({ length: len }, (_, i) => {
       const low = lows[i] ?? 100;
@@ -63,14 +64,14 @@ describe('pivot controls (V25)', () => {
     return { bars, oi5m };
   };
   const LEN = 150;
-  const I = LEN - (P.k + P.n + 1); // the bar this evaluation decides
+  const I = LEN - (P.k + P.nRight + 1); // the bar this evaluation decides: OI up to k after it, then nRight to confirm
 
-  it('a low pivot at the decided bar → bullish control, stop = its low, t0 = close of bar i + N, + 6 min, up to 5 m', () => {
+  it('a low pivot at the decided bar → bullish control, stop = its low, t0 = close of bar i + nRight, + 6 min, up to 5 m', () => {
     const { bars, oi5m } = make(LEN, { [I]: 95 });
     const r = detectDivergences({ tfSec: TF, bars, oi5m, params: P });
     const picks = pivotControlPicks({ tfSec: TF, bars, oi5m, params: P }, r);
     expect(picks.map((x) => [x.kind, x.direction, x.barTime, x.stopPrice, x.t0])).toEqual([
-      ['pivot', 'bullish', T0 + I * TF, 95, T0 + (I + P.n + 1) * TF + 600],
+      ['pivot', 'bullish', T0 + I * TF, 95, T0 + (I + P.nRight + 1) * TF + 600],
     ]);
   });
 
@@ -96,5 +97,14 @@ describe('pivot controls (V25)', () => {
     // the venue's own silence there is not a hole: the control stands
     const silent = { ...inp, venueSilent: [{ from: T0 + (I - 5) * TF + 600, to: T0 + (I - 5) * TF + 600 }] };
     expect(pivotControlPicks(silent, detectDivergences(silent))).toHaveLength(1);
+  });
+
+  it('the hole window starts at bar i − W − nLeft: a hole there voids the control, one bar earlier does not', () => {
+    const { bars, oi5m } = make(LEN, { [I]: 95 });
+    const at = (bar: number) => {
+      const inp = { tfSec: TF, bars, oi5m: oi5m.filter((x) => x.time !== T0 + bar * TF + 600), params: P };
+      return pivotControlPicks(inp, detectDivergences(inp)).length;
+    };
+    expect([at(I - P.w - P.nLeft), at(I - P.w - P.nLeft - 1)]).toEqual([0, 1]);
   });
 });

@@ -79,7 +79,7 @@ maybeDescribe('IB-114 migration 026: line tolerances and 1h W 168 in alert_setti
     try {
       await db.query(
         `update alert_settings set params = jsonb_set(params, '{perTf,1h,w}', '150') || '{"priceLineTolAtrMult":0.4}'::jsonb where id = 1`, []);
-      await runMigrations({ connectionString: url });
+      await runMigrations({ connectionString: url, target: '026' }); // 026's own effect; 032 then splits N (its own spec)
       expect(await params(db)).toEqual({
         ...ROUND_1_SEED,
         perTf: { ...ROUND_1_SEED.perTf, '1h': { n: 6, k: 3, w: 150 } },
@@ -100,7 +100,10 @@ maybeDescribe('IB-114 migration 026: line tolerances and 1h W 168 in alert_setti
       await runMigrations({ connectionString: url });
       const [r] = await db.query<{ params: unknown }>('select params from oi_divergence_alerts', []);
       expect(r.params).toEqual(ROUND_1_SEED);
-      expect(OiDivergenceJournalParamsSchema.parse(r.params)).toEqual({ ...ROUND_1_SEED, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 });
+      const n6 = (w: number) => ({ nLeft: 6, nRight: 6, k: 3, w }); // V34: a row with one n reads as both sides
+      expect(OiDivergenceJournalParamsSchema.parse(r.params)).toEqual({
+        ...ROUND_1_SEED, perTf: { '15m': n6(96), '1h': n6(120), '4h': n6(90) }, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0,
+      });
     } finally {
       await db.end();
     }

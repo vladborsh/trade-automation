@@ -270,7 +270,7 @@ describe('R11 the OI divergence alert (IB-113, V16)', () => {
     id: 9, source: 'live' as const, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
     a: { time: NOW / 1000 - 30 * 3_600, price: 100, oiTime: NOW / 1000 - 30 * 3_600, oi: 1_000 },
     b: { time: NOW / 1000 - 8 * 3_600, price: 98.2, oiTime: NOW / 1000 - 8 * 3_600, oi: 1_032 },
-    runOf: null, runLength: 2, params: { perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }, // a round-1 row as read (V20)
+    runOf: null, runLength: 2, params: { perTf: { '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 120 }, '4h': { nLeft: 6, nRight: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }, // a round-1 row as read (V20)
     confirmedAt: NOW / 1000 - 3_600, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null,
   };
   it('shows the journal\'s alert: B against A, an EVENT (rarity 1, ranks first), the chart at B; its chart is built after ranking (IB-119)', () => {
