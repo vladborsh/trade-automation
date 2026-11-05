@@ -66,6 +66,10 @@ export const WebMemberSettingsSchema = z.object({
    * while this is false answers 403 `{ code: 'SETTING_NOT_AVAILABLE', field: 'oiAlerts' }`.
    */
   oiAlertsVisible: z.boolean(),
+  /** IB-122 (design §1 Recipients): large-liquidation alerts in Telegram (`users.liq_alerts`). Admins start on. */
+  liqAlerts: z.boolean(),
+  /** As `oiAlertsVisible`, for `liqAlerts`, behind `alert_type_settings('liq').members_visible`. */
+  liqAlertsVisible: z.boolean(),
 });
 export type WebMemberSettings = z.infer<typeof WebMemberSettingsSchema>;
 
@@ -80,5 +84,7 @@ export const WebMemberSettingsPatchSchema = z.object({
   calendarAlerts: z.union([z.boolean(), z.string()]).optional(),
   /** IB-112: parsed like `calendarAlerts` (the bot's `parseOnOff`). */
   oiAlerts: z.union([z.boolean(), z.string()]).optional(),
+  /** IB-122: parsed like `calendarAlerts`; 403 `SETTING_NOT_AVAILABLE` while hidden. */
+  liqAlerts: z.union([z.boolean(), z.string()]).optional(),
 }).strict();
 export type WebMemberSettingsPatch = z.infer<typeof WebMemberSettingsPatchSchema>;
