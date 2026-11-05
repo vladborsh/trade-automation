@@ -93,14 +93,17 @@ export type WebPositioningResponse = z.infer<typeof WebPositioningResponseSchema
 // -------------------------------------------------------------------------------------------------
 // D10: GET /api/web/market/kpis
 
-export const WEB_KPI_IDS = ['market_cap', 'btc_dominance', 'fear_greed', 'liquidations_24h', 'btc_oi', 'btc_funding'] as const;
+/**
+ * IB-117 (market round 2 §1): five tiles. `fear_greed` is gone — it repeated the gauge panel below
+ * (owner, 2026-11-05); the gauge reads `WebFearGreedCard` from the cards route and is unchanged.
+ */
+export const WEB_KPI_IDS = ['market_cap', 'btc_dominance', 'liquidations_24h', 'btc_oi', 'btc_funding'] as const;
 export const WebKpiIdSchema = z.enum(WEB_KPI_IDS);
 export type WebKpiId = z.infer<typeof WebKpiIdSchema>;
 
 /** The tile's sentence, worded by the client (D4): a closed key set plus typed params. */
 export const WEB_KPI_CONTEXT_KEYS = [
   'kpi.ctx.change',          // {deltaPct}: "+2.1 % за 24ч"
-  'kpi.ctx.fng_band',        // {band}: extreme_fear | fear | neutral | greed | extreme_greed
   'kpi.ctx.liq_side',        // {side, sharePct}: "70 % — лонги"
   'kpi.ctx.funding_side',    // {side}: longs_pay | shorts_pay | flat
 ] as const;
@@ -113,7 +116,6 @@ export const WebKpiContextKeySchema = z.enum(WEB_KPI_CONTEXT_KEYS);
  */
 export const WEB_KPI_NOTE_KEYS = [
   'kpi.note.eth_share',      // {ethPct}: "ETH 10.6%" (btc_dominance; CoinGecko /global, the same fetch)
-  'kpi.note.fng_history',    // {yesterday, weekAgo}: "вчера 37 · неделю назад 48" (fear_greed); a null half is omitted
   'kpi.note.ls_accounts',    // {ratio}: "лонги/шорты по счетам 2.62" (btc_funding; Binance global-account L/S, last point)
 ] as const;
 export const WebKpiNoteKeySchema = z.enum(WEB_KPI_NOTE_KEYS);
@@ -121,9 +123,9 @@ export type WebKpiNoteKey = z.infer<typeof WebKpiNoteKeySchema>;
 
 export const WebKpiTileSchema = z.object({
   id: WebKpiIdSchema,
-  /** USD for cap / liquidations / OI-notional; percent for dominance; index 0–100 for F&G; a fraction for funding. */
+  /** USD for cap / liquidations / OI-notional; percent for dominance; a fraction for funding. */
   value: z.number().nullable(),
-  /** Change over `deltaBasis`, in the same unit as `value` (percent points for dominance, index points for F&G). */
+  /** Change over `deltaBasis`, in the same unit as `value` (percent points for dominance). */
   delta: z.number().nullable(),
   deltaBasis: z.enum(['24h', '7d']),
   /** Long/short split, liquidations only. */
@@ -131,7 +133,7 @@ export const WebKpiTileSchema = z.object({
   context: z.object({ key: WebKpiContextKeySchema, params: z.record(z.string(), z.union([z.number(), z.string()])) }).nullable(),
   /** IB-106: the note under the bar (§7.5). Required, so a server that forgets it fails the parse rather than hiding it. */
   note: z.object({ key: WebKpiNoteKeySchema, params: z.record(z.string(), z.number().nullable()) }).nullable(),
-  /** Attribution the tile must show (§5: alternative.me requires it for F&G). */
+  /** Attribution the tile shows. */
   source: z.object({ name: z.string(), url: z.string().url().nullable() }),
   /** Why `value` is null, when it is. */
   unavailable: z.enum(['venue_unavailable', 'insufficient_history']).nullable(),
@@ -141,7 +143,7 @@ export type WebKpiTile = z.infer<typeof WebKpiTileSchema>;
 
 export const WebKpisResponseSchema = z.object({
   asOf: TimeSec,
-  /** Always the six tiles, in `WEB_KPI_IDS` order — an unavailable one says so rather than vanishing. */
+  /** Always the five tiles, in `WEB_KPI_IDS` order — an unavailable one says so rather than vanishing. */
   tiles: z.array(WebKpiTileSchema).length(WEB_KPI_IDS.length),
 });
 export type WebKpisResponse = z.infer<typeof WebKpisResponseSchema>;

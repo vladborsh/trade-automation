@@ -42,32 +42,6 @@
    "asOf": 1793722766
   },
   {
-   "id": "fear_greed",
-   "value": 26,
-   "delta": -11,
-   "deltaBasis": "24h",
-   "split": null,
-   "context": {
-    "key": "kpi.ctx.fng_band",
-    "params": {
-     "band": "fear"
-    }
-   },
-   "note": {
-    "key": "kpi.note.fng_history",
-    "params": {
-     "yesterday": 37,
-     "weekAgo": 48
-    }
-   },
-   "source": {
-    "name": "alternative.me",
-    "url": "https://alternative.me/crypto/fear-and-greed-index/"
-   },
-   "unavailable": null,
-   "asOf": 1793664000
-  },
-  {
    "id": "liquidations_24h",
    "value": 21785428.38406395,
    "delta": null,
