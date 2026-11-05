@@ -122,24 +122,45 @@ export const WEB_KPI_NOTE_KEYS = [
 export const WebKpiNoteKeySchema = z.enum(WEB_KPI_NOTE_KEYS);
 export type WebKpiNoteKey = z.infer<typeof WebKpiNoteKeySchema>;
 
+const KpiPointsSchema = z.array(z.object({ time: TimeSec, value: z.number() })).min(1);
+
+/**
+ * IB-131 (market round 2 §7) — the second line of a `lines` chart: ETH dominance under BTC's, on its
+ * own scale. `points` oldest first (a BTC row without ETH is a hole here, never a zero); `min`/`max`
+ * are over `points`. Shares `from`/`to`/`breakAfterSec` with the chart it belongs to.
+ */
+export const WebKpiSecondLineSchema = z.object({
+  label: z.literal('ETH'),
+  points: KpiPointsSchema,
+  min: z.number(),
+  max: z.number(),
+}).refine((l) => l.min <= l.max, { message: 'min ≤ max' });
+export type WebKpiSecondLine = z.infer<typeof WebKpiSecondLineSchema>;
+
 /**
  * IB-118 (market round 2 §2) — a tile's 7-day mini chart. `area` for levels (market cap, BTC OI): a
- * line over time; `bars` for settlements (BTC funding): one bar per settlement around zero.
- * `points` oldest first, in the tile's own unit (USD; a fraction per settlement for funding).
- * `from`/`to` are the span the points ACTUALLY cover (the first and last point), so a short span is
- * stated rather than drawn as if it were seven days. `min`/`max` are over `points`.
+ * line over time; `bars` for settlements (BTC funding): one bar per settlement around zero;
+ * IB-131 `lines` for the dominance tile: BTC in `points`/`min`/`max` (the tile's own value) and ETH in
+ * `second`, drawn as two strips each on its own scale. `second` is required: null for `area`/`bars`,
+ * an object for `lines` — so a server that forgets it fails the parse.
+ * `points` oldest first, in the tile's own unit (USD; a fraction per settlement for funding; percent).
+ * `from`/`to` are the span the points ACTUALLY cover (the first and last point, of both lines), so a
+ * short span is stated rather than drawn as if it were seven days. `min`/`max` are over `points`.
  * `breakAfterSec`: two neighbouring points further apart than this are not joined — the line breaks,
- * never interpolated (cap: 30 min; OI: 1.5 of its 1 h period); null for `bars` (positioned by index).
+ * never interpolated (cap and dominance: 30 min; OI: 1.5 of its 1 h period); null for `bars`.
  */
 export const WebKpiHistorySchema = z.object({
-  kind: z.enum(['area', 'bars']),
-  points: z.array(z.object({ time: TimeSec, value: z.number() })).min(1),
+  kind: z.enum(['area', 'bars', 'lines']),
+  points: KpiPointsSchema,
   from: TimeSec,
   to: TimeSec,
   min: z.number(),
   max: z.number(),
   breakAfterSec: z.number().int().positive().nullable(),
-}).refine((h) => h.from <= h.to && h.min <= h.max, { message: 'from ≤ to and min ≤ max' });
+  second: WebKpiSecondLineSchema.nullable(),
+}).refine((h) => h.from <= h.to && h.min <= h.max, { message: 'from ≤ to and min ≤ max' })
+  .refine((h) => (h.kind === 'lines') === (h.second !== null), { message: "second is an object for 'lines' and null otherwise" })
+  .refine((h) => [...h.points, ...(h.second?.points ?? [])].every((p) => p.time >= h.from && p.time <= h.to), { message: 'from/to cover every point of both lines' });
 export type WebKpiHistory = z.infer<typeof WebKpiHistorySchema>;
 
 export const WebKpiTileSchema = z.object({
@@ -160,9 +181,9 @@ export const WebKpiTileSchema = z.object({
   unavailable: z.enum(['venue_unavailable', 'insufficient_history']).nullable(),
   asOf: TimeSec.nullable(),
   /**
-   * IB-118: the 7-day chart under the value (market cap, BTC OI, BTC funding). Null is honest: no
-   * series in hand (the venue did not answer, our own table holds under 6 h, or the tile has none —
-   * dominance and liquidations keep their bars). Required, so a server that forgets it fails the parse.
+   * IB-118: the 7-day chart under the value (market cap, BTC OI, BTC funding; IB-131 dominance as
+   * `lines`). Null is honest: no series in hand (the venue did not answer, our own table holds under
+   * 6 h, or the tile has none — liquidations keep their bar). Required, so a server that forgets it fails the parse.
    */
   history: WebKpiHistorySchema.nullable(),
 });

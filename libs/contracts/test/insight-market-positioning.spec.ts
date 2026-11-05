@@ -59,7 +59,7 @@ describe('IB-085 contracts', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const kpis = require('./fixtures/kpis.json');
     const parsed = WebKpisResponseSchema.parse(kpis);
-    expect(parsed.tiles.map((t) => t.history?.kind ?? null)).toEqual(['area', null, null, 'area', 'bars']);
+    expect(parsed.tiles.map((t) => t.history?.kind ?? null)).toEqual(['area', 'lines', null, 'area', 'bars']);
     const cap = kpis.tiles[0];
     const withHistory = (history: unknown) => ({ ...kpis, tiles: [{ ...cap, history }, ...kpis.tiles.slice(1)] });
     expect(WebKpisResponseSchema.safeParse(withHistory(null)).success).toBe(true);
@@ -71,6 +71,27 @@ describe('IB-085 contracts', () => {
     expect(WebKpisResponseSchema.safeParse({ ...kpis, tiles: [without, ...kpis.tiles.slice(1)] }).success).toBe(false); // absence is stated
     const collecting = { ...cap, history: null, note: { key: 'kpi.note.collecting', params: { hours: 3 } } };
     expect(WebKpisResponseSchema.safeParse({ ...kpis, tiles: [collecting, ...kpis.tiles.slice(1)] }).success).toBe(true);
+  });
+
+  it('IB-131: `lines` carries ETH in a required `second`; area/bars carry null; from/to cover both lines', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const kpis = require('./fixtures/kpis.json');
+    const [cap, dom] = kpis.tiles;
+    const withTile = (i: number, tile: unknown) => ({ ...kpis, tiles: kpis.tiles.map((t: unknown, k: number) => (k === i ? tile : t)) });
+    const parsed = WebKpisResponseSchema.parse(kpis).tiles[1].history;
+    expect(parsed?.second?.label).toBe('ETH');
+    expect(parsed?.second?.points.length).toBe((parsed?.points.length ?? 0) - 1); // the fixture's ETH hole
+    const { second: _s, ...linesWithout } = dom.history;
+    expect(WebKpisResponseSchema.safeParse(withTile(1, { ...dom, history: linesWithout })).success).toBe(false); // absence is not null
+    expect(WebKpisResponseSchema.safeParse(withTile(1, { ...dom, history: { ...dom.history, second: null } })).success).toBe(false); // lines without ETH
+    expect(WebKpisResponseSchema.safeParse(withTile(0, { ...cap, history: { ...cap.history, second: dom.history.second } })).success).toBe(false); // area with second
+    const { second: _c, ...areaWithout } = cap.history;
+    expect(WebKpisResponseSchema.safeParse(withTile(0, { ...cap, history: areaWithout })).success).toBe(false); // required on area too
+    expect(WebKpisResponseSchema.safeParse(withTile(1, { ...dom, history: { ...dom.history, second: { ...dom.history.second, label: 'SOL' } } })).success).toBe(false);
+    expect(WebKpisResponseSchema.safeParse(withTile(1, { ...dom, history: { ...dom.history, second: { ...dom.history.second, points: [] } } })).success).toBe(false);
+    expect(WebKpisResponseSchema.safeParse(withTile(1, { ...dom, history: { ...dom.history, second: { ...dom.history.second, min: dom.history.second.max + 1 } } })).success).toBe(false);
+    const late = { ...dom.history.second, points: [...dom.history.second.points, { time: dom.history.to + 600, value: 11 }] };
+    expect(WebKpisResponseSchema.safeParse(withTile(1, { ...dom, history: { ...dom.history, second: late } })).success).toBe(false); // an ETH point outside from/to
   });
 
   it('four tiles do not parse — an unavailable tile says so, it does not vanish', () => {
