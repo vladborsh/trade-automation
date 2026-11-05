@@ -142,7 +142,7 @@ The axis ticks and scales are a **pure client helper** (`insight-chart.geometry.
 - **Memory** ≤ 1 000 × ≈ 200 B ≈ 200 KB per key. That is bounded, and the report states the real figure.
 - The report includes `EXPLAIN ANALYZE` of the 7d / $100K / all query on a slot DB.
 
-**Nav item: none.** I agree with the coordinator. The page is reached from Market and by link, and a sixth top-level item for a drill-down would dilute the nav.
+**Nav item: «ликвидации», between «рынок» and «позиционирование»** (owner override, 2026-11-05; IB-132). This supersedes the original call here, which was no nav item: reach the page from Market and by link, so as not to dilute the nav with a drill-down. The owner wants it as a top-level item. The Market link «Все ликвидации →» stays. A `/liquidations` redesign («episodes») is planned; its brief follows the mockup and is not part of this round.
 
 **Help «Как этим пользоваться».** Use `mockup.html`'s text, including the Binance one-per-second caveat.
 - It is open on the first visit and collapsed afterwards, in `localStorage`, read and written in `try/catch`. When storage is unavailable it renders open.
