@@ -38,6 +38,7 @@ FILES=(
   "scripts/backup.sh:/opt/insight-bot/backup.sh:0755"
   "scripts/restore.sh:/opt/insight-bot/restore.sh:0755"
   "scripts/liq-backfill.sh:/opt/insight-bot/liq-backfill.sh:0755"
+  "scripts/oi-hidden-backfill.sh:/opt/insight-bot/oi-hidden-backfill.sh:0755"
   "systemd/insight-bot-backup.service:/etc/systemd/system/insight-bot-backup.service:0644"
   "systemd/insight-bot-backup.timer:/etc/systemd/system/insight-bot-backup.timer:0644"
 )
