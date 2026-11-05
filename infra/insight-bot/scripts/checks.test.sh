@@ -203,6 +203,64 @@ d['link_code'] = 502"
 run first-live-alert fla-link
 check 'first-live-alert link answering 502 → FLAG:link_http' '[ "$(verdict fla-link first-live-alert)" = FLAG:link_http ]'
 
+# ------------------------------------------------------------------------------------ oi-4h-first-eval
+# IB-141 batch 3: the lines are the bot's own shape, as pinned by apps/insight-bot/test/delivery/oi-alerts-log-line.spec.ts.
+OI4H='
+d = {"now": "2026-11-06T00:20:00Z", "boot": "2026-11-05T22:40:00Z", "settings": [["6", "2", None]],
+     "lines": ["oi alerts 4h @2026-11-05T20:00:00.000Z: 5 coins, 0 found (late 0), sent 0, skipped 0, controls 0, near-misses 0",
+               "oi alerts 4h @2026-11-06T00:00:00.000Z: 5 coins, 1 found (late 0), sent 1, skipped 0, controls 2, near-misses 1"],
+     "warns": [],
+     "rows": [["alert", "401", "6", "2", None], ["control", "9001", "6", "2", None], ["near_miss", "77", "6", "2", None]]}
+'
+fixture o4-pass "$OI4H"
+run oi-4h-first-eval o4-pass
+check 'oi-4h-first-eval two clean 4h evaluations, every row 6/2 → PASS, nothing sent' \
+  '[ "$(verdict o4-pass oi-4h-first-eval)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"close\": \"2026-11-06T00:00:00.000Z\"" $work/out-o4-pass/oi-4h-first-eval.json'
+fixture o4-norows "$OI4H
+d['rows'] = []"
+run oi-4h-first-eval o4-norows
+check 'oi-4h-first-eval no 4h row journalled → PASS with a note (a quiet evaluation writes nothing)' \
+  '[ "$(verdict o4-norows oi-4h-first-eval)" = PASS ] && grep -q "no 4h row journalled since boot" $work/out-o4-norows/oi-4h-first-eval.md'
+fixture o4-oldrow "$OI4H
+d['rows'].append(['control', '9002', '6', '6', None])"
+run oi-4h-first-eval o4-oldrow
+check 'oi-4h-first-eval one row still 6/6 → FLAG:rows_4h_not_6_2, named in the notes' \
+  '[ "$(verdict o4-oldrow oi-4h-first-eval)" = FLAG:rows_4h_not_6_2 ] && grep -q "control #9002 nLeft=6 nRight=6" $work/out-o4-oldrow/oi-4h-first-eval.md'
+fixture o4-legacy "$OI4H
+d['rows'].append(['alert', '402', None, None, '6'])"
+run oi-4h-first-eval o4-legacy
+check 'oi-4h-first-eval a row in the old n shape (pre-032 code still running) → FLAG:rows_4h_not_6_2' \
+  '[ "$(verdict o4-legacy oi-4h-first-eval)" = FLAG:rows_4h_not_6_2 ]'
+fixture o4-settings "$OI4H
+d['settings'] = [['6', '6', None]]"
+run oi-4h-first-eval o4-settings
+check 'oi-4h-first-eval alert_settings 4h 6/6 (an owner value, or 032 not applied) → FLAG:settings_4h_6_2' \
+  '[ "$(verdict o4-settings oi-4h-first-eval)" = FLAG:settings_4h_6_2 ]'
+fixture o4-nolines "$OI4H
+d['lines'] = []"
+run oi-4h-first-eval o4-nolines
+check 'oi-4h-first-eval no 4h evaluation line since boot → FLAG:eval_lines_4h' \
+  '[ "$(verdict o4-nolines oi-4h-first-eval)" = FLAG:eval_lines_4h ]'
+fixture o4-failed "$OI4H
+d['lines'][1] += ', failed TRXUSDT'
+d['warns'] = ['oi alerts TRXUSDT 4h: boom']"
+run oi-4h-first-eval o4-failed
+check 'oi-4h-first-eval a failed coin and its warning → FLAG:evals_with_failed_coins,coin_warnings_4h, the warning quoted' \
+  '[ "$(verdict o4-failed oi-4h-first-eval)" = FLAG:evals_with_failed_coins,coin_warnings_4h ] && grep -q "warning: oi alerts TRXUSDT 4h: boom" $work/out-o4-failed/oi-4h-first-eval.md && [ "$(sent)" = 0 ]'
+fixture o4-broken 'd = {"now": "2026-11-06T00:20:00Z", "boot": "x", "lines": [], "warns": [], "rows": []}'
+run oi-4h-first-eval o4-broken
+check 'oi-4h-first-eval an input missing → FAIL, one message' '[ "$(verdict o4-broken oi-4h-first-eval | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
+check 'oi-4h-first-eval matches the line the bot spec pins (oi-alerts-log-line.spec.ts), quiet and busy' "python3 -I - '$CHECKS' '$HERE/../../../apps/insight-bot/test/delivery/oi-alerts-log-line.spec.ts' <<'PY'
+import importlib.util, re, sys
+spec = importlib.util.spec_from_file_location('c', sys.argv[1]); c = importlib.util.module_from_spec(spec); spec.loader.exec_module(c)
+pinned = re.findall(r\"'(oi alerts (?:15m|1h|4h) @[^']+)'\", open(sys.argv[2], encoding='utf-8').read())
+assert len(pinned) == 2, pinned
+for line in pinned:
+    m = re.search(c.OI_4H_LINE, line.replace(' 15m @', ' 4h @').replace(' 1h @', ' 4h @'))
+    assert m and m.group(6) is not None, line
+assert re.search(c.OI_4H_LINE, pinned[1].replace(' 1h @', ' 4h @')).group(8) == 'TRXUSDT'
+PY"
+
 # -------------------------------------------------------------------------------------- backfill-rerun
 BF='
 counts = [["alerts", "54"], ["controls", "2424"], ["near_misses", "88"], ["paths", "7698"], ["paths_open", "314"]]

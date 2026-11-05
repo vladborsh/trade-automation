@@ -544,11 +544,79 @@ def rcd_evaluate(raw):
 
 # --------------------------------------------------------------------------------------------- runner
 
+# ----------------------------------------------------------------------------------------- oi-4h-first-eval
+# IB-141's deploy (batch 3): the 4h OI-divergence evaluations since the bot started run on the new pivot sides
+# (4h 6 left / 2 right, migration 032). Verified from the bot's own evaluation lines and the journal, not by hand.
+# One-shot, scheduled after the first 4h close the new process evaluates on schedule (close + 6 min + margin);
+# the boot evaluation counts too. Figures: alert_settings 4h is 6/2; ≥ 1 «oi alerts 4h @…» line since boot, none
+# with `failed`; 0 per-coin «oi alerts <SYM> 4h: …» warnings (an error, or «not evaluated»); every 4h row journalled
+# since boot (alerts, controls, near-misses) carries 6/2 in its params. No 4h row at all is a note, not a flag:
+# an evaluation that finds nothing writes nothing.
+
+OI_4H_LINE = r'oi alerts 4h @(\S+?Z): (\d+) coins, (\d+) found \(late (\d+)\), sent (\d+)(?:, skipped \d+, controls (\d+), near-misses (\d+))?(?:, failed (\S+))?'
+OI_4H_WARN = r'^oi alerts [A-Z0-9]+ 4h: '
+
+
+def oi4h_gather():
+    import re
+    bot = sh(['docker', 'compose', 'ps', '-q', 'insight-bot'], cwd=DEPLOY_DIR).strip()
+    if not bot:
+        raise CheckFailed('the bot container is not running')
+    started = sh(['docker', 'inspect', '--format', '{{.State.StartedAt}}', bot]).strip()
+    boot = epoch(started[:19] + 'Z')
+    raw = {'now': utc(time.time()), 'boot': utc(boot), 'lines': [], 'warns': []}
+    for line in sh(['docker', 'logs', '--since', str(int(boot)), bot], timeout=120).splitlines():
+        try:
+            msg = str(json.loads(line).get('msg', ''))
+        except (ValueError, AttributeError):
+            msg = line
+        if re.search(OI_4H_LINE, msg):
+            raw['lines'].append(msg)
+        elif re.search(OI_4H_WARN, msg):
+            raw['warns'].append(msg[:200])
+    since = int(boot)
+    raw['settings'] = psql("select params #>> '{perTf,4h,nLeft}', params #>> '{perTf,4h,nRight}', params #>> '{perTf,4h,n}' from alert_settings where id = 1")
+    raw['rows'] = psql(
+        "select 'alert', id, params #>> '{perTf,4h,nLeft}', params #>> '{perTf,4h,nRight}', params #>> '{perTf,4h,n}' from oi_divergence_alerts"
+        " where tf = '4h' and source = 'live' and confirmed_at >= to_timestamp(%d) union all"
+        " select 'control', id, params #>> '{perTf,4h,nLeft}', params #>> '{perTf,4h,nRight}', params #>> '{perTf,4h,n}' from oi_divergence_controls"
+        " where tf = '4h' and source = 'live' and created_at >= to_timestamp(%d) union all"
+        " select 'near_miss', id, params #>> '{perTf,4h,nLeft}', params #>> '{perTf,4h,nRight}', params #>> '{perTf,4h,n}' from oi_divergence_near_misses"
+        " where tf = '4h' and source = 'live' and created_at >= to_timestamp(%d) order by 1, 2" % (since, since, since))
+    return raw
+
+
+def oi4h_evaluate(raw):
+    import re
+    flags, rows, notes = [], [], []
+    st = raw['settings'][0] if raw['settings'] else [None, None, None]
+    rows.append(band(flags, 'settings_4h_6_2', 1 if (st[0], st[1]) == ('6', '2') else 0, 1, 1))
+    evals = []
+    for msg in raw['lines']:
+        m = re.search(OI_4H_LINE, msg)
+        evals.append({'close': m.group(1), 'coins': int(m.group(2)), 'found': int(m.group(3)), 'late': int(m.group(4)), 'sent': int(m.group(5)),
+                      'controls': None if m.group(6) is None else int(m.group(6)), 'near_misses': None if m.group(7) is None else int(m.group(7)),
+                      'failed': m.group(8)})
+    rows.append(band(flags, 'eval_lines_4h', len(evals), 1, 1000))
+    rows.append(band(flags, 'evals_with_failed_coins', sum(1 for e in evals if e['failed']), 0, 0))
+    rows.append(band(flags, 'coin_warnings_4h', len(raw['warns']), 0, 0))
+    bad = [r for r in raw['rows'] if (r[2], r[3]) != ('6', '2')]
+    rows.append(band(flags, 'rows_4h_not_6_2', len(bad), 0, 0))
+    if not raw['rows']:
+        notes.append('no 4h row journalled since boot (%s): the evaluations found no alert, control or near-miss — params read from alert_settings only' % raw['boot'])
+    notes += ['warning: ' + w for w in raw['warns'][:5]]
+    notes += ['row not 6/2: %s #%s nLeft=%s nRight=%s n=%s' % tuple(r) for r in bad[:5]]
+    m = {'boot': raw['boot'], 'now': raw['now'], 'settings_4h': {'nLeft': st[0], 'nRight': st[1], 'n': st[2]}, 'evaluations': evals,
+         'rows_4h': [{'kind': r[0], 'id': int(r[1]), 'nLeft': r[2], 'nRight': r[3]} for r in raw['rows']]}
+    return {'flags': flags, 'rows': rows, 'notes': notes, 'measured': m}
+
+
 CHECKS = {
     'v28': (v28_gather, v28_evaluate, 'IB-115 V28 live day [%s, %s)' % (V28_FROM, V28_TO)),
     'cap-24h': (cap_gather, cap_evaluate, 'IB-118 / IB-130: a day of market_cap_total'),
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
+    'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),
     'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
     'random-controls-day': (rcd_gather, rcd_evaluate, 'IB-BUG-047: the previous UTC day of live OI random controls — exactly enabled coins × 3 TFs × 2'),
 }
