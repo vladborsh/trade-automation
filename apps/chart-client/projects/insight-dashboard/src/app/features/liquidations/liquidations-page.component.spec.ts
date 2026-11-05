@@ -117,7 +117,9 @@ describe('LiquidationsPageComponent (IB-120)', () => {
     TestBed.resetTestingModule();
     const small = await open('/liquidations');
     expect(small.el.querySelector('.foot')?.textContent?.trim()).toBe('liquidations: 6 · sort by any column');
-  });
+    // renders 1 000 table rows: 1.5 s alone, 6.8 s inside the parallel `npm test` (dev-1, 2026-11-05) — past
+    // vitest's 5 s default, so it carries its own budget rather than failing whenever the suite is busy
+  }, 20_000);
 
   it('no rows: says so instead of an empty table', async () => {
     const { el } = await open('/liquidations', 'en', (q) => answer(q, { rows: [], total: 0, truncated: false }));
