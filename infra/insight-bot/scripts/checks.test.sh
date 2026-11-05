@@ -37,6 +37,9 @@ d = {'from': '2026-11-04T21:41:43Z', 'to': '2026-11-05T21:41:43Z', 'now': '2026-
      'controls': [['live', 'pivot', '15m', '75'], ['live', 'pivot', '1h', '19'], ['live', 'pivot', '4h', '5'],
                   ['live', 'random', '15m', '10'], ['live', 'random', '1h', '10'], ['live', 'random', '4h', '10'],
                   ['backfill', 'pivot', '15m', '1448']],
+     # IB-BUG-047: live random per (symbol, tf, UTC day of the bar); the window straddles 11-04 and 11-05
+     'random_days': [[s, tf, day, '1'] for s in ('BNBUSDT', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'TRXUSDT')
+                     for tf in ('15m', '1h', '4h') for day in ('2026-11-04', '2026-11-05')],
      'near': [['live', 'k', '15m', '4', '2.1'], ['live', 'price_line', '1h', '1', '0.1'], ['backfill', 'k', '15m', '88', '2.2']],
      'alerts': [['live', '1', '0', '1']],
      # source, win, rows, measured, failing, overdue, measured_in_window, ambiguous, entry≠t0, min(measured_at)
@@ -92,12 +95,15 @@ v28_input near0 "d['near'] = [x for x in d['near'] if x[0] != 'live']"
 run v28 near0
 check 'v28 0 near-misses → FLAG and a note that 0 needs explaining' \
   '[ "$(verdict near0 v28)" = FLAG:near_misses ] && grep -q "0 near-misses needs explaining" $work/out-near0/v28.md'
-v28_input rnd33 "d['controls'][3][3] = '13'"
-run v28 rnd33
-check 'v28 random controls 33 → FLAG; 31 → PASS with the midnight note' '[ "$(verdict rnd33 v28)" = FLAG:random_controls ]'
-v28_input rnd31 "d['controls'][3][3] = '11'"
-run v28 rnd31
-check 'v28 random 31 → PASS, the note names the UTC-date hashing' '[ "$(verdict rnd31 v28)" = PASS ] && grep -q "hashed by UTC date" $work/out-rnd31/v28.md'
+# IB-BUG-047: the window's random total is not a band (it straddles two UTC days); >2 per (coin, TF, day) is
+v28_input rnd39 "d['random_days'] = [[s, tf, day, '2'] for s in ('BNBUSDT', 'BTCUSDT', 'ETHUSDT') for tf in ('15m', '1h', '4h') for day in ('2026-11-04', '2026-11-05')] + [['SOLUSDT', '4h', '2026-11-04', '1'], ['TRXUSDT', '4h', '2026-11-04', '1'], ['SOLUSDT', '1h', '2026-11-05', '1']]"
+run v28 rnd39
+check 'v28 39 random in the window, none above 2 a UTC day (the 2026-11-05 shape) → PASS, the total a note' \
+  '[ "$(verdict rnd39 v28)" = PASS ] && grep -q "random controls in the window: 39" $work/out-rnd39/v28.md && grep -q "| random_over_2_per_utc_day | 0 | 0–0 | ok |" $work/out-rnd39/v28.md'
+v28_input rnd-redraw "d['random_days'][4][3] = '3'"
+run v28 rnd-redraw
+check 'v28 a (coin, TF, UTC day) with 3 — the re-draw signature → FLAG, the pair and day named' \
+  '[ "$(verdict rnd-redraw v28)" = FLAG:random_over_2_per_utc_day ] && grep -q "BNBUSDT 4h on 2026-11-04 has 3" $work/out-rnd-redraw/v28.md'
 v28_input mem "d['sar'][50]['avail'] = 99; d['sar'][60]['swap'] = 501; d['paths'][0][5] = '2'"
 run v28 mem
 check 'v28 memory < 100 MB, swap > 500 MB, overdue paths → each FLAGged' \
@@ -282,6 +288,56 @@ fixture liq-nojson "$LIQ
 d['output'] = '\n'.join(l for l in out.split('\n') if not l.startswith('LIQ_HISTORY_JSON'))"
 run liq-weekly liq-nojson
 check 'liq-weekly no summary line → FAIL' '[ "$(verdict liq-nojson liq-weekly | cut -c1-5)" = FAIL: ]'
+
+# ---------------------------------------------------------------------------------- random-controls-day
+# IB-BUG-047: the previous UTC day, exactly enabled coins × 3 × 2. $1 = case, $2 = python edits on `d`.
+rcd_input() {
+  python3 -I - "$work/$1.json" "$2" <<'PY'
+import json, sys
+path, edits = sys.argv[1], sys.argv[2]
+coins = ('BNBUSDT', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'TRXUSDT')
+d = {'now': '2026-11-06T00:30:01Z', 'day': '2026-11-05',
+     'coins': [[c, '1793000000'] for c in coins],  # all added long before the day
+     'counts': [[c, tf, '2', '03:00 17:00'] for c in coins for tf in ('15m', '1h', '4h')]}
+exec(edits)
+with open(path, 'w') as f:
+    json.dump(d, f)
+PY
+}
+rcd_day() { python3 -I -c 'import importlib.util,sys;s=importlib.util.spec_from_file_location("c",sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(m.rcd_day(m.epoch(sys.argv[2])))' "$CHECKS" "$1"; }
+check 'random-controls-day the timer at 00:30 UTC checks the PREVIOUS UTC day; 23:59:59 still the day before it' \
+  '[ "$(rcd_day 2026-11-06T00:30:00Z)" = 2026-11-05 ] && [ "$(rcd_day 2026-11-06T00:00:00Z)" = 2026-11-05 ] && [ "$(rcd_day 2026-11-05T23:59:59Z)" = 2026-11-04 ] && [ "$(rcd_day 2027-01-01T00:30:00Z)" = 2026-12-31 ]'
+rcd_input rcd-pass ''
+run random-controls-day rcd-pass
+check 'random-controls-day 5 coins × 3 × 2 = 30 → PASS, exit 0, nothing sent' \
+  '[ "$(verdict rcd-pass random-controls-day)" = PASS ] && [ "$(cat $work/rcd-pass.rc)" = 0 ] && [ "$(sent)" = 0 ] && grep -q "| random_controls | 30 | 30–30 | ok |" $work/out-rcd-pass/random-controls-day.md'
+rcd_input rcd-lost "d['counts'][4][2] = '1'"
+run random-controls-day rcd-lost
+check 'random-controls-day a pick LOST (BTCUSDT 1h has 1) → FLAG naming the total and that pair, nothing sent' \
+  '[ "$(verdict rcd-lost random-controls-day)" = FLAG:random_controls,BTCUSDT/1h ] && [ "$(sent)" = 0 ] && grep -q "a pick lost for good" $work/out-rcd-lost/random-controls-day.md'
+rcd_input rcd-absent "d['counts'] = [r for r in d['counts'] if (r[0], r[1]) != ('TRXUSDT', '4h')]"
+run random-controls-day rcd-absent
+check 'random-controls-day a pair with NO row at all counts as 0 → FLAG names it' \
+  '[ "$(verdict rcd-absent random-controls-day)" = FLAG:random_controls,TRXUSDT/4h ] && grep -qF "| TRXUSDT/4h | 0 | 2–2 | **FLAG** |" $work/out-rcd-absent/random-controls-day.md'
+rcd_input rcd-swap "d['counts'][0][2] = '1'; d['counts'][14][2] = '3'"
+run random-controls-day rcd-swap
+check 'random-controls-day one lost + one extra: the total still 30, the two pairs named (a total alone would pass)' \
+  '[ "$(verdict rcd-swap random-controls-day)" = FLAG:BNBUSDT/15m,TRXUSDT/4h ]'
+rcd_input rcd-added "d['coins'].append(['DOGEUSDT', '1794000000'])"
+run random-controls-day rcd-added
+check 'random-controls-day a coin enabled mid-day → its 3 pairs FLAGged, the note says fewer is expected' \
+  '[ "$(verdict rcd-added random-controls-day)" = FLAG:random_controls,DOGEUSDT/15m,DOGEUSDT/1h,DOGEUSDT/4h ] && grep -q "DOGEUSDT was added to alert_symbols at" $work/out-rcd-added/random-controls-day.md'
+rcd_input rcd-disabled "d['coins'] = d['coins'][:4]"
+run random-controls-day rcd-disabled
+check 'random-controls-day rows for a coin disabled since → its pairs still checked, the note says so' \
+  '[ "$(verdict rcd-disabled random-controls-day)" = FLAG:random_controls ] && grep -q "TRXUSDT is not enabled now" $work/out-rcd-disabled/random-controls-day.md'
+rcd_input rcd-edge "d['now'] = '2026-11-06T00:07:00Z'"
+run random-controls-day rcd-edge
+check 'random-controls-day exactly 00:07 after the day (its last pick recorded ≈ 00:06) → runs, PASS' '[ "$(verdict rcd-edge random-controls-day)" = PASS ]'
+rcd_input rcd-early "d['now'] = '2026-11-06T00:06:59Z'"
+run random-controls-day rcd-early
+check 'random-controls-day a second earlier → FAIL (the day is not settled), one message' \
+  '[ "$(verdict rcd-early random-controls-day | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
 
 # ------------------------------------------------------------------------------------- the token, usage
 check 'the token is on curl stdin (sent at all)' 'grep -q "$TOKEN" $work/curl-stdin'

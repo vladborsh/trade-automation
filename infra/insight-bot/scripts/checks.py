@@ -97,6 +97,9 @@ def v28_gather():
     win = lambda col: '%s >= %s' % (col, w % col)
     raw = {'from': V28_FROM, 'to': V28_TO, 'now': utc(time.time())}
     raw['controls'] = psql("select source, kind, tf, count(*) from oi_divergence_controls where %s group by 1,2,3 order by 1,2,3" % win('created_at'))
+    # IB-BUG-047: live random controls per (symbol, tf, UTC day of the bar) — the unit the hash picks 2 in
+    raw['random_days'] = psql("select symbol, tf, to_char(bar_time, 'YYYY-MM-DD'), count(*) from oi_divergence_controls"
+                              " where source = 'live' and kind = 'random' and %s group by 1,2,3 order by 1,2,3" % win('created_at'))
     raw['near'] = psql("select source, rule, tf, count(*), round(avg(miss)::numeric,3) from oi_divergence_near_misses where %s group by 1,2,3 order by 1,2,3" % win('created_at'))
     raw['alerts'] = psql("select source, count(*), count(*) filter (where late), coalesce(sum(recipients),0) from oi_divergence_alerts where %s group by 1" % win('confirmed_at'))
     # paths by their subject's source; overdue = the window closed (+60 s) and still no measurement
@@ -168,13 +171,19 @@ def v28_evaluate(raw):
     live = lambda rows_, i=0: [r for r in rows_ if r[i] == 'live']
     ctl = live(raw['controls'])
     pivot = sum(int(r[3]) for r in ctl if r[1] == 'pivot')
-    random_ = sum(int(r[3]) for r in ctl if r[1] == 'random')
     near = sum(int(r[3]) for r in live(raw['near']))
     rows.append(band(flags, 'pivot_controls', pivot, 50, 200))
-    # random picks are hashed by UTC date: a window crossing midnight may get 28–32 (kit); outside that, flag
-    rows.append(band(flags, 'random_controls', random_, 28, 32))
-    if random_ != 30 and 28 <= random_ <= 32:
-        notes.append('random controls %d ≠ 30: the window crosses midnight and the picks are hashed by UTC date' % random_)
+    # IB-BUG-047: random picks are 2 per (coin, TF, UTC day of the bar), by a hash. This window is 24 h of
+    # created_at from the live start: it straddles two UTC days, so its total is not 30 and has no honest band
+    # (39 on 2026-11-05, all of them the hash's own picks). What it CAN test is the re-draw signature: no
+    # (symbol, tf, day) above 2. Whether a day got all 30 is the recurring `random-controls-day` check.
+    random_ = sum(int(r[3]) for r in raw['random_days'])
+    over = [r for r in raw['random_days'] if int(r[3]) > RANDOM_PER_DAY]
+    rows.append(band(flags, 'random_over_2_per_utc_day', len(over), 0, 0))
+    for r in over:
+        notes.append('random controls: %s %s on %s has %s (the hash picks %d a UTC day)' % (r[0], r[1], r[2], r[3], RANDOM_PER_DAY))
+    notes.append('random controls in the window: %d. The window crosses UTC midnight, so this is not «30 a day»; '
+                 'each UTC day is checked exactly by `random-controls-day`' % random_)
     rows.append(band(flags, 'near_misses', near, 2.5, 10))
     if near == 0:
         notes.append('0 near-misses needs explaining: name the path that would write one (diagnose at len − (2k+N+1)) before calling it «none happened»')
@@ -231,6 +240,7 @@ def v28_evaluate(raw):
     alerts = live(raw['alerts'])
     measured = {
         'controls_live': [{'kind': r[1], 'tf': r[2], 'n': int(r[3])} for r in ctl],
+        'random_by_utc_day': [{'symbol': r[0], 'tf': r[1], 'day': r[2], 'n': int(r[3])} for r in raw['random_days']],
         'near_misses_live': [{'rule': r[1], 'tf': r[2], 'n': int(r[3]), 'avg_miss': num(r[4])} for r in live(raw['near'])],
         'alerts_live': {'n': int(alerts[0][1]), 'late': int(alerts[0][2]), 'recipients': int(alerts[0][3])} if alerts else {'n': 0, 'late': 0, 'recipients': 0},
         'paths_live': [{'win': r[1], 'rows': int(r[2]), 'measured': int(r[3]), 'failing': int(r[4]), 'overdue': int(r[5]),
@@ -466,6 +476,72 @@ def liq_evaluate(raw):
                          'min_mem_available_mb': int(mem.group(1)), 'tail': out[-1500:]}}
 
 
+# --------------------------------------------------------------------------------- random-controls-day
+# IB-BUG-047: one UTC day of live random controls, exact. The loop picks 2 bar closes per (coin, TF, UTC day of
+# the bar) by a hash of (symbol, tf, day) (apps/insight-bot/src/alerts/oi-divergence/research/controls.ts, design
+# V25), so a whole day holds exactly enabled coins × 3 × 2 — a count, not a band. What breaks it:
+#   fewer — a pick lost for good: each tick evaluates only the LATEST due close, so a bot down for the whole of
+#           [the pick's close + 6 min, the next close + 6 min) never records it (15 min on 15m, 1 h on 1h, 4 h on
+#           4h); also a venue error on that coin's evaluation, or a coin added during the day;
+#   more  — a re-draw or a duplicate (the once-key should make it impossible).
+# Daily timer at 00:30 UTC for the previous day: its last bar (4h 20:00) closes 00:00 and is recorded ≈ 00:06.
+# CHECKS_DAY=YYYY-MM-DD checks another day by hand.
+
+RANDOM_PER_DAY = 2                      # OI_RANDOM_CONTROLS_PER_DAY (libs/contracts/src/insight/oi-divergence-research.ts)
+OI_TFS = ('15m', '1h', '4h')            # OI_DIVERGENCE_TFS
+RCD_SETTLE_SEC = 7 * 60                 # the day's last close (00:00) + the loop's 6 min + 1
+
+
+def rcd_day(now):
+    """The UTC day before the one `now` falls in, YYYY-MM-DD."""
+    return utc((now // 86400 - 1) * 86400)[:10]
+
+
+def rcd_gather():
+    import re
+    now = time.time()
+    day = os.environ.get('CHECKS_DAY') or rcd_day(now)
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', day):
+        raise CheckFailed('CHECKS_DAY %r is not YYYY-MM-DD' % day)
+    raw = {'now': utc(now), 'day': day}
+    raw['coins'] = psql("select symbol, extract(epoch from added_at) from alert_symbols where enabled order by symbol")
+    raw['counts'] = psql("select symbol, tf, count(*), string_agg(to_char(bar_time, 'HH24:MI'), ' ' order by bar_time)"
+                         " from oi_divergence_controls where source = 'live' and kind = 'random'"
+                         " and bar_time >= '%s'::timestamptz and bar_time < '%s'::timestamptz + interval '1 day'"
+                         " group by 1, 2 order by 1, 2" % (day + 'T00:00:00Z', day + 'T00:00:00Z'))
+    return raw
+
+
+def rcd_evaluate(raw):
+    start = epoch(raw['day'] + 'T00:00:00Z')
+    end = start + 86400
+    if epoch(raw['now']) < end + RCD_SETTLE_SEC:
+        raise CheckFailed('ran at %s, before %s\'s last pick could be recorded (%s)' % (raw['now'], raw['day'], utc(end + RCD_SETTLE_SEC)))
+    enabled = {r[0]: float(r[1]) for r in raw['coins']}
+    got = {(r[0], r[1]): (int(r[2]), r[3]) for r in raw['counts']}
+    coins = sorted(set(enabled) | {k[0] for k in got})
+    flags, rows, notes = [], [], []
+    expect = len(enabled) * len(OI_TFS) * RANDOM_PER_DAY
+    total = sum(n for n, _ in got.values())
+    rows.append(band(flags, 'random_controls', total, expect, expect))
+    for sym in coins:
+        for tf in OI_TFS:
+            n, bars = got.get((sym, tf), (0, ''))
+            rows.append(band(flags, '%s/%s' % (sym, tf), n, RANDOM_PER_DAY, RANDOM_PER_DAY))
+    for sym in coins:
+        if sym not in enabled:
+            notes.append('%s is not enabled now but has random controls that day (disabled since?)' % sym)
+        elif enabled[sym] > start:
+            notes.append('%s was added to alert_symbols at %s: fewer than %d on that day is expected' % (sym, utc(enabled[sym]), RANDOM_PER_DAY))
+    if flags:
+        notes.append('fewer than 2: a pick lost for good (the bot down from its close + 6 min to the next close + 6 min, or a venue error '
+                     'on that evaluation) — see the bot log and deploy times; more than 2: a re-draw or duplicate, a defect')
+    notes.append('expected = %d enabled coins × %d TFs × %d' % (len(enabled), len(OI_TFS), RANDOM_PER_DAY))
+    return {'flags': flags, 'rows': rows, 'notes': notes,
+            'measured': {'day': raw['day'], 'enabled': sorted(enabled), 'total': total, 'expected': expect,
+                         'pairs': [{'symbol': k[0], 'tf': k[1], 'n': v[0], 'bars_utc': v[1]} for k, v in sorted(got.items())]}}
+
+
 # --------------------------------------------------------------------------------------------- runner
 
 CHECKS = {
@@ -474,6 +550,7 @@ CHECKS = {
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
     'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
+    'random-controls-day': (rcd_gather, rcd_evaluate, 'IB-BUG-047: the previous UTC day of live OI random controls — exactly enabled coins × 3 TFs × 2'),
 }
 
 
