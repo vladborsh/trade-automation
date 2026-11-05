@@ -98,7 +98,7 @@ describe('R5 funding_extremes — the coin is the subject; the sign says who pay
   it('negative: shorts pay; one more coin is said', () => {
     const w = words(r5(-0.00039, 2));
     expect(w.title).toBe('TRUMP: шорты доплачивают лонгам −0.0390 % — необычно много');
-    expect(w.expl).toContain('Отрицательный: шортов больше, и они платят.');
+    expect(w.expl).toContain('Отрицательный: платят шорты — на их стороне перекос.');
     expect(w.expl).toMatch(/Так же необычно ещё у 1 из 30 монет\.$/);
     expect(w.link).toBe('Все монеты →');
     expect(w.chip.tone).toBe('pos');
@@ -106,8 +106,16 @@ describe('R5 funding_extremes — the coin is the subject; the sign says who pay
   it('positive: longs pay; alone, no «ещё у»', () => {
     const w = words(r5(0.0011, 1));
     expect(w.title).toBe('TRUMP: лонги доплачивают шортам 0.1100 % — необычно много');
-    expect(w.expl).toContain('Положительный: лонгов больше, и они платят.');
+    expect(w.expl).toContain('Положительный: платят лонги — на их стороне перекос.');
     expect(w.expl).not.toContain('Так же');
+  });
+  it('never claims who OUTNUMBERS whom — funding says who pays and where the crowding is (IB-119 review, as IB-121)', () => {
+    for (const rate of [-0.00039, 0.0011]) {
+      expect(words(r5(rate, 1)).expl).not.toMatch(/больше, и они платят/);
+      expect(words(r5(rate, 1), 'en').expl).not.toMatch(/outnumber/);
+    }
+    expect(words(r5(-0.00039, 1), 'en').expl).toContain('Negative: shorts pay (the crowding is on their side).');
+    expect(words(r5(0.0011, 1), 'en').expl).toContain('Positive: longs pay (the crowding is on their side).');
   });
 });
 
