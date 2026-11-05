@@ -77,9 +77,8 @@ describe('PositioningPageComponent (IB-103)', () => {
     const btc = [...el.querySelectorAll('app-pos-quadrant g.dot')].find((c) => c.querySelector('title')?.textContent === 'BTC') as SVGElement;
     btc.querySelector('circle')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     f.detectChanges();
-    const text = el.querySelector('app-pos-quadrant .tip')?.textContent ?? '';
-    expect(text).toContain('BTC: price −1.20 %, open interest +3.40 %, OI Binance $8.1B');
-    expect(text).toContain('dot size: OI Binance in USD');
+    expect(el.querySelector('app-pos-quadrant .tip')?.textContent).toContain('BTC: price −1.20 %, open interest +3.40 %, OI Binance $8.1B');
+    expect(el.querySelector('app-pos-quadrant')?.textContent).toContain('dot size: OI Binance in USD');
   });
 
   it('opens on the URL\'s sort — a link shows the same view', async () => {

@@ -99,6 +99,17 @@ describe('quadrantLayout with a view (IB-137)', () => {
     expect(at('Q').label?.anchor).toBe('end'); // Q moved its label to its own left
   });
 
+  it('on a phone, the farthest-out coin\'s label wins: a bigger coin just past the top edge does not take the corner from TRUMP', () => {
+    // 342 px: NEAR (+0.4 / +5.4, OI 5e9) is just above the bulk view, TRUMP (+38 / +12) far out in the corner.
+    // By OI alone NEAR's long label would claim the top-left run first and TRUMP's would find no spot.
+    const view = { xMin: -5, xMax: 5, yMin: -5, yMax: 5 };
+    const l = quadrantLayout([row('NEAR', 0.4, 5.4, 5e9), row('TRUMP', 38, 12, 1e8)], size, view);
+    const t = l.dots.find((d) => d.row.base === 'TRUMP')!;
+    expect(t.label?.text).toBe('TRUMP +38 % / +12 %');
+    expect(t.label!.box.x + t.label!.box.w).toBeLessThanOrEqual(size.width);
+    expect(t.label!.box.x).toBeGreaterThanOrEqual(0);
+  });
+
   it('the dots stay in OI order whatever the label order (the keyboard walks them in that order)', () => {
     const l = quadrantLayout([...crowd, row('TRUMP', 38, 12, 5e8)], big, bulk);
     expect(l.dots.map((d) => d.row.base)).toEqual(['A', 'B', 'C', 'D', 'TRUMP']);

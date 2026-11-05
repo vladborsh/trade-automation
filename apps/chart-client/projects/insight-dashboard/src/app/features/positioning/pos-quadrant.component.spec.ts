@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import type { WebPositioningResponse, WebPositioningRow } from '@trade-automation/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import captured from '../../../../../../e2e-insight-dashboard/fixtures/market-positioning.24h.json';
+import { I18nService } from '../../i18n/i18n.service';
 import { PosQuadrantComponent } from './pos-quadrant.component';
 
 /**
@@ -10,13 +11,18 @@ import { PosQuadrantComponent } from './pos-quadrant.component';
  * `matchMedia`, so `hover` is false here: the touch path, unless a test stubs it.
  */
 const data = captured as unknown as WebPositioningResponse;
+// the fixture's own TRUMP row, moved to +38 % / +12 % (one row per symbol, as the server sends)
+const fixtureTrump = data.rows.find((r) => r.symbol === 'TRUMPUSDT')!;
 const trump: WebPositioningRow = {
-  ...data.rows[0], symbol: 'TRUMPUSDT', base: 'TRUMP', oiUsd: 1e8,
+  ...fixtureTrump, oiUsd: 1e8,
   priceChangePct: { ...data.rows[0].priceChangePct, value: 38 }, oiChangePct: { ...data.rows[0].oiChangePct, value: 12 },
 };
 
-function mount(rows: readonly WebPositioningRow[] = [...data.rows, trump]) {
+const others = data.rows.filter((r) => r.symbol !== 'TRUMPUSDT');
+
+function mount(rows: readonly WebPositioningRow[] = [...others, trump]) {
   TestBed.configureTestingModule({ imports: [PosQuadrantComponent], providers: [provideRouter([])] });
+  TestBed.inject(I18nService).setLang('en');
   const f = TestBed.createComponent(PosQuadrantComponent);
   f.componentRef.setInput('rows', rows);
   f.componentRef.setInput('asOf', data.asOf);
@@ -39,6 +45,7 @@ describe('PosQuadrantComponent — views (IB-137)', () => {
     expect(el.querySelector('button.bulk')?.getAttribute('aria-pressed')).toBe('true');
     expect(dot('TRUMP').classList).toContain('pinned');
     expect(el.textContent).toContain('TRUMP +38 % / +12 %');
+    expect(el.querySelector('button.bulk')?.textContent).toBe('without outliers');
     tap(el.querySelector('button.full')!);
     expect(dot('TRUMP').classList).not.toContain('pinned');
     expect(el.querySelector('button.full')?.getAttribute('aria-pressed')).toBe('true');
@@ -118,7 +125,7 @@ describe('PosQuadrantComponent — open a coin (IB-137)', () => {
   it('keyboard: every dot is focusable, in OI order; Enter opens', () => {
     const { el, dot, nav } = mount();
     const order = [...el.querySelectorAll('g.dot')].map((g) => g.getAttribute('data-symbol'));
-    const byOi = [...data.rows, trump].sort((a, b) => (b.oiUsd ?? 0) - (a.oiUsd ?? 0)).map((r) => r.symbol);
+    const byOi = [...others, trump].sort((a, b) => (b.oiUsd ?? 0) - (a.oiUsd ?? 0)).map((r) => r.symbol);
     expect(order).toEqual(byOi);
     expect([...el.querySelectorAll('g.dot')].every((g) => g.getAttribute('tabindex') === '0')).toBe(true);
     dot('XRP').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));

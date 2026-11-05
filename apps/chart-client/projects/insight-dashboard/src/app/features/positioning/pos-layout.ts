@@ -104,7 +104,12 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
 
   const boxes: Box[] = dots.map((d) => ({ x: d.cx - d.r, y: d.cy - d.r, w: 2 * d.r, h: 2 * d.r }));
   let hidden = 0;
-  for (const d of [...dots.filter((x) => x.pin), ...dots.filter((x) => !x.pin)]) {
+  // pinned first, the farthest beyond the view first: a real outlier's label beats a coin just past the edge
+  const beyond = (v: number, lo: number, hi: number) => (v > hi ? v - hi : v < lo ? lo - v : 0) / (hi - lo);
+  const outness = (d: QuadrantDot) => Math.max(
+    beyond(d.row.priceChangePct.value as number, domain.xMin, domain.xMax), beyond(d.row.oiChangePct.value as number, domain.yMin, domain.yMax));
+  const pinnedFirst = dots.filter((x) => x.pin).sort((a, b) => outness(b) - outness(a));
+  for (const d of [...pinnedFirst, ...dots.filter((x) => !x.pin)]) {
     const text = d.pin
       ? `${d.row.base} ${compactPct(d.row.priceChangePct.value as number)} / ${compactPct(d.row.oiChangePct.value as number)}`
       : d.row.base;
@@ -118,9 +123,14 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
     const l = at(d.cx - d.r - 3, d.cy - LABEL_H / 2, 'end');
     const a = at(d.cx, d.cy - d.r - 2 - LABEL_H, 'middle');
     const b = at(d.cx, d.cy + d.r + 2, 'middle');
+    // a corner pin: below / above, aligned to its edge so the label runs inward
+    const edgeX = d.pin?.dx === 1 ? d.cx + d.r : d.cx - d.r;
+    const edgeAnchor = d.pin?.dx === 1 ? 'end' : 'start';
+    const bIn = at(edgeX, d.cy + d.r + 2, edgeAnchor);
+    const aIn = at(edgeX, d.cy - d.r - 2 - LABEL_H, edgeAnchor);
     const spots = !d.pin ? [r, l, a, b]
-      : d.pin.dy === 1 ? [b, d.pin.dx === 1 ? l : r, d.pin.dx === 1 ? r : l, a]
-      : d.pin.dy === -1 ? [a, d.pin.dx === 1 ? l : r, d.pin.dx === 1 ? r : l, b]
+      : d.pin.dy === 1 ? (d.pin.dx === 0 ? [b, r, l, a] : [b, bIn, d.pin.dx === 1 ? l : r, aIn])
+      : d.pin.dy === -1 ? (d.pin.dx === 0 ? [a, r, l, b] : [a, aIn, d.pin.dx === 1 ? l : r, bIn])
       : d.pin.dx === 1 ? [l, a, b, r] : [r, a, b, l];
     const free = spots.find((s) => inside(s.box, size) && boxes.every((bx) => !overlaps(bx, s.box)));
     if (free) {
