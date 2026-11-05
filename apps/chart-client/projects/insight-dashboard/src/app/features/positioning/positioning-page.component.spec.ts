@@ -74,10 +74,10 @@ describe('PositioningPageComponent (IB-103)', () => {
 
   it('the OI in USD is ONE venue\'s, and says so: «OI Binance» in the tap text and the legend (moved from the Market block spec)', async () => {
     const { f, el } = await open('/positioning');
-    const btc = [...el.querySelectorAll('app-pos-quadrant circle')].find((c) => c.querySelector('title')?.textContent === 'BTC') as SVGElement;
-    btc.dispatchEvent(new MouseEvent('click'));
+    const btc = [...el.querySelectorAll('app-pos-quadrant g.dot')].find((c) => c.querySelector('title')?.textContent === 'BTC') as SVGElement;
+    btc.querySelector('circle')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     f.detectChanges();
-    const text = el.querySelector('app-pos-quadrant')?.textContent ?? '';
+    const text = el.querySelector('app-pos-quadrant .tip')?.textContent ?? '';
     expect(text).toContain('BTC: price −1.20 %, open interest +3.40 %, OI Binance $8.1B');
     expect(text).toContain('dot size: OI Binance in USD');
   });

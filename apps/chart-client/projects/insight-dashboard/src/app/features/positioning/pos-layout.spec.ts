@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
-import { type Box, DOT_R_MAX, DOT_R_MIN, heatOf, heatRow, LABEL_CHAR_PX, niceMax, quadrantLayout } from './pos-layout';
+import { type Box, DOT_R_MAX, DOT_R_MIN, heatOf, heatRow, LABEL_CHAR_PX, niceMax, PIN_R, quadrantLayout, quadrantLink } from './pos-layout';
 
 /** IB-090 — positioning geometry and cell words, on the contract fixture (BTC, ETH, SOL, DOGE). */
 const rows = (fixture as unknown as WebPositioningResponse).rows;
@@ -26,7 +26,8 @@ describe('quadrantLayout', () => {
 
   it('symmetric, round axis ends: ±5 % price, ±50 % OI for the fixture', () => {
     const l = quadrantLayout(rows, size);
-    expect([l.xMax, l.yMax]).toEqual([5, 50]);
+    expect([l.domain.xMax, l.domain.yMax]).toEqual([5, 50]);
+    expect([l.domain.xMin, l.domain.yMin]).toEqual([-5, -50]);
     expect([niceMax(0), niceMax(1.2), niceMax(3.4), niceMax(26), niceMax(101)]).toEqual([1, 2, 5, 50, 200]);
   });
 
@@ -57,6 +58,72 @@ describe('quadrantLayout', () => {
     }
     expect(boxes.length + l.hiddenLabels).toBe(20);
     expect(l.hiddenLabels).toBeGreaterThan(0); // the crowd really did collide — the test exercised the drop
+  });
+});
+
+describe('quadrantLayout with a view (IB-137)', () => {
+  const big = { width: 600, height: 400 };
+  const bulk = { xMin: -5, xMax: 5, yMin: -5, yMax: 5 };
+  const crowd = [row('A', 1, 1, 4e9), row('B', -2, 3, 3e9), row('C', 2, -2, 2e9), row('D', -1, -1, 1e9)];
+
+  it('a coin beyond the view is drawn ON THE EDGE at its clamped position, sign kept, as an arrow with its true values', () => {
+    const l = quadrantLayout([...crowd, row('TRUMP', 38, 12, 5e8)], big, bulk);
+    const t = l.dots.find((d) => d.row.base === 'TRUMP')!;
+    expect([t.cx, t.cy]).toEqual([l.right, l.top]); // top-right corner: price up, OI up
+    expect(t.pin).toEqual({ dx: 1, dy: 1, angle: -45 });
+    expect(t.r).toBe(PIN_R);
+    expect(t.label?.text).toBe('TRUMP +38 % / +12 %');
+    expect(l.pinned).toBe(1);
+    // the label sits INSIDE the chart (inward of the right edge)
+    expect(t.label!.box.x + t.label!.box.w).toBeLessThanOrEqual(big.width);
+  });
+
+  it('pinned on one axis only: the other stays where it is; each direction gets its arrow', () => {
+    const l = quadrantLayout([...crowd, row('L', -40, 2, 1e8), row('Dn', 1, -30, 1e8)], big, bulk);
+    const at = (b: string) => l.dots.find((d) => d.row.base === b)!;
+    expect(at('L').pin).toEqual({ dx: -1, dy: 0, angle: 180 });
+    expect(at('L').cx).toBe(l.left);
+    expect(at('L').cy).toBeCloseTo(l.top + ((5 - 2) / 10) * (l.bottom - l.top));
+    expect(at('Dn').pin).toMatchObject({ dx: 0, dy: -1, angle: 90 });
+    expect(at('Dn').cy).toBe(l.bottom);
+    expect(at('A').pin).toBeNull();
+  });
+
+  it('pinned labels win collisions: an in-box coin whose label wants the same spot yields it', () => {
+    // OUT is pinned to the right edge at OI 0; its only spot inside the chart is to its LEFT, which
+    // is exactly where Q's (bigger, so first by OI) label would go. Placed by OI alone, OUT would lose.
+    const q = row('Q', -5 + ((430 - 28) / 544) * 10, 0, 1e9);
+    const l = quadrantLayout([q, row('OUT', 30, 0, 1)], big, bulk);
+    const at = (b: string) => l.dots.find((d) => d.row.base === b)!;
+    expect(at('OUT').label?.anchor).toBe('end');
+    expect(at('Q').label?.anchor).toBe('end'); // Q moved its label to its own left
+  });
+
+  it('the dots stay in OI order whatever the label order (the keyboard walks them in that order)', () => {
+    const l = quadrantLayout([...crowd, row('TRUMP', 38, 12, 5e8)], big, bulk);
+    expect(l.dots.map((d) => d.row.base)).toEqual(['A', 'B', 'C', 'D', 'TRUMP']);
+  });
+
+  it('zero outside the view: its axis is clamped to the edge and flagged out; the origin is not in view', () => {
+    const l = quadrantLayout(crowd, big, { xMin: 0.5, xMax: 2.5, yMin: -3, yMax: 3 });
+    expect([l.x0In, l.y0In, l.originIn]).toEqual([false, true, false]);
+    expect(l.x0).toBe(l.left);
+    const all = quadrantLayout(crowd, big, bulk);
+    expect([all.x0In, all.y0In, all.originIn]).toEqual([true, true, true]);
+    expect([all.x0, all.y0]).toEqual([300, 200]);
+  });
+
+  it('dots keep their size when the view changes (a data domain, not a CSS scale)', () => {
+    const a = quadrantLayout(crowd, big, bulk);
+    const b = quadrantLayout(crowd, big, { xMin: -2.5, xMax: 2.5, yMin: -3.5, yMax: 3.5 });
+    expect(b.dots.map((d) => d.r)).toEqual(a.dots.map((d) => d.r));
+  });
+});
+
+describe('quadrantLink (IB-137 = R4\'s link, IB-BUG-023)', () => {
+  it('/instrument/<SYM> at the start of the period the dot measures, marked as a period start', () => {
+    expect(quadrantLink('TRUMPUSDT', 1_800_000_000, '24h')).toEqual({ commands: ['/instrument', 'TRUMPUSDT'], queryParams: { at: 1_800_000_000 - 86_400, span: '24h' } });
+    expect(quadrantLink('BTCUSDT', 1_800_000_000, '4h').queryParams.at).toBe(1_800_000_000 - 14_400);
   });
 });
 

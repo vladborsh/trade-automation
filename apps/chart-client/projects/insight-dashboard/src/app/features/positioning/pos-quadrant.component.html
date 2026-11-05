@@ -1,27 +1,74 @@
 @let l = layout();
-<svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height()" [attr.width]="width()" [attr.height]="height()"
-     role="img" [attr.aria-label]="t('positioning.quadrant.axes')">
-  <line class="axis" [attr.x1]="pad" [attr.x2]="width() - pad" [attr.y1]="l.y0" [attr.y2]="l.y0" />
-  <line class="axis" [attr.x1]="l.x0" [attr.x2]="l.x0" [attr.y1]="pad" [attr.y2]="height() - pad" />
-  <text class="corner" x="4" y="14">{{ t('insight.quadrant.new_shorts') }}</text>
-  <text class="corner end" [attr.x]="width() - 4" y="14">{{ t('insight.quadrant.new_longs') }}</text>
-  <text class="corner" x="4" [attr.y]="height() - 4">{{ t('insight.quadrant.long_closing') }}</text>
-  <text class="corner end" [attr.x]="width() - 4" [attr.y]="height() - 4">{{ t('insight.quadrant.short_closing') }}</text>
-  <text class="tick" [attr.x]="width() - pad" [attr.y]="l.y0 - 4">{{ axis(l.xMax) }}</text>
-  <text class="tick start" [attr.x]="pad" [attr.y]="l.y0 - 4">{{ axis(-l.xMax) }}</text>
-  <text class="tick start" [attr.x]="l.x0 + 4" [attr.y]="pad + 10">{{ axis(l.yMax) }}</text>
-  @for (d of l.dots; track d.row.symbol) {
-    <circle [class]="d.row.quadrant ?? 'flat'" [class.selected]="d.row.symbol === selected()" [attr.cx]="d.cx" [attr.cy]="d.cy" [attr.r]="d.r" (click)="pick(d.row.symbol)">
-      <title>{{ d.row.base }}</title>
-    </circle>
-    @if (d.label; as lb) {
-      <!-- IB-108 (§7.6): the label as the mockup's pill, in its quadrant's colour; the dot keeps OI's size -->
-      <rect [class]="'pill ' + (d.row.quadrant ?? 'flat')" [attr.x]="lb.box.x - 3" [attr.y]="lb.box.y - 1" [attr.width]="lb.box.w + 6" [attr.height]="lb.box.h + 2" rx="8" />
-      <text class="label num" [attr.x]="lb.x" [attr.y]="lb.y" [attr.text-anchor]="lb.anchor">{{ d.row.base }}</text>
+@let v = view().mode;
+<!-- IB-137: the two named views as a segmented pair, then − / + -->
+<div class="controls">
+  <div class="seg" role="group" [attr.aria-label]="t('positioning.quadrant.view.label')">
+    <button type="button" class="bulk" [class.on]="v === 'bulk'" [attr.aria-pressed]="v === 'bulk'" (click)="setView('bulk')">{{ t('positioning.quadrant.view.bulk') }}</button>
+    <button type="button" class="full" [class.on]="v === 'full'" [attr.aria-pressed]="v === 'full'" (click)="setView('full')">{{ t('positioning.quadrant.view.full') }}</button>
+  </div>
+  <button type="button" class="zoom out" [attr.aria-label]="t('positioning.quadrant.zoom.out')" [title]="t('positioning.quadrant.zoom.out')" (click)="zoomBy(zoomOut)">−</button>
+  <button type="button" class="zoom in" [attr.aria-label]="t('positioning.quadrant.zoom.in')" [title]="t('positioning.quadrant.zoom.in')" (click)="zoomBy(zoomIn)">+</button>
+</div>
+<!-- touch-action: a swipe scrolls the page unless the reader zoomed in; a pinch is always ours -->
+<div #plot class="plot" [class.pannable]="pannable()" [style.touch-action]="pannable() ? 'none' : 'pan-y'">
+  <svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height()" [attr.width]="width()" [attr.height]="height()"
+       role="group" [attr.aria-label]="t('positioning.quadrant.axes')" (click)="onChartClick($event)">
+    <rect class="bg" x="0" y="0" [attr.width]="width()" [attr.height]="height()" />
+    @if (l.y0In) {
+      <line class="axis" [attr.x1]="l.left" [attr.x2]="l.right" [attr.y1]="l.y0" [attr.y2]="l.y0" />
+    } @else {
+      <!-- zero is above or below the view: a «0» on that edge -->
+      <text class="zero" [attr.x]="l.left + 4" [attr.y]="l.y0 === l.top ? l.top - 6 : l.bottom + 16">{{ l.y0 === l.top ? '0 ↑' : '0 ↓' }}</text>
     }
+    @if (l.x0In) {
+      <line class="axis" [attr.x1]="l.x0" [attr.x2]="l.x0" [attr.y1]="l.top" [attr.y2]="l.bottom" />
+    } @else {
+      <text class="zero" [class.end]="l.x0 === l.right" [attr.x]="l.x0 === l.right ? width() - 2 : 2" [attr.y]="height() / 2">{{ l.x0 === l.right ? '0 →' : '← 0' }}</text>
+    }
+    @if (l.originIn) {
+      <text class="corner" x="4" y="14">{{ t('insight.quadrant.new_shorts') }}</text>
+      <text class="corner end" [attr.x]="width() - 4" y="14">{{ t('insight.quadrant.new_longs') }}</text>
+      <text class="corner" x="4" [attr.y]="height() - 4">{{ t('insight.quadrant.long_closing') }}</text>
+      <text class="corner end" [attr.x]="width() - 4" [attr.y]="height() - 4">{{ t('insight.quadrant.short_closing') }}</text>
+    }
+    <text class="tick" [attr.x]="l.right" [attr.y]="l.y0 - 4">{{ axis(l.domain.xMax) }}</text>
+    <text class="tick start" [attr.x]="l.left" [attr.y]="l.y0 - 4">{{ axis(l.domain.xMin) }}</text>
+    <text class="tick" [class.start]="l.x0 < l.right" [attr.x]="l.x0 < l.right ? l.x0 + 4 : l.x0 - 4" [attr.y]="l.top + 10">{{ axis(l.domain.yMax) }}</text>
+    <text class="tick" [class.start]="l.x0 < l.right" [attr.x]="l.x0 < l.right ? l.x0 + 4 : l.x0 - 4" [attr.y]="l.bottom - 2">{{ axis(l.domain.yMin) }}</text>
+    @for (d of l.dots; track d.row.symbol) {
+      <g class="dot" [class.pinned]="d.pin" [class.active]="d.row.symbol === active()" [attr.data-symbol]="d.row.symbol"
+         tabindex="0" role="link" [attr.aria-label]="d.row.base"
+         (mouseenter)="onHover(d.row.symbol)" (mouseleave)="onHover(null)"
+         (focus)="onFocus($event, d.row.symbol)" (blur)="onBlur(d.row.symbol)" (keydown.enter)="open(d.row.symbol)">
+        @if (d.pin; as p) {
+          <!-- a coin beyond the view: an outward arrow on the edge, a larger invisible target around it -->
+          <circle class="hit" [attr.cx]="d.cx" [attr.cy]="d.cy" r="14" />
+          <path [class]="'arrow ' + (d.row.quadrant ?? 'flat')" d="M-6,-6 L7,0 L-6,6 Z" [attr.transform]="'translate(' + d.cx + ' ' + d.cy + ') rotate(' + p.angle + ')'" />
+        } @else {
+          <circle [class]="d.row.quadrant ?? 'flat'" [attr.cx]="d.cx" [attr.cy]="d.cy" [attr.r]="d.r" />
+        }
+        <title>{{ d.row.base }}</title>
+      </g>
+      @if (d.label; as lb) {
+        <!-- IB-108 (§7.6): the label as the mockup's pill, in its quadrant's colour; the dot keeps OI's size -->
+        <rect [class]="'pill ' + (d.row.quadrant ?? 'flat')" [attr.x]="lb.box.x - 3" [attr.y]="lb.box.y - 1" [attr.width]="lb.box.w + 6" [attr.height]="lb.box.h + 2" rx="8" />
+        <text class="label num" [class.pinned]="d.pin" [attr.x]="lb.x" [attr.y]="lb.y" [attr.text-anchor]="lb.anchor">{{ lb.text }}</text>
+      }
+    }
+  </svg>
+  @if (tip(); as tp) {
+    <div class="tip" role="tooltip" [class.flip]="tp.flipX" [class.above]="tp.above" [style.left.px]="tp.x" [style.top.px]="tp.y">
+      <span class="tip-text">{{ tp.text }}</span>
+      @if (!hover) {
+        <a class="open" [routerLink]="tp.link.commands" [queryParams]="tp.link.queryParams">{{ t('positioning.quadrant.open') }}</a>
+      }
+    </div>
   }
-</svg>
-<p class="muted">{{ detail() ?? t('positioning.quadrant.tap') }}</p>
+</div>
+<p class="muted">{{ hover ? t('positioning.quadrant.hint.pointer') : t('positioning.quadrant.hint.touch') }}</p>
+@if (l.pinned > 0) {
+  <p class="muted">{{ t('positioning.quadrant.pinned', { count: l.pinned }) }}</p>
+}
 <p class="muted">{{ t('positioning.quadrant.axes') }}</p>
 @if (l.unplaced > 0) {
   <p class="muted">{{ t('positioning.quadrant.unplaced', { count: l.unplaced }) }}</p>

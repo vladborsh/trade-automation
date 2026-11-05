@@ -10,7 +10,7 @@
 @if (data(); as d) {
   <!-- IB-108 (§7.6): the same card, tokens and heading row as Market -->
   <app-card [heading]="t('positioning.quadrant.title')">
-    <app-pos-quadrant [rows]="d.rows" [maxHeight]="quadrantMaxHeight" />
+    <app-pos-quadrant [rows]="d.rows" [asOf]="d.asOf" [period]="d.period" [maxHeight]="quadrantMaxHeight" />
   </app-card>
   <app-card [heading]="t('positioning.table.title')">
     <!-- IB-136: the ticker search, in the URL as ?q=; a query shows every match (no phone limit). First in

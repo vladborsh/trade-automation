@@ -1,10 +1,34 @@
 /* Dark-terminal palette (AGENTS.md). The quadrant's colour is the reading: longs building green,
    shorts building red, closings muted versions of the side that is leaving. */
 :host { display: block; min-width: 0; }
-.chart { display: block; }
+
+/* IB-137: the view controls — the segmented pair as the period switch draws it (IB-106), then − / + */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--seg-border); border-radius: var(--seg-radius); overflow: hidden; }
+button {
+  min-height: var(--touch-min); /* IB-088: touch targets ≥ 40 px */
+  min-width: var(--touch-min);
+  padding: var(--seg-pad);
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--seg-border); }
+.seg button.on { background: var(--seg-active-bg); color: var(--color-text); font-weight: 600; }
+button.zoom { border: 1px solid var(--seg-border); border-radius: var(--seg-radius); padding: 0; font-size: 18px; line-height: 1; }
+button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+.plot { position: relative; }
+.plot.pannable { cursor: grab; }
+.chart { display: block; user-select: none; -webkit-user-select: none; }
+.bg { fill: transparent; }
 .axis { stroke: var(--card-border); }
 .corner { fill: #8b949e; font-size: 12px; }
 .corner.end { text-anchor: end; }
+.zero { fill: #8b949e; font-size: 12px; }
+.zero.end { text-anchor: end; }
 .tick { fill: #8b949e; font-size: 12px; text-anchor: end; }
 .tick.start { text-anchor: start; }
 /* IB-108: pills — teal for new longs, red for new shorts, grey for the closings and flat */
@@ -12,12 +36,49 @@
 .pill { pointer-events: none; fill: var(--gray-400); }
 .pill.new_longs { fill: var(--color-up); }
 .pill.new_shorts { fill: var(--color-down); }
-circle { cursor: pointer; fill-opacity: 0.6; stroke-width: 1; }
+.dot { cursor: pointer; outline: none; }
+.dot circle { fill-opacity: 0.6; stroke-width: 1; }
 circle.new_longs { fill: #26a69a; stroke: #26a69a; }
 circle.new_shorts { fill: #ef5350; stroke: #ef5350; }
 circle.long_closing { fill: #8b949e; stroke: #ef5350; }
 circle.short_closing { fill: #8b949e; stroke: #26a69a; }
 circle.flat { fill: #6e7681; stroke: #6e7681; }
-circle.selected { stroke: #c9d1d9; stroke-width: 2; }
+.dot circle.hit { fill: transparent; stroke: none; }
+/* a pinned coin: an arrow pointing off the view, in its quadrant's colour */
+.arrow { fill: #6e7681; stroke: none; }
+.arrow.new_longs { fill: #26a69a; }
+.arrow.new_shorts { fill: #ef5350; }
+.arrow.long_closing, .arrow.short_closing { fill: #8b949e; }
+.dot.active circle:not(.hit), .dot:focus-visible circle:not(.hit) { stroke: #c9d1d9; stroke-width: 2; }
+.dot.active .arrow, .dot:focus-visible .arrow { stroke: #c9d1d9; stroke-width: 1.5; }
+
+/* the numbers of the active coin, beside it; flipped so it stays inside the chart */
+.tip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(10px, 10px);
+  max-width: 240px;
+  padding: 8px 10px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font: var(--type-small);
+  pointer-events: auto;
+}
+.tip.flip { transform: translate(calc(-100% - 10px), 10px); }
+.tip.above { transform: translate(10px, calc(-100% - 10px)); }
+.tip.flip.above { transform: translate(calc(-100% - 10px), calc(-100% - 10px)); }
+.tip-text { display: block; }
+.open {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  color: var(--link);
+  text-decoration: none;
+  font-weight: 600;
+}
+.open:focus-visible { text-decoration: underline; }
+
 p { margin: 6px 0 0; font: var(--type-small); }
 .muted { color: #8b949e; }
