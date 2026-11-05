@@ -39,8 +39,9 @@ import { QUIET_MS, WINDOW_MS, bestPerHour, quietAt, scanSide, statsAt, type LiqP
  *
  * Boot: the cursor starts 35 min back (one quiet period + one window), so a cascade the process slept
  * through is journalled late (L6), and the quiet periods of alerts sent before a restart are honoured.
- * Crossings journalled before IB-143 carry no `eventAt`: they are placed in time order and remembered by id for
- * the process's life (`assigned`), so a replay from a clean start places them exactly as new ones.
+ * Crossings journalled before IB-143 carry no `eventAt`: they are placed in time order like new ones. The grouping
+ * reads 65 min of crossings and acts on events of the last 35 min, so an event's opener is always in the read: a
+ * read that starts mid-event can only misplace rows of an event older than any it acts on.
  * A near-miss hour that a restart cut in two is judged on the evaluated part only.
  */
 export interface LiqAlertLoopPorts {
@@ -103,8 +104,6 @@ export class LiqAlertLoop {
    * dropped at the flush in favour of the hour's next best.
    */
   private readonly nearMisses = new Map<string, { symbol: string; side: LiqSide; thresholdUsd: number; hour: number; candidates: NearMissCandidate[] }>();
-  /** Journal id → event T0, for crossings written before IB-143 (no `eventAt`); see the module comment. */
-  private readonly assigned = new Map<number, number>();
   /** Venue status, read at most once a tick and only when a row needs it. */
   private status: VenueStatus | null = null;
 
@@ -219,8 +218,6 @@ export class LiqAlertLoop {
     const { store, source } = this.ports;
     const journal = (await store.journal(source, nowMs - EVENT_LOOKBACK_MS)).filter((j) => j.at <= nowMs);
     report.reads++;
-    const live = new Set(journal.filter((j) => j.event === 'alert').map((j) => j.id));
-    for (const id of this.assigned.keys()) if (!live.has(id)) this.assigned.delete(id);
 
     const sides = LIQ_SIDES.map((side) => this.sideState(side, journal, pending));
     const need = sides.flatMap((x) => x.need);
@@ -272,7 +269,7 @@ export class LiqAlertLoop {
     const alerts = own.filter((j) => j.event === 'alert');
     const newOnes = pending.filter((p) => p.side === side);
     const rows: CrossingRow[] = [
-      ...alerts.map((j) => ({ key: `id:${j.id}`, symbol: j.symbol, at: j.at, eventAt: j.eventAt ?? this.assigned.get(j.id) ?? null })),
+      ...alerts.map((j) => ({ key: `id:${j.id}`, symbol: j.symbol, at: j.at, eventAt: j.eventAt })),
       ...newOnes.map((p) => ({ key: `new:${p.coin.symbol}:${p.at}`, symbol: p.coin.symbol, at: p.at, eventAt: null })),
     ];
     const final = (t0: number): boolean => {
@@ -296,8 +293,6 @@ export class LiqAlertLoop {
       if (m.key.startsWith('new:')) {
         const p = x.pending.find((q) => `new:${q.coin.symbol}:${q.at}` === m.key) as Pending;
         await this.journalAlert(p, event.t0, settings, nowMs, report);
-      } else if (m.eventAt === null) {
-        this.assigned.set(Number(m.key.slice(3)), event.t0);
       }
     }
     if (event.t0 <= nowMs - BOOT_LOOKBACK_MS) return; // older than any boot look-back: decided before, or never

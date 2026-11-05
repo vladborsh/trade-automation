@@ -103,8 +103,8 @@ export function phases(t0: number, members: readonly CrossingRow[], times: Print
 export function groupEvents(rows: readonly CrossingRow[], times: PrintTimes, nowMs: number, decided: ReadonlyMap<number, DecidedEvent>): LiqEvent[] {
   const sorted = [...rows].sort((a, b) => a.at - b.at || a.symbol.localeCompare(b.symbol) || a.key.localeCompare(b.key));
   const byT0 = new Map<number, CrossingRow[]>();
+  // closed at `a` when its close (capped at T0 + 30 min by `phases`) is at or before `a`
   const openAt = (t0: number, members: readonly CrossingRow[], a: number): boolean => {
-    if (a >= t0 + EVENT_MAX_MS) return false;
     const { close } = phases(t0, members, times, a, decided.get(t0));
     return close === null || a < close.at;
   };
