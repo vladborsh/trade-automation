@@ -9,8 +9,9 @@
 # → no, 501 → yes; /healthz the same as memory); one message per reason per deploy; nothing sent on
 # CLEAN; SUPERSEDED wins over an alarm already sent (which stays sent); a watch stopped any other way
 # leaves no verdict; the files are written at every sample; the token is on curl's stdin only — never
-# in argv, stdout, stderr (the systemd journal is exactly those two) or the files. Checks 3–5 are
-# warnings, never alarms; the OI-loop expectation covers only closes inside the window plus the lag.
+# in argv, stdout, stderr (the systemd journal is exactly those two) or the files. An over-send and a
+# missing owed OI evaluation are alarms (TL review); error lines and the Σ sent mismatch are warnings only;
+# the OI-loop expectation covers only closes inside the window plus the lag.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -124,13 +125,35 @@ case_is build-sha-missing "$(seven '{"build_sha": ""}' "$G" "$G" "$G" "$G" "$G" 
 
 case_is two-reasons "$(seven "$G" '{"mem.swap_mb": 600}' '{"mem.swap_mb": 600, "mem.available_mb": 90}' '{"mem.available_mb": 90}' "$G" "$G" "$G")" ALARM:swap_high,memory_low 2
 
-# Checks 3–5: warnings in the files, never an alarm, never a message.
-case_is warnings "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"log.errors": 2, "log.first_errors": ["boom", "bang"], "db.eligible": 1, "db.alerts": [{"id": 7, "recipients": 2}], "db.last_fired": 1}')" CLEAN 0
-check "warnings: error lines, recipients > eligible, Σ sent mismatch — and no OI warning when every evaluation was logged" \
-  "grep -q 'error_lines: 2 (first: boom | bang)' '$work/warnings/out/$SHA.md' && grep -q 'alert 7: 2 > 1' '$work/warnings/out/$SHA.md' \
-   && grep -q 'Σ recipients 2 ≠ Σ «sent» 0' '$work/warnings/out/$SHA.md' && ! grep -q 'oi_evaluation_missing' '$work/warnings/out/$SHA.md'"
-case_is oi-missing "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"log.oi": []}')" CLEAN 0
-check "oi-missing: every owed evaluation is named" "grep -q 'oi_evaluation_missing: 15m @' '$work/oi-missing/out/$SHA.md' && grep -q ', 4h @' '$work/oi-missing/out/$SHA.md'"
+# Error lines and the Σ sent mismatch: warnings in the files, never an alarm, never a message.
+case_is warnings "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"log.errors": 2, "log.first_errors": ["boom", "bang"], "db.eligible": 2, "db.alerts": [{"id": 7, "recipients": 2}], "db.last_fired": 1}')" CLEAN 0
+check "warnings: error lines and Σ sent mismatch listed; recipients == eligible is no over-send" \
+  "grep -q 'error_lines: 2 (first: boom | bang)' '$work/warnings/out/$SHA.md' && grep -q 'Σ recipients 2 ≠ Σ «sent» 0' '$work/warnings/out/$SHA.md'"
+
+# alert_oversend: recipients > eligible members → ALARM; == is the boundary (the warnings case above).
+O='{"db.eligible": 1, "db.alerts": [{"id": 7, "recipients": 2}], "db.last_fired": 1}'
+case_is oversend "$(seven "$G" "$G" "$G" "$O" "$O" "$O" "$O")" ALARM:alert_oversend 1
+check "oversend: the message names the alert, both figures and the opt-out caveat" \
+  "grep -q '№7 — 2; подписано 1' '$work/oversend/curl-args' && grep -q 'Если кто-то отписался за эти полчаса, тревога ложная' '$work/oversend/curl-args'"
+
+# oi_loop_missing: an owed evaluation line absent → ALARM (once, though it stays missing).
+case_is oi-missing "$(seven "$G" "$G" "$G" '{"log.oi": []}' '{"log.oi": []}' '{"log.oi": []}' '{"log.oi": []}')" ALARM:oi_loop_missing 1
+check "oi-missing: the message names the owed evaluations" "grep -q 'цикл OI-сигналов молчит: нет проверки 15m за' '$work/oi-missing/curl-args' && grep -q '4h за' '$work/oi-missing/curl-args'"
+check "oi-missing: OI_ALERTS_LOOP_ENABLED=false owes nothing → CLEAN" "[ \"\$(fixtures oi-off '[{\"log.oi\": []}, {\"log.oi\": []}, {}, {}, {}, {}, {}]'; d='$work/oi-off'; mkdir -p \$d; \
+  printf \"OI_ALERTS_LOOP_ENABLED='false'\\n\" >\$d/env; PATH='$work/bin':\$PATH WATCH_FAKE_SAMPLES='$work/oi-off.samples.json' WATCH_INTERVAL=0 WATCH_DIR=\$d/out \
+  WATCH_ENV_FILE=\$d/env DEPLOY_DIR=\$d STUB_CURL_ARGS=\$d/curl-args STUB_CURL_STDIN=\$d/curl-stdin python3 -I '$WATCH' watch --tag sha-$SHA </dev/null >/dev/null 2>&1; \
+  python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"verdict\"])' \$d/out/$SHA.json)\" = CLEAN ]"
+check "oi-missing boundary (pure): boot 14:13:13, the 14:30 line absent → silent at 14:40:59, ALARM at 14:41:00; no 4h close owed" "[ \"\$(python3 -I - '$WATCH' <<'PY'
+import importlib.util, sys
+from datetime import datetime, timezone
+spec = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
+T = lambda h, m, s=0: datetime(2026, 11, 5, h, m, s, tzinfo=timezone.utc).timestamp()
+boot = T(14, 13, 13)
+oi = [{'tf': tf, 'bar_close': int(c), 'found': 0, 'sent': 0, 'at': None} for tf, c in (('15m', T(14, 0)), ('15m', T(14, 15)), ('1h', T(14, 0)), ('4h', T(12, 0)))]
+s = [{'bot': {'id': 'a', 'state': 'running', 'restarts': 0, 'started_at': 'x', 'started_epoch': boot}, 'log': {'oi': oi, 'cookie_lines': 0}}]
+print(sorted(w.alarms_at(s, 0, 'x', T(14, 40, 59)).keys() - {'build_sha_mismatch'}), sorted(w.alarms_at(s, 0, 'x', T(14, 41)).keys() - {'build_sha_mismatch'}))
+PY
+)\" = \"[] ['oi_loop_missing']\" ]"
 case_is send-in-flight "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"db.alerts": [{"id": 8, "recipients": 1}], "db.last_fired": 9999999999}')" CLEAN 0
 check "send-in-flight: an alert newer than the last evaluation line is not a mismatch yet" "! grep -q 'oi_sent_mismatch' '$work/send-in-flight/out/$SHA.json'"
 

@@ -21,8 +21,9 @@
 #
 # ALARM (the existing rollback rule, unchanged): MemAvailable < 100 MB on 2 ADJACENT samples; swap
 # > 500 MB; any restart or OOM (or the container not running); /healthz failing on 2 adjacent samples;
-# any raw cookie line; a BUILD_SHA mismatch. Checks 3, 4, 5 never alarm: their findings are WARNINGS
-# in the files (the spec's alarm list is the rollback rule, and these are not rollback reasons).
+# any raw cookie line; a BUILD_SHA mismatch. Plus two from check 5 (TL review, IB-139): an alert sent to more
+# members than are eligible (`alert_oversend`), and an owed OI evaluation line missing (`oi_loop_missing`:
+# the loop is dead or stuck). Error lines and the Σ sent mismatch stay WARNINGS in the files.
 #
 # Outputs (written after EVERY sample, so a lost watch still shows how far it got):
 #   /var/log/insight-watch/<sha12>.json — samples, alarms, warnings, verdict (null while running)
@@ -245,10 +246,24 @@ def adjacent(samples, i, bad):
     return i >= 1 and bad(samples[i]) and bad(samples[i - 1])
 
 
-def alarms_at(samples, i, expected_sha):
-    """The alarm reasons firing at sample i: {reason: plain-Russian detail}. Pure."""
+def alarms_at(samples, i, expected_sha, now, loop_enabled=True):
+    """The alarm reasons firing at sample i (taken at `now`): {reason: plain-Russian detail}. Pure."""
     s, base = samples[i], samples[0]
     out = {}
+    log, db = s.get('log'), s.get('db')
+    boot = (s.get('bot') or {}).get('started_epoch')
+    if log is not None and boot and loop_enabled:
+        seen = {(o['tf'], o['bar_close']) for o in log['oi']}
+        missing = [e for e in expected_evaluations(boot, now) if e not in seen]
+        if missing:
+            out['oi_loop_missing'] = 'цикл OI-сигналов молчит: нет проверки %s — сигналы участникам не уходят' % (
+                ', '.join('%s за %s' % (tf, utc(c)[11:16]) for tf, c in missing))
+    if db and db.get('eligible') is not None:
+        over = [a for a in db['alerts'] if a['recipients'] > db['eligible']]
+        if over:
+            out['alert_oversend'] = ('OI-сигнал разослан большему числу людей, чем подписано сейчас (%s; подписано %d). '
+                                     'Если кто-то отписался за эти полчаса, тревога ложная') % (
+                ', '.join('№%d — %d' % (a['id'], a['recipients']) for a in over), db['eligible'])
     low = lambda x: x.get('mem', {}).get('available_mb') is not None and x['mem']['available_mb'] < MEM_LOW_MB
     if adjacent(samples, i, low):
         out['memory_low'] = 'свободной памяти %d и %d МБ два замера подряд (порог %d МБ)' % (
@@ -291,24 +306,15 @@ def expected_evaluations(boot, now):
     return out
 
 
-def warnings_at(s, now, loop_enabled):
-    """Checks 3, 4 (recorded) and 5 (OI loop + sends): findings, never alarms. Cumulative: the last
+def warnings_at(s):
+    """Error lines (check 3) and the Σ sent mismatch (check 5): findings, never alarms. Cumulative: the last
     sample's list is the watch's."""
     out = []
     log = s.get('log')
     if log and log['errors']:
         out.append('error_lines: %d (first: %s)' % (log['errors'], ' | '.join(log['first_errors'])))
-    boot = (s.get('bot') or {}).get('started_epoch')
-    if log is not None and boot and loop_enabled:
-        seen = {(o['tf'], o['bar_close']) for o in log['oi']}
-        missing = [e for e in expected_evaluations(boot, now) if e not in seen]
-        if missing:
-            out.append('oi_evaluation_missing: ' + ', '.join('%s @%s' % (tf, utc(c)) for tf, c in missing))
     db = s.get('db')
     if db and log is not None:
-        over = [a for a in db['alerts'] if db['eligible'] is not None and a['recipients'] > db['eligible']]
-        if over:
-            out.append('oi_recipients_over_eligible: ' + ', '.join('alert %d: %d > %d' % (a['id'], a['recipients'], db['eligible']) for a in over))
         last_line = max([o['at'] for o in log['oi'] if o['at']] or [0])
         if db['last_fired'] is None or db['last_fired'] <= last_line:  # else an evaluation is mid-flight
             sent = sum(o['sent'] for o in log['oi'])
@@ -431,7 +437,7 @@ class Watch:
             raw = probe(self.deploy_start)
         raw.update({'i': i, 't_min': int(round(i * INTERVAL / 60.0)), 'time': utc(t), 'seconds': round(time.time() - t, 2)})
         self.doc['samples'].append(raw)
-        for reason, detail in sorted(alarms_at(self.doc['samples'], i, self.sha).items()):
+        for reason, detail in sorted(alarms_at(self.doc['samples'], i, self.sha, t, self.loop_enabled).items()):
             if any(a['reason'] == reason for a in self.doc['alarms']):
                 continue  # one message per reason per deploy
             text = 'Инсайт: тревога после выкладки %s: %s. Откат пока не делали — решает Tech Lead. Команда отката: %s' % (
@@ -439,7 +445,7 @@ class Watch:
             self.doc['alarms'].append({'reason': reason, 'at': raw['time'], 'sample': i, 'detail': detail,
                                        'telegram': send_owner(text, self.dry_run)})
             say('ALARM %s: %s' % (reason, detail))
-        self.doc['warnings'] = warnings_at(raw, t, self.loop_enabled)
+        self.doc['warnings'] = warnings_at(raw)
         self.write()
 
     def finish(self, state):
