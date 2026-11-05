@@ -56,17 +56,19 @@ Null is honest: "no series in hand".
 |---|---|---|---|
 | BTC OI | `OiLsService.openInterest(btc, now − 7 d, now)`: the IB-080 path, period 1 h, 168 points, USD (`sumOpenInterestValue`, the tile's own unit) | `/futures/data`, **weight 0**; its own 300 s cache, so ≤ 1 request per 5 min of the endpoint's 1 000 | 168 points |
 | BTC funding | The **positioning baseline's** 30-day settled funding for BTC (`PositioningService`, refreshed hourly, Binance `/fapi/v1/fundingRate`); the last 21 settlements. **Not "our tape": funding is not stored (storage ruling S1).** The baseline must keep each settlement's **time** next to its rate (today `fundingSettled: number[]`). | **0 new calls** (the baseline is already paid for) | + one timestamp per settlement: 30 coins × 90 × 8 B ≈ 22 KB |
-| Market cap | **There is no keyless 7-day history.** CoinGecko's `/global/market_cap_chart` is paid (`env.schema.ts`; context ruling). `market_chart` is per coin, and a sum of coins is a different number, so it is not used. **Decision: an in-memory ring.** A 10-minute sampler reads `MarketCardsService.global()` (its 120 s cache, so 0 extra calls while anyone is on the page) and appends `total_market_cap.usd` to a ring of 1 008 slots (7 days). | CoinGecko ≤ 0.1 call/min when nobody is viewing, 0 otherwise | 1 008 × 16 B ≈ 16 KB |
+| Market cap | **There is no keyless 7-day history.** CoinGecko's `/global/market_cap_chart` is paid (`env.schema.ts`; context ruling). `market_chart` is per coin, and a sum of coins is a different number, so it is not used. **Decision (owner ruling 2026-11-05, replacing the in-memory ring): we record it ourselves** in a table, `market_cap_total` (below). The tile reads the last 7 days from it. | CoinGecko `/global`: one call per 10 min from the writer, shared with the cards' 120 s cache, so **≤ 0.1 call/min** | DB: ≈ 3 MB a year; memory: one 7-day read (≤ 1 008 rows) per KPI compute, inside the 60 s cache |
 
-**The ring is lost on every restart.** With several deploys a day it will seldom hold 7 days. The tile says so, never pads:
-- under 6 h collected: no chart, «копим историю: {h} ч»;
-- otherwise: the chart over what is held, with the span named («за {d} д {h} ч»), and min/max over that span.
-
-**Owner's call, flagged, not in the task:** keeping one row per 10 min in Postgres (≈ 1 000 rows a week, ≈ 3 MB a year) would give a full 7 days across deploys. It fits the storage rule's own test ("the box stores what the venue forgets"; keyless CoinGecko forgets this). The brief said "no DB growth", so the ring is the default.
+**`market_cap_total`** (amended 2026-11-05, owner: «записываем сами»):
+- **Table:** `ts timestamptz primary key` (CoinGecko's own `updated_at`, so two polls of the same refresh collapse onto one row), `total_usd numeric not null check (total_usd > 0)`, `fetched_at timestamptz not null`. Not partitioned.
+- **Migration 029**, the next free number across every ref on 2026-11-05 (re-check at commit). The table `market_cap_global`, dropped in 024, is **not** revived: it held dominance and a different key, and a new name keeps 024's history readable.
+- **Writer cadence:** a timer every **10 min**, independent of viewers, reads `MarketCardsService.global()` (its 120 s cache) and upserts on `ts`. A failed read writes nothing and logs once; the next tick retries.
+- **Retention: none.** 52 560 rows a year at ≈ 60 B ≈ **3 MB a year** (arithmetic; the report gives `pg_total_relation_size` after a day). Keyless CoinGecko cannot give this back, which is the storage rule's own test (`storage-ruling-2026-11-03.md` §1). Revisit only if it ever passes 50 MB.
+- **Reading:** the tile reads `ts > now − 7 d`. **A gap over 30 min breaks the line**, never interpolated. Min/max are over the rows held.
+- **A fresh database:** under 6 h of rows, no chart, «копим историю: {h} ч». Under 7 days, the chart over what is held, with the span named («за {d} д {h} ч»). From then on, deploys no longer reset it.
 
 **Total for item 2:**
 - Binance `fapi` weight +0; `/futures/data` ≤ 1 per 5 min; CoinGecko ≤ 0.1/min;
-- memory ≈ 40 KB;
+- memory ≈ 25 KB (funding times + OI points); DB: `market_cap_total`, ≈ 3 MB a year (the round's one new table);
 - `KpisService` keeps its 60 s cache, and the tiles' history rides in the same response.
 
 ## 3. Item 1: insight cards with a real chart (IB-119)
@@ -175,4 +177,4 @@ The coordinator's order, WIP 2, a fresh dev context per task:
 **Budget of the round, all items:**
 - Binance `fapi` ≤ ≈ 1.2 weight/min while pages are open (R4); `/futures/data` a few calls per 5 min at weight 0; CoinGecko ≤ 0.1/min;
 - memory well under 1 MB;
-- DB: reads only, no new table.
+- DB: one new table, `market_cap_total` (≈ 3 MB a year, migration 029); everything else reads only.
