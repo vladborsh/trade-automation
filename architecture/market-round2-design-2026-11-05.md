@@ -119,7 +119,7 @@ The axis ticks and scales are a **pure client helper** (`insight-chart.geometry.
 
 ## 4. Item 4: the `/liquidations` page (IB-120)
 
-**Market block.** Unchanged at 8 cards. «Показать все (50)» becomes a router link «Все ликвидации ({n}) →» to `/liquidations?p=<current period>`.
+**Market block.** Unchanged at 8 cards. «Показать все (50)» becomes a router link «Все ликвидации →» to `/liquidations?p=<current period>` (no count: amended 2026-11-05, IB-120 review).
 
 **The page:**
 - a breadcrumb «Рынок / Крупные ликвидации»;
@@ -131,7 +131,7 @@ The axis ticks and scales are a **pure client helper** (`insight-chart.geometry.
   - minimum `$100K | $1M`;
   - side (both, longs, shorts);
   - venue (all, or one);
-- a table sorted by time (newest first), sortable on every column: time, coin, side, sum, price, venue, series («{count} за {min} мин» from `seriesCount` / `seriesSpanSec`, «—» when not in a series);
+- a table sorted by time (newest first), sortable on every column: time, coin, side, sum, price, venue, series («{count} за {min} мин» from `seriesCount` / `seriesSpanSec`, «—» when not in a series). **A series is market-wide** (all coins together, the same grouping as R3 and the Market block), not per coin; the help text says so (amended 2026-11-05, IB-120 review, mockup.html corrected by dev-1);
 - each row opens `/instrument/<SYM>?at=<time>`;
 - **at 390 px the table drops price and venue.**
 
