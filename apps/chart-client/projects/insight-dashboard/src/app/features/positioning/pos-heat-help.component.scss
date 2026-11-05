@@ -6,7 +6,11 @@
 .help-list li { margin: 4px 0; }
 .help-list b { color: var(--color-text-strong); }
 .levels { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
-.level { white-space: nowrap; }
+/* IB-BUG-041: a level may wrap, its swatch kept beside the first line. `nowrap` here pushed the ru
+   «оценить нельзя — данных мало или нет» 8 px past a 320 px screen, and the phone widened the page. */
+.level { display: inline-flex; align-items: baseline; max-width: 100%; }
+/* a swatch has no text, so baseline alignment puts its bottom on the baseline; -2 px is the old vertical-align */
+.level .sw { flex: none; margin-bottom: -2px; }
 .sw {
   display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px;
   border: 1px solid #30363d;

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import type { WebPositioningRow } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
@@ -6,6 +6,7 @@ import type { StringKey } from '../../i18n/keys';
 import { formatUsd } from '../liquidations/liquidations.format';
 import { HEAT_COLUMNS, heatRow, PHONE_HEAT_LIMIT, type HeatColumn, type HeatRow } from './pos-layout';
 import { DEFAULT_SORT, nextSort, sortRows, type SortKey, type SortState } from './pos-sort';
+import { hasMoreRight } from './scroll-fade';
 
 /**
  * IB-090 (D9) — one row per coin: price, OI, funding, L/S crowd, L/S top traders, liquidations.
@@ -49,6 +50,32 @@ export class PosHeatComponent {
   /** On a phone the full table stops here, most unusual first, with «показать все» (the 4 900 px rule). */
   readonly phoneLimit = PHONE_HEAT_LIMIT;
   readonly expanded = signal(false);
+
+  /**
+   * IB-BUG-041: the right-edge fade. The phone hides the box's scrollbar, so without it the box's
+   * edge cuts a number in half and reads as «the table runs off the screen». Re-checked on scroll and
+   * whenever the box or the table changes width («show all», a sort, a period, a rotated phone).
+   */
+  readonly moreRight = signal(false);
+  private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
+
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const el = this.box().nativeElement;
+      this.updateFade();
+      if (typeof ResizeObserver === 'undefined') return;
+      const ro = new ResizeObserver(() => this.updateFade());
+      ro.observe(el);
+      const table = el.querySelector('table');
+      if (table) ro.observe(table);
+      destroyRef.onDestroy(() => ro.disconnect());
+    });
+  }
+
+  updateFade(): void {
+    this.moreRight.set(hasMoreRight(this.box().nativeElement));
+  }
 
   sortBy(key: SortKey): void {
     if (!this.compact()) this.sortChange.emit(nextSort(this.sort(), key));

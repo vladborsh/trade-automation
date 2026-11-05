@@ -1,5 +1,7 @@
-<!-- D16: the table scrolls inside its own box, ticker column pinned -->
-<div class="scroll" [class.expanded]="expanded() || compact()">
+<!-- D16: the table scrolls inside its own box, ticker column pinned. IB-BUG-041: the frame holds the
+     box and, beside it (not inside, so it stays put whichever way the box scrolls), the right-edge fade. -->
+<div class="frame">
+<div #box class="scroll" [class.expanded]="expanded() || compact()" (scroll)="updateFade()">
   <table>
     <thead>
       <tr>
@@ -34,6 +36,8 @@
       }
     </tbody>
   </table>
+</div>
+<div class="fade" [class.on]="moreRight()" aria-hidden="true"></div>
 </div>
 @if (!compact() && view().length > phoneLimit) {
   <button type="button" class="more" (click)="expanded.set(!expanded())">

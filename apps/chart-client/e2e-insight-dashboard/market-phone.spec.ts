@@ -67,9 +67,10 @@ async function withFngHistory(page: Page): Promise<void> {
     route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...cards, fearGreed: { ...cards.fearGreed, history: SYNTHETIC_FNG_HISTORY } }) }));
 }
 
-async function openPositioning(page: Page, url = '/positioning?p=24h'): Promise<void> {
+async function openPositioning(page: Page, url = '/positioning?p=24h', setup?: (page: Page) => Promise<void>): Promise<void> {
   await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
   await mockApi(page);
+  if (setup) await setup(page);
   await page.goto(url);
   await page.clock.runFor(2_000);
   await expect(page.locator('app-pos-heat tbody tr').first()).toBeAttached();
@@ -378,6 +379,101 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
   });
 });
 
+/**
+ * IB-BUG-041: the owner saw the positioning table «run past the right edge» at 390. Measured live on
+ * 2026-11-05 the page did NOT overflow — the table scrolled inside its box (D16) — but the box's edge
+ * cut a number in half and the phone hides the scrollbar, so nothing said «this scrolls». The fix is a
+ * right-edge fade while there is more to the right. These guard both halves: the page never scrolls
+ * sideways (with numbers longer than any real row), and the fade is there exactly while columns are
+ * hidden — the part that fails on the code before the fix.
+ */
+async function withLongNumbers(page: Page): Promise<void> {
+  const long = <T extends { value: number | null }>(c: T, value: number) => ({ ...c, value });
+  await page.route('**/api/web/market/positioning**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    ...positioning,
+    rows: positioning.rows.map((r, i) => ({
+      ...r,
+      base: i === 0 ? '1000000MOGCOIN' : r.base,
+      priceChangePct: long(r.priceChangePct, -1234.5678),
+      oiChangePct: long(r.oiChangePct, 9876.54321),
+      fundingRate: long(r.fundingRate, -0.0123456),
+      lsGlobal: long(r.lsGlobal, 12345.6789),
+      lsTopPosition: long(r.lsTopPosition, 98765.4321),
+      liqUsd: long(r.liqUsd, 987654321098.76),
+      oiUsd: 123456789012345.67,
+      signal: 'capitulation',
+    })),
+  }) }));
+}
+
+/** The table's box and its card, and the page's own width. */
+async function fit(page: Page, host: string) {
+  return page.evaluate((host) => {
+    const box = document.querySelector(`${host} app-pos-heat .scroll`)!.getBoundingClientRect();
+    const card = document.querySelector(`${host} app-pos-heat`)!.closest('app-card')!.getBoundingClientRect();
+    const table = document.querySelector(`${host} app-pos-heat table`)!.getBoundingClientRect();
+    return {
+      scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth,
+      box: { left: box.left, right: box.right }, card: { left: card.left, right: card.right }, table: table.width,
+    };
+  }, host);
+}
+
+for (const width of [390, 320]) {
+  test.describe(`IB-BUG-041 phone ${width}: the positioning table stays in its card`, () => {
+    test.use({ viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+
+    // ru too: its help legend is the longer one, and at 320 its «оценить нельзя — данных мало или нет»
+    // (white-space: nowrap) was 8 px too wide. A mobile browser then WIDENS the layout viewport to fit,
+    // so innerWidth itself reads 328 — which is why innerWidth is asserted, not only scrollWidth.
+    for (const lang of ['en', 'ru'] as const) test(`/positioning (${lang}) with long numbers: no page scroll at ${width}; the box inside its card; the table wider than the box`, async ({ page }, info) => {
+      await openPositioning(page, '/positioning?p=24h', async (p) => {
+        await withLongNumbers(p);
+        if (lang === 'ru') await p.route('**/api/web/auth/me', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ user: { ...MEMBER.user, lang: 'ru' } }) }));
+      });
+      await expect(page.locator('app-pos-heat-help details')).toHaveAttribute('open', ''); // the legend is on the page
+      await page.locator('app-pos-heat .more').click(); // every row, the widest the table gets
+      await page.clock.runFor(100);
+      const f = await fit(page, 'app-positioning-page');
+      await info.attach(`phone-${width}-positioning-long-${lang}.png`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      expect(f.innerWidth).toBe(width);
+      expect(f.scrollWidth).toBe(width);
+      expect(f.box.left).toBeGreaterThanOrEqual(f.card.left);
+      expect(f.box.right).toBeLessThanOrEqual(f.card.right);
+      expect(f.table).toBeGreaterThan(f.box.right - f.box.left); // or the assertion above proves nothing
+    });
+
+    test(`Market with long numbers: no page scroll at ${width}; the compact box inside its card`, async ({ page }) => {
+      await openMarket(page, withLongNumbers);
+      // The charts draw at hostWidth's fallback (342 px) and re-render at their box's width on the next
+      // tick; under page.clock that tick waits for the clock, and a stale 342 px chart widens a 320 px
+      // phone's layout viewport to 375 (7 of 15 runs before this line). Let the tick happen.
+      await page.clock.runFor(100);
+      const f = await fit(page, 'app-positioning-block');
+      expect(f.innerWidth).toBe(width);
+      expect(f.scrollWidth).toBe(width);
+      expect(f.box.left).toBeGreaterThanOrEqual(f.card.left);
+      expect(f.box.right).toBeLessThanOrEqual(f.card.right);
+      expect(f.table).toBeGreaterThan(f.box.right - f.box.left);
+    });
+
+    test(`/positioning at ${width}: the right-edge fade shows while columns are hidden and goes at the far right`, async ({ page }) => {
+      await openPositioning(page);
+      const box = page.locator('app-positioning-page app-pos-heat .scroll');
+      const fade = page.locator('app-positioning-page app-pos-heat .fade');
+      await expect(fade).toHaveCSS('opacity', '1');
+      // it sits on the box's right edge and never takes a tap
+      const [b, fb] = [await box.boundingBox(), await fade.boundingBox()];
+      expect(fb!.x + fb!.width).toBeCloseTo(b!.x + b!.width, 0);
+      await expect(fade).toHaveCSS('pointer-events', 'none');
+      await box.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+      await expect(fade).toHaveCSS('opacity', '0');
+      await box.evaluate((el) => { el.scrollLeft = 0; });
+      await expect(fade).toHaveCSS('opacity', '1');
+    });
+  });
+}
+
 test.describe('market page — desktop 1440×900 (IB-088)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -393,6 +489,8 @@ test.describe('market page — desktop 1440×900 (IB-088)', () => {
     const oi = await page.locator('app-pos-heat tbody tr').evaluateAll((trs) => trs.map((tr) => tr.querySelectorAll('td')[6]?.textContent?.trim()));
     expect(oi.length).toBe(positioning.rows.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+    // IB-BUG-041: the whole table fits, so there is nothing to the right and no fade
+    await expect(page.locator('app-pos-heat .fade')).toHaveCSS('opacity', '0');
     await info.attach('desktop-positioning.png', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   });
 
@@ -720,3 +818,4 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
     });
   });
 }
+

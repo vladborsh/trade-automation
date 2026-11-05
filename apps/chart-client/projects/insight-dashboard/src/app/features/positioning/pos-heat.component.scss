@@ -4,6 +4,16 @@
    up/down green/red: a rare fall and a rare rise are equally worth a look. */
 :host { display: block; min-width: 0; }
 .scroll { overflow-x: auto; max-width: 100%; }
+/* IB-BUG-041: «there is more to the right». A sibling of the box, not a child: it covers the box's
+   visible edge whatever the box's scroll position on either axis (IB-136 makes it scroll vertically
+   too). z-index 4 is above IB-136's sticky header (2) and corner cell (3); it never takes a tap. */
+.frame { position: relative; }
+.fade {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 32px;
+  background: linear-gradient(to right, transparent, var(--card-bg));
+  pointer-events: none; z-index: 4; opacity: 0; transition: opacity 150ms;
+}
+.fade.on { opacity: 1; }
 table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
 th, td { padding: 6px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--card-border); }
 thead th { color: var(--color-text-muted); font-weight: 600; font-size: 12px; }
