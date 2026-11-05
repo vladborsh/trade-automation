@@ -30,7 +30,7 @@ export const WebInsightRuleSchema = z.enum(WEB_INSIGHT_RULES);
  * - `insight.dvol_spike`       R8 {value, change}                     — BTC implied vol (DVOL) rose unusually over the period
  * - `insight.stablecoin_supply` R9 {usd, pct, days}                  — total stablecoin supply moved unusually in 1 or 7 days
  * - `insight.coinbase_premium` R10 {pct, minutes}                    — Coinbase BTC held a premium / discount most of the last hour
- * - `insight.oi_divergence`    R11 {symbol, tf, direction, pricePct, oiPct, runLength} — the newest on-time OI divergence alert of the last 24 h (IB-113)
+ * - `insight.oi_divergence`    R11 {symbol, tf, direction, kind, pricePct, oiPct, runLength} — the newest on-time OI divergence alert of the last 24 h (IB-113; `kind` regular | hidden since IB-144, V44)
  * - `insight.neutral`          the block line when nothing passes      {} (the reason is a field, not a param)
  */
 export const WEB_INSIGHT_KEYS = [

@@ -1,13 +1,13 @@
 import {
   OI_DIVERGENCE_DEFAULT_PARAMS, OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS, OiDivergenceJournalParamsSchema, OiDivergenceParamsSchema, WebAlertSymbolSchema,
-  WebOiDivergenceAlertSchema, WebOiDivergenceLineSchema, WebOiDivergenceSeriesResponseSchema,
+  OI_DIVERGENCE_KINDS, WebOiDivergenceAlertSchema, WebOiDivergenceLineSchema, WebOiDivergenceSeriesResponseSchema,
 } from '../src/insight';
 import box393Row from './fixtures/oi-divergence-alert-393.box.json';
 
 /** IB-109 — the divergence contracts: the defaults are valid, and each guard refuses what it should. */
 const point = (time: number, price: number, oi: number) => ({ time, price, oiTime: time, oi });
 const line = {
-  direction: 'bullish', a: point(1_793_700_000, 100, 1_000), b: point(1_793_790_000, 98, 1_050),
+  direction: 'bullish', kind: 'regular', a: point(1_793_700_000, 100, 1_000), b: point(1_793_790_000, 98, 1_050),
   confirmedAt: 1_793_811_600, pricePct: -2, oiPct: 5, repeat: null, firedAt: null,
 };
 
@@ -15,7 +15,8 @@ describe('OI divergence contracts (IB-109)', () => {
   it('the defaults parse: N 6/6 on 15m and 1h, 6/2 on 4h (V34), k 3, W 96/168/90 (V19), δp 0.25 × ATR, δoi 0.5 × median, line tolerances 0.25 / 0.5 (V18)', () => {
     expect(OiDivergenceParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual({
       perTf: {
-        '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 168 }, '4h': { nLeft: 6, nRight: 2, k: 3, w: 90 },
+        '15m': { nLeft: 6, nRight: 6, k: 3, w: 96, sendHidden: false }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 168, sendHidden: false },
+        '4h': { nLeft: 6, nRight: 2, k: 3, w: 90, sendHidden: false },
       },
       atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5,
     });
@@ -41,8 +42,8 @@ describe('OI divergence contracts (IB-109)', () => {
   });
 
   it('V34: settings and admin writes are strict — every TF needs nLeft and nRight (1 … 50), and an old n alone is refused', () => {
-    const withTf = (tf: Record<string, number>) => ({ ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '4h': tf } });
-    const ok = (tf: Record<string, number>) => OiDivergenceParamsSchema.safeParse(withTf(tf)).success;
+    const withTf = (tf: Record<string, number | boolean>) => ({ ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '4h': tf } });
+    const ok = (tf: Record<string, number | boolean>) => OiDivergenceParamsSchema.safeParse(withTf({ sendHidden: false, ...tf })).success;
     expect(ok({ nLeft: 6, nRight: 2, k: 3, w: 90 })).toBe(true);
     expect(ok({ n: 6, k: 3, w: 90 })).toBe(false);
     expect(ok({ nLeft: 6, k: 3, w: 90 })).toBe(false);
@@ -55,13 +56,39 @@ describe('OI divergence contracts (IB-109)', () => {
     // live alert #393 (ETHUSDT 4h) exactly as the box's journal holds it
     const box393 = box393Row.params;
     expect(OiDivergenceJournalParamsSchema.parse(box393).perTf).toEqual({
-      '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 168 }, '4h': { nLeft: 6, nRight: 6, k: 3, w: 90 },
+      '15m': { nLeft: 6, nRight: 6, k: 3, w: 96, sendHidden: false }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 168, sendHidden: false },
+      '4h': { nLeft: 6, nRight: 6, k: 3, w: 90, sendHidden: false },
     });
     const old5 = { ...box393, perTf: { ...box393.perTf, '4h': { n: 5, k: 3, w: 90 } } };
-    expect(OiDivergenceJournalParamsSchema.parse(old5).perTf['4h']).toEqual({ nLeft: 5, nRight: 5, k: 3, w: 90 });
+    expect(OiDivergenceJournalParamsSchema.parse(old5).perTf['4h']).toEqual({ nLeft: 5, nRight: 5, k: 3, w: 90, sendHidden: false });
     expect(OiDivergenceJournalParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
     expect(OiDivergenceJournalParamsSchema.safeParse({ ...box393, perTf: { ...box393.perTf, '4h': { n: 0, k: 3, w: 90 } } }).success).toBe(false);
     expect(OiDivergenceJournalParamsSchema.safeParse({ ...box393, perTf: { ...box393.perTf, '4h': { k: 3, w: 90 } } }).success).toBe(false);
+  });
+
+  it('IB-144 (V42): sendHidden is required in settings and admin writes (strict), a boolean; a journal row without it (before 033) reads false, a stored true is kept', () => {
+    const tf4h = (tf: Record<string, unknown>) => ({ ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '4h': tf } });
+    const { sendHidden: _s, ...noKey } = OI_DIVERGENCE_DEFAULT_PARAMS.perTf['4h'];
+    expect(OiDivergenceParamsSchema.safeParse(tf4h(noKey)).success).toBe(false);
+    expect(OiDivergenceParamsSchema.safeParse(tf4h({ ...noKey, sendHidden: 'yes' })).success).toBe(false);
+    expect(OiDivergenceParamsSchema.parse(tf4h({ ...noKey, sendHidden: true })).perTf['4h'].sendHidden).toBe(true);
+    // a 032-era row (nLeft/nRight, no sendHidden) and a pre-032 row (n) both read sendHidden = false
+    expect(OiDivergenceJournalParamsSchema.parse(tf4h(noKey)).perTf['4h']).toEqual({ ...noKey, sendHidden: false });
+    expect(OiDivergenceJournalParamsSchema.parse(tf4h({ n: 6, k: 3, w: 90 })).perTf['4h'].sendHidden).toBe(false);
+    expect(OiDivergenceJournalParamsSchema.parse(tf4h({ ...noKey, sendHidden: true })).perTf['4h'].sendHidden).toBe(true);
+  });
+
+  it('IB-144 (V41, V44): kind is regular | hidden, required on a line and on a journal row', () => {
+    expect([...OI_DIVERGENCE_KINDS]).toEqual(['regular', 'hidden']);
+    expect(WebOiDivergenceLineSchema.safeParse({ ...line, kind: 'hidden', pricePct: 2, oiPct: -5 }).success).toBe(true);
+    expect(WebOiDivergenceLineSchema.safeParse({ ...line, kind: 'reverse' }).success).toBe(false);
+    const { kind: _k, ...noKind } = line;
+    expect(WebOiDivergenceLineSchema.safeParse(noKind).success).toBe(false);
+    const row = { id: 1, source: 'live', symbol: 'BTCUSDT', tf: '15m', direction: 'bearish', kind: 'hidden', a: line.a, b: line.b, runOf: null, runLength: 2,
+      params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 1, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null };
+    expect(WebOiDivergenceAlertSchema.parse(row).kind).toBe('hidden');
+    const { kind: _r, ...rowNoKind } = row;
+    expect(WebOiDivergenceAlertSchema.safeParse(rowNoKind).success).toBe(false);
   });
 
   it('a line parses; a repeat must say a run of at least 3 pivots', () => {
@@ -81,7 +108,7 @@ describe('OI divergence contracts (IB-109)', () => {
   });
 
   it('a journal row: run length ≥ 2, params kept with it; an alert symbol is a venue symbol, not a base', () => {
-    const row = { id: 1, source: 'live', symbol: 'BTCUSDT', tf: '15m', direction: 'bearish', a: line.a, b: line.b, runOf: null, runLength: 2,
+    const row = { id: 1, source: 'live', symbol: 'BTCUSDT', tf: '15m', direction: 'bearish', kind: 'regular', a: line.a, b: line.b, runOf: null, runLength: 2,
       params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 1, firedAt: null, late: true, recipients: 0,
       priceAtFire: null, price4h: null, price24h: null, outcomeAt: null };
     expect(WebOiDivergenceAlertSchema.safeParse(row).success).toBe(true);
@@ -93,7 +120,7 @@ describe('OI divergence contracts (IB-109)', () => {
   });
 
   it('IB-116 (V30): a journal row says who wrote it — live or backfill; absent or anything else is refused', () => {
-    const row = { id: 1, source: 'backfill', symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', a: { time: 1, price: 2, oiTime: 1, oi: 3 }, b: { time: 2, price: 1, oiTime: 2, oi: 4 },
+    const row = { id: 1, source: 'backfill', symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', kind: 'regular', a: { time: 1, price: 2, oiTime: 1, oi: 3 }, b: { time: 2, price: 1, oiTime: 2, oi: 4 },
       runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: 3, firedAt: null, late: false, recipients: 0,
       priceAtFire: null, price4h: null, price24h: null, outcomeAt: null };
     expect(WebOiDivergenceAlertSchema.parse(row).source).toBe('backfill');

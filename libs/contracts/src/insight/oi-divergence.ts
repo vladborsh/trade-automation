@@ -6,6 +6,7 @@ import { z } from 'zod';
  *
  * - **Bullish**, on lows: price makes a lower low and OI a higher low.
  * - **Bearish**, on highs: price makes a higher high and OI a lower high.
+ * - IB-144: the **hidden** pair flips both (a higher low with lower OI; a lower high with higher OI) — `kind`.
  *
  * Every time is unix SECONDS. A bar is named by its OPEN time, as the venue's klines are.
  */
@@ -19,6 +20,17 @@ export const OI_DIVERGENCE_TF_SEC: Record<OiDivergenceTf, number> = { '15m': 900
 export const OI_DIVERGENCE_DIRECTIONS = ['bullish', 'bearish'] as const;
 export const OiDivergenceDirectionSchema = z.enum(OI_DIVERGENCE_DIRECTIONS);
 export type OiDivergenceDirection = z.infer<typeof OiDivergenceDirectionSchema>;
+
+/**
+ * IB-144 (design §11, V40–V41) — which pair a divergence is:
+ * - **regular** (V7): bullish = price LOWER low, OI higher; bearish = price HIGHER high, OI lower;
+ * - **hidden**: bullish = price HIGHER low, OI lower; bearish = price LOWER high, OI higher.
+ * Only V7's conditions (1) and (2) flip; pivots, pairing, W, the noise floors and the line checks are the same.
+ * A journal / near-miss column of its own (migration 033), part of the once-keys.
+ */
+export const OI_DIVERGENCE_KINDS = ['regular', 'hidden'] as const;
+export const OiDivergenceKindSchema = z.enum(OI_DIVERGENCE_KINDS);
+export type OiDivergenceKind = z.infer<typeof OiDivergenceKindSchema>;
 
 // -------------------------------------------------------------------------------------------------
 // Params (V5–V7): editable in the admin page, kept with every journal row
@@ -37,6 +49,12 @@ export const OiDivergenceTfParamsSchema = z.object({
   nRight: PivotReachSchema,
   k: PairReachSchema,
   w: LookbackSchema,
+  /**
+   * IB-144 (V42): whether this TF's HIDDEN alerts are sent. Detection and the journal run for hidden whatever it
+   * says; a hidden alert goes out only while `alert_settings.enabled` AND this are on. Default false (migration
+   * 033); switched on per TF by V47's guard, never by the merge. Required here (the write schema is strict).
+   */
+  sendHidden: z.boolean(),
 });
 export type OiDivergenceTfParams = z.infer<typeof OiDivergenceTfParamsSchema>;
 
@@ -46,9 +64,10 @@ export type OiDivergenceTfParams = z.infer<typeof OiDivergenceTfParamsSchema>;
  * never rewritten (each is the record of what was used). New-shape rows parse first.
  */
 const OiDivergenceJournalTfParamsSchema = z.union([
-  OiDivergenceTfParamsSchema,
+  // IB-144 (V42): a row written before migration 033 has no `sendHidden` — nothing hidden was ever sent then
+  OiDivergenceTfParamsSchema.extend({ sendHidden: z.boolean().default(false) }),
   z.object({ n: PivotReachSchema, k: PairReachSchema, w: LookbackSchema })
-    .transform(({ n, k, w }): OiDivergenceTfParams => ({ nLeft: n, nRight: n, k, w })),
+    .transform(({ n, k, w }): OiDivergenceTfParams => ({ nLeft: n, nRight: n, k, w, sendHidden: false })),
 ]);
 
 /** V18: a line tolerance multiplier. 0 is the round-1 rule (no crossing at all). */
@@ -96,14 +115,14 @@ export const OiDivergenceJournalParamsSchema = z.object({
  * on 1h** (owner, round 2, V19; was 5), 15 days on 4h. Line tolerances 0.25 × ATR14 and 0.5 × the
  * median (owner, round 2, V18). **Starting values, not measured**: IB-111 / IB-114 report counts with
  * them and the owner judges. Migration 025 seeded round 1's values; 026 brings an untouched row to
- * exactly this, and 032 splits N (`migration-026` / `migration-032.integration.spec.ts` compare the end of the chain
- * with it).
+ * exactly this, 032 splits N, and 033 adds `sendHidden: false` on every TF (IB-144, V42: merging is not a go-live)
+ * (`migration-026` / `-032` / `-033.integration.spec.ts` compare the end of the chain with it).
  */
 export const OI_DIVERGENCE_DEFAULT_PARAMS: OiDivergenceParams = {
   perTf: {
-    '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 },
-    '1h': { nLeft: 6, nRight: 6, k: 3, w: 168 },
-    '4h': { nLeft: 6, nRight: 2, k: 3, w: 90 },
+    '15m': { nLeft: 6, nRight: 6, k: 3, w: 96, sendHidden: false },
+    '1h': { nLeft: 6, nRight: 6, k: 3, w: 168, sendHidden: false },
+    '4h': { nLeft: 6, nRight: 2, k: 3, w: 90, sendHidden: false },
   },
   atrMult: 0.25,
   oiMedianMult: 0.5,
@@ -126,11 +145,13 @@ export type WebOiDivergencePoint = z.infer<typeof WebOiDivergencePointSchema>;
 
 export const WebOiDivergenceLineSchema = z.object({
   direction: OiDivergenceDirectionSchema,
+  /** IB-144 (V44): regular or hidden — the chart draws hidden dotted (a hidden repeat large-dashed). */
+  kind: OiDivergenceKindSchema,
   a: WebOiDivergencePointSchema,
   b: WebOiDivergencePointSchema,
   /** When the pair at B was confirmed: the close of bar max(B price, B OI) + nRight. */
   confirmedAt: TimeSec,
-  /** B against A, in percent: price (negative for a bullish one) and OI. */
+  /** B against A, in percent: price and OI (a regular bullish one: price negative, OI positive; hidden: the reverse). */
   pricePct: z.number(),
   oiPct: z.number(),
   /**
@@ -210,6 +231,8 @@ export const WebOiDivergenceAlertSchema = z.object({
   symbol: z.string().min(1),
   tf: OiDivergenceTfSchema,
   direction: OiDivergenceDirectionSchema,
+  /** IB-144 (V41): regular or hidden; every row before migration 033 is regular. */
+  kind: OiDivergenceKindSchema,
   a: WebOiDivergencePointSchema,
   b: WebOiDivergencePointSchema,
   /** The run's first alert, for a repeat; null otherwise. */

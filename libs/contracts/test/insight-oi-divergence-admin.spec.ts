@@ -20,8 +20,11 @@ describe('IB-112 admin alert writes', () => {
     expect(WebAlertSettingsPatchSchema.safeParse({ membersVisible: false, params: OI_DIVERGENCE_DEFAULT_PARAMS }).success).toBe(true);
     expect(WebAlertSettingsPatchSchema.safeParse({}).success).toBe(false);
     expect(WebAlertSettingsPatchSchema.safeParse({ updatedBy: 1 }).success).toBe(false);
-    const badN = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 0, nRight: 6, k: 3, w: 120 } } };
+    const badN = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 0, nRight: 6, k: 3, w: 120, sendHidden: false } } };
     expect(WebAlertSettingsPatchSchema.safeParse({ params: badN }).success).toBe(false);
+    // IB-144 (V42): the hidden switch per TF is part of the whole params — absent is refused, not defaulted
+    const { sendHidden: _s, ...noHidden } = OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'];
+    expect(WebAlertSettingsPatchSchema.safeParse({ params: { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': noHidden } } }).success).toBe(false);
   });
 
   it('refusals are a closed list', () => {
