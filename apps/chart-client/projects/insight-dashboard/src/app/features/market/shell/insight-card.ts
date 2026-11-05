@@ -2,7 +2,7 @@ import type { WebInsightBasis, WebInsightBlock, WebInsightSpark, WebInsightState
 import { venueName } from '@trade-automation/contracts';
 import type { StringKey } from '../../../i18n/keys';
 import { formatUsd } from '../../liquidations/liquidations.format';
-import { fundingPct, insightView, signedPct, type InsightView } from './market-text';
+import { fundingPct, insightView, signedPct } from './market-text';
 import type { SparkScale } from './spark-bars';
 
 /**
@@ -19,6 +19,33 @@ export interface Phrase {
   nested: Record<string, StringKey>;
 }
 
+/**
+ * IB-BUG-035 — where a card's link goes. A `route` is a router link; a `block` is a section of the
+ * Market page, by its element id. Never a bare `href="#id"`: under `<base href="/">` that resolves to
+ * `/#id` and leaves the page (the «К позициям ↓» link that led nowhere).
+ */
+export type CardLinkTarget =
+  | { kind: 'route'; commands: string[]; queryParams: Record<string, number | string> | null }
+  | { kind: 'block'; id: WebInsightBlock };
+
+/**
+ * IB-BUG-035 — the blocks that have a page of their own: the card goes there, not to the Market
+ * section. Positioning since IB-103 (Market keeps a compact top 5; «Все монеты →» opens the page
+ * with the card's period).
+ */
+const BLOCK_PAGES: Partial<Record<WebInsightBlock, string>> = { positioning: '/positioning' };
+
+/** A statement's link (`insightView`'s) → the card's target: a block with a page becomes a route to it. */
+export function cardLinkTarget(s: WebInsightStatement, nowSec: number): CardLinkTarget {
+  const link = insightView(s, nowSec).link;
+  if ('commands' in link) return { kind: 'route', ...link };
+  const block = link.anchor as WebInsightBlock;
+  const page = BLOCK_PAGES[block];
+  return page === undefined
+    ? { kind: 'block', id: block }
+    : { kind: 'route', commands: [page], queryParams: { p: s.basis.window } };
+}
+
 /** The chip colours of §7.2: liquidations by side (`liq` without one), else by block. */
 export type ChipTone = 'long' | 'short' | 'liq' | 'pos' | 'sent' | 'flows' | 'caps';
 
@@ -31,7 +58,7 @@ export interface CardView {
   explanation: Phrase[];
   spark: WebInsightSpark | null;
   sparkScale: SparkScale;
-  link: { label: Phrase; target: InsightView['link'] };
+  link: { label: Phrase; target: CardLinkTarget };
   basis: Phrase;
   basisTip: Phrase;
 }
@@ -258,7 +285,7 @@ export function cardView(s: WebInsightStatement, nowSec: number): CardView {
     // the contract requires the field; an older payload without it is no chart, not a crash
     spark: s.spark ?? null,
     sparkScale: sparkScaleOf(s.ruleId),
-    link: { label: linkLabel(s), target: insightView(s, nowSec).link },
+    link: { label: linkLabel(s), target: cardLinkTarget(s, nowSec) },
     basis,
     basisTip: tip,
   };

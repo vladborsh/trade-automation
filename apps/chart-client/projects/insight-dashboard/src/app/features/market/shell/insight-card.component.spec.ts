@@ -57,6 +57,13 @@ describe('InsightCardComponent (IB-107)', () => {
     expect([...title.querySelectorAll('.num')].some((n) => n.textContent?.includes('%'))).toBe(false);
   });
 
+  it('IB-BUG-035: a block link is the current page with the block as its fragment, never a bare #href', () => {
+    const r8: WebInsightStatement = { ...r3, ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: { value: 52.2, change: 6.1 }, link: { anchor: 'flows' }, spark: null };
+    const href = render(r8, 'ru').querySelector('.link')?.getAttribute('href');
+    expect(href).toBe('/#flows'); // the test host sits at '/'; on the page it is /market?p=…#flows
+    expect(href).toMatch(/^\//);
+  });
+
   it('no spark: no chart, the rest stands', () => {
     const el = render({ ...r3, spark: null }, 'en');
     expect(el.querySelector('.spark')).toBeNull();

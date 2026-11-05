@@ -486,7 +486,7 @@ export const en: Strings = {
   'card.link.window': 'Open {base} over {window} →',
   'card.link.at': 'Open {base} at {time} UTC →',
   'card.link.anchor.liquidations': 'To liquidations ↓',
-  'card.link.anchor.positioning': 'To positioning ↓',
+  'card.link.anchor.positioning': 'All coins →',
   'card.link.anchor.sentiment': 'More on sentiment ↓',
   'card.link.anchor.flows': 'To derivatives and flows ↓',
   'card.link.anchor.caps': 'To market cap ↓',

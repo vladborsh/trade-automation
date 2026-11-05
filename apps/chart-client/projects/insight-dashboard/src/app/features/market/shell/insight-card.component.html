@@ -15,10 +15,11 @@
       }
     </div>
   }
-  @if ('commands' in v.link.target) {
+  @if (v.link.target.kind === 'route') {
     <a class="link" [routerLink]="v.link.target.commands" [queryParams]="v.link.target.queryParams">{{ word(v.link.label) }}</a>
   } @else {
-    <a class="link" [href]="'#' + v.link.target.anchor">{{ word(v.link.label) }}</a>
+    <!-- IB-BUG-035: the current page with the period kept and the block as the fragment; the click scrolls -->
+    <a class="link" [routerLink]="[]" queryParamsHandling="preserve" [fragment]="v.link.target.id" (click)="scrollToBlock(v.link.target.id)">{{ word(v.link.label) }}</a>
   }
   <p class="basis" [attr.title]="word(v.basisTip)">{{ word(v.basis) }}</p>
 </article>

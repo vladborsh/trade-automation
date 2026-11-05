@@ -4,7 +4,7 @@ import { en } from '../../../i18n/en';
 import { fill } from '../../../i18n/i18n.service';
 import type { StringKey } from '../../../i18n/keys';
 import { ru } from '../../../i18n/ru';
-import { baseOf, basisOf, cardView, chipOf, figureRuns, linkLabel, ratioText, sparkScaleOf, whenOf, type Phrase } from './insight-card';
+import { baseOf, basisOf, cardLinkTarget, cardView, chipOf, figureRuns, linkLabel, ratioText, sparkScaleOf, whenOf, type Phrase } from './insight-card';
 import { wordInsight } from './market-text';
 
 /**
@@ -100,7 +100,7 @@ describe('R5 funding_extremes — the coin is the subject; the sign says who pay
     expect(w.title).toBe('TRUMP: шорты доплачивают лонгам −0.0390 % — необычно много');
     expect(w.expl).toContain('Отрицательный: шортов больше, и они платят.');
     expect(w.expl).toMatch(/Так же необычно ещё у 1 из 30 монет\.$/);
-    expect(w.link).toBe('К позициям ↓');
+    expect(w.link).toBe('Все монеты →');
     expect(w.chip.tone).toBe('pos');
   });
   it('positive: longs pay; alone, no «ещё у»', () => {
@@ -188,7 +188,7 @@ describe('R11 oi_divergence (IB-113) — the alert, worded as what happened', ()
     expect(sparkScaleOf('R11')).toBe('range');
   });
   it('the link opens the chart at B on the alert\'s timeframe (as the Telegram message does)', () => {
-    expect(cardView(r11('bullish'), NOW).link.target).toEqual({ commands: ['/instrument', 'BTCUSDT'], queryParams: { at: TODAY_3AM, tf: '1h' } });
+    expect(cardView(r11('bullish'), NOW).link.target).toEqual({ kind: 'route', commands: ['/instrument', 'BTCUSDT'], queryParams: { at: TODAY_3AM, tf: '1h' } });
   });
 });
 
@@ -206,12 +206,22 @@ describe('the parts every card shares', () => {
     expect(say(basisOf({ window: '1h', venues: ['coinbase', 'binance'], sampleWindows: 600, observedWindows: 580, from: null }).tip, 'en')).toBe('norm: 580 windows with data of 600');
     expect(say(basisOf({ window: '1h', venues: ['coinbase', 'binance'], sampleWindows: 600, observedWindows: 580, from: null }).basis, 'en')).toBe('over 1h · Coinbase, Binance');
   });
-  it('every anchor has its own label; none says «к графику»', () => {
-    for (const anchor of ['liquidations', 'positioning', 'sentiment', 'flows', 'caps'] as const) {
+  it('every anchor has its own label; none says «к графику»; positioning says «Все монеты →» (IB-BUG-035)', () => {
+    for (const anchor of ['liquidations', 'sentiment', 'flows', 'caps'] as const) {
       const label = say(linkLabel(st({ ruleId: 'R7', block: anchor, key: 'insight.breadth', params: {}, link: { anchor } })));
       expect(label).toMatch(/↓$/);
       expect(label).not.toContain('графику');
     }
+    const pos = st({ ruleId: 'R5', block: 'positioning', key: 'insight.funding_extremes', params: {}, link: { anchor: 'positioning' } });
+    expect(say(linkLabel(pos))).toBe('Все монеты →');
+    expect(say(linkLabel(pos), 'en')).toBe('All coins →');
+  });
+  it('IB-BUG-035: positioning goes to its page with the card\'s period; other blocks stay Market sections; instruments stay routes', () => {
+    const pos = st({ ruleId: 'R5', block: 'positioning', key: 'insight.funding_extremes', params: {}, link: { anchor: 'positioning' } });
+    expect(cardLinkTarget({ ...pos, basis: { ...pos.basis, window: '4h' } }, NOW)).toEqual({ kind: 'route', commands: ['/positioning'], queryParams: { p: '4h' } });
+    expect(cardLinkTarget(st({ ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: {} }), NOW)).toEqual({ kind: 'block', id: 'flows' });
+    expect(cardLinkTarget(st({ ruleId: 'R3', block: 'liquidations', key: 'insight.liq_cascade', params: {}, link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: TODAY_3AM } }), NOW))
+      .toEqual({ kind: 'route', commands: ['/instrument', 'BTCUSDT'], queryParams: { at: TODAY_3AM } });
   });
   it('the chip colours: liquidations by side, else by block', () => {
     expect(chipOf({ block: 'liquidations', params: { side: 'short' } }).tone).toBe('short');

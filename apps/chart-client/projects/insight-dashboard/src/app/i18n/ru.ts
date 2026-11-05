@@ -492,7 +492,7 @@ export const ru: Strings = {
   'card.link.window': 'Открыть {base} за {window} →',
   'card.link.at': 'Открыть {base} в {time} UTC →',
   'card.link.anchor.liquidations': 'К ликвидациям ↓',
-  'card.link.anchor.positioning': 'К позициям ↓',
+  'card.link.anchor.positioning': 'Все монеты →',
   'card.link.anchor.sentiment': 'Подробнее о настроении ↓',
   'card.link.anchor.flows': 'К деривативам и потокам ↓',
   'card.link.anchor.caps': 'К капитализации ↓',

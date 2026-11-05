@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { WebInsightStatement } from '@trade-automation/contracts';
@@ -22,6 +23,7 @@ import { sparkGeometry } from './spark-bars';
 })
 export class InsightCardComponent {
   private readonly i18n = inject(I18nService);
+  private readonly document = inject(DOCUMENT);
   readonly statement = input.required<WebInsightStatement>();
   readonly nowSec = input.required<number>();
 
@@ -32,6 +34,14 @@ export class InsightCardComponent {
     const s = this.view().spark;
     return s === null ? null : sparkGeometry(s, this.view().sparkScale);
   });
+
+  /**
+   * IB-BUG-035: the router only updates the fragment (no anchor scrolling is configured, and a
+   * second click on the same fragment is not a navigation at all), so the click scrolls itself.
+   */
+  scrollToBlock(id: string): void {
+    this.document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   word(p: Phrase): string {
     // the lang signal is read so a language switch re-words the card
