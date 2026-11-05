@@ -240,20 +240,17 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     expect(widest).toBeLessThanOrEqual(390);
   });
 
-  test('IB-089 / IB-108 phone: large cards fold at 8 (IB-101\'s rule, §7.6) with «show all»; the old list and table are gone', async ({ page }) => {
+  test('IB-089 / IB-108 / IB-120 phone: large cards stay at 8; «All liquidations →» links to /liquidations (no «show all» on Market); the old list and table are gone', async ({ page }) => {
     await openMarket(page);
     const cards = page.locator('app-liq-large li');
     const total = overview.block.large.length;
-    expect(total).toBeGreaterThan(10); // more than 8 + IB-101's minimum of 3 hidden: the fold applies
+    expect(total).toBeGreaterThan(8); // more than the block shows: the rest is the /liquidations page's job
     await expect(cards.filter({ visible: true })).toHaveCount(8);
-    await page.getByRole('button', { name: `Show all (${total})` }).click();
-    await page.clock.runFor(100); // the page's timers are faked: let Angular render
-    await expect(cards.filter({ visible: true })).toHaveCount(total);
+    // IB-120: the button that unfolded the block became a router link to the new page, with no count
+    await expect(page.locator('app-liq-large').getByRole('button', { name: /^Show all/ })).toHaveCount(0);
+    const link = page.locator('app-liq-large').getByRole('link', { name: 'All liquidations →' });
+    await expect(link).toHaveAttribute('href', '/liquidations?p=24h');
     await expect(page.locator('app-liquidations-feed, app-liquidations-where')).toHaveCount(0);
-    const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    await page.getByRole('button', { name: 'Show fewer' }).first().click();
-    await page.clock.runFor(100);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(height);
   });
 
   test('IB-101 phone: «where» folds to the top 8 with «12 more coins · $X»; the button is ≥ 40 px; show all, then a new period folds it again', async ({ page }, info) => {
@@ -467,11 +464,18 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
           insightsFirst: !!(ins.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING),
           tiles: tiles.length,
           columns: new Set(tiles.map((r) => Math.round(r.x))).size,
-          bars: [...kpi.querySelectorAll('.bar')].map((b) => Math.round(b.getBoundingClientRect().y)),
-          // TL review: every tile's bar is drawn — the track, and the filled part where the tile has one
-          barBoxes: [...kpi.querySelectorAll('.tile')].map((t) => {
-            const r = t.querySelector('.bar')!.getBoundingClientRect();
-            const fill = [...t.querySelectorAll('.bar span')].reduce((w, s) => w + s.getBoundingClientRect().width, 0);
+          // `.tile > .bar`: the strip's own bar, not the funding chart's bars (IB-118)
+          bars: [...kpi.querySelectorAll('.tile > .bar')].map((b) => Math.round(b.getBoundingClientRect().y)),
+          // TL review: every BAR tile's bar is drawn — the track and its fill. IB-118: cap, BTC OI and BTC
+          // funding draw a 7-day chart in that row instead, so only dominance and liquidations carry a bar
+          charts: [...kpi.querySelectorAll('.tile')].filter((t) => t.querySelector('app-kpi-chart')).map((t) => ({
+            id: t.getAttribute('data-kpi'), kind: t.querySelector('app-kpi-chart .chart')!.getAttribute('data-kind'),
+            top: Math.round(t.querySelector('app-kpi-chart')!.getBoundingClientRect().top), bars: t.querySelectorAll('app-kpi-chart .bar').length,
+            right: Math.round(t.querySelector('app-kpi-chart')!.getBoundingClientRect().right), tileRight: Math.round(t.getBoundingClientRect().right),
+          })),
+          barBoxes: [...kpi.querySelectorAll('.tile')].filter((t) => t.querySelector(':scope > .bar')).map((t) => {
+            const r = t.querySelector(':scope > .bar')!.getBoundingClientRect();
+            const fill = [...t.querySelectorAll(':scope > .bar span')].reduce((w, s) => w + s.getBoundingClientRect().width, 0);
             return { id: t.getAttribute('data-kpi'), w: Math.round(r.width), h: Math.round(r.height), fill: Math.round(fill) };
           }),
           tileInner: Math.round(kpi.querySelector('.tile')!.getBoundingClientRect().width) - 34,
@@ -494,9 +498,15 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
         // the funding figure wraps («−0.0123 %» over «shorts pay») — so the check below can disagree.
         // IB-117: five tiles are wider, so at 1440 the word fits beside the figure; 1240 still wraps
         if (width === 1240) expect(m.fundingWraps).toBe(true);
-        // and the strip's subgrid still puts every tile's bar at the same height
+        // and the strip's subgrid still puts every tile's bar at the same height — and every chart (IB-118)
         expect(new Set(m.bars).size).toBe(1);
+        expect(new Set(m.charts.map((c) => c.top)).size).toBe(1);
       }
+      // IB-118: three charts from the fixture's histories (a real /kpis answer for OI and funding)
+      expect(m.charts.map((c) => [c.id, c.kind])).toEqual([['market_cap', 'area'], ['btc_oi', 'area'], ['btc_funding', 'bars']]);
+      expect(m.charts.find((c) => c.id === 'btc_funding')?.bars).toBe(21);
+      for (const c of m.charts) expect(c.right, `${c.id} chart inside its tile`).toBeLessThanOrEqual(c.tileRight);
+      expect(m.barBoxes.map((b) => b.id)).toEqual(['btc_dominance', 'liquidations_24h']);
       expect(m.scrollWidth).toBeLessThanOrEqual(width);
       for (const bar of m.barBoxes) {
         expect(bar.h, `${bar.id} bar height`).toBe(6);
@@ -523,8 +533,14 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
       await expect(strip.locator('[data-kpi="fear_greed"]')).toHaveCount(0);
       await expect(strip).not.toContainText('Fear & Greed');
       await expect(page.locator('#sentiment app-fear-greed-gauge svg').first()).toBeVisible();
-      await expect(strip.locator('[data-kpi="btc_funding"] .note')).toHaveText('long/short by accounts 2.62');
-      await expect(strip.locator('[data-kpi="btc_oi"] .note')).toHaveText('Binance, over 24h');
+      // IB-118: under a chart, the range row and a caption saying what the chart is; the L/S fact moves to the range row
+      await expect(strip.locator('[data-kpi="btc_funding"] .range')).toHaveText(/^\s*last settlements: 21\s*L\/S accounts 2\.62\s*$/);
+      await expect(strip.locator('[data-kpi="btc_funding"] .note')).toHaveText('Binance · bar = one settlement (8 h); above 0 longs pay');
+      await expect(strip.locator('[data-kpi="btc_oi"] .range')).toHaveText(/^\s*7d min \$\d+\.\dB\s*max \$\d+\.\dB\s*$/);
+      await expect(strip.locator('[data-kpi="btc_oi"] .note')).toHaveText('Binance · 7 days');
+      // the cap's fixture series spans 6 h: named as such, never passed off as 7 days
+      await expect(strip.locator('[data-kpi="market_cap"] .range')).toHaveText(/^\s*min \$\d\.\d{2}T\s*max \$\d\.\d{2}T\s*$/);
+      await expect(strip.locator('[data-kpi="market_cap"] .note')).toHaveText('CoinGecko · over 0 d 6 h');
       // visible credit only where the terms ask: CoinGecko; Binance in the tooltip (alternative.me left with the F&G tile, IB-117)
       await expect(strip.locator('.credit')).toHaveText(['CoinGecko', 'CoinGecko']);
       await expect(strip.locator('[data-kpi="btc_oi"] h3')).toHaveAttribute('title', 'source: Binance');
