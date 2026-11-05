@@ -1,0 +1,22 @@
+{
+  "asOf": 1793980800,
+  "query": {
+    "period": "24h",
+    "symbol": "all",
+    "minUsd": 100000,
+    "side": "all",
+    "venue": "all"
+  },
+  "norm": {
+    "status": "collecting",
+    "collectingHours": 17
+  },
+  "summary": {
+    "count": 0,
+    "shorts": 0,
+    "longs": 0,
+    "largestId": null
+  },
+  "episodes": [],
+  "folded": 0
+}
