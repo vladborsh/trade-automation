@@ -78,6 +78,11 @@ test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
       await expect(page.locator('h1')).toContainText(title);
       await expect(page.locator('table').first()).toBeVisible();
       if (path === '/admin/alerts') await expect(page.locator('app-admin-liq-alerts tbody tr')).toHaveCount(liqPage.coins.length + 1);
+      if (path === '/admin/alerts') {
+        // IB-144 (V42, V44): a «скрытые» checkbox per TF, and the hidden journal row (the longest symbol) labelled
+        await expect(page.getByRole('checkbox', { name: /^(15m|1h|4h) скрытые$/ })).toHaveCount(3);
+        await expect(page.locator('tbody tr', { hasText: '1000PEPEUSDT' }).locator('.kind')).toHaveText('· скрытая дивергенция OI');
+      }
       const m = await measure(page);
       expect(m.innerWidth).toBe(390);
       expect(m.scrollWidth).toBeLessThanOrEqual(390);

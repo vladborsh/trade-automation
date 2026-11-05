@@ -8,7 +8,8 @@ import type { PaneData } from './pane-data';
 /**
  * IB-110 — the instrument page's OI divergence lines: fetched beside the window (never blocking it),
  * merged into the chart's data, and left out — as an EMPTY list, so the legend keeps its entry — when
- * the reader hid them. Kept out of `instrument.component.ts`, which sits at the 250-line ceiling.
+ * the reader hid them. IB-144 (V44): per kind — the regular and the hidden lines each have their own switch.
+ * Kept out of `instrument.component.ts`, which sits at the 250-line ceiling.
  *
  * A switch only changes the lines, so its merge is marked `extendsLater`: the chart redraws on the
  * same time scale and the reader's zoom and scroll survive (`carried-view.ts`).
@@ -17,7 +18,7 @@ export class DivergenceOverlay {
   readonly lines = signal<{ key: string; lines: readonly WebOiDivergenceLine[] } | null>(null);
   private generation = 0;
   private lastPanes: PaneData | null = null;
-  private lastHidden: boolean | null = null;
+  private lastSwitches: string | null = null;
 
   constructor(private readonly api: InsightApiClient, private readonly prefs: DivergencePrefs) {}
 
@@ -39,15 +40,16 @@ export class DivergenceOverlay {
   merge(panes: PaneData | null): PaneData | null {
     if (!panes) return null;
     const got = this.lines();
-    const hidden = this.prefs.hidden();
+    const off = { regular: this.prefs.hidden(), hidden: this.prefs.hiddenKindHidden() };
+    const switches = `${off.regular}:${off.hidden}`;
     // `instrument` is the venue-qualified id (`binance:BTCUSDT`); the lines were asked for the bare symbol
     const symbol = panes.instrument.split(':').pop();
     const lines = got && got.key === `${symbol}:${panes.timeframe}` ? got.lines : undefined;
     // the same window, only the lines or the switch moved: redraw in place, keeping the reader's view
-    const inPlace = panes === this.lastPanes && (this.lastHidden !== hidden || lines !== undefined);
+    const inPlace = panes === this.lastPanes && (this.lastSwitches !== switches || lines !== undefined);
     this.lastPanes = panes;
-    this.lastHidden = hidden;
-    const divergences = lines === undefined ? undefined : hidden ? [] : lines;
+    this.lastSwitches = switches;
+    const divergences = lines?.filter((l) => !off[l.kind]);
     return { ...panes, divergences, ...(inPlace ? { extendsLater: true } : {}) };
   }
 }

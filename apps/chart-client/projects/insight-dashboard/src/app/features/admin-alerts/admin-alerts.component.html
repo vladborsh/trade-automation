@@ -69,7 +69,7 @@
       <p class="note">{{ t('alerts.paramsNote') }}</p>
       <div class="scroll">
         <table class="params">
-          <thead><tr><th></th><th>{{ t('alerts.param.nLeft') }}</th><th>{{ t('alerts.param.nRight') }}</th><th>{{ t('alerts.param.k') }}</th><th>{{ t('alerts.param.w') }}</th></tr></thead>
+          <thead><tr><th></th><th>{{ t('alerts.param.nLeft') }}</th><th>{{ t('alerts.param.nRight') }}</th><th>{{ t('alerts.param.k') }}</th><th>{{ t('alerts.param.w') }}</th><th>{{ t('alerts.param.sendHidden') }}</th></tr></thead>
           <tbody>
             @for (tf of tfs; track tf) {
               <tr>
@@ -78,6 +78,7 @@
                 <td><input inputmode="numeric" [value]="f.perTf[tf].nRight" (input)="editParam(tf, 'nRight', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.nRight')" /></td>
                 <td><input inputmode="numeric" [value]="f.perTf[tf].k" (input)="editParam(tf, 'k', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.k')" /></td>
                 <td><input inputmode="numeric" [value]="f.perTf[tf].w" (input)="editParam(tf, 'w', $any($event.target).value)" [attr.aria-label]="tf + ' ' + t('alerts.param.w')" /></td>
+                <td class="check"><input type="checkbox" [checked]="f.perTf[tf].sendHidden" (change)="editSendHidden(tf, $any($event.target).checked)" [attr.aria-label]="tf + ' ' + t('alerts.param.sendHidden')" /></td>
               </tr>
             }
           </tbody>
@@ -112,7 +113,7 @@
           <tbody>
             @for (r of alerts(); track r.id) {
               <tr>
-                <td class="nowrap">{{ r.confirmed }}</td><td>{{ r.symbol }}</td><td>{{ r.tf }}</td><td>{{ t(r.direction) }}</td>
+                <td class="nowrap">{{ r.confirmed }}</td><td>{{ r.symbol }}</td><td>{{ r.tf }}</td><td>{{ t(r.direction) }}@if (r.kind) {<span class="kind"> · {{ t(r.kind) }}</span>}</td>
                 <td class="num">{{ r.price }}</td><td class="num">{{ r.oi }}</td><td>{{ r.run ?? '' }}</td>
                 <td [class.warn]="r.status.key === 'alerts.status.late'" [class.history]="r.status.key === 'alerts.status.history'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
                 <td class="num">{{ r.after4h }}</td><td class="num">{{ r.after24h }}</td>

@@ -1,5 +1,5 @@
 {
- "_comment": "IB-112 SYNTHETIC (no server yet): shaped by the IB-109 contract, values plausible, not a capture; IB-114: settings carry the round-2 defaults (1h W 168, line tolerances); journal rows read as tolerance 0 (V20: found before 026)",
+ "_comment": "IB-112 SYNTHETIC (no server yet): shaped by the IB-109 contract, values plausible, not a capture; IB-114: settings carry the round-2 defaults (1h W 168, line tolerances); journal rows read as tolerance 0 (V20: found before 026); IB-144: settings carry sendHidden false per TF (V42), every row a kind, row 9 (the longest symbol) hidden bullish — price higher low, OI lower — so the journal's widest cell is measured",
  "settings": {
   "enabled": false,
   "membersVisible": false,
@@ -9,19 +9,22 @@
      "nLeft": 6,
      "nRight": 6,
      "k": 3,
-     "w": 96
+     "w": 96,
+     "sendHidden": false
     },
     "1h": {
      "nLeft": 6,
      "nRight": 6,
      "k": 3,
-     "w": 168
+     "w": 168,
+     "sendHidden": false
     },
     "4h": {
      "nLeft": 6,
      "nRight": 2,
      "k": 3,
-     "w": 90
+     "w": 90,
+     "sendHidden": false
     }
    },
    "atrMult": 0.25,
@@ -83,6 +86,7 @@
    "symbol": "1000PEPEUSDT",
    "tf": "15m",
    "direction": "bullish",
+   "kind": "hidden",
    "a": {
     "time": 1793725200,
     "price": 0.0102,
@@ -91,9 +95,9 @@
    },
    "b": {
     "time": 1793793600,
-    "price": 0.00998,
+    "price": 0.0104,
     "oiTime": 1793793900,
-    "oi": 8600000000.0
+    "oi": 7900000000.0
    },
    "runOf": null,
    "runLength": 2,
@@ -138,6 +142,7 @@
    "symbol": "TRXUSDT",
    "tf": "1h",
    "direction": "bullish",
+   "kind": "regular",
    "a": {
     "time": 1793721600,
     "price": 0.3,
@@ -193,6 +198,7 @@
    "symbol": "BTCUSDT",
    "tf": "4h",
    "direction": "bearish",
+   "kind": "regular",
    "a": {
     "time": 1793718000,
     "price": 104200,

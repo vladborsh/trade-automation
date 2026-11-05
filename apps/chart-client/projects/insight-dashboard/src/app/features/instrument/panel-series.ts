@@ -148,8 +148,8 @@ function drawOpenInterest(chart: IChartApi, data: PaneData, renderers: PanelRend
 
 /**
  * IB-110 (V15): the OI divergence lines on the price and OI panes (`oi-divergence-lines.ts`): two points
- * each, teal bullish / red bearish, a repeat dashed. Out of the autoscale like the levels — a line is
- * between two values the pane already shows, and must never rescale it.
+ * each, teal bullish / red bearish, the dash by kind × repeat (IB-144, `DIVERGENCE_LINE_STYLES`). Out of the
+ * autoscale like the levels — a line is between two values the pane already shows, and must never rescale it.
  */
 function drawDivergences(chart: IChartApi, data: PaneData, which: 'price' | 'openInterest', pane: number): void {
   const tf = data.divergences ? divergenceTf(data.timeframe) : null;
@@ -167,7 +167,7 @@ function drawDivergences(chart: IChartApi, data: PaneData, which: 'price' | 'ope
   }
   for (const s of strokes) {
     chart.addSeries(LineSeries, {
-      ...scale, color: s.colour, lineWidth: 2, lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
+      ...scale, color: s.colour, lineWidth: 2, lineStyle: s.lineStyle,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: true,
       autoscaleInfoProvider: () => null,
     }, pane).setData(s.points as never);

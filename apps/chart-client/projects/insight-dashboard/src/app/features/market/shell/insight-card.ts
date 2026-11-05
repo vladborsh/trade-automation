@@ -254,17 +254,19 @@ export function wordingOf(s: WebInsightStatement): { title: Phrase; figures: str
     case 'insight.oi_divergence': {
       // IB-113 (OI divergence design V16, D20): what happened at B against A, never what comes next
       const bull = p['direction'] !== 'bearish';
+      // IB-144 (V44): a hidden divergence has its own key per direction; an absent kind (an older payload) is regular
+      const dir = `${p['kind'] === 'hidden' ? 'hidden_' : ''}${bull ? 'bullish' : 'bearish'}` as const;
       const price = signedPct(num('pricePct'), 1) ?? '—';
       const oi = signedPct(num('oiPct'), 1) ?? '—';
       const tf = typeof p['tf'] === 'string' ? p['tf'] : '';
       const run = num('runLength') ?? 2;
       return {
-        title: phrase(`card.oi_divergence.title.${bull ? 'bullish' : 'bearish'}`, { base, tf, pricePct: price, oiPct: oi }),
+        title: phrase(`card.oi_divergence.title.${dir}`, { base, tf, pricePct: price, oiPct: oi }),
         figures: [price, oi],
         explanation: [
-          phrase(`card.oi_divergence.expl.${bull ? 'bullish' : 'bearish'}`),
+          phrase(`card.oi_divergence.expl.${dir}`),
           // the count after a colon: it agrees with no noun («подряд: 3»)
-          ...(run > 2 ? [phrase(`card.oi_divergence.repeat.${bull ? 'bullish' : 'bearish'}`, { count: run })] : []),
+          ...(run > 2 ? [phrase(`card.oi_divergence.repeat.${dir}`, { count: run })] : []),
         ],
       };
     }

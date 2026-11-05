@@ -62,6 +62,13 @@
   &.off { text-decoration: line-through; opacity: 0.6; }
   &:focus-visible { outline: 1px solid var(--color-focus); outline-offset: 2px; }
   .bear { background: var(--color-down); }
+  /* IB-144: the hidden lines are dotted on the chart, so is their swatch */
+  .swatch.line.dotted {
+    height: 0;
+    background: none;
+    border-top: 2px dotted var(--color-up);
+    &.bear { border-top-color: var(--color-down); }
+  }
 }
 @media (max-width: 767px) {
   .entry.toggle::before { content: ''; position: absolute; inset: -14px -6px; } /* a ≥ 40 px target, not a bigger legend */

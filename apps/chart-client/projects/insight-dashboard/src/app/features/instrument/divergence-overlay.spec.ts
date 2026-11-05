@@ -9,12 +9,16 @@ import type { PaneData } from './pane-data';
  * builds them (`instrument` is venue-qualified: `binance:BTCUSDT`) — a merge keyed on the bare symbol
  * matched nothing on the slot, and this spec now pins it.
  */
-const line = { direction: 'bullish', a: { time: 1, price: 1, oiTime: 1, oi: 1 }, b: { time: 2, price: 1, oiTime: 2, oi: 1 },
+const line = { direction: 'bullish', kind: 'regular', a: { time: 1, price: 1, oiTime: 1, oi: 1 }, b: { time: 2, price: 1, oiTime: 2, oi: 1 },
   confirmedAt: 3, pricePct: 0, oiPct: 0, repeat: null, firedAt: null } as WebOiDivergenceLine;
+const hiddenLine = { ...line, kind: 'hidden', b: { ...line.b, time: 4 } } as WebOiDivergenceLine;
 const panes = (instrument: string, timeframe: string) => ({ instrument, timeframe }) as unknown as PaneData;
 
 function build(lines: WebOiDivergenceLine[] = [line]) {
-  const prefs = { hidden: signal(false), toggle() { this.hidden.update((h) => !h); } };
+  const prefs = {
+    hidden: signal(false), hiddenKindHidden: signal(false),
+    toggle(kind: 'regular' | 'hidden' = 'regular') { (kind === 'hidden' ? this.hiddenKindHidden : this.hidden).update((h) => !h); },
+  };
   const asked: string[] = [];
   const api = { oiDivergences: async (symbol: string, tf: string) => { asked.push(`${symbol}:${tf}`); return { lines }; } };
   return { overlay: new DivergenceOverlay(api as never, prefs as never), prefs, asked };
@@ -53,5 +57,22 @@ describe('DivergenceOverlay', () => {
     expect(hidden.divergences).toEqual([]);
     expect(hidden.extendsLater).toBe(true); // same window: the reader's view is kept
     expect(overlay.merge(panes('binance:BTCUSDT', '1h'))?.extendsLater).toBeUndefined(); // a new window draws fresh
+  });
+
+  it('IB-144 (V44): each kind has its own switch — hiding one leaves the other drawn, and each switch redraws in place', async () => {
+    const { overlay, prefs } = build([line, hiddenLine]);
+    await overlay.load('BTCUSDT', '1h');
+    const p = panes('binance:BTCUSDT', '1h');
+    expect(overlay.merge(p)?.divergences).toEqual([line, hiddenLine]);
+    prefs.toggle('hidden');
+    const noHidden = overlay.merge(p)!;
+    expect(noHidden.divergences).toEqual([line]);
+    expect(noHidden.extendsLater).toBe(true);
+    prefs.toggle('regular');
+    expect(overlay.merge(p)?.divergences).toEqual([]); // both off: an empty list, the legend keeps both switches
+    prefs.toggle('hidden');
+    const onlyHidden = overlay.merge(p)!;
+    expect(onlyHidden.divergences).toEqual([hiddenLine]);
+    expect(onlyHidden.extendsLater).toBe(true);
   });
 });

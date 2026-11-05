@@ -5,10 +5,13 @@
       <span class="pane-title">{{ legend.heading }}</span>
       @for (entry of legend.entries; track entry.label) {
         @if (entry.toggle) {
-          <!-- IB-110: a switch for what it keys; struck through while the lines are hidden -->
+          <!-- IB-110: a switch for what it keys; struck through while the lines are hidden. IB-144: one per kind -->
           <button type="button" class="entry toggle" [class.off]="entry.off" [attr.aria-pressed]="!entry.off"
-                  [attr.title]="t('instrument.legend.divergencesToggle')" (click)="divergencePrefs.toggle()">
-            <span class="swatch line" [style.background]="entry.colour"></span><span class="swatch line bear"></span>{{ entry.label }}
+                  [attr.data-toggle]="entry.toggle"
+                  [attr.title]="t(entry.toggle === 'hidden' ? 'instrument.legend.hiddenDivergencesToggle' : 'instrument.legend.divergencesToggle')"
+                  (click)="divergencePrefs.toggle(entry.toggle)">
+            <span class="swatch line" [class.dotted]="entry.dotted" [style.background]="entry.dotted ? null : entry.colour"></span><span
+              class="swatch line bear" [class.dotted]="entry.dotted"></span>{{ entry.label }}
           </button>
         } @else {
           <span class="entry">

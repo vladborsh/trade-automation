@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { OI_DIVERGENCE_DEFAULT_PARAMS, type WebOiDivergenceAlert } from '@trade-automation/contracts';
-import { formToParams, movePct, normalizeSymbol, paramsToForm, pctText, symbolRefusalKey, toAlertRow, toSkipRow } from './alert-rows';
+import { alertKindKey, formToParams, movePct, normalizeSymbol, paramsToForm, pctText, symbolRefusalKey, toAlertRow, toSkipRow } from './alert-rows';
 
 /** IB-112 (V12, V17) — the admin alerts page's mapping. */
 const ALERT: WebOiDivergenceAlert = {
-  id: 7, source: 'live', symbol: 'TRXUSDT', tf: '1h', direction: 'bullish',
+  id: 7, source: 'live', symbol: 'TRXUSDT', tf: '1h', direction: 'bullish', kind: 'regular',
   a: { time: 1_793_700_000, price: 0.3, oiTime: 1_793_700_300, oi: 1_000_000 },
   b: { time: 1_793_790_000, price: 0.294, oiTime: 1_793_790_300, oi: 1_068_000 },
   runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS,
@@ -15,7 +15,7 @@ const ALERT: WebOiDivergenceAlert = {
 describe('toAlertRow', () => {
   it('B against A for price and OI, the delivery, and the move after sending', () => {
     expect(toAlertRow(ALERT)).toEqual({
-      id: 7, confirmed: '2026-11-04 18:00', symbol: 'TRXUSDT', tf: '1h', direction: 'alerts.direction.bullish',
+      id: 7, confirmed: '2026-11-04 18:00', symbol: 'TRXUSDT', tf: '1h', direction: 'alerts.direction.bullish', kind: null,
       price: '−2.0 %', oi: '+6.8 %', run: null,
       status: { key: 'alerts.status.sent', recipients: 1 },
       after4h: '+2.0 %', after24h: '—',
@@ -29,6 +29,12 @@ describe('toAlertRow', () => {
     const history = { ...ALERT, source: 'backfill' as const, firedAt: null, recipients: 0, late: false };
     expect(toAlertRow(history).status).toEqual({ key: 'alerts.status.history', recipients: 0 });
     expect(toAlertRow({ ...history, source: 'live' }).status).toEqual({ key: 'alerts.status.journalOnly', recipients: 0 });
+  });
+  it('IB-144 (V44): a hidden row is labelled «скрытая дивергенция OI»; a regular one carries no label (today\'s look)', () => {
+    expect(toAlertRow({ ...ALERT, kind: 'hidden' }).kind).toBe('alerts.kind.hidden');
+    expect(toAlertRow({ ...ALERT, kind: 'hidden', direction: 'bearish' })).toMatchObject({ kind: 'alerts.kind.hidden', direction: 'alerts.direction.bearish' });
+    expect(toAlertRow(ALERT).kind).toBeNull();
+    expect([alertKindKey('hidden'), alertKindKey('regular')]).toEqual(['alerts.kind.hidden', null]);
   });
   it('a repeat shows its run length; bearish says highs', () => {
     expect(toAlertRow({ ...ALERT, runLength: 3, runOf: 5 }).run).toBe(3);
@@ -50,8 +56,14 @@ describe('the params form', () => {
   });
   it('IB-141: each side is its own field — 4h shows 6 left and 2 right, and an edited side goes back on that side only', () => {
     const f = paramsToForm(OI_DIVERGENCE_DEFAULT_PARAMS);
-    expect(f.perTf['4h']).toEqual({ nLeft: '6', nRight: '2', k: '3', w: '90' });
-    expect(formToParams({ ...f, perTf: { ...f.perTf, '1h': { ...f.perTf['1h'], nRight: '3' } } })?.perTf['1h']).toEqual({ nLeft: 6, nRight: 3, k: 3, w: 168 });
+    expect(f.perTf['4h']).toEqual({ nLeft: '6', nRight: '2', k: '3', w: '90', sendHidden: false });
+    expect(formToParams({ ...f, perTf: { ...f.perTf, '1h': { ...f.perTf['1h'], nRight: '3' } } })?.perTf['1h']).toEqual({ nLeft: 6, nRight: 3, k: 3, w: 168, sendHidden: false });
+  });
+  it('IB-144 (V42): sendHidden per TF is carried both ways — on for 15m only stays on 15m only, and is never dropped', () => {
+    const f = paramsToForm({ ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '15m': { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['15m'], sendHidden: true } } });
+    expect(f.perTf['15m'].sendHidden).toBe(true);
+    const back = formToParams(f)!;
+    expect([back.perTf['15m'].sendHidden, back.perTf['1h'].sendHidden, back.perTf['4h'].sendHidden]).toEqual([true, false, false]);
   });
   it('a comma decimal is a decimal; an empty field is not zero; out of range is refused by the contract', () => {
     const f = paramsToForm(OI_DIVERGENCE_DEFAULT_PARAMS);

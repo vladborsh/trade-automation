@@ -31,6 +31,8 @@ export interface AlertRow {
   symbol: string;
   tf: OiDivergenceTf;
   direction: StringKey;
+  /** IB-144 (V43, V44): «скрытая дивергенция OI» on a hidden row; null on a regular one (today's look). */
+  kind: StringKey | null;
   price: string;
   oi: string;
   /** Pivots in the run when this is a repeat (3 = «третий подряд»); null for a first alert. */
@@ -41,6 +43,10 @@ export interface AlertRow {
   after24h: string;
 }
 
+/** IB-144: the label a journal row carries for its kind — only a hidden row has one. */
+export const alertKindKey = (kind: WebOiDivergenceAlert['kind']): StringKey | null =>
+  kind === 'hidden' ? 'alerts.kind.hidden' : null;
+
 export function toAlertRow(a: WebOiDivergenceAlert): AlertRow {
   return {
     id: a.id,
@@ -48,6 +54,7 @@ export function toAlertRow(a: WebOiDivergenceAlert): AlertRow {
     symbol: a.symbol,
     tf: a.tf,
     direction: a.direction === 'bullish' ? 'alerts.direction.bullish' : 'alerts.direction.bearish',
+    kind: alertKindKey(a.kind),
     price: pctText(movePct(a.a.price, a.b.price)),
     oi: pctText(movePct(a.a.oi, a.b.oi)),
     run: a.runLength > 2 ? a.runLength : null,
@@ -77,9 +84,12 @@ export function toSkipRow(s: WebOiDivergenceSkipRow): SkipRow {
   return { at: utcMinute(s.at), symbol: s.symbol, tf: s.tf, bar: utcMinute(s.barTime), hole: `${utcMinute(s.holeFrom)} – ${utcMinute(s.holeTo)}` };
 }
 
-/** The params form: every number as the admin typed it (a string), so a half-typed value is not lost. */
+/**
+ * The params form: every number as the admin typed it (a string), so a half-typed value is not lost;
+ * IB-144 (V42): `sendHidden` per TF is a checkbox, a boolean.
+ */
 export interface ParamsForm {
-  perTf: Record<OiDivergenceTf, { nLeft: string; nRight: string; k: string; w: string }>;
+  perTf: Record<OiDivergenceTf, { nLeft: string; nRight: string; k: string; w: string; sendHidden: boolean }>;
   atrMult: string;
   oiMedianMult: string;
   priceLineTolAtrMult: string;
@@ -89,7 +99,7 @@ export interface ParamsForm {
 export function paramsToForm(p: OiDivergenceParams): ParamsForm {
   const perTf = Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => {
     const x = p.perTf[tf];
-    return [tf, { nLeft: String(x.nLeft), nRight: String(x.nRight), k: String(x.k), w: String(x.w) }];
+    return [tf, { nLeft: String(x.nLeft), nRight: String(x.nRight), k: String(x.k), w: String(x.w), sendHidden: x.sendHidden }];
   })) as ParamsForm['perTf'];
   return {
     perTf, atrMult: String(p.atrMult), oiMedianMult: String(p.oiMedianMult),
@@ -107,7 +117,7 @@ export function formToParams(f: ParamsForm): OiDivergenceParams | null {
   const candidate = {
     perTf: Object.fromEntries(OI_DIVERGENCE_TFS.map((tf) => {
       const x = f.perTf[tf];
-      return [tf, { nLeft: num(x.nLeft), nRight: num(x.nRight), k: num(x.k), w: num(x.w) }];
+      return [tf, { nLeft: num(x.nLeft), nRight: num(x.nRight), k: num(x.k), w: num(x.w), sendHidden: x.sendHidden }];
     })),
     atrMult: num(f.atrMult),
     oiMedianMult: num(f.oiMedianMult),

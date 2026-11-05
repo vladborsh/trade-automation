@@ -6,6 +6,8 @@ import { LEVEL_COLOURS } from './prior-levels';
 import { SESSIONS } from './trading-sessions';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
 import { CLOSED_BAND_SWATCH } from './weekend-bands';
+import { DIVERGENCE_COLOURS, OI_CONTRACTS_COLOUR } from './oi-divergence-lines';
+import type { WebOiDivergenceLine } from '@trade-automation/contracts';
 
 const t = (key: StringKey): string => (ru as Record<string, string>)[key] ?? `MISSING:${key}`;
 const price = PANELS.find((p) => p.key === 'price')!;
@@ -87,5 +89,41 @@ describe('IB-081 — the coverage statements on the OI, long/short and funding p
     expect(legendEntries(longShort, data, tp)).toHaveLength(longShort.legend.length);
     expect(legendEntries(fundingPane, data, tp)).toHaveLength(fundingPane.legend.length);
     expect(legendEntries(price, data, tp).map((e) => e.label)).not.toContain('данные с 2026-10-05');
+  });
+});
+
+describe('IB-144 (V44) — two divergence switches: «Дивергенции OI» (regular) and «Скрытые дивергенции OI» (hidden)', () => {
+  const oi = PANELS.find((p) => p.key === 'openInterest')!;
+  const line = { kind: 'hidden', direction: 'bullish' } as WebOiDivergenceLine;
+  const switches = (entries: ReturnType<typeof legendEntries>) => entries.filter((e) => e.toggle).map((e) => [e.label, e.toggle, e.off, e.dotted ?? false]);
+
+  it('both entries on the price and OI panes when the frame has divergences, an empty list included; none on other panes', () => {
+    for (const pane of [price, oi]) {
+      expect(switches(legendEntries(pane, { timeframe: '1h', divergences: [] }, t))).toEqual([
+        ['Дивергенции OI', 'regular', false, false], ['Скрытые дивергенции OI', 'hidden', false, true],
+      ]);
+    }
+    expect(switches(legendEntries(funding, { timeframe: '1h', divergences: [] }, t))).toEqual([]);
+    expect(switches(legendEntries(price, { timeframe: '1m' }, t))).toEqual([]); // a frame without divergences
+  });
+
+  it('each entry is off by its own switch only', () => {
+    const data = { timeframe: '1h', divergences: [] };
+    expect(switches(legendEntries(price, data, t, { regular: false, hidden: true })).map((e) => e[2])).toEqual([false, true]);
+    expect(switches(legendEntries(oi, data, t, { regular: true, hidden: false })).map((e) => e[2])).toEqual([true, false]);
+    const boxes = paneLegends(t, data, 'BTCUSDT', PANELS.map(() => ({ top: 0 })), { regular: false, hidden: true });
+    expect(switches(boxes.find((b) => b.key === 'openInterest')!.entries).map((e) => e[2])).toEqual([false, true]);
+  });
+
+  it('the swatch colour is the bullish teal on both (colour carries direction); the hidden one is dotted', () => {
+    const entries = legendEntries(price, { timeframe: '1h', divergences: [] }, t).filter((e) => e.toggle);
+    expect(entries.map((e) => e.colour)).toEqual([DIVERGENCE_COLOURS.bullish, DIVERGENCE_COLOURS.bullish]);
+  });
+
+  it('the contracts line is keyed while any OI stroke is drawn — a hidden line alone counts; none drawn, no entry', () => {
+    const contracts = (divergences: WebOiDivergenceLine[]) =>
+      legendEntries(oi, { timeframe: '1h', divergences }, t).filter((e) => e.colour === OI_CONTRACTS_COLOUR).length;
+    expect(contracts([line])).toBe(1);
+    expect(contracts([])).toBe(0);
   });
 });

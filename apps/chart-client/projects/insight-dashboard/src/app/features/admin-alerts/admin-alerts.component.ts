@@ -91,6 +91,11 @@ export class AdminAlertsComponent {
     });
   }
 
+  /** IB-144 (V42): the per-TF «скрытые» checkbox — whether that TF's hidden alerts are sent. */
+  editSendHidden(tf: keyof ParamsForm['perTf'], on: boolean): void {
+    this.form.update((f) => (f === null ? f : { ...f, perTf: { ...f.perTf, [tf]: { ...f.perTf[tf], sendHidden: on } } }));
+  }
+
   addSymbol(): Promise<void> {
     const symbol = normalizeSymbol(this.newSymbol());
     if (symbol === '') return Promise.resolve();

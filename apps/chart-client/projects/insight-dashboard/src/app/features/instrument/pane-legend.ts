@@ -1,3 +1,4 @@
+import type { OiDivergenceKind } from '@trade-automation/contracts';
 import { DIVERGENCE_COLOURS, OI_CONTRACTS_COLOUR } from './oi-divergence-lines';
 import type { StringKey } from '../../i18n/keys';
 import { noAnswerLabel, seriesStartLabel, type CoverageLabel } from './coverage-labels';
@@ -20,10 +21,19 @@ export interface LegendEntry {
   colour: string | null;
   /** Drawn as a short line rather than a block: the entry keys a line series. */
   line: boolean;
-  /** IB-110: the entry is a switch for what it keys (the divergence lines); `off` when they are hidden. */
-  toggle?: 'divergences';
+  /**
+   * IB-110: the entry is a switch for what it keys (the divergence lines); `off` when they are hidden.
+   * IB-144 (V44): one switch per kind — 'regular' («Дивергенции OI»), 'hidden' («Скрытые дивергенции OI»).
+   */
+  toggle?: OiDivergenceKind;
   off?: boolean;
+  /** IB-144: the swatch is drawn dotted (the hidden lines are dotted on the chart). */
+  dotted?: boolean;
 }
+
+/** IB-144: which kinds of divergence line the reader hid, one switch each (`divergence-prefs.ts`). */
+export type DivergencesOff = Readonly<Record<OiDivergenceKind, boolean>>;
+export const NONE_OFF: DivergencesOff = { regular: false, hidden: false };
 
 /** What the legend reads: the timeframe always, and (IB-081) the coverage the server stated. */
 export type LegendData = Pick<PaneData, 'timeframe'> & Partial<Pick<PaneData, 'funding' | 'longShort' | 'openInterestCoverage' | 'divergences'>>;
@@ -34,14 +44,19 @@ export function legendEntries(
   panel: PanelDef,
   data: LegendData | null,
   t: Translate,
-  divergencesHidden = false,
+  off: DivergencesOff = NONE_OFF,
 ): LegendEntry[] {
-  // IB-110: on the two panes the lines are drawn on, whenever this frame has them (an empty list included)
+  // IB-110: on the two panes the lines are drawn on, whenever this frame has them (an empty list included);
+  // IB-144: two switches, the regular lines and the hidden ones, each independent of the other
   const divergences: LegendEntry[] = data?.divergences !== undefined && (panel.key === 'price' || panel.key === 'openInterest')
-    ? [{ label: t('instrument.legend.divergences'), colour: DIVERGENCE_COLOURS.bullish, line: true, toggle: 'divergences', off: divergencesHidden }]
+    ? [
+      { label: t('instrument.legend.divergences'), colour: DIVERGENCE_COLOURS.bullish, line: true, toggle: 'regular', off: off.regular },
+      { label: t('instrument.legend.hiddenDivergences'), colour: DIVERGENCE_COLOURS.bullish, line: true, toggle: 'hidden', off: off.hidden, dotted: true },
+    ]
     : [];
-  // TL review: while OI strokes are drawn, the OI pane also carries the contracts line they sit on
-  const contracts: LegendEntry[] = panel.key === 'openInterest' && !divergencesHidden && (data?.divergences?.length ?? 0) > 0
+  // TL review: while OI strokes are drawn, the OI pane also carries the contracts line they sit on (the lines in
+  // the data are the ones not switched off — `divergence-overlay.ts`)
+  const contracts: LegendEntry[] = panel.key === 'openInterest' && (data?.divergences?.length ?? 0) > 0
     ? [{ label: t('instrument.legend.oiContracts'), colour: OI_CONTRACTS_COLOUR, line: true }]
     : [];
   const own = [...panel.legend.map((e) => ({ label: t(e.labelKey), colour: e.colour, line: false })), ...contracts, ...divergences];
@@ -85,12 +100,12 @@ export function paneLegends(
   data: LegendData | null,
   symbol: string,
   edges: ReadonlyArray<{ top: number }>,
-  divergencesHidden = false,
+  off: DivergencesOff = NONE_OFF,
 ): Array<{ key: PanelDef['key']; heading: string; entries: LegendEntry[]; top: number }> {
   return PANELS.map((panel, i) => ({
     key: panel.key,
     heading: panelHeading(t, panel, symbol),
-    entries: legendEntries(panel, data, t, divergencesHidden),
+    entries: legendEntries(panel, data, t, off),
     top: edges[i].top,
   }));
 }

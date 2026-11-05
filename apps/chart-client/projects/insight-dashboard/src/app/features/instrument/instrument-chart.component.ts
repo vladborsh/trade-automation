@@ -106,9 +106,10 @@ export class InstrumentChartComponent implements OnDestroy {
   /** Each pane's edges in px from the chart's top: its legend at the top, its handle at the bottom. */
   readonly edges = computed(() => paneEdges(this.heights()));
 
-  /** IB-110: the «Дивергенции OI» legend entry is the switch for the lines (`divergence-prefs.ts`). */
+  /** IB-110, IB-144: the two divergence legend entries are the switches for the lines (`divergence-prefs.ts`). */
   readonly divergencePrefs = inject(DivergencePrefs);
-  readonly legends = computed(() => paneLegends(this.t, this.data(), this.symbol(), this.edges(), this.divergencePrefs.hidden()));
+  readonly legends = computed(() => paneLegends(this.t, this.data(), this.symbol(), this.edges(),
+    { regular: this.divergencePrefs.hidden(), hidden: this.divergencePrefs.hiddenKindHidden() }));
 
   /** IB-060: the bar under the crosshair, and the economic events on it for the tooltip. */
   readonly hover = signal<{ time: number; x: number } | null>(null);

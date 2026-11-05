@@ -197,6 +197,32 @@ describe('R11 oi_divergence (IB-113) — the alert, worded as what happened', ()
     expect(words(r11('bearish', 4), 'en').expl).toMatch(/A repeat — highs in a row: 4\.$/);
     expect(words(r11('bullish')).expl).not.toContain('Повторное');
   });
+  it('IB-144 (V43, V44): a hidden statement has its own title and explanation per direction; the signs agree with the kind', () => {
+    const hidden = (direction: string, runLength = 2) => {
+      const s = r11(direction, runLength);
+      // hidden bullish: price higher low (+), OI lower (−); hidden bearish: price lower high (−), OI higher (+)
+      const bull = direction === 'bullish';
+      return { ...s, params: { ...s.params, kind: 'hidden', pricePct: bull ? 0.9 : -1.1, oiPct: bull ? -2.4 : 1.6 } };
+    };
+    const hb = words(hidden('bullish'));
+    expect(hb.title).toBe('BTC 1h: цена — более высокий минимум (+0.9 %), OI — ниже (−2.4 %)');
+    expect(hb.expl).toBe('Позиции закрываются, а цена держится выше прошлого минимума.');
+    expect(words(hidden('bullish'), 'en').title).toBe('BTC 1h: price made a higher low (+0.9 %), OI is lower (−2.4 %)');
+    expect(words(hidden('bullish'), 'en').expl).toBe('Positions are being closed while price holds above the previous low.');
+    const hr = words(hidden('bearish'));
+    expect(hr.title).toBe('BTC 1h: цена — более низкий максимум (−1.1 %), OI — выше (+1.6 %)');
+    expect(hr.expl).toBe('Позиции набираются, а цена не дошла до прошлого максимума.');
+    expect(words(hidden('bearish'), 'en').title).toBe('BTC 1h: price made a lower high (−1.1 %), OI is higher (+1.6 %)');
+    expect(words(hidden('bearish'), 'en').expl).toBe('Positions are being added while price stays below the previous high.');
+    expect(words(hidden('bearish', 3)).expl).toMatch(/Повторное — максимумов подряд: 3\.$/);
+  });
+  it('IB-144: an absent kind, or kind regular, is worded as the regular pair', () => {
+    const regular = r11('bullish');
+    expect(regular.params['kind']).toBeUndefined();
+    const explicit = { ...regular, params: { ...regular.params, kind: 'regular' } };
+    expect(words(explicit).title).toBe(words(regular).title);
+    expect(words(regular).title).toBe('BTC 1h: цена ниже прошлого минимума (−1.8 %), OI выше (+3.2 %)');
+  });
   it('the tooltip says it is an event, not «норма: 0 окон»', () => {
     const w = words(r11('bullish'));
     expect(w.tip).toBe('Сигнал бота: событие, а не сравнение с нормой.');

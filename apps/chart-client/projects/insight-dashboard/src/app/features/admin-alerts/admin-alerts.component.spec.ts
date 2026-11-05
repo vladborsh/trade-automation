@@ -8,7 +8,7 @@ import { AdminAlertsComponent } from './admin-alerts.component';
 
 /** IB-112 (V17) — the admin alerts page against a stub API: what it shows, and what it sends. */
 const ALERT: WebOiDivergenceAlert = {
-  id: 7, source: 'live', symbol: 'TRXUSDT', tf: '1h', direction: 'bullish',
+  id: 7, source: 'live', symbol: 'TRXUSDT', tf: '1h', direction: 'bullish', kind: 'regular',
   a: { time: 1_793_700_000, price: 0.3, oiTime: 1_793_700_300, oi: 1_000_000 },
   b: { time: 1_793_790_000, price: 0.294, oiTime: 1_793_790_300, oi: 1_068_000 },
   runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS,
@@ -66,10 +66,10 @@ describe('AdminAlertsComponent (IB-112)', () => {
   it('IB-141: the params table has N left and N right per TF — 4h shows 6 and 2', async () => {
     const { el } = await setup();
     expect([...el.querySelectorAll('table.params thead th')].map((th) => th.textContent?.trim())).toEqual([
-      '', 'N left, candles before', 'N right, candles to confirm', 'k, candles to the pair', 'window, candles',
+      '', 'N left, candles before', 'N right, candles to confirm', 'k, candles to the pair', 'window, candles', 'hidden',
     ]);
     const row4h = [...el.querySelectorAll('table.params tbody tr')].find((r) => r.querySelector('td')?.textContent?.trim() === '4h') as HTMLElement;
-    expect([...row4h.querySelectorAll('input')].map((i) => [i.getAttribute('aria-label'), i.value])).toEqual([
+    expect([...row4h.querySelectorAll('input:not([type=checkbox])')].map((i) => [i.getAttribute('aria-label'), (i as HTMLInputElement).value])).toEqual([
       ['4h N left, candles before', '6'], ['4h N right, candles to confirm', '2'], ['4h k, candles to the pair', '3'], ['4h window, candles', '90'],
     ]);
   });
@@ -135,8 +135,34 @@ describe('AdminAlertsComponent (IB-112)', () => {
       perTf: {
         ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf,
         '1h': { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'], k: 2 },
-        '4h': { nLeft: 6, nRight: 3, k: 3, w: 90 },
+        '4h': { nLeft: 6, nRight: 3, k: 3, w: 90, sendHidden: false },
       },
     } }]]);
+  });
+
+  it('IB-144 (V42): a «hidden» checkbox per TF, labelled «<tf> hidden», off by default; ticking 1h saves the whole params with 1h on', async () => {
+    const { el, cmp, sent, fixture } = await setup();
+    const boxes = [...el.querySelectorAll<HTMLInputElement>('table.params input[type=checkbox]')];
+    expect(boxes.map((b) => [b.getAttribute('aria-label'), b.checked])).toEqual([['15m hidden', false], ['1h hidden', false], ['4h hidden', false]]);
+    expect(cmp.paramsChanged()).toBe(false);
+    boxes[1].checked = true;
+    boxes[1].dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(cmp.paramsChanged()).toBe(true);
+    await cmp.saveParams();
+    expect(sent).toEqual([['settings', { params: {
+      ...OI_DIVERGENCE_DEFAULT_PARAMS,
+      perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf['1h'], sendHidden: true } },
+    } }]]);
+  });
+
+  it('IB-144 (V44): a hidden journal row says «hidden OI divergence» / «скрытая дивергенция OI»; the regular row beside it does not', async () => {
+    const hidden: WebOiDivergenceAlert = { ...ALERT, id: 9, kind: 'hidden', b: { ...ALERT.b, price: 0.31, oi: 950_000 } };
+    const { el, fixture } = await setup({ alertsAdmin: async () => ({ ...PAGE, alerts: [hidden, ALERT] }) });
+    const rows = [...el.querySelectorAll('tbody tr')].filter((r) => r.textContent?.includes('on lows'));
+    expect(rows.map((r) => r.querySelector('.kind')?.textContent?.trim() ?? null)).toEqual(['· hidden OI divergence', null]);
+    TestBed.inject(I18nService).setLang('ru');
+    fixture.detectChanges();
+    expect(el.querySelector('.kind')?.textContent?.trim()).toBe('· скрытая дивергенция OI');
   });
 });

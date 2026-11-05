@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { WebOiDivergenceLine } from '@trade-automation/contracts';
-import { DIVERGENCE_COLOURS, divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, oiBarOf, visibleLines } from './oi-divergence-lines';
+import type { OiDivergenceKind, WebOiDivergenceLine } from '@trade-automation/contracts';
+import { LineStyle } from 'lightweight-charts';
+import { DIVERGENCE_COLOURS, DIVERGENCE_LINE_STYLES, divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, oiBarOf, visibleLines } from './oi-divergence-lines';
 import { TRX_1H_LINES, TRX_1H_OI } from './oi-divergence-trx-1h.fixture';
 
 /** IB-110 — what the chart draws from the divergence lines. */
 const H = 3_600;
 const T = 1_793_000_000 - (1_793_000_000 % H);
 const end = (bar: number, price: number, oiBar: number, oi: number) => ({ time: T + bar * H, price, oiTime: T + oiBar * H + 1_800, oi });
-const line = (dir: 'bullish' | 'bearish', a: ReturnType<typeof end>, b: ReturnType<typeof end>, repeat: WebOiDivergenceLine['repeat'] = null): WebOiDivergenceLine => ({
-  direction: dir, a, b, confirmedAt: b.time + 7 * H, pricePct: (b.price / a.price - 1) * 100, oiPct: (b.oi / a.oi - 1) * 100, repeat, firedAt: null,
+const line = (
+  dir: 'bullish' | 'bearish', a: ReturnType<typeof end>, b: ReturnType<typeof end>, repeat: WebOiDivergenceLine['repeat'] = null,
+  kind: OiDivergenceKind = 'regular',
+): WebOiDivergenceLine => ({
+  direction: dir, kind, a, b, confirmedAt: b.time + 7 * H, pricePct: (b.price / a.price - 1) * 100, oiPct: (b.oi / a.oi - 1) * 100, repeat, firedAt: null,
 });
 
 describe('divergenceTf', () => {
@@ -25,17 +29,48 @@ describe('visibleLines — a repeat replaces the line it extends (V8)', () => {
     expect(visibleLines([ab, ac, other])).toEqual([other, ac]);
     expect(visibleLines([ab, other])).toEqual([other, ab]); // control: no repeat, both drawn
   });
+
+  it('IB-144: the run key carries the kind — a hidden run never replaces a regular line, nor the reverse', () => {
+    const ab = line('bullish', end(10, 100, 10, 900), end(30, 98, 30, 950));
+    // a hidden line whose run starts at the same B, same direction: a run of its own
+    const hiddenAc = line('bullish', end(10, 100, 10, 900), end(50, 101, 50, 880), { runLength: 3, firstBTime: ab.b.time }, 'hidden');
+    expect(visibleLines([ab, hiddenAc])).toEqual([ab, hiddenAc]);
+    const hiddenAb = line('bullish', end(10, 100, 10, 900), end(30, 101, 30, 880), null, 'hidden');
+    const regularAc = line('bullish', end(10, 100, 10, 900), end(50, 96, 50, 980), { runLength: 3, firstBTime: hiddenAb.b.time });
+    expect(visibleLines([hiddenAb, regularAc])).toEqual([hiddenAb, regularAc]);
+    // control: within one kind the repeat still replaces
+    const hiddenRepeat = line('bullish', end(10, 100, 10, 900), end(50, 102, 50, 870), { runLength: 3, firstBTime: hiddenAb.b.time }, 'hidden');
+    expect(visibleLines([hiddenAb, hiddenRepeat, regularAc])).toEqual([hiddenRepeat, regularAc]);
+  });
 });
 
 describe('divergenceStrokes', () => {
   it('two strokes a line: price at the wicks, OI at the pivot bars in CONTRACTS (the detector’s values); a repeat dashed', () => {
     const l = line('bullish', end(10, 100, 11, 900), end(30, 98, 30, 950), { runLength: 3, firstBTime: T });
     const [price, oi] = divergenceStrokes([l], '1h');
-    expect(price).toEqual({ pane: 'price', unit: 'price', direction: 'bullish', colour: DIVERGENCE_COLOURS.bullish, dashed: true,
+    expect(price).toEqual({ pane: 'price', unit: 'price', direction: 'bullish', kind: 'regular', colour: DIVERGENCE_COLOURS.bullish, lineStyle: LineStyle.Dashed,
       points: [{ time: T + 10 * H, value: 100 }, { time: T + 30 * H, value: 98 }] });
     // the OI pivot's reading at 11:30 belongs to the bar opened 11:00
-    expect(oi).toMatchObject({ pane: 'openInterest', unit: 'contracts', colour: DIVERGENCE_COLOURS.bullish,
+    expect(oi).toMatchObject({ pane: 'openInterest', unit: 'contracts', colour: DIVERGENCE_COLOURS.bullish, lineStyle: LineStyle.Dashed,
       points: [{ time: T + 11 * H, value: 900 }, { time: T + 30 * H, value: 950 }] });
+  });
+
+  it('IB-144 (V44): the dash is kind × repeat — regular solid, regular repeat dashed, hidden dotted, hidden repeat large-dashed; both panes', () => {
+    const rep = (first: number) => ({ runLength: 3, firstBTime: T + first * H });
+    const cases: Array<[OiDivergenceKind, boolean, LineStyle]> = [
+      ['regular', false, LineStyle.Solid], ['regular', true, LineStyle.Dashed],
+      ['hidden', false, LineStyle.Dotted], ['hidden', true, LineStyle.LargeDashed],
+    ];
+    for (const [kind, repeat, style] of cases) {
+      const l = line('bearish', end(10, 110, 10, 1_000), end(30, 108, 30, 1_050), repeat ? rep(20) : null, kind);
+      const strokes = divergenceStrokes([l], '1h');
+      expect(strokes.map((s) => [s.pane, s.kind, s.lineStyle, s.colour])).toEqual([
+        ['price', kind, style, DIVERGENCE_COLOURS.bearish], ['openInterest', kind, style, DIVERGENCE_COLOURS.bearish],
+      ]);
+    }
+    // four different styles: a hidden line never looks like a regular one or a repeat
+    const all = Object.values(DIVERGENCE_LINE_STYLES).flatMap((s) => [s.first, s.repeat]);
+    expect(new Set(all).size).toBe(4);
   });
 
   it('OI pivots out of order on this frame (B’s before A’s): the price stroke alone', () => {
