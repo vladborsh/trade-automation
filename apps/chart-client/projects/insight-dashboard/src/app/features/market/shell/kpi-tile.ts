@@ -70,7 +70,8 @@ export const FULL_SPAN_SEC = 7 * 86_400 - 2 * 3_600;
 export function kpiTileView(tile: WebKpiTile): KpiTileView {
   const base = kpiView(tile);
   const visible = VISIBLE_ATTRIBUTION.has(tile.id);
-  const history = CHARTED.has(tile.id) ? tile.history : null;
+  // IB-BUG-038: `?? null` — an older server sends no `history` field at all; absent reads as no series
+  const history = CHARTED.has(tile.id) ? (tile.history ?? null) : null;
   const chart = kpiChartGeometry(history);
   const caption = chart && history ? { source: { ...tile.source, link: visible }, text: captionText(history) } : null;
   return {
@@ -90,7 +91,7 @@ export function kpiTileView(tile: WebKpiTile): KpiTileView {
 }
 
 function range(tile: WebKpiTile, history: WebKpiHistory | null): KpiTileView['range'] {
-  if (history === null) {
+  if (history == null) {
     const n = tile.note;
     return isCollecting(tile) && n ? { left: { key: 'kpi.note.collecting', params: { hours: Number(n.params['hours'] ?? 0) } }, right: null } : null;
   }

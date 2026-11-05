@@ -13,8 +13,9 @@ const bars = (values: number[]): WebKpiHistory => {
 };
 
 describe('kpiChartGeometry', () => {
-  it('null history draws nothing', () => {
+  it('null history draws nothing — and an absent one (undefined, IB-BUG-038) neither, without throwing', () => {
     expect(kpiChartGeometry(null)).toBeNull();
+    expect(kpiChartGeometry(undefined)).toBeNull();
   });
 
   it('area: one unbroken run spans the box; the max at the top pad, the min at the bottom pad', () => {

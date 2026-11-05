@@ -76,6 +76,16 @@ describe('IB-118: the 7-day chart, its min / max row and its caption', () => {
     return { kind: 'bars', points, from: points[0].time, to: points[n - 1].time, min: Math.min(...v), max: Math.max(...v), breakAfterSec: null };
   };
 
+  it('IB-BUG-038: a tile with NO history field (a server older than IB-118) is a tile without a chart, not a crash', () => {
+    for (const id of ['market_cap', 'btc_oi', 'btc_funding'] as const) {
+      const { history: _absent, ...old } = base(id, { value: 1 });
+      const v = kpiTileView(old as WebKpiTile);
+      expect(v).toMatchObject({ chart: null, range: null, caption: null });
+    }
+    const { history: _h, ...oi } = base('btc_oi', { value: 7.7e9 });
+    expect(kpiTileView(oi as WebKpiTile).note).toEqual({ key: 'kpi.note.venue_over.24h', params: { venue: 'Binance' } }); // as before IB-118
+  });
+
   it('null history draws no chart: the tile is as before (cap: CoinGecko credited, no range)', () => {
     const v = kpiTileView(base('market_cap', { value: 2.68e12, source: COINGECKO, history: null }));
     expect(v).toMatchObject({ chart: null, range: null, caption: null, attribution: COINGECKO });

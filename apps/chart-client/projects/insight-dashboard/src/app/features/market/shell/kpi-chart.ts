@@ -55,8 +55,12 @@ export const PAD_PCT = 10;
 /** The gap between two bars, as a share of a bar's slot. */
 const BAR_GAP_SHARE = 0.25;
 
-export function kpiChartGeometry(history: WebKpiHistory | null): KpiChartGeometry | null {
-  if (history === null || history.points.length === 0) return null;
+/**
+ * `undefined` too (IB-BUG-038): a payload from a server older than IB-118 — or a fixture captured before
+ * it — has no `history` at all. Absent is "no series", the same as null, never a crash of the page.
+ */
+export function kpiChartGeometry(history: WebKpiHistory | null | undefined): KpiChartGeometry | null {
+  if (history == null || history.points.length === 0) return null;
   return history.kind === 'area' ? area(history) : bars(history);
 }
 

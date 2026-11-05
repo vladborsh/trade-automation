@@ -33,12 +33,12 @@ const caps = (period: WebMarketPeriod): WebCapsResponse => ({
 
 interface Call { endpoint: string; period?: WebMarketPeriod }
 
-function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean; cards?: unknown } = {}) {
+function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean; cards?: unknown; kpis?: unknown } = {}) {
   const calls: Call[] = [];
   const navigate = vi.fn(async () => true);
   const api = {
     liquidationsOverview: async (_min: number, _limit: number, period: WebMarketPeriod) => { calls.push({ endpoint: 'liquidations', period }); return overview(period); },
-    marketKpis: async () => { calls.push({ endpoint: 'kpis' }); return kpisFixture as unknown as WebKpisResponse; },
+    marketKpis: async () => { calls.push({ endpoint: 'kpis' }); return (opts.kpis ?? kpisFixture) as unknown as WebKpisResponse; },
     marketInsights: (period: WebMarketPeriod) => {
       calls.push({ endpoint: 'insights', period });
       const body = { ...(insightsFixture as unknown as WebInsightsResponse), period, ...(opts.noStatements ? { top: [] } : {}) };
@@ -161,6 +161,32 @@ describe('MarketComponent shell (IB-088)', () => {
     day.fixture.detectChanges();
     expect(text(day.fixture)).not.toContain('No 24h data');
     expect(text(day.fixture)).toMatch(/Nothing unusual over 24h|Not enough history/);
+  });
+
+  it('IB-BUG-038: a KPI answer with NO history field (a pre-IB-118 server) still draws the page — five tiles, no chart, the rest intact', async () => {
+    const charts = async (kpis: unknown) => {
+      const { fixture } = setup({ kpis });
+      await vi.advanceTimersByTimeAsync(0);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      const out = {
+        tiles: [...el.querySelectorAll('app-kpi-strip .tile')].map((t) => t.getAttribute('data-kpi')),
+        charts: el.querySelectorAll('app-kpi-strip app-kpi-chart').length,
+        positioning: el.querySelectorAll('app-pos-heat tbody tr').length,
+      };
+      TestBed.resetTestingModule();
+      return out;
+    };
+    // positive control: the same page with the fixture's histories draws three charts
+    const withHistory = await charts(kpisFixture);
+    expect(withHistory.charts).toBe(3);
+    const old = { ...kpisFixture, tiles: kpisFixture.tiles.map(({ history: _absent, ...t }) => t) };
+    expect(old.tiles.every((t) => !('history' in t))).toBe(true);
+    const without = await charts(old);
+    expect(without.tiles).toEqual(['market_cap', 'btc_dominance', 'liquidations_24h', 'btc_oi', 'btc_funding']);
+    expect(without.charts).toBe(0);
+    expect(without.positioning).toBe(withHistory.positioning);
+    expect(without.positioning).toBeGreaterThan(0);
   });
 
   it('IB-117: five KPI tiles, none of them Fear & Greed — and the gauge panel still draws the index', async () => {
