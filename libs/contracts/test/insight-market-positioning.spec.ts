@@ -55,6 +55,24 @@ describe('IB-085 contracts', () => {
     expect(WebKpisResponseSchema.safeParse({ ...kpis, tiles: [without, ...kpis.tiles.slice(1)] }).success).toBe(false); // absence is stated
   });
 
+  it('IB-118: the tile history is required, null allowed, a closed kind, at least one point, from ≤ to and min ≤ max', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const kpis = require('./fixtures/kpis.json');
+    const parsed = WebKpisResponseSchema.parse(kpis);
+    expect(parsed.tiles.map((t) => t.history?.kind ?? null)).toEqual(['area', null, null, 'area', 'bars']);
+    const cap = kpis.tiles[0];
+    const withHistory = (history: unknown) => ({ ...kpis, tiles: [{ ...cap, history }, ...kpis.tiles.slice(1)] });
+    expect(WebKpisResponseSchema.safeParse(withHistory(null)).success).toBe(true);
+    expect(WebKpisResponseSchema.safeParse(withHistory({ ...cap.history, kind: 'line' })).success).toBe(false);
+    expect(WebKpisResponseSchema.safeParse(withHistory({ ...cap.history, points: [] })).success).toBe(false); // empty is null, not []
+    expect(WebKpisResponseSchema.safeParse(withHistory({ ...cap.history, from: cap.history.to + 1 })).success).toBe(false);
+    expect(WebKpisResponseSchema.safeParse(withHistory({ ...cap.history, min: cap.history.max + 1 })).success).toBe(false);
+    const { history: _dropped, ...without } = cap;
+    expect(WebKpisResponseSchema.safeParse({ ...kpis, tiles: [without, ...kpis.tiles.slice(1)] }).success).toBe(false); // absence is stated
+    const collecting = { ...cap, history: null, note: { key: 'kpi.note.collecting', params: { hours: 3 } } };
+    expect(WebKpisResponseSchema.safeParse({ ...kpis, tiles: [collecting, ...kpis.tiles.slice(1)] }).success).toBe(true);
+  });
+
   it('four tiles do not parse — an unavailable tile says so, it does not vanish', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const kpis = require('./fixtures/kpis.json');
