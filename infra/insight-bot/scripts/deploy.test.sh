@@ -10,6 +10,12 @@
 # /health is the SPA now), when it is a 500, and when nothing listens. Also that it probes
 # /healthz and nothing else, and that a rollback to a pre-WD-011 image (whose SPA fallback answers
 # /healthz with index.html) still counts as healthy.
+#
+# IB-139: that a healthy deploy launches the watch through WATCH_LAUNCHER with the exact line (unit
+# name, the previous tag read from .env BEFORE render-env rewrites it, the deploy start) and sends
+# nothing; that a running watch is marked superseded and stopped by unit name first; that a failed
+# deploy sends the owner exactly one message carrying the rollback command, with the token only on
+# curl's stdin — never in its argv, deploy.sh's output, or the launch line.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -45,7 +51,28 @@ fi
 exit 0
 STUB
 printf '#!/usr/bin/env bash\nexit 0\n' >"$work/bin/sleep"
-chmod +x "$work/bin/aws" "$work/bin/docker" "$work/bin/sleep"
+# IB-139 stubs: curl (the Telegram send), systemctl (one running watch when STUB_ACTIVE_WATCH is set),
+# and the WATCH_LAUNCHER that stands in for systemd-run.
+cat >"$work/bin/curl" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$STUB_CURL_ARGS"
+cat >>"$STUB_CURL_STDIN"
+echo '{"ok":true,"result":{}}'
+STUB
+cat >"$work/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+echo "systemctl $*" >>"$STUB_LAUNCH"
+if [ "${1:-}" = list-units ] && [ -n "${STUB_ACTIVE_WATCH:-}" ]; then
+  echo "${STUB_ACTIVE_WATCH} loaded active running /usr/bin/python3 -I /opt/insight-bot/deploy-watch.py"
+fi
+exit 0
+STUB
+cat >"$work/launcher" <<'STUB'
+#!/usr/bin/env bash
+echo "LAUNCH $*" >>"$STUB_LAUNCH"
+STUB
+chmod +x "$work/bin/aws" "$work/bin/docker" "$work/bin/sleep" "$work/bin/curl" "$work/bin/systemctl" "$work/launcher"
+TOKEN='123456:FAKE-token_never-printed'
 
 # The fake app. MODE: new (WD-011+), lost-route, error, old (pre-WD-011 image with the SPA bundle).
 cat >"$work/app.js" <<'APP'
@@ -66,11 +93,18 @@ http.createServer((req, res) => {
 }).listen(0, '127.0.0.1', function () { fs.writeFileSync(portFile, String(this.address().port)); });
 APP
 
-run() { # $1 = case name, $2 = app mode or "none"
+run() { # $1 = case name, $2 = app mode or "none", $3 = previous IMAGE in .env (optional), $4 = a running watch unit (optional)
   local dir="$work/$1"
   mkdir -p "$dir/box/pgdata"
-  printf '#!/usr/bin/env bash\necho "POSTGRES_PASSWORD=x" >"$DEPLOY_DIR/.env"\n' >"$dir/box/render-env.sh"; chmod +x "$dir/box/render-env.sh"
-  : >"$dir/requests"; : >"$dir/probes"
+  # like the real one: rewrites .env from SSM, so IMAGE= is gone after it
+  cat >"$dir/box/render-env.sh" <<RENDER
+#!/usr/bin/env bash
+printf "POSTGRES_PASSWORD='x'\nTELEGRAM_BOT_TOKEN='${TOKEN}'\nTELEGRAM_SERVICE_CHAT_ID='-1001'\n" >"\$DEPLOY_DIR/.env"
+RENDER
+  chmod +x "$dir/box/render-env.sh"
+  [ -n "${3:-}" ] && printf "POSTGRES_PASSWORD='x'\nIMAGE='%s'\n" "$3" >"$dir/box/.env"
+  cp "$HERE/deploy-watch.py" "$dir/box/deploy-watch.py"
+  : >"$dir/requests"; : >"$dir/probes"; : >"$dir/curl-args"; : >"$dir/curl-stdin"; : >"$dir/launch"
   local port
   if [ "$2" = none ]; then
     port=$(node -e 'const s=require("net").createServer().listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')
@@ -81,20 +115,48 @@ run() { # $1 = case name, $2 = app mode or "none"
   fi
   set +e
   PATH="$work/bin:$PATH" DEPLOY_DIR="$dir/box" STUB_PORT="$port" STUB_PROBES="$dir/probes" \
+    STUB_CURL_ARGS="$dir/curl-args" STUB_CURL_STDIN="$dir/curl-stdin" STUB_LAUNCH="$dir/launch" \
+    STUB_ACTIVE_WATCH="${4:-}" WATCH_LAUNCHER="$work/launcher" WATCH_DIR="$dir/watch" \
     bash "$HERE/deploy.sh" sha-0123456789ab >"$dir/out" 2>&1
   echo $? >"$dir/exit"
   set -e
   if [ -n "$server_pid" ]; then kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; server_pid=""; fi
 }
 
-run healthy new
+PREV=123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/insight-bot:sha-aaaaaaaaaaaa
+run healthy new "$PREV"
 check "healthy: /healthz 200 → exit 0" "[ \"\$(cat '$work/healthy/exit')\" = 0 ]"
 check "healthy: prints 'healthy on'" "grep -q 'deploy.sh: healthy on .*insight-bot:sha-0123456789ab' '$work/healthy/out'"
 check "healthy: probed /healthz only, never /health" \
   "grep -qx '/healthz' '$work/healthy/requests' && ! grep -qx '/health' '$work/healthy/requests'"
 check "healthy: the probe text names /healthz" "grep -q '127.0.0.1:3005/healthz\"' '$work/healthy/probes'"
 
-run lost-route lost-route
+check "healthy: launches the watch with the exact line (previous tag read before render-env)" \
+  "grep -qxF \"LAUNCH --unit insight-watch-0123456789ab --collect --quiet -p MemoryMax=128M -p Nice=10 --setenv=DEPLOY_DIR=$work/healthy/box --setenv=WATCH_DIR=$work/healthy/watch /usr/bin/python3 -I $work/healthy/box/deploy-watch.py watch --tag sha-0123456789ab --prev sha-aaaaaaaaaaaa --deploy-start \" <(sed -E 's/[0-9]+$//' '$work/healthy/launch')"
+check "healthy: the deploy start is an epoch" "grep -qE -- '--deploy-start [0-9]{10}$' '$work/healthy/launch'"
+check "healthy: launched once, after 'healthy on'" \
+  "[ \"\$(grep -c '^LAUNCH' '$work/healthy/launch')\" = 1 ] && grep -q 'starting the 30-min watch insight-watch-0123456789ab' '$work/healthy/out'"
+check "healthy: no running watch → nothing stopped, no marker" \
+  "! grep -q 'systemctl stop' '$work/healthy/launch' && [ ! -d '$work/healthy/watch' ]"
+check "healthy: no Telegram message" "[ ! -s '$work/healthy/curl-args' ]"
+
+run supersede new "$PREV" insight-watch-bbbbbbbbbbbb.service
+check "supersede: the running watch gets a marker naming the new tag" \
+  "[ \"\$(cat '$work/supersede/watch/bbbbbbbbbbbb.superseded-by')\" = sha-0123456789ab ]"
+check "supersede: stopped by unit name, before the new launch" \
+  "[ \"\$(grep -n -e 'systemctl stop insight-watch-bbbbbbbbbbbb.service' -e '^LAUNCH' '$work/supersede/launch' | cut -d: -f1 | tr '\n' ' ')\" = '2 3 ' ]"
+
+run first-deploy new
+check "no IMAGE in .env before (first deploy): --prev unknown" "grep -q -- '--prev unknown ' '$work/first-deploy/launch'"
+
+run lost-route lost-route "$PREV"
+check "route lost: no watch launched" "! grep -q '^LAUNCH' '$work/lost-route/launch'"
+check "route lost: exactly one message to the owner" "[ \"\$(wc -l <'$work/lost-route/curl-args' | tr -d ' ')\" = 1 ]"
+check "route lost: the message says what failed and the rollback command" \
+  "grep -q 'не удалась (/healthz did not answer within 150 s)' '$work/lost-route/curl-args' && grep -q 'Команда отката: /opt/insight-bot/deploy.sh sha-aaaaaaaaaaaa' '$work/lost-route/curl-args'"
+check "route lost: the token is on curl's stdin only" \
+  "grep -qF '$TOKEN' '$work/lost-route/curl-stdin' && ! grep -qF '$TOKEN' '$work/lost-route/curl-args' && ! grep -qF '$TOKEN' '$work/lost-route/out'"
+check "route lost: still exit 1 (the message does not mask the failure)" "[ \"\$(cat '$work/lost-route/exit')\" = 1 ]"
 check "route lost (/healthz 404, /health 200): exit 1" "[ \"\$(cat '$work/lost-route/exit')\" = 1 ]"
 check "route lost: says /healthz did not answer" "grep -q '/healthz did not answer within 150 s' '$work/lost-route/out'"
 check "route lost: retried 30 times" "[ \"\$(grep -cx '/healthz' '$work/lost-route/requests')\" = 30 ]"
@@ -108,5 +170,7 @@ check "nothing listening: says /healthz did not answer" "grep -q '/healthz did n
 
 run rollback old
 check "rollback to a pre-WD-011 image (SPA answers /healthz): still healthy" "[ \"\$(cat '$work/rollback/exit')\" = 0 ]"
+
+check "no case printed the token" "! grep -rqF '$TOKEN' $work/*/out $work/*/launch $work/*/curl-args"
 
 [ "$fail" -eq 0 ] && echo "deploy.test.sh: all passed" || { echo "deploy.test.sh: FAILED"; exit 1; }

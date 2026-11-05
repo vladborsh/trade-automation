@@ -90,17 +90,18 @@ resource "aws_instance" "insight_bot" {
   # gzip + base64: inlined, the bootstrap passed EC2's 16 KiB user-data limit (IB-082 added the
   # Caddyfile); cloud-init recognises gzip and unpacks it. First boot only, see lifecycle below.
   user_data_base64 = base64gzip(templatefile("${path.module}/user_data.sh.tftpl", {
-    region         = var.region
-    ssm_prefix     = var.ssm_parameter_prefix
-    backup_bucket  = aws_s3_bucket.backups.bucket
-    compose_file   = file("${path.module}/../compose/docker-compose.yml")
-    caddyfile      = file("${path.module}/../compose/Caddyfile")
-    render_env_sh  = file("${path.module}/../scripts/render-env.sh")
-    deploy_sh      = file("${path.module}/../scripts/deploy.sh")
-    backup_sh      = file("${path.module}/../scripts/backup.sh")
-    restore_sh     = file("${path.module}/../scripts/restore.sh")
-    backup_service = file("${path.module}/../systemd/insight-bot-backup.service")
-    backup_timer   = file("${path.module}/../systemd/insight-bot-backup.timer")
+    region          = var.region
+    ssm_prefix      = var.ssm_parameter_prefix
+    backup_bucket   = aws_s3_bucket.backups.bucket
+    compose_file    = file("${path.module}/../compose/docker-compose.yml")
+    caddyfile       = file("${path.module}/../compose/Caddyfile")
+    render_env_sh   = file("${path.module}/../scripts/render-env.sh")
+    deploy_sh       = file("${path.module}/../scripts/deploy.sh")
+    deploy_watch_py = file("${path.module}/../scripts/deploy-watch.py") # IB-139, started by deploy.sh
+    backup_sh       = file("${path.module}/../scripts/backup.sh")
+    restore_sh      = file("${path.module}/../scripts/restore.sh")
+    backup_service  = file("${path.module}/../systemd/insight-bot-backup.service")
+    backup_timer    = file("${path.module}/../systemd/insight-bot-backup.timer")
   }))
 
   tags = { Name = "insight-bot" }

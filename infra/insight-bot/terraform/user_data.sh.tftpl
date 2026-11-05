@@ -54,6 +54,10 @@ cat >/opt/insight-bot/deploy.sh <<'DEPLOY_EOF'
 ${deploy_sh}
 DEPLOY_EOF
 
+cat >/opt/insight-bot/deploy-watch.py <<'WATCH_EOF'
+${deploy_watch_py}
+WATCH_EOF
+
 cat >/opt/insight-bot/backup.sh <<'BACKUP_EOF'
 ${backup_sh}
 BACKUP_EOF
@@ -70,7 +74,7 @@ cat >/etc/systemd/system/insight-bot-backup.timer <<'TIMER_EOF'
 ${backup_timer}
 TIMER_EOF
 
-chmod 0755 /opt/insight-bot/*.sh
+chmod 0755 /opt/insight-bot/*.sh /opt/insight-bot/deploy-watch.py
 
 # Static facts the scripts read instead of hardcoding.
 printf '%s' "${backup_bucket}" >/opt/insight-bot/backup-bucket
