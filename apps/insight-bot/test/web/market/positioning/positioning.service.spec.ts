@@ -264,6 +264,19 @@ describe('IB-118: KpisService — the three charts, each its own soft read', () 
     expect(tiles.btc_funding.history?.points.map((p) => p.time)).toEqual(settlements.slice(-21).map((s) => s.time));
   });
 
+  it('baseline rebuilding: the last bars seen stand in, for at most 2 h — then no chart', async () => {
+    let now = NOW;
+    let held: Map<string, unknown> | null = new Map([['BTCUSDT', settlements]]);
+    const svc = make({ positioning: { fundingSettlements: async () => held }, now: () => now, cache: new TtlCache({ now: () => now }) });
+    const first = (await svc.kpis()).tiles[4].history;
+    expect(first?.points).toHaveLength(21);
+    held = null;
+    now += 61_000; // past the 60 s cache
+    expect((await svc.kpis()).tiles[4].history).toEqual(first);
+    now += 2 * H;
+    expect((await svc.kpis()).tiles[4].history).toBeNull();
+  });
+
   it('funding baseline not held yet: no chart, nothing else lost', async () => {
     const tiles = await byId(make({ positioning: { fundingSettlements: async () => null } }));
     expect(tiles.btc_funding.history).toBeNull();

@@ -37,6 +37,11 @@ import type { PositioningService } from './positioning.service';
  * | BTC funding | the positioning baseline's last 21 settlements, **held only** (never builds it) | 0 |
  * | market cap | `market_cap_total`, our own table, `ts > now − 7 d` (≤ 1 008 rows) | 0 (the recorder pays ≤ 0.1 CoinGecko call/min) |
  * Under 6 h of cap rows: no chart, the note «копим историю: {h} ч». All inside this 60 s cache.
+ *
+ * The funding baseline is rebuilt hourly and a cold build takes ≈ 11 s (measured once on dev-1,
+ * 2026-11-05: one observation). Waiting for it would hold the whole strip; not waiting would drop the
+ * funding chart for up to a minute every hour. So the last bars seen are kept (21 points) and reused
+ * while the baseline is not held, for at most `FUNDING_HISTORY_STALE_MS`.
  */
 export interface KpisOptions {
   cache: TtlCache;
@@ -62,6 +67,8 @@ const SOURCES = {
 export class KpisService {
   private readonly logger = new Logger(KpisService.name);
   private readonly now: () => number;
+  /** IB-118: the last funding bars built from a held baseline, and when. */
+  private lastFunding: { history: WebKpiTile['history']; atMs: number } | null = null;
 
   constructor(private readonly options: KpisOptions) {
     this.now = options.now ?? Date.now;
@@ -136,7 +143,12 @@ export class KpisService {
     // IB-118: each chart is its own read; a failure leaves `history` null and touches nothing else
     if (oi7d) tiles.btc_oi.history = oiHistory(oi7d.points);
     const btcFunding = funding?.get(btc);
-    if (btcFunding) tiles.btc_funding.history = fundingHistory(btcFunding);
+    if (btcFunding) {
+      tiles.btc_funding.history = fundingHistory(btcFunding);
+      this.lastFunding = { history: tiles.btc_funding.history, atMs: now };
+    } else if (this.lastFunding && now - this.lastFunding.atMs <= FUNDING_HISTORY_STALE_MS) {
+      tiles.btc_funding.history = this.lastFunding.history;
+    }
     if (caps) {
       const cap = capHistory(caps);
       tiles.market_cap.history = cap.history;
@@ -157,4 +169,6 @@ function available(value: number, delta: number | null | undefined, asOf: number
 
 /** IB-106: the window the L/S note reads — the last 5-minute point is all it needs; 2 h covers a late venue. */
 const LS_NOTE_WINDOW_MS = 2 * 3_600_000;
+/** IB-118: the baseline is rebuilt hourly; two hours covers a late rebuild, and a settlement is 8 h apart. */
+export const FUNDING_HISTORY_STALE_MS = 2 * 3_600_000;
 const round = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 ** digits;
