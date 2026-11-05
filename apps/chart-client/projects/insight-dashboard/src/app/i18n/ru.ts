@@ -11,6 +11,7 @@ export const ru: Strings = {
   'nav.brand': 'инсайт',
   'nav.market': 'рынок',
   'nav.instrument': 'инструмент',
+  'nav.liquidations': 'ликвидации',
   'nav.positioning': 'позиционирование',
   'nav.admin': 'админ',
   'nav.health': 'сбор данных',

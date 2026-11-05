@@ -15,6 +15,7 @@ export type StringKey =
   | 'nav.brand'
   | 'nav.market'
   | 'nav.instrument'
+  | 'nav.liquidations'
   | 'nav.positioning'
   | 'nav.admin'
   | 'nav.health'

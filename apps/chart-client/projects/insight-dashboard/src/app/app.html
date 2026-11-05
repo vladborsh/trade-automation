@@ -3,6 +3,9 @@
   <!-- Market is the landing page and comes first; the instrument view next; the operator's two
        pages stay, but last (see app.routes.ts). -->
   <a routerLink="/market" routerLinkActive="active">{{ t('nav.market') }}</a>
+  <!-- IB-132 (owner ruling 2026-11-05): liquidations is a top-level item, not only a link from Market.
+       routerLinkActive's default (non-exact) options ignore extra query params, so ?p=7d&side=short stays active. -->
+  <a routerLink="/liquidations" routerLinkActive="active">{{ t('nav.liquidations') }}</a>
   <a routerLink="/positioning" routerLinkActive="active">{{ t('nav.positioning') }}</a>
   <a routerLink="/instrument/BTCUSDT" routerLinkActive="active">{{ t('nav.instrument') }}</a>
   @if (isAdmin()) {

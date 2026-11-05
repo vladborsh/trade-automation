@@ -5,6 +5,7 @@ export const en: Strings = {
   'nav.brand': 'insight',
   'nav.market': 'market',
   'nav.instrument': 'instrument',
+  'nav.liquidations': 'liquidations',
   'nav.positioning': 'positioning',
   'nav.admin': 'admin',
   'nav.health': 'data collection',
