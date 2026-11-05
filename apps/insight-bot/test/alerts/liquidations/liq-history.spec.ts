@@ -1,6 +1,6 @@
 import { LIQ_DEFAULT_PARAMS, type LiqVenue } from '@trade-automation/contracts';
 import {
-  MemoryJournalStore, countRows, firstFullDay, historyStore, replayLiq, scaleParams,
+  MemoryJournalStore, countRows, crossCheck, firstFullDay, historyStore, replayLiq, scaleParams,
 } from '../../../src/alerts/liquidations/backfill/liq-history';
 import { parseLiqCliArgs } from '../../../src/alerts/liquidations/backfill/liq-backfill.cli';
 import { BOOT_LOOKBACK_MS, LiqAlertLoop } from '../../../src/alerts/liquidations/liq-alert-loop';
@@ -153,6 +153,14 @@ describe('IB-123 the counts: an in-memory journal over the database tape', () =>
 });
 
 describe('IB-123 pure helpers', () => {
+  it('crossCheck compares with the rows STORED, so a rerun (0 new rows) agrees; any table off by one disagrees', () => {
+    const stored = { alerts: 25, continuations: 19, controls_random: 18, controls_near_miss: 15, paths: 231 };
+    expect(crossCheck({ alerts: 25, continuations: 19, controls: 33 }, stored)).toBeNull();
+    expect(crossCheck({ alerts: 25, continuations: 19, controls: 32 }, stored)).toMatch(/25\/19\/32\) differs .* \(25\/19\/33\)/);
+    expect(crossCheck({ alerts: 24, continuations: 19, controls: 33 }, stored)).not.toBeNull();
+    expect(crossCheck({ alerts: 25, continuations: 18, controls: 33 }, stored)).not.toBeNull();
+  });
+
   it('scaleParams multiplies every threshold and keeps on/off', () => {
     const p = scaleParams({ perCoin: { BTCUSDT: { enabled: true, thresholdUsd: 5e6 }, TRXUSDT: { enabled: false, thresholdUsd: 3e5 } } }, 0.5);
     expect(p).toEqual({ perCoin: { BTCUSDT: { enabled: true, thresholdUsd: 2.5e6 }, TRXUSDT: { enabled: false, thresholdUsd: 1.5e5 } } });

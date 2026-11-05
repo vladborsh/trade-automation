@@ -217,3 +217,15 @@ export function countRows(store: MemoryJournalStore, params: LiqParams, multipli
 
 /** The pinned base of every history run (see the module comment). */
 export const LIQ_HISTORY_PARAMS: LiqParams = LIQ_DEFAULT_PARAMS;
+
+/**
+ * The ×1 in-memory count against the backfill rows the database holds for the same range. Not against the
+ * rows THIS run wrote: a rerun writes 0 and still holds every row (the 2026-11-11 check is a rerun). Null when
+ * they agree, else the disagreement.
+ */
+export function crossCheck(memory: { alerts: number; continuations: number; controls: number }, stored: Record<string, number>): string | null {
+  const db = { alerts: stored.alerts ?? 0, continuations: stored.continuations ?? 0, controls: (stored.controls_random ?? 0) + (stored.controls_near_miss ?? 0) };
+  return memory.alerts === db.alerts && memory.continuations === db.continuations && memory.controls === db.controls
+    ? null
+    : `the in-memory ×1 replay (${memory.alerts}/${memory.continuations}/${memory.controls}) differs from the backfill rows stored (${db.alerts}/${db.continuations}/${db.controls})`;
+}

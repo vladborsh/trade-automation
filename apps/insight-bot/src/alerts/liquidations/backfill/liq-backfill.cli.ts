@@ -44,7 +44,7 @@ import { PgLiqAlertStore } from '../pg/liq-alerts.repo';
 import { BOOT_LOOKBACK_MS } from '../liq-alert-loop';
 import {
   DAY_MS, LIQ_HISTORY_MULTIPLIERS, LIQ_HISTORY_PARAMS, MemoryJournalStore, countRows, firstFullDay, historyStore, replayLiq,
-  scaleParams, type LiqCountRow, type LiqReplayTotals,
+  scaleParams, crossCheck, type LiqCountRow, type LiqReplayTotals,
 } from './liq-history';
 
 /** V31's budget, as IB-116: ≈ 8 % of the IP's 2 400 a minute while it runs. */
@@ -160,10 +160,9 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
       if (Object.keys(t.warnings).length > 0) exit = 1;
       table.push(...countRows(mem as unknown as MemoryJournalStore, scaleParams(LIQ_HISTORY_PARAMS, k), k, days));
       say(`counts ×${k}: ${t.ticks} ticks, ${t.alerts} alerts, ${t.continuations} continuations, ${t.controls} controls, ${t.reads} reads`);
-      if (k === 1 && args.countsToMs === args.untilMs && (t.alerts !== totals.alerts || t.continuations !== totals.continuations || t.controls !== totals.controls)) {
-        say(`MISMATCH: the in-memory ×1 replay (${t.alerts}/${t.continuations}/${t.controls}) differs from the database one (${totals.alerts}/${totals.continuations}/${totals.controls})`);
-        exit = 1;
-      }
+      // same range only: a longer counts range (the weekly rerun) holds days the write never covers
+      const mismatch = k === 1 && args.countsToMs === args.untilMs ? crossCheck(t, counts) : null;
+      if (mismatch) { say(`MISMATCH: ${mismatch}`); exit = 1; }
     }
     printTable(table, fromMs, args.countsToMs, days);
     say(`LIQ_HISTORY_JSON ${JSON.stringify({ mode: args.mode, from: iso(fromMs), until: iso(args.untilMs), countsTo: iso(args.countsToMs), days: Math.round(days * 1000) / 1000, written: counts, table })}`);
