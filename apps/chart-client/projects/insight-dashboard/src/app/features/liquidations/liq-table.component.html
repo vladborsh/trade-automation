@@ -1,0 +1,24 @@
+<table>
+  <thead>
+    <tr>
+      @for (c of columns; track c) {
+        <th scope="col" [class]="c" [class.phone-hide]="phoneHidden(c)" [attr.aria-sort]="ariaSort(c)">
+          <button type="button" (click)="sortChange.emit(c)">{{ heading(c) }}</button>
+        </th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (v of views(); track v.row.time + v.row.symbol + v.row.venue + v.row.usd + v.row.side) {
+      <tr (click)="open(v)">
+        <td class="time num">{{ v.time }}</td>
+        <td class="base"><a [routerLink]="v.link.commands" [queryParams]="v.link.queryParams" (click)="$event.stopPropagation()">{{ v.row.base }}</a></td>
+        <td class="side" [attr.data-side]="v.row.side">{{ side(v) }}</td>
+        <td class="usd num">{{ v.usd }}</td>
+        <td class="price num phone-hide">{{ v.price }}</td>
+        <td class="venue phone-hide">{{ v.venue }}</td>
+        <td class="series num">{{ series(v) }}</td>
+      </tr>
+    }
+  </tbody>
+</table>

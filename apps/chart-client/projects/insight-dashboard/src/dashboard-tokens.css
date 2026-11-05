@@ -72,4 +72,6 @@
   --link: var(--blue-400); --link-hover: #79b8ff;   /* no underline; underline on focus-visible only */
   --bar-track: var(--gray-800); --bar-h: 6px; --bar-radius: 3px;
   --spark-h: 34px; --spark-gap: 3px; --spark-radius: 2px; --spark-opacity: .85;
+  /* IB-120: the help block (`app-help-block`), market-round2 mockup's `.help` */
+  --help-bg: #0d1a2b; --help-border: #1f3a5f;
 }

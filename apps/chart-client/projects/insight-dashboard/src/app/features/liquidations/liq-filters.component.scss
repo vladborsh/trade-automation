@@ -1,0 +1,13 @@
+/* market-round2 mockup `.toolbar` / `.pill`: rounded chips, the active one outlined in the link colour. */
+:host { display: block; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  min-height: var(--touch-min); box-sizing: border-box; padding: 0 12px;
+  background: transparent; color: var(--color-text-muted); border: 1px solid var(--seg-border); border-radius: var(--pill-radius);
+  font: var(--type-small); cursor: pointer;
+}
+.pill:hover { border-color: var(--color-border-strong); color: var(--color-text); }
+.pill.on { border-color: var(--link); color: var(--link); background: var(--chip-sent-bg); }
+.pill:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+select.pill { appearance: auto; padding-right: 6px; }
+select.pill option { background: var(--card-bg); color: var(--color-text); }

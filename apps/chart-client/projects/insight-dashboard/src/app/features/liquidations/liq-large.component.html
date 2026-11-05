@@ -3,7 +3,7 @@
 } @else {
   <app-liq-bubbles [events]="large()" [from]="from()" [to]="to()" [bucketSec]="bucketSec()" />
   <ol class="cards">
-    @for (card of visible(); track card.event.time + card.event.symbol + card.event.venue + card.event.usd) {
+    @for (card of collapsed().shown; track card.event.time + card.event.symbol + card.event.venue + card.event.usd) {
       <li>
         <a class="card" [routerLink]="card.link.commands" [queryParams]="card.link.queryParams" [attr.data-side]="card.event.side">
           <i class="dot" aria-hidden="true"></i>
@@ -21,11 +21,7 @@
       </li>
     }
   </ol>
-  @if (collapsed().hiddenCount > 0) {
-    <button type="button" class="more" [attr.aria-expanded]="expanded()" (click)="expanded.set(!expanded())">
-      {{ expanded() ? t('liq.large.showFewer') : t('liq.large.showAll', { count: cards().length }) }}
-    </button>
-  }
+  <a class="more" [routerLink]="pageLink().commands" [queryParams]="pageLink().queryParams">{{ t('liqPage.marketLink', { count: cards().length }) }}</a>
 }
 @if (note(); as n) {
   <p class="muted">{{ n }}</p>

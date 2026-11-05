@@ -1,0 +1,29 @@
+/* market-round2 mockup's table: mono cells, muted headings, a hairline per row. */
+:host { display: block; min-width: 0; }
+table { width: 100%; border-collapse: collapse; font: var(--type-note); }
+th, td { padding: 8px; border-bottom: 1px solid var(--card-border); text-align: left; white-space: nowrap; }
+th { font-weight: 400; }
+th button {
+  min-height: 32px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--color-text-muted); font: inherit;
+}
+th button:hover, th button:focus-visible { color: var(--color-text); }
+th[aria-sort] button { color: var(--color-text); }
+th[aria-sort='ascending'] button::after { content: ' \2191'; }
+th[aria-sort='descending'] button::after { content: ' \2193'; }
+th.usd, th.price, th.series, td.usd, td.price, td.series { text-align: right; }
+.num { font-family: var(--font-num); }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--seg-active-bg); }
+td.usd { color: var(--color-text-strong); }
+td.side[data-side='long'] { color: var(--color-down); }
+td.side[data-side='short'] { color: var(--color-up); }
+td.base a { color: var(--color-text); text-decoration: none; font-family: var(--font-num); }
+td.base a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+td.series { color: var(--color-text-muted); }
+
+/* §4: on a phone the table drops price and venue, and the remaining five fit 390 px */
+@media (max-width: 480px) {
+  .phone-hide { display: none; }
+  th, td { padding: 8px 4px; }
+}

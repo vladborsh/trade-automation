@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import type { WebInsightBlockLine, WebLiquidationBlock, WebLiquidationsOverviewResponse } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
+import { routes } from '../../app.routes';
 import { I18nService } from '../../i18n/i18n.service';
 import { LiquidationsBlockComponent } from './liquidations-block.component';
 
@@ -17,12 +18,12 @@ const overview = (over: Partial<WebLiquidationBlock> = {}): WebLiquidationsOverv
   venues: { present: ['binance', 'bybit'], missing: ['okx'] }, block: { ...block, ...over },
 });
 
-function render(o: WebLiquidationsOverviewResponse, line: WebInsightBlockLine | null = null, nowSec = 1_793_700_000) {
+function render(o: WebLiquidationsOverviewResponse, line: WebInsightBlockLine | null = null, nowSec = 1_793_700_000, period: '1h' | '24h' | '7d' = '24h') {
   TestBed.configureTestingModule({ imports: [LiquidationsBlockComponent], providers: [provideRouter([])] });
   TestBed.inject(I18nService).setLang('en');
   const f = TestBed.createComponent(LiquidationsBlockComponent);
   f.componentRef.setInput('overview', o);
-  f.componentRef.setInput('period', '24h');
+  f.componentRef.setInput('period', period);
   f.componentRef.setInput('line', line);
   f.componentRef.setInput('nowSec', nowSec);
   f.detectChanges();
@@ -61,6 +62,21 @@ describe('LiquidationsBlockComponent (IB-089)', () => {
     expect(el.querySelector('app-liq-where .side')).not.toBeNull();
     expect(el.querySelector('app-liq-hourly')?.textContent).toContain('normal appears on 2026-11-10');
     expect(el.querySelector('app-liq-large')?.textContent).toContain('normal appears on 2026-11-10');
+  });
+
+  it('IB-120: «All liquidations (N) →» is a router link to /liquidations at Market\'s period — a real route, never a bare #href', () => {
+    const link = (p: '1h' | '24h' | '7d') => {
+      TestBed.resetTestingModule();
+      return render(overview(), null, 1_793_700_000, p).querySelector('app-liq-large a.more') as HTMLAnchorElement;
+    };
+    expect(link('7d').getAttribute('href')).toBe('/liquidations?p=7d');
+    expect(link('1h').getAttribute('href')).toBe('/liquidations?p=24h');
+    const a = link('24h');
+    expect(a.getAttribute('href')).toBe('/liquidations?p=24h');
+    expect(a.textContent?.trim()).toBe(`All liquidations (${block.large.length}) →`);
+    expect(routes.some((r) => r.path === 'liquidations' && r.loadComponent !== undefined)).toBe(true);
+    // the fold stays at 8 cards; the rest are on the page
+    expect(a.closest('app-liq-large')?.querySelectorAll('.card').length).toBeLessThanOrEqual(8);
   });
 
   it('ends with the block line: the neutral reason when nothing passed', () => {

@@ -9,6 +9,8 @@ import type {
   WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebFlowsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
   WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
+  WebLiquidationsLargeQuery,
+  WebLiquidationsLargeResponse,
 } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
@@ -144,6 +146,16 @@ export class InsightApiClient {
   async liquidationsOverview(feedMinUsd = 100_000, feedLimit = 30, period: WebMarketPeriod = '24h'): Promise<WebLiquidationsOverviewResponse> {
     return this.get<WebLiquidationsOverviewResponse>('/liquidations/overview', {
       symbols: 'top20', feed_min_usd: feedMinUsd, feed_limit: feedLimit, period,
+    });
+  }
+
+  /**
+   * IB-120 — the /liquidations page: the period's large liquidations, filtered, ≤ 1 000 newest first.
+   * Our tape only (venue weight 0); the server caches each filter set for 10 s.
+   */
+  async liquidationsLarge(q: WebLiquidationsLargeQuery): Promise<WebLiquidationsLargeResponse> {
+    return this.get<WebLiquidationsLargeResponse>('/liquidations/large', {
+      period: q.period, symbol: q.symbol, minUsd: q.minUsd, side: q.side, venue: q.venue,
     });
   }
 

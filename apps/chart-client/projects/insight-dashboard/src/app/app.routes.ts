@@ -70,5 +70,10 @@ export const routes: Routes = [
     path: 'positioning',
     loadComponent: () => import('./features/positioning/positioning-page.component').then((m) => m.PositioningPageComponent),
   },
+  {
+    // IB-120 (market-round2 §4): every large liquidation, filtered — reached from Market, no nav item
+    path: 'liquidations',
+    loadComponent: () => import('./features/liquidations/liquidations-page.component').then((m) => m.LiquidationsPageComponent),
+  },
   { path: '**', redirectTo: LANDING_REDIRECT },
 ];

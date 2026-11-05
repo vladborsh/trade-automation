@@ -1,0 +1,26 @@
+/* Market's page box (IB-108 §7.6); the mockup draws the whole view as one card. The shell's `.page` pads 16 px. */
+:host {
+  --shell-pad: 16px;
+  display: block; min-width: 0;
+  box-sizing: content-box; max-width: var(--page-max); margin: 0 auto; padding: calc(var(--page-pad) - var(--shell-pad));
+  color: var(--color-text);
+}
+.panel {
+  display: flex; flex-direction: column; gap: var(--card-inner-gap); min-width: 0;
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad);
+}
+.crumbs { display: flex; gap: 6px; font: var(--type-small); color: var(--color-text-muted); }
+.crumbs a { color: var(--link); text-decoration: none; }
+.crumbs a:focus-visible { text-decoration: underline; }
+h1 { margin: 0; font: var(--type-h2); font-size: 18px; color: var(--color-text-strong); }
+.help-list { margin: 0; padding-left: 18px; }
+.help-list li { margin: 4px 0; }
+.help-list b { color: var(--color-text-strong); }
+.muted { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
+.foot { text-align: center; }
+.error { margin: 0; color: var(--color-down); font: var(--type-note); }
+
+@media (max-width: 480px) {
+  :host { padding: calc(var(--page-pad-phone) - var(--shell-pad)) 0; }
+  .panel { padding: 12px; }
+}

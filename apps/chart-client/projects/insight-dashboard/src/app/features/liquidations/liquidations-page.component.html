@@ -1,0 +1,33 @@
+@let s = state();
+<section class="panel">
+  <nav class="crumbs">
+    <a routerLink="/market" [queryParams]="marketParams()">{{ t('liqPage.crumb') }}</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">{{ t('liqPage.title') }}</span>
+  </nav>
+  <h1>{{ t('liqPage.title') }}</h1>
+  <app-help-block [title]="t('liqPage.help.title')" storageKey="liquidations">
+    <ul class="help-list">
+      @for (item of helpItems; track item) {
+        <li><b>{{ help(item, 'lead') }}</b> {{ help(item, 'text') }}</li>
+      }
+    </ul>
+  </app-help-block>
+  <app-liq-filters [query]="s.query" [coins]="data()?.coins ?? []" (queryChange)="onQuery($event)" />
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ t('market.blockError', { message }) }}</p>
+  }
+  @if (data(); as d) {
+    <app-liq-bubbles [events]="d.rows" [from]="d.from" [to]="d.asOf" [bucketSec]="week() ? 14400 : 3600" />
+    @if (d.rows.length === 0) {
+      <p class="muted">{{ t('liqPage.empty') }}</p>
+    } @else {
+      <app-liq-table [rows]="d.rows" [sort]="s.sort" [withDay]="week()" (sortChange)="onSort($event)" />
+      <p class="muted foot">
+        {{ d.truncated ? t('liqPage.truncated', { shown: count(d.rows.length), total: count(d.total) }) : t('liqPage.count', { total: count(d.total) }) }}
+      </p>
+    }
+  } @else if (!error()) {
+    <app-loader variant="block" [label]="t('market.loadingLiquidations')" />
+  }
+</section>

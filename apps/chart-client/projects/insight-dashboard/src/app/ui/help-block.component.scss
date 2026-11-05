@@ -1,0 +1,10 @@
+/* market-round2 mockup `.help`: a blue-tinted panel, a link-coloured summary, 13 px body. */
+:host { display: block; min-width: 0; }
+.help {
+  background: var(--help-bg); border: 1px solid var(--help-border); border-radius: var(--card-radius);
+  padding: 12px 14px; font: var(--type-note); color: var(--color-text);
+}
+summary { cursor: pointer; color: var(--link); font-weight: 600; min-height: 24px; }
+summary:hover { color: var(--link-hover); }
+summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.body { margin-top: 8px; }

@@ -1,0 +1,23 @@
+@let q = query();
+<div class="toolbar" role="group" [attr.aria-label]="t('liqPage.filters')">
+  @for (p of periods; track p) {
+    <button type="button" class="pill" [class.on]="q.period === p" [attr.aria-pressed]="q.period === p" (click)="setPeriod(p)">{{ periodLabel(p) }}</button>
+  }
+  <select class="pill" [class.on]="q.symbol !== 'all'" [attr.aria-label]="t('liqPage.filter.coin')" (change)="setCoin($event)">
+    <option value="all" [selected]="q.symbol === 'all'">{{ t('liqPage.filter.coinAll') }}</option>
+    @for (c of coinOptions(); track c.symbol) {
+      <option [value]="c.symbol" [selected]="q.symbol === c.symbol">{{ c.base }}</option>
+    }
+  </select>
+  @for (m of mins; track m) {
+    <button type="button" class="pill" [class.on]="q.minUsd === m" [attr.aria-pressed]="q.minUsd === m" (click)="setMin(m)">{{ minLabel(m) }}</button>
+  }
+  <button type="button" class="pill side" data-side="long" [class.on]="q.side === 'long'" [attr.aria-pressed]="q.side === 'long'" (click)="toggleSide('long')">{{ t('liq.side.longs') }}</button>
+  <button type="button" class="pill side" data-side="short" [class.on]="q.side === 'short'" [attr.aria-pressed]="q.side === 'short'" (click)="toggleSide('short')">{{ t('liq.side.shorts') }}</button>
+  <select class="pill" [class.on]="q.venue !== 'all'" [attr.aria-label]="t('liqPage.filter.venue')" (change)="setVenue($event)">
+    <option value="all" [selected]="q.venue === 'all'">{{ t('liqPage.filter.venueAll') }}</option>
+    @for (v of venues; track v.key) {
+      <option [value]="v.key" [selected]="q.venue === v.key">{{ v.name }}</option>
+    }
+  </select>
+</div>

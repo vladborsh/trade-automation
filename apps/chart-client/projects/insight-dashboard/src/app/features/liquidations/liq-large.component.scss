@@ -24,11 +24,12 @@ p { margin: 8px 0 0; font: var(--type-small); }
 .ctx { font-size: 12px; color: var(--color-warning); }
 
 .more {
-  margin-top: 10px; min-height: var(--touch-min); padding: 0 14px;
-  background: transparent; color: var(--color-text); border: 1px solid var(--seg-border); border-radius: var(--seg-radius);
-  font: var(--type-note); cursor: pointer;
+  display: inline-flex; align-items: center; margin-top: 10px; min-height: var(--touch-min); box-sizing: border-box; padding: 0 14px;
+  color: var(--link); border: 1px solid var(--seg-border); border-radius: var(--seg-radius);
+  font: var(--type-note); text-decoration: none;
 }
-.more:hover { border-color: var(--color-border-strong); }
+.more:hover { border-color: var(--color-border-strong); color: var(--link-hover); }
+.more:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 @media (max-width: 767px) {
   .cards { grid-template-columns: minmax(0, 1fr); }
   .more { width: 100%; }
