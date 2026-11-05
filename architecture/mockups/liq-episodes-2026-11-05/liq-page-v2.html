@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liquidations v2 mockup</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--b:#30363d;--grid:#21262d;--t:#c9d1d9;--m:#8b949e;--up:#26a69a;--dn:#ef5350;--amber:#d29922;--blue:#58a6ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;padding:20px}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--b);border-radius:8px;padding:16px;min-width:0}
+.crumb{font-size:12px;color:var(--m)}.crumb a{color:var(--blue);text-decoration:none}
+h1{font-size:20px;margin:4px 0 0}
+h2{font-size:15px;margin:0 0 4px}
+.sub{font-size:12px;color:var(--m);margin:0 0 10px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{border:1px solid var(--b);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--m)}.pill.on{border-color:var(--blue);color:var(--blue)}
+.help{font-size:12px;color:var(--blue)}
+/* verdict */
+.verdict{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:12px}
+.verdict .big{font:600 22px/1.2 "IBM Plex Mono",monospace}
+.lab{font-size:11px;color:var(--m);text-transform:uppercase;letter-spacing:.05em}
+.split{height:8px;border-radius:4px;display:flex;overflow:hidden;margin:8px 0 4px}
+.headline{font-size:15px;line-height:1.4}
+/* timeline */
+svg{display:block;width:100%}
+.key{display:flex;gap:14px;font-size:11px;color:var(--m);flex-wrap:wrap;margin-top:6px}.key i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+/* episodes */
+.eps{display:grid;gap:10px}
+.ep{display:grid;grid-template-columns:150px 1fr 300px;gap:16px;align-items:center;border:1px solid var(--b);border-radius:8px;padding:12px 14px;background:#0f141a}
+.ep .when{font-size:12px;color:var(--m)}
+.ep .side{font-weight:600}
+.ep .sum{font:600 20px/1.2 "IBM Plex Mono",monospace}
+.ep .what{font-size:13px}
+.ep .what b{font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:11px;border-radius:4px;padding:1px 6px;background:#21262d;color:var(--t)}
+.price{font-size:12px;color:var(--m)}
+.price .mono{color:var(--t)}
+.ep a{font-size:12px;color:var(--blue);text-decoration:none}
+/* by coin */
+.coins{display:grid;grid-template-columns:60px 1fr 1fr 70px;gap:4px 8px;align-items:center;font-size:12px}
+.coins .l{display:flex;justify-content:flex-end}.coins .l span,.coins .r span{height:12px;border-radius:2px;display:block}
+.topnav{display:flex;gap:18px;align-items:center;font-size:13px;color:var(--m);border-bottom:1px solid var(--b);padding-bottom:10px;flex-wrap:wrap}.topnav b{letter-spacing:.1em;color:var(--t);font-weight:500}.topnav a.on{color:var(--t);font-weight:600}
+.anno{font-size:12px;color:var(--amber);margin:6px 0 0}
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+.raw{font-size:13px;color:var(--blue)}
+@media (max-width:700px){body{padding:12px}.verdict{grid-template-columns:1fr 1fr}.verdict>div:first-child{grid-column:1/-1}
+.ep{grid-template-columns:1fr;gap:6px}.grid2{grid-template-columns:1fr}.hide-phone{display:none}}
+</style></head><body><div class="wrap">
+
+<nav class="topnav"><b>ИНСАЙТ</b><a>рынок</a><a class="on">ликвидации</a><a>позиционирование</a><a>инструмент</a></nav>
+<div>
+  <h1>Крупные ликвидации</h1>
+</div>
+<div class="bar"><span class="pill">24ч</span><span class="pill on">7д</span><span class="pill">Все монеты ▾</span><span class="pill on">от $100K</span><span class="pill">от $1M</span><span class="pill">Все биржи ▾</span><span class="pill">лонги</span><span class="pill">шорты</span><span class="help">ⓘ Как читать</span></div>
+
+<div class="card"><div class="headline">За 7 дней — <b>6 эпизодов</b>: 4 раза выбивали <b style="color:var(--up)">шортов</b>, 2 раза <b style="color:var(--dn)">лонгов</b>. Крупнейший — <b>4 ноя 17:04</b>, BTC, <span class="mono">$68M</span> за 9 минут.</div>
+<p class="anno">Общие суммы, ликвидации по часам и разбивка по монетам уже есть на «Рынке» — здесь их нет. Эта страница только про эпизоды.</p></div>
+<!-- 3. episodes -->
+<div class="card">
+  <h2>Эпизоды</h2>
+  <p class="sub">Эпизод — подряд идущие ликвидации одной стороны, с паузами меньше 3 минут, на сумму от $5M. Вместо сотен строк — что случилось.</p>
+  <div class="eps">
+    <div class="ep">
+      <div><div class="when mono">① 4 ноя 17:04–17:13</div><div class="side" style="color:var(--up)">Шорты выбиты</div><div class="sum">$68M</div></div>
+      <div class="what"><b>181 ликвидация за 9 минут.</b> Почти всё — BTC.
+        <div class="chips"><span class="chip">BTC $56M</span><span class="chip">ETH $9M</span><span class="chip">SOL $2M</span><span class="chip">ещё 4</span></div>
+        <div class="chips"><span class="chip">Binance 71 %</span><span class="chip">OKX 18 %</span><span class="chip">Bybit 11 %</span></div></div>
+      <div class="price"><svg class="mini" viewBox="0 0 300 90" preserveAspectRatio="none" style="height:90px;margin-bottom:6px"></svg>BTC во время: <span class="mono">79 900 → 81 130</span> <span style="color:var(--up)">+1,5 %</span><br>через 4 ч: <span class="mono">80 450</span> <span style="color:var(--dn)">−0,8 %</span><br><a href="#">Открыть BTC в 17:04 →</a></div>
+    </div>
+    <div class="ep">
+      <div><div class="when mono">② 4 ноя 14:22–14:31</div><div class="side" style="color:var(--dn)">Лонги выбиты</div><div class="sum">$14M</div></div>
+      <div class="what"><b>46 ликвидаций за 9 минут.</b> ETH и альты.
+        <div class="chips"><span class="chip">ETH $6M</span><span class="chip">SOL $3M</span><span class="chip">HYPE $2M</span><span class="chip">ещё 9</span></div></div>
+      <div class="price"><svg class="mini" viewBox="0 0 300 90" preserveAspectRatio="none" style="height:90px;margin-bottom:6px"></svg>BTC во время: <span class="mono">80 610 → 80 020</span> <span style="color:var(--dn)">−0,7 %</span><br>через 4 ч: <span class="mono">80 900</span> <span style="color:var(--up)">+1,1 %</span><br><a href="#">Открыть ETH в 14:22 →</a></div>
+    </div>
+    <div class="ep">
+      <div><div class="when mono">③ 5 ноя 00:35–00:44</div><div class="side" style="color:var(--up)">Шорты выбиты</div><div class="sum">$7M</div></div>
+      <div class="what"><b>5 ликвидаций за 9 минут.</b> Только ETH.
+        <div class="chips"><span class="chip">ETH $7M</span></div></div>
+      <div class="price"><svg class="mini" viewBox="0 0 300 90" preserveAspectRatio="none" style="height:90px;margin-bottom:6px"></svg>ETH во время: <span class="mono">2 418 → 2 441</span> <span style="color:var(--up)">+1,0 %</span><br>через 4 ч: <span class="mono">2 430</span> <span style="color:var(--dn)">−0,5 %</span><br><a href="#">Открыть ETH в 00:35 →</a></div>
+    </div>
+    <div style="font-size:12px;color:var(--m)">… ещё 3 эпизода · <a class="raw" href="#">все 1 000 ликвидаций списком →</a></div>
+  </div>
+</div>
+<p class="anno">Мини-график в каждой карточке: цена за час до и 4 ч после эпизода, столбики — ликвидации эпизода по минутам, серая зона — сам эпизод. Цена «во время» и «через 4 ч» — факт, не прогноз. Нажатие на эпизод раскрывает его ликвидации (до 20 крупнейших) прямо в карточке. Плоская таблица остаётся, но за ссылкой.</p>
+
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg';function el(s,t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);s.appendChild(e);return e}
+function rnd(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+document.querySelectorAll('svg.mini').forEach((s,j)=>{const r=rnd(3+j*7),n=60,W=300,H=90,up=j!==1,e0=12,e1=16;let p=0,px=[];
+for(let i=0;i<n;i++){if(i>=e0&&i<=e1)p+=(up?1:-1)*(1.2+r());else if(i>e1)p+=(up?-0.18:0.2)+(r()-.5)*0.6;else p+=(r()-.5)*0.5;px.push(p)}
+const mn=Math.min(...px),mx=Math.max(...px),y=v=>6+(mx-v)/(mx-mn)*50,x=i=>i*W/(n-1);
+el(s,'rect',{x:x(e0),y:0,width:x(e1)-x(e0)+4,height:H,fill:'#8b949e',opacity:.12});
+for(let i=e0;i<=e1;i++){const h=8+r()*24;el(s,'rect',{x:x(i),y:H-h,width:3,height:h,fill:up?'#26a69a':'#ef5350'})}
+el(s,'path',{d:px.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' '),fill:'none',stroke:'#c9d1d9','stroke-width':1.4});
+[['−1ч',0],['+4ч',n-1]].forEach(([t,i])=>{const e=el(s,'text',{x:i?W-22:0,y:H-2,fill:'#8b949e','font-size':9});e.textContent=t})});
+</script></body></html>
