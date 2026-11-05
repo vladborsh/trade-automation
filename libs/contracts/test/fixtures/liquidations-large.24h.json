@@ -1,0 +1,105 @@
+{
+  "asOf": 1793880000,
+  "from": 1793793600,
+  "query": {
+    "period": "24h",
+    "symbol": "all",
+    "minUsd": 100000,
+    "side": "all",
+    "venue": "all"
+  },
+  "rows": [
+    {
+      "time": 1793878800,
+      "symbol": "ETHUSDT",
+      "base": "ETH",
+      "side": "long",
+      "usd": 1200000,
+      "price": 2391.4,
+      "venue": "bybit",
+      "seriesId": null,
+      "seriesCount": 0,
+      "seriesSpanSec": 0
+    },
+    {
+      "time": 1793869200,
+      "symbol": "BTCUSDT",
+      "base": "BTC",
+      "side": "short",
+      "usd": 5700000,
+      "price": 69780,
+      "venue": "okx",
+      "seriesId": "short-1793868660",
+      "seriesCount": 44,
+      "seriesSpanSec": 540
+    },
+    {
+      "time": 1793868900,
+      "symbol": "BTCUSDT",
+      "base": "BTC",
+      "side": "short",
+      "usd": 9700000,
+      "price": 69655,
+      "venue": "binance",
+      "seriesId": "short-1793868660",
+      "seriesCount": 44,
+      "seriesSpanSec": 540
+    },
+    {
+      "time": 1793868660,
+      "symbol": "BTCUSDT",
+      "base": "BTC",
+      "side": "short",
+      "usd": 11000000,
+      "price": 69412,
+      "venue": "binance",
+      "seriesId": "short-1793868660",
+      "seriesCount": 44,
+      "seriesSpanSec": 540
+    },
+    {
+      "time": 1793847600,
+      "symbol": "SOLUSDT",
+      "base": "SOL",
+      "side": "long",
+      "usd": 240000,
+      "price": 182.35,
+      "venue": "binance",
+      "seriesId": null,
+      "seriesCount": 0,
+      "seriesSpanSec": 0
+    },
+    {
+      "time": 1793808000,
+      "symbol": "DOGEUSDT",
+      "base": "DOGE",
+      "side": "short",
+      "usd": 130000,
+      "price": 0.1712,
+      "venue": "okx",
+      "seriesId": null,
+      "seriesCount": 0,
+      "seriesSpanSec": 0
+    }
+  ],
+  "total": 6,
+  "truncated": false,
+  "coins": [
+    {
+      "symbol": "BTCUSDT",
+      "base": "BTC"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "base": "DOGE"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "base": "ETH"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "base": "SOL"
+    }
+  ]
+}

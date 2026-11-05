@@ -15,6 +15,8 @@ export * from './series';
 export * from './universe';
 // IB-038 — the liquidations overview behind the landing page's card, table and feed.
 export * from './liquidations-overview';
+// IB-120 — the /liquidations page: every large liquidation of the period, filtered.
+export * from './liquidations-large';
 // IB-015 — the feature frame: the key set, the per-key value type, and the arming rule.
 export * from './feature-frame';
 // IB-037 — the market-context page (Fear & Greed, dominance, top-20 caps).
