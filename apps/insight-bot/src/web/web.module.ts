@@ -31,6 +31,8 @@ import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
+import { LiquidationsLargeController } from './liquidations/liquidations-large.controller';
+import { LiquidationsLargeService } from './liquidations/large.service';
 import { MarketCardsService } from './market/market-cards.service';
 import { CandlesService } from './market/candles.service';
 import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
@@ -90,6 +92,8 @@ export class WebModule {
         WebMembersController, WebMeSettingsController,
         // IB-112: the OI divergence alerts admin page
         WebAlertsAdminController,
+        // IB-120: the /liquidations page
+        LiquidationsLargeController,
       ],
       providers: [
         WebAuthService,
@@ -101,6 +105,7 @@ export class WebModule {
         { provide: LoginGuard, useFactory: () => new LoginGuard() },
         CredentialsService,
         LiquidationsOverviewService,
+        LiquidationsLargeService,
         {
           // IB-084 (D6): universe classes + Binance exchangeInfo (weight 1, once a day) into the shared tracker
           provide: AssetClassifier,

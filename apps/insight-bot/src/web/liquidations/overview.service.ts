@@ -1,7 +1,7 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   WEB_LIQUIDATION_BUCKET_SECONDS, WEB_LIQUIDATION_MIN_HISTORY_DAYS, WEB_LIQUIDATION_WINDOWS, WEB_LIQUIDATION_WINDOW_SECONDS,
-  WEB_LIQUIDATION_NORM_DAYS, WEB_MARKET_PERIOD_SECONDS,
+  WEB_LIQUIDATION_NORM_DAYS, WEB_LIQUIDATION_VENUES, WEB_MARKET_PERIOD_SECONDS,
   type WebLiquidationBlock, type WebLiquidationCoin, type WebLiquidationsOverviewResponse, type WebMarketPeriod,
 } from '@trade-automation/contracts';
 import { DB, type Db } from '../../db/db.port';
@@ -21,7 +21,7 @@ import * as repo from './pg/overview.repo';
  * as evidence rather than as a hard-coded sentence: Binance is REST-degraded here and has no
  * `forceOrder`, so it writes nothing and appears as missing on its own.
  */
-export const LIQUIDATION_VENUES = ['binance', 'bybit', 'okx'] as const;
+export const LIQUIDATION_VENUES = WEB_LIQUIDATION_VENUES;
 
 /**
  * §12.3: several members polling must not multiply the query. IB-084 (D8) lowers it from 15 s to
@@ -92,6 +92,17 @@ export class LiquidationsOverviewService {
       for (const { venue, symbol } of present) out[this.classifier.classify(venue, symbol)].push(`${venue}:${symbol}`);
       return out;
     });
+  }
+
+  /**
+   * IB-120: the crypto `venue:symbol` keys and the alias map — the scope every Market total uses
+   * (D6, IB-BUG-025), for the /liquidations page to read the same population.
+   */
+  async cryptoScope(nowMs: number): Promise<{ keys: string[]; aliases: ReturnType<AssetClassifier['aliases']> }> {
+    const db = this.db;
+    if (!db) throw new Error('no database');
+    const keys = await this.classKeys(db, nowMs);
+    return { keys: keys.crypto, aliases: this.classifier.aliases() };
   }
 
   /** IB-BUG-025: the coin of an unmapped row's `venue:symbol` (Binance base asset when known). */

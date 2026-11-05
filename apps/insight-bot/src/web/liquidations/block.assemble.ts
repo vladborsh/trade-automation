@@ -125,6 +125,25 @@ export function hourly(args: {
   };
 }
 
+/** One event's cascade, as `groupSeries` found it. */
+export interface EventSeries {
+  id: string;
+  count: number;
+  spanSec: number;
+}
+
+/**
+ * Each event's series (by its index in `events`), from `groupSeries` over ALL of `events` — the one
+ * place the Market block's cards (IB-084) and the /liquidations table (IB-120) get it from, so a
+ * cascade cannot be «137 за 8 мин» on one and something else on the other.
+ */
+export function seriesByIndex(events: readonly Pick<FeedRow, 'timeSec' | 'side' | 'usd'>[]): Map<string, EventSeries> {
+  const series = groupSeries(events.map((e, i) => ({ key: String(i), timeSec: e.timeSec, side: e.side, usd: e.usd })));
+  const out = new Map<string, EventSeries>();
+  for (const s of series) for (const key of s.keys) out.set(key, { id: s.id, count: s.count, spanSec: s.spanSec });
+  return out;
+}
+
 /**
  * D8(c): the period's largest events, biggest first, each with `xMedian` (÷ the median single
  * event over the norm period, null under 7 days of history) and its series from `groupSeries`
@@ -139,10 +158,8 @@ export function largeEvents(args: {
   normPeriodDays: number;
   minHistoryDays: number;
 }): WebLiquidationLargeEvent[] {
+  const seriesOf = seriesByIndex(args.events);
   const keyed = args.events.map((e, i) => ({ e, key: String(i) }));
-  const series = groupSeries(keyed.map(({ e, key }) => ({ key, timeSec: e.timeSec, side: e.side, usd: e.usd })));
-  const seriesOf = new Map<string, { id: string; count: number; spanSec: number }>();
-  for (const s of series) for (const key of s.keys) seriesOf.set(key, { id: s.id, count: s.count, spanSec: s.spanSec });
   const median = args.normPeriodDays >= args.minHistoryDays && args.medianEventUsd !== null && args.medianEventUsd > 0 ? args.medianEventUsd : null;
 
   return keyed
