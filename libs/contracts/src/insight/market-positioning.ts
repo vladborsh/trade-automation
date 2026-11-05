@@ -57,8 +57,16 @@ export type WebPositioningSignal = z.infer<typeof WebPositioningSignalSchema>;
 export const WebPositioningRowSchema = z.object({
   symbol: z.string(),
   base: z.string(),
-  /** Price change over the period, in PERCENT. */
+  /** Price change over the period, in PERCENT: the last price against the close at `priceRefTime`. */
   priceChangePct: WebPositioningCellSchema,
+  /**
+   * IB-BUG-040: when the price change starts, in seconds. This is the close time of the reference bar:
+   * - 1h/4h/24h: the 5 m bar whose close is nearest now − P;
+   * - 7d: the last whole hour ending at or before now − P.
+   * R4's chart starts its price line here, so the chart and the title share one reference.
+   * Null when no reference close is held.
+   */
+  priceRefTime: TimeSec.nullable(),
   /** Open-interest change over the period, in PERCENT. */
   oiChangePct: WebPositioningCellSchema,
   /** The current funding rate as the venue states it (a fraction per settlement, 0.0001 = 0.01 %). */

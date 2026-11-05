@@ -11,7 +11,7 @@ const NOW = Date.UTC(2026, 10, 4, 12);
 const c = (value: number | null, rarity: number | null, sample = 696): WebPositioningCell => ({ value, rarity, unavailable: rarity === null ? 'insufficient_history' : null, sample });
 const sol: WebPositioningRow = {
   symbol: 'SOLUSDT', base: 'SOL', priceChangePct: c(0.1, 0.2), oiChangePct: c(26, 0.99), fundingRate: c(0.0001, 0.5, 90),
-  lsGlobal: c(1.5, 0.5, 720), lsTopPosition: c(1.2, 0.5, 720), liqUsd: c(1000, null), oiUsd: null, quadrant: 'new_longs', signal: null,
+  lsGlobal: c(1.5, 0.5, 720), lsTopPosition: c(1.2, 0.5, 720), liqUsd: c(1000, null), oiUsd: null, priceRefTime: (NOW - 86_400_000) / 1000, quadrant: 'new_longs', signal: null,
 };
 function chartReads(over: Partial<ChartReads> = {}): { reads: ChartReads; calls: string[] } {
   const calls: string[] = [];
@@ -39,7 +39,7 @@ describe('IB-119: InsightsService attaches each displayed statement\'s chart thr
     const res = await service(reads).insights('24h');
     const r4 = res.top.find((s) => s.ruleId === 'R4');
     expect(r4?.chart?.series.map((x) => [x.key, x.points[0]?.value])).toEqual([['price', 0], ['oi', 0]]);
-    expect(calls.sort()).toEqual(['klines:SOLUSDT:5m:288', 'oi:SOLUSDT']);
+    expect(calls.sort()).toEqual(['klines:SOLUSDT:5m:289', 'oi:SOLUSDT']); // the reference bar + 288 after it
   });
 
   it('a read that fails costs the chart, not the statement', async () => {

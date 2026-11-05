@@ -4,13 +4,13 @@ import {
 } from '@trade-automation/contracts';
 import { levelBand, pctFromFirst, thin, upperBand } from '../../../src/insights/charts/chart-math';
 import { attachCharts, chartFor, type ChartReads } from '../../../src/insights/charts/insight-charts';
-import { r11Bars, r4Window } from '../../../src/insights/charts/rule-charts';
+import { r11Bars, r4PriceLine, r4Window } from '../../../src/insights/charts/rule-charts';
 import { runInsights } from '../../../src/insights/engine';
 import { levelRarity, rarity } from '../../../src/insights/rarity';
 import { R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, RULES } from '../../../src/insights/rules';
 import { isRefusal, type InsightSnapshot, type Rule } from '../../../src/insights/types';
 import { TtlCache } from '../../../src/venues/ttl-cache';
-import { refClose } from '../../../src/web/market/positioning/positioning.service';
+import { refBarCloseMs } from '../../../src/web/market/positioning/price-ref';
 
 /**
  * IB-119 (market round 2 §3) — one spec per rule: WHICH series the chart draws and WHICH reference
@@ -27,7 +27,7 @@ function row(symbol: string, o: Partial<Record<'price' | 'oi' | 'funding' | 'lsG
   return {
     symbol, base: symbol.replace('USDT', ''),
     priceChangePct: o.price ?? c(0.5, 0.4), oiChangePct: o.oi ?? c(1, 0.5), fundingRate: o.funding ?? c(0.0001, 0.5, 90),
-    lsGlobal: o.lsG ?? c(1.5, 0.5, 720), lsTopPosition: o.lsT ?? c(1.2, 0.5, 720), liqUsd: c(1000, null), oiUsd: null, quadrant: 'flat', signal: null,
+    lsGlobal: o.lsG ?? c(1.5, 0.5, 720), lsTopPosition: o.lsT ?? c(1.2, 0.5, 720), liqUsd: c(1000, null), oiUsd: null, priceRefTime: null, quadrant: 'flat', signal: null,
   };
 }
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -61,7 +61,7 @@ function reads(over: Partial<ChartReads> = {}) {
   const calls: string[] = [];
   const r: ChartReads = {
     fundingSettlements: async () => { calls.push('funding'); return new Map(); },
-    hourlyCloses: async (coin, fromMs) => { calls.push(`closes:${coin}:${fromMs}`); return ramp(168, 0).map((i) => ({ time: NOW_S - (167 - i) * 3_600, value: 100 + i })); },
+    hourlyCloses: async (coin, fromMs) => { calls.push(`closes:${coin}:${fromMs}`); return ramp(168, 0).map((i) => ({ time: fromMs / 1000 + i * 3_600, value: 100 + i })); },
     closedKlines: async (coin, tf, fromMs, limit) => {
       calls.push(`klines:${coin}:${tf}:${fromMs}:${limit}`);
       const sec = { '5m': 300, '15m': 900, '1h': 3_600, '4h': 14_400 }[tf];
@@ -142,56 +142,100 @@ describe('R3 cascade: 1-minute sums of BOTH sides, ±15 min, the cascade\'s minu
   });
 });
 
-describe('R4 OI vs price: two lines as % from the period start, ref 0', () => {
-  const r4row = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
-  it('24h: 5 m klines at EXACTLY 288 (weight 2), OI at 5 m (weight 0); price first, both from 0', async () => {
-    const s = snapshot({ positioning: [r4row] });
+describe('R4 OI vs price: two lines as % from the row\'s own reference, ref 0', () => {
+  const r4row = (refSec: number | null) => ({ ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const, priceRefTime: refSec });
+  const ref24h = refBarCloseMs('24h', NOW) / 1000; // NOW is 12:02: yesterday's 12:00 close
+  it('24h: 5 m klines from the reference bar at EXACTLY 289 (weight 2), OI at 5 m (weight 0); price first, both from 0', async () => {
+    const s = snapshot({ positioning: [r4row(ref24h)] });
     const { r, calls } = reads();
     const chart = valid(await chartFor(said(R4, s), s, r, cache()));
-    const bars = r4Window('24h', NOW).bars as { fromMs: number; limit: number };
-    expect(bars.limit).toBe(288); // NOW is 12:02: from yesterday's 12:00 close to today's 11:55 bar
-    expect(calls.sort()).toEqual([`klines:SOLUSDT:5m:${bars.fromMs}:288`, 'oi:SOLUSDT:0'].sort());
-    expect(chart).toMatchObject({ kind: 'lines', unit: 'pct', ref: 0, band: null, span: { from: bars.fromMs / 1000, to: NOW_S } }); // from the reference close
+    const fromMs = ref24h * 1000 - 300_000; // the bar that CLOSES at the reference
+    expect(calls.sort()).toEqual([`klines:SOLUSDT:5m:${fromMs}:289`, 'oi:SOLUSDT:0'].sort());
+    expect(chart).toMatchObject({ kind: 'lines', unit: 'pct', ref: 0, band: null, span: { from: ref24h, to: NOW_S } });
     expect(keys(chart)).toEqual(['price', 'oi']);
-    expect(chart.series[0]?.points[0]).toEqual({ time: bars.fromMs / 1000, value: 0 });
-    expect(chart.series[0]?.points.at(-1)?.value).toBeCloseTo((51 + 287) / 50 * 100 - 100, 6);
+    // the first point is the reference bar's CLOSE at the reference time (the fake's closes are 51 + i)
+    expect(chart.series[0]?.points[0]).toEqual({ time: ref24h, value: 0 });
+    expect(chart.series[0]?.points.at(-1)?.value).toBeCloseTo((51 + 288) / 51 * 100 - 100, 6);
     expect(chart.series[1]?.points[0]?.value).toBe(0);
     expect(chart.series[1]?.points.at(-1)?.value).toBeCloseTo((1_000 - 288) / 1_000 * 100 - 100, 6);
   });
-  it('the price starts at the RULE\'s reference close (the last whole hour ending ≤ now − P), and ends at the last CLOSED bar', () => {
-    expect(['1h', '4h', '24h'].map((p) => r4Window(p as '1h', NOW).bars?.limit)).toEqual([12, 48, 288]);
-    // 12:40: the rule's 24h reference is still yesterday's 12:00 close — 296 bars, weight still 2 (< 500)
-    const late = NOW + 38 * 60_000;
-    const w = r4Window('24h', late);
-    expect(w.refMs).toBe(Date.UTC(2026, 10, 4, 12));
-    expect(w.bars).toEqual({ fromMs: w.refMs, limit: 296 });
-    const b = r4Window('1h', late).bars as { fromMs: number; limit: number };
-    expect(b.fromMs).toBe(Date.UTC(2026, 10, 5, 11));
-    expect(b.fromMs + b.limit * 300_000).toBeLessThanOrEqual(late);
-    expect(b.fromMs + (b.limit + 1) * 300_000).toBeGreaterThan(late);
-    expect(['1h', '4h', '24h'].map((p) => r4Window(p as '1h', Date.UTC(2026, 10, 5, 12, 59, 59)).bars?.limit)).toEqual([23, 59, 299]); // the widest: 11 bars more
+
+  it('ACCEPTANCE (1h): at any moment of an hour, the axis starts within 5 min of −60 min', async () => {
+    const t0 = Date.UTC(2026, 10, 5, 12);
+    for (let at = t0; at < t0 + 3_600_000; at += 37_000) {
+      const s = snapshot({ nowMs: at, period: '1h', positioning: [r4row(refBarCloseMs('1h', at) / 1000)] });
+      const st = { ...said(R4, { ...s, period: '24h' }), basis: { ...said(R4, { ...s, period: '24h' }).basis, window: '1h' as const } };
+      const chart = valid(await chartFor(st, s, reads().r, new TtlCache({ now: () => at })));
+      const back = Math.floor(at / 1000) - chart.span.from;
+      expect(back).toBeGreaterThanOrEqual(3_600);
+      expect(back).toBeLessThanOrEqual(3_600 + 300);
+      expect(chart.series[0]?.points[0]?.time).toBe(refBarCloseMs('1h', at) / 1000);
+    }
   });
-  it('the reference close agrees with the rule\'s own refClose', () => {
-    const closeTimes = ramp(48, 0).map((i) => Date.UTC(2026, 10, 3, 12) + i * 3_600_000); // bar opens
-    const late = NOW + 38 * 60_000;
-    expect(refClose({ closes: ramp(48, 100), closeTimes }, late - 86_400_000)).toBe(100 + closeTimes.findIndex((t) => t + 3_600_000 === r4Window('24h', late).refMs));
+
+  it('ONE reference: the chart starts at the ROW\'s priceRefTime, not one recomputed from the snapshot\'s clock', async () => {
+    // the row was built at 11:57 (its own 60 s cache): its 24h reference is yesterday's 11:55, though the snapshot's clock says 12:00
+    const rowRef = ref24h - 300;
+    const s = snapshot({ positioning: [r4row(rowRef)] });
+    const { r, calls } = reads();
+    const chart = valid(await chartFor(said(R4, s), s, r, cache()));
+    expect(chart.series[0]?.points[0]?.time).toBe(rowRef);
+    expect(chart.span.from).toBe(rowRef);
+    expect(calls).toContain(`klines:SOLUSDT:5m:${rowRef * 1000 - 300_000}:290`);
   });
-  it('7d: the baseline\'s hourly closes (no klines) and OI at ≥ 1 h', async () => {
-    const s = snapshot({ period: '7d', positioning: [r4row] });
+
+  it('the window: the reference bar to the last CLOSED bar — 12–13 / 48–49 / 288–289 bars, weight 1 / 1 / 2', () => {
+    for (const at of [NOW, NOW + 38 * 60_000, Date.UTC(2026, 10, 5, 12, 59, 59)]) {
+      for (const p of ['1h', '4h', '24h'] as const) {
+        const w = r4Window(p, refBarCloseMs(p, at) / 1000, at).bars as { fromMs: number; limit: number };
+        const lastClose = w.fromMs + w.limit * 300_000;
+        expect(lastClose).toBeLessThanOrEqual(at);
+        expect(lastClose + 300_000).toBeGreaterThan(at);
+        const n = { '1h': 12, '4h': 48, '24h': 288 }[p];
+        expect([n, n + 1]).toContain(w.limit);
+      }
+    }
+  });
+
+  it('r4PriceLine: each bar\'s close at its END — the first point is the reference close, never the next bar\'s open', () => {
+    expect(r4PriceLine([{ time: 1_000, close: 7 }, { time: 1_300, close: 8 }])).toEqual([{ time: 1_300, value: 7 }, { time: 1_600, value: 8 }]);
+  });
+
+  it('a price line not starting at the reference (the venue skipped that bar) is no chart: it would not match the title', async () => {
+    const s = snapshot({ positioning: [r4row(ref24h)] });
+    const { r } = reads({ closedKlines: async (_c, _tf, fromMs, limit) => ramp(limit - 1, 1).map((i) => ({ time: fromMs / 1000 + i * 300, open: 1, high: 1, low: 1, close: 1 })) });
+    expect(await chartFor(said(R4, s), s, r, cache())).toBeNull();
+  });
+
+  it('a row with no reference reads nothing and draws nothing', async () => {
+    const s = snapshot({ positioning: [r4row(null)] });
+    const { r, calls } = reads();
+    expect(await chartFor(said(R4, s), s, r, cache())).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('7d: the baseline\'s hourly closes from the row\'s reference (no klines) and OI at ≥ 1 h', async () => {
+    const ref7d = Date.UTC(2026, 9, 29, 12) / 1000; // the last whole hour ≤ now − 7 d: 2026-10-29 12:00
+    const s = snapshot({ period: '7d', positioning: [r4row(ref7d)] });
     const { r, calls } = reads();
     const st = { ...said(R4, { ...s, period: '24h' }), basis: { ...said(R4, { ...s, period: '24h' }).basis, window: '7d' as const } };
-    valid(await chartFor(st, s, r, cache()));
+    const chart = valid(await chartFor(st, s, r, cache()));
     expect(calls.some((x) => x.startsWith('klines'))).toBe(false);
     expect(calls).toContain('oi:SOLUSDT:3600000');
-    expect(calls).toContain(`closes:SOLUSDT:${r4Window('7d', NOW).refMs}`);
+    expect(calls).toContain(`closes:SOLUSDT:${ref7d * 1000}`);
+    expect(chart.series[0]?.points[0]?.time).toBe(ref7d);
   });
-  it('a second request for the same (coin, period) inside 5 minutes reads nothing', async () => {
-    const s = snapshot({ positioning: [r4row] });
+
+  it('a second request for the same (coin, period, reference) inside 5 minutes reads nothing; a new reference reads again', async () => {
     const { r, calls } = reads();
     const k = cache();
+    const s = snapshot({ positioning: [r4row(ref24h)] });
     await chartFor(said(R4, s), s, r, k);
     await chartFor(said(R4, s), s, r, k);
     expect(calls).toHaveLength(2);
+    const moved = snapshot({ positioning: [r4row(ref24h + 300)] });
+    await chartFor(said(R4, moved), moved, r, k);
+    expect(calls).toHaveLength(4);
   });
 });
 
@@ -336,7 +380,7 @@ describe('the 300-point limit and the shared helpers', () => {
 });
 
 describe('only displayed statements get a chart (after ranking); a failed read is that card\'s null', () => {
-  const r4row = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
+  const r4row = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const, priceRefTime: refBarCloseMs('24h', NOW) / 1000 };
 
   it('a statement in the top AND its block is built once; the response parses', async () => {
     const s = snapshot({ positioning: [r4row] });

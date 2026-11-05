@@ -34,6 +34,19 @@ describe('IB-085 contracts', () => {
     expect(WebPositioningResponseSchema.safeParse({ ...fixture, rows: [without] }).success).toBe(false); // absence is stated, not omitted
   });
 
+  it('IB-BUG-040: priceRefTime is when the price change starts — whole seconds, null when no reference, never omitted', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fixture = require('./fixtures/positioning.24h.json');
+    const parsed = WebPositioningResponseSchema.parse(fixture);
+    // the fixture's 24h reference: the 5 m close nearest asOf − 24 h
+    expect(parsed.rows.map((r) => r.priceRefTime)).toEqual(parsed.rows.map(() => Math.round((parsed.asOf - 86_400) / 300) * 300));
+    const row = (priceRefTime: unknown) => ({ ...fixture, rows: [{ ...fixture.rows[0], priceRefTime }] });
+    expect(WebPositioningResponseSchema.safeParse(row(null)).success).toBe(true);
+    expect(WebPositioningResponseSchema.safeParse(row(1.5)).success).toBe(false);
+    const { priceRefTime: _dropped, ...without } = fixture.rows[0];
+    expect(WebPositioningResponseSchema.safeParse({ ...fixture, rows: [without] }).success).toBe(false);
+  });
+
   it('the example KPI fixture parses, with all five tiles in order', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const parsed = WebKpisResponseSchema.parse(require('./fixtures/kpis.json'));

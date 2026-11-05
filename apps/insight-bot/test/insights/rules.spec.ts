@@ -37,7 +37,7 @@ function row(symbol: string, o: Partial<Record<'price' | 'oi' | 'funding' | 'lsG
   return {
     symbol, base: symbol.replace('USDT', ''),
     priceChangePct: o.price ?? c(0.5, 0.4), oiChangePct: o.oi ?? c(1, 0.5), fundingRate: o.funding ?? c(0.0001, 0.5, 90),
-    lsGlobal: o.lsG ?? c(1.5, 0.5, 720), lsTopPosition: o.lsT ?? c(1.2, 0.5, 720), liqUsd: c(1000, null), oiUsd: null, quadrant: 'flat', signal: null,
+    lsGlobal: o.lsG ?? c(1.5, 0.5, 720), lsTopPosition: o.lsT ?? c(1.2, 0.5, 720), liqUsd: c(1000, null), oiUsd: null, priceRefTime: null, quadrant: 'flat', signal: null,
   };
 }
 

@@ -66,7 +66,7 @@ describe('R5 and signalOf read the SAME helper: the card and the table cannot di
   const c = (value: number | null, rarity: number | null, sample = 90): WebPositioningCell => ({ value, rarity, unavailable: rarity === null ? 'insufficient_history' : null, sample });
   const row = (rate: number, rarity: number): WebPositioningRow => ({
     symbol: 'XUSDT', base: 'X', priceChangePct: c(0.2, 0.3, 696), oiChangePct: c(0.3, 0.3, 696), fundingRate: c(rate, rarity),
-    lsGlobal: c(rate > 0 ? 2.5 : 0.5, 0.97, 720), lsTopPosition: c(1, 0.5, 720), liqUsd: c(0, null), oiUsd: null, quadrant: 'flat', signal: null,
+    lsGlobal: c(rate > 0 ? 2.5 : 0.5, 0.97, 720), lsTopPosition: c(1, 0.5, 720), liqUsd: c(0, null), oiUsd: null, priceRefTime: null, quadrant: 'flat', signal: null,
   });
   const snap = (r: WebPositioningRow, intervalH: number | null): InsightSnapshot => ({
     period: '24h', nowMs: Date.UTC(2026, 10, 5, 12), liquidations: null, positioning: [r],

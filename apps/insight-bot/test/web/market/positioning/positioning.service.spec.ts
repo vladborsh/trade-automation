@@ -10,6 +10,9 @@ const NOW = Date.UTC(2026, 10, 3, 12, 30);
 const sym = (id: string, base: string, asset_class: 'crypto' | 'tradfi') => ({ id, base, asset_class, quote: 'USDT', binance_perp: id, listed_perp: '2020-01-01' });
 const SYMBOLS = [sym('BTCUSDT', 'BTC', 'crypto'), sym('ETHUSDT', 'ETH', 'crypto'), sym('XAUUSDT', 'XAU', 'tradfi')];
 
+/** IB-BUG-040: the close of the 5 m bar that OPENS at `t` — far from the hourly curve (≈ 100). */
+const close5m = (t: number) => 90 + ((t / 300_000) % 7);
+
 /** `hours` of hourly history ending at NOW; OI jumps 26 % in the last hour on a flat price. */
 function fakes(hours: number) {
   const hourly = <T>(n: number, f: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => f(i));
@@ -23,7 +26,12 @@ function fakes(hours: number) {
   const priceAt = (t: number) => 100 + Math.sin(t / H) * 0.5;
   return {
     summary: { summary: async () => ({ asOfMs: NOW, venue: 'binance-perp', rows: [{ id: 'BTCUSDT', base: 'BTC', volumeRank: 1, lastPrice: 100.1, changePct24h: 0, fundingRate: 0.0003, nextFundingTimeMs: null, oiChangePct24h: 0 }] }) },
-    candles: { candles: async (_m: string, _s: string, _tf: string, from: number, to: number) => series(from, to - H, priceAt).map(({ t, v }) => ({ time: t / 1000, open: v, high: v, low: v, close: v, volume: 1 })) },
+    candles: {
+      candles: async (_m: string, _s: string, _tf: string, from: number, to: number) => series(from, to - H, priceAt).map(({ t, v }) => ({ time: t / 1000, open: v, high: v, low: v, close: v, volume: 1 })),
+      // IB-BUG-040: 5 m bars on their OWN price curve, so a change against an hourly close is visible
+      closedKlines: async (_s: string, _tf: string, fromMs: number, limit: number) => Array.from({ length: limit }, (_, i) => fromMs + i * 300_000)
+        .filter((t) => t + 300_000 <= NOW).map((t) => ({ time: t / 1000, open: 1, high: 1, low: 1, close: close5m(t), volume: 1 })),
+    },
     funding: { binanceSettledHistory: async () => hourly(Math.floor(hours / 8), (i) => ({ time: i, rate: 0.0001 })) },
     oiLs: {
       openInterest: async (_s: string, from: number, to: number) => ({ points: series(from, to, (t) => (t >= NOW - 30 * 60_000 ? 1260 : 1000)).map(({ t, v }) => ({ time: t / 1000, value: v, notional: v * 100 })) }),
@@ -83,6 +91,77 @@ describe('PositioningService', () => {
     const eth = (await service(30 * 24).positioning('1h')).rows[1];
     expect(eth.priceChangePct).toMatchObject({ value: null, unavailable: 'venue_unavailable' });
     expect(eth.fundingRate).toMatchObject({ value: null, unavailable: 'venue_unavailable' });
+    expect(eth.priceRefTime).toBeNull(); // IB-BUG-040: no change, so no moment it starts from
+  });
+});
+
+describe('IB-BUG-040: the price change starts at the 5 m close nearest now − P (7d: the last whole hour)', () => {
+  const M = 60_000;
+  function counted(now: { ms: number }, closedKlines?: (...a: unknown[]) => Promise<unknown>) {
+    const f = fakes(30 * 24);
+    const calls: unknown[][] = [];
+    const svc = new PositioningService({
+      symbols: SYMBOLS as never, cache: new TtlCache({ now: () => now.ms }), summary: f.summary as never, funding: f.funding as never,
+      oiLs: f.oiLs as never, liquidations: null, now: () => now.ms,
+      candles: { candles: f.candles.candles, closedKlines: async (...a: Parameters<typeof f.candles.closedKlines>) => { calls.push(a); return (closedKlines ?? f.candles.closedKlines)(...a); } } as never,
+    });
+    return { svc, calls };
+  }
+
+  it.each([['1h', H], ['4h', 4 * H], ['24h', 24 * H]] as const)('%s: against the bar CLOSING at now − P (NOW 12:30), stamped there', async (period, ms) => {
+    const btc = (await counted({ ms: NOW }).svc.positioning(period)).rows[0];
+    const refClose = NOW - ms; // 12:30 − P is on a 5 m close
+    expect(btc.priceRefTime).toBe(refClose / 1000);
+    expect(btc.priceChangePct.value).toBeCloseTo((100.1 / close5m(refClose - 300_000) - 1) * 100, 9);
+  });
+
+  it('nearest, not at-or-before: at 12:32:31 the 1h change starts at 11:35, at 12:32:29 at 11:30', async () => {
+    const clock = { ms: NOW + 2 * M + 31_000 };
+    expect((await counted(clock).svc.positioning('1h')).rows[0].priceRefTime).toBe((NOW - H + 5 * M) / 1000);
+    clock.ms = NOW + 2 * M + 29_000;
+    expect((await counted(clock).svc.positioning('1h')).rows[0].priceRefTime).toBe((NOW - H) / 1000);
+  });
+
+  it('reads: ONE 289-bar call per coin serves 1h, 4h and 24h for 30 min, then one more', async () => {
+    const clock = { ms: NOW };
+    const { svc, calls } = counted(clock);
+    for (const p of ['1h', '4h', '24h'] as const) await svc.positioning(p);
+    expect(calls.map((c) => [c[0], c[1], c[3]])).toEqual([['BTCUSDT', '5m', 289], ['ETHUSDT', '5m', 289]]);
+    clock.ms = NOW + 29 * M;
+    for (const p of ['1h', '4h', '24h'] as const) {
+      const btc = (await svc.positioning(p)).rows[0];
+      expect(btc.priceRefTime).toBe(Math.round((clock.ms - { '1h': H, '4h': 4 * H, '24h': 24 * H }[p]) / 300_000) * 300);
+      expect(btc.priceChangePct.value).not.toBeNull(); // the old read still holds the moved reference
+    }
+    expect(calls).toHaveLength(2);
+    clock.ms = NOW + 31 * M;
+    await svc.positioning('1h');
+    expect(calls).toHaveLength(4);
+  });
+
+  it('reference bars unavailable: price null with venue_unavailable, no reference — never the hourly close instead', async () => {
+    const { svc, calls } = counted({ ms: NOW }, async () => { throw new Error('503 weight ceiling'); });
+    const btc = (await svc.positioning('1h')).rows[0];
+    expect(btc.priceChangePct).toMatchObject({ value: null, rarity: null, unavailable: 'venue_unavailable' });
+    expect(btc.priceRefTime).toBeNull();
+    await svc.positioning('4h'); // another period: the 1h response itself is cached for 60 s
+    expect(calls).toHaveLength(4); // a failure is not cached: the next build asks again
+  });
+
+  it('7d: the baseline\'s last whole hour ≤ now − 7 d, and no 5 m read', async () => {
+    const { svc, calls } = counted({ ms: NOW });
+    const btc = (await svc.positioning('7d')).rows[0];
+    const end = Math.floor((NOW - 7 * 24 * H) / H) * H; // 12:00 a week ago
+    expect(btc.priceRefTime).toBe(end / 1000);
+    expect(btc.priceChangePct.value).toBeCloseTo((100.1 / (100 + Math.sin((end - H) / H) * 0.5) - 1) * 100, 9);
+    expect(calls).toEqual([]);
+  });
+
+  it('the rarity sample is unchanged: changes over EXACTLY P between hourly closes (rollingChangesPct)', async () => {
+    const svc = counted({ ms: NOW }).svc;
+    const [h1, h24] = [(await svc.positioning('1h')).rows[0], (await svc.positioning('24h')).rows[0]];
+    // the fake holds 719 closed hours: 718 one-hour changes, 695 twenty-four-hour ones
+    expect([h1.priceChangePct.sample, h24.priceChangePct.sample]).toEqual([718, 695]);
   });
 });
 

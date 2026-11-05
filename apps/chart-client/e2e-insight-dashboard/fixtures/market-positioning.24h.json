@@ -12,6 +12,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 1.632392221490675,
     "rarity": 0.624103299856528,
@@ -55,6 +56,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.9182767691493732,
     "rarity": 0.48206599713055953,
@@ -98,6 +100,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.3108781118404291,
     "rarity": 0.08177905308464849,
@@ -141,6 +144,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -2.062288113321842,
     "rarity": 0.6126255380200861,
@@ -184,6 +188,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 19.50229737782081,
     "rarity": 0.9842180774748924,
@@ -227,6 +232,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -2.4911195269984865,
     "rarity": 0.48923959827833574,
@@ -270,6 +276,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 1.8383342262258129,
     "rarity": 0.5279770444763271,
@@ -313,6 +320,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -1.7195151701237643,
     "rarity": 0.4261119081779053,
@@ -356,6 +364,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 3.266577235606971,
     "rarity": 0.7733142037302726,
@@ -399,6 +408,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -1.5780707184902876,
     "rarity": 0.7087517934002869,
@@ -442,6 +452,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -1.4002517176964657,
     "rarity": 0.31850789096126253,
@@ -485,6 +496,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -0.44038024825425737,
     "rarity": 0.133428981348637,
@@ -528,6 +540,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.493395590304746,
     "rarity": 0.07890961262553801,
@@ -571,6 +584,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.8372130830280433,
     "rarity": 0.23529411764705882,
@@ -614,6 +628,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.42632654813705706,
     "rarity": 0.06169296987087518,
@@ -657,6 +672,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 1.0377716566308592,
     "rarity": 0.296987087517934,
@@ -700,6 +716,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 2.312377188209269,
     "rarity": 0.5136298421807748,
@@ -743,6 +760,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.07898269168664651,
     "rarity": 0.03156384505021521,
@@ -786,6 +804,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 1.8992778092260743,
     "rarity": 0.533715925394548,
@@ -829,6 +848,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -0.46048401631653135,
     "rarity": 0.15351506456241032,
@@ -872,6 +892,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 1.8319815216604196,
     "rarity": 0.46915351506456243,
@@ -915,6 +936,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -3.815568658734181,
     "rarity": 0.7517934002869441,
@@ -958,6 +980,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.0235837601793909,
     "rarity": 0.010043041606886656,
@@ -1001,6 +1024,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.6300754192042568,
     "rarity": 0.09899569583931134,
@@ -1044,6 +1068,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 5.3880022055622145,
     "rarity": 0.8565279770444764,
@@ -1087,6 +1112,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.619830349117434,
     "rarity": 0.23672883787661406,
@@ -1130,6 +1156,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.7538591703546427,
     "rarity": 0.1951219512195122,
@@ -1173,6 +1200,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": -2.410997080933397,
     "rarity": 0.3916786226685796,
@@ -1216,6 +1244,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.5579904382833512,
     "rarity": 0.13916786226685796,
@@ -1259,6 +1288,7 @@
     "unavailable": null,
     "sample": 696
    },
+   "priceRefTime": 1793640000,
    "oiChangePct": {
     "value": 0.3661248807918627,
     "rarity": 0.054519368723098996,

@@ -1,5 +1,5 @@
 import { cell, changeRarity, levelRarity, quadrantOf, rollingChangesPct, signalOf } from '../../../../src/web/market/positioning/positioning.rules';
-import { mapLimited, refClose } from '../../../../src/web/market/positioning/positioning.service';
+import { mapLimited } from '../../../../src/web/market/positioning/positioning.service';
 import { rarity } from '../../../../src/insights/rarity';
 
 /** IB-085 (D2, D3, D9) — the positioning rules. */
@@ -95,14 +95,6 @@ describe('signalOf — the closed vocabulary', () => {
 });
 
 describe('helpers', () => {
-  it('refClose: the last complete hour that ended at or before the instant', () => {
-    const H = 3_600_000;
-    const base = { closes: [1, 2, 3], closeTimes: [0, H, 2 * H] };
-    expect(refClose(base, 2 * H)).toBe(2);
-    expect(refClose(base, 2 * H - 1)).toBe(1);
-    expect(refClose(base, 0)).toBeNull();
-  });
-
   it('mapLimited keeps order and never has more than `limit` in flight', async () => {
     let inFlight = 0;
     let max = 0;

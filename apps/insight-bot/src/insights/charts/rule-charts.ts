@@ -38,7 +38,7 @@ export const R9_DAYS = 30;
 export const R10_MINUTES = 60;
 /** R11: bars before A, and the alert's own N after B (capped at the last closed bar). */
 export const R11_BARS_BEFORE_A = 2;
-/** R4 below 7d: 5 m price bars from the rule's own reference close (12–23 / 48–59 / 288–299 → weight 1 / 1 / 2). */
+/** R4 below 7d: 5 m price bars from the row's reference bar to the last closed one (12–13 / 48–49 / 288–289 → weight 1 / 1 / 2; one more when the row is older than the snapshot by a bar). */
 export const R4_BAR_SEC = 300;
 const HOUR_MS = 3_600_000;
 
@@ -106,32 +106,39 @@ export function r3Chart(win: { fromMs: number; toMs: number; start: number; end:
 }
 
 /**
- * R4's price line starts where the RULE's price change starts: `refClose` — the close of the last whole
- * hour that ended at or before now − P (positioning.service.ts). Starting at now − P instead put the
- * chart's «цена +1.9 %» beside the title's «+1.5 %» (found live, BNB 24h, 2026-11-05). So `refMs` is
- * that hour's end, and below 7d the 5 m bars run from it to the last closed bar: one klines call at
- * exactly that count (IB-115's exact limit), at most P/5m + 11 bars.
+ * R4's price line starts where the row's price change starts: `priceRefTime` (positioning.service.ts,
+ * price-ref.ts). The chart takes that moment from the row and never recomputes it. The row was built
+ * up to a minute before the snapshot (its own cache), so a recomputed "nearest 5 m close" could land
+ * one bar away from the title's.
+ *
+ * - **7d:** the baseline's hourly closes from `refMs`.
+ * - **Below:** 5 m bars from the reference bar itself (it closes at `refMs`) to the last closed bar.
+ *   One klines call at exactly that count (IB-115's exact limit). The line keeps only the bars'
+ *   closes (`r4PriceLine`), so its first point is the reference close at `refMs`.
  */
-export function r4Window(period: WebMarketPeriod, nowMs: number): { refMs: number; bars: { fromMs: number; limit: number } | null } {
-  const refMs = Math.floor((nowMs - WEB_MARKET_PERIOD_SECONDS[period] * 1000) / HOUR_MS) * HOUR_MS;
+export function r4Window(period: WebMarketPeriod, refSec: number, nowMs: number): { refMs: number; bars: { fromMs: number; limit: number } | null } {
+  const refMs = refSec * 1000;
   if (period === '7d') return { refMs, bars: null };
-  const lastOpen = Math.floor(nowMs / (R4_BAR_SEC * 1000)) * R4_BAR_SEC * 1000 - R4_BAR_SEC * 1000;
-  return { refMs, bars: { fromMs: refMs, limit: (lastOpen - refMs) / (R4_BAR_SEC * 1000) + 1 } };
+  const bar = R4_BAR_SEC * 1000;
+  const lastOpen = Math.floor(nowMs / bar) * bar - bar;
+  return { refMs, bars: { fromMs: refMs - bar, limit: (lastOpen - (refMs - bar)) / bar + 1 } };
 }
 
-/** 5 m klines → a price line: the first bar's open, then each close at its bar's end. */
-export function klinesToLine(klines: ReadonlyArray<{ time: number; open: number; close: number }>, barSec: number): WebInsightChartPoint[] {
-  const first = klines[0];
-  if (!first) return [];
-  return [{ time: first.time, value: first.open }, ...klines.map((k) => ({ time: k.time + barSec, value: k.close }))];
+/** R4 below 7d: each 5 m bar's close at its end, so the first point is the reference bar's close. */
+export function r4PriceLine(klines: ReadonlyArray<{ time: number; close: number }>): WebInsightChartPoint[] {
+  return klines.map((k) => ({ time: k.time + R4_BAR_SEC, value: k.close }));
 }
 
 /**
- * Each line is % from ITS title figure's start: price from the reference close (`r4Window`), OI from its
- * first reading at or after now − P (`currentFor`'s OI change) — so the corner agrees with the title.
+ * Each line is % from ITS title figure's start, so the corner agrees with the title:
+ * - price from the reference close at `refSec`;
+ * - OI from its first reading at or after now − P (`currentFor`'s OI change).
+ * A price line that does not start at `refSec` (the venue skipped the reference bar) is no chart. It
+ * would show a change the title does not state.
  */
-export function r4Chart(s: InsightSnapshot, price: readonly WebInsightChartPoint[], oi: readonly WebInsightChartPoint[]): WebInsightChart | null {
-  const from = Math.min(price[0]?.time ?? now(s), now(s) - WEB_MARKET_PERIOD_SECONDS[s.period]);
+export function r4Chart(s: InsightSnapshot, refSec: number, price: readonly WebInsightChartPoint[], oi: readonly WebInsightChartPoint[]): WebInsightChart | null {
+  if (price[0]?.time !== refSec) return null;
+  const from = Math.min(refSec, now(s) - WEB_MARKET_PERIOD_SECONDS[s.period]);
   return chartOf({
     kind: 'lines', unit: 'pct', ref: 0, band: null,
     series: [{ key: 'price', points: pctFromFirst(price) }, { key: 'oi', points: pctFromFirst(oi) }],
