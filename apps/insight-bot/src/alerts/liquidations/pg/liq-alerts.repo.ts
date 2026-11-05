@@ -2,7 +2,7 @@ import {
   LiqParamsSchema, OI_RESEARCH_WINDOWS, type LiqParams, type LiqSide, type LiqVenue, type MarketAlertControlKind, type MarketAlertSource,
   type WebLiqAlertRow,
 } from '@trade-automation/contracts';
-import type { Db } from '../../../db/db.port';
+import type { DbHandle } from '../../../db/db.port';
 import { BINANCE_LIQUIDATION_STREAM } from '../../../collectors/uptime/liquidation-streams';
 import { STREAM_LIQUIDATION as BYBIT_STREAM } from '../../../collectors/bybit/bybit-collector';
 import { STREAM_LIQUIDATION as OKX_STREAM } from '../../../collectors/okx/okx-collector';
@@ -75,7 +75,11 @@ export interface LiqAlertStore {
   runningSum(pairs: readonly VenuePair[], side: LiqSide, fromMs: number, toMs: number, target: number): Promise<{ crossedAt: number | null; total: number }>;
   /** Journal rows of `source` with `at` after `sinceMs`. */
   journal(source: MarketAlertSource, sinceMs: number): Promise<JournalLiqRow[]>;
-  venueStatus(): Promise<VenueStatus>;
+  /**
+   * Heartbeats, gaps and `liquidation_tracked`. Gaps ending after `gapsSinceMs` (default: the last day, all a live
+   * window ≤ 35 min back can overlap); the history run (IB-123) passes its own start.
+   */
+  venueStatus(gapsSinceMs?: number): Promise<VenueStatus>;
   /** Null: the dedupe key exists already (a restart, an overlapping tick). */
   insertAlert(x: NewMarketAlert): Promise<number | null>;
   insertControl(x: NewMarketControl): Promise<number | null>;
@@ -90,7 +94,7 @@ export interface LiqAlertStore {
 const ms = (d: Date | string): number => new Date(d).getTime();
 
 export class PgLiqAlertStore implements LiqAlertStore {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbHandle) {}
 
   async settings(): Promise<LiqSettings> {
     const [r] = await this.db.query<{ enabled: boolean; members_visible: boolean; params: unknown; updated_at: Date }>(
@@ -143,16 +147,18 @@ export class PgLiqAlertStore implements LiqAlertStore {
     }));
   }
 
-  async venueStatus(): Promise<VenueStatus> {
+  async venueStatus(gapsSinceMs?: number): Promise<VenueStatus> {
     const streams = Object.keys(STREAM_VENUE);
-    const [beats, gaps, tracked] = await Promise.all([
-      this.db.query<{ stream: string; first_seen_at: Date; last_seen_at: Date }>(
-        'select stream, first_seen_at, last_seen_at from collector_heartbeats where stream = any($1::text[])', [streams]),
-      // the last day of gaps is all a window (≤ 35 min back) can overlap
-      this.db.query<{ stream: string; gap_from: Date; gap_to: Date }>(
-        `select stream, gap_from, gap_to from collector_gaps where stream = any($1::text[]) and gap_to > now() - interval '1 day'`, [streams]),
-      this.db.query<{ venue: 'bybit' | 'okx'; symbol: string; since: Date }>('select venue, symbol, since from liquidation_tracked'),
-    ]);
+    // one after another, not Promise.all: on a transaction (IB-123's dry run) the handle is ONE client, and pg
+    // refuses concurrent queries on a client from v9 (a deprecation warning today)
+    const beats = await this.db.query<{ stream: string; first_seen_at: Date; last_seen_at: Date }>(
+      'select stream, first_seen_at, last_seen_at from collector_heartbeats where stream = any($1::text[])', [streams]);
+    // the last day of gaps is all a live window (≤ 35 min back) can overlap; a history run asks from its start
+    const gaps = await this.db.query<{ stream: string; gap_from: Date; gap_to: Date }>(
+      `select stream, gap_from, gap_to from collector_gaps
+        where stream = any($1::text[]) and gap_to > coalesce($2::timestamptz, now() - interval '1 day')`,
+      [streams, gapsSinceMs === undefined ? null : new Date(gapsSinceMs)]);
+    const tracked = await this.db.query<{ venue: 'bybit' | 'okx'; symbol: string; since: Date }>('select venue, symbol, since from liquidation_tracked');
     const heartbeats = new Map(beats.map((b) => [STREAM_VENUE[b.stream] as LiqVenue, { firstSeen: ms(b.first_seen_at), lastSeen: ms(b.last_seen_at) }]));
     const byVenue = new Map<'bybit' | 'okx', Map<string, number>>([['bybit', new Map()], ['okx', new Map()]]);
     for (const t of tracked) byVenue.get(t.venue)?.set(t.symbol, ms(t.since));
@@ -244,7 +250,7 @@ export class PgLiqAlertStore implements LiqAlertStore {
 
 /** §1 Recipients: whether members see the liquidation-alerts toggle (`/me/settings`). */
 export class PgLiqAlertsVisibility {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbHandle) {}
 
   async membersVisible(): Promise<boolean> {
     const rows = await this.db.query<{ members_visible: boolean }>(`select members_visible from alert_type_settings where type = 'liq'`);

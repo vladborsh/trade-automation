@@ -84,6 +84,9 @@ export interface NewPaths {
   atr14: number;
   stopPrice: number | null;
 }
+/** IB-123: which subjects a `pathsDue` read takes (see the port). */
+export type PathSubjects = 'all' | 'oi' | 'market';
+
 export interface PathDue {
   id: number;
   symbol: string;
@@ -140,7 +143,13 @@ export interface OiAlertStore {
    * Only paths of `source` subjects (V31): the live loop never measures the backfill's backlog, the backfill run
    * measures its own.
    */
-  pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]>;
+  /**
+   * `subjects` (IB-123): which subjects' windows — `all` (the live tick: one queue, one measurer), `oi` (the OI
+   * divergence journal, controls and near-misses: IB-116's history run) or `market` (market_alerts and their
+   * controls: IB-123's). Each history run measures only its own backlog, so its weight and its check's bands
+   * are its own.
+   */
+  pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number, subjects?: PathSubjects): Promise<PathDue[]>;
   setPath(id: number, m: PathMeasurement, measuredAt: number): Promise<void>;
   pathFailed(id: number, at: number): Promise<void>;
 }
@@ -278,7 +287,7 @@ export class PgOiAlertStore implements OiAlertStore {
     );
   }
 
-  async pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number): Promise<PathDue[]> {
+  async pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number, subjects: PathSubjects = 'all'): Promise<PathDue[]> {
     // the subject's source: exactly one of the five ids is set (027's check, widened by 031 for the IB-122
     // market alerts and controls), so the coalesce picks it. One queue, one measurer: liquidation paths are
     // measured by this loop's tick, inside its PATHS_PER_TICK budget.
@@ -293,8 +302,9 @@ export class PgOiAlertStore implements OiAlertStore {
           and coalesce(a.source, c.source, n.source, ma.source, mc.source) = $8
           and p.t0 + (case p.win when '4h' then $4::int when '24h' then $5::int else $6::int end) * interval '1 second' + $7 * interval '1 second' <= $1
           and (p.tried_at is null or p.tried_at + $3 * interval '1 second' <= $1)
+          and ($9 = 'all' or ($9 = 'market') = (p.market_alert_id is not null or p.market_control_id is not null))
         order by p.tried_at nulls first, p.t0, p.id limit $2`,
-      [at(nowSec), limit, retryAfterSec, OI_RESEARCH_WINDOW_SEC['4h'], OI_RESEARCH_WINDOW_SEC['24h'], OI_RESEARCH_WINDOW_SEC['72h'], PATH_SETTLE_SEC, source],
+      [at(nowSec), limit, retryAfterSec, OI_RESEARCH_WINDOW_SEC['4h'], OI_RESEARCH_WINDOW_SEC['24h'], OI_RESEARCH_WINDOW_SEC['72h'], PATH_SETTLE_SEC, source, subjects],
     );
     return rows.map((r) => ({
       id: Number(r.id), symbol: r.symbol, win: r.win, direction: r.direction, t0: sec(r.t0) as number,

@@ -4,7 +4,7 @@ import type { OiWindow } from '../../../insights/divergence/oi-window.reader';
 import { detectorParams } from '../../../insights/divergence/params';
 import { minBarsToEvaluate } from '../basis';
 import { OiAlertLoop, type OiAlertLoopPorts } from '../oi-alert-loop';
-import type { OiAlertStore, PathSubjectRef, NewPaths } from '../pg/oi-alerts.repo';
+import type { OiAlertStore, PathSubjectRef, NewPaths, PathSubjects } from '../pg/oi-alerts.repo';
 import { klinesWeight, windowBars } from '../research/path';
 import { OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC } from '@trade-automation/contracts';
 import { dueBarClose, EVALUATE_AFTER_CLOSE_SEC } from '../timing';
@@ -220,6 +220,8 @@ export async function measureBackfillPaths(
   pacer: { take(weight: number): Promise<void> },
   now: () => number,
   batch = 50,
+  /** IB-123: whose backlog — IB-116's run measures `oi`, IB-123's `market`; `all` only in specs that want both. */
+  subjects: PathSubjects = 'oi',
 ): Promise<PathMeasureReport> {
   const loop = new OiAlertLoop({
     store: ports.store, klines5m: ports.klines5m, build: ports.build, source: 'backfill', webBaseUrl: '',
@@ -230,7 +232,7 @@ export async function measureBackfillPaths(
   const started = now();
   const out: PathMeasureReport = { measured: 0, failed: 0, weight: 0, durationSec: 0, left: 0 };
   for (;;) {
-    const r = await loop.measurePaths(Math.floor(now() / 1000), { limit: batch, beforeCall: (w) => pacer.take(w) });
+    const r = await loop.measurePaths(Math.floor(now() / 1000), { limit: batch, beforeCall: (w) => pacer.take(w), subjects });
     out.measured += r.measured;
     out.failed += r.failed;
     out.weight += r.weight;

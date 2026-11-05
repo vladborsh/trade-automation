@@ -7,7 +7,7 @@ import { barsToFetch, fullBasisIndex, hasFullBasis, minBarsForNearMisses, minBar
 import { pivotControlPicks, randomControlPick, type ControlPick } from './research/controls';
 import { entryT0, klinesWeight, measurePath, windowBars } from './research/path';
 import { dueBarClose, isLate } from './timing';
-import type { OiAlertStore } from './pg/oi-alerts.repo';
+import type { OiAlertStore, PathSubjects } from './pg/oi-alerts.repo';
 
 /**
  * IB-112 (architecture/oi-divergence-design-2026-11-04.md V8–V10, V12–V14) — the OI divergence alert
@@ -232,12 +232,13 @@ export class OiAlertLoop {
   /**
    * IB-115 (V24): measures the windows that have closed — one klines call each, oldest first, failed ones last.
    * Only this loop's own source (IB-116, V31): the live tick never takes the backfill's backlog. `beforeCall`
-   * lets the backfill pace each call (≤ 200 weight a minute); `limit` its batch.
+   * lets the backfill pace each call (≤ 200 weight a minute); `limit` its batch; `subjects` (IB-123) keeps each
+   * history run to its own subjects (the live tick takes all).
    */
-  async measurePaths(nowSec: number, opts: { limit?: number; beforeCall?: (weight: number) => Promise<void> } = {}): Promise<PathRunReport> {
+  async measurePaths(nowSec: number, opts: { limit?: number; beforeCall?: (weight: number) => Promise<void>; subjects?: PathSubjects } = {}): Promise<PathRunReport> {
     const { store, source } = this.ports;
     const out: PathRunReport = { measured: 0, failed: 0, weight: 0 };
-    for (const due of await store.pathsDue(source, nowSec, opts.limit ?? PATHS_PER_TICK, PATH_RETRY_SEC)) {
+    for (const due of await store.pathsDue(source, nowSec, opts.limit ?? PATHS_PER_TICK, PATH_RETRY_SEC, opts.subjects ?? 'all')) {
       const limit = windowBars(due.win);
       try {
         await opts.beforeCall?.(klinesWeight(limit));
