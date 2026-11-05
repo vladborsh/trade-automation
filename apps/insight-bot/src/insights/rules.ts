@@ -304,7 +304,8 @@ export const R11: Rule = {
     const oiPct = (a.b.oi / a.a.oi - 1) * 100;
     return {
       ruleId: 'R11', block: 'positioning', key: 'insight.oi_divergence',
-      params: { symbol: a.symbol, tf: a.tf, direction: a.direction, pricePct, oiPct, runLength: a.runLength },
+      // IB-144 (V44): hidden ranks as regular (an event, rarity 1); the card words it by kind and direction
+      params: { symbol: a.symbol, tf: a.tf, direction: a.direction, kind: a.kind, pricePct, oiPct, runLength: a.runLength },
       rarity: 1, magnitude: Math.abs(oiPct),
       basis: { window: '24h', venues: ['binance'], sampleWindows: 0, observedWindows: 0, from: null },
       link: { route: 'instrument', symbol: a.symbol, timeSec: a.b.time },

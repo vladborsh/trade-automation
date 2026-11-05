@@ -9,6 +9,10 @@ const BASE = 'https://35-74-48-140.sslip.io';
 const bull: OiDivergenceAlertText = { symbol: 'TRXUSDT', base: 'TRX', tf: '1h', direction: 'bullish', pricePct: -2.35, oiPct: 6.8, runLength: 2, bTime: 1_793_793_600 };
 const bear: OiDivergenceAlertText = { ...bull, symbol: 'BTCUSDT', base: 'BTC', tf: '4h', direction: 'bearish', pricePct: 1.2, oiPct: -3.4 };
 
+// IB-144 (V43): the hidden pair — bullish = a higher low (price +) with lower OI (−); bearish = a lower high (−) with higher OI (+)
+const hBull: OiDivergenceAlertText = { ...bull, kind: 'hidden', pricePct: 1.8, oiPct: -2.6 };
+const hBear: OiDivergenceAlertText = { ...bear, kind: 'hidden', pricePct: -0.9, oiPct: 4.1 };
+
 describe('V14: the OI divergence alert text', () => {
   it('bullish, ru and en, as the owner worded it, then the link', () => {
     const t = oiDivergenceAlert(bull, BASE);
@@ -45,8 +49,36 @@ describe('V14: the OI divergence alert text', () => {
 
   it('no forecast and no hit rate, in any variant (owner, D20)', () => {
     const FORECAST = [/будет/i, /вырастет/i, /упад[её]т/i, /разворот/i, /вероятн/i, /\bwill\b/i, /\bexpect/i, /\breversal\b/i, /\bprobab/i, /\d+\s?% (случаев|of the time)/i];
-    const all = [bull, bear].flatMap((d) => [2, 3].map((runLength) => oiDivergenceAlert({ ...d, runLength }, BASE))).flatMap((t) => [t.ru, t.en]);
-    expect(all).toHaveLength(8);
+    const all = [bull, bear, hBull, hBear].flatMap((d) => [2, 3].map((runLength) => oiDivergenceAlert({ ...d, runLength }, BASE))).flatMap((t) => [t.ru, t.en]);
+    expect(all).toHaveLength(16);
     expect(all.filter((s) => FORECAST.some((re) => re.test(s)))).toEqual([]);
+  });
+});
+
+describe('IB-144 V43: the hidden pair’s texts', () => {
+  it('hidden bullish, ru and en, as the owner worded it; no «скрытая» / "hidden" in the message (the label is the admin’s and the legend’s)', () => {
+    const t = oiDivergenceAlert(hBull, BASE);
+    expect(t.ru).toBe('TRX 1h: цена — более высокий минимум (+1.8 %), OI — ниже (−2.6 %). Позиции закрываются, а цена держится выше прошлого минимума.\nhttps://35-74-48-140.sslip.io/instrument/TRXUSDT?at=1793793600&tf=1h');
+    expect(t.en).toBe('TRX 1h: price made a higher low (+1.8 %), OI is lower (−2.6 %). Positions are being closed while price holds above the previous low.\nhttps://35-74-48-140.sslip.io/instrument/TRXUSDT?at=1793793600&tf=1h');
+    expect(`${t.ru} ${t.en}`).not.toMatch(/скрыт|hidden/i);
+  });
+
+  it('hidden bearish mirrors it', () => {
+    const t = oiDivergenceAlert(hBear, BASE);
+    expect(t.ru).toMatch(/^BTC 4h: цена — более низкий максимум \(−0.90 %\), OI — выше \(\+4.1 %\)\. Позиции набираются, а цена не дошла до прошлого максимума\.\n/);
+    expect(t.en).toMatch(/^BTC 4h: price made a lower high \(−0.90 %\), OI is higher \(\+4.1 %\)\. Positions are being added while price stays below the previous high\.\n/);
+  });
+
+  it('the signs in the sentence agree with the kind: hidden bullish shows price + and OI −, hidden bearish the reverse', () => {
+    const signs = (text: string) => [...text.matchAll(/\(([+−])/g)].map((m) => m[1]);
+    expect(signs(oiDivergenceAlert(hBull, BASE).ru)).toEqual(['+', '−']);
+    expect(signs(oiDivergenceAlert(hBear, BASE).en)).toEqual(['−', '+']);
+    expect(signs(oiDivergenceAlert(bull, BASE).ru)).toEqual(['−', '+']); // and regular bullish the other way round
+  });
+
+  it('a hidden repeat says «повторное: третий подряд» / "repeat: third in a row" (V43); an absent kind is regular', () => {
+    expect(oiDivergenceAlert({ ...hBull, runLength: 3 }, BASE).ru).toContain('выше прошлого минимума. · повторное: третий подряд\n');
+    expect(oiDivergenceAlert({ ...hBear, runLength: 4 }, BASE).en).toContain('below the previous high. · repeat: fourth in a row\n');
+    expect(oiDivergenceAlert({ ...hBull, kind: 'regular' }, BASE).ru).toBe(oiDivergenceAlert({ ...bull, pricePct: 1.8, oiPct: -2.6 }, BASE).ru);
   });
 });

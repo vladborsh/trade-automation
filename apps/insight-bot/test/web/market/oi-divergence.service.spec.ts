@@ -19,7 +19,7 @@ const NOW = (LAST_CLOSE + 7 * 60) * 1000; // 7 minutes into the forming bar
 class FakeDb implements Db {
   params: unknown = OI_DIVERGENCE_DEFAULT_PARAMS;
   stored = true;
-  fired: Array<{ direction: string; a_time: Date; b_time: Date; fired_at: Date }> = [];
+  fired: Array<{ kind: string; direction: string; a_time: Date; b_time: Date; fired_at: Date }> = [];
   async query<T>(sql: string, params: readonly unknown[] = []): Promise<T[]> {
     if (sql.includes('from alert_settings')) return [{ params: this.params }] as T[];
     if (sql.includes('min(ts) as first')) return [{ first: this.stored ? new Date(F.oi5m[0].time * 1000) : null }] as T[];
@@ -111,7 +111,7 @@ describe('OiDivergenceService.series (IB-110, V11)', () => {
 
   it('the admin’s params are used (W = 10 bars loses this 28-bar line); an invalid row falls back to the defaults', async () => {
     const short = build();
-    short.db.params = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 6, nRight: 6, k: 3, w: 10 } } };
+    short.db.params = { ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '1h': { nLeft: 6, nRight: 6, k: 3, w: 10, sendHidden: false } } };
     const r = await short.service.series('ETHUSDT', '1h');
     expect(theLine(r)).toEqual([]);
     expect(r.params.perTf['1h'].w).toBe(10);
@@ -122,9 +122,18 @@ describe('OiDivergenceService.series (IB-110, V11)', () => {
 
   it('a line the journal sent carries its fired_at; the others carry null', async () => {
     const { db, service } = build();
-    db.fired = [{ direction: 'bullish', a_time: new Date(F.expected.aTime * 1000), b_time: new Date(F.expected.bTime * 1000), fired_at: new Date(1_793_000_000_000) }];
+    db.fired = [{ kind: 'regular', direction: 'bullish', a_time: new Date(F.expected.aTime * 1000), b_time: new Date(F.expected.bTime * 1000), fired_at: new Date(1_793_000_000_000) }];
     const r = await service.series('ETHUSDT', '1h');
     expect(theLine(r)[0].firedAt).toBe(1_793_000_000);
     expect(r.lines.filter((l) => l !== theLine(r)[0]).every((l) => l.firedAt === null)).toBe(true);
+  });
+
+  it('IB-144: the fired key includes kind — a HIDDEN alert sent with the same A and B does not mark the regular line; every line says its kind', async () => {
+    const { db, service } = build();
+    db.fired = [{ kind: 'hidden', direction: 'bullish', a_time: new Date(F.expected.aTime * 1000), b_time: new Date(F.expected.bTime * 1000), fired_at: new Date(1_793_000_000_000) }];
+    const r = await service.series('ETHUSDT', '1h');
+    expect(theLine(r)[0].kind).toBe('regular');
+    expect(theLine(r)[0].firedAt).toBeNull();
+    expect(r.lines.every((l) => l.kind === 'regular' || l.kind === 'hidden')).toBe(true);
   });
 });

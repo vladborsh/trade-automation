@@ -7,8 +7,9 @@ import type { DivergenceParams } from './detector';
  * one caller and not the other.
  */
 export function detectorParams(p: OiDivergenceParams, tf: OiDivergenceTf): DivergenceParams {
+  const { sendHidden: _sending, ...reach } = p.perTf[tf]; // IB-144: a delivery switch, not a detector param
   return {
-    ...p.perTf[tf],
+    ...reach,
     atrMult: p.atrMult,
     oiMedianMult: p.oiMedianMult,
     priceLineTolAtrMult: p.priceLineTolAtrMult,

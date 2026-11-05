@@ -24,6 +24,12 @@ const LIVE_START = LAST_CLOSE + H + 6 * 60 + 30;
 
 const barsFor = (tf: OiDivergenceTf, from: number, to: number) => (tf === '1h' ? STRETCH.filter((b) => b.time >= from && b.time < to) : []);
 
+/** IB-144: «the live loop already journalled this B of this kind», read from the store as the SQL does. */
+function liveIn(store: MemoryStore): HistoryBackfillPorts['hasLive'] {
+  return async (what, symbol, tf, kind, direction, bTime) => (what === 'alert' ? store.alerts : store.nearMisses)
+    .some((r) => r.source === 'live' && r.symbol === symbol && r.tf === tf && r.kind === kind && r.direction === direction && r.b.time === bTime);
+}
+
 function backfillPorts(store: MemoryStore, over: Partial<HistoryBackfillPorts> = {}): HistoryBackfillPorts {
   return {
     store,
@@ -31,6 +37,9 @@ function backfillPorts(store: MemoryStore, over: Partial<HistoryBackfillPorts> =
     oiWindow: async (_s, from, to) => ({ oi5m: F.oi5m.filter((o) => o.time > from && o.time <= to), venueSilent: [] }),
     firstStoredOi: async () => FIRST_OI,
     liveStart: async () => LIVE_START,
+    // IB-144: the hidden-aware live build started where the live journal did (so both kinds share one window here)
+    hiddenEnd: async () => LIVE_START,
+    hasLive: liveIn(store),
     build: 'b49cd48d4ab4',
     ...over,
   };
@@ -123,7 +132,7 @@ describe('IB-116: the history run is the live loop, replayed', () => {
   it('ends before the live loop’s first close: with the live start one bar earlier, the last close is not evaluated', async () => {
     const r = await replayHistory(backfillPorts(new MemoryStore()), LIVE_START);
     expect(r.perTf.find((t) => t.tf === '1h')?.lastClose).toBe(dueBarClose(LIVE_START, H) - H);
-    const earlier = await replayHistory(backfillPorts(new MemoryStore(), { liveStart: async () => LIVE_START - H }), LIVE_START);
+    const earlier = await replayHistory(backfillPorts(new MemoryStore(), { liveStart: async () => LIVE_START - H, hiddenEnd: async () => LIVE_START - H }), LIVE_START);
     expect(earlier.perTf.find((t) => t.tf === '1h')?.lastClose).toBe(LAST_CLOSE - H);
   });
 
@@ -192,7 +201,7 @@ describe('IB-116: runs — run_of links only within backfill rows, and matches t
     const oiw = async (_s: string, from: number, to: number) => ({ oi5m: oi5m.filter((o) => o.time > from && o.time <= to), venueSilent: [] });
     const ports = (store: MemoryStore): HistoryBackfillPorts => ({
       store, bars: async (_s, t, from, to) => kl(t, from, to), oiWindow: oiw, firstStoredOi: async () => (bars[0] as Bar).time,
-      liveStart: async () => liveStart, build: 'b49cd48d4ab4',
+      liveStart: async () => liveStart, hiddenEnd: async () => liveStart, hasLive: async () => false, build: 'b49cd48d4ab4',
     });
     const live = new MemoryStore();
     const loop = new OiAlertLoop({

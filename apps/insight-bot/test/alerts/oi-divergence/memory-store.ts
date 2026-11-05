@@ -1,4 +1,7 @@
-import { OI_DIVERGENCE_DEFAULT_PARAMS, OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC, type OiDivergenceDirection, type OiDivergenceTf, type OiJournalSource, type WebAlertSettings } from '@trade-automation/contracts';
+import {
+  OI_DIVERGENCE_DEFAULT_PARAMS, OI_RESEARCH_WINDOWS, OI_RESEARCH_WINDOW_SEC, type OiDivergenceDirection, type OiDivergenceKind, type OiDivergenceTf, type OiJournalSource,
+  type WebAlertSettings,
+} from '@trade-automation/contracts';
 import type {
   NewOiAlert, NewOiControl, NewOiNearMiss, NewOiSkip, NewPaths, OiAlertRecipient, OiAlertStore, OutcomeDue, PathDue, PathSubjectRef,
 } from '../../../src/alerts/oi-divergence/pg/oi-alerts.repo';
@@ -8,8 +11,9 @@ const H = 3_600;
 
 /**
  * IB-112 / IB-115 / IB-116 — the alert store in memory, for the loop's and the backfill's specs. It enforces the
- * once-keys and checks as the migrations do (025, 027, and 028's `source` in every key plus the backfill check),
- * so a spec that relies on the database refusing something can fail here too.
+ * once-keys and checks as the migrations do (025, 027, 028's `source` in every key plus the backfill check, and
+ * 033's `kind` in the journal's and the near-misses' keys), so a spec that relies on the database refusing
+ * something can fail here too.
  */
 export class MemoryStore implements OiAlertStore {
   settingsRow: WebAlertSettings = { enabled: false, membersVisible: false, params: OI_DIVERGENCE_DEFAULT_PARAMS, updatedBy: null, updatedAt: 0 };
@@ -20,15 +24,16 @@ export class MemoryStore implements OiAlertStore {
   async settings() { return this.settingsRow; }
   async enabledSymbols() { return this.symbols; }
   async insertAlert(x: NewOiAlert) {
-    // migration 028's once-key: (source, symbol, tf, direction, a_time, b_time); 028's backfill check
+    // migration 033's once-key: (source, symbol, tf, kind, direction, a_time, b_time); 028's backfill check
     if (x.source === 'backfill' && x.late) throw new Error('violates check constraint "oi_divergence_alerts_backfill_unsent"');
-    if (this.alerts.some((a) => a.source === x.source && a.symbol === x.symbol && a.tf === x.tf && a.direction === x.direction && a.a.time === x.a.time && a.b.time === x.b.time)) return null;
+    if (x.kind !== 'regular' && x.kind !== 'hidden') throw new Error('null value in column "kind" violates not-null constraint');
+    if (this.alerts.some((a) => a.source === x.source && a.symbol === x.symbol && a.tf === x.tf && a.kind === x.kind && a.direction === x.direction && a.a.time === x.a.time && a.b.time === x.b.time)) return null;
     const id = this.alerts.length + 1;
     this.alerts.push({ ...x, id, firedAt: null, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null });
     return id;
   }
-  async runFirstId(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number) {
-    return this.alerts.find((a) => a.source === source && a.symbol === symbol && a.tf === tf && a.direction === direction && a.b.time === bTime)?.id ?? null;
+  async runFirstId(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, kind: OiDivergenceKind, direction: OiDivergenceDirection, bTime: number) {
+    return this.alerts.find((a) => a.source === source && a.symbol === symbol && a.tf === tf && a.kind === kind && a.direction === direction && a.b.time === bTime)?.id ?? null;
   }
   async markFired(id: number, firedAt: number, recipients: number, priceAtFire: number | null) {
     if (this.alerts[id - 1]?.source === 'backfill') throw new Error('violates check constraint "oi_divergence_alerts_backfill_unsent"');
@@ -53,8 +58,8 @@ export class MemoryStore implements OiAlertStore {
   controls: Array<NewOiControl & { id: number }> = [];
   nearMisses: Array<NewOiNearMiss & { id: number }> = [];
   paths: Array<NewPaths & { id: number; subject: PathSubjectRef; win: (typeof OI_RESEARCH_WINDOWS)[number]; m: PathMeasurement | null; triedAt: number | null }> = [];
-  async hasAlert(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, direction: OiDivergenceDirection, bTime: number) {
-    return this.alerts.some((a) => a.source === source && a.symbol === symbol && a.tf === tf && a.direction === direction && a.b.time === bTime);
+  async hasAlert(source: OiJournalSource, symbol: string, tf: OiDivergenceTf, kind: OiDivergenceKind, direction: OiDivergenceDirection, bTime: number) {
+    return this.alerts.some((a) => a.source === source && a.symbol === symbol && a.tf === tf && a.kind === kind && a.direction === direction && a.b.time === bTime);
   }
   async insertControl(x: NewOiControl) {
     if (this.controls.some((c) => c.source === x.source && c.symbol === x.symbol && c.tf === x.tf && c.kind === x.kind && c.direction === x.direction && c.barTime === x.barTime)) return null;
@@ -63,7 +68,8 @@ export class MemoryStore implements OiAlertStore {
     return id;
   }
   async insertNearMiss(x: NewOiNearMiss) {
-    if (this.nearMisses.some((c) => c.source === x.source && c.symbol === x.symbol && c.tf === x.tf && c.direction === x.direction && c.b.time === x.b.time)) return null;
+    if (x.kind !== 'regular' && x.kind !== 'hidden') throw new Error('null value in column "kind" violates not-null constraint');
+    if (this.nearMisses.some((c) => c.source === x.source && c.symbol === x.symbol && c.tf === x.tf && c.kind === x.kind && c.direction === x.direction && c.b.time === x.b.time)) return null;
     const id = this.nearMisses.length + 1;
     this.nearMisses.push({ ...x, id });
     return id;

@@ -1,7 +1,7 @@
 import { OI_NEAR_MISS_UNIT, type OiNearMissRule, type OiNearMissUnit } from '@trade-automation/contracts';
 import {
-  aEligibility, atrAt, bOiHolds, holeFinder, lineAt, noiseAt, pair, type Bar, type Direction, type DivergenceEnd, type DivergenceInput, type DivergenceParams,
-  type DivergenceResult, type Noise, type PivotPair,
+  aEligibility, atrAt, bOiHolds, holeFinder, KINDS, lineAt, noiseAt, oiGap, pair, priceGap, type Bar, type Direction, type DivergenceEnd, type DivergenceInput,
+  type DivergenceParams, type DivergenceResult, type Kind, type Noise, type PivotPair,
 } from './detector';
 import { oiPerBar } from './oi-per-bar';
 import type { Side } from './pivots';
@@ -21,11 +21,17 @@ import type { Side } from './pivots';
  * | `w` | A is more than W bars before B | W + 1 … ⌊1.5 W⌋ | bars beyond W |
  *
  * A line rule with tolerance 0 has no reach (one more tolerance is still 0): round 1's lines yield no near-miss.
- * At most one per (direction, B), only for a B with no detection; of several A, the smallest `miss` relative to
- * its reach wins (the farther A on a tie, as V7 picks A). A B whose window has a hole is not judged (V9).
+ * At most one per (kind, direction, B), only for a B with no detection OF THAT KIND; of several A, the smallest
+ * `miss` relative to its reach wins (the farther A on a tie, as V7 picks A). A B whose window has a hole is not
+ * judged (V9).
+ *
+ * IB-144 (V41): run per kind. For `hidden`, `price_delta` / `oi_delta` measure the flipped (1) / (2) — the price
+ * BETTER at B, OI WORSE — through the detector's own `priceGap` / `oiGap`; the line, k and W rules and their reaches
+ * are unchanged (the line side follows the pivot, V40).
  */
 export interface NearMiss {
   direction: Direction;
+  kind: Kind;
   a: DivergenceEnd;
   b: DivergenceEnd;
   aIndex: number;
@@ -65,40 +71,42 @@ export function diagnose(input: DivergenceInput, result: DivergenceResult): Near
     const price = side === 'low' ? result.pivots.lows : result.pivots.highs;
     const oiPivots = side === 'low' ? result.pivots.oiLows : result.pivots.oiHighs;
     const wide = pair(price, oiPivots, side, { ...p, k: reach.k }).filter((x) => x.confirmIndex < bars.length);
-    const detected = new Set(result.divergences.filter((d) => d.direction === direction).map((d) => d.bIndex));
     const relative = (f: Failure) => f.miss / reachOf(f.rule, p, reach);
+    const end = (x: PivotPair): DivergenceEnd => ({
+      time: bars[x.price].time,
+      price: side === 'low' ? bars[x.price].low : bars[x.price].high,
+      oiTime: seriesTime[x.oi] as number,
+      oi: series[x.oi] as number,
+    });
 
-    for (const b of wide) {
-      if (detected.has(b.price)) continue;
-      const lo = Math.max(0, b.price - reach.w - p.nLeft);
-      const hi = Math.min(bars.length - 1, b.price + reach.k + p.nRight);
-      if (holes(bars[lo].time, bars[hi].time + input.tfSec)) continue;
-      if (!bOiHolds(series, b)) continue; // the same B the detector could judge (IB-141 option 1)
-      const noise = noiseAt(bars, series, b.price, p);
-      if (noise === null) continue;
-      let best: { a: PivotPair; f: Failure } | null = null;
-      for (const a of wide) {
-        if (!(a.price < b.price && b.price - a.price <= reach.w && a.confirmIndex <= b.confirmIndex && a.oi < b.oi && canBeA(a, b.confirmIndex))) continue;
-        const failed = failures(side, bars, series, a, b, noise, p, reach);
-        if (failed.length !== 1 || !failed[0].inReach) continue;
-        const f = failed[0];
-        if (best === null || relative(f) < relative(best.f) || (relative(f) === relative(best.f) && a.price < best.a.price)) best = { a, f };
+    for (const kind of KINDS) {
+      const detected = new Set(result.divergences.filter((d) => d.direction === direction && d.kind === kind).map((d) => d.bIndex));
+      for (const b of wide) {
+        if (detected.has(b.price)) continue;
+        const lo = Math.max(0, b.price - reach.w - p.nLeft);
+        const hi = Math.min(bars.length - 1, b.price + reach.k + p.nRight);
+        if (holes(bars[lo].time, bars[hi].time + input.tfSec)) continue;
+        if (!bOiHolds(series, b)) continue; // the same B the detector could judge (IB-141 option 1)
+        const noise = noiseAt(bars, series, b.price, p);
+        if (noise === null) continue;
+        let best: { a: PivotPair; f: Failure } | null = null;
+        for (const a of wide) {
+          if (!(a.price < b.price && b.price - a.price <= reach.w && a.confirmIndex <= b.confirmIndex && a.oi < b.oi && canBeA(a, b.confirmIndex))) continue;
+          const failed = failures(side, kind, bars, series, a, b, noise, p, reach);
+          if (failed.length !== 1 || !failed[0].inReach) continue;
+          const f = failed[0];
+          if (best === null || relative(f) < relative(best.f) || (relative(f) === relative(best.f) && a.price < best.a.price)) best = { a, f };
+        }
+        if (best === null) continue;
+        out.push({
+          direction, kind, a: end(best.a), b: end(b), aIndex: best.a.price, bIndex: b.price,
+          rule: best.f.rule, miss: best.f.miss, unit: OI_NEAR_MISS_UNIT[best.f.rule],
+          confirmedAt: bars[b.confirmIndex].time + input.tfSec,
+        });
       }
-      if (best === null) continue;
-      const end = (x: PivotPair): DivergenceEnd => ({
-        time: bars[x.price].time,
-        price: side === 'low' ? bars[x.price].low : bars[x.price].high,
-        oiTime: seriesTime[x.oi] as number,
-        oi: series[x.oi] as number,
-      });
-      out.push({
-        direction, a: end(best.a), b: end(b), aIndex: best.a.price, bIndex: b.price,
-        rule: best.f.rule, miss: best.f.miss, unit: OI_NEAR_MISS_UNIT[best.f.rule],
-        confirmedAt: bars[b.confirmIndex].time + input.tfSec,
-      });
     }
   }
-  return out.sort((x, y) => x.confirmedAt - y.confirmedAt || x.b.time - y.b.time);
+  return out.sort((x, y) => x.confirmedAt - y.confirmedAt || x.b.time - y.b.time || KINDS.indexOf(x.kind) - KINDS.indexOf(y.kind));
 }
 
 /** The width of each rule's reach, in its own unit — what «smallest miss relative to its unit» divides by. */
@@ -120,7 +128,7 @@ function reachOf(rule: OiNearMissRule, p: DivergenceParams, reach: Pick<Divergen
 
 /** Every one of the six conditions A–B fails, with how much and whether that is within reach. */
 function failures(
-  side: Side, bars: readonly Bar[], series: ReadonlyArray<number | null>, a: PivotPair, b: PivotPair, noise: Noise,
+  side: Side, kind: Kind, bars: readonly Bar[], series: ReadonlyArray<number | null>, a: PivotPair, b: PivotPair, noise: Noise,
   p: DivergenceParams, reach: Pick<DivergenceParams, 'k' | 'w'>,
 ): Failure[] {
   const out: Failure[] = [];
@@ -130,10 +138,10 @@ function failures(
   const oA = series[a.oi] as number;
   const oB = series[b.oi] as number;
 
-  // (1) δp, (2) δoi: the detector requires MORE than the threshold (strict)
-  const worse = side === 'low' ? pA - pB : pB - pA;
+  // (1) δp, (2) δoi: the detector requires MORE than the threshold (strict); the gap in the kind's direction (V40)
+  const worse = priceGap(side, kind, pA, pB);
   if (!(worse > noise.dp)) out.push({ rule: 'price_delta', miss: noise.dp > 0 ? (noise.dp - worse) / noise.dp : 0, inReach: noise.dp > 0 && worse >= 0 });
-  const better = side === 'low' ? oB - oA : oA - oB;
+  const better = oiGap(side, kind, oA, oB);
   if (!(better > noise.doi)) out.push({ rule: 'oi_delta', miss: noise.doi > 0 ? (noise.doi - better) / noise.doi : 0, inReach: noise.doi > 0 && better >= 0 });
 
   // (3) the price line: each crossing bar against ITS ATR14 tolerance (V18)

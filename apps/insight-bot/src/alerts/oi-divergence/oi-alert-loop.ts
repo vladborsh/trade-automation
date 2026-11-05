@@ -21,7 +21,8 @@ import type { OiAlertStore, PathSubjects } from './pg/oi-alerts.repo';
  *    the switch says. The unique key absorbs a re-evaluation or a restart (V8). One confirmed more
  *    than one bar + 10 min ago is journalled `late` and never sent (V10).
  * 3. Only a NEW, on-time row is sent, and only while `alert_settings.enabled` (default OFF, V13): to
- *    every user with `oi_alerts`, in their language, through the Telegram sender.
+ *    every user with `oi_alerts`, in their language, through the Telegram sender. IB-144 (V42): a HIDDEN row also
+ *    needs its TF's `perTf[tf].sendHidden` (default off); it is detected and journalled whatever that says.
  * 4. Skips (a hole in OI the venue did not cause, V9) are logged once per (symbol, TF, bar).
  * 5. Hourly: the +4 h and +24 h closes of sent alerts (1 m kline close, 1 weight each, V12).
  * 6. IB-115, the research journal (V23–V27), from the same bars — no extra bar fetch:
@@ -162,9 +163,9 @@ export class OiAlertLoop {
           if (!hasFullBasis(d.bIndex, params, bars.length) || d.confirmedAt > to) continue;
           // V30: a backfilled row was never sent, so it cannot have been sent late either (the database refuses it)
           const late = !backfill && isLate(d.confirmedAt, nowSec, tfSec);
-          const runOf = d.runFirstBTime === null ? null : await store.runFirstId(source, symbol, tf, d.direction, d.runFirstBTime);
+          const runOf = d.runFirstBTime === null ? null : await store.runFirstId(source, symbol, tf, d.kind, d.direction, d.runFirstBTime);
           const id = await store.insertAlert({
-            source, symbol, tf, direction: d.direction, a: d.a, b: d.b, runOf, runLength: d.runLength,
+            source, symbol, tf, direction: d.direction, kind: d.kind, a: d.a, b: d.b, runOf, runLength: d.runLength,
             params: settings.params, confirmedAt: d.confirmedAt, late, build,
           });
           if (id === null) continue; // already journalled: a re-evaluation or a restart (V8)
@@ -174,9 +175,10 @@ export class OiAlertLoop {
           if (late) { report.late++; continue; }
           if (backfill) continue; // V33: history is never sent
           if (!settings.enabled) continue; // V13: the journal runs either way; nothing is sent while off
+          if (d.kind === 'hidden' && !settings.params.perTf[tf].sendHidden) continue; // V42: hidden per TF, default off
           const recipients = await store.recipients();
           const texts = oiDivergenceAlert({
-            symbol, base: baseOf(symbol), tf, direction: d.direction, pricePct: d.pricePct, oiPct: d.oiPct, runLength: d.runLength, bTime: d.b.time,
+            symbol, base: baseOf(symbol), tf, direction: d.direction, kind: d.kind, pricePct: d.pricePct, oiPct: d.oiPct, runLength: d.runLength, bTime: d.b.time,
           }, this.ports.webBaseUrl);
           let delivered = 0;
           for (const r of recipients) if (await this.ports.send(r.chatId, texts[r.lang])) delivered++;
@@ -195,6 +197,8 @@ export class OiAlertLoop {
   /**
    * IB-115 (V25, V26): the controls and the near-miss this evaluation decides, from the bars it already read.
    * Both exclude a B the journal holds an alert for — the journal, not this window, is what «produced an alert» means.
+   * IB-144 (V41): a pivot control excludes only a REGULAR alert's B (the control series is unchanged across the
+   * deploy; a hidden alert does not remove a control); a near-miss excludes a B with an alert of ITS kind.
    */
   private async research(
     symbol: string, tf: OiDivergenceTf, input: DivergenceInput, result: ReturnType<typeof detectDivergences>,
@@ -204,7 +208,7 @@ export class OiAlertLoop {
     const { bars, params: p, tfSec } = input;
     const picks: ControlPick[] = [];
     for (const pick of pivotControlPicks(input, result)) {
-      if (!(await store.hasAlert(source, symbol, tf, pick.direction as 'bullish' | 'bearish', pick.barTime))) picks.push(pick);
+      if (!(await store.hasAlert(source, symbol, tf, 'regular', pick.direction as 'bullish' | 'bearish', pick.barTime))) picks.push(pick);
     }
     const random = randomControlPick(symbol, tf, bars, tfSec);
     if (random) picks.push(random);
@@ -219,9 +223,9 @@ export class OiAlertLoop {
     const decided = bars.length - (2 * p.k + p.nRight + 1); // the newest B whose OI pivot may lie 2k after it, then nRight to confirm
     for (const m of diagnose(input, result)) {
       if (m.bIndex !== decided) continue;
-      if (await store.hasAlert(source, symbol, tf, m.direction, m.b.time)) continue;
+      if (await store.hasAlert(source, symbol, tf, m.kind, m.direction, m.b.time)) continue;
       const id = await store.insertNearMiss({
-        source, symbol, tf, direction: m.direction, a: m.a, b: m.b, rule: m.rule, miss: m.miss, unit: m.unit, params, confirmedAt: m.confirmedAt, build,
+        source, symbol, tf, direction: m.direction, kind: m.kind, a: m.a, b: m.b, rule: m.rule, miss: m.miss, unit: m.unit, params, confirmedAt: m.confirmedAt, build,
       });
       if (id === null) continue;
       report.nearMisses++;

@@ -1,4 +1,4 @@
-import type { OiDivergenceDirection, OiDivergenceTf } from '@trade-automation/contracts';
+import type { OiDivergenceDirection, OiDivergenceKind, OiDivergenceTf } from '@trade-automation/contracts';
 import type { Lang } from '../../users/user.model';
 import type { Texts } from './texts';
 
@@ -12,12 +12,18 @@ import type { Texts } from './texts';
  * for forecast words.
  *
  * Tickers and timeframes stay as the venue spells them (texts.ts rule 1).
+ *
+ * IB-144 (V43): the hidden pair has its own sentences — what happened (a higher low with lower OI; a lower high
+ * with higher OI) and what that describes. The word «скрытая» / "hidden" is NOT in the message (the sentence says
+ * which it is); it labels the admin list and the chart legend.
  */
 export interface OiDivergenceAlertText {
   symbol: string;
   base: string;
   tf: OiDivergenceTf;
   direction: OiDivergenceDirection;
+  /** IB-144: absent = regular (every caller before 033). */
+  kind?: OiDivergenceKind;
   /** B against A, in percent: price and OI. */
   pricePct: number;
   oiPct: number;
@@ -59,6 +65,19 @@ export function oiDivergenceAlert(a: OiDivergenceAlertText, webBaseUrl: string):
   const oi = signedPct(a.oiPct);
   const bull = a.direction === 'bullish';
   const repeat = a.runLength > 2;
+  const link = alertLink(webBaseUrl, a);
+  if (a.kind === 'hidden') {
+    // V43: the repeat suffix names no pivot — «третий подряд» of what the sentence already said
+    const ruH = (bull
+      ? `${a.base} ${a.tf}: цена — более высокий минимум (${price}), OI — ниже (${oi}). Позиции закрываются, а цена держится выше прошлого минимума.`
+      : `${a.base} ${a.tf}: цена — более низкий максимум (${price}), OI — выше (${oi}). Позиции набираются, а цена не дошла до прошлого максимума.`)
+      + (repeat ? ` · повторное: ${ordinal(a.runLength, 'ru')} подряд` : '');
+    const enH = (bull
+      ? `${a.base} ${a.tf}: price made a higher low (${price}), OI is lower (${oi}). Positions are being closed while price holds above the previous low.`
+      : `${a.base} ${a.tf}: price made a lower high (${price}), OI is higher (${oi}). Positions are being added while price stays below the previous high.`)
+      + (repeat ? ` · repeat: ${ordinal(a.runLength, 'en')} in a row` : '');
+    return { ru: `${ruH}\n${link}`, en: `${enH}\n${link}` };
+  }
   const ru = (bull
     ? `${a.base} ${a.tf}: цена обновила минимум (${price}), OI — нет (${oi}). Набирают позиции на падении.`
     : `${a.base} ${a.tf}: цена обновила максимум (${price}), OI — нет (${oi}). Рост идёт без новых позиций.`)
@@ -67,7 +86,6 @@ export function oiDivergenceAlert(a: OiDivergenceAlertText, webBaseUrl: string):
     ? `${a.base} ${a.tf}: price made a lower low (${price}), OI did not (${oi}). Positions are being opened into the drop.`
     : `${a.base} ${a.tf}: price made a higher high (${price}), OI did not (${oi}). The rise comes without new positions.`)
     + (repeat ? ` · repeat: ${ordinal(a.runLength, 'en')} ${bull ? 'lower low' : 'higher high'} in a row` : '');
-  const link = alertLink(webBaseUrl, a);
   return { ru: `${ru}\n${link}`, en: `${en}\n${link}` };
 }
 

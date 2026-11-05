@@ -335,10 +335,10 @@ const box393 = JSON.parse(readFileSync(join(__dirname, '../../../../../libs/cont
 
 describe('R11 OI divergence: price and OI (contracts) as % from A − 2 bars, ref 0, A and B marked', () => {
   const alert = {
-    id: 9, source: 'live' as const, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
+    id: 9, source: 'live' as const, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const, kind: 'regular' as const,
     a: { time: Math.floor(NOW_S / 3_600) * 3_600 - 30 * 3_600, price: 40, oiTime: 0, oi: 1_000 },
     b: { time: Math.floor(NOW_S / 3_600) * 3_600 - 8 * 3_600, price: 38, oiTime: 0, oi: 1_032 },
-    runOf: null, runLength: 2, params: { perTf: { '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 7, nRight: 4, k: 3, w: 168 }, '4h': { nLeft: 6, nRight: 2, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 },
+    runOf: null, runLength: 2, params: { perTf: { '15m': { nLeft: 6, nRight: 6, k: 3, w: 96, sendHidden: false }, '1h': { nLeft: 7, nRight: 4, k: 3, w: 168, sendHidden: false }, '4h': { nLeft: 6, nRight: 2, k: 3, w: 90, sendHidden: false } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5 },
     confirmedAt: NOW_S - 3_600, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null,
   };
   // IB-141 (V35): unequal sides on the alert's own TF, so B + nLeft (or another TF's reach) would fail here

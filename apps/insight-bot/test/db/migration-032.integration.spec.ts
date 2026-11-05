@@ -79,10 +79,11 @@ maybeDescribe('IB-141 migration 032: N splits into nLeft / nRight in alert_setti
     try {
       await db.query(
         `update alert_settings set params = jsonb_set(jsonb_set(params, '{perTf,4h,n}', '5'), '{perTf,1h}', '{"n":8,"k":2,"w":150}') where id = 1`, []);
-      await runMigrations({ connectionString: url });
+      await runMigrations({ connectionString: url, target: '032' }); // 032's own effect; 033 adds sendHidden (its own spec)
       expect(await params(db)).toEqual({
         ...OI_DIVERGENCE_DEFAULT_PARAMS,
         perTf: { '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 8, nRight: 8, k: 2, w: 150 }, '4h': { nLeft: 5, nRight: 5, k: 3, w: 90 } },
+        // (no sendHidden at 032)
       });
     } finally {
       await db.end();
@@ -110,7 +111,7 @@ maybeDescribe('IB-141 migration 032: N splits into nLeft / nRight in alert_setti
       await runMigrations({ connectionString: url });
       const [r] = await db.query<{ params: unknown }>('select params from oi_divergence_alerts', []);
       expect(r.params).toEqual(ONE_N);
-      expect(OiDivergenceJournalParamsSchema.parse(r.params).perTf['4h']).toEqual({ nLeft: 6, nRight: 6, k: 3, w: 90 });
+      expect(OiDivergenceJournalParamsSchema.parse(r.params).perTf['4h']).toEqual({ nLeft: 6, nRight: 6, k: 3, w: 90, sendHidden: false });
     } finally {
       await db.end();
     }

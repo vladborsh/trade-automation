@@ -21,7 +21,7 @@ import type { CandlesService } from './candles.service';
  *   pages, weight 0, cached 15 minutes.
  * - **Bars:** `CandlesService` (its page cache and its `WEIGHT_CEILING_1M` refusal); closed bars only.
  * - **OI and the venue's silences:** `OiWindowReader`, the read the alert loop uses too.
- * - **Fired:** a line whose (symbol, tf, direction, A, B) is in the journal carries its `fired_at`.
+ * - **Fired:** a line whose (symbol, tf, kind, direction, A, B) is in the journal carries its `fired_at`.
  * - **Cache:** per (symbol, tf) for one bar — a new bar is the only thing that can change the answer.
  *
  * Holds nothing beyond that cache (no boot warm-up, IB-096).
@@ -112,27 +112,29 @@ export class OiDivergenceService {
   /** V11: lines the alert loop sent, keyed as the journal's once-key. */
   private async fired(symbol: string, tf: OiDivergenceTf): Promise<Map<string, number>> {
     if (!this.options.db) return new Map();
-    const rows = await this.options.db.query<{ direction: string; a_time: Date; b_time: Date; fired_at: Date }>(
-      `select direction, a_time, b_time, fired_at from oi_divergence_alerts
+    const rows = await this.options.db.query<{ kind: string; direction: string; a_time: Date; b_time: Date; fired_at: Date }>(
+      `select kind, direction, a_time, b_time, fired_at from oi_divergence_alerts
         where symbol = $1 and tf = $2 and fired_at is not null`, [symbol, tf]);
     return new Map(rows.map((r) => [
-      firedKey(r.direction, sec(r.a_time), sec(r.b_time)), sec(r.fired_at),
+      firedKey(r.kind, r.direction, sec(r.a_time), sec(r.b_time)), sec(r.fired_at),
     ]));
   }
 }
 
 const sec = (d: Date) => Math.floor(new Date(d).getTime() / 1000);
-const firedKey = (direction: string, a: number, b: number) => `${direction}:${a}:${b}`;
+/** The journal's once-key without source and tf (IB-144: kind is in it — one B can be both kinds). */
+const firedKey = (kind: string, direction: string, a: number, b: number) => `${kind}:${direction}:${a}:${b}`;
 
 function line(d: Divergence, fired: Map<string, number>): WebOiDivergenceLine {
   return {
     direction: d.direction,
+    kind: d.kind,
     a: d.a,
     b: d.b,
     confirmedAt: d.confirmedAt,
     pricePct: d.pricePct,
     oiPct: d.oiPct,
     repeat: d.runLength > 2 && d.runFirstBTime !== null ? { runLength: d.runLength, firstBTime: d.runFirstBTime } : null,
-    firedAt: fired.get(firedKey(d.direction, d.a.time, d.b.time)) ?? null,
+    firedAt: fired.get(firedKey(d.kind, d.direction, d.a.time, d.b.time)) ?? null,
   };
 }

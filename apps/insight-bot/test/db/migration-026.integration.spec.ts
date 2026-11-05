@@ -100,7 +100,7 @@ maybeDescribe('IB-114 migration 026: line tolerances and 1h W 168 in alert_setti
       await runMigrations({ connectionString: url });
       const [r] = await db.query<{ params: unknown }>('select params from oi_divergence_alerts', []);
       expect(r.params).toEqual(ROUND_1_SEED);
-      const n6 = (w: number) => ({ nLeft: 6, nRight: 6, k: 3, w }); // V34: a row with one n reads as both sides
+      const n6 = (w: number) => ({ nLeft: 6, nRight: 6, k: 3, w, sendHidden: false }); // and 033's switch, absent → off // V34: a row with one n reads as both sides
       expect(OiDivergenceJournalParamsSchema.parse(r.params)).toEqual({
         ...ROUND_1_SEED, perTf: { '15m': n6(96), '1h': n6(120), '4h': n6(90) }, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0,
       });

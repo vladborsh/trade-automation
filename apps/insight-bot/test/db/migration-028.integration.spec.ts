@@ -41,8 +41,10 @@ maybeDescribe('IB-116 migration 028: source live | backfill', () => {
     }
   };
   const ALERT_COLS = 'symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, params, confirmed_at, build';
+  /** Before the chain's end there is no kind column; after it (033, IB-144) every writer names one. */
+  let withKind = false;
   const alertSql = (extraCols: string, extraVals: string) =>
-    `insert into oi_divergence_alerts (${ALERT_COLS}${extraCols}) values ('BTCUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, '{}', $2, '${SHA}'${extraVals})`;
+    `insert into oi_divergence_alerts (${ALERT_COLS}${extraCols}${withKind ? ', kind' : ''}) values ('BTCUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, '{}', $2, '${SHA}'${extraVals}${withKind ? ", 'regular'" : ''})`;
 
   beforeAll(async () => {
     const prefix = scratchPrefix('insight_m028', DATABASE_URL as string);
@@ -62,6 +64,7 @@ maybeDescribe('IB-116 migration 028: source live | backfill', () => {
     await db.query(`insert into oi_divergence_near_misses (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build)
       values ('BTCUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, 'k', 1, 'bars', '{}', $2, $3)`, [T0, T1, SHA]);
     await runMigrations({ connectionString: url });
+    withKind = true;
   }, DB_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -84,8 +87,8 @@ maybeDescribe('IB-116 migration 028: source live | backfill', () => {
     expect(await fails(alertSql(', source', ", 'history'"), [T0, new Date(T1.getTime() + 3_600_000)])).toMatch(/check constraint/);
     expect(await fails(`insert into oi_divergence_controls (symbol, tf, kind, direction, bar_time, stop_price, params, build) values ('ETHUSDT', '1h', 'random', null, $1, null, '{}', $2)`, [T1, SHA]))
       .toMatch(/null value in column "source"/);
-    expect(await fails(`insert into oi_divergence_near_misses (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build)
-      values ('ETHUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, 'k', 1, 'bars', '{}', $2, $3)`, [T0, T1, SHA])).toMatch(/null value in column "source"/);
+    expect(await fails(`insert into oi_divergence_near_misses (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build, kind)
+      values ('ETHUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, 'k', 1, 'bars', '{}', $2, $3, 'regular')`, [T0, T1, SHA])).toMatch(/null value in column "source"/);
   });
 
   it('V30: the same alert, control and near-miss exist once as live AND once as backfill; a second backfill is refused', async () => {
@@ -95,8 +98,8 @@ maybeDescribe('IB-116 migration 028: source live | backfill', () => {
     const control = (src: string) => fails(`insert into oi_divergence_controls (symbol, tf, kind, direction, bar_time, stop_price, params, build, source) values ('BTCUSDT', '1h', 'random', null, $1, null, '{}', $2, $3)`, [T0, SHA, src]);
     expect(await control('backfill')).toBe('accepted');
     expect(await control('backfill')).toMatch(/oi_divergence_controls_once/); // nulls not distinct still holds
-    const nm = (src: string) => fails(`insert into oi_divergence_near_misses (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build, source)
-      values ('BTCUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, 'w', 2, 'bars', '{}', $2, $3, $4)`, [T0, T1, SHA, src]);
+    const nm = (src: string) => fails(`insert into oi_divergence_near_misses (symbol, tf, direction, a_time, a_price, a_oi_time, a_oi, b_time, b_price, b_oi_time, b_oi, rule, miss, unit, params, confirmed_at, build, source, kind)
+      values ('BTCUSDT', '1h', 'bullish', $1, 100, $1, 1000, $2, 98, $2, 1050, 'w', 2, 'bars', '{}', $2, $3, $4, 'regular')`, [T0, T1, SHA, src]);
     expect(await nm('backfill')).toBe('accepted');
     expect(await nm('backfill')).toMatch(/oi_divergence_near_misses_once/);
     expect(await nm('live')).toMatch(/oi_divergence_near_misses_once/);
@@ -117,7 +120,7 @@ maybeDescribe('IB-116 migration 028: source live | backfill', () => {
     await db.query('delete from oi_divergence_alerts', []);
     const now = 1_800_000_000;
     const put = (source: 'live' | 'backfill', confirmedAt: number, bTime: number) => store.insertAlert({
-      source, symbol: 'ETHUSDT', tf: '1h', direction: 'bullish', a: { time: bTime - 72_000, price: 1, oiTime: bTime - 72_000, oi: 1 },
+      source, symbol: 'ETHUSDT', tf: '1h', direction: 'bullish', kind: 'regular', a: { time: bTime - 72_000, price: 1, oiTime: bTime - 72_000, oi: 1 },
       b: { time: bTime, price: 0.98, oiTime: bTime, oi: 1.03 }, runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt, late: false, build: SHA,
     });
     await put('backfill', now - 3_600, now - 7 * 3_600);
@@ -134,13 +137,13 @@ maybeDescribe('IB-116 migration 028: source live | backfill', () => {
     await db.query('delete from oi_divergence_controls', []);
     const bT = 1_792_000_800;
     const live = await store.insertAlert({
-      source: 'live', symbol: 'SOLUSDT', tf: '1h', direction: 'bearish', a: { time: bT - 36_000, price: 1, oiTime: bT - 36_000, oi: 2 },
+      source: 'live', symbol: 'SOLUSDT', tf: '1h', direction: 'bearish', kind: 'regular', a: { time: bT - 36_000, price: 1, oiTime: bT - 36_000, oi: 2 },
       b: { time: bT, price: 1.1, oiTime: bT, oi: 1.9 }, runOf: null, runLength: 2, params: OI_DIVERGENCE_DEFAULT_PARAMS, confirmedAt: bT + 25_200, late: false, build: SHA,
     });
-    expect(await store.runFirstId('live', 'SOLUSDT', '1h', 'bearish', bT)).toBe(live);
-    expect(await store.runFirstId('backfill', 'SOLUSDT', '1h', 'bearish', bT)).toBeNull();
-    expect(await store.hasAlert('live', 'SOLUSDT', '1h', 'bearish', bT)).toBe(true);
-    expect(await store.hasAlert('backfill', 'SOLUSDT', '1h', 'bearish', bT)).toBe(false);
+    expect(await store.runFirstId('live', 'SOLUSDT', '1h', 'regular', 'bearish', bT)).toBe(live);
+    expect(await store.runFirstId('backfill', 'SOLUSDT', '1h', 'regular', 'bearish', bT)).toBeNull();
+    expect(await store.hasAlert('live', 'SOLUSDT', '1h', 'regular', 'bearish', bT)).toBe(true);
+    expect(await store.hasAlert('backfill', 'SOLUSDT', '1h', 'regular', 'bearish', bT)).toBe(false);
 
     const t0 = 1_792_008_000;
     const control = async (source: 'live' | 'backfill') => (await store.insertControl({

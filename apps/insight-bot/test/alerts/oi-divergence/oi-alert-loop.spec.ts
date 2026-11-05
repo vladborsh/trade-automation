@@ -336,7 +336,7 @@ describe.each([
 
   it('a B the journal holds an alert for gets no near-miss', async () => {
     const store = storeWith();
-    store.hasAlert = async (_src, _s, _tf, _d, bTime) => bTime === T0 + B * TF;
+    store.hasAlert = async (_src, _s, _tf, _k, _d, bTime) => bTime === T0 + B * TF;
     const { loop: l } = loop(store, ports());
     expect((await l.evaluate('15m', close, close + 6 * 60)).nearMisses).toBe(0);
   });

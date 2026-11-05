@@ -9,6 +9,10 @@ import { pivots, type Side } from './pivots';
  *
  * - **Bullish**, on lows: the price's wick low is LOWER at B than at A, OI's per-bar min is HIGHER.
  * - **Bearish**, on highs: the wick high is HIGHER at B, OI's per-bar max is LOWER.
+ * - IB-144 (V40, V41) — the **hidden** pair: only V7's (1) and (2) flip — bullish = a HIGHER low with LOWER OI,
+ *   bearish = a LOWER high with HIGHER OI. Pivots, pairing, full A, the B-side OI rule, k, W, δp/δoi and the line
+ *   checks (and the side they check, which follows the pivot, not the kind) are the same code. «Farthest A» and
+ *   repeat runs are per (kind, direction): one B can give both kinds, against different A's.
  *
  * Holds nothing between calls: the caller passes the bars and readings it read, and gets plain data
  * back (no boot warm-up, IB-096).
@@ -60,6 +64,9 @@ export interface DivergenceInput {
 }
 
 export type Direction = 'bullish' | 'bearish';
+/** IB-144 (V41): which pair — `regular` (V7) or `hidden` (V40: conditions (1) and (2) flipped). */
+export type Kind = 'regular' | 'hidden';
+export const KINDS: readonly Kind[] = ['regular', 'hidden'];
 
 export interface PivotPair {
   side: Side;
@@ -79,6 +86,7 @@ export interface DivergenceEnd {
 
 export interface Divergence {
   direction: Direction;
+  kind: Kind;
   a: DivergenceEnd;
   b: DivergenceEnd;
   /** Bar indexes, for the caller's own drawing / checks. */
@@ -128,6 +136,11 @@ export const OI_MEDIAN_MIN = 20;
  *   max(nLeft, nRight) bars on the right, so the first bar that can cross is A + max(nLeft, nRight) + 1 →
  *   B ≥ W + ATR_PERIOD − max(nLeft, nRight) − 1 (binding only while that max is < 7). (`aRule: 'fast'` holds A to
  *   nRight only; the history run's W keeps this term below the OI one on 4h, so the count is unchanged there.)
+ *   **IB-144: a HIDDEN line rises from a low (falls from a high), so a bar right after A can cross it** and needs ATR
+ *   at A + 1. The count is deliberately NOT raised for that: it would move the regular path's basis (V47's «regular
+ *   unchanged» check). Where ATR is not known yet (only an A within the first ATR_PERIOD bars of the DATA — a
+ *   window that starts later is at least `barsForEvaluation + W` long, so its B's A is past bar 100) the tolerance
+ *   is 0, the stricter round-1 rule, and the chart (which starts at the same first bar, V11) agrees.
  * - the noise floor's 100 moves end at B's previous bar and start at bar B − OI_MEDIAN_BARS − 1 → B ≥ OI_MEDIAN_BARS + 1;
  *   ATR14 at B needs B ≥ ATR_PERIOD, always the smaller;
  * - after B: its OI pivot up to k bars later, then nRight bars to confirm → k + nRight bars, plus B's own bar.
@@ -161,7 +174,8 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
     const sidePairs = pairs.filter((p) => p.side === side).sort((x, y) => x.confirmIndex - y.confirmIndex || x.price - y.price);
     const series = side === 'low' ? oi.min : oi.max;
     const seriesTime = side === 'low' ? oi.minTime : oi.maxTime;
-    const found: Divergence[] = [];
+    // V41: «farthest A» and the repeat runs are per (kind, direction) — a hidden run never extends a regular one
+    const found: Record<Kind, Divergence[]> = { regular: [], hidden: [] };
     for (const b of sidePairs) {
       const lo = Math.max(0, b.price - params.w - params.nLeft);
       const hi = Math.min(bars.length - 1, b.price + params.k + params.nRight);
@@ -173,25 +187,28 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
       if (!bOiHolds(series, b)) continue; // IB-141 option 1: an OI pivot before B must still stand on B's own bar
       const noise = noiseAt(bars, series, b.price, params);
       if (noise === null) continue;
-      const candidates = sidePairs.filter((a) => a.price < b.price && a.price >= b.price - params.w
-        && a.confirmIndex <= b.confirmIndex && a.oi < b.oi && canBeA(a, b.confirmIndex)
-        && diverges(side, bars, series, a, b, noise, params));
-      if (candidates.length === 0) continue;
-      const a = candidates.reduce((far, c) => (c.price < far.price ? c : far)); // V7: the farthest A
-      const d = divergence(side, bars, series, seriesTime, a, b, input.tfSec);
-      // V8: a repeat extends the latest earlier line from the same A (or a farther one) through a B before this one
-      const prev = found.filter((p) => a.price <= p.aIndex && p.bIndex > a.price && p.bIndex < b.price)
-        .reduce<Divergence | null>((last, p) => (last === null || p.bIndex > last.bIndex ? p : last), null);
-      if (prev) {
-        d.runLength = prev.runLength + 1;
-        d.runFirstBTime = prev.runFirstBTime ?? prev.b.time;
+      const eligible = sidePairs.filter((a) => a.price < b.price && a.price >= b.price - params.w
+        && a.confirmIndex <= b.confirmIndex && a.oi < b.oi && canBeA(a, b.confirmIndex));
+      for (const kind of KINDS) {
+        const candidates = eligible.filter((a) => diverges(side, kind, bars, series, a, b, noise, params));
+        if (candidates.length === 0) continue;
+        const a = candidates.reduce((far, c) => (c.price < far.price ? c : far)); // V7: the farthest A
+        const d = divergence(side, kind, bars, series, seriesTime, a, b, input.tfSec);
+        // V8: a repeat extends the latest earlier line from the same A (or a farther one) through a B before this one
+        const prev = found[kind].filter((p) => a.price <= p.aIndex && p.bIndex > a.price && p.bIndex < b.price)
+          .reduce<Divergence | null>((last, p) => (last === null || p.bIndex > last.bIndex ? p : last), null);
+        if (prev) {
+          d.runLength = prev.runLength + 1;
+          d.runFirstBTime = prev.runFirstBTime ?? prev.b.time;
+        }
+        found[kind].push(d);
       }
-      found.push(d);
     }
-    divergences.push(...found);
+    divergences.push(...found.regular, ...found.hidden);
   }
 
-  divergences.sort((x, y) => x.confirmedAt - y.confirmedAt || x.b.time - y.b.time);
+  // regular before hidden at the same moment: a stable order for the journal and the chart
+  divergences.sort((x, y) => x.confirmedAt - y.confirmedAt || x.b.time - y.b.time || KINDS.indexOf(x.kind) - KINDS.indexOf(y.kind));
   skips.sort((x, y) => x.barTime - y.barTime);
   return { pivots: { lows, highs, oiLows, oiHighs }, pairs, divergences, skips };
 }
@@ -294,21 +311,39 @@ function median(values: number[]): number {
   return s.length % 2 === 1 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** V7's four conditions, mirrored for highs; conditions 3–4 with V18's tolerances. */
+/**
+ * V7 (1) and (2) as signed gaps: how far B is past A **in the direction the kind requires**, in the series' own
+ * unit. Each condition holds when its gap is MORE than its noise floor (δp, δoi). Regular: the price is worse at B
+ * (lows: lower; highs: higher) and OI better (lows: higher; highs: lower). **Hidden (V40) is exactly the negation
+ * of both**: the price better at B, OI worse. The near-miss diagnosis (`diagnose.ts`) reads the same two gaps.
+ */
+export function priceGap(side: Side, kind: Kind, pA: number, pB: number): number {
+  const worse = side === 'low' ? pA - pB : pB - pA;
+  return kind === 'regular' ? worse : -worse;
+}
+export function oiGap(side: Side, kind: Kind, oA: number, oB: number): number {
+  const better = side === 'low' ? oB - oA : oA - oB;
+  return kind === 'regular' ? better : -better;
+}
+
+/**
+ * V7's four conditions, mirrored for highs; conditions 3–4 with V18's tolerances. IB-144 (V40): `kind` flips (1) and
+ * (2) only. The line checks do NOT depend on it: a line through two lows must have nothing BELOW it, through two highs
+ * nothing ABOVE, whatever its slope — a hidden bullish price line rises, and is still a support line.
+ */
 function diverges(
-  side: Side, bars: readonly Bar[], series: ReadonlyArray<number | null>, a: PivotPair, b: PivotPair, noise: Noise, p: DivergenceParams,
+  side: Side, kind: Kind, bars: readonly Bar[], series: ReadonlyArray<number | null>, a: PivotPair, b: PivotPair, noise: Noise, p: DivergenceParams,
 ): boolean {
   const price = (t: number) => (side === 'low' ? bars[t].low : bars[t].high);
   const pA = price(a.price);
   const pB = price(b.price);
   const oA = series[a.oi] as number;
   const oB = series[b.oi] as number;
-  // (1) the price is worse at B, (2) OI is better at B — each by more than its noise
-  const priceWorse = side === 'low' ? pB < pA - noise.dp : pB > pA + noise.dp;
-  const oiBetter = side === 'low' ? oB > oA + noise.doi : oB < oA - noise.doi;
-  if (!priceWorse || !oiBetter) return false;
+  // (1) the price is worse at B (hidden: better), (2) OI is better at B (hidden: worse) — each by more than its noise
+  if (!(priceGap(side, kind, pA, pB) > noise.dp) || !(oiGap(side, kind, oA, oB) > noise.doi)) return false;
   // (3) no wick between A and B crosses the price line, (4) no per-bar OI crosses the OI line — by MORE than the
   // tolerance (V18): `beyond` is strict, so a crossing of exactly the tolerance passes, and tolerance 0 is round 1.
+  // The side is the PIVOT's (low: below, high: above), never the kind's (V40).
   const beyond = (v: number, line: number, tol: number) => (side === 'low' ? v < line - tol : v > line + tol);
   for (let t = a.price + 1; t < b.price; t++) {
     const line = lineAt(a.price, pA, b.price, pB, t);
@@ -330,7 +365,7 @@ export function lineAt(x0: number, y0: number, x1: number, y1: number, x: number
 }
 
 function divergence(
-  side: Side, bars: readonly Bar[], series: ReadonlyArray<number | null>, seriesTime: ReadonlyArray<number | null>,
+  side: Side, kind: Kind, bars: readonly Bar[], series: ReadonlyArray<number | null>, seriesTime: ReadonlyArray<number | null>,
   a: PivotPair, b: PivotPair, tfSec: number,
 ): Divergence {
   const end = (p: PivotPair): DivergenceEnd => ({
@@ -342,7 +377,7 @@ function divergence(
   const A = end(a);
   const B = end(b);
   return {
-    direction: side === 'low' ? 'bullish' : 'bearish',
+    direction: side === 'low' ? 'bullish' : 'bearish', kind,
     a: A, b: B, aIndex: a.price, bIndex: b.price,
     confirmedAt: bars[b.confirmIndex].time + tfSec,
     pricePct: (B.price / A.price - 1) * 100,
