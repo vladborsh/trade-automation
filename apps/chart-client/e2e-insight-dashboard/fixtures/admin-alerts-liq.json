@@ -1,0 +1,69 @@
+{
+  "settings": {
+    "enabled": false,
+    "membersVisible": false,
+    "params": {
+      "perCoin": {
+        "BNBUSDT": {
+          "enabled": true,
+          "thresholdUsd": 300000
+        },
+        "BTCUSDT": {
+          "enabled": true,
+          "thresholdUsd": 5000000
+        },
+        "ETHUSDT": {
+          "enabled": true,
+          "thresholdUsd": 3000000
+        },
+        "SOLUSDT": {
+          "enabled": true,
+          "thresholdUsd": 1000000
+        },
+        "TRXUSDT": {
+          "enabled": true,
+          "thresholdUsd": 300000
+        }
+      }
+    },
+    "updatedAt": 1793897193
+  },
+  "coins": [
+    {
+      "symbol": "BNBUSDT",
+      "base": "BNB",
+      "listed": true,
+      "enabled": true,
+      "thresholdUsd": 300000
+    },
+    {
+      "symbol": "BTCUSDT",
+      "base": "BTC",
+      "listed": true,
+      "enabled": true,
+      "thresholdUsd": 5000000
+    },
+    {
+      "symbol": "ETHUSDT",
+      "base": "ETH",
+      "listed": true,
+      "enabled": true,
+      "thresholdUsd": 3000000
+    },
+    {
+      "symbol": "SOLUSDT",
+      "base": "SOL",
+      "listed": true,
+      "enabled": true,
+      "thresholdUsd": 1000000
+    },
+    {
+      "symbol": "TRXUSDT",
+      "base": "TRX",
+      "listed": true,
+      "enabled": true,
+      "thresholdUsd": 300000
+    }
+  ],
+  "alerts": []
+}

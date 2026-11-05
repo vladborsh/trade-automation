@@ -18,6 +18,12 @@
         <span>{{ t('settings.oiAlerts') }}</span>
       </label>
     }
+    @if (s.liqAlertsVisible) {
+      <label class="row">
+        <input type="checkbox" [checked]="s.liqAlerts" (change)="setLiqAlerts($any($event.target).checked)" [disabled]="busy()" />
+        <span>{{ t('settings.liqAlerts') }}</span>
+      </label>
+    }
     <p class="muted hint">{{ t('settings.hint') }}</p>
   }
   @if (status(); as key) {

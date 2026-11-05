@@ -33,6 +33,8 @@ async function setup(api: Partial<Record<keyof InsightApiClient, unknown>> = {})
       provide: InsightApiClient,
       useValue: {
         alertsAdmin: async () => PAGE,
+        // IB-122: the «Large liquidations» section inside the page has its own read
+        liqAlertsAdmin: async () => ({ settings: { enabled: false, membersVisible: false, params: { perCoin: {} }, updatedAt: 0 }, coins: [], alerts: [] }),
         patchAlertSettings: async (p: WebAlertSettingsPatch) => { sent.push(['settings', p]); return { ...PAGE, settings: { ...PAGE.settings, ...p } }; },
         addAlertSymbol: async (s: string) => { sent.push(['add', s]); return { ...PAGE, symbols: [...PAGE.symbols, { symbol: s, base: s, enabled: true, addedAt: 1, addedBy: 1 }] }; },
         setAlertSymbolEnabled: async (s: string, on: boolean) => { sent.push(['toggle', s, on]); return PAGE; },

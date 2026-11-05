@@ -45,6 +45,11 @@ export class MemberSettingsComponent {
     void this.save({ oiAlerts: on });
   }
 
+  /** IB-122: large-liquidation alerts — offered only while the server says this member may see them. */
+  setLiqAlerts(on: boolean): void {
+    void this.save({ liqAlerts: on });
+  }
+
   private async save(patch: WebMemberSettingsPatch): Promise<void> {
     if (this.busy()) return;
     this.busy.set(true);

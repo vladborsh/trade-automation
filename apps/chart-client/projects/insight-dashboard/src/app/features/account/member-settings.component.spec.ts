@@ -9,7 +9,7 @@ import { MemberSettingsComponent } from './member-settings.component';
 /** IB-035 — the account page's settings: the bot's /lang and /calendar, on the site. */
 async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMemberSettings>, initial: Partial<WebMemberSettings> = {}) {
   const patches: WebMemberSettingsPatch[] = [];
-  let stored: WebMemberSettings = { lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, ...initial };
+  let stored: WebMemberSettings = { lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, ...initial };
   TestBed.configureTestingModule({
     imports: [MemberSettingsComponent],
     providers: [{
@@ -19,7 +19,7 @@ async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMembe
         updateMemberSettings: async (p: WebMemberSettingsPatch) => {
           patches.push(p);
           if (patchImpl) return patchImpl(p);
-          stored = { ...stored, lang: (p.lang as 'ru' | 'en') ?? stored.lang, calendarAlerts: typeof p.calendarAlerts === 'boolean' ? p.calendarAlerts : stored.calendarAlerts, oiAlerts: typeof p.oiAlerts === 'boolean' ? p.oiAlerts : stored.oiAlerts };
+          stored = { ...stored, lang: (p.lang as 'ru' | 'en') ?? stored.lang, calendarAlerts: typeof p.calendarAlerts === 'boolean' ? p.calendarAlerts : stored.calendarAlerts, oiAlerts: typeof p.oiAlerts === 'boolean' ? p.oiAlerts : stored.oiAlerts, liqAlerts: typeof p.liqAlerts === 'boolean' ? p.liqAlerts : stored.liqAlerts };
           return stored;
         },
       },
@@ -80,5 +80,18 @@ describe('MemberSettingsComponent (IB-035)', () => {
     await shown.fixture.whenStable();
     expect(shown.patches).toEqual([{ oiAlerts: true }]);
     expect(shown.cmp.settings()?.oiAlerts).toBe(true);
+  });
+
+  it('IB-122: the liquidation alerts switch is absent while hidden; when shown it sends exactly liqAlerts', async () => {
+    const hidden = await setup();
+    expect(hidden.el.textContent).not.toContain('крупных ликвидациях');
+    TestBed.resetTestingModule();
+    const shown = await setup(undefined, { liqAlertsVisible: true });
+    expect(shown.el.textContent).toContain('Сигналы о крупных ликвидациях в Telegram');
+    expect(shown.el.textContent).not.toContain('Сигналы OI'); // each type has its own visibility
+    shown.cmp.setLiqAlerts(true);
+    await shown.fixture.whenStable();
+    expect(shown.patches).toEqual([{ liqAlerts: true }]);
+    expect(shown.cmp.settings()?.liqAlerts).toBe(true);
   });
 });

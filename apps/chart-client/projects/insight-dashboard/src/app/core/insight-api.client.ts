@@ -2,7 +2,9 @@ import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type {
   WebInviteResponse, WebMemberResponse, WebMemberSettings, WebMemberSettingsPatch, WebMembersResponse,
-  WebAlertsAdminResponse, WebAlertSettingsPatch, WebAlertSymbolAdd, WebAlertSymbolPatch,
+  WebAlertsAdminResponse,
+  WebLiqAlertsAdminResponse,
+  WebLiqAlertSettingsPatch, WebAlertSettingsPatch, WebAlertSymbolAdd, WebAlertSymbolPatch,
   WebOpenInterestResponse, OiDivergenceTf, WebOiDivergenceSeriesResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
@@ -279,6 +281,17 @@ export class InsightApiClient {
 
   async patchAlertSettings(patch: WebAlertSettingsPatch): Promise<WebAlertsAdminResponse> {
     return this.sendJson<WebAlertsAdminResponse>('PATCH', '/admin/alerts/settings', patch);
+  }
+
+  // ------------------------------------------------------ IB-122, large-liquidation alerts (admin)
+
+  /** Admin only: the «Large liquidations» section — switches, per-coin thresholds, the last 50 journal rows. */
+  async liqAlertsAdmin(): Promise<WebLiqAlertsAdminResponse> {
+    return this.get<WebLiqAlertsAdminResponse>('/admin/alerts/liq');
+  }
+
+  async patchLiqAlerts(patch: WebLiqAlertSettingsPatch): Promise<WebLiqAlertsAdminResponse> {
+    return this.sendJson<WebLiqAlertsAdminResponse>('PATCH', '/admin/alerts/liq', patch);
   }
 
   // ------------------------------------------------------ IB-035, members and own settings

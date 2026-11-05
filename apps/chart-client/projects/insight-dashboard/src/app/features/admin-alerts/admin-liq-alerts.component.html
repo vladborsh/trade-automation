@@ -1,0 +1,75 @@
+<section class="liq">
+  <h2>{{ t('liqAlerts.title') }}</h2>
+  <p class="note">{{ t('liqAlerts.intro') }}</p>
+
+  @if (actionError(); as key) {
+    <p class="error" role="alert">{{ t(key) }}</p>
+  }
+
+  @if (loadError(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  } @else if (page(); as p) {
+    <div class="switch">
+      <span>{{ t('alerts.enabled') }}: <strong [class.on]="p.settings.enabled">{{ t(p.settings.enabled ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" [class.primary]="!p.settings.enabled" (click)="setSwitch('enabled', !p.settings.enabled)" [disabled]="busy()" data-testid="liq-enabled">
+        {{ t(p.settings.enabled ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('liqAlerts.enabledNote') }}</p>
+    <div class="switch">
+      <span>{{ t('alerts.membersVisible') }}: <strong [class.on]="p.settings.membersVisible">{{ t(p.settings.membersVisible ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" (click)="setSwitch('membersVisible', !p.settings.membersVisible)" [disabled]="busy()" data-testid="liq-members-visible">
+        {{ t(p.settings.membersVisible ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('liqAlerts.membersVisibleNote') }} · {{ t('alerts.updated', { at: updated() }) }}</p>
+
+    <h3>{{ t('liqAlerts.thresholds') }}</h3>
+    <p class="note">{{ t('liqAlerts.thresholdsNote') }}</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('liqAlerts.col.on') }}</th><th>{{ t('liqAlerts.col.threshold') }}</th><th></th></tr></thead>
+        <tbody>
+          @for (c of form(); track c.symbol) {
+            <tr [class.off]="!c.enabled">
+              <td>{{ c.symbol }}</td>
+              <td><input type="checkbox" [checked]="c.enabled" (change)="edit(c.symbol, 'enabled', $any($event.target).checked)" [attr.aria-label]="c.symbol + ' ' + t('liqAlerts.col.on')" /></td>
+              <td><input inputmode="numeric" [value]="c.threshold" (input)="edit(c.symbol, 'threshold', $any($event.target).value)" [attr.aria-label]="c.symbol + ' ' + t('liqAlerts.col.threshold')" [placeholder]="t('liqAlerts.noThreshold')" /></td>
+              <td class="muted">{{ c.listed ? '' : t('liqAlerts.paused') }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" (click)="save()" [disabled]="busy() || !changed()">{{ t('alerts.save') }}</button>
+      <button type="button" (click)="reset()" [disabled]="busy()">{{ t('alerts.reset') }}</button>
+      @if (patch() === null) { <span class="error">{{ t('liqAlerts.invalid') }}</span> }
+    </div>
+
+    <h3>{{ t('alerts.journal') }}</h3>
+    @if (alerts().length === 0) {
+      <p class="muted">{{ t('alerts.journalEmpty') }}</p>
+    } @else {
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('liqAlerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('liqAlerts.col.side') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
+              <th>{{ t('liqAlerts.col.sum') }}</th><th>{{ t('liqAlerts.col.threshold') }}</th><th>{{ t('alerts.col.status') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of alerts(); track r.id) {
+              <tr>
+                <td class="nowrap">{{ r.at }}</td><td>{{ r.symbol }}</td><td>{{ t(r.side) }}</td><td>{{ t(r.event) }}</td>
+                <td class="num">{{ r.sum }}</td><td class="num">{{ r.threshold }}</td>
+                <td [class.warn]="r.status.key === 'alerts.status.late'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>

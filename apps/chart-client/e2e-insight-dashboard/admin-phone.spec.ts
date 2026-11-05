@@ -6,6 +6,14 @@ import members from './fixtures/admin-members.json';
 import loginEvents from './fixtures/admin-login-events.json';
 // IB-112: SYNTHETIC — the alerts endpoint has no server yet; shaped by the IB-109 contract, longest symbol included
 import alertsPage from './fixtures/admin-alerts.synthetic.json';
+// IB-122: the «Large liquidations» section, the real answer of slot dev-3's LiqAlertsAdmin (2026-11-05). Its journal was
+// empty, so ONE synthetic row (the widest: a continuation) is appended below, so the journal table is measured too.
+import liqPage from './fixtures/admin-alerts-liq.json';
+
+const liqWithRow = {
+  ...liqPage,
+  alerts: [{ id: 1, source: 'live', event: 'continuing', symbol: '1000PEPEUSDT', side: 'short', at: 1_793_888_888, sumUsd: 12_345_678, thresholdUsd: 5_000_000, firedAt: null, late: true, recipients: 0 }],
+};
 
 /**
  * IB-BUG-034 — the admin pages on a 390×844 phone and at 1440: the PAGE never scrolls sideways. A
@@ -27,6 +35,7 @@ async function mockApi(page: Page): Promise<void> {
       '/admin/members': members,
       '/admin/login-events': loginEvents,
       '/admin/alerts': alertsPage,
+      '/admin/alerts/liq': liqWithRow,
       '/calendar/upcoming': { events: [] },
     };
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
@@ -68,6 +77,7 @@ test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
       await page.goto(path);
       await expect(page.locator('h1')).toContainText(title);
       await expect(page.locator('table').first()).toBeVisible();
+      if (path === '/admin/alerts') await expect(page.locator('app-admin-liq-alerts tbody tr')).toHaveCount(liqPage.coins.length + 1);
       const m = await measure(page);
       expect(m.innerWidth).toBe(390);
       expect(m.scrollWidth).toBeLessThanOrEqual(390);

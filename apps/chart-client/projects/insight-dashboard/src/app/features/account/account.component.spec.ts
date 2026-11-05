@@ -11,7 +11,7 @@ function setup(change: (b: unknown) => Promise<void>) {
     providers: [{ provide: InsightApiClient, useValue: {
       changePassword: async (b: unknown) => { sent.push(b); return change(b); },
       // IB-035: the settings section the page now embeds
-      memberSettings: async () => ({ lang: 'en', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false }),
+      memberSettings: async () => ({ lang: 'en', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false }),
     } }],
   });
   TestBed.inject(SessionService).signedIn({ id: 2, tgUserId: 222, role: 'member', lang: 'en', login: 'bob' });
