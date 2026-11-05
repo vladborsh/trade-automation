@@ -1,5 +1,5 @@
 /* market-round2 mockup's table: mono cells, muted headings, a hairline per row. */
-:host { display: block; min-width: 0; }
+:host { display: block; min-width: 0; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font: var(--type-note); }
 th, td { padding: 8px; border-bottom: 1px solid var(--card-border); text-align: left; white-space: nowrap; }
 th { font-weight: 400; }
@@ -26,4 +26,6 @@ td.series { color: var(--color-text-muted); }
 @media (max-width: 480px) {
   .phone-hide { display: none; }
   th, td { padding: 8px 4px; }
+  /* «04/11 17:13» and «100 за 8 мин» break onto two lines rather than push the card wider */
+  td.time, td.series { white-space: normal; }
 }
