@@ -341,7 +341,6 @@ export const en: Strings = {
   'positioning.sortByRarityOf': 'Sort {column} by how unusual',
   'positioning.fullTable': 'Full table →',
   'positioning.page.intro': 'Who is unusual right now, by Binance perpetuals: tap a header to sort, a row to open the coin.',
-  'positioning.legend': 'Colour = how unusual against the coin\'s own 30 days, not up or down. Hatched = cannot say yet.',
   'positioning.noValue': '—',
   'positioning.signal.squeeze': 'squeeze',
   'positioning.signal.capitulation': 'capitulation',

@@ -348,7 +348,6 @@ export type StringKey =
   | 'positioning.sortByRarityOf'
   | 'positioning.fullTable'
   | 'positioning.page.intro'
-  | 'positioning.legend'
   | 'positioning.noValue'
   | 'positioning.signal.squeeze'
   | 'positioning.signal.capitulation'

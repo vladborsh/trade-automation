@@ -24,7 +24,6 @@ tbody tr:hover td, tbody tr:hover .coin { background-color: rgb(48 54 61 / 40%);
 .coin a:hover { color: #26a69a; text-decoration: underline; }
 td { @include heat.fills; }
 .signal { color: #d29922; }
-.legend { margin: 8px 0 0; font: var(--type-small); color: var(--color-text-muted); }
 
 .more {
   display: none;

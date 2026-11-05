@@ -347,7 +347,6 @@ export const ru: Strings = {
   'positioning.sortByRarityOf': 'Сортировать «{column}» по редкости',
   'positioning.fullTable': 'Вся таблица →',
   'positioning.page.intro': 'Кто сейчас необычен — по бессрочным фьючерсам Binance. Нажмите на заголовок, чтобы отсортировать, на строку — чтобы открыть монету.',
-  'positioning.legend': 'Цвет — насколько необычно для самой монеты за 30 дней, а не рост или падение. Штриховка — пока оценить нельзя.',
   'positioning.noValue': '—',
   'positioning.signal.squeeze': 'сквиз',
   'positioning.signal.capitulation': 'капитуляция',

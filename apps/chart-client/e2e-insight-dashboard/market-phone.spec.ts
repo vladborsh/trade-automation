@@ -656,6 +656,7 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
       await expect(help.locator('summary')).toHaveText('Что значит подсветка?');
       expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
       expect((await help.boundingBox())!.y).toBeLessThan((await card.locator('app-pos-heat').boundingBox())!.y);
+      await expect(card.locator('app-pos-heat .legend')).toHaveCount(0); // TL review: the help replaced the old legend line
       await card.scrollIntoViewIfNeeded();
       await shot(info, `market-${width}-collapsed.png`, await card.screenshot());
       await help.locator('summary').click();
@@ -675,6 +676,7 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
       const help = page.locator('app-positioning-page app-pos-heat-help');
       await expect(help.locator('summary')).toHaveText('Что значит подсветка и как читать таблицу');
       expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(true);
+      await expect(page.locator('app-pos-heat .legend')).toHaveCount(0); // TL review: the help replaced the old legend line
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       // the same rules paint both: each swatch's background is the background of a cell at that level
       const fills = await page.evaluate(() => {
