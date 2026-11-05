@@ -1,5 +1,6 @@
 // IB-119 (market round 2 §3, mockup §1–2): a 150 px plot, ticks on the right, the span under it,
 // the caption and the current value above, a one-line legend below. Palette: the dashboard's tokens.
+// Every label is ≥ 12 px (IB-088's guard), larger than the mockup's 9–11 px axis text.
 :host { display: block; min-width: 0; }
 .ichart { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .cap { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font: var(--type-small); color: var(--color-text-muted); }
@@ -48,15 +49,15 @@
 .dot.mark { width: 8px; height: 8px; }
 .dot.mark.up { background: var(--color-up); }
 .dot.mark.down { background: var(--color-down); }
-.mark-label { position: absolute; top: 0; transform: translateX(-50%); font: 600 11px/1 var(--font-sans); color: var(--color-text-muted); }
+.mark-label { position: absolute; top: 0; transform: translateX(-50%); font: 600 12px/1 var(--font-sans); color: var(--color-text-muted); }
 .yaxis { position: relative; min-width: 44px; }
-.yaxis .num { position: absolute; right: 0; transform: translateY(-50%); font-size: 11px; line-height: 1; color: var(--color-text-muted); white-space: nowrap; }
-.xaxis { position: relative; height: 14px; font: var(--type-micro); color: var(--color-text-muted); }
+.yaxis .num { position: absolute; right: 0; transform: translateY(-50%); font-size: 12px; line-height: 1; color: var(--color-text-muted); white-space: nowrap; }
+.xaxis { position: relative; height: 17px; font: var(--type-small); color: var(--color-text-muted); }
 .x { position: absolute; top: 0; white-space: nowrap; }
 .x0 { left: 0; }
 .x50 { left: 50%; transform: translateX(-50%); }
 .x100 { right: 0; }
-.legend { margin: 2px 0 0; display: flex; gap: 4px 12px; flex-wrap: wrap; font: var(--type-micro); color: var(--color-text-muted); }
+.legend { margin: 2px 0 0; display: flex; gap: 4px 12px; flex-wrap: wrap; font: var(--type-small); color: var(--color-text-muted); }
 .key { display: inline-flex; align-items: center; gap: 4px; }
 .sw { display: inline-block; width: 10px; height: 2px; background: var(--c, var(--color-text)); }
 .sw.band { height: 8px; background: rgba(139, 148, 158, .35); }

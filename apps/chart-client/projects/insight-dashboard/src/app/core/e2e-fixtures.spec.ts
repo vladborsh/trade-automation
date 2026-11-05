@@ -39,6 +39,7 @@ const SINGLE: Record<string, z.ZodTypeAny> = {
   'market-caps.4h.json': WebCapsResponseSchema,
   'market-caps.24h.json': WebCapsResponseSchema,
   'market-insights.24h.json': WebInsightsResponseSchema,
+  'market-insights-charts.24h.json': WebInsightsResponseSchema, // IB-119: the mockup's cards with charts (synthetic)
   'market-kpis.json': WebKpisResponseSchema,
   'market-positioning.24h.json': WebPositioningResponseSchema,
 };
