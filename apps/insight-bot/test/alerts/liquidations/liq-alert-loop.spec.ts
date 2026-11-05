@@ -215,6 +215,17 @@ describe('LiqAlertLoop: restarts, late, dedupe', () => {
     expect(h.sent).toEqual([]);
   });
 
+  it('L14 late S: a crossing found in time, then the process down until its S is more than 5 min old → late, never sent', async () => {
+    const h = setup();
+    h.store.enabled = true;
+    h.print(T, 6e6);
+    await h.run(h.loop, T - 30 * S, T + 30 * S); // the crossing is journalled in time; S (T + 60 s) not reached
+    expect(alertsOf(h.store)).toEqual([expect.objectContaining({ late: false })]);
+    await h.make().tick(T + 6 * MIN + 10 * S); // boots 5 min 10 s after S
+    expect(alertsOf(h.store, 'event')).toEqual([expect.objectContaining({ atMs: T + MIN, late: true, firedAt: null })]);
+    expect(h.sent).toEqual([]);
+  });
+
   it('L14 late T0: a crossing found late makes the whole event late, even when its S is recent', async () => {
     const h = setup();
     h.store.enabled = true;
