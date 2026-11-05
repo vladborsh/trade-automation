@@ -203,9 +203,12 @@ def v28_evaluate(raw):
     per_row = round(sizes.get('oi_divergence_paths', 0) / n_paths) if n_paths else None
     heap = {r[0]: int(r[3]) for r in raw['sizes'] if len(r) > 3}
     heap_row = round(heap['oi_divergence_paths'] / n_paths) if n_paths and 'oi_divergence_paths' in heap else None
-    # both against the same band, so the verdict names which one breaks (the band is not widened)
-    rows.append(band(flags, 'path_bytes_per_row', per_row, 75, 300, ' B (heap + indexes)'))
+    # Architect (IB-140 a review): V28's ≈ 150 B/row is HEAP ONLY (band 75–300); all-in it implies ≈ 172 B/row
+    # (band 86–345). Each figure against its own band, so a FLAG names the one that breaks.
     rows.append(band(flags, 'path_heap_bytes_per_row', heap_row, 75, 300, ' B (heap only)'))
+    rows.append(band(flags, 'path_bytes_per_row', per_row, 86, 345, ' B (heap + indexes)'))
+    if n_paths and n_paths < 50000:
+        notes.append('bytes/row at %d rows still carry fixed page and index overhead; recheck at ≈ 50 k rows' % n_paths)
     if per_row:
         notes.append('paths table: %d rows (all sources) → %.1f MB per 145 k rows/year at this size' % (n_paths, per_row * 145000 / 1e6))
     sar = raw.get('sar') or []

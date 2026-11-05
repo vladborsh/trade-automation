@@ -102,13 +102,13 @@ v28_input mem "d['sar'][50]['avail'] = 99; d['sar'][60]['swap'] = 501; d['paths'
 run v28 mem
 check 'v28 memory < 100 MB, swap > 500 MB, overdue paths → each FLAGged' \
   '[ "$(verdict mem v28)" = FLAG:paths_overdue,mem_available_min_mb,swap_used_max_mb ]'
-v28_input bytes "d['sizes'][0][1] = str(301 * 8000)"
+v28_input bytes "d['sizes'][0][1] = str(346 * 8000)"
 run v28 bytes
-check 'v28 301 B/row with indexes, heap 125 → FLAG names the total only' '[ "$(verdict bytes v28)" = FLAG:path_bytes_per_row ]'
+check 'v28 all-in 346 B/row (band 86–345), heap 125 → FLAG names the all-in figure only' '[ "$(verdict bytes v28)" = FLAG:path_bytes_per_row ] && grep -q "recheck at ≈ 50 k rows" $work/out-bytes/v28.md'
 
-v28_input heap "d['sizes'][0][1] = str(400 * 8000); d['sizes'][0][3] = str(301 * 8000)"
+v28_input heap "d['sizes'][0][1] = str(345 * 8000); d['sizes'][0][3] = str(301 * 8000)"
 run v28 heap
-check 'v28 heap-only 301 B/row → both figures FLAG, each named' '[ "$(verdict heap v28)" = FLAG:path_bytes_per_row,path_heap_bytes_per_row ]'
+check 'v28 heap 301 B/row (band 75–300), all-in 345 → FLAG names the heap figure only' '[ "$(verdict heap v28)" = FLAG:path_heap_bytes_per_row ]'
 check 'v28 the md shows the path-weight formula' 'grep -q "E = (1 100/8 subjects/day)" $work/out-pass/v28.md'
 
 v28_input early "d['now'] = '2026-11-05T21:40:00Z'"
