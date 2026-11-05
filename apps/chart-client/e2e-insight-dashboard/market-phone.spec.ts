@@ -625,3 +625,76 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) {
     });
   });
 }
+
+/**
+ * IB-121 — the heat table's help «Что значит подсветка и как читать таблицу», in Russian (the mockup's
+ * language) at the two acceptance widths: one collapsed line on Market, open on the first /positioning
+ * visit; four swatches painted exactly like the table's cells; no page scroll. `E2E_SHOTS` (a folder)
+ * also writes the screenshots there for the task report.
+ */
+async function asRussianMember(page: Page): Promise<void> {
+  await page.route('**/api/web/auth/me', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ user: { ...MEMBER.user, lang: 'ru' } }) }));
+}
+async function shot(info: import('@playwright/test').TestInfo, name: string, body: Buffer): Promise<void> {
+  await info.attach(name, { body, contentType: 'image/png' });
+  if (process.env['E2E_SHOTS']) (await import('node:fs')).writeFileSync(`${process.env['E2E_SHOTS']}/${name}`, body);
+}
+
+for (const [width, height] of [[1240, 900], [390, 844]] as const) {
+  test.describe(`IB-121 heat-table help — ${width}`, () => {
+    test.use({ viewport: { width, height } });
+
+    test('Market: one collapsed line «Что значит подсветка?» above the table; opened, it fits', async ({ page }, info) => {
+      await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
+      await mockApi(page);
+      await asRussianMember(page); // after mockApi: the later route answers first
+      await page.goto('/market?p=24h');
+      await page.clock.runFor(2_000);
+      const card = page.locator('#positioning');
+      const help = card.locator('app-pos-heat-help');
+      await expect(help.locator('summary')).toHaveText('Что значит подсветка?');
+      expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
+      expect((await help.boundingBox())!.y).toBeLessThan((await card.locator('app-pos-heat').boundingBox())!.y);
+      await card.scrollIntoViewIfNeeded();
+      await shot(info, `market-${width}-collapsed.png`, await card.screenshot());
+      await help.locator('summary').click();
+      await page.clock.runFor(100);
+      await expect(help.locator('li')).toHaveCount(7);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await shot(info, `market-${width}-open.png`, await card.screenshot());
+    });
+
+    test('/positioning: open on the first visit, collapsed on the next; swatches = the cells\' fills; no page scroll', async ({ page }, info) => {
+      await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
+      await mockApi(page);
+      await asRussianMember(page); // after mockApi: the later route answers first
+      await page.goto('/positioning?p=24h');
+      await page.clock.runFor(2_000);
+      await expect(page.locator('app-pos-heat tbody tr').first()).toBeAttached();
+      const help = page.locator('app-positioning-page app-pos-heat-help');
+      await expect(help.locator('summary')).toHaveText('Что значит подсветка и как читать таблицу');
+      expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      // the same rules paint both: each swatch's background is the background of a cell at that level
+      const fills = await page.evaluate(() => {
+        const bg = (el: Element | null) => (el ? getComputedStyle(el).backgroundImage + '|' + getComputedStyle(el).backgroundColor : null);
+        return ['notable', 'unusual', 'extreme', 'none'].map((h) => ({
+          heat: h,
+          swatch: bg(document.querySelector(`app-pos-heat-help .sw[data-heat='${h}']`)),
+          cell: bg(document.querySelector(`app-pos-heat td[data-heat='${h}']`)),
+        }));
+      });
+      for (const f of fills) {
+        expect(f.swatch, f.heat).not.toBeNull();
+        if (f.cell !== null) expect(f.swatch, f.heat).toBe(f.cell);
+      }
+      expect(fills.filter((f) => f.cell !== null).length).toBeGreaterThanOrEqual(2); // the capture really has coloured and hatched cells
+      await shot(info, `positioning-${width}.png`, await page.locator('app-positioning-page app-card').nth(1).screenshot());
+      await page.reload();
+      await page.clock.runFor(2_000);
+      await expect(page.locator('app-pos-heat tbody tr').first()).toBeAttached();
+      expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
+    });
+  });
+}
