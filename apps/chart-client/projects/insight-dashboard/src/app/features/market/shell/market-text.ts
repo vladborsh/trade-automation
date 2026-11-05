@@ -70,12 +70,10 @@ export function kpiView(tile: WebKpiTile): KpiView {
   const value = v === null ? null
     : tile.id === 'market_cap' ? capUsd(v)
     : tile.id === 'btc_dominance' ? `${v.toFixed(1)} %`
-    : tile.id === 'fear_greed' ? String(Math.round(v))
     : tile.id === 'btc_funding' ? fundingPct(v)
     : formatUsd(v);
   const deltaText = d === null ? null
     : tile.id === 'btc_dominance' ? `${d > 0 ? '+' : d < 0 ? MINUS : ''}${Math.abs(d).toFixed(2)} pp`
-    : tile.id === 'fear_greed' ? `${d > 0 ? '+' : d < 0 ? MINUS : ''}${Math.abs(Math.round(d))}`
     : signedPct(d);
   return {
     labelKey: `kpi.${tile.id}` as StringKey,
@@ -103,7 +101,6 @@ function kpiContext(tile: WebKpiTile): KpiView['context'] {
   const p = c.params;
   switch (c.key) {
     case 'kpi.ctx.change': return { key: 'kpi.ctx.change', params: { change: signedPct(Number(p['deltaPct'])) ?? '' } };
-    case 'kpi.ctx.fng_band': return { key: `kpi.ctx.fng.${String(p['band'])}` as StringKey, params: {} };
     case 'kpi.ctx.liq_side': return { key: p['side'] === 'long' ? 'kpi.ctx.liq.long' : 'kpi.ctx.liq.short', params: { share: Number(p['sharePct']) } };
     case 'kpi.ctx.funding_side': return { key: `kpi.ctx.funding.${String(p['side'])}` as StringKey, params: {} };
   }

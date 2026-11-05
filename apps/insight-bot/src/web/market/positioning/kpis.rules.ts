@@ -1,9 +1,7 @@
 /**
  * IB-085 (D10) — the KPI tiles' context words, pure. The client words them (D4); these decide
- * which word. The F&G bands are alternative.me's own (0–24 extreme fear, 25–44 fear, 45–55 neutral,
- * 56–75 greed, 76–100 extreme greed — the classification its API returns beside the value).
+ * which word. (IB-117: the F&G tile and its band word left; `fngBand` lives in `insights/sentiment`.)
  */
-export { fngBand } from '../../../insights/sentiment';
 
 /** Which side dominated the liquidations, and its share in whole percent. */
 export function liqSide(long: number, short: number): { side: 'long' | 'short'; sharePct: number } {

@@ -7,6 +7,7 @@ import kpisFixture from '../../../../../../../../libs/contracts/test/fixtures/kp
 import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
 import positioningFixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
 import flowsFixture from '../../../../../../../../libs/contracts/test/fixtures/flows.24h.json';
+import fearGreedFixture from '../../../../../../../../libs/contracts/test/fixtures/fear-greed-card.json';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { MarketComponent } from './market.component';
@@ -32,7 +33,7 @@ const caps = (period: WebMarketPeriod): WebCapsResponse => ({
 
 interface Call { endpoint: string; period?: WebMarketPeriod }
 
-function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean } = {}) {
+function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean; cards?: unknown } = {}) {
   const calls: Call[] = [];
   const navigate = vi.fn(async () => true);
   const api = {
@@ -43,7 +44,7 @@ function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean;
       const body = { ...(insightsFixture as unknown as WebInsightsResponse), period, ...(opts.noStatements ? { top: [] } : {}) };
       return new Promise<WebInsightsResponse>((r) => setTimeout(() => r(body), opts.insightsDelayMs ?? 0));
     },
-    marketCards: async () => { calls.push({ endpoint: 'sentiment' }); return null; },
+    marketCards: async () => { calls.push({ endpoint: 'sentiment' }); return (opts.cards ?? null) as never; },
     marketPositioning: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'positioning', period }); return { ...(positioningFixture as unknown as WebPositioningResponse), period }; },
     marketCaps: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'caps', period }); if (opts.capsFail) throw new Error('502 from CoinGecko'); return caps(period); },
     marketFlows: async (period: WebMarketPeriod) => { calls.push({ endpoint: 'flows', period }); return { ...(flowsFixture as unknown as WebFlowsResponse), period }; },
@@ -160,6 +161,21 @@ describe('MarketComponent shell (IB-088)', () => {
     day.fixture.detectChanges();
     expect(text(day.fixture)).not.toContain('No 24h data');
     expect(text(day.fixture)).toMatch(/Nothing unusual over 24h|Not enough history/);
+  });
+
+  it('IB-117: five KPI tiles, none of them Fear & Greed — and the gauge panel still draws the index', async () => {
+    const { fixture } = setup({ cards: { fearGreed: fearGreedFixture, dominance: null, btcVsTop: null, caps: [], capsDay: null, capsSource: 'coingecko', live: true } });
+    await vi.advanceTimersByTimeAsync(0);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const tiles = [...el.querySelectorAll('app-kpi-strip .tile')].map((t) => t.getAttribute('data-kpi'));
+    expect(tiles).toEqual(['market_cap', 'btc_dominance', 'liquidations_24h', 'btc_oi', 'btc_funding']);
+    expect(el.querySelector('app-kpi-strip')?.textContent).not.toContain('Fear & Greed');
+    expect(el.querySelector('app-kpi-strip')?.textContent).not.toContain('alternative.me');
+    const gauge = el.querySelector('#sentiment app-fear-greed-gauge');
+    expect(gauge).not.toBeNull();
+    expect(gauge?.querySelector('svg.gauge')).not.toBeNull();
+    expect(gauge?.textContent).toContain('26');
   });
 
   it('there is no Refresh button: the page refreshes itself', () => {

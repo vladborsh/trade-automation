@@ -6,19 +6,22 @@ import type { LiquidationsOverviewService } from '../../liquidations/overview.se
 import type { MarketCardsService } from '../market-cards.service';
 import type { OiLsService } from '../oi-ls.service';
 import type { UniverseSummaryService } from '../universe-summary.service';
-import { fngBand, fundingSide, liqSide } from './kpis.rules';
+import { fundingSide, liqSide } from './kpis.rules';
 
 /**
- * IB-085 (market-page design D10) — `GET /api/web/market/kpis`: the six tiles, from reads the page
+ * IB-085 (market-page design D10) — `GET /api/web/market/kpis`: the five tiles, from reads the page
  * already makes (market cards, the liquidation block, the OI path, the universe summary). No new
  * venue call: the cards ask only F&G and CoinGecko `/global` (no coin list, so no `/coins/markets`),
  * the OI read shares OiLsService's cache, the summary its own 60 s. Cached 60 s.
  *
- * A source that fails gives its tile `unavailable: 'venue_unavailable'` — the six tiles are always
- * there (the contract refuses five). F&G carries alternative.me's attribution (§5).
+ * A source that fails gives its tile `unavailable: 'venue_unavailable'` — the five tiles are always
+ * there (the contract refuses four).
  *
- * IB-106 (design §7.5, D25) — each tile may carry a `note`. Two come from the cards fetch above (ETH's
- * share, F&G yesterday / a week ago). The third, BTC's global-account long/short ratio, is **the one
+ * IB-117 (market round 2 §1) — no Fear & Greed tile: it repeated the gauge panel (owner, 2026-11-05).
+ * The cards fetch still carries F&G for the gauge; this service no longer reads it.
+ *
+ * IB-106 (design §7.5, D25) — each tile may carry a `note`. One comes from the cards fetch above (ETH's
+ * share). The other, BTC's global-account long/short ratio, is **the one
  * new read**: `oiLs.longShort(btc, 'global_account', now − 2 h, now)`, a `/futures/data` page at
  * **weight 0**, at most one request per compute (this cache, 60 s) and in practice one per 5 minutes
  * (OiLsService caches the 5-minute-snapped window 300 s): ≤ 5 of the endpoint's 1 000 per 5 min.
@@ -37,7 +40,6 @@ export interface KpisOptions {
 
 const SOURCES = {
   coingecko: { name: 'CoinGecko', url: 'https://www.coingecko.com' },
-  fng: { name: 'alternative.me', url: 'https://alternative.me/crypto/fear-and-greed-index/' },
   liquidations: { name: [WEB_VENUE_NAMES.binance, WEB_VENUE_NAMES.bybit, WEB_VENUE_NAMES.okx].join(', '), url: null },
   binance: { name: WEB_VENUE_NAMES.binance, url: null },
 } as const;
@@ -70,7 +72,6 @@ export class KpisService {
     const tiles: Record<WebKpiId, WebKpiTile> = {
       market_cap: tile('market_cap', SOURCES.coingecko),
       btc_dominance: tile('btc_dominance', SOURCES.coingecko),
-      fear_greed: tile('fear_greed', SOURCES.fng),
       liquidations_24h: tile('liquidations_24h', SOURCES.liquidations),
       btc_oi: tile('btc_oi', SOURCES.binance),
       btc_funding: tile('btc_funding', SOURCES.binance),
@@ -83,17 +84,6 @@ export class KpisService {
     }
     if (dom) Object.assign(tiles.btc_dominance, available(dom.btcPct, dom.changePct24h, Math.floor(dom.atMs / 1000)));
     if (dom?.ethPct != null) tiles.btc_dominance.note = { key: 'kpi.note.eth_share', params: { ethPct: round(dom.ethPct, 1) } };
-
-    const fg = cards?.fearGreed ?? null;
-    if (fg) {
-      Object.assign(tiles.fear_greed, available(fg.now.value, fg.previous ? fg.now.value - fg.previous.value : null, dayStartSec(fg.now.day)), {
-        context: { key: 'kpi.ctx.fng_band', params: { band: fngBand(fg.now.value) } },
-      });
-      // a half the venue did not publish is null (the client omits it); neither half → no note
-      if (fg.previous || fg.weekAgo) {
-        tiles.fear_greed.note = { key: 'kpi.note.fng_history', params: { yesterday: fg.previous?.value ?? null, weekAgo: fg.weekAgo?.value ?? null } };
-      }
-    }
 
     if (overview) {
       const t = overview.block.totals;
@@ -138,4 +128,3 @@ function available(value: number, delta: number | null | undefined, asOf: number
 /** IB-106: the window the L/S note reads — the last 5-minute point is all it needs; 2 h covers a late venue. */
 const LS_NOTE_WINDOW_MS = 2 * 3_600_000;
 const round = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 ** digits;
-const dayStartSec = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 1000);

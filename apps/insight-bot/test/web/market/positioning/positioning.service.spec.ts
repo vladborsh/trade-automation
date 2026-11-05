@@ -129,14 +129,14 @@ describe('KpisService', () => {
   const fundingOk = { summary: async () => ({ asOfMs: NOW, venue: 'binance-perp', rows: [{ id: 'BTCUSDT', base: 'BTC', volumeRank: 1, lastPrice: 1, changePct24h: 0, fundingRate: 0.0001, nextFundingTimeMs: null, oiChangePct24h: 0 }] }) };
   const byId = async (k: KpisService) => Object.fromEntries((await k.kpis()).tiles.map((t) => [t.id, t]));
 
-  it('every source down: still SIX tiles, in order, each saying why it is empty', async () => {
+  it('every source down: still FIVE tiles, in order, each saying why it is empty', async () => {
     const res = await kpis(failing).kpis();
     expect(res.tiles.map((t) => t.id)).toEqual([...WEB_KPI_IDS]);
     expect(res.tiles.every((t) => t.value === null && t.unavailable === 'venue_unavailable')).toBe(true);
     expect(res.tiles.every((t) => t.note === null)).toBe(true);
   });
 
-  it('IB-106 notes: ETH share, F&G yesterday and a week ago, BTC account L/S (the last point of ONE global_account read over 2 h)', async () => {
+  it('IB-106 notes: ETH share, BTC account L/S (the last point of ONE global_account read over 2 h)', async () => {
     const calls: unknown[][] = [];
     const oiLs = {
       openInterest: down,
@@ -147,23 +147,20 @@ describe('KpisService', () => {
     };
     const tiles = await byId(kpis(cardsWith(fng(reading('2026-11-02', 37), reading('2026-10-27', 48)), 10.6349), oiLs, fundingOk));
     expect(tiles.btc_dominance.note).toEqual({ key: 'kpi.note.eth_share', params: { ethPct: 10.6 } });
-    expect(tiles.fear_greed.note).toEqual({ key: 'kpi.note.fng_history', params: { yesterday: 37, weekAgo: 48 } });
     expect(tiles.btc_funding.note).toEqual({ key: 'kpi.note.ls_accounts', params: { ratio: 2.62 } });
     expect(calls).toEqual([['BTCUSDT', 'global_account', NOW - 2 * H, NOW]]);
-    // the other three tiles have no note
+    // the other three tiles have no note — and with F&G history on the cards, no tile carries it (IB-117)
+    expect(Object.keys(tiles)).not.toContain('fear_greed');
     expect([tiles.market_cap.note, tiles.liquidations_24h.note, tiles.btc_oi.note]).toEqual([null, null, null]);
   });
 
-  it('IB-106 null cases: no ETH share, no F&G past, an L/S read that fails or is empty — no note, and no tile value lost', async () => {
+  it('IB-106 null cases: no ETH share, an L/S read that fails or is empty — no note, and no tile value lost', async () => {
     const failed = await byId(kpis(cardsWith(fng(null, null), null), { openInterest: down, longShort: down }, fundingOk));
     expect(failed.btc_dominance).toMatchObject({ value: 59.2, note: null });
-    expect(failed.fear_greed).toMatchObject({ value: 26, note: null });
     expect(failed.btc_funding).toMatchObject({ value: 0.0001, unavailable: null, note: null });
 
     const empty = await byId(kpis(cardsWith(fng(null, reading('2026-10-27', 48)), 10.6), { openInterest: down, longShort: async () => ({ points: [] }) }, fundingOk));
     expect(empty.btc_funding.note).toBeNull();
-    // one half missing: that half is null, the other stands (the client omits the null half)
-    expect(empty.fear_greed.note).toEqual({ key: 'kpi.note.fng_history', params: { yesterday: null, weekAgo: 48 } });
   });
 
   it('IB-106: the L/S note is its own fact — it stands when the funding read failed', async () => {
@@ -171,7 +168,7 @@ describe('KpisService', () => {
     expect(tiles.btc_funding).toMatchObject({ value: null, unavailable: 'venue_unavailable', note: { key: 'kpi.note.ls_accounts', params: { ratio: 1.9 } } });
   });
 
-  it('F&G carries alternative.me attribution and its band; BTC OI its 24 h change', async () => {
+  it('IB-117: F&G on the cards makes no tile (the gauge reads it); BTC OI its 24 h change', async () => {
     const cards = { cards: async () => ({
       fearGreed: { now: { day: '2026-11-03', value: 26, classification: 'Fear' }, previous: { day: '2026-11-02', value: 37, classification: 'Fear' }, weekAgo: null, source: 'alternative.me' },
       dominance: { btcPct: 59.2, ethPct: 10.6, totalUsd: 2.62e12, atMs: NOW, changePct24h: null, changePct7d: null, totalChangePct24h: -2.97, coverageDays: 0, source: 'coingecko' },
@@ -179,7 +176,9 @@ describe('KpisService', () => {
     }) };
     const oi = { longShort: down, openInterest: async () => ({ points: [{ time: (NOW - 24 * H) / 1000, value: 1, notional: 100 }, { time: NOW / 1000, value: 1, notional: 110 }] }) };
     const tiles = Object.fromEntries((await kpis(cards, oi).kpis()).tiles.map((t) => [t.id, t]));
-    expect(tiles.fear_greed).toMatchObject({ value: 26, delta: -11, source: { name: 'alternative.me' }, context: { key: 'kpi.ctx.fng_band', params: { band: 'fear' } } });
+    expect(Object.keys(tiles)).toEqual([...WEB_KPI_IDS]);
+    expect(Object.keys(tiles)).not.toContain('fear_greed');
+    expect(Object.values(tiles).map((t) => t.source.name)).not.toContain('alternative.me');
     expect(tiles.market_cap).toMatchObject({ value: 2.62e12, delta: -2.97 });
     expect(tiles.btc_oi).toMatchObject({ value: 110, delta: 10 });
   });

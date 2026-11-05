@@ -4,10 +4,10 @@ import { I18nService } from '../../../i18n/i18n.service';
 import { kpiTileView } from './kpi-tile';
 
 /**
- * IB-088 (D10), IB-106 (design §7.5) — the KPI strip: six tiles filling the row
+ * IB-088 (D10), IB-106 (design §7.5) — the KPI strip: five tiles (IB-117 dropped F&G) filling the row
  * (`auto-fit, minmax(200px, 1fr)`). Each tile: label (its source in the tooltip), the value with
  * its delta or word beside it, a 6 px bar, a muted note, and a small visible credit only where
- * the source's terms ask for one (alternative.me, CoinGecko). A tile the server could not fill
+ * the source's terms ask for one (CoinGecko). A tile the server could not fill
  * says «нет данных» in words. What goes where is `kpi-tile.ts`.
  */
 @Component({

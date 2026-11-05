@@ -13,7 +13,7 @@
             <span class="inline num" [class.up]="i.tone === 'up'" [class.down]="i.tone === 'down'"
                   [attr.title]="i.overKey ? t(i.overKey) : null">{{ i.text }}@if (i.overKey) {<span class="sr-only"> {{ t(i.overKey) }}</span>}</span>
           } @else if (i.key) {
-            <span class="inline" [class.muted]="i.tone === 'muted'" [style.color]="i.colour">{{ t(i.key) }}</span>
+            <span class="inline" [class.muted]="i.tone === 'muted'">{{ t(i.key) }}</span>
           }
         }
       </div>

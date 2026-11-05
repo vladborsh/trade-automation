@@ -20,7 +20,7 @@ import flows from '../../../libs/contracts/test/fixtures/flows.24h.json';
  * their own box — and the same page at desktop width. Full-page screenshots of both are attached.
  *
  * The data is real: four responses captured from slot dev-3's bot on 2026-11-03 (20 coins, a
- * 30-row feed, six KPI tiles, an R4 insight), so the widths here are the widths a member sees.
+ * 30-row feed, six KPI tiles — five since IB-117 removed Fear & Greed from the fixture — an R4 insight), so the widths here are the widths a member sees.
  * The page clock is pinned to the capture's `asOf`, so a green run does not depend on today.
  */
 const MEMBER = { user: { id: 1, tgUserId: 111, role: 'member', lang: 'en', login: 'e2e' } };
@@ -362,7 +362,7 @@ test.describe('market page — phone 390×844 (IB-088)', () => {
     await openMarket(page);
     // IB-108: every block is an app-card now (the KPI tiles beside them); the old .cards grid is gone
     const lefts = await page.locator('app-market app-card, app-market app-kpi-strip .tile').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
-    expect(lefts.length).toBeGreaterThanOrEqual(12); // 6 tiles + 7 cards: the selector found the page
+    expect(lefts.length).toBeGreaterThanOrEqual(12); // 5 tiles + 7 cards: the selector found the page
     expect(new Set(lefts).size).toBe(1);
   });
 
@@ -451,11 +451,11 @@ async function withWrappingFunding(page: Page): Promise<void> {
   }) }));
 }
 
-for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const) {
+for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 844, 1]] as const) {
   test.describe(`IB-106 header + KPI strip — ${width}`, () => {
     test.use({ viewport: { width, height } });
 
-    test(`«Main now» before the KPIs; ${columns === 6 ? 'six tiles in one row' : 'one column'}; notes from the contract; Plex for words, mono for figures`, async ({ page }) => {
+    test(`«Main now» before the KPIs; ${columns === 5 ? 'five tiles in one row' : 'one column'}; notes from the contract; Plex for words, mono for figures`, async ({ page }) => {
       await openMarket(page, withWrappingFunding);
       const m = await page.evaluate(() => {
         const ins = document.querySelector('app-insights-block')!;
@@ -488,9 +488,9 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
         };
       });
       expect(m.insightsFirst).toBe(true);
-      expect(m.tiles).toBe(6);
+      expect(m.tiles).toBe(5); // IB-117: no Fear & Greed tile
       expect(m.columns).toBe(columns);
-      if (columns === 6) {
+      if (columns === 5) {
         // the funding figure wraps («−0.0123 %» over «shorts pay») — so the check below can disagree —
         expect(m.fundingWraps).toBe(true);
         // and the strip's subgrid still puts every tile's bar at the same height
@@ -503,7 +503,6 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
       }
       const fill = Object.fromEntries(m.barBoxes.map((b) => [b.id, b.fill / b.w]));
       expect(fill['btc_dominance']).toBeCloseTo(0.592, 1); // 59.25 % of the track, amber
-      expect(fill['fear_greed']).toBeCloseTo(0.26, 1); // 26 of 100, zone colour
       expect(fill['liquidations_24h']).toBeCloseTo(1, 1); // the long/short split fills the track
       // «7d: available from …» is the 7d button's description, not a visible line
       expect(m.weekDisabled).toBe(true);
@@ -519,11 +518,14 @@ for (const [width, height, columns] of [[1440, 900, 6], [390, 844, 1]] as const)
       await expect(strip.locator('[data-kpi="btc_dominance"] .inline')).toHaveText(/^\+0\.40 pp/);
       await expect(strip.locator('[data-kpi="market_cap"] .inline')).toHaveText(/^−2\.49 %/);
       await expect(strip.locator('[data-kpi="btc_oi"] .inline')).toHaveText(/^[+−]\d+\.\d{2} %/);
-      await expect(strip.locator('[data-kpi="fear_greed"] .note')).toHaveText('yesterday 37 · a week ago 48');
+      // IB-117: the tile is gone, the gauge panel below still draws the index
+      await expect(strip.locator('[data-kpi="fear_greed"]')).toHaveCount(0);
+      await expect(strip).not.toContainText('Fear & Greed');
+      await expect(page.locator('#sentiment app-fear-greed-gauge svg').first()).toBeVisible();
       await expect(strip.locator('[data-kpi="btc_funding"] .note')).toHaveText('long/short by accounts 2.62');
       await expect(strip.locator('[data-kpi="btc_oi"] .note')).toHaveText('Binance, over 24h');
-      // visible credit only where the terms ask: alternative.me and CoinGecko; Binance in the tooltip
-      await expect(strip.locator('.credit')).toHaveText(['CoinGecko', 'CoinGecko', 'alternative.me']);
+      // visible credit only where the terms ask: CoinGecko; Binance in the tooltip (alternative.me left with the F&G tile, IB-117)
+      await expect(strip.locator('.credit')).toHaveText(['CoinGecko', 'CoinGecko']);
       await expect(strip.locator('[data-kpi="btc_oi"] h3')).toHaveAttribute('title', 'source: Binance');
       // the fonts are ours: served from /fonts, and actually in use
       expect(await page.evaluate(() => document.fonts.check('600 24px "IBM Plex Mono"') && document.fonts.check('14px "IBM Plex Sans"'))).toBe(true);

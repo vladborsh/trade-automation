@@ -34,7 +34,6 @@ describe('kpiView', () => {
   it('each tile in its own unit, delta with sign and tone', () => {
     expect(kpiView(tile('market_cap', 2.62e12, -3.06))).toMatchObject({ value: '$2.62T', delta: { text: '−3.06 %', tone: 'down' } });
     expect(kpiView(tile('btc_dominance', 59.2, 0.4))).toMatchObject({ value: '59.2 %', delta: { text: '+0.40 pp', tone: 'up' } });
-    expect(kpiView(tile('fear_greed', 26, -11))).toMatchObject({ value: '26', delta: { text: '−11', tone: 'down' } });
     expect(kpiView(tile('btc_funding', 0.0001, null))).toMatchObject({ value: '0.0100 %', delta: null });
     expect(kpiView(tile('btc_oi', null, null))).toMatchObject({ value: null, delta: null });
   });

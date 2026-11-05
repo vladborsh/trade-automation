@@ -1,4 +1,4 @@
-// IB-106 (§7.5): tiles fill the row — six across at 1360, one column at 390 — on the §7.2 tokens
+// IB-106 (§7.5): tiles fill the row — five across at 1240 since IB-117, one column at 390 — on the §7.2 tokens
 .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--card-gap); }
 // subgrid: a tile's five rows (label, figure, bar, note, credit) are the strip's rows, so a value
 // whose word wraps («0.0100 % платят лонги») moves its row for the whole strip, not one tile's bar
