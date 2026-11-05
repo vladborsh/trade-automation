@@ -1,10 +1,19 @@
 // IB-107 (§7.2, §7.3): tokens from dashboard-tokens.css (IB-106); names fixed by the design
-:host { display: block; min-width: 0; }
+// IB-119 (round 2 §3): two columns, text ≈ 55 % and the chart ≈ 45 %; under 720 px of CARD width
+// the chart goes under the text (a container query: the card's width decides, not the window's)
+:host { display: block; min-width: 0; container-type: inline-size; }
 .card {
   height: 100%; box-sizing: border-box;
-  display: flex; flex-direction: column; gap: var(--card-inner-gap);
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px;
   background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius);
   padding: var(--card-pad);
+}
+.card.has-chart { grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); }
+.text { display: flex; flex-direction: column; gap: var(--card-inner-gap); min-width: 0; }
+.chart { border-left: 1px solid var(--gray-800); padding-left: 16px; min-width: 0; }
+@container (max-width: 719.98px) {
+  .card.has-chart { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .chart { border-left: 0; padding-left: 0; border-top: 1px solid var(--gray-800); padding-top: 12px; }
 }
 .meta { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chip {
@@ -16,17 +25,6 @@
 .when { font: var(--type-small); color: var(--color-text-muted); }
 .title { margin: 0; font: var(--type-h2); color: var(--color-text-strong); overflow-wrap: anywhere; }
 .explanation { margin: 0; font: var(--type-note); color: var(--color-text-muted); overflow-wrap: anywhere; }
-.spark {
-  position: relative; height: var(--spark-h);
-  display: flex; gap: var(--spark-gap); margin-top: auto;
-}
-.slot { position: relative; flex: 1 1 0; min-width: 0; }
-.bar {
-  position: absolute; left: 0; right: 0;
-  background: var(--chip-fg); opacity: var(--spark-opacity); border-radius: var(--spark-radius);
-}
-.bar.lit { opacity: 1; }
-.zero { position: absolute; left: 0; right: 0; height: 1px; background: var(--card-border); }
 .link {
   align-self: flex-start; display: inline-flex; align-items: center;
   min-height: var(--touch-min, 40px); // phone acceptance: touch targets ≥ 40 px, whichever lands first, IB-106 or this
@@ -36,7 +34,7 @@
 .link:focus-visible { text-decoration: underline; }
 .basis { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 
-// the chip colour per topic, and the spark in the chip's foreground (§7.2)
+// the chip colour per topic (§7.2)
 .tone-long { --chip-bg: var(--chip-long-bg); --chip-fg: var(--chip-long-fg); }
 .tone-short { --chip-bg: var(--chip-short-bg); --chip-fg: var(--chip-short-fg); }
 .tone-liq { --chip-bg: var(--chip-liq-bg); --chip-fg: var(--chip-liq-fg); }

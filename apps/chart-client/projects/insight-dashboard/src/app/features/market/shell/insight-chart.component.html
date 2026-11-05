@@ -1,0 +1,37 @@
+@let v = g();
+<figure class="ichart" role="img" [attr.aria-label]="ariaLabel()" [attr.data-kind]="v.kind">
+  <figcaption class="cap">
+    <span class="caption">{{ caption() }}</span>
+    <span class="corner"><span class="prefix">{{ corner().prefix }}</span>@for (c of corner().values; track c.key) {<span [class]="'val s-' + c.key" [class.muted]="c.muted">@if (c.name) {<span class="name">{{ c.name }}</span>} <span class="num">{{ c.text }}</span></span>}</span>
+  </figcaption>
+  <div class="body" aria-hidden="true">
+    <div class="plot">
+      @if (v.band; as b) { <span class="band" [style.top.%]="b.top" [style.height.%]="b.height"></span> }
+      @if (v.highlight; as h) { <span class="hl" [style.left.%]="h.x" [style.width.%]="h.width"></span> }
+      <svg class="grid" viewBox="0 0 100 100" preserveAspectRatio="none">
+        @for (t of v.ticks; track t.y) { <line class="tick" x1="0" x2="100" [attr.y1]="t.y" [attr.y2]="t.y" vector-effect="non-scaling-stroke" /> }
+        @if (v.ref; as r) { <line class="ref" x1="0" x2="100" [attr.y1]="r.y" [attr.y2]="r.y" vector-effect="non-scaling-stroke" /> }
+        @for (l of v.lines; track l.key) { <path [class]="'line s-' + l.key" [attr.d]="l.d" vector-effect="non-scaling-stroke" /> }
+        @for (s of v.segments; track s.key) { <path [class]="'seg ' + direction()" [attr.d]="s.d" vector-effect="non-scaling-stroke" /> }
+      </svg>
+      @for (b of v.bars; track $index) {
+        <span [class]="'bar ' + b.tone + ' s-' + b.key" [class.lit]="b.lit" [style.left.%]="b.x" [style.width.%]="b.width" [style.top.%]="b.top" [style.height.%]="b.height"></span>
+      }
+      @for (l of v.lines; track l.key) { <span [class]="'dot s-' + l.key" [style.left.%]="l.last.x" [style.top.%]="l.last.y"></span> }
+      @if (v.nowDot; as d) { <span [class]="'dot now ' + d.tone" [style.left.%]="d.x" [style.top.%]="d.y"></span> }
+      @for (m of v.marks; track m.label) {
+        @for (y of m.ys; track $index) { <span [class]="'dot mark ' + direction()" [style.left.%]="m.x" [style.top.%]="y"></span> }
+        <span class="mark-label" [style.left.%]="m.x">{{ m.label }}</span>
+      }
+    </div>
+    <div class="yaxis">
+      @for (t of v.ticks; track t.y) { <span class="num" [style.top.%]="t.y">{{ t.label }}</span> }
+    </div>
+    <div class="xaxis">
+      @for (l of v.xLabels; track l.x) { <span [class]="'x x' + l.x">{{ xText(l) }}</span> }
+    </div>
+  </div>
+  <p class="legend">
+    @for (item of legend(); track $index) { <span class="key"><i [class]="'sw ' + item.swatch"></i>{{ item.text }}</span> }
+  </p>
+</figure>

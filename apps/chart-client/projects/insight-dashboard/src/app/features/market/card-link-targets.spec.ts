@@ -29,7 +29,7 @@ const NOW = 1_793_719_530;
 const PERIOD: WebMarketPeriod = '24h';
 const basis = { window: PERIOD, venues: ['binance'], sampleWindows: 30, observedWindows: 30, from: null };
 const statement = (link: WebInsightStatement['link'], block: WebInsightStatement['block']): WebInsightStatement => ({
-  ruleId: 'R7', block, key: 'insight.breadth', params: {}, rarity: 0.95, magnitude: 1, basis, link, spark: null,
+  ruleId: 'R7', block, key: 'insight.breadth', params: {}, rarity: 0.95, magnitude: 1, basis, link, chart: null,
 });
 
 /** Every link a rule can emit, by the contract: one per block anchor, one per route kind. */

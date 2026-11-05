@@ -1,0 +1,65 @@
+// IB-119 (market round 2 §3, mockup §1–2): a 150 px plot, ticks on the right, the span under it,
+// the caption and the current value above, a one-line legend below. Palette: the dashboard's tokens.
+:host { display: block; min-width: 0; }
+.ichart { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cap { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font: var(--type-small); color: var(--color-text-muted); }
+.caption { min-width: 0; overflow-wrap: anywhere; }
+.corner { display: inline-flex; gap: 6px; flex-wrap: wrap; white-space: nowrap; }
+.num { font-family: var(--font-num); }
+.val { color: var(--c, var(--color-text)); }
+.val + .val::before { content: '·'; margin-right: 6px; color: var(--color-text-muted); }
+.val.muted { --c: var(--gray-500); }
+.name { margin-right: 4px; }
+.body {
+  margin: 6px 0 0; // the top tick label is centred on the plot's edge
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 150px auto;
+  column-gap: 6px; row-gap: 2px;
+}
+.plot { position: relative; min-width: 0; }
+.grid { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tick { stroke: var(--gray-800); stroke-width: 1; stroke-dasharray: 2 3; }
+.ref { stroke: var(--color-text-muted); stroke-width: 1; }
+.band { position: absolute; left: 0; right: 0; background: rgba(139, 148, 158, .18); }
+.hl { position: absolute; top: 0; bottom: 0; min-width: 1px; background: rgba(139, 148, 158, .12); }
+.line { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+.seg { fill: none; stroke-width: 2.6; stroke-linejoin: round; }
+.seg.up { stroke: var(--color-up); }
+.seg.down { stroke: var(--color-down); }
+// the series' colours, shared by lines, dots, the corner and the legend swatches
+.s-price, .s-ls_global, .s-up_share, .s-dvol, .s-stablecoins { --c: var(--color-text); }
+.s-oi, .s-ls_top { --c: var(--amber-500); }
+.s-ls_global { --c: var(--blue-400); }
+.s-short { --c: var(--color-up); }
+.s-long { --c: var(--color-down); }
+.line { stroke: var(--c, var(--color-text)); }
+.bar { position: absolute; background: var(--color-text-muted); opacity: .55; border-radius: 1px; }
+.bar.lit { opacity: 1; }
+.bar.out { background: var(--amber-500); opacity: .9; }
+.bar.in { background: var(--gray-500); opacity: .7; }
+.bar.up { background: var(--color-up); }
+.bar.down { background: var(--color-down); }
+// mirrored liquidations: shorts above in teal, longs below in red; the side the card names in colour
+.bar.named { background: var(--c); opacity: .6; }
+.bar.named.lit { opacity: 1; }
+.bar.other { background: var(--gray-500); }
+.dot { position: absolute; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--c, var(--color-text)); }
+.dot.now { width: 9px; height: 9px; border: 2px solid var(--card-bg); box-sizing: content-box; background: var(--amber-500); }
+.dot.now.in, .dot.now.up, .dot.now.down { background: var(--color-text); }
+.dot.mark { width: 8px; height: 8px; }
+.dot.mark.up { background: var(--color-up); }
+.dot.mark.down { background: var(--color-down); }
+.mark-label { position: absolute; top: 0; transform: translateX(-50%); font: 600 11px/1 var(--font-sans); color: var(--color-text-muted); }
+.yaxis { position: relative; min-width: 44px; }
+.yaxis .num { position: absolute; right: 0; transform: translateY(-50%); font-size: 11px; line-height: 1; color: var(--color-text-muted); white-space: nowrap; }
+.xaxis { position: relative; height: 14px; font: var(--type-micro); color: var(--color-text-muted); }
+.x { position: absolute; top: 0; white-space: nowrap; }
+.x0 { left: 0; }
+.x50 { left: 50%; transform: translateX(-50%); }
+.x100 { right: 0; }
+.legend { margin: 2px 0 0; display: flex; gap: 4px 12px; flex-wrap: wrap; font: var(--type-micro); color: var(--color-text-muted); }
+.key { display: inline-flex; align-items: center; gap: 4px; }
+.sw { display: inline-block; width: 10px; height: 2px; background: var(--c, var(--color-text)); }
+.sw.band { height: 8px; background: rgba(139, 148, 158, .35); }
+.sw.ref { background: var(--color-text-muted); }
+.sw.s-muted { background: var(--gray-500); }
+.sw.focus { width: 6px; height: 6px; border-radius: 3px; background: var(--amber-500); }

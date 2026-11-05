@@ -4,7 +4,7 @@ import { en } from '../../../i18n/en';
 import { fill } from '../../../i18n/i18n.service';
 import type { StringKey } from '../../../i18n/keys';
 import { ru } from '../../../i18n/ru';
-import { baseOf, basisOf, cardLinkTarget, cardView, chipOf, figureRuns, linkLabel, ratioText, sparkScaleOf, whenOf, type Phrase } from './insight-card';
+import { baseOf, basisOf, cardLinkTarget, cardView, chipOf, figureRuns, linkLabel, ratioText, whenOf, type Phrase } from './insight-card';
 import { wordInsight } from './market-text';
 
 /**
@@ -19,7 +19,7 @@ const say = (p: Phrase, lang: 'ru' | 'en' = 'ru') => {
   return wordInsight(p, (key: StringKey, params?: Record<string, string | number>) => fill(table[key], params));
 };
 const st = (o: Partial<WebInsightStatement> & Pick<WebInsightStatement, 'ruleId' | 'block' | 'key' | 'params'>): WebInsightStatement => ({
-  rarity: 0.97, magnitude: 1, link: { anchor: o.block }, spark: null,
+  rarity: 0.97, magnitude: 1, link: { anchor: o.block }, chart: null,
   basis: { window: '24h', venues: ['binance'], sampleWindows: 697, observedWindows: 697, from: Date.UTC(2026, 9, 5) / 1000 },
   ...o,
 });
@@ -182,10 +182,9 @@ describe('R11 oi_divergence (IB-113) — the alert, worded as what happened', ()
     expect(words(r11('bearish', 4), 'en').expl).toMatch(/A repeat — highs in a row: 4\.$/);
     expect(words(r11('bullish')).expl).not.toContain('Повторное');
   });
-  it('the tooltip says it is an event, not «норма: 0 окон»; the OI spark scales as a level', () => {
+  it('the tooltip says it is an event, not «норма: 0 окон»', () => {
     const w = words(r11('bullish'));
     expect(w.tip).toBe('Сигнал бота: событие, а не сравнение с нормой.');
-    expect(sparkScaleOf('R11')).toBe('range');
   });
   it('the link opens the chart at B on the alert\'s timeframe (as the Telegram message does)', () => {
     expect(cardView(r11('bullish'), NOW).link.target).toEqual({ kind: 'route', commands: ['/instrument', 'BTCUSDT'], queryParams: { at: TODAY_3AM, tf: '1h' } });
@@ -228,13 +227,9 @@ describe('the parts every card shares', () => {
     expect(chipOf({ block: 'liquidations', params: {} }).tone).toBe('liq');
     expect(['positioning', 'sentiment', 'flows', 'caps'].map((block) => chipOf({ block: block as never, params: {} }).tone)).toEqual(['pos', 'sent', 'flows', 'caps']);
   });
-  it('levels (OI, L/S, DVOL, supply) scale over their range; amounts and signed values from zero', () => {
-    expect(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10'].map(sparkScaleOf))
-      .toEqual(['zero', 'zero', 'zero', 'range', 'zero', 'range', 'zero', 'range', 'range', 'zero']);
-  });
-  it('a payload without the spark field (older server) is no chart, not a crash', () => {
-    const { spark: _gone, ...old } = st({ ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: { value: 40, change: 2 } });
-    expect(cardView(old as WebInsightStatement, NOW).spark).toBeNull();
+  it('IB-119: a payload without the chart field (older server) is no chart, not a crash', () => {
+    const { chart: _gone, ...old } = st({ ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: { value: 40, change: 2 } });
+    expect(cardView(old as WebInsightStatement, NOW).chart).toBeNull();
   });
   it('raw period codes never render: the «when» is a word', () => {
     const w = whenOf(st({ ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike', params: {} }), NOW);

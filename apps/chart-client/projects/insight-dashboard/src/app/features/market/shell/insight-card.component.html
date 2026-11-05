@@ -1,25 +1,22 @@
 @let v = view();
-<article class="card" [class]="'tone-' + v.chip.tone">
-  <p class="meta">
-    <span class="chip">{{ word({ key: v.chip.key, params: {}, nested: {} }) }}</span>
-    <span class="when">{{ word(v.when) }}</span>
-  </p>
-  <!-- no whitespace between runs: a figure inside «(+6.1)» must not gain spaces -->
-  <h3 class="title">@for (run of titleRuns(); track $index) {@if (run.num) {<span class="num">{{ run.text }}</span>} @else {<ng-container>{{ run.text }}</ng-container>}}</h3>
-  <p class="explanation">{{ explanation() }}</p>
-  @if (spark(); as g) {
-    <div class="spark" aria-hidden="true">
-      @if (g.zero !== null) { <span class="zero" [style.top.%]="g.zero"></span> }
-      @for (bar of g.bars; track $index) {
-        <span class="slot"><span class="bar" [class.lit]="bar.lit" [style.top.%]="bar.top" [style.height.%]="bar.height"></span></span>
-      }
-    </div>
+<article class="card" [class]="'tone-' + v.chip.tone" [class.has-chart]="v.chart !== null">
+  <div class="text">
+    <p class="meta">
+      <span class="chip">{{ word({ key: v.chip.key, params: {}, nested: {} }) }}</span>
+      <span class="when">{{ word(v.when) }}</span>
+    </p>
+    <!-- no whitespace between runs: a figure inside «(+6.1)» must not gain spaces -->
+    <h3 class="title">@for (run of titleRuns(); track $index) {@if (run.num) {<span class="num">{{ run.text }}</span>} @else {<ng-container>{{ run.text }}</ng-container>}}</h3>
+    <p class="explanation">{{ explanation() }}</p>
+    @if (v.link.target.kind === 'route') {
+      <a class="link" [routerLink]="v.link.target.commands" [queryParams]="v.link.target.queryParams">{{ word(v.link.label) }}</a>
+    } @else {
+      <!-- IB-BUG-035: the current page with the period kept and the block as the fragment; the click scrolls -->
+      <a class="link" [routerLink]="[]" queryParamsHandling="preserve" [fragment]="v.link.target.id" (click)="scrollToBlock(v.link.target.id)">{{ word(v.link.label) }}</a>
+    }
+    <p class="basis" [attr.title]="word(v.basisTip)">{{ word(v.basis) }}</p>
+  </div>
+  @if (v.chart; as chart) {
+    <app-insight-chart class="chart" [chart]="chart" [statement]="statement()" [nowSec]="nowSec()" />
   }
-  @if (v.link.target.kind === 'route') {
-    <a class="link" [routerLink]="v.link.target.commands" [queryParams]="v.link.target.queryParams">{{ word(v.link.label) }}</a>
-  } @else {
-    <!-- IB-BUG-035: the current page with the period kept and the block as the fragment; the click scrolls -->
-    <a class="link" [routerLink]="[]" queryParamsHandling="preserve" [fragment]="v.link.target.id" (click)="scrollToBlock(v.link.target.id)">{{ word(v.link.label) }}</a>
-  }
-  <p class="basis" [attr.title]="word(v.basisTip)">{{ word(v.basis) }}</p>
 </article>

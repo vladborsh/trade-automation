@@ -5,18 +5,19 @@ import type { WebInsightStatement } from '@trade-automation/contracts';
 import { I18nService } from '../../../i18n/i18n.service';
 import { cardView, figureRuns, type Phrase } from './insight-card';
 import { wordInsight } from './market-text';
-import { sparkGeometry } from './spark-bars';
+import { InsightChartComponent } from './insight-chart.component';
 
 /**
  * IB-107 (market-page design §7.3) — one «Главное сейчас» card: topic chip and «when», the title,
- * what the number means (D20), the mini-chart from the statement's own series, a link that says
- * where it goes, and the quiet basis with the sample sizes in its tooltip. All wording is chosen in
+ * what the number means (D20), a link that says where it goes and the quiet basis with the sample
+ * sizes in its tooltip on the left; on the right the statement's chart (IB-119), stacked under the
+ * text below 720 px. All wording is chosen in
  * `insight-card.ts`; this class only translates and draws.
  */
 @Component({
   selector: 'app-insight-card',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, InsightChartComponent],
   templateUrl: './insight-card.component.html',
   styleUrl: './insight-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -30,10 +31,6 @@ export class InsightCardComponent {
   readonly view = computed(() => cardView(this.statement(), this.nowSec()));
   readonly titleRuns = computed(() => figureRuns(this.word(this.view().title), this.view().figures));
   readonly explanation = computed(() => this.view().explanation.map((p) => this.word(p)).join(' '));
-  readonly spark = computed(() => {
-    const s = this.view().spark;
-    return s === null ? null : sparkGeometry(s, this.view().sparkScale);
-  });
 
   /**
    * IB-BUG-035: the router only updates the fragment (no anchor scrolling is configured, and a
