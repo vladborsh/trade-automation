@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market feedback 2 mockup</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--b:#30363d;--t:#c9d1d9;--m:#8b949e;--up:#26a69a;--dn:#ef5350;--amber:#d29922;--blue:#58a6ff;--grid:#21262d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;padding:24px}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+h2{font-size:13px;color:var(--m);text-transform:uppercase;letter-spacing:.06em;margin:28px 0 10px;font-weight:600}
+h2 b{color:var(--amber);font-weight:600}
+.wrap{max-width:1180px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--b);border-radius:8px;padding:16px}
+.chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 8px;border-radius:4px;background:#3b2e0f;color:var(--amber)}
+.chip.liq{background:#0f3330;color:var(--up)}
+.when{color:var(--m);font-size:12px;margin-left:8px}
+.ins{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:stretch}
+.ins h3{font-size:16px;margin:10px 0 6px;line-height:1.3}
+.ins p{color:var(--m);margin:0 0 10px;font-size:13px}
+.ins .link{color:var(--blue);text-decoration:none;font-size:13px}
+.ins .src{color:var(--m);font-size:11px;margin-top:10px}
+.chart{border-left:1px solid var(--grid);padding-left:16px;display:flex;flex-direction:column}
+.chart .cap{font-size:11px;color:var(--m);display:flex;justify-content:space-between;margin-bottom:4px}
+.chart svg{width:100%;height:150px;display:block}
+.key{display:flex;gap:12px;font-size:11px;color:var(--m);margin-top:4px;flex-wrap:wrap}
+.key i{display:inline-block;width:10px;height:2px;vertical-align:middle;margin-right:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.kpi .lab{color:var(--m);font-size:12px}
+.kpi .val{font:600 26px/1.2 "IBM Plex Mono",monospace;margin:4px 0 2px}
+.kpi .val small{font-size:13px;margin-left:8px}
+.kpi svg{width:100%;height:56px;display:block;margin:6px 0 2px}
+.kpi .rng{display:flex;justify-content:space-between;font-size:11px;color:var(--m)}
+.kpi .note{font-size:11px;color:var(--m);margin-top:6px}
+.gone{border:1px dashed var(--dn);border-radius:8px;padding:14px;color:var(--m);font-size:12px;display:flex;align-items:center;justify-content:center;text-align:center}
+.gone b{color:var(--dn)}
+.help{background:#0d1a2b;border:1px solid #1f3a5f;border-radius:8px;padding:12px 14px;font-size:13px}
+.help summary{cursor:pointer;color:var(--blue);font-weight:600}
+.help ul{margin:8px 0 0;padding-left:18px;color:var(--t)}.help li{margin:4px 0}
+.help .sw{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:4px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:right}
+th{color:var(--m);font-weight:500}th:first-child,td:first-child{text-align:left}
+td.n{background:rgba(210,153,34,.15)}td.u{background:rgba(210,153,34,.32)}td.x{background:rgba(210,153,34,.55);color:#fff}
+td.h{background:repeating-linear-gradient(45deg,transparent 0 4px,#30363d 4px 5px);color:var(--m)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.pill{border:1px solid var(--b);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--m)}
+.pill.on{border-color:var(--blue);color:var(--blue)}
+.crumb{font-size:12px;color:var(--m)}.crumb a{color:var(--blue);text-decoration:none}
+.anno{font-size:12px;color:var(--amber);margin:6px 0 0}
+@media (max-width:700px){body{padding:16px}.ins{grid-template-columns:1fr}.chart{border-left:0;padding-left:0;border-top:1px solid var(--grid);padding-top:12px}
+.kpis{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.hide-phone{display:none}}
+</style></head><body><div class="wrap">
+
+<h2>1 · Карточка «Главное сейчас» — фандинг <b>(было: столбики без оси)</b></h2>
+<div class="card ins">
+  <div>
+    <span class="chip">ПОЗИЦИИ</span><span class="when">за 24ч</span>
+    <h3>TRUMP: шорты доплачивают лонгам <span class="mono">−0.0332 %</span> — необычно много</h3>
+    <p>Фандинг — плата между лонгами и шортами, которая держит цену фьючерса у спота. Отрицательный: шортов больше, и они платят. Для TRUMP такая ставка бывает реже, чем 1 раз из 10 за 30 дней. Так же необычно ещё у 2 из 30 монет.</p>
+    <a class="link" href="#">Открыть TRUMP на графике →</a> &nbsp; <a class="link" href="#">Все монеты →</a>
+    <div class="src">Binance · каждые 8 ч</div>
+  </div>
+  <div class="chart">
+    <div class="cap"><span>Фандинг TRUMP, 30 дней (каждая выплата)</span><span class="mono">сейчас −0.0332 %</span></div>
+    <svg id="fund" viewBox="0 0 420 150" preserveAspectRatio="none"></svg>
+    <div class="key"><span><i style="background:rgba(139,148,158,.35);height:8px"></i>обычный диапазон (90 % дней)</span><span><i style="background:var(--m)"></i>0</span><span><i style="background:var(--amber);height:6px;width:6px;border-radius:3px"></i>сейчас</span></div>
+  </div>
+</div>
+<p class="anno">Справа — настоящий график с осью, нулём и полосой «обычно». Видно, насколько далеко сейчас от нормы. Ссылка «К позициям ↓» (вела на якорь, которого нет) → «Все монеты →» на /positioning.</p>
+
+<h2>2 · Карточка «Главное сейчас» — открытый интерес <b>(было: столбики без оси)</b></h2>
+<div class="card ins">
+  <div>
+    <span class="chip">ПОЗИЦИИ</span><span class="when">за 24ч</span>
+    <h3>BNB: открытый интерес <span class="mono">−4.1 %</span> при цене <span class="mono">+1.8 %</span></h3>
+    <p>Для BNB такое изменение открытого интереса за 24ч — редкость, а цена в обычных пределах. Позиций меньше при росте — скорее закрывают шорты.</p>
+    <a class="link" href="#">Открыть BNB за 24ч →</a>
+    <div class="src">Binance · 5 мин</div>
+  </div>
+  <div class="chart">
+    <div class="cap"><span>BNB за 24ч, изменение от начала, %</span><span class="mono"><span style="color:var(--up)">цена +1.8</span> · <span style="color:var(--amber)">OI −4.1</span></span></div>
+    <svg id="oi" viewBox="0 0 420 150" preserveAspectRatio="none"></svg>
+    <div class="key"><span><i style="background:var(--t)"></i>цена</span><span><i style="background:var(--amber)"></i>открытый интерес</span><span><i style="background:var(--m)"></i>0 % — начало периода</span></div>
+  </div>
+</div>
+<p class="anno">Две линии в процентах от начала периода на одной оси — расхождение видно сразу. Для других правил (ликвидации, потоки, капитализация) — тот же макет, график по смыслу правила.</p>
+
+<h2>3 · Плитки сверху <b>(было: пустая полоса; «Страх и жадность» убираем — есть циферблат ниже)</b></h2>
+<div class="kpis">
+  <div class="card kpi"><div class="lab">Капитализация рынка</div>
+    <div class="val">$2.68T<small style="color:var(--dn)">−0.42 %</small></div>
+    <svg id="k1" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <div class="rng mono"><span>7д мин $2.61T</span><span>макс $2.79T</span></div>
+    <div class="note">CoinGecko · 7 дней</div></div>
+  <div class="card kpi"><div class="lab">Открытый интерес BTC</div>
+    <div class="val">$7.7B<small style="color:var(--dn)">−0.65 %</small></div>
+    <svg id="k2" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <div class="rng mono"><span>7д мин $7.4B</span><span>макс $8.1B</span></div>
+    <div class="note">Binance · 7 дней</div></div>
+  <div class="card kpi"><div class="lab">Фандинг BTC</div>
+    <div class="val">0.0100 %<small style="color:var(--m)">платят лонги</small></div>
+    <svg id="k3" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <div class="rng mono"><span>последние 21 выплата</span><span>L/S счета 1.40</span></div>
+    <div class="note">Binance · столбик = выплата (8 ч), выше 0 платят лонги</div></div>
+</div>
+<p class="anno">Плитка = цифра + мини-график за 7 дней + мин/макс. Без мин/макс и оси такой график снова будет «картинкой».</p>
+<div class="gone" style="margin-top:12px;max-width:380px">Плитка <b>«Страх и жадность»</b> удалена — её показывает циферблат в блоке «Настроение» ниже (там вчера/неделю назад и история).</div>
+
+<h2>4 · Крупные ликвидации: «Показать все (50)» → отдельная страница <b>/liquidations</b></h2>
+<div class="card">
+  <div class="crumb"><a href="#">Рынок</a> / Крупные ликвидации</div>
+  <h3 style="margin:8px 0 4px;font-size:18px">Крупные ликвидации</h3>
+  <details class="help" open><summary>Как этим пользоваться</summary>
+    <ul>
+      <li><b>Что это.</b> Ликвидация — биржа принудительно закрывает позицию, у которой кончилось обеспечение. Здесь — каждая от $100K на Binance, Bybit, OKX.</li>
+      <li><b>Шорты над линией, лонги под ней.</b> Ликвидация шортов — это принудительная покупка, она толкает цену вверх; лонгов — продажа, вниз.</li>
+      <li><b>Серия</b> («137 за 8 мин») — сколько ликвидаций по монете подряд. Серия = каскад: цену протолкнули через стопы. После каскада движение часто выдыхается, но это не правило — смотрите график.</li>
+      <li><b>Как читать.</b> Одна большая ликвидация — шум. Кластер кругов в одной стороне — кто-то был массово не прав. Нажмите строку — откроется график монеты в эту минуту.</li>
+      <li><b>Биржи.</b> Binance публикует не больше одной ликвидации в секунду по монете, поэтому реальные суммы у Binance выше показанных.</li>
+    </ul></details>
+  <div class="toolbar"><span class="pill on">24ч</span><span class="pill">7д</span><span class="pill">Все монеты ▾</span><span class="pill on">от $100K</span><span class="pill">от $1M</span><span class="pill">лонги</span><span class="pill">шорты</span><span class="pill">Все биржи ▾</span></div>
+  <table class="mono"><thead><tr><th>Время</th><th>Монета</th><th>Сторона</th><th>Сумма</th><th class="hide-phone">Цена</th><th class="hide-phone">Биржа</th><th>Серия</th></tr></thead><tbody>
+  <tr><td>17:04</td><td>BTC</td><td style="color:var(--up)">шорты</td><td>$11M</td><td class="hide-phone">69 412</td><td class="hide-phone">Binance</td><td>137 за 8 мин</td></tr>
+  <tr><td>17:08</td><td>BTC</td><td style="color:var(--up)">шорты</td><td>$9.7M</td><td class="hide-phone">69 655</td><td class="hide-phone">Binance</td><td>44 за 9 мин</td></tr>
+  <tr><td>17:13</td><td>BTC</td><td style="color:var(--up)">шорты</td><td>$5.7M</td><td class="hide-phone">69 780</td><td class="hide-phone">OKX</td><td>44 за 9 мин</td></tr>
+  <tr><td>14:22</td><td>ETH</td><td style="color:var(--dn)">лонги</td><td>$1.2M</td><td class="hide-phone">2 391</td><td class="hide-phone">Bybit</td><td>—</td></tr>
+  <tr><td colspan="7" style="text-align:center;color:var(--m)">… 46 ещё · таблица сортируется по столбцам</td></tr>
+  </tbody></table>
+</div>
+<p class="anno">На «Рынке» блок остаётся как есть (8 карточек), кнопка становится ссылкой «Все ликвидации (50) →». Сверху на новой странице — та же диаграмма с кругами.</p>
+
+<h2>5 · «Кто набирает позиции» — справка к таблице</h2>
+<div class="card">
+  <details class="help" open><summary>Что значит подсветка и как читать таблицу</summary>
+    <ul>
+      <li><b>Цвет — это необычность, а не рост или падение.</b> Каждая ячейка сравнивается с этой же монетой за её последние 30 дней. Знак смотрите в самом числе.
+        <br><span class="sw" style="background:rgba(210,153,34,.15)"></span>заметно (реже 1 из 4) &nbsp; <span class="sw" style="background:rgba(210,153,34,.32)"></span>необычно (реже 1 из 10) &nbsp; <span class="sw" style="background:rgba(210,153,34,.55)"></span>крайне редко (реже 1 из 100) &nbsp; <span class="sw" style="background:repeating-linear-gradient(45deg,transparent 0 3px,#30363d 3px 4px)"></span>данных ещё мало — оценить нельзя</li>
+      <li><b>Цена, OI</b> — изменение за период. <b>OI</b> (открытый интерес) — сколько позиций открыто. Цена ↑ и OI ↑ — входят новые деньги; цена ↑ и OI ↓ — закрываются шорты.</li>
+      <li><b>Фандинг</b> — плата между лонгами и шортами; плюс — платят лонги (их больше).</li>
+      <li><b>L/S толпа</b> — отношение лонгов к шортам по числу счетов. <b>L/S топ-трейдеры</b> — то же по объёму позиций у крупнейших счетов. Когда толпа и топ-трейдеры смотрят в разные стороны — это и интересно.</li>
+      <li><b>Сигнал:</b> <i>сквиз</i> — цена резко вверх при падении OI (шорты выбиты); <i>капитуляция</i> — резко вниз при падении OI (лонги выбиты); <i>толпа в лонгах / шортах</i> — фандинг и L/S одновременно необычно перекошены в одну сторону; <i>тихо</i> — ничего необычного.</li>
+      <li>Это описание текущей картины, не прогноз.</li>
+    </ul></details>
+  <table class="mono" style="margin-top:12px"><thead><tr><th>Монета</th><th>Цена</th><th>OI</th><th>Фандинг</th><th>L/S толпа</th><th>L/S топ</th><th class="hide-phone">Ликвидации</th><th>Сигнал</th></tr></thead><tbody>
+  <tr><td>TRUMP</td><td>−3.1 %</td><td class="u">+9.4 %</td><td class="x">−0.0332 %</td><td class="n">0.82</td><td>1.05</td><td class="hide-phone">$0.4M</td><td style="font-family:inherit">толпа в шортах</td></tr>
+  <tr><td>BNB</td><td>+1.8 %</td><td class="x">−4.1 %</td><td>0.0081 %</td><td>1.21</td><td class="n">1.36</td><td class="hide-phone">$0.2M</td><td style="font-family:inherit">—</td></tr>
+  <tr><td>SUI</td><td class="u">+6.2 %</td><td>+1.1 %</td><td class="h">—</td><td>1.44</td><td>1.30</td><td class="hide-phone">$1.1M</td><td style="font-family:inherit">—</td></tr>
+  </tbody></table>
+</div>
+<p class="anno">Справка свёрнута по умолчанию на «Рынке» (одна строка «Что значит подсветка?»), раскрыта при первом визите на /positioning.</p>
+</div>
+
+<script>
+function rnd(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+const NS='http://www.w3.org/2000/svg';
+function el(svg,tag,a){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e}
+function path(pts){return pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}
+// 1 funding 90 settlements
+(()=>{const s=document.getElementById('fund'),r=rnd(7),n=90,W=420,H=150,pad=18;let v=[];for(let i=0;i<n;i++){v.push(0.006+ (r()-.5)*0.012)}
+for(let i=78;i<n;i++)v[i]=-0.004-(i-78)*0.0026-(r()*0.002);v[n-1]=-0.0332;
+const lo=-0.036,hi=0.02,y=x=>pad+(hi-x)/(hi-lo)*(H-2*pad),x=i=>4+i*(W-60)/(n-1);
+el(s,'rect',{x:4,y:y(0.014),width:W-60,height:y(-0.004)-y(0.014),fill:'rgba(139,148,158,.18)'});
+[0.01,0,-0.01,-0.02,-0.03].forEach(t=>{el(s,'line',{x1:4,x2:W-56,y1:y(t),y2:y(t),stroke:t===0?'#8b949e':'#21262d','stroke-width':1,'stroke-dasharray':t===0?'':'2 3'});const tx=el(s,'text',{x:W-52,y:y(t)+3,fill:'#8b949e','font-size':9,'font-family':'IBM Plex Mono,monospace'});tx.textContent=(t>0?'+':'')+(t).toFixed(2)+'%'});
+v.forEach((d,i)=>{const yy=y(d),y0=y(0);el(s,'rect',{x:x(i)-1.5,width:3,y:Math.min(yy,y0),height:Math.max(1,Math.abs(yy-y0)),fill:d<-0.004||d>0.014?'#d29922':'#484f58'})});
+el(s,'circle',{cx:x(n-1),cy:y(v[n-1]),r:4,fill:'#d29922',stroke:'#0d1117','stroke-width':2});
+[['30д',0],['15д',45],['сейчас',89]].forEach(([t,i])=>{const tx=el(s,'text',{x:x(i)-(i?14:0),y:H-2,fill:'#8b949e','font-size':9});tx.textContent=t});})();
+// 2 OI vs price 24h
+(()=>{const s=document.getElementById('oi'),r=rnd(11),n=96,W=420,H=150,pad=14;let p=[0],o=[0];for(let i=1;i<n;i++){p.push(p[i-1]+(r()-.47)*0.35);o.push(o[i-1]+(r()-.5)*0.25-(i>30&&i<50?0.18:0))}
+const pf=1.8/p[n-1];p=p.map(z=>z*(Math.abs(pf)<3?pf:1));p[n-1]=1.8;const of=-4.1/o[n-1];o=o.map(z=>z*of);
+const lo=-5,hi=3,y=v=>pad+(hi-v)/(hi-lo)*(H-2*pad-10),x=i=>4+i*(W-50)/(n-1);
+[2,0,-2,-4].forEach(t=>{el(s,'line',{x1:4,x2:W-46,y1:y(t),y2:y(t),stroke:t===0?'#8b949e':'#21262d','stroke-dasharray':t===0?'':'2 3'});const tx=el(s,'text',{x:W-42,y:y(t)+3,fill:'#8b949e','font-size':9,'font-family':'IBM Plex Mono,monospace'});tx.textContent=(t>0?'+':'')+t+'%'});
+el(s,'path',{d:path(p.map((v,i)=>[x(i),y(v)])),fill:'none',stroke:'#c9d1d9','stroke-width':1.6});
+el(s,'path',{d:path(o.map((v,i)=>[x(i),y(v)])),fill:'none',stroke:'#d29922','stroke-width':1.6});
+el(s,'circle',{cx:x(n-1),cy:y(1.8),r:3.5,fill:'#c9d1d9'});el(s,'circle',{cx:x(n-1),cy:y(-4.1),r:3.5,fill:'#d29922'});
+[['−24ч',0],['−12ч',48],['сейчас',95]].forEach(([t,i])=>{const tx=el(s,'text',{x:x(i)-(i?16:0),y:H-2,fill:'#8b949e','font-size':9});tx.textContent=t});})();
+// kpi sparks
+function spark(id,seed,dir,col){const s=document.getElementById(id),r=rnd(seed),n=84;let v=[0];for(let i=1;i<n;i++)v.push(v[i-1]+(r()-.5+dir*0.02));const lo=Math.min(...v),hi=Math.max(...v),W=300,H=56,y=z=>4+(hi-z)/(hi-lo||1)*(H-8),x=i=>i*W/(n-1);
+const pts=v.map((z,i)=>[x(i),y(z)]);el(s,'path',{d:path(pts)+` L${W} ${H} L0 ${H} Z`,fill:col,opacity:.12});el(s,'path',{d:path(pts),fill:'none',stroke:col,'stroke-width':1.5});
+const mi=v.indexOf(lo),ma=v.indexOf(hi);el(s,'circle',{cx:x(mi),cy:y(lo),r:2.5,fill:'#8b949e'});el(s,'circle',{cx:x(ma),cy:y(hi),r:2.5,fill:'#8b949e'});el(s,'circle',{cx:W-2,cy:y(v[n-1]),r:3,fill:col})}
+spark('k1',3,-1,'#ef5350');spark('k2',5,0.5,'#ef5350');
+(()=>{const s=document.getElementById('k3'),r=rnd(9),n=21,W=300,H=56,y0=36;el(s,'line',{x1:0,x2:W,y1:y0,y2:y0,stroke:'#8b949e'});for(let i=0;i<n;i++){const v=i===n-1?0.01:0.004+r()*0.009-(i>5&&i<9?0.012:0);const h=v/0.014*30;el(s,'rect',{x:i*W/n+2,width:W/n-4,y:h>0?y0-h:y0,height:Math.max(1,Math.abs(h)),fill:v>0?'#d29922':'#58a6ff',opacity:i===n-1?1:.6})}})();
+</script></body></html>
