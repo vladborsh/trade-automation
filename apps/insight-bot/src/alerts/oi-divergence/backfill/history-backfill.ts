@@ -315,7 +315,7 @@ function hiddenContext(
   // the earliest bar any check reads: ATR14 just after A (and its previous close), and the 100 per-bar moves before B
   const fromTime = Math.min(row.a.time, row.a.oiTime - tfSec, row.b.time - (OI_MEDIAN_BARS + 1) * tfSec) - (ATR_PERIOD + 2) * tfSec;
   const oiFrom = fromTime - tfSec;
-  const toTime = Math.max(row.b.time, row.b.oiTime) + tfSec;
+  const toTime = Math.max(row.b.time + tfSec, row.b.oiTime + tfSec, row.confirmedAt - tfSec); // through the confirming bar (the pictures)
   return {
     symbol: d.symbol, tf: d.tf, kind: d.kind, direction: d.direction, aTime: d.aTime, bTime: d.bTime, runLength: d.runLength,
     confirmedAt: d.confirmedAt, close: d.close, inWindow: d.inWindow, a: row.a, b: row.b,
