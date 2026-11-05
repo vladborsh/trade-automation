@@ -249,9 +249,158 @@ def v28_evaluate(raw):
     return {'flags': flags, 'rows': rows, 'notes': notes, 'measured': measured}
 
 
+# --------------------------------------------------------------------------------------------- cap-24h
+# IB-118 / IB-130: a day of market_cap_total. The recorder writes one row per 10-min tick (144/day); since
+# migration 030 every row carries btc_pct / eth_pct. Bands: rows 72–288 (2× of 144); no gap > 30 min; no
+# null btc_pct after the first row that has one. Size is a note: with a few hundred rows, page overhead
+# dominates bytes/row (design: ≈ 4 MB/year with the shares).
+
+CAP_ROWS_PER_DAY = 144
+CAP_GAP_SEC = 30 * 60
+
+
+def cap_gather():
+    now = time.time()
+    raw = {'now': utc(now), 'from': utc(now - 86400)}
+    raw['rows'] = psql("select extract(epoch from ts), btc_pct is not null from market_cap_total where ts >= '%s' order by ts" % raw['from'])
+    raw['size'] = psql("select pg_total_relation_size('market_cap_total'), count(*), extract(epoch from min(ts)), extract(epoch from max(ts)),"
+                       " count(*) filter (where btc_pct is not null), extract(epoch from min(ts) filter (where btc_pct is not null)) from market_cap_total")
+    return raw
+
+
+def cap_evaluate(raw):
+    flags, rows, notes = [], [], []
+    ts = [float(r[0]) for r in raw['rows']]
+    rows.append(band(flags, 'rows_24h', len(ts), CAP_ROWS_PER_DAY // 2, CAP_ROWS_PER_DAY * 2))
+    edges = [epoch(raw['from'])] + ts + [epoch(raw['now'])]
+    gaps = [(a, b) for a, b in zip(edges, edges[1:]) if b - a > CAP_GAP_SEC]
+    rows.append(band(flags, 'gaps_over_30_min', len(gaps), 0, 0))
+    for a, b in gaps:
+        notes.append('gap %s → %s (%d min)' % (utc(a), utc(b), (b - a) // 60))
+    size, total, t_min, t_max, with_btc, first_btc = raw['size'][0]
+    first_btc = num(first_btc)
+    nulls_after = sum(1 for r in raw['rows'] if first_btc is not None and float(r[0]) > first_btc and r[1] != 't')
+    rows.append(band(flags, 'btc_pct_null_after_030', nulls_after, 0, 0))
+    total = int(total)
+    notes.append('table: %s B, %d rows (%s → %s), %s with btc_pct; %s B/row now (page overhead dominates at this size)' % (
+        size, total, utc(float(t_min)) if t_min else '—', utc(float(t_max)) if t_max else '—', with_btc,
+        round(int(size) / total) if total else '—'))
+    return {'flags': flags, 'rows': rows, 'notes': notes,
+            'measured': {'from': raw['from'], 'to': raw['now'], 'rows_24h': len(ts), 'gaps': [[utc(a), utc(b)] for a, b in gaps],
+                         'size_bytes': int(size), 'rows_total': total, 'with_btc_pct': int(with_btc),
+                         'first_btc_pct_row': utc(first_btc) if first_btc else None}}
+
+
+# ------------------------------------------------------------------------------------- first-live-alert
+# The first OI alert with source='live' and fired_at set: its facts go to a file (recipients, the delay, the
+# link the members got, and whether that link answers 200 through Caddy). Until then the run is PENDING: a
+# file without a sentinel. Once found, the timer removes itself. The owner is NOT told — he got the alert.
+
+def first_alert_gather():
+    raw = {'now': utc(time.time())}
+    raw['alert'] = psql("select id, symbol, tf, direction, extract(epoch from b_time), extract(epoch from confirmed_at), extract(epoch from fired_at),"
+                        " recipients, late, build from oi_divergence_alerts where source = 'live' and fired_at is not null order by fired_at, id limit 1")
+    raw['eligible'] = psql("select count(*) from users where oi_alerts and not disabled and chat_id is not null")
+    raw['link_code'] = None
+    if raw['alert']:
+        a = raw['alert'][0]
+        base = env_value(os.path.join(DEPLOY_DIR, '.env'), 'WEB_BASE_URL') or ''
+        raw['link'] = '%s/instrument/%s?at=%d&tf=%s' % (base.rstrip('/'), a[1], int(float(a[4])), a[2]) if base else None
+        if raw['link']:
+            out = subprocess.run(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '15', raw['link']],
+                                 capture_output=True, text=True, timeout=30).stdout.strip()
+            raw['link_code'] = int(out) if out.isdigit() else None
+    return raw
+
+
+def env_value(path, key):
+    spec = importlib.util.spec_from_file_location('deploy_watch', os.path.join(HERE, 'deploy-watch.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.env_value(path, key)
+
+
+def first_alert_evaluate(raw):
+    if not raw['alert']:
+        return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live alert fired yet at %s' % raw['now']], 'measured': None}
+    a = raw['alert'][0]
+    b_time, confirmed, fired = float(a[4]), float(a[5]), float(a[6])
+    flags, rows = [], []
+    rows.append(band(flags, 'recipients_le_eligible', int(a[7]), 0, int(raw['eligible'][0][0])))
+    rows.append(band(flags, 'link_http', raw.get('link_code'), 200, 200))
+    m = {'id': int(a[0]), 'symbol': a[1], 'tf': a[2], 'direction': a[3], 'b_time': utc(b_time), 'confirmed_at': utc(confirmed),
+         'fired_at': utc(fired), 'fire_after_confirm_s': round(fired - confirmed), 'fire_after_b_open_s': round(fired - b_time),
+         'recipients': int(a[7]), 'eligible_now': int(raw['eligible'][0][0]), 'late': a[8] == 't', 'build': a[9],
+         'link': raw.get('link'), 'link_http': raw.get('link_code')}
+    return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the alert itself'], 'measured': m, 'done': True}
+
+
+# ---------------------------------------------------------------------------------------- backfill-rerun
+# IB-116's rerun after 2026-11-07 22:00 UTC: /root/box-backfill.sh --write measures the windows that were
+# open at the first run (314) and writes no new subject (the once-keys hold). The script carries its own
+# 1 s sampler and kills the CLI below 100 MB MemAvailable. Bands: 0 new rows; measured 157–628 (2× of 314);
+# 0 failed; 0 left open; weight 400–1 600 (≈ 800). A killed or failed run is FAIL.
+
+BACKFILL_SCRIPT = os.environ.get('CHECKS_BACKFILL_SCRIPT', '/root/box-backfill.sh')
+BACKFILL_OPEN = 314
+BACKFILL_COUNTS = ("select 'alerts', count(*) from oi_divergence_alerts where source = 'backfill' union all"
+                   " select 'controls', count(*) from oi_divergence_controls where source = 'backfill' union all"
+                   " select 'near_misses', count(*) from oi_divergence_near_misses where source = 'backfill' union all"
+                   " select 'paths', count(*) from oi_divergence_paths p left join oi_divergence_alerts a on a.id = p.alert_id"
+                   " left join oi_divergence_controls c on c.id = p.control_id left join oi_divergence_near_misses n on n.id = p.near_miss_id"
+                   " where coalesce(a.source, c.source, n.source) = 'backfill' union all"
+                   " select 'paths_open', count(*) from oi_divergence_paths p left join oi_divergence_alerts a on a.id = p.alert_id"
+                   " left join oi_divergence_controls c on c.id = p.control_id left join oi_divergence_near_misses n on n.id = p.near_miss_id"
+                   " where coalesce(a.source, c.source, n.source) = 'backfill' and p.measured_at is null")
+
+
+def backfill_gather():
+    if not os.path.exists(BACKFILL_SCRIPT):
+        raise CheckFailed('%s is missing' % BACKFILL_SCRIPT)
+    raw = {'started': utc(time.time()), 'before': psql(BACKFILL_COUNTS)}
+    try:
+        p = subprocess.run(['bash', BACKFILL_SCRIPT, '--write'], capture_output=True, text=True, timeout=4 * 3600)
+    except subprocess.TimeoutExpired:
+        raise CheckFailed('%s --write ran over 4 h' % BACKFILL_SCRIPT)
+    raw['rc'], raw['output'] = p.returncode, (p.stdout + p.stderr)[-6000:]
+    raw['after'] = psql(BACKFILL_COUNTS)
+    return raw
+
+
+def backfill_evaluate(raw):
+    import re
+    out = raw['output']
+    if 'KILLED for memory' in out:
+        raise CheckFailed('the CLI was killed: MemAvailable < 100 MB (box-backfill.sh sampler)')
+    cli = re.search(r'== CLI output \(exit (\d+)\)', out)
+    if raw['rc'] != 0 or not cli or cli.group(1) != '0':
+        raise CheckFailed('box-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
+    paths = re.search(r'paths: measured (\d+), failed (\d+), weight (\d+)', out)
+    left = re.search(r'left (\d+)', out)
+    mem = re.search(r'min MemAvailable (\d+) MB', out)
+    if not paths or not mem:
+        raise CheckFailed('box-backfill.sh output has no «paths: measured …» or «min MemAvailable» line')
+    before, after = dict((r[0], int(r[1])) for r in raw['before']), dict((r[0], int(r[1])) for r in raw['after'])
+    flags, rows = [], []
+    new_rows = sum(after[k] - before[k] for k in ('alerts', 'controls', 'near_misses', 'paths'))
+    rows.append(band(flags, 'new_rows', new_rows, 0, 0))
+    rows.append(band(flags, 'paths_measured', int(paths.group(1)), BACKFILL_OPEN // 2, BACKFILL_OPEN * 2))
+    rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
+    rows.append(band(flags, 'paths_left_open', after['paths_open'], 0, 0))
+    rows.append(band(flags, 'path_weight', int(paths.group(3)), 400, 1600))
+    rows.append(band(flags, 'min_mem_available_mb', int(mem.group(1)), 100, 10 ** 6))
+    return {'flags': flags, 'rows': rows, 'notes': ['CLI «left» line: %s' % (left.group(1) if left else '—')],
+            'measured': {'before': before, 'after': after, 'tail': out[-1500:]}}
+
+
 # --------------------------------------------------------------------------------------------- runner
 
-CHECKS = {'v28': (v28_gather, v28_evaluate, 'IB-115 V28 live day [%s, %s)' % (V28_FROM, V28_TO))}
+CHECKS = {
+    'v28': (v28_gather, v28_evaluate, 'IB-115 V28 live day [%s, %s)' % (V28_FROM, V28_TO)),
+    'cap-24h': (cap_gather, cap_evaluate, 'IB-118 / IB-130: a day of market_cap_total'),
+    'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
+    'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
+}
 
 
 def send_owner(text, dry_run):
@@ -301,7 +450,7 @@ def run_check(name, dry_run):
             raw = gather()
         res = evaluate(raw)
         doc['result'] = res
-        doc['verdict'] = ('FLAG:' + ','.join(res['flags'])) if res['flags'] else 'PASS'
+        doc['verdict'] = 'PENDING' if res.get('pending') else ('FLAG:' + ','.join(res['flags'])) if res['flags'] else 'PASS'
     except CheckFailed as e:
         doc['error'] = str(e)
     except Exception as e:  # a bug in the check is a broken check: FAIL, and the owner hears
@@ -313,7 +462,10 @@ def run_check(name, dry_run):
     doc['finished'] = utc(time.time())
     write_atomic(os.path.join(CHECKS_DIR, name + '.json'), json.dumps(doc, ensure_ascii=False, indent=1))
     write_atomic(os.path.join(CHECKS_DIR, name + '.md'), markdown(doc))
-    write_atomic(sentinel, doc['verdict'])  # last: the waiter reads a verdict only once the files are whole
+    if doc['verdict'] != 'PENDING':  # PENDING: a recurring check that has nothing yet — files, no sentinel
+        write_atomic(sentinel, doc['verdict'])  # last: the waiter reads a verdict only once the files are whole
+        if (doc['result'] or {}).get('done') and not FAKE_INPUT:
+            subprocess.run(['systemctl', 'stop', 'insight-check-%s.timer' % name], capture_output=True)  # found: stop recurring
     say('%s → %s (%s/%s.json)' % (name, doc['verdict'], CHECKS_DIR, name))
     return 1 if doc['verdict'].startswith('FAIL') else 0
 

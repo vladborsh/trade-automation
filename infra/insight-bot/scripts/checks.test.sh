@@ -121,6 +121,119 @@ run v28 broken
 check 'v28 a missing input (a bug or a failed query) → FAIL, not a crash without files' \
   '[ "$(verdict broken v28)" = "FAIL:KeyError: '"'"'paths'"'"'" ] && [ -s $work/out-broken/v28.md ]'
 
+# --------------------------------------------------------------------------------------------- cap-24h
+fixture() { # $1 = case, $2 = python building `d` (json-dumped to $work/<case>.json)
+  python3 -I - "$work/$1.json" "$2" <<'PY'
+import json, sys
+path, code = sys.argv[1], sys.argv[2]
+ns = {}
+exec(code, ns)
+with open(path, 'w') as f:
+    json.dump(ns['d'], f)
+PY
+}
+CAP='
+NOW = 1793929500  # 2026-11-06T13:45:00Z
+FROM = NOW - 86400
+def iso(t):
+    import time; return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+rows = [[str(FROM + 300 + 600 * i), "t"] for i in range(144)]
+def mk(rows, first_btc=FROM - 1000):
+    return {"now": iso(NOW), "from": iso(FROM), "rows": rows,
+            "size": [["49152", str(len(rows) + 20), str(FROM - 9000), rows[-1][0], str(len(rows)), str(first_btc)]]}
+'
+fixture cap-pass "$CAP
+d = mk(rows)"
+run cap-24h cap-pass
+check 'cap-24h 144 rows, no gap, shares on every row → PASS, nothing sent' '[ "$(verdict cap-pass cap-24h)" = PASS ] && [ "$(sent)" = 0 ]'
+check 'cap-24h notes the table size and rows' 'grep -q "table: 49152 B, 164 rows" $work/out-cap-pass/cap-24h.md'
+fixture cap-72 "$CAP
+d = mk([[str(FROM + 600 + 1200 * i), 't'] for i in range(72)])"
+run cap-24h cap-72
+check 'cap-24h 72 rows, 20-min spacing (half of 144, on the edge) → PASS' '[ "$(verdict cap-72 cap-24h)" = PASS ]'
+fixture cap-gap "$CAP
+d = mk(rows[:50] + rows[53:])"
+run cap-24h cap-gap
+check 'cap-24h 40 min without a row → FLAG:gaps_over_30_min, the gap named' \
+  '[ "$(verdict cap-gap cap-24h)" = FLAG:gaps_over_30_min ] && grep -q "(40 min)" $work/out-cap-gap/cap-24h.md'
+fixture cap-30 "$CAP
+d = mk(rows[:50] + rows[52:])"
+run cap-24h cap-30
+check 'cap-24h exactly 30 min without a row → PASS (the band is «over 30»)' '[ "$(verdict cap-30 cap-24h)" = PASS ]'
+fixture cap-null "$CAP
+rows[100][1] = 'f'
+d = mk(rows)"
+run cap-24h cap-null
+check 'cap-24h a null btc_pct after the first share row → FLAG:btc_pct_null_after_030' '[ "$(verdict cap-null cap-24h)" = FLAG:btc_pct_null_after_030 ]'
+fixture cap-pre030 "$CAP
+rows[0][1] = 'f'
+d = mk(rows, first_btc=int(rows[1][0]))"
+run cap-24h cap-pre030
+check 'cap-24h nulls BEFORE the first share row (pre-030) are not flagged' '[ "$(verdict cap-pre030 cap-24h)" = PASS ]'
+fixture cap-broken "d = {'now': '2026-11-06T13:45:00Z', 'from': '2026-11-05T13:45:00Z', 'rows': []}"
+run cap-24h cap-broken
+check 'cap-24h a missing size query → FAIL, one message' '[ "$(verdict cap-broken cap-24h | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
+
+# ------------------------------------------------------------------------------------ first-live-alert
+ALERT='
+d = {"now": "2026-11-05T16:15:00Z", "eligible": [["1"]], "link": "https://x/instrument/BTCUSDT?at=1793893500&tf=15m", "link_code": 200,
+     "alert": [["7", "BTCUSDT", "15m", "bear", "1793893500", "1793894400", "1793894802", "1", "f", "caa595788ec0"]]}
+'
+fixture fla-pending 'd = {"now": "2026-11-05T15:00:00Z", "alert": [], "eligible": [["1"]], "link_code": None}'
+run first-live-alert fla-pending
+check 'first-live-alert none yet → PENDING: files, NO sentinel, nothing sent, exit 0' \
+  '[ ! -e $work/out-fla-pending/first-live-alert.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-fla-pending/first-live-alert.json && [ "$(sent)" = 0 ] && [ "$(cat $work/fla-pending.rc)" = 0 ]'
+fixture fla-pass "$ALERT"
+run first-live-alert fla-pass
+check 'first-live-alert found → PASS with the facts; the owner is NOT told' \
+  '[ "$(verdict fla-pass first-live-alert)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"fire_after_confirm_s\": 402" $work/out-fla-pass/first-live-alert.json && grep -q "\"recipients\": 1" $work/out-fla-pass/first-live-alert.json'
+fixture fla-over "$ALERT
+d['alert'][0][7] = '2'"
+run first-live-alert fla-over
+check 'first-live-alert sent to more than are eligible → FLAG:recipients_le_eligible (not sent to the owner)' \
+  '[ "$(verdict fla-over first-live-alert)" = FLAG:recipients_le_eligible ] && [ "$(sent)" = 0 ]'
+fixture fla-link "$ALERT
+d['link_code'] = 502"
+run first-live-alert fla-link
+check 'first-live-alert link answering 502 → FLAG:link_http' '[ "$(verdict fla-link first-live-alert)" = FLAG:link_http ]'
+
+# -------------------------------------------------------------------------------------- backfill-rerun
+BF='
+counts = [["alerts", "54"], ["controls", "2424"], ["near_misses", "88"], ["paths", "7698"], ["paths_open", "314"]]
+after = [["alerts", "54"], ["controls", "2424"], ["near_misses", "88"], ["paths", "7698"], ["paths_open", "0"]]
+out = ("start 20261107T220500Z mode --write\n== CLI output (exit 0)\n"
+       "paths: measured 314, failed 0, weight 790, 1500 s; left 0 (the last window closes -)\n"
+       "== memory over 1500 samples\nmin MemAvailable 150 MB; max bot RSS 120 MB; max CLI RSS 90 MB\nfiles: /root/x.out /root/x.mem\n")
+d = {"started": "2026-11-07T22:05:00Z", "before": counts, "after": after, "rc": 0, "output": out}
+'
+fixture bf-pass "$BF"
+run backfill-rerun bf-pass
+check 'backfill-rerun 0 new rows, 314 measured, 0 failed, 0 left, 790 weight, 150 MB → PASS' '[ "$(verdict bf-pass backfill-rerun)" = PASS ] && [ "$(sent)" = 0 ]'
+fixture bf-new "$BF
+d['after'][1][1] = '2427'"
+run backfill-rerun bf-new
+check 'backfill-rerun 3 new controls (once-keys broken) → FLAG:new_rows' '[ "$(verdict bf-new backfill-rerun)" = FLAG:new_rows ]'
+fixture bf-many "$BF
+d['output'] = out.replace('measured 314', 'measured 629')"
+run backfill-rerun bf-many
+check 'backfill-rerun 629 measured (> 2× of 314) → FLAG; 628 → PASS' '[ "$(verdict bf-many backfill-rerun)" = FLAG:paths_measured ]'
+fixture bf-628 "$BF
+d['output'] = out.replace('measured 314', 'measured 628')"
+run backfill-rerun bf-628
+check 'backfill-rerun 628 measured → PASS' '[ "$(verdict bf-628 backfill-rerun)" = PASS ]'
+fixture bf-open "$BF
+d['after'][4][1] = '2'"
+run backfill-rerun bf-open
+check 'backfill-rerun 2 windows still open → FLAG:paths_left_open' '[ "$(verdict bf-open backfill-rerun)" = FLAG:paths_left_open ]'
+fixture bf-killed "$BF
+d['output'] = out + 'KILLED for memory\n'"
+run backfill-rerun bf-killed
+check 'backfill-rerun killed for memory → FAIL, the owner told once' '[ "$(verdict bf-killed backfill-rerun | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ] && grep -q "100 MB" $work/out-bf-killed/backfill-rerun.md'
+fixture bf-exit "$BF
+d['output'] = out.replace('(exit 0)', '(exit 1)')"
+run backfill-rerun bf-exit
+check 'backfill-rerun CLI exit 1 → FAIL' '[ "$(verdict bf-exit backfill-rerun)" = "FAIL:box-backfill.sh exit 0, CLI exit 1" ]'
+
 # ------------------------------------------------------------------------------------- the token, usage
 check 'the token is on curl stdin (sent at all)' 'grep -q "$TOKEN" $work/curl-stdin'
 check 'the token is never in argv, stdout, stderr or any file' \
