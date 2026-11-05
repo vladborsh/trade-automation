@@ -32,7 +32,7 @@
 
 ## 2. Item 2: KPI tiles get a 7-day chart (IB-118)
 
-**What changes.** The 6 px bar on **market cap, BTC OI and BTC funding** is empty today (`kpi-tile.ts` `bar()` returns `[]` for them). It is replaced by a mini chart with «7д мин {min} / макс {max}» under it. Dominance and liquidations keep their bars: those carry a share and are not empty.
+**What changes.** The 6 px bar on **market cap, BTC OI and BTC funding** is empty today (`kpi-tile.ts` `bar()` returns `[]` for them). It is replaced by a mini chart with «7д мин {min} / макс {max}» under it. Dominance and liquidations keep their bars: those carry a share and are not empty. *(Amended 2026-11-05: dominance gets its own chart in §7; liquidations keep their bar.)*
 
 **Contract.** `WebKpiTile.history`, nullable:
 - `kind`: `'area'` (cap, OI) or `'bars'` (funding);
@@ -178,8 +178,40 @@ The coordinator's order, WIP 2, a fresh dev context per task:
 | 3 | IB-119 (item 1) | IB-BUG-035 (the link rule it keeps) |
 | 4 | IB-120 (item 4) | — |
 | 5 | IB-121 (item 5) | IB-120 (`help-block`) |
+| 6 | IB-130 (§7, recorder; may ship before the rest) | — |
+| 7 | IB-131 (§7, tile) | IB-119 (owner's order), IB-130 |
 
 **Budget of the round, all items:**
 - Binance `fapi` ≤ ≈ 1.2 weight/min while pages are open (R4); `/futures/data` a few calls per 5 min at weight 0; CoinGecko ≤ 0.1/min;
 - memory well under 1 MB;
-- DB: one new table, `market_cap_total` (≈ 3 MB a year, migration 029); everything else reads only.
+- DB: one new table, `market_cap_total` (≈ 3 MB a year, migration 029), plus two dominance columns on it (§7, migration 030, ≈ 1 MB a year); everything else reads only.
+
+## 7. Item 6: BTC and ETH dominance history (IB-130, IB-131) — added 2026-11-05
+
+**Input:** `reports/coordinator-dominance-history-2026-11-05.md` (owner, P2, after IB-119). The «Доля BTC» tile shows a share bar today; the owner wants the **7-day history of BTC and ETH dominance** (each coin's share of total crypto market cap), recorded by us like the cap.
+
+**Source, no new call.** The `/global` payload the cap recorder already reads every 10 min (`MarketCapRecorderService`, `MarketCardsService.global()`) carries `data.market_cap_percentage` (a record of PERCENT values, `market-cards.payloads.ts`). We store `btc` and `eth` from the same payload, in the same row. **CoinGecko +0 calls; Binance +0.**
+
+**Columns on `market_cap_total`, not a sibling table.** Same key (CoinGecko `updated_at`), same fetch, same writer, same retention: a sibling table would repeat `ts` and `fetched_at` and add a join to the one read. 029 is applied on the box and MD5-frozen, so this is a **new migration**:
+- **Migration 030** (`030.do.market-cap-dominance.sql`): `alter table market_cap_total add column btc_pct double precision null check (btc_pct between 0 and 100), add column eth_pct double precision null check (eth_pct between 0 and 100)`; undo drops both columns. No default, so the `alter` is metadata-only (no rewrite). Re-check the number across **every ref** at commit (on 2026-11-05: 029 is the highest on all refs; IB-122..128 move to 031–034, below).
+- **Old rows stay null.** Rows written before 030 have no dominance and none can be recovered; the chart starts where the data starts.
+- **Writer.** `marketCapObservation` also returns `btcPct`/`ethPct`, each **independently** null when absent, non-finite or outside 0–100. The cap rule is unchanged: a row is written when the total is valid, with whatever dominance came along; a payload with dominance but no valid total writes nothing (as today). Conflict on `ts` still does nothing (the same refresh has the same percentages).
+- **Size.** 2 × 8 B per row × ≤ 52 560 rows a year ≈ **0.84 MB a year**, ≤ ≈ 1 MB with alignment; the table ≈ 4 MB a year in all (arithmetic; IB-130's report gives `pg_total_relation_size` after a day). **No retention cut**, per the cap ruling: keyless CoinGecko cannot give this back either.
+
+**Split, because recording starts only when deployed.** **IB-130** is migration 030 + the writer + the read, no UI; it can ship in the next deploy. **IB-131** is the tile, after IB-119 as the owner ordered. By the time the tile ships, days of history are held, so the "collecting" state is in practice only seen on fresh slot databases.
+
+**Migration order is a dependency, not a hope.** postgrator applies only versions above the current one (`burned-migration-numbers`): if IB-122's 031 reached the box before IB-130's 030, 030 would be silently skipped there and applied on fresh databases. So **IB-122 `depends_on` IB-130**. IB-130 is small, so this costs the alerts row little.
+
+**Read.** `marketCapSince` returns `btcPct`/`ethPct` alongside `totalUsd`: the one 7-day read (≤ 1 008 rows) the cap tile already makes per KPI compute, inside its 60 s cache. No second query.
+
+**Contract.** `WebKpiHistory.kind` gains `'lines'`. For `'lines'`, `points`/`min`/`max` are **BTC's** (the tile's own value), and a new field `second: { label: 'ETH', points, min, max } | null` carries ETH; `second` is required and null for `area`/`bars`, so a server that forgets it fails the parse. `from`/`to` cover both. `breakAfterSec` 30 min, as the cap.
+
+**Tile (IB-131).**
+- **Two stacked strips, each on its own scale**, BTC above (amber, the bar's existing `--amber-500`), ETH below (muted `#8b949e`, no new colour). Not two lines on one axis: BTC sits near 57 % and ETH near 11 %, so on a shared 0–60 axis a week's 1-point move is under 2 % of the chart height and both lines draw flat; one box with two independent scales would invite reading the crossings as meaningful. Each strip has dots on its min and max and the newest point marked, as the cap chart.
+- Under it: «7д BTC {min}–{max}% · ETH {min}–{max}%» (one decimal). At 390 px it may wrap to two lines; it must not scroll.
+- **Kept:** the value (BTC %), its 24 h delta and the ETH note «ETH {ethPct}%». **Goes:** the share bar, as on the other charted tiles.
+- **Under 6 h of rows with `btc_pct` not null:** `history` null, and the tile is exactly today's (bar and ETH note). No «копим историю» note: the note slot holds the ETH share, which the owner asked to keep.
+- **Under 7 days:** the chart over what is held, span named as on the cap tile. A gap over 30 min breaks both lines.
+- A row with BTC but no ETH puts a hole in the ETH strip only.
+
+**Total:** venue weight +0; memory +2 numbers per row on a ≤ 1 008-row read; DB ≈ 1 MB a year on top of the cap's 3 MB.

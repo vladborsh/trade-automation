@@ -113,4 +113,4 @@ The stream adds **< 1 weight / min** to Binance in steady state and a few MB a y
 | IB-128 | Custom levels (P9) | IB-127 |
 | IB-129 | Chart marks and level lines (§5) | IB-122, IB-126 |
 
-**Migrations** (amended 2026-11-05: 029 is IB-118's `market_cap_total`): planned **IB-122 030, IB-124 031, IB-126 032, IB-128 033**. The history runs (IB-123/125/127) and IB-129 add none. Each task still re-checks **every ref** at commit time and takes the next free number if these moved.
+**Migrations** (amended 2026-11-05: 029 is IB-118's `market_cap_total`; 030 is IB-130's dominance columns, market round 2 §7, and IB-122 depends on IB-130 so 030 reaches the box first): planned **IB-122 031, IB-124 032, IB-126 033, IB-128 034**. The history runs (IB-123/125/127) and IB-129 add none. Each task still re-checks **every ref** at commit time and takes the next free number if these moved.
