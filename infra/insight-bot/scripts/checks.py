@@ -393,6 +393,79 @@ def backfill_evaluate(raw):
             'measured': {'before': before, 'after': after, 'tail': out[-1500:]}}
 
 
+# ------------------------------------------------------------------------------------------ liq-weekly
+# IB-123: a week of liquidation tape. /opt/insight-bot/liq-backfill.sh --write reruns the history CLI: it writes 0
+# new rows (the write range ends at the live loop's first evaluated moment, LIQ_UNTIL, and its once-keys hold),
+# measures the backfill path windows that have closed since, and counts alerts per coin at ×½, ×1, ×2 over
+# [first full day, today 00:00 UTC) — a whole week on 2026-11-11 — with the live loop's code, into memory.
+# The table goes to the .md. Bands: 0 new rows; ≥ 6.9 days counted; 0 failed and 0 open path windows; memory
+# ≥ 100 MB. A killed run, a CLI exit ≠ 0 or no summary line is FAIL (the owner hears); PASS and FLAG are silent.
+
+LIQ_SCRIPT = os.environ.get('CHECKS_LIQ_SCRIPT', os.path.join(DEPLOY_DIR, 'liq-backfill.sh'))
+LIQ_UNTIL = '2026-11-05T16:59:34.379Z'  # the live liq loop's boot tick `from` (bot log, 1861c048ab60)
+
+
+def liq_gather():
+    if not os.path.exists(LIQ_SCRIPT):
+        raise CheckFailed('%s is missing' % LIQ_SCRIPT)
+    now = time.time()
+    raw = {'started': utc(now), 'counts_to': utc(now // 86400 * 86400)}
+    try:
+        p = subprocess.run(['bash', LIQ_SCRIPT, '--write', '--until', LIQ_UNTIL, '--counts-to', raw['counts_to']],
+                           capture_output=True, text=True, timeout=4 * 3600)
+    except subprocess.TimeoutExpired:
+        raise CheckFailed('%s --write ran over 4 h' % LIQ_SCRIPT)
+    raw['rc'], raw['output'] = p.returncode, (p.stdout + p.stderr)[-20000:]
+    return raw
+
+
+def liq_md_table(table, days):
+    by = {}
+    for r in table:
+        by.setdefault(r['symbol'], {})[r['multiplier']] = r
+    L = ['## Alerts per week, per coin (%.2f days of tape; ×1 = L4 defaults)' % days, '',
+         '| coin | ×½ threshold | ×½ /week | ×1 threshold | ×1 /week (long/short) | ×1 continuing /week | ×2 threshold | ×2 /week | ×1 with a gap | ×1 venue not collected |',
+         '|---|---|---|---|---|---|---|---|---|---|']
+    for sym, m in by.items():
+        h, one, two = m.get(0.5, {}), m.get(1, {}), m.get(2, {})
+        L.append('| %s | $%s | %s | $%s | %s (%s/%s) | %s | $%s | %s | %s | %s |' % (
+            sym, '{:,}'.format(int(h.get('thresholdUsd', 0))), h.get('perWeek'), '{:,}'.format(int(one.get('thresholdUsd', 0))),
+            one.get('perWeek'), one.get('longs'), one.get('shorts'), one.get('continuationsPerWeek'),
+            '{:,}'.format(int(two.get('thresholdUsd', 0))), two.get('perWeek'), one.get('withGap'), one.get('notCollected')))
+    return '\n'.join(L)
+
+
+def liq_evaluate(raw):
+    import re
+    out = raw['output']
+    if 'KILLED for memory' in out:
+        raise CheckFailed('the CLI was killed: MemAvailable < 100 MB (liq-backfill.sh sampler)')
+    cli = re.search(r'== CLI output \(exit (\d+)\)', out)
+    if raw['rc'] != 0 or not cli or cli.group(1) != '0':
+        raise CheckFailed('liq-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
+    js = re.search(r'^LIQ_HISTORY_JSON (\{.*\})$', out, re.M)
+    new = re.search(r'write ×1: .*new rows: alerts (\d+), continuations (\d+), controls (\d+)', out)
+    paths = re.search(r'paths: measured (\d+), failed (\d+), weight (\d+), \d+ s; left (\d+)', out)
+    mem = re.search(r'min MemAvailable (\d+) MB', out)
+    if not js or not new or not paths or not mem:
+        raise CheckFailed('liq-backfill.sh output lacks a LIQ_HISTORY_JSON, «write ×1», «paths:» or «min MemAvailable» line')
+    summary = json.loads(js.group(1))
+    flags, rows = [], []
+    rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups()), 0, 0))
+    rows.append(band(flags, 'days_counted', summary['days'], 6.9, 10 ** 6))
+    rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
+    rows.append(band(flags, 'paths_left_open', int(paths.group(4)), 0, 0))
+    rows.append(band(flags, 'min_mem_available_mb', int(mem.group(1)), 100, 10 ** 6))
+    notes = ['counts over (%s, %s]: the live loop\'s code at the 30 s cadence, into memory; nothing from it is written' % (summary['from'], summary['countsTo']),
+             'written rows (source = backfill) stop at %s, where the live journal starts; live and backfill are never pooled (V32)' % summary['until'],
+             'TRX: Binance only until 2026-11-05 17:34 UTC (L5); Bybit and OKX after',
+             'path weight this run: %s (measured %s windows)' % (paths.group(3), paths.group(1)),
+             'no hit rate: «worked» and the baseline are not defined yet (design §1 C5)']
+    return {'flags': flags, 'rows': rows, 'notes': notes, 'md': liq_md_table(summary['table'], summary['days']),
+            'measured': {'summary': summary, 'paths': {'measured': int(paths.group(1)), 'failed': int(paths.group(2)), 'weight': int(paths.group(3)), 'left': int(paths.group(4))},
+                         'min_mem_available_mb': int(mem.group(1)), 'tail': out[-1500:]}}
+
+
 # --------------------------------------------------------------------------------------------- runner
 
 CHECKS = {
@@ -400,6 +473,7 @@ CHECKS = {
     'cap-24h': (cap_gather, cap_evaluate, 'IB-118 / IB-130: a day of market_cap_total'),
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
+    'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
 }
 
 
@@ -427,6 +501,8 @@ def markdown(doc):
         L += ['| figure | value | band | |', '|---|---|---|---|']
         L += ['| %s | %s | %s | %s |' % (r['figure'], '—' if r['value'] is None else r['value'], r['band'], 'ok' if r['ok'] else '**FLAG**') for r in res['rows']]
         L.append('')
+    if res.get('md'):
+        L += [res['md'], '']
     if res.get('notes'):
         L += ['## Notes', ''] + ['- ' + n for n in res['notes']] + ['']
     if res.get('measured'):

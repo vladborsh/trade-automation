@@ -234,6 +234,55 @@ d['output'] = out.replace('(exit 0)', '(exit 1)')"
 run backfill-rerun bf-exit
 check 'backfill-rerun CLI exit 1 → FAIL' '[ "$(verdict bf-exit backfill-rerun)" = "FAIL:box-backfill.sh exit 0, CLI exit 1" ]'
 
+# ------------------------------------------------------------------------------------------ liq-weekly
+LIQ='
+import json
+row = lambda sym, k, thr, n, cont: {"symbol": sym, "multiplier": k, "thresholdUsd": thr, "alerts": n, "longs": n - n // 3, "shorts": n // 3,
+                                     "continuations": cont, "withGap": 0, "notCollected": 0, "perWeek": n, "continuationsPerWeek": cont}
+table = [row(s, k, t * k, n, c) for k, scale in ((0.5, 2), (1, 1), (2, 0.5)) for s, t, n, c in
+         (("BTCUSDT", 5e6, int(28 * scale), 24), ("ETHUSDT", 3e6, int(29 * scale), 25), ("TRXUSDT", 3e5, 0, 0))]
+summary = {"mode": "write", "from": "2026-11-04T00:00:00.000Z", "until": "2026-11-05T16:59:34.379Z", "countsTo": "2026-11-11T00:00:00.000Z",
+           "days": 7, "written": {"alerts": 25}, "table": table}
+out = ("start 20261111T003000Z mode --write\n== CLI output (exit 0)\n"
+       "write ×1: 4851 ticks over (…]; new rows: alerts 0, continuations 0, controls 0; 24739 reads, at most 2074 prints held\n"
+       "paths: measured 120, failed 0, weight 600, 180 s; left 0\n"
+       "LIQ_HISTORY_JSON " + json.dumps(summary) + "\n"
+       "== memory over 900 samples\nmin MemAvailable 140 MB; max bot RSS 120 MB; max CLI RSS 100 MB\nfiles: /root/x.out /root/x.mem\n")
+d = {"started": "2026-11-11T00:30:00Z", "counts_to": "2026-11-11T00:00:00Z", "rc": 0, "output": out}
+'
+fixture liq-pass "$LIQ"
+run liq-weekly liq-pass
+check 'liq-weekly a clean week → PASS, nothing sent, the weekly table in the .md' \
+  '[ "$(verdict liq-pass liq-weekly)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "| BTCUSDT | \$2,500,000 | 56 | \$5,000,000 | 28 (19/9) | 24 | \$10,000,000 | 14 |" $work/out-liq-pass/liq-weekly.md'
+fixture liq-new "$LIQ
+d['output'] = out.replace('controls 0;', 'controls 2;')"
+run liq-weekly liq-new
+check 'liq-weekly a rerun that wrote rows (once-keys broken) → FLAG:new_rows' '[ "$(verdict liq-new liq-weekly)" = FLAG:new_rows ] && [ "$(sent)" = 0 ]'
+fixture liq-short "$LIQ
+d['output'] = out.replace('\"days\": 7', '\"days\": 6.8')"
+run liq-weekly liq-short
+check 'liq-weekly 6.8 days counted → FLAG:days_counted; 6.9 → PASS' '[ "$(verdict liq-short liq-weekly)" = FLAG:days_counted ]'
+fixture liq-69 "$LIQ
+d['output'] = out.replace('\"days\": 7', '\"days\": 6.9')"
+run liq-weekly liq-69
+check 'liq-weekly 6.9 days → PASS' '[ "$(verdict liq-69 liq-weekly)" = PASS ]'
+fixture liq-paths "$LIQ
+d['output'] = out.replace('failed 0', 'failed 3').replace('left 0', 'left 3')"
+run liq-weekly liq-paths
+check 'liq-weekly 3 failed / open path windows → FLAG (a finding, not FAIL)' '[ "$(verdict liq-paths liq-weekly)" = FLAG:paths_failed,paths_left_open ] && [ "$(sent)" = 0 ]'
+fixture liq-killed "$LIQ
+d['output'] = out + 'KILLED for memory\n'"
+run liq-weekly liq-killed
+check 'liq-weekly killed for memory → FAIL, the owner told once' '[ "$(verdict liq-killed liq-weekly | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
+fixture liq-exit "$LIQ
+d['output'] = out.replace('(exit 0)', '(exit 1)')"
+run liq-weekly liq-exit
+check 'liq-weekly CLI exit 1 → FAIL' '[ "$(verdict liq-exit liq-weekly)" = "FAIL:liq-backfill.sh exit 0, CLI exit 1" ] && [ "$(sent)" = 1 ]'
+fixture liq-nojson "$LIQ
+d['output'] = '\n'.join(l for l in out.split('\n') if not l.startswith('LIQ_HISTORY_JSON'))"
+run liq-weekly liq-nojson
+check 'liq-weekly no summary line → FAIL' '[ "$(verdict liq-nojson liq-weekly | cut -c1-5)" = FAIL: ]'
+
 # ------------------------------------------------------------------------------------- the token, usage
 check 'the token is on curl stdin (sent at all)' 'grep -q "$TOKEN" $work/curl-stdin'
 check 'the token is never in argv, stdout, stderr or any file' \
