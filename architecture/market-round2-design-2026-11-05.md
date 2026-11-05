@@ -154,8 +154,13 @@ The axis ticks and scales are a **pure client helper** (`insight-chart.geometry.
 
 - **Placement:** above the heat table on Market and on `/positioning`.
 - **Title:** «Что значит подсветка и как читать таблицу».
-- **Text:** the text in `mockup.html`, verbatim. It is consistent with `heatOf` (0.75 / 0.90 / 0.99) and `positioning.rules.ts`.
-- **Swatches:** one per level (заметно / необычно / крайне редко), plus the hatch for "мало данных". They are drawn by the **same CSS classes the table cells use**, so a palette change cannot make the help disagree with the table.
+- **Text:** the text in `mockup.html` §5, **as corrected against the code in the IB-121 review** (amended 2026-11-05; the first draft was not fully consistent, and I had called it consistent without checking). The corrections:
+  - the hatch is «оценить нельзя — данных мало или нет»;
+  - funding reads «(на их стороне перекос)», not «(их больше)»;
+  - the «Ликвидации» and «OI, $» columns are explained;
+  - «пусто — ни одно правило не сработало» is added.
+  The source of truth is `heatOf` (0.75 / 0.90 / 0.99) and `positioning.rules.ts`; where the mockup and the code disagree, the code wins and the mockup is corrected.
+- **Swatches:** one per level (заметно / необычно / крайне редко), plus the hatch for «оценить нельзя». They are drawn by the **same CSS classes the table cells use**, so a palette change cannot make the help disagree with the table.
 - **Behaviour:**
   - on Market it is one collapsed line, «Что значит подсветка?»;
   - on `/positioning` it is open on the first visit and collapsed afterwards;
