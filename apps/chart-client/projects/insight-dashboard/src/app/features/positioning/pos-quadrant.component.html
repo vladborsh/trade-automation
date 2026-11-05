@@ -31,10 +31,9 @@
       <text class="corner" x="4" [attr.y]="height() - 4">{{ t('insight.quadrant.long_closing') }}</text>
       <text class="corner end" [attr.x]="width() - 4" [attr.y]="height() - 4">{{ t('insight.quadrant.short_closing') }}</text>
     }
-    <text class="tick" [attr.x]="l.right" [attr.y]="l.y0 - 4">{{ axis(l.domain.xMax) }}</text>
-    <text class="tick start" [attr.x]="l.left" [attr.y]="l.y0 - 4">{{ axis(l.domain.xMin) }}</text>
-    <text class="tick" [class.start]="l.x0 < l.right" [attr.x]="l.x0 < l.right ? l.x0 + 4 : l.x0 - 4" [attr.y]="l.top + 10">{{ axis(l.domain.yMax) }}</text>
-    <text class="tick" [class.start]="l.x0 < l.right" [attr.x]="l.x0 < l.right ? l.x0 + 4 : l.x0 - 4" [attr.y]="l.bottom - 2">{{ axis(l.domain.yMin) }}</text>
+    @for (tk of l.ticks; track $index) {
+      <text class="tick" [class.start]="tk.anchor === 'start'" [attr.x]="tk.x" [attr.y]="tk.y">{{ tk.text }}</text>
+    }
     @for (d of l.dots; track d.row.symbol) {
       <g class="dot" [class.pinned]="d.pin" [class.active]="d.row.symbol === active()" [attr.data-symbol]="d.row.symbol"
          tabindex="0" role="link" [attr.aria-label]="d.row.base"

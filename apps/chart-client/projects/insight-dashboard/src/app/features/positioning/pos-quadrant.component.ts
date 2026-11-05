@@ -7,7 +7,7 @@ import { hostWidth } from '../../ui/host-width';
 import { formatUsd } from '../liquidations/liquidations.format';
 import { signedPct } from '../market/shell/market-text';
 import { quadrantLayout, quadrantLink, QUADRANT_PAD } from './pos-layout';
-import { bulkDomain, compactPct, dataAt, type Domain, fullDomain, panByPx, sameDomain, zoom, ZOOM_STEP } from './pos-zoom';
+import { bulkDomain, dataAt, type Domain, fullDomain, panByPx, sameDomain, zoom, ZOOM_STEP } from './pos-zoom';
 import { QuadrantGestures } from './quadrant-gestures';
 
 /** IB-137: the two named views, or wherever zoom and pan left it. */
@@ -145,5 +145,4 @@ export class PosQuadrantComponent {
     if (this.active() === symbol) this.active.set(null);
   }
 
-  axis = compactPct;
 }

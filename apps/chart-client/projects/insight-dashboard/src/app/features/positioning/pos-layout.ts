@@ -24,6 +24,8 @@ export const PIN_R = 7;
 /** A label's box at 12 px monospace: ~7.3 px per character, 14 px tall. */
 export const LABEL_CHAR_PX = 7.3;
 export const LABEL_H = 14;
+/** IB-137: labels keep out of the top and bottom 18 px, where the quadrant names and «0» markers sit. */
+export const LABEL_BAND = 18;
 
 /** IB-137: which edge(s) a coin outside the view is pinned to: −1 left/below, +1 right/above. */
 export interface Pin {
@@ -44,8 +46,18 @@ export interface QuadrantDot {
   label: { x: number; y: number; anchor: 'start' | 'end' | 'middle'; box: Box; text: string } | null;
 }
 
+export interface AxisTick {
+  text: string;
+  x: number;
+  y: number;
+  anchor: 'start' | 'end';
+  box: Box;
+}
+
 export interface QuadrantLayout {
   domain: Domain;
+  /** IB-137: the axis-end values, placed here so labels can avoid them. */
+  ticks: AxisTick[];
   /** The zero axes in pixels, clamped to the plot edge when zero is outside the view. */
   x0: number;
   y0: number;
@@ -102,7 +114,11 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
       return { row, cx: clamp(px(x), left, right), cy: clamp(py(y), top, bottom), r, pin, label: null };
     });
 
-  const boxes: Box[] = dots.map((d) => ({ x: d.cx - d.r, y: d.cy - d.r, w: 2 * d.r, h: 2 * d.r }));
+  const x0 = clamp(px(0), left, right);
+  const y0 = clamp(py(0), top, bottom);
+  const ticks = axisTicks(domain, { left, right, top, bottom, x0, y0 });
+  // the axis-end texts are obstacles too: a label never covers «+5 %»
+  const boxes: Box[] = [...dots.map((d) => ({ x: d.cx - d.r, y: d.cy - d.r, w: 2 * d.r, h: 2 * d.r })), ...ticks.map((t) => t.box)];
   let hidden = 0;
   // pinned first, the farthest beyond the view first: a real outlier's label beats a coin just past the edge
   const beyond = (v: number, lo: number, hi: number) => (v > hi ? v - hi : v < lo ? lo - v : 0) / (hi - lo);
@@ -132,7 +148,11 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
       : d.pin.dy === 1 ? (d.pin.dx === 0 ? [b, r, l, a] : [b, bIn, d.pin.dx === 1 ? l : r, aIn])
       : d.pin.dy === -1 ? (d.pin.dx === 0 ? [a, r, l, b] : [a, aIn, d.pin.dx === 1 ? l : r, bIn])
       : d.pin.dx === 1 ? [l, a, b, r] : [r, a, b, l];
-    const free = spots.find((s) => inside(s.box, size) && boxes.every((bx) => !overlaps(bx, s.box)));
+    // a pinned label may step one or two rows inward along its edge (past an axis value, past a neighbour's label)
+    const step = LABEL_H + 2;
+    const rowsIn = !d.pin ? [0] : d.pin.dy === 1 ? [0, step, 2 * step] : d.pin.dy === -1 ? [0, -step, -2 * step] : [0, step, -step];
+    const shift = (s: (typeof spots)[number], dy: number) => ({ ...s, y: s.y + dy, box: { ...s.box, y: s.box.y + dy } });
+    const free = rowsIn.flatMap((o) => spots.map((s) => shift(s, o))).find((s) => inside(s.box, size, LABEL_BAND) && boxes.every((bx) => !overlaps(bx, s.box)));
     if (free) {
       d.label = free;
       boxes.push(free.box);
@@ -143,8 +163,8 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
   const x0In = domain.xMin <= 0 && 0 <= domain.xMax;
   const y0In = domain.yMin <= 0 && 0 <= domain.yMax;
   return {
-    domain, left, right, top, bottom,
-    x0: clamp(px(0), left, right), y0: clamp(py(0), top, bottom), x0In, y0In, originIn: originInView(domain),
+    domain, left, right, top, bottom, ticks,
+    x0, y0, x0In, y0In, originIn: originInView(domain),
     dots, unplaced: rows.length - placed.length, hiddenLabels: hidden, pinned: dots.filter((d) => d.pin).length,
   };
 }
@@ -169,8 +189,34 @@ function overlaps(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-function inside(b: Box, size: Size): boolean {
-  return b.x >= 0 && b.y >= 0 && b.x + b.w <= size.width && b.y + b.h <= size.height;
+/** `band`: the strip along the top and bottom edges kept for the quadrant names and the «0» markers. */
+function inside(b: Box, size: Size, band = 0): boolean {
+  return b.x >= 0 && b.y >= band && b.x + b.w <= size.width && b.y + b.h <= size.height - band;
+}
+
+/** A 12 px proportional digit or sign is narrower than the label's monospace; 7.3 px keeps the box safe. */
+const TICK_H = 14;
+
+/**
+ * IB-137: the four axis-end values («−5 %», «+5 %» on each axis), where the template draws them: the
+ * price ends just above the zero line, the OI ends beside the zero axis (inside the plot, on the side
+ * with room). Each carries its box, so the label layout can keep clear of it.
+ */
+function axisTicks(domain: Domain, p: { left: number; right: number; top: number; bottom: number; x0: number; y0: number }): AxisTick[] {
+  const tick = (value: number, x: number, y: number, anchor: 'start' | 'end'): AxisTick => {
+    const text = compactPct(value);
+    const w = text.length * LABEL_CHAR_PX;
+    return { text, x, y, anchor, box: { x: anchor === 'start' ? x : x - w, y: y - 11, w, h: TICK_H } };
+  };
+  const yAnchor = p.x0 < p.right ? 'start' : 'end';
+  const yx = p.x0 < p.right ? p.x0 + 4 : p.x0 - 4;
+  return [
+    tick(domain.xMax, p.right, p.y0 - 4, 'end'),
+    tick(domain.xMin, p.left, p.y0 - 4, 'start'),
+    // in the band above / below the plot, beside the zero axis: a pinned coin's corner stays free
+    tick(domain.yMax, yx, p.top - 6, yAnchor),
+    tick(domain.yMin, yx, p.bottom + 16, yAnchor),
+  ];
 }
 
 // ------------------------------------------------------------------------------------------------

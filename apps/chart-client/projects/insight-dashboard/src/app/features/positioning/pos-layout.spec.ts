@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
-import { type Box, DOT_R_MAX, DOT_R_MIN, heatOf, heatRow, LABEL_CHAR_PX, niceMax, PIN_R, quadrantLayout, quadrantLink } from './pos-layout';
+import { type Box, DOT_R_MAX, DOT_R_MIN, heatOf, heatRow, LABEL_BAND, LABEL_CHAR_PX, niceMax, PIN_R, quadrantLayout, quadrantLink } from './pos-layout';
 
 /** IB-090 — positioning geometry and cell words, on the contract fixture (BTC, ETH, SOL, DOGE). */
 const rows = (fixture as unknown as WebPositioningResponse).rows;
@@ -90,10 +90,11 @@ describe('quadrantLayout with a view (IB-137)', () => {
   });
 
   it('pinned labels win collisions: an in-box coin whose label wants the same spot yields it', () => {
-    // OUT is pinned to the right edge at OI 0; its only spot inside the chart is to its LEFT, which
+    // OUT is pinned to the right edge at OI +2; its only spot inside the chart is to its LEFT, which
     // is exactly where Q's (bigger, so first by OI) label would go. Placed by OI alone, OUT would lose.
-    const q = row('Q', -5 + ((430 - 28) / 544) * 10, 0, 1e9);
-    const l = quadrantLayout([q, row('OUT', 30, 0, 1)], big, bulk);
+    // (at OI +2, off the zero line where the «+5 %» price tick sits)
+    const q = row('Q', -5 + ((422 - 28) / 544) * 10, 2, 1e9);
+    const l = quadrantLayout([q, row('OUT', 30, 2, 1)], big, bulk);
     const at = (b: string) => l.dots.find((d) => d.row.base === b)!;
     expect(at('OUT').label?.anchor).toBe('end');
     expect(at('Q').label?.anchor).toBe('end'); // Q moved its label to its own left
@@ -108,6 +109,22 @@ describe('quadrantLayout with a view (IB-137)', () => {
     expect(t.label?.text).toBe('TRUMP +38 % / +12 %');
     expect(t.label!.box.x + t.label!.box.w).toBeLessThanOrEqual(size.width);
     expect(t.label!.box.x).toBeGreaterThanOrEqual(0);
+  });
+
+  it('labels keep clear of the axis-end values and of the top / bottom band where the quadrant names sit', () => {
+    const view = { xMin: -5, xMax: 5, yMin: -5, yMax: 5 };
+    // XRP just above the top edge near the OI axis, where «+5 %» is printed; TRUMP in the corner, by «new longs»
+    const l = quadrantLayout([row('ONDO', 0.4, 5.4, 5e9), row('XRP', 2.5, 20, 3e9), row('TRUMP', 38, 12, 1e8), row('BTC', 0.3, 1.6, 9e9)], size, view);
+    expect(l.ticks.map((t) => t.text)).toEqual(['+5 %', '−5 %', '+5 %', '−5 %']);
+    const hit = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const labels = l.dots.filter((d) => d.label).map((d) => d.label!.box);
+    expect(labels.length).toBeGreaterThan(0);
+    for (const b of labels) {
+      for (const t of l.ticks) expect(hit(b, t.box)).toBe(false);
+      expect(b.y).toBeGreaterThanOrEqual(LABEL_BAND);
+      expect(b.y + b.h).toBeLessThanOrEqual(size.height - LABEL_BAND);
+    }
+    expect(l.dots.find((d) => d.row.base === 'TRUMP')!.label?.text).toBe('TRUMP +38 % / +12 %');
   });
 
   it('the dots stay in OI order whatever the label order (the keyboard walks them in that order)', () => {
