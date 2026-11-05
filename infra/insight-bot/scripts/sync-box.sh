@@ -41,30 +41,41 @@ FILES=(
   "systemd/insight-bot-backup.timer:/etc/systemd/system/insight-bot-backup.timer:0644"
 )
 
+# SSM caps one command at 97 KB (parameters + document), and the files together are past it (IB-140's
+# checks.py). So each file is STAGED by its own command as <dst>.new, and one last command installs them
+# all, reloads systemd and writes SYNCED-FROM: a failed stage leaves the box's files as they were.
 params="$(mktemp)"
 trap 'rm -f "$params"' EXIT
-{
-  for f in "${FILES[@]}"; do
-    IFS=: read -r src dst mode <<<"$f"
-    printf '%s\t%s\t%s\t%s\n' "$src" "$dst" "$mode" "$(base64 <"$HERE/$src" | tr -d '\n')"
-  done
-} | python3 -I -c '
-import json, sys
-commit = sys.argv[1]
-cmds = ["set -euo pipefail"]
-for line in sys.stdin:
-    src, dst, mode, b64 = line.rstrip("\n").split("\t")
-    cmds.append(f"echo {b64} | base64 -d > {dst}.new && install -m {mode} {dst}.new {dst} && rm -f {dst}.new && echo synced {dst}")
-cmds += ["systemctl daemon-reload", f"echo {commit} > /opt/insight-bot/SYNCED-FROM"]
-print(json.dumps({"commands": cmds}))
-' "$COMMIT" >"$params"
+
+ssm_run() { # $1 = comment; the commands JSON is in $params → prints the output; fails unless Success
+  local cid status
+  cid="$(aws ssm send-command --region "$REGION" --instance-ids "$INSTANCE" \
+    --document-name AWS-RunShellScript --comment "$1" \
+    --parameters "file://$params" --query Command.CommandId --output text)"
+  aws ssm wait command-executed --region "$REGION" --command-id "$cid" --instance-id "$INSTANCE" || true
+  aws ssm get-command-invocation --region "$REGION" --command-id "$cid" --instance-id "$INSTANCE" \
+    --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
+  status="$(aws ssm get-command-invocation --region "$REGION" --command-id "$cid" --instance-id "$INSTANCE" --query Status --output text)"
+  test "$status" = Success
+}
 
 echo "==> syncing ${#FILES[@]} files from ${COMMIT:0:12} to ${INSTANCE}"
-cid="$(aws ssm send-command --region "$REGION" --instance-ids "$INSTANCE" \
-  --document-name AWS-RunShellScript --comment "sync-box ${COMMIT:0:12}" \
-  --parameters "file://$params" --query Command.CommandId --output text)"
-aws ssm wait command-executed --region "$REGION" --command-id "$cid" --instance-id "$INSTANCE" || true
-aws ssm get-command-invocation --region "$REGION" --command-id "$cid" --instance-id "$INSTANCE" \
-  --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
-status="$(aws ssm get-command-invocation --region "$REGION" --command-id "$cid" --instance-id "$INSTANCE" --query Status --output text)"
-test "$status" = Success
+installs=()
+for f in "${FILES[@]}"; do
+  IFS=: read -r src dst mode <<<"$f"
+  b64="$(base64 <"$HERE/$src" | tr -d '\n')"
+  if [ "${#b64}" -gt 90000 ]; then
+    echo "sync-box.sh: $src is too large for one SSM command (${#b64} B base64)" >&2
+    exit 1
+  fi
+  python3 -I -c 'import json,sys; print(json.dumps({"commands": ["set -euo pipefail", "echo %s | base64 -d > %s.new && echo staged %s" % (sys.argv[1], sys.argv[2], sys.argv[2])]}))' \
+    "$b64" "$dst" >"$params"
+  ssm_run "sync-box ${COMMIT:0:12} stage $(basename "$dst")" >/dev/null || { echo "sync-box.sh: staging $dst failed; nothing installed" >&2; exit 1; }
+  installs+=("install -m $mode $dst.new $dst && rm -f $dst.new && echo synced $dst")
+done
+python3 -I -c '
+import json, sys
+commit, cmds = sys.argv[1], sys.argv[2:]
+print(json.dumps({"commands": ["set -euo pipefail"] + cmds + ["systemctl daemon-reload", "echo %s > /opt/insight-bot/SYNCED-FROM" % commit]}))
+' "$COMMIT" "${installs[@]}" >"$params"
+ssm_run "sync-box ${COMMIT:0:12} install"
