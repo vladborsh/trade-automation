@@ -1,6 +1,6 @@
 import { WebKpiHistorySchema } from '@trade-automation/contracts';
 import {
-  CAP_BREAK_AFTER_SEC, capHistory, FUNDING_BARS, fundingHistory, history, OI_BREAK_AFTER_SEC, oiHistory,
+  CAP_BREAK_AFTER_SEC, capHistory, dominanceHistory, FUNDING_BARS, fundingHistory, history, OI_BREAK_AFTER_SEC, oiHistory,
 } from '../../../../src/web/market/positioning/kpis.history';
 
 /** IB-118 — the KPI tiles' 7-day series, pure: what they cover, min/max over the points, the 6 h rule. */
@@ -65,5 +65,63 @@ describe('OI and funding', () => {
     expect(h?.points).toHaveLength(FUNDING_BARS);
     expect(h).toMatchObject({ kind: 'bars', breakAfterSec: null, from: settlements[69].time, to: settlements[89].time, min: -11 / 1e5, max: 9 / 1e5 });
     expect(fundingHistory([])).toBeNull();
+  });
+});
+
+describe('IB-131 dominanceHistory — BTC and ETH from the cap rows, only rows with btc_pct', () => {
+  /** `n` rows 10 min apart; BTC 60 + i/100, ETH 11 − i/100 unless `eth` says otherwise. */
+  const dom = (n: number, opts: { start?: number; btc?: (i: number) => number | null; eth?: (i: number) => number | null } = {}) =>
+    Array.from({ length: n }, (_, i) => ({
+      tsMs: T0 + ((opts.start ?? 0) + i) * 10 * 60_000, totalUsd: 2.6e12,
+      btcPct: opts.btc ? opts.btc(i) : 60 + i / 100, ethPct: opts.eth ? opts.eth(i) : 11 - i / 100,
+    }));
+
+  it('the 6 h threshold counts rows WITH btc_pct, not cap rows: a week of cap rows and 5 h 50 min of dominance is no chart', () => {
+    const preMigration = rows(1000, 10 * 60_000); // btcPct null: rows written before 030
+    const recent = dom(36, { start: 1000 }); // 5 h 50 min
+    expect(dominanceHistory([...preMigration, ...recent])).toBeNull();
+    const h = dominanceHistory([...preMigration, ...dom(37, { start: 1000 })]); // exactly 6 h
+    expect(h).toMatchObject({ kind: 'lines', breakAfterSec: CAP_BREAK_AFTER_SEC, from: (T0 + 1000 * 600_000) / 1000, to: (T0 + 1036 * 600_000) / 1000 });
+    expect(h?.points).toHaveLength(37);
+    expect(WebKpiHistorySchema.safeParse(h).success).toBe(true);
+    expect(dominanceHistory([])).toBeNull();
+  });
+
+  it('a row with BTC but no ETH is a hole in ETH only — no ETH point there, BTC unbroken, nothing filled in', () => {
+    const h = dominanceHistory(dom(40, { eth: (i) => (i === 20 ? null : 11 - i / 100) }));
+    expect(h?.points).toHaveLength(40);
+    expect(h?.second?.points).toHaveLength(39);
+    expect(h?.second?.points.map((p) => p.time)).not.toContain(h?.points[20].time);
+    expect(h?.second?.label).toBe('ETH');
+    expect(WebKpiHistorySchema.safeParse(h).success).toBe(true);
+  });
+
+  it('a row with ETH but no BTC is not a dominance row: neither line has it', () => {
+    const h = dominanceHistory(dom(40, { btc: (i) => (i === 10 ? null : 60) }));
+    expect(h?.points).toHaveLength(39);
+    expect(h?.second?.points).toHaveLength(39);
+  });
+
+  it('a gap over 30 min stays a gap in both lines: the break rule travels with the points', () => {
+    const h = dominanceHistory([...dom(20), ...dom(20, { start: 30 })]); // 100 min missing
+    expect(h?.breakAfterSec).toBe(30 * 60);
+    expect(h?.points).toHaveLength(40);
+    expect((h?.points[20].time ?? 0) - (h?.points[19].time ?? 0)).toBeGreaterThan(30 * 60);
+    expect((h?.second?.points[20].time ?? 0) - (h?.second?.points[19].time ?? 0)).toBeGreaterThan(30 * 60);
+  });
+
+  it('min / max of each line are values that line holds', () => {
+    const btc = [60.1, 59.8, 60.4, 60.0];
+    const eth = [11.2, 11.5, 10.9, 11.0];
+    const h = dominanceHistory(Array.from({ length: 40 }, (_, i) => ({ tsMs: T0 + i * 600_000, totalUsd: 1, btcPct: btc[i % 4], ethPct: eth[i % 4] })));
+    expect(h).toMatchObject({ min: 59.8, max: 60.4, second: { min: 10.9, max: 11.5 } });
+    expect(h?.points.map((p) => p.value)).toEqual(expect.arrayContaining([h?.min, h?.max]));
+    expect(h?.second?.points.map((p) => p.value)).toEqual(expect.arrayContaining([h?.second?.min, h?.second?.max]));
+  });
+
+  it('no ETH at all: no chart (two strips or none) — and the other kinds carry second: null', () => {
+    expect(dominanceHistory(dom(40, { eth: () => null }))).toBeNull();
+    expect(capHistory(rows(37, 10 * 60_000)).history?.second).toBeNull();
+    expect(oiHistory([{ time: 0, notional: 1 }])?.second).toBeNull();
   });
 });

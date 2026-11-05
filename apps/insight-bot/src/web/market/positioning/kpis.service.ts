@@ -7,7 +7,7 @@ import type { MarketCardsService } from '../market-cards.service';
 import type { OiLsService } from '../oi-ls.service';
 import type { UniverseSummaryService } from '../universe-summary.service';
 import type { MarketCapRow } from '../pg/market-cap.repo';
-import { capHistory, fundingHistory, KPI_HISTORY_MS, OI_PERIOD_MS, oiHistory } from './kpis.history';
+import { capHistory, dominanceHistory, fundingHistory, KPI_HISTORY_MS, OI_PERIOD_MS, oiHistory } from './kpis.history';
 import { fundingSide, liqSide } from './kpis.rules';
 import type { PositioningService } from './positioning.service';
 
@@ -36,7 +36,9 @@ import type { PositioningService } from './positioning.service';
  * | BTC OI | `oiLs.openInterest(btc, now − 7 d, now, 1 h)`: 168 hourly points, USD | `/futures/data`, weight 0; its 300 s cache on an hour-snapped key, so ≤ 1 request per 5 min |
  * | BTC funding | the positioning baseline's last 21 settlements, **held only** (never builds it) | 0 |
  * | market cap | `market_cap_total`, our own table, `ts > now − 7 d` (≤ 1 008 rows) | 0 (the recorder pays ≤ 0.1 CoinGecko call/min) |
- * Under 6 h of cap rows: no chart, the note «копим историю: {h} ч». All inside this 60 s cache.
+ * | BTC dominance (IB-131) | the same `market_cap_total` read: rows with `btc_pct`, BTC and ETH as `lines` | 0 |
+ * Under 6 h of cap rows: no chart, the note «копим историю: {h} ч»; under 6 h of dominance rows: no
+ * dominance chart, the tile keeps its bar and ETH note. All inside this 60 s cache.
  *
  * The funding baseline is rebuilt hourly and a cold build takes ≈ 11 s (measured once on dev-1,
  * 2026-11-05: one observation). Waiting for it would hold the whole strip; not waiting would drop the
@@ -153,6 +155,8 @@ export class KpisService {
       const cap = capHistory(caps);
       tiles.market_cap.history = cap.history;
       if (cap.collectingHours !== null) tiles.market_cap.note = { key: 'kpi.note.collecting', params: { hours: cap.collectingHours } };
+      // IB-131: the same read; under 6 h of dominance rows the tile keeps its bar and ETH note
+      tiles.btc_dominance.history = dominanceHistory(caps);
     }
 
     return { asOf: Math.floor(now / 1000), tiles: WEB_KPI_IDS.map((id) => tiles[id]) };

@@ -1,4 +1,4 @@
-import { WEB_KPI_IDS } from '@trade-automation/contracts';
+import { WEB_KPI_IDS, WebKpisResponseSchema } from '@trade-automation/contracts';
 import { Logger } from '@nestjs/common';
 import { TtlCache } from '../../../../src/venues/ttl-cache';
 import { KpisService } from '../../../../src/web/market/positioning/kpis.service';
@@ -286,6 +286,29 @@ describe('IB-118: KpisService — the three charts, each its own soft read', () 
     expect(fresh.market_cap.history).toBeNull();
     expect(fresh.market_cap.note).toEqual({ key: 'kpi.note.collecting', params: { hours: 3 } });
     expect(fresh.market_cap.value).toBe(2.62e12); // the value is the cards', untouched
+  });
+
+  it('IB-131 dominance: the SAME cap read, only rows with btc_pct count, the ETH note stays', async () => {
+    let reads = 0;
+    // a week of cap rows, dominance on the newest `dom` of them only (recorded since migration 030)
+    const rowsWithDominance = (dom: number) => async () => {
+      reads += 1;
+      return Array.from({ length: 1008 }, (_, i) => ({
+        tsMs: NOW - (1007 - i) * 600_000, totalUsd: 2.6e12, btcPct: i >= 1008 - dom ? 60 + i / 1e4 : null, ethPct: i >= 1008 - dom ? 11 - i / 1e4 : null,
+      }));
+    };
+    const charted = await byId(make({ capRows: rowsWithDominance(37) })); // exactly 6 h of dominance rows
+    expect(reads).toBe(1); // no second query
+    expect(charted.market_cap.history?.points).toHaveLength(1008);
+    expect(charted.btc_dominance.history).toMatchObject({ kind: 'lines', breakAfterSec: 1800, from: (NOW - 36 * 600_000) / 1000, to: NOW / 1000 });
+    expect(charted.btc_dominance.history?.points).toHaveLength(37);
+    expect(charted.btc_dominance.history?.second?.points).toHaveLength(37);
+    expect(charted.btc_dominance.note).toEqual({ key: 'kpi.note.eth_share', params: { ethPct: 10.6 } }); // the cards', kept
+    expect(WebKpisResponseSchema.safeParse({ asOf: 0, tiles: Object.values(charted) }).success).toBe(true);
+    const short = await byId(make({ capRows: rowsWithDominance(36) })); // 5 h 50 min of them, a week of cap rows
+    expect(short.btc_dominance.history).toBeNull();
+    expect(short.market_cap.history).not.toBeNull();
+    expect(short.btc_dominance.note?.key).toBe('kpi.note.eth_share'); // no «копим историю» on this tile
   });
 
   it('every history read failing: all three null, values and notes as before', async () => {

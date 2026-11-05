@@ -26,7 +26,7 @@ export function history(kind: WebKpiHistory['kind'], raw: ReadonlyArray<{ time: 
     if (p.value < min) min = p.value;
     if (p.value > max) max = p.value;
   }
-  return { kind, points, from: points[0].time, to: points[points.length - 1].time, min, max, breakAfterSec };
+  return { kind, points, from: points[0].time, to: points[points.length - 1].time, min, max, breakAfterSec, second: null };
 }
 
 /**
@@ -37,6 +37,24 @@ export function capHistory(rows: readonly MarketCapRow[]): { history: WebKpiHist
   const span = rows.length === 0 ? 0 : rows[rows.length - 1].tsMs - rows[0].tsMs;
   if (span < CAP_MIN_SPAN_MS) return { history: null, collectingHours: Math.floor(span / 3_600_000) };
   return { history: history('area', rows.map((r) => ({ time: Math.floor(r.tsMs / 1000), value: r.totalUsd })), CAP_BREAK_AFTER_SEC), collectingHours: null };
+}
+
+/**
+ * IB-131 (market round 2 §7) — BTC and ETH dominance from the same 7-day `market_cap_total` read as the
+ * cap. Only rows with `btc_pct` count (rows from before migration 030, or a payload without BTC, are not
+ * dominance rows): under 6 h between the first and last of them, no chart — the tile keeps its bar and
+ * ETH note, no «копим историю». A row with BTC but no ETH is a hole in ETH only: it is not an ETH point,
+ * and nothing is filled in. ETH points are a subset of BTC's times, so BTC's first and last cover both.
+ * No ETH point at all: no chart either — the tile is two strips or none, never a BTC strip alone.
+ */
+export function dominanceHistory(rows: readonly MarketCapRow[]): WebKpiHistory | null {
+  const held = rows.filter((r) => r.btcPct !== null && Number.isFinite(r.btcPct));
+  if (held.length === 0 || held[held.length - 1].tsMs - held[0].tsMs < CAP_MIN_SPAN_MS) return null;
+  const at = (r: MarketCapRow) => Math.floor(r.tsMs / 1000);
+  const btc = history('lines', held.map((r) => ({ time: at(r), value: r.btcPct })), CAP_BREAK_AFTER_SEC);
+  const eth = history('lines', held.map((r) => ({ time: at(r), value: r.ethPct })), CAP_BREAK_AFTER_SEC);
+  if (!btc || !eth) return null;
+  return { ...btc, second: { label: 'ETH', points: eth.points, min: eth.min, max: eth.max } };
 }
 
 /** BTC OI in USD (the tile's own unit, `sumOpenInterestValue`) from the 7-day hourly read. */
