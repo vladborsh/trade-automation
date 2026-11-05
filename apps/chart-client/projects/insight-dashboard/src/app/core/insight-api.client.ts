@@ -11,7 +11,9 @@ import type {
   WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
   WebLiquidationsLargeQuery,
   WebLiquidationsLargeResponse,
+  WebLiquidationEpisodesResponse,
 } from '@trade-automation/contracts';
+import { WebLiquidationEpisodesResponseSchema } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
 import { toWebApiError } from './web-api-error';
@@ -157,6 +159,18 @@ export class InsightApiClient {
     return this.get<WebLiquidationsLargeResponse>('/liquidations/large', {
       period: q.period, symbol: q.symbol, minUsd: q.minUsd, side: q.side, venue: q.venue,
     });
+  }
+
+  /**
+   * IB-134 — the /liquidations episodes (design E7): the norm, the summary, ≤ 10/5 episodes with their
+   * price paths. Parsed by the contract (E7: "zod-parsed by the client"): the cards do arithmetic on
+   * these fields, so an answer that breaks the schema's invariants is an error, not a wrong card.
+   */
+  async liquidationEpisodes(q: WebLiquidationsLargeQuery): Promise<WebLiquidationEpisodesResponse> {
+    const body = await this.get<unknown>('/liquidations/episodes', {
+      period: q.period, symbol: q.symbol, minUsd: q.minUsd, side: q.side, venue: q.venue,
+    });
+    return WebLiquidationEpisodesResponseSchema.parse(body);
   }
 
   // ------------------------------------------------------ IB-037, the market cards

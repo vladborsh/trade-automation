@@ -1,0 +1,79 @@
+@let e = episode();
+<article class="ep" [attr.data-side]="e.side" [class.open]="open()" (click)="toggle($event)">
+  <div class="head">
+    <div class="when num">{{ rankMark() }} {{ time() }}</div>
+    <div class="side">{{ sideLabel() }}</div>
+    <div class="sum num">{{ usd(e.usd) }}</div>
+  </div>
+  <div class="what">
+    <button type="button" class="lead" [attr.aria-expanded]="open()" [attr.aria-controls]="'prints-' + e.id">{{ what() }}</button>
+    @if (coinLine(); as line) {
+      {{ line }}
+    }
+    <div class="chips">
+      @for (c of coins().chips; track c.label) {
+        <span class="chip num" [class.on]="c.on">{{ c.label }}</span>
+      }
+      @if (coins().more > 0) {
+        <span class="chip">{{ t('liqEp.chips.more', { n: coins().more }) }}</span>
+      }
+    </div>
+    @if (venues().length > 0) {
+      <div class="chips">
+        @for (v of venues(); track v.label) {
+          <span class="chip" [class.on]="v.on">{{ v.label }}</span>
+        }
+      </div>
+    }
+  </div>
+  <div class="price">
+    @if (facts(); as f) {
+      <div class="chart">
+        <svg [attr.viewBox]="'0 0 ' + w + ' ' + h" preserveAspectRatio="none" role="img" [attr.aria-label]="t('liqEp.chart.label', { coin: f.coin })">
+          <rect class="shade" [attr.x]="chart().shade.x" y="0" [attr.width]="chart().shade.width" [attr.height]="h" />
+          @for (b of chart().bars; track b.x) {
+            <rect class="bar" [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.width" [attr.height]="b.height" />
+          }
+          <path class="line" [attr.d]="chart().line" vector-effect="non-scaling-stroke" />
+        </svg>
+        <div class="ends"><span>{{ t('liqEp.chart.before') }}</span><span>{{ t('liqEp.chart.after') }}</span></div>
+      </div>
+      <div class="fact">
+        {{ t('liqEp.facts.during', { coin: f.coin }) }}
+        <span class="num val">{{ f.during.from }} → {{ f.during.to }}</span>
+        <span class="num pct" [attr.data-tone]="f.during.tone">{{ f.during.pct }}</span>
+      </div>
+      <div class="fact">
+        {{ t('liqEp.facts.after') }}
+        @if (f.after; as a) {
+          <span class="num val">{{ a.close }}</span>
+          <span class="num pct" [attr.data-tone]="a.tone">{{ a.pct }}</span>
+        } @else {
+          {{ t('liqEp.facts.notYet') }}
+        }
+      </div>
+    } @else {
+      <div class="no-price">{{ t('liqEp.noPrice') }}</div>
+    }
+    <a class="open-link" [routerLink]="link().link.commands" [queryParams]="link().link.queryParams">{{ t('liqEp.open', { coin: link().coin, time: link().time }) }}</a>
+  </div>
+  @if (open()) {
+    <div class="prints" [id]="'prints-' + e.id">
+      @if (prints().length === 0) {
+        <p class="muted">{{ t('liqEp.prints.empty', { usd: usd(minUsd()) }) }}</p>
+      } @else {
+        <ol [attr.aria-label]="t('liqEp.prints.title')">
+          @for (p of prints(); track $index) {
+            <li>
+              <span class="num">{{ p.when }}</span>
+              <span>{{ p.base }}</span>
+              <span class="muted">{{ p.venueName }}</span>
+              <span class="side">{{ sideLabel() }}</span>
+              <span class="num amount">{{ p.amount }}</span>
+            </li>
+          }
+        </ol>
+      }
+    </div>
+  }
+</article>

@@ -1,0 +1,55 @@
+/* IB-134 — the episode card (liq-page-v2 mockup `.ep`): 150px | 1fr | 300px, one column on a phone. */
+:host { display: block; min-width: 0; }
+.ep {
+  display: grid; grid-template-columns: 150px minmax(0, 1fr) 300px; gap: 8px 16px; align-items: center;
+  padding: 12px 14px; border: 1px solid var(--card-border); border-radius: var(--card-radius);
+  background: var(--color-bg); cursor: pointer;
+}
+.ep:hover { border-color: var(--color-border-strong); }
+.ep[data-side='short'] { --side: var(--color-up); }
+.ep[data-side='long'] { --side: var(--color-down); }
+
+.when { font-size: 12px; color: var(--color-text-muted); }
+.side { font-weight: 600; color: var(--side); }
+.sum { font: 600 20px/1.2 var(--font-num); color: var(--color-text-strong); }
+
+.what { font-size: 13px; min-width: 0; }
+.lead {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--color-text-strong); text-align: left;
+}
+.lead:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 11px; line-height: 1.6; border-radius: 4px; padding: 1px 6px; background: var(--color-bg-overlay); color: var(--color-text); }
+.chip.on { outline: 1px solid var(--link); color: var(--link); }
+
+.price { font-size: 12px; color: var(--color-text-muted); min-width: 0; }
+.chart { margin-bottom: 6px; }
+svg { display: block; width: 100%; height: 90px; }
+.shade { fill: var(--color-text-muted); opacity: 0.12; }
+.bar { fill: var(--side); }
+.line { fill: none; stroke: var(--color-text); stroke-width: 1.4; }
+.ends { display: flex; justify-content: space-between; font: var(--type-micro); }
+.fact .val { color: var(--color-text); }
+.pct { margin-left: 4px; }
+.pct[data-tone='up'] { color: var(--color-up); }
+.pct[data-tone='down'] { color: var(--color-down); }
+.no-price { padding: 8px 0; }
+.open-link { display: inline-block; margin-top: 2px; color: var(--link); text-decoration: none; }
+.open-link:hover { color: var(--link-hover); }
+.open-link:focus-visible { text-decoration: underline; }
+
+.prints { grid-column: 1 / -1; border-top: 1px solid var(--card-border); padding-top: 8px; cursor: default; }
+.prints ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }
+.prints li { display: grid; grid-template-columns: 110px 80px 80px 1fr auto; gap: 8px; }
+.prints .side { font-weight: 400; }
+.prints .amount { color: var(--color-text-strong); text-align: right; }
+.muted { margin: 0; color: var(--color-text-muted); }
+
+@media (max-width: 700px) {
+  .ep { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .prints li { grid-template-columns: auto 1fr auto auto; }
+  .prints li .side { display: none; }
+  /* IB-088: a phone tap target is at least 40 px */
+  .open-link, .lead { display: inline-flex; align-items: center; min-height: var(--touch-min); }
+}

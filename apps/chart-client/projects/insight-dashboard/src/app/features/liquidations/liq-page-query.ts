@@ -13,7 +13,11 @@ import { LIQ_DEFAULT_SORT, parseLiqSort, type LiqSort } from './liq-table';
 export interface LiqPageState {
   query: WebLiquidationsLargeQuery;
   sort: LiqSort;
+  /** IB-134: episodes are the page (default); the IB-120 flat list is behind «все ликвидации списком →» (`?view=list`). */
+  view: LiqView;
 }
+
+export type LiqView = 'episodes' | 'list';
 
 /** URL name → the contract's query field. `p` is Market's own period parameter. */
 const PARAM_OF = { period: 'p', symbol: 'coin', minUsd: 'min', side: 'side', venue: 'venue' } as const satisfies Record<keyof WebLiquidationsLargeQuery, string>;
@@ -28,7 +32,7 @@ export function parseLiqPage(get: (name: string) => string | null): LiqPageState
     const one = WebLiquidationsLargeQuerySchema.shape[field].safeParse(raw);
     if (one.success) (query as Record<string, unknown>)[field] = one.data;
   }
-  return { query, sort: parseLiqSort(get('sort'), get('dir')) };
+  return { query, sort: parseLiqSort(get('sort'), get('dir')), view: get('view') === 'list' ? 'list' : 'episodes' };
 }
 
 /** Every URL parameter of the view; a default is `null`, which the router drops. */
@@ -41,6 +45,7 @@ export function liqPageParams(state: LiqPageState): Record<string, string | null
   const defaultSort = state.sort.column === LIQ_DEFAULT_SORT.column && state.sort.dir === LIQ_DEFAULT_SORT.dir;
   out['sort'] = defaultSort ? null : state.sort.column;
   out['dir'] = defaultSort ? null : state.sort.dir;
+  out['view'] = state.view === 'list' ? 'list' : null;
   return out;
 }
 

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   WebAlertsAdminResponseSchema, WebCalendarEventsResponseSchema, WebCandlesResponseSchema, WebCapsResponseSchema, WebDbHealthResponseSchema,
-  WebFundingResponseSchema, WebInsightsResponseSchema, WebKpisResponseSchema, WebLiquidationEventsResponseSchema, WebLiquidationsOverviewResponseSchema,
+  WebFundingResponseSchema, WebInsightsResponseSchema, WebLiquidationEpisodesResponseSchema, WebKpisResponseSchema, WebLiquidationEventsResponseSchema, WebLiquidationsOverviewResponseSchema,
   WebLiquidationsResponseSchema, WebLoginEventsResponseSchema, WebLongShortResponseSchema, WebMarketCardsResponseSchema, WebMeResponseSchema,
   WebMembersResponseSchema, WebOpenInterestResponseSchema, WebPositioningResponseSchema, WebStreamsResponseSchema, WebTopLiquidationSchema,
   WebUniverseSummaryResponseSchema, WebUniverseTopResponseSchema,
@@ -35,6 +35,9 @@ const SINGLE: Record<string, z.ZodTypeAny> = {
   'admin-login-events.json': WebLoginEventsResponseSchema,
   'admin-members.json': WebMembersResponseSchema,
   'context-cards.json': WebMarketCardsResponseSchema,
+  // IB-134: the box's answers at 2026-11-05 14:27 UTC, rebuilt with the shipped IB-133 functions over the box's prints
+  'liquidation-episodes.box-7d.json': WebLiquidationEpisodesResponseSchema,
+  'liquidation-episodes.box-24h.json': WebLiquidationEpisodesResponseSchema,
   'liquidations-overview.24h.json': WebLiquidationsOverviewResponseSchema,
   'market-caps.4h.json': WebCapsResponseSchema,
   'market-caps.24h.json': WebCapsResponseSchema,

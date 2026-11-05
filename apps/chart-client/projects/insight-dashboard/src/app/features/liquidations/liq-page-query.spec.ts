@@ -9,15 +9,22 @@ describe('parseLiqPage / liqPageParams', () => {
     expect(from({})).toEqual({
       query: { period: '24h', symbol: 'all', minUsd: 100_000, side: 'all', venue: 'all' },
       sort: { column: 'time', dir: 'desc' },
+      view: 'episodes',
     });
     expect(Object.values(liqPageParams(from({}))).every((v) => v === null)).toBe(true);
   });
 
   it('every filter and the sort survive a reload: params → state → params is the identity', () => {
-    const url = { p: '7d', coin: 'BTCUSDT', min: '1000000', side: 'short', venue: 'okx', sort: 'usd', dir: 'asc' };
+    const url = { p: '7d', coin: 'BTCUSDT', min: '1000000', side: 'short', venue: 'okx', sort: 'usd', dir: 'asc', view: 'list' };
     const state = from(url);
     expect(state.query).toEqual({ period: '7d', symbol: 'BTCUSDT', minUsd: 1_000_000, side: 'short', venue: 'okx' });
     expect(liqPageParams(state)).toEqual(url);
+  });
+
+  it('IB-134: episodes are the default view; only `view=list` opens the flat list', () => {
+    expect(from({ view: 'list' }).view).toBe('list');
+    expect(from({ view: 'cards' }).view).toBe('episodes');
+    expect(liqPageParams({ ...from({}), view: 'episodes' })['view']).toBeNull();
   });
 
   it('a hand-edited value falls back for that filter only', () => {

@@ -1,0 +1,20 @@
+/* IB-134 — the summary box and the episodes box (liq-page-v2 mockup `.card`, `.headline`, `.anno`, `.eps`). */
+:host { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); min-width: 0; }
+.headline { margin: 0; font-size: 15px; line-height: 1.4; color: var(--color-text); }
+.headline b { font-weight: 600; color: var(--color-text-strong); }
+.headline b[data-side='short'] { color: var(--color-up); }
+.headline b[data-side='long'] { color: var(--color-down); }
+.anno { margin: 6px 0 0; font: var(--type-small); color: var(--color-warning); }
+.anno a { color: inherit; text-decoration: underline; }
+h2 { margin: 0 0 4px; font: var(--type-h2); font-size: 15px; color: var(--color-text-strong); }
+.sub { margin: 0 0 10px; font: var(--type-small); color: var(--color-text-muted); }
+.eps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fold { margin: 10px 0 0; font: var(--type-small); color: var(--color-text-muted); }
+.list-link { font-size: 13px; color: var(--link); }
+.list-link:hover { color: var(--link-hover); }
+
+@media (max-width: 480px) {
+  .box { padding: 12px; }
+  .list-link { display: inline-flex; align-items: center; min-height: var(--touch-min); }
+}

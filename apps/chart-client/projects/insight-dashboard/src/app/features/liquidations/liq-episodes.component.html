@@ -1,0 +1,37 @@
+@let r = answer();
+<div class="box summary">
+  <!-- one line on purpose: whitespace between the segments would print as spaces inside the sentence -->
+  <p class="headline">@for (s of summary(); track $index) {@switch (s.part) {@case ('count') {<b>{{ s.text }}</b>}@case ('shortsWord') {<b data-side="short">{{ s.text }}</b>}@case ('longsWord') {<b data-side="long">{{ s.text }}</b>}@case ('when') {<b class="num">{{ s.text }}</b>}@case ('usd') {<span class="num">{{ s.text }}</span>}@default {<ng-container>{{ s.text }}</ng-container>}}}</p>
+  <p class="anno">@for (s of notMarket(); track $index) {@if (s.part === 'market') {<a routerLink="/market" [queryParams]="marketParams()">{{ s.text }}</a>} @else {<ng-container>{{ s.text }}</ng-container>}}</p>
+</div>
+@if (state() === 'cards') {
+  <section class="box">
+    <h2>{{ t('liqEp.title') }}</h2>
+    <p class="sub">
+      {{ t('liqEp.sub', { usd: threshold() ?? '' }) }}
+      @if (normDays(); as d) {
+        <span class="norm-days">· {{ t('liqEp.normDays', { d }) }}</span>
+      }
+    </p>
+    <ol class="eps">
+      @for (e of r.episodes; track e.id; let i = $index) {
+        <li>
+          <app-liq-episode-card [episode]="e" [rank]="i + 1" [withDay]="week()" [symbol]="r.query.symbol" [venue]="r.query.venue" [minUsd]="r.query.minUsd" />
+        </li>
+      }
+    </ol>
+    <p class="fold">
+      @if (folded(); as f) {
+        <span>… {{ f }} · </span>
+      }
+      <a class="list-link" routerLink="/liquidations" [queryParams]="listParams()">{{ t('liqEp.listLink') }}</a>
+    </p>
+  </section>
+} @else {
+  <p class="fold">
+    @if (normDays(); as d) {
+      <span>{{ t('liqEp.normDays', { d }) }} · </span>
+    }
+    <a class="list-link" routerLink="/liquidations" [queryParams]="listParams()">{{ t('liqEp.listLink') }}</a>
+  </p>
+}
