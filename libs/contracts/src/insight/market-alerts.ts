@@ -37,12 +37,21 @@ export const LIQ_VENUES = ['binance', 'bybit', 'okx'] as const;
 export const LiqVenueSchema = z.enum(LIQ_VENUES);
 export type LiqVenue = z.infer<typeof LiqVenueSchema>;
 
-/** L1: the window is 5 minutes, sliding; the loop evaluates every 30 s. */
+/** L1: the window is 5 minutes, sliding. L14 (IB-143): the loop evaluates every 10 s (was 30 s). */
 export const LIQ_WINDOW_SEC = 300;
-export const LIQ_TICK_SEC = 30;
-/** L2: quiet for 30 min from `at`; one continuation when the running sum from the window's start reaches 2×. */
+export const LIQ_TICK_SEC = 10;
+/**
+ * L2: quiet for 30 min from `at` per (coin, side). The per-coin 2× continuation (`LIQ_CONTINUATION_MULT`) was
+ * replaced by the event's continuation (L13, IB-143); the constant stays for the old `continuing` rows' meaning.
+ */
 export const LIQ_QUIET_SEC = 1_800;
 export const LIQ_CONTINUATION_MULT = 2;
+/** L11 (IB-143): an event's first message goes after this long without a member print ("settled")… */
+export const LIQ_SETTLE_SEC = 60;
+/** …but at the latest this long after the event's first crossing T0 ("cap"). */
+export const LIQ_SEND_CAP_SEC = 180;
+/** L11: an event closes at the latest this long after T0 (= the quiet of its first coin). */
+export const LIQ_EVENT_MAX_SEC = LIQ_QUIET_SEC;
 /** L6: an `at` older than this when it is found is journalled `late` and never sent. */
 export const LIQ_LATE_SEC = 300;
 /** L8: a near-miss is the hour's largest window sum at ≥ this × the threshold that fired nothing. */
@@ -109,6 +118,11 @@ export const LiqAlertDetailsSchema = z.object({
   silentVenues: z.array(LiqSilentVenueSchema),
   /** The Binance one-per-second footnote went with this message (the first of its UTC day). */
   binanceFootnote: z.boolean(),
+  /**
+   * L10 (IB-143): the T0 of the market event this crossing belongs to, epoch ms. Absent on rows journalled
+   * before IB-143 (the loop then assigns them in time order).
+   */
+  eventAt: z.number().int().optional(),
 }).strict();
 export type LiqAlertDetails = z.infer<typeof LiqAlertDetailsSchema>;
 
@@ -123,7 +137,66 @@ export const LiqContinuationDetailsSchema = z.object({
 }).strict();
 export type LiqContinuationDetails = z.infer<typeof LiqContinuationDetailsSchema>;
 
-export const LIQ_ALERT_EVENTS = ['alert', 'continuing'] as const;
+/** L11: how the first message's moment S came: 60 s without a member print, or T0 + 3 min. */
+export const LIQ_EVENT_SETTLED = ['quiet', 'cap'] as const;
+/** L11: how an event that hit the cap closed: 60 s without a member print, or T0 + 30 min. */
+export const LIQ_EVENT_CLOSED_BY = ['quiet', 'max'] as const;
+
+/** L12: one member coin of a market event; its sum runs from its own window start to the message's moment. */
+export const LiqEventCoinSchema = z.object({
+  symbol: z.string(),
+  /** The coin's crossing (its `alert` row's `at`), epoch ms. */
+  crossedAt: z.number().int(),
+  /** `crossedAt − 5 min`, epoch ms: the coin's sum is over (windowStartMs, the message's moment]. */
+  windowStartMs: z.number().int(),
+  sumUsd: z.number().nonnegative(),
+  thresholdUsd: z.number().positive(),
+  byVenue: LiqByVenueSchema,
+  count: z.number().int().nonnegative(),
+  largest: z.object({ usd: z.number().nonnegative(), venue: LiqVenueSchema }).strict(),
+  silentVenues: z.array(LiqSilentVenueSchema),
+}).strict();
+export type LiqEventCoin = z.infer<typeof LiqEventCoinSchema>;
+
+const liqEventShape = {
+  side: LiqSideSchema,
+  /** T0: the event's first crossing, epoch ms. */
+  eventAt: z.number().int(),
+  /** S: the first message's moment, epoch ms. */
+  sentAt: z.number().int(),
+  /** Largest sum first. */
+  coins: z.array(LiqEventCoinSchema).min(1),
+  totalUsd: z.number().nonnegative(),
+  count: z.number().int().nonnegative(),
+  largest: z.object({ usd: z.number().nonnegative(), venue: LiqVenueSchema, symbol: z.string() }).strict(),
+  binanceFootnote: z.boolean(),
+};
+
+/** `event = 'event'` (L12): the first message of a market event, at S. The row's `at` is S. */
+export const LiqEventDetailsSchema = z.object({
+  ...liqEventShape,
+  settled: z.enum(LIQ_EVENT_SETTLED),
+}).strict();
+export type LiqEventDetails = z.infer<typeof LiqEventDetailsSchema>;
+
+/**
+ * `event = 'event_continuing'` (L13): an event that hit the cap, at its close (the row's `at`). Written for every
+ * such event so its final size is journalled; **sent only when `news`**: a coin joined after S (`newCoins`) or a
+ * member added at least its own threshold between S and the close (`addedCoins`).
+ */
+export const LiqEventContinuingDetailsSchema = z.object({
+  ...liqEventShape,
+  closedAt: z.number().int(),
+  closedBy: z.enum(LIQ_EVENT_CLOSED_BY),
+  firstMessageId: z.number().int().positive(),
+  newCoins: z.array(z.string()),
+  addedCoins: z.array(z.string()),
+  news: z.boolean(),
+}).strict();
+export type LiqEventContinuingDetails = z.infer<typeof LiqEventContinuingDetailsSchema>;
+
+/** `continuing` is IB-122's per-coin 2× row, no longer written (L13); old rows keep the name. */
+export const LIQ_ALERT_EVENTS = ['alert', 'continuing', 'event', 'event_continuing'] as const;
 export type LiqAlertEvent = (typeof LIQ_ALERT_EVENTS)[number];
 
 /** `market_alert_controls.details`, `kind = 'near_miss'` (L8): the hour's largest window that fired nothing. */
@@ -159,10 +232,15 @@ export const WebLiqAlertRowSchema = z.object({
   event: z.enum(LIQ_ALERT_EVENTS),
   symbol: z.string(),
   side: LiqSideSchema,
-  /** Unix seconds: the crossing moment (the link's `at`). */
+  /** Unix seconds: the crossing moment (the link's `at`); for `event` rows S, for `event_continuing` the close. */
   at: z.number().int(),
   sumUsd: z.number(),
-  thresholdUsd: z.number(),
+  /** Null on event rows: each member has its own (IB-143). */
+  thresholdUsd: z.number().nullable(),
+  /** Event rows (IB-143): the members, largest first; new coins of a continuation prefixed «+». Else `[symbol]`. */
+  coins: z.array(z.string()),
+  /** `event_continuing` (L13): false = journalled only (nothing new after S), never sent. True elsewhere. */
+  news: z.boolean(),
   firedAt: z.number().int().nullable(),
   late: z.boolean(),
   recipients: z.number().int(),
