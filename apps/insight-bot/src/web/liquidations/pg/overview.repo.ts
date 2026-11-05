@@ -30,7 +30,7 @@ export interface SymbolAlias {
  * every other parameter, so no query's existing `$n` moves. An alias is never a `symbols`
  * spelling (`aliasTable` guarantees it), so the join stays one row per liquidation.
  */
-function mapCte(params: unknown[], aliases: readonly SymbolAlias[] | undefined): string {
+export function mapCte(params: unknown[], aliases: readonly SymbolAlias[] | undefined): string {
   if (!aliases || aliases.length === 0) return `map as (${MAP_ROWS}\n  )`;
   params.push(aliases.map((a) => a.symbol), aliases.map((a) => a.id));
   const syms = params.length - 1;
@@ -48,10 +48,10 @@ const asDate = (ms: number) => new Date(ms);
  * classifier assigned to it. Omitted = every row (the IB-038 behaviour). An EMPTY list matches
  * nothing — a class with no symbols has no rows, it does not fall back to all of them.
  */
-function keysFilter(keys: readonly string[] | undefined, param: number): string {
+export function keysFilter(keys: readonly string[] | undefined, param: number): string {
   return keys === undefined ? '' : `and (l.venue || ':' || l.symbol) = any($${param}::text[])`;
 }
-function keysParams(params: unknown[], keys: readonly string[] | undefined): unknown[] {
+export function keysParams(params: unknown[], keys: readonly string[] | undefined): unknown[] {
   return keys === undefined ? params : [...params, [...keys]];
 }
 

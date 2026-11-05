@@ -28,7 +28,7 @@ export interface ChartReads {
   /** The positioning baseline's hourly closes since `fromMs`, `{time: close time (s), value}`. */
   hourlyCloses(coin: string, fromMs: number): Promise<WebInsightChartPoint[]>;
   /** IB-115's exact-limit read: `limit` CLOSED perp klines from `fromMs`, one request. */
-  closedKlines(coin: string, tf: '5m' | '15m' | '1h' | '4h', fromMs: number, limit: number): Promise<Array<{ time: number; open: number; high: number; low: number; close: number }>>;
+  closedKlines(coin: string, tf: '1m' | '5m' | '15m' | '1h' | '4h', fromMs: number, limit: number): Promise<Array<{ time: number; open: number; high: number; low: number; close: number }>>;
   /** OI in contracts (`/futures/data`, weight 0) at the finest grain ≥ `minPeriodMs`. */
   openInterest(coin: string, fromMs: number, toMs: number, minPeriodMs: number): Promise<WebInsightChartPoint[]>;
   longShort(coin: string, kind: 'global_account' | 'top_position', fromMs: number, toMs: number): Promise<Array<{ time: number; ratio: number }>>;

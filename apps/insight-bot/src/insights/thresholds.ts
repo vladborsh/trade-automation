@@ -14,6 +14,26 @@ export const SERIES_MIN_USD = 100_000;
 /** … first to last within this many seconds ("4 за 9 минут" is one; "3 за 11 минут" is not). */
 export const SERIES_MAX_SPAN_SEC = 600;
 
+/**
+ * IB-133 (liquidation-episodes design E1, E2) — the /liquidations page's «episodes». NOT the series
+ * above: a series is ≥ 3 prints within 10 min of the first (R3, Market); an episode is a run of
+ * same-side prints ≥ `SERIES_MIN_USD`, market-wide, neighbours less than `EPISODE_GAP_SEC` apart,
+ * shown only when its sum clears a norm set by RATE (E2), not by dollars.
+ */
+/** E1: a pause of this many seconds or more between neighbouring prints starts a new episode (owner: 3 min). */
+export const EPISODE_GAP_SEC = 180;
+/**
+ * E2: the norm T is the level the trailing window would have cleared this many times a week. The ONE
+ * knob if the box's weekly counts land outside the owner's 5–10 (do not move the gap or the floor).
+ */
+export const EPISODE_TARGET_PER_WEEK = 7.5;
+/** E2: the trailing window the norm is read over, at most. */
+export const EPISODE_NORM_DAYS = 30;
+/** E2: T is never below this, whatever the window says. */
+export const EPISODE_FLOOR_USD = 1_000_000;
+/** E2: under this much tape there is no norm; the page shows the flat list («копим историю»). */
+export const EPISODE_MIN_HELD_DAYS = 1;
+
 /** D8: the "large" list's floor, in USD, and how many events it returns. */
 export const LARGE_MIN_USD = 100_000;
 export const LARGE_LIMIT = 50;

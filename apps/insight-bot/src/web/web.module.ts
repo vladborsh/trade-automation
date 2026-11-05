@@ -31,6 +31,8 @@ import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
 import { LiquidationsLargeController } from './liquidations/liquidations-large.controller';
 import { LiquidationsLargeService } from './liquidations/large.service';
+import { LiquidationEpisodesController } from './liquidations/liquidation-episodes.controller';
+import { EPISODE_PRICE_READER, LiquidationEpisodesService, type EpisodePriceReader } from './liquidations/episodes.service';
 import { MarketCardsService } from './market/market-cards.service';
 import { MarketCapRecorderService } from './market/market-cap/market-cap-recorder.service';
 import { marketCapSince } from './market/pg/market-cap.repo';
@@ -94,6 +96,8 @@ export class WebModule {
         WebAlertsAdminController,
         // IB-120: the /liquidations page
         LiquidationsLargeController,
+        // IB-133: the /liquidations page as «episodes»
+        LiquidationEpisodesController,
       ],
       providers: [
         WebAuthService,
@@ -108,6 +112,16 @@ export class WebModule {
         CredentialsService,
         LiquidationsOverviewService,
         LiquidationsLargeService,
+        LiquidationEpisodesService,
+        {
+          // IB-133 (E8): an episode's price path — the universe's Binance perp, ONE exact-limit 1m read (weight 2)
+          provide: EPISODE_PRICE_READER,
+          inject: [AppConfigService, CandlesService],
+          useFactory: (config: AppConfigService, candles: CandlesService): EpisodePriceReader => ({
+            binancePerp: (symbolId) => config.symbols.find((x) => x.id === symbolId)?.binance_perp ?? null,
+            closedKlines1m: (symbol, fromMs, limit) => candles.closedKlines(symbol, '1m', fromMs, limit),
+          }),
+        },
         {
           // IB-084 (D6): universe classes + Binance exchangeInfo (weight 1, once a day) into the shared tracker
           provide: AssetClassifier,
