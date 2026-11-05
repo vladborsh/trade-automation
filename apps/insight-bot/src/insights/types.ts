@@ -33,6 +33,12 @@ export interface InsightSnapshot {
   } | null;
   positioning: WebPositioningRow[] | null;
   /**
+   * IB-135: coin → funding settlement interval (h), from the positioning baselines' settled times. R5
+   * normalises each rate to 8 h with it. A coin that is absent counts as 8 h, and so does everything
+   * when the whole part is null. That can only make a coin look smaller (`funding-extreme.ts`).
+   */
+  fundingIntervalH: Map<string, number> | null;
+  /**
    * IB-113 (OI divergence design V16): the newest on-time OI divergence alert of the last 24 h on a
    * listed coin, from the journal (our DB, no venue). Null: none. Its chart (IB-119) reads its own window.
    */

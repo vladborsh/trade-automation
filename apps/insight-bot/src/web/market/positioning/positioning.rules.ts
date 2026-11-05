@@ -1,6 +1,7 @@
 import type {
   WebPositioningCell, WebPositioningQuadrant, WebPositioningSignal,
 } from '@trade-automation/contracts';
+import { fundingExtreme } from '../../../insights/funding-extreme';
 import { changeRarity, levelRarity } from '../../../insights/rarity';
 import { OI_FLAT_PCT, PRICE_FLAT_PCT, QUIET_MAX_RARITY, QUIET_MIN_CELLS, RARITY_SHOW } from '../../../insights/thresholds';
 
@@ -17,8 +18,9 @@ import { OI_FLAT_PCT, PRICE_FLAT_PCT, QUIET_MAX_RARITY, QUIET_MIN_CELLS, RARITY_
  *   rare (rarity ≥ 0.90).
  * - `capitulation` — quadrant `long_closing` (price down, OI down: longs forced out) and the price
  *   move rare.
- * - `crowded_long` — funding positive AND rare, and the global account L/S above 1 AND rare.
- * - `crowded_short` — funding negative AND rare, and the global L/S below 1 AND rare.
+ * - `crowded_long` — funding `high` by `fundingExtreme` (rare for the coin AND ≥ +0.03 % per 8 h,
+ *   IB-135), and the global account L/S above 1 AND rare.
+ * - `crowded_short` — funding `low` (rare AND ≤ −0.03 % per 8 h), and the global L/S below 1 AND rare.
  * - `quiet` — at least 3 cells measured and every measured rarity under 0.5.
  * - otherwise null: the row has nothing worth a word.
  * Thresholds live in `insights/thresholds.ts` — judgements, revisited after a week of box data.
@@ -73,17 +75,20 @@ export function signalOf(row: {
   quadrant: WebPositioningQuadrant | null;
   priceChangePct: WebPositioningCell;
   fundingRate: WebPositioningCell;
+  /** IB-135: the coin's settlement interval (h), to normalise funding to 8 h; null counts as 8 h. */
+  fundingIntervalH: number | null;
   lsGlobal: WebPositioningCell;
   cells: readonly WebPositioningCell[];
 }): WebPositioningSignal | null {
   const rare = (c: WebPositioningCell) => c.rarity !== null && c.rarity >= RARITY_SHOW;
   if (row.quadrant === 'short_closing' && rare(row.priceChangePct)) return 'squeeze';
   if (row.quadrant === 'long_closing' && rare(row.priceChangePct)) return 'capitulation';
-  const f = row.fundingRate.value;
+  // IB-135: the same helper as R5, so the table cannot call «толпа в лонгах» what the card stays silent on
+  const funding = fundingExtreme(row.fundingRate.value, row.fundingRate.rarity, row.fundingIntervalH);
   const ls = row.lsGlobal.value;
-  if (f !== null && ls !== null && rare(row.fundingRate) && rare(row.lsGlobal)) {
-    if (f > 0 && ls > 1) return 'crowded_long';
-    if (f < 0 && ls < 1) return 'crowded_short';
+  if (funding !== null && ls !== null && rare(row.lsGlobal)) {
+    if (funding === 'high' && ls > 1) return 'crowded_long';
+    if (funding === 'low' && ls < 1) return 'crowded_short';
   }
   const measured = row.cells.filter((c) => c.rarity !== null);
   if (measured.length >= QUIET_MIN_CELLS && measured.every((c) => (c.rarity as number) < QUIET_MAX_RARITY)) return 'quiet';

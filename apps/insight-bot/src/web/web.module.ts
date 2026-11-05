@@ -245,6 +245,8 @@ export class WebModule {
                   return { ...m, coins, large: overview.block.large, bars };
                 },
                 positioning: async (period) => (await positioning.positioning(period)).rows,
+                // IB-135: R5 normalises funding to 8 h with the interval the table's signalOf uses
+                fundingIntervalH: () => positioning.fundingIntervals(),
                 // IB-113 (TL): R11 owner-first — members see it only while the admin page's members_visible is on
                 oiAlertsMembersVisible: async () => (db ? new PgOiAlertsVisibility(db).membersVisible() : false),
                 // IB-113 (V16): the journal's newest on-time alert of 24 h, its OI per bar from our DB — no venue call

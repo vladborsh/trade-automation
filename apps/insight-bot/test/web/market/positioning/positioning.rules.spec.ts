@@ -67,7 +67,7 @@ describe('quadrantOf — by the signs of the changes', () => {
 
 describe('signalOf — the closed vocabulary', () => {
   const c = (value: number | null, r: number | null) => ({ value, rarity: r, unavailable: null, sample: 600 });
-  const base = { priceChangePct: c(1, 0.5), fundingRate: c(0.0001, 0.5), lsGlobal: c(1.5, 0.5) };
+  const base = { priceChangePct: c(1, 0.5), fundingRate: c(0.0001, 0.5), fundingIntervalH: 8, lsGlobal: c(1.5, 0.5) };
 
   it('squeeze: shorts closing on a rare price rise; capitulation: longs closing on a rare fall', () => {
     expect(signalOf({ ...base, quadrant: 'short_closing', priceChangePct: c(6, 0.97), cells: [] })).toBe('squeeze');
@@ -79,6 +79,13 @@ describe('signalOf — the closed vocabulary', () => {
     expect(signalOf({ ...base, quadrant: 'new_shorts', fundingRate: c(-0.0004, 0.96), lsGlobal: c(0.6, 0.95), cells: [] })).toBe('crowded_short');
     // rare funding, crowd on the OTHER side: no crowded word
     expect(signalOf({ ...base, quadrant: 'flat', fundingRate: c(0.0005, 0.96), lsGlobal: c(0.6, 0.95), cells: [] })).toBeNull();
+  });
+
+  it('IB-135: rare but trivial funding is no crowd (BNB 0.0206 %); a 4 h coin is read per 8 h', () => {
+    expect(signalOf({ ...base, quadrant: 'flat', fundingRate: c(0.000206, 0.95), lsGlobal: c(3.2, 0.95), cells: [] })).toBeNull();
+    expect(signalOf({ ...base, quadrant: 'flat', fundingRate: c(0.00016, 0.95), fundingIntervalH: 4, lsGlobal: c(3.2, 0.95), cells: [] })).toBe('crowded_long');
+    expect(signalOf({ ...base, quadrant: 'flat', fundingRate: c(-0.00016, 0.95), fundingIntervalH: 4, lsGlobal: c(0.6, 0.95), cells: [] })).toBe('crowded_short');
+    expect(signalOf({ ...base, quadrant: 'flat', fundingRate: c(0.00016, 0.95), fundingIntervalH: null, lsGlobal: c(3.2, 0.95), cells: [] })).toBeNull();
   });
 
   it('quiet: at least three measured cells, all under 0.5; fewer measured is not "quiet"', () => {

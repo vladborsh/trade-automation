@@ -7,6 +7,15 @@
 /** D2: a statement (and an hourly outlier bar) is shown only at or above this rarity. */
 export const RARITY_SHOW = 0.9;
 
+/**
+ * IB-135 (market round 3 §1; alerts design F3): funding is SAID to be extreme only when it is rare for
+ * the coin (`RARITY_SHOW`) AND at least this far from zero, as a FRACTION per 8 h (0.0003 = 0.03 %).
+ * A coin parked at the 0.01 % base rate for a month makes 0.0206 % "rare" (BNB, owner 2026-11-05),
+ * and that is not news. The ONE floor: R5, `signalOf`'s crowded words and IB-124's funding alerts all
+ * read it through `fundingExtreme` (`funding-extreme.ts`). Do not declare a second one.
+ */
+export const FUNDING_FLOOR_PER_8H = 0.0003;
+
 /** D5 R3 — a cascade: at least this many same-side events … */
 export const SERIES_MIN_EVENTS = 3;
 /** … each at least this big, in USD … */

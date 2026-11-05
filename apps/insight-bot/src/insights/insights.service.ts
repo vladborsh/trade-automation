@@ -16,6 +16,8 @@ import type { InsightSnapshot } from './types';
 export interface InsightPorts {
   liquidations?: (period: WebMarketPeriod) => Promise<InsightSnapshot['liquidations']>;
   positioning?: (period: WebMarketPeriod) => Promise<InsightSnapshot['positioning']>;
+  /** IB-135: each coin's funding interval (h), for R5's 8 h normalisation. */
+  fundingIntervalH?: () => Promise<InsightSnapshot['fundingIntervalH']>;
   /** IB-113 (V16): the OI divergence journal's newest on-time alert of the last 24 h, with its OI series. */
   oiDivergence?: (nowMs: number) => Promise<InsightSnapshot['oiDivergence']>;
   /** IB-113 (V16, TL): `alert_settings.members_visible` — whether a non-admin sees R11. Absent or failed → hidden. */
@@ -72,16 +74,17 @@ export class InsightsService {
         }
       };
       const p = this.options.ports;
-      const [liquidations, positioning, breadth, fng, flows, oiDivergence, membersVisible] = await Promise.all([
+      const [liquidations, positioning, fundingIntervalH, breadth, fng, flows, oiDivergence, membersVisible] = await Promise.all([
         soft('liquidations', p.liquidations && (() => (p.liquidations as NonNullable<InsightPorts['liquidations']>)(period))),
         soft('positioning', p.positioning && (() => (p.positioning as NonNullable<InsightPorts['positioning']>)(period))),
+        soft('funding intervals', p.fundingIntervalH),
         soft('breadth', p.breadth && (() => (p.breadth as NonNullable<InsightPorts['breadth']>)(period))),
         soft('fng', p.fng),
         soft('flows', p.flows && (() => (p.flows as NonNullable<InsightPorts['flows']>)(period))),
         soft('oi divergence', p.oiDivergence && (() => (p.oiDivergence as NonNullable<InsightPorts['oiDivergence']>)(nowMs))),
         soft('oi alerts visibility', p.oiAlertsMembersVisible),
       ]);
-      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, breadth, fng, flows, oiDivergence };
+      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, fundingIntervalH, breadth, fng, flows, oiDivergence };
       return { snapshot, membersVisible: membersVisible === true };
     });
   }

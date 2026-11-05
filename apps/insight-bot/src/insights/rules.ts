@@ -1,4 +1,5 @@
 import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow, type WebVenueKey } from '@trade-automation/contracts';
+import { fundingExtreme, fundingPer8h } from './funding-extreme';
 import { levelRarity, rarity } from './rarity';
 import { fngBand } from './sentiment';
 import { LIQ_RULE_MIN_DAYS, PREMIUM_SUSTAINED_MIN, R2_MIN_USD, RARITY_SHOW, VENUE_RULE_MIN_DAYS } from './thresholds';
@@ -17,8 +18,9 @@ import type { InsightSnapshot, Refusal, Rule } from './types';
  * R3 a cascade — the period's largest series (≥ 3 same-side events ≥ $100k within 10 min, IB-084's
  *    grouping), rare against the market's HOURLY totals: ten minutes that outweigh most whole hours.
  * R4 OI vs price — |ΔOI| rare while |Δprice| is not; named by quadrant.
- * R5 funding extremes — coins whose funding is beyond their own 30-day p95/p5 (two-sided rarity ≥ 0.90);
- *    the most extreme is named.
+ * R5 funding extremes — coins whose funding is beyond their own 30-day p95/p5 (two-sided rarity ≥ 0.90)
+ *    AND at least ±0.03 % per 8 h (IB-135, `fundingExtreme`, shared with the table's crowded words and
+ *    the funding alerts); the most extreme is named.
  * R6 crowd vs top traders — global account L/S and top-trader POSITION L/S on opposite sides of 1,
  *    both rare. (The gap's own history is not held; "both rare, opposite sides" is the stated proxy.)
  * R7 sentiment and breadth — share of coins up and median alt change minus BTC, each two-sided rare
@@ -162,8 +164,11 @@ export const R5: Rule = {
   run(s) {
     const rows = measuredRows(s, (r) => r.fundingRate.rarity !== null && r.fundingRate.value !== null);
     if (!Array.isArray(rows)) return rows;
-    const extreme = rows.filter((r) => (r.fundingRate.rarity as number) >= RARITY_SHOW)
-      .sort((a, b) => (b.fundingRate.rarity as number) - (a.fundingRate.rarity as number) || Math.abs(b.fundingRate.value as number) - Math.abs(a.fundingRate.value as number));
+    // IB-135: rare for the coin AND not trivial in absolute terms; the count is of the same set
+    const intervalH = (r: WebPositioningRow) => s.fundingIntervalH?.get(r.symbol) ?? null;
+    const per8h = (r: WebPositioningRow) => Math.abs(fundingPer8h(r.fundingRate.value as number, intervalH(r)));
+    const extreme = rows.filter((r) => fundingExtreme(r.fundingRate.value, r.fundingRate.rarity, intervalH(r)) !== null)
+      .sort((a, b) => (b.fundingRate.rarity as number) - (a.fundingRate.rarity as number) || per8h(b) - per8h(a));
     const top = extreme[0];
     if (!top) return null;
     return {

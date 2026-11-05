@@ -46,7 +46,7 @@ function snapshot(over: Partial<InsightSnapshot> = {}): InsightSnapshot {
     },
     positioning: [row('BTCUSDT', {})],
     breadth: { upShare: 0.05, altGapPct: 0.1, upShareSample: ramp(696, 0, 0.001).map((x) => 0.3 + (x % 0.4)), altGapSample: ramp(696, 0).map((i) => (i % 7) - 3), days: 30, coins: 30, lastHourEnd: NOW_S - 120 },
-    fng: 50, flows: null, oiDivergence: null,
+    fng: 50, flows: null, oiDivergence: null, fundingIntervalH: null,
     ...over,
   };
 }

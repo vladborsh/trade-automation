@@ -6,6 +6,7 @@ import type { UniverseSymbol } from '../../../config/universe.schema';
 import {
   POSITIONING_BASELINE_CACHE_MS, POSITIONING_BASELINE_DAYS, POSITIONING_CURRENT_CACHE_MS, POSITIONING_MIN_HISTORY_DAYS,
 } from '../../../insights/thresholds';
+import { fundingIntervalH } from '../../../insights/funding-extreme';
 import type { TtlCache } from '../../../venues/ttl-cache';
 import type { LiquidationsOverviewService } from '../../liquidations/overview.service';
 import type { CandlesService } from '../candles.service';
@@ -131,7 +132,8 @@ export class PositioningService {
     const cells: WebPositioningCell[] = [priceChangePct, oiChangePct, fundingRate, lsGlobal, lsTopPosition, liqUsd];
     return {
       symbol: coin.id, base: coin.base, priceChangePct, oiChangePct, fundingRate, lsGlobal, lsTopPosition, liqUsd,
-      oiUsd: current.oiUsd, quadrant, signal: signalOf({ quadrant, priceChangePct, fundingRate, lsGlobal, cells }),
+      oiUsd: current.oiUsd, quadrant,
+      signal: signalOf({ quadrant, priceChangePct, fundingRate, fundingIntervalH: base ? fundingIntervalH(base.fundingTimes) : null, lsGlobal, cells }),
     };
   }
 
@@ -197,6 +199,19 @@ export class PositioningService {
     const base = options.held ? this.options.cache.get<Map<string, Baseline>>(BASELINES_KEY) ?? null : await this.baselines();
     if (base === null) return null;
     return new Map([...base.entries()].map(([id, b]) => [id, b.fundingTimes.map((time, i) => ({ time, rate: b.fundingSettled[i] }))] as const));
+  }
+
+  /**
+   * IB-135: each coin's funding settlement interval in hours, from the baseline's settled times (no
+   * venue call). R5 normalises to 8 h with it, as `signalOf` does for the table. A coin without
+   * baselines or with too few settlements is absent, and `fundingExtreme` counts it as 8 h.
+   */
+  async fundingIntervals(): Promise<Map<string, number>> {
+    const base = await this.baselines();
+    return new Map([...base.entries()].flatMap(([id, b]) => {
+      const h = fundingIntervalH(b.fundingTimes);
+      return h === null ? [] : [[id, h] as const];
+    }));
   }
 
   /** The hourly baselines for every coin, rebuilt once an hour (D9). A coin whose reads fail is absent. */

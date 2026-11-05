@@ -299,3 +299,30 @@ describe('IB-118: KpisService — the three charts, each its own soft read', () 
     expect(tiles.market_cap).toMatchObject({ value: 2.62e12, note: null });
   });
 });
+
+describe('IB-135: fundingIntervals — each coin\'s settlement interval, from the baseline\'s times (no venue call)', () => {
+  const withSpacing = (spacingSec: number) => {
+    const f = fakes(30 * 24);
+    const calls = { funding: 0 };
+    const svc = new PositioningService({
+      symbols: SYMBOLS as never, cache: new TtlCache({ now: () => NOW }), summary: f.summary as never, candles: f.candles as never,
+      funding: { binanceSettledHistory: async () => { calls.funding++; return Array.from({ length: 90 }, (_, i) => ({ time: 1_790_000_000 + i * spacingSec, rate: 0.0001 })); } } as never,
+      oiLs: f.oiLs as never, liquidations: null, now: () => NOW,
+    });
+    return { svc, calls };
+  };
+
+  it('8 h and 4 h coins, crypto only, read from the same cached baselines as the table', async () => {
+    expect((await withSpacing(28_800).svc.fundingIntervals()).get('BTCUSDT')).toBe(8);
+    const { svc, calls } = withSpacing(14_400);
+    await svc.positioning('24h');
+    const before = calls.funding;
+    const m = await svc.fundingIntervals();
+    expect([...m.entries()]).toEqual([['BTCUSDT', 4], ['ETHUSDT', 4]]);
+    expect(calls.funding).toBe(before);
+  });
+
+  it('a coin whose interval cannot be read is ABSENT (fundingExtreme then counts it as 8 h), not a 0', async () => {
+    expect((await withSpacing(60).svc.fundingIntervals()).size).toBe(0);
+  });
+});

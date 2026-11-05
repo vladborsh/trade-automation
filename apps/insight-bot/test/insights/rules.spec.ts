@@ -24,6 +24,7 @@ function snapshot(over: Partial<InsightSnapshot> = {}): InsightSnapshot {
       bars: Array.from({ length: 24 }, (_, i) => ({ time: NOW / 1000 - (23 - i) * 3_600, long: 1_000 + i, short: 5_000 + i })),
     },
     positioning: [row('BTCUSDT', {})],
+    fundingIntervalH: null,
     breadth: { upShare: 0.5, altGapPct: 0.1, upShareSample: Array.from({ length: 696 }, (_, i) => 0.3 + (i % 5) * 0.1), altGapSample: Array.from({ length: 696 }, (_, i) => (i % 7) - 3), days: 30, coins: 30, lastHourEnd: NOW / 1000 },
     fng: 50,
     flows: null,
@@ -122,6 +123,21 @@ describe('R5 funding extremes', () => {
     expect(shown(R5.run(snapshot({ positioning: rows })))).toMatchObject({ params: { count: 2, total: 3, symbol: 'A' } });
   });
   it('SILENT on an ordinary day', () => expect(R5.run(snapshot())).toBeNull());
+  it('IB-135: rare but trivial is SILENT and not counted (BNB, 0.0206 % at rarity 0.95)', () => {
+    expect(R5.run(snapshot({ positioning: [row('BNBUSDT', { funding: c(0.000206, 0.95, 90) })] }))).toBeNull();
+    const rows = [row('A', { funding: c(0.001, 0.97, 90) }), row('BNBUSDT', { funding: c(0.000206, 0.99, 90) }), row('C', {})];
+    // BNB is the rarer of the two, but under the floor: neither named nor counted
+    expect(shown(R5.run(snapshot({ positioning: rows })))).toMatchObject({ params: { count: 1, total: 3, symbol: 'A' } });
+  });
+  it('IB-135: a 4 h coin is normalised to 8 h with the snapshot\'s interval; unknown counts as 8 h', () => {
+    const rows = [row('HYPEUSDT', { funding: c(0.00016, 0.95, 180) })];
+    expect(shown(R5.run(snapshot({ positioning: rows, fundingIntervalH: new Map([['HYPEUSDT', 4]]) })))).toMatchObject({ params: { count: 1, symbol: 'HYPEUSDT', rate: 0.00016 } });
+    expect(R5.run(snapshot({ positioning: rows }))).toBeNull();
+  });
+  it('IB-135: ties on rarity go to the larger rate PER 8 H, not the larger raw rate', () => {
+    const rows = [row('E8', { funding: c(0.0004, 1, 90) }), row('E4', { funding: c(0.00025, 1, 180) })];
+    expect(shown(R5.run(snapshot({ positioning: rows, fundingIntervalH: new Map([['E8', 8], ['E4', 4]]) })))).toMatchObject({ params: { count: 2, symbol: 'E4' } });
+  });
 });
 
 describe('R6 crowd vs top traders', () => {
