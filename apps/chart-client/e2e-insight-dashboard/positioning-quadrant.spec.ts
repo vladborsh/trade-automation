@@ -39,6 +39,19 @@ const q = (page: Page) => page.locator('app-pos-quadrant');
 const pressed = (page: Page, cls: 'bulk' | 'full') => q(page).locator(`button.${cls}`);
 /** The right end of the price axis, as printed — moves with every zoom and pan. */
 const xMaxTick = (page: Page) => q(page).locator('text.tick').first().textContent();
+/** IB-137 review: every pinned coin is named — by a label on the chart AND in the footnote with its values. */
+async function expectEveryPinNamed(page: Page): Promise<void> {
+  const pinned = await q(page).locator('g.dot.pinned title').allTextContents();
+  expect(pinned.length).toBeGreaterThan(0);
+  const labels = await q(page).locator('text.label').allTextContents();
+  const foot = (await q(page).locator('p.muted', { hasText: 'Coins beyond the chart edge' }).textContent()) ?? '';
+  expect(foot).toContain(`Coins beyond the chart edge: ${pinned.length} — `);
+  for (const base of pinned) {
+    expect(labels.some((t) => t === base || t.startsWith(`${base} `)), `${base} labelled`).toBe(true);
+    expect(foot).toMatch(new RegExp(`\\b${base} [+−]`));
+  }
+}
+
 const settle = (page: Page) => page.clock.runFor(100);
 
 async function plotCentre(page: Page): Promise<{ x: number; y: number }> {
@@ -72,6 +85,7 @@ test.describe('IB-137 quadrant — phone 390×844, touch', () => {
     await expect(chart.locator('g.dot.pinned[data-symbol="TRUMPUSDT"]')).toHaveCount(1);
     await expect(chart.locator('text.label')).toContainText([OUTLIER]);
     await expect(chart.locator('text.corner')).toHaveCount(4);
+    await expectEveryPinNamed(page);
     // targets: the view buttons are ≥ 40 px tall on a phone
     for (const b of await chart.locator('.controls button').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(40);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
@@ -158,6 +172,7 @@ test.describe('IB-137 quadrant — desktop 1240×900, mouse', () => {
     const chart = q(page);
     await chart.scrollIntoViewIfNeeded();
     await expect(chart.locator('text.label')).toContainText([OUTLIER]);
+    await expectEveryPinNamed(page);
     await shot(info, 'ib137-1240-bulk.png', await chart.screenshot());
     await pressed(page, 'full').click();
     await settle(page);

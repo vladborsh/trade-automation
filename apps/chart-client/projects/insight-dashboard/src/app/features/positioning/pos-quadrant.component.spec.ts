@@ -51,6 +51,27 @@ describe('PosQuadrantComponent — views (IB-137)', () => {
     expect(el.querySelector('button.full')?.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('every pinned coin stays identifiable: its ticker is in a label on the chart AND in the footnote (342 px, default and zoomed)', () => {
+    const { f, el, tap } = mount();
+    const check = () => {
+      const pinned = [...el.querySelectorAll('g.dot.pinned')].map((g) => g.querySelector('title')!.textContent!);
+      expect(pinned.length).toBeGreaterThan(0);
+      const labels = [...el.querySelectorAll('text.label')].map((t) => t.textContent ?? '');
+      const foot = [...el.querySelectorAll('p.muted')].map((p) => p.textContent ?? '').find((t) => t.startsWith('Coins beyond the chart edge'))!;
+      expect(foot).toContain(`Coins beyond the chart edge: ${pinned.length} — `);
+      for (const base of pinned) expect(foot).toMatch(new RegExp(`\\b${base} [+−]`));
+      return { pinned, labelled: pinned.filter((b) => labels.some((t) => t === b || t.startsWith(`${b} `))) };
+    };
+    const bulk = check();
+    // at the default view every pin also has its label on the chart (the owner's «not lost»)
+    expect(bulk.labelled).toEqual(bulk.pinned);
+    expect(bulk.pinned).toContain('TRUMP');
+    tap(el.querySelector('button.zoom.in')!);
+    tap(el.querySelector('button.zoom.in')!);
+    f.detectChanges();
+    check(); // zoomed in, labels may not all fit; the footnote still names every one
+  });
+
   it('+ zooms in (neither preset pressed, the chart pannable); «без выбросов» comes back from anywhere', () => {
     const { f, el, tap } = mount();
     const plot = el.querySelector('.plot') as HTMLElement;

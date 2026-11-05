@@ -338,7 +338,7 @@ export const ru: Strings = {
   'positioning.quadrant.open': 'Открыть →',
   'positioning.quadrant.hint.pointer': 'Наведите на точку — цифры; клик открывает монету. Колесо — масштаб, перетаскивание — сдвиг.',
   'positioning.quadrant.hint.touch': 'Нажмите на точку — цифры и ссылка на монету. Два пальца — масштаб; при увеличении один палец сдвигает.',
-  'positioning.quadrant.pinned': 'Монеты за краем графика: {count} — стрелка показывает направление, в подписи настоящие значения (цена / OI).',
+  'positioning.quadrant.pinned': 'Монеты за краем графика: {count} — {coins} (цена / OI). Стрелка на краю показывает направление.',
   'positioning.quadrant.detail': '{coin}: цена {price}, открытый интерес {oi}, OI Binance {oiUsd}',
   'positioning.quadrant.unplaced': 'Монет без обеих величин, не показано: {count}',
   'positioning.table.title': 'По монетам',

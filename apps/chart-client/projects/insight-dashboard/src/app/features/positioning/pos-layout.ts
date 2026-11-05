@@ -79,6 +79,8 @@ export interface QuadrantLayout {
   hiddenLabels: number;
   /** IB-137: coins drawn on the edge. */
   pinned: number;
+  /** IB-137 review: every pinned coin with its true values, farthest-out first — the footnote names them all. */
+  pinnedTexts: string[];
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -126,33 +128,10 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
     beyond(d.row.priceChangePct.value as number, domain.xMin, domain.xMax), beyond(d.row.oiChangePct.value as number, domain.yMin, domain.yMax));
   const pinnedFirst = dots.filter((x) => x.pin).sort((a, b) => outness(b) - outness(a));
   for (const d of [...pinnedFirst, ...dots.filter((x) => !x.pin)]) {
-    const text = d.pin
-      ? `${d.row.base} ${compactPct(d.row.priceChangePct.value as number)} / ${compactPct(d.row.oiChangePct.value as number)}`
-      : d.row.base;
-    const w = text.length * LABEL_CHAR_PX;
-    // text baseline = box top + 11 (12 px glyphs in a 14 px box)
-    const at = (x: number, y: number, anchor: 'start' | 'end' | 'middle') => {
-      const l = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
-      return { x, y: y + 11, anchor, box: { x: l, y, w, h: LABEL_H }, text };
-    };
-    const r = at(d.cx + d.r + 3, d.cy - LABEL_H / 2, 'start');
-    const l = at(d.cx - d.r - 3, d.cy - LABEL_H / 2, 'end');
-    const a = at(d.cx, d.cy - d.r - 2 - LABEL_H, 'middle');
-    const b = at(d.cx, d.cy + d.r + 2, 'middle');
-    // a corner pin: below / above, aligned to its edge so the label runs inward
-    const edgeX = d.pin?.dx === 1 ? d.cx + d.r : d.cx - d.r;
-    const edgeAnchor = d.pin?.dx === 1 ? 'end' : 'start';
-    const bIn = at(edgeX, d.cy + d.r + 2, edgeAnchor);
-    const aIn = at(edgeX, d.cy - d.r - 2 - LABEL_H, edgeAnchor);
-    const spots = !d.pin ? [r, l, a, b]
-      : d.pin.dy === 1 ? (d.pin.dx === 0 ? [b, r, l, a] : [b, bIn, d.pin.dx === 1 ? l : r, aIn])
-      : d.pin.dy === -1 ? (d.pin.dx === 0 ? [a, r, l, b] : [a, aIn, d.pin.dx === 1 ? l : r, bIn])
-      : d.pin.dx === 1 ? [l, a, b, r] : [r, a, b, l];
-    // a pinned label may step one or two rows inward along its edge (past an axis value, past a neighbour's label)
-    const step = LABEL_H + 2;
-    const rowsIn = !d.pin ? [0] : d.pin.dy === 1 ? [0, step, 2 * step] : d.pin.dy === -1 ? [0, -step, -2 * step] : [0, step, -step];
-    const shift = (s: (typeof spots)[number], dy: number) => ({ ...s, y: s.y + dy, box: { ...s.box, y: s.box.y + dy } });
-    const free = rowsIn.flatMap((o) => spots.map((s) => shift(s, o))).find((s) => inside(s.box, size, LABEL_BAND) && boxes.every((bx) => !overlaps(bx, s.box)));
+    // a pinned coin tries its full label (ticker + true values) first, then the bare ticker by its
+    // arrow; the footnote lists every pin with its values either way
+    const tries = d.pin ? [...candidates(d, pinText(d.row), 2), ...candidates(d, d.row.base, 1)] : candidates(d, d.row.base, 0);
+    const free = tries.find((s) => inside(s.box, size, LABEL_BAND) && boxes.every((bx) => !overlaps(bx, s.box)));
     if (free) {
       d.label = free;
       boxes.push(free.box);
@@ -165,7 +144,8 @@ export function quadrantLayout(rows: readonly WebPositioningRow[], size: Size, d
   return {
     domain, left, right, top, bottom, ticks,
     x0, y0, x0In, y0In, originIn: originInView(domain),
-    dots, unplaced: rows.length - placed.length, hiddenLabels: hidden, pinned: dots.filter((d) => d.pin).length,
+    dots, unplaced: rows.length - placed.length, hiddenLabels: hidden, pinned: pinnedFirst.length,
+    pinnedTexts: pinnedFirst.map((d) => pinText(d.row)),
   };
 }
 
@@ -187,6 +167,44 @@ export interface Box {
 
 function overlaps(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/** A pinned coin's label: its ticker and true values, «TRUMP +38 % / +12 %». */
+function pinText(row: WebPositioningRow): string {
+  return `${row.base} ${compactPct(row.priceChangePct.value as number)} / ${compactPct(row.oiChangePct.value as number)}`;
+}
+
+type LabelSpot = NonNullable<QuadrantDot['label']>;
+
+/**
+ * Where a dot's label may go, in order of preference. A free dot: right, left, above, below. A pinned
+ * one: the inward side first (a corner pin also edge-aligned, running inward), then the same spots
+ * stepped up to `rowsInward` label rows inward along its edge — past an axis value or a neighbour's label.
+ */
+function candidates(d: QuadrantDot, text: string, rowsInward: number): LabelSpot[] {
+  const w = text.length * LABEL_CHAR_PX;
+  // text baseline = box top + 11 (12 px glyphs in a 14 px box)
+  const at = (x: number, y: number, anchor: 'start' | 'end' | 'middle'): LabelSpot => {
+    const l = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+    return { x, y: y + 11, anchor, box: { x: l, y, w, h: LABEL_H }, text };
+  };
+  const r = at(d.cx + d.r + 3, d.cy - LABEL_H / 2, 'start');
+  const l = at(d.cx - d.r - 3, d.cy - LABEL_H / 2, 'end');
+  const a = at(d.cx, d.cy - d.r - 2 - LABEL_H, 'middle');
+  const b = at(d.cx, d.cy + d.r + 2, 'middle');
+  if (!d.pin) return [r, l, a, b];
+  const edgeX = d.pin.dx === 1 ? d.cx + d.r : d.cx - d.r;
+  const edgeAnchor = d.pin.dx === 1 ? 'end' : 'start';
+  const bIn = at(edgeX, d.cy + d.r + 2, edgeAnchor);
+  const aIn = at(edgeX, d.cy - d.r - 2 - LABEL_H, edgeAnchor);
+  const spots = d.pin.dy === 1 ? (d.pin.dx === 0 ? [b, r, l, a] : [b, bIn, d.pin.dx === 1 ? l : r, aIn])
+    : d.pin.dy === -1 ? (d.pin.dx === 0 ? [a, r, l, b] : [a, aIn, d.pin.dx === 1 ? l : r, bIn])
+    : d.pin.dx === 1 ? [l, a, b, r] : [r, a, b, l];
+  const step = LABEL_H + 2;
+  const dir = d.pin.dy === 1 ? [1] : d.pin.dy === -1 ? [-1] : [1, -1];
+  const offsets = [0];
+  for (let k = 1; k <= rowsInward; k++) for (const s of dir) offsets.push(s * k * step);
+  return offsets.flatMap((o) => spots.map((sp) => ({ ...sp, y: sp.y + o, box: { ...sp.box, y: sp.box.y + o } })));
 }
 
 /** `band`: the strip along the top and bottom edges kept for the quadrant names and the «0» markers. */

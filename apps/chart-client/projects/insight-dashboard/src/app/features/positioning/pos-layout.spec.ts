@@ -125,6 +125,8 @@ describe('quadrantLayout with a view (IB-137)', () => {
       expect(b.y + b.h).toBeLessThanOrEqual(size.height - LABEL_BAND);
     }
     expect(l.dots.find((d) => d.row.base === 'TRUMP')!.label?.text).toBe('TRUMP +38 % / +12 %');
+    // the footnote's list: every pin with its true values, farthest-out first
+    expect(l.pinnedTexts).toEqual(['TRUMP +38 % / +12 %', 'XRP +2.5 % / +20 %', 'ONDO +0.4 % / +5.4 %']);
   });
 
   it('the dots stay in OI order whatever the label order (the keyboard walks them in that order)', () => {

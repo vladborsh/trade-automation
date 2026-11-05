@@ -332,7 +332,7 @@ export const en: Strings = {
   'positioning.quadrant.open': 'Open →',
   'positioning.quadrant.hint.pointer': 'Hover a dot for its numbers; click to open the coin. Wheel zooms, drag pans.',
   'positioning.quadrant.hint.touch': 'Tap a dot for its numbers and a link to the coin. Two fingers zoom; once zoomed, one finger pans.',
-  'positioning.quadrant.pinned': 'Coins beyond the chart edge: {count} — the arrow shows the direction, the label their real values (price / OI).',
+  'positioning.quadrant.pinned': 'Coins beyond the chart edge: {count} — {coins} (price / OI). The arrow on the edge shows the direction.',
   'positioning.quadrant.detail': '{coin}: price {price}, open interest {oi}, OI Binance {oiUsd}',
   'positioning.quadrant.unplaced': 'Coins without both changes, not placed: {count}',
   'positioning.table.title': 'By coin',
