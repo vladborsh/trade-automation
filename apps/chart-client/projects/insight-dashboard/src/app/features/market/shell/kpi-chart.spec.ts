@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { WebKpiHistory } from '@trade-automation/contracts';
-import { kpiChartGeometry, PAD_PCT, type KpiAreaGeometry, type KpiBarsGeometry } from './kpi-chart';
+import { kpiChartGeometry, PAD_PCT, type KpiAreaGeometry, type KpiBarsGeometry, type KpiLinesGeometry } from './kpi-chart';
 
 /** IB-118 — the tile chart's geometry: breaks, min/max dots on their points, tone, bars around zero. */
 const area = (values: number[], stepSec = 600, breakAfterSec: number | null = 1800, times?: number[]): WebKpiHistory => {
   const points = values.map((value, i) => ({ time: times ? times[i] : 1_000 + i * stepSec, value }));
-  return { kind: 'area', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec };
+  return { kind: 'area', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec, second: null };
 };
 const bars = (values: number[]): WebKpiHistory => {
   const points = values.map((value, i) => ({ time: 1_000 + i * 28_800, value }));
-  return { kind: 'bars', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec: null };
+  return { kind: 'bars', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec: null, second: null };
 };
 
 describe('kpiChartGeometry', () => {
@@ -82,5 +82,54 @@ describe('kpiChartGeometry', () => {
     const g = kpiChartGeometry(bars([1, 2, 4])) as KpiBarsGeometry;
     expect(g.zero).toBe(100 - PAD_PCT);
     expect(g.bars.every((b) => b.top + b.height === g.zero)).toBe(true);
+  });
+});
+
+describe('IB-131 kpiChartGeometry — lines: BTC over ETH, each strip on its own scale', () => {
+  /** BTC `btc`, ETH `eth` (null = a BTC row without ETH), 10 min apart unless `times` says otherwise. */
+  const lines = (btc: number[], eth: Array<number | null>, times?: number[]): WebKpiHistory => {
+    const t = (i: number) => (times ? times[i] : 1_000 + i * 600);
+    const points = btc.map((value, i) => ({ time: t(i), value }));
+    const ethPoints = eth.flatMap((value, i) => (value === null ? [] : [{ time: t(i), value }]));
+    const ev = ethPoints.map((p) => p.value);
+    return {
+      kind: 'lines', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...btc), max: Math.max(...btc), breakAfterSec: 1800,
+      second: { label: 'ETH', points: ethPoints, min: Math.min(...ev), max: Math.max(...ev) },
+    };
+  };
+
+  it('each strip spans its own box: a 1-point BTC move and a 0.2-point ETH move both fill pad to pad', () => {
+    const g = kpiChartGeometry(lines([57, 58, 57.5], [11, 11.2, 11.1])) as KpiLinesGeometry;
+    expect(g.kind).toBe('lines');
+    const [btc, eth] = g.strips;
+    expect([btc.max.y, btc.min.y]).toEqual([PAD_PCT, 100 - PAD_PCT]);
+    expect([eth.max.y, eth.min.y]).toEqual([PAD_PCT, 100 - PAD_PCT]); // not flat at the bottom of a shared 0–60 axis
+    expect(btc.last).toEqual({ x: 100, y: 50 });
+    expect(eth.last).toEqual({ x: 100, y: 50 });
+  });
+
+  it('min / max dots sit on the points that hold them, in each strip', () => {
+    const g = kpiChartGeometry(lines([60.1, 59.8, 60.4, 60.0], [11.2, 11.5, 10.9, 11.0])) as KpiLinesGeometry;
+    expect(g.strips[0].max.x).toBe(66.67); // 60.4 is the third point
+    expect(g.strips[0].min.x).toBe(33.33);
+    expect(g.strips[1].max.x).toBe(33.33); // 11.5 is the second
+    expect(g.strips[1].min.x).toBe(66.67);
+  });
+
+  it('both strips share the x axis: an ETH point lands under the BTC point of the same time', () => {
+    const g = kpiChartGeometry(lines([1, 2, 3, 4], [null, 5, 6, 7])) as KpiLinesGeometry;
+    expect(g.strips[1].segments[0]).toMatch(/^M33.33 /); // ETH starts at the second BTC time, not at 0
+  });
+
+  it('a gap over 30 min breaks both lines; a missing ETH row breaks ETH only', () => {
+    const gap = kpiChartGeometry(lines([1, 2, 3, 4], [5, 6, 7, 8], [0, 600, 9_000, 9_600])) as KpiLinesGeometry;
+    expect(gap.strips.map((s) => s.segments.length)).toEqual([2, 2]);
+    // BTC every 20 min; ETH missing at the second row → its neighbours are 40 min apart
+    const hole = kpiChartGeometry(lines([1, 2, 3, 4], [5, null, 7, 8], [0, 1_200, 2_400, 3_600])) as KpiLinesGeometry;
+    expect(hole.strips.map((s) => s.segments.length)).toEqual([1, 2]);
+  });
+
+  it('lines without its second line draws nothing (the contract refuses it; no BTC strip alone)', () => {
+    expect(kpiChartGeometry({ ...lines([1, 2], [3, 4]), second: null })).toBeNull();
   });
 });

@@ -569,11 +569,13 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
           // `.tile > .bar`: the strip's own bar, not the funding chart's bars (IB-118)
           bars: [...kpi.querySelectorAll('.tile > .bar')].map((b) => Math.round(b.getBoundingClientRect().y)),
           // TL review: every BAR tile's bar is drawn — the track and its fill. IB-118: cap, BTC OI and BTC
-          // funding draw a 7-day chart in that row instead, so only dominance and liquidations carry a bar
+          // funding draw a 7-day chart in that row instead; IB-131 dominance too, so only liquidations carry a bar
           charts: [...kpi.querySelectorAll('.tile')].filter((t) => t.querySelector('app-kpi-chart')).map((t) => ({
             id: t.getAttribute('data-kpi'), kind: t.querySelector('app-kpi-chart .chart')!.getAttribute('data-kind'),
             top: Math.round(t.querySelector('app-kpi-chart')!.getBoundingClientRect().top), bars: t.querySelectorAll('app-kpi-chart .bar').length,
             right: Math.round(t.querySelector('app-kpi-chart')!.getBoundingClientRect().right), tileRight: Math.round(t.getBoundingClientRect().right),
+            // IB-131: the dominance chart's strips, top to bottom, with their heights (each its own box)
+            strips: [...t.querySelectorAll<HTMLElement>('app-kpi-chart [data-strip]')].map((e) => ({ id: e.dataset['strip'], top: Math.round(e.getBoundingClientRect().top), h: Math.round(e.getBoundingClientRect().height) })),
           })),
           barBoxes: [...kpi.querySelectorAll('.tile')].filter((t) => t.querySelector(':scope > .bar')).map((t) => {
             const r = t.querySelector(':scope > .bar')!.getBoundingClientRect();
@@ -604,18 +606,21 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
         expect(new Set(m.bars).size).toBe(1);
         expect(new Set(m.charts.map((c) => c.top)).size).toBe(1);
       }
-      // IB-118: three charts from the fixture's histories (a real /kpis answer for OI and funding)
-      expect(m.charts.map((c) => [c.id, c.kind])).toEqual([['market_cap', 'area'], ['btc_oi', 'area'], ['btc_funding', 'bars']]);
+      // IB-118: three charts from the fixture's histories (a real /kpis answer for OI and funding); IB-131 dominance as two strips
+      expect(m.charts.map((c) => [c.id, c.kind])).toEqual([['market_cap', 'area'], ['btc_dominance', 'lines'], ['btc_oi', 'area'], ['btc_funding', 'bars']]);
+      const strips = m.charts.find((c) => c.id === 'btc_dominance')!.strips;
+      expect(strips.map((x) => x.id)).toEqual(['btc', 'eth']);
+      expect(strips[1].top).toBeGreaterThan(strips[0].top + strips[0].h - 1); // stacked, not overlaid
+      for (const x of strips) expect(x.h, `${x.id} strip height`).toBeGreaterThanOrEqual(20);
       expect(m.charts.find((c) => c.id === 'btc_funding')?.bars).toBe(21);
       for (const c of m.charts) expect(c.right, `${c.id} chart inside its tile`).toBeLessThanOrEqual(c.tileRight);
-      expect(m.barBoxes.map((b) => b.id)).toEqual(['btc_dominance', 'liquidations_24h']);
+      expect(m.barBoxes.map((b) => b.id)).toEqual(['liquidations_24h']);
       expect(m.scrollWidth).toBeLessThanOrEqual(width);
       for (const bar of m.barBoxes) {
         expect(bar.h, `${bar.id} bar height`).toBe(6);
         expect(bar.w, `${bar.id} bar spans the tile`).toBeGreaterThanOrEqual(m.tileInner - 2);
       }
       const fill = Object.fromEntries(m.barBoxes.map((b) => [b.id, b.fill / b.w]));
-      expect(fill['btc_dominance']).toBeCloseTo(0.592, 1); // 59.25 % of the track, amber
       expect(fill['liquidations_24h']).toBeCloseTo(1, 1); // the long/short split fills the track
       // «7d: available from …» is the 7d button's description, not a visible line
       expect(m.weekDisabled).toBe(true);
@@ -626,7 +631,13 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
       await page.clock.runFor(2_000); // the pill words the age on the page's tick
       await expect(page.locator('app-market .live-age')).toHaveText(/^\s*Live · updated \d+ s ago\s*$/);
       const strip = page.locator('app-kpi-strip');
-      await expect(strip.locator('[data-kpi="btc_dominance"] .note')).toHaveText('ETH 10.6 %');
+      // IB-131: the fixture's dominance spans 7 days: the caption names it, the ETH share follows it; the range row is each line's own min–max
+      await expect(strip.locator('[data-kpi="btc_dominance"] .note')).toHaveText('CoinGecko · 7 days · ETH 10.6 %');
+      await expect(strip.locator('[data-kpi="btc_dominance"] .range')).toHaveText(/^\s*7d BTC 58\.3–59\.8 %\s*ETH 10\.5–11\.7 %\s*$/);
+      // a part wraps whole, never mid-figure: each part is one line high
+      for (const part of await strip.locator('[data-kpi="btc_dominance"] .range span').all()) {
+        expect(await part.evaluate((e) => e.getClientRects().length), await part.innerText()).toBe(1);
+      }
       // TL review: the delta beside the value, for every tile whose payload carries one (dominance 0.4 pp as set above; cap and OI as captured)
       await expect(strip.locator('[data-kpi="btc_dominance"] .inline')).toHaveText(/^\+0\.40 pp/);
       await expect(strip.locator('[data-kpi="market_cap"] .inline')).toHaveText(/^−2\.49 %/);
@@ -649,6 +660,27 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
       // the fonts are ours: served from /fonts, and actually in use
       expect(await page.evaluate(() => document.fonts.check('600 24px "IBM Plex Mono"') && document.fonts.check('14px "IBM Plex Sans"'))).toBe(true);
     });
+  });
+}
+
+/**
+ * IB-131 (§7): under 6 h of dominance rows the server sends `history: null` — the tile is exactly what it
+ * was: the amber share bar and «ETH {ethPct} %», no range row, no «collecting history».
+ */
+for (const [width, height] of [[1240, 900], [390, 844]] as const) {
+  test(`IB-131 dominance without history keeps its share bar — ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await openMarket(page, (p) => p.route('**/api/web/market/kpis**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+      ...kpis, tiles: kpis.tiles.map((t) => (t.id === 'btc_dominance' ? { ...t, history: null } : t)),
+    }) })));
+    const tile = page.locator('app-kpi-strip [data-kpi="btc_dominance"]');
+    await expect(tile.locator('app-kpi-chart')).toHaveCount(0);
+    await expect(tile.locator('.note')).toHaveText('ETH 10.6 %');
+    await expect(tile.locator('.range')).toHaveText('');
+    await expect(tile.locator('.credit')).toHaveText('CoinGecko');
+    const fill = await tile.locator(':scope > .bar').evaluate((b) => [...b.querySelectorAll('span')].reduce((w, s) => w + s.getBoundingClientRect().width, 0) / b.getBoundingClientRect().width);
+    expect(fill).toBeCloseTo(0.592, 1); // 59.25 % of the track, amber
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });
 }
 

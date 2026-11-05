@@ -11,6 +11,20 @@
     <span class="dot extreme" data-dot="max" [style.left.%]="g.max.x" [style.top.%]="g.max.y"></span>
     <span class="dot last" data-dot="last" [class.up]="g.tone === 'up'" [class.down]="g.tone === 'down'"
           [style.left.%]="g.last.x" [style.top.%]="g.last.y"></span>
+  } @else if (g.kind === 'lines') {
+    <!-- IB-131: BTC above, ETH below, each strip on its own scale -->
+    @for (s of g.strips; track $index) {
+      <div class="strip" [class.btc]="$index === 0" [class.eth]="$index === 1" [attr.data-strip]="$index === 0 ? 'btc' : 'eth'">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          @for (line of s.segments; track $index) {
+            <path class="line" [attr.d]="line" vector-effect="non-scaling-stroke" />
+          }
+        </svg>
+        <span class="dot extreme" data-dot="min" [style.left.%]="s.min.x" [style.top.%]="s.min.y"></span>
+        <span class="dot extreme" data-dot="max" [style.left.%]="s.max.x" [style.top.%]="s.max.y"></span>
+        <span class="dot last" data-dot="last" [style.left.%]="s.last.x" [style.top.%]="s.last.y"></span>
+      </div>
+    }
   } @else {
     <span class="zero" [style.top.%]="g.zero"></span>
     @for (b of g.bars; track $index) {

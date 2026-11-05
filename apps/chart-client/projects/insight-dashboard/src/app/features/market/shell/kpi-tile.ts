@@ -16,6 +16,10 @@ import { kpiView, type Tone } from './market-text';
  * «последние 21 выплата» / «L/S счета {r}» for the funding bars. The note row then says what the
  * chart is (`caption`: «CoinGecko · 7 дней», a shorter span named «за {d} д {h} ч»). With no
  * history the tile is as before; a cap table still filling says «копим историю: {h} ч».
+ *
+ * IB-131 (§7): dominance charts too — two strips (BTC, ETH), the range row «7д BTC a–b %» / «ETH c–d %»
+ * (one decimal), and the ETH note KEPT after the caption («CoinGecko · 7 дней · ETH 11.0 %»). The share
+ * bar goes; with no history the tile is exactly as before (bar and ETH note).
  */
 export interface KpiText {
   key: StringKey;
@@ -62,8 +66,8 @@ const AMBER = 'var(--amber-500)';
 const LONG = 'var(--color-down)';
 const SHORT = 'var(--color-up)';
 
-/** IB-118: the tiles whose bar was empty and now carry a 7-day chart. */
-const CHARTED: ReadonlySet<WebKpiId> = new Set(['market_cap', 'btc_oi', 'btc_funding']);
+/** IB-118: the tiles whose bar was empty and now carry a 7-day chart; IB-131 dominance in place of its bar. */
+const CHARTED: ReadonlySet<WebKpiId> = new Set(['market_cap', 'btc_dominance', 'btc_oi', 'btc_funding']);
 /** A span this close to 7 days is «7 дней»: the first hourly point or 10-min row lands just inside the window. */
 export const FULL_SPAN_SEC = 7 * 86_400 - 2 * 3_600;
 
@@ -84,8 +88,9 @@ export function kpiTileView(tile: WebKpiTile): KpiTileView {
     chart,
     range: range(tile, chart ? history : null),
     caption,
-    // the caption carries the source (and CoinGecko's link) when there is a chart; the note's fact moves to the range row
-    note: caption || isCollecting(tile) ? null : note(tile),
+    // the caption carries the source (and CoinGecko's link) when there is a chart; the note's fact moves to the
+    // range row — except dominance's ETH share, which the range row does not say: it follows the caption (IB-131)
+    note: (caption && history?.kind !== 'lines') || isCollecting(tile) ? null : note(tile),
     attribution: visible && !caption ? { ...tile.source } : null,
   };
 }
@@ -103,8 +108,17 @@ function range(tile: WebKpiTile, history: WebKpiHistory | null): KpiTileView['ra
       right: ratio == null ? null : { key: 'kpi.range.ls_accounts', params: { ratio: ratio.toFixed(2) } },
     };
   }
-  const fmt = tile.id === 'market_cap' ? (v: number) => capUsd(v) ?? '' : formatUsd;
   const full = history.to - history.from >= FULL_SPAN_SEC;
+  if (history.kind === 'lines') {
+    const eth = history.second;
+    if (!eth) return null;
+    // two parts, as the cap's min / max: in a narrow tile ETH wraps whole onto its own line, never mid-figure
+    return {
+      left: { key: full ? 'kpi.range.dominance_btc_7d' : 'kpi.range.dominance_btc', params: { min: pct1(history.min), max: pct1(history.max) } },
+      right: { key: 'kpi.range.dominance_eth', params: { min: pct1(eth.min), max: pct1(eth.max) } },
+    };
+  }
+  const fmt = tile.id === 'market_cap' ? (v: number) => capUsd(v) ?? '' : formatUsd;
   return {
     left: { key: full ? 'kpi.range.min_7d' : 'kpi.range.min', params: { value: fmt(history.min) } },
     right: { key: 'kpi.range.max', params: { value: fmt(history.max) } },
@@ -184,3 +198,4 @@ function note(tile: WebKpiTile): KpiTileView['note'] {
 
 const clampPct = (v: number) => Math.max(0, Math.min(100, v));
 const round1 = (v: number) => Math.round(v * 10) / 10;
+const pct1 = (v: number) => v.toFixed(1);

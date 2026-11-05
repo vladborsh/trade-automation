@@ -68,12 +68,12 @@ describe('IB-118: the 7-day chart, its min / max row and its caption', () => {
   const area = (values: number[], spanSec: number, breakAfterSec = 1800): WebKpiTile['history'] => {
     const step = spanSec / (values.length - 1);
     const points = values.map((value, i) => ({ time: 1_000_000 + Math.round(i * step), value }));
-    return { kind: 'area', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec };
+    return { kind: 'area', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec, second: null };
   };
   const settlements = (n: number): WebKpiTile['history'] => {
     const points = Array.from({ length: n }, (_, i) => ({ time: 1_000_000 + i * 28_800, value: (i % 5 - 1) / 1e5 }));
     const v = points.map((p) => p.value);
-    return { kind: 'bars', points, from: points[0].time, to: points[n - 1].time, min: Math.min(...v), max: Math.max(...v), breakAfterSec: null };
+    return { kind: 'bars', points, from: points[0].time, to: points[n - 1].time, min: Math.min(...v), max: Math.max(...v), breakAfterSec: null, second: null };
   };
 
   it('IB-BUG-038: a tile with NO history field (a server older than IB-118) is a tile without a chart, not a crash', () => {
@@ -130,21 +130,69 @@ describe('IB-118: the 7-day chart, its min / max row and its caption', () => {
     expect(kpiTileView(base('btc_funding', { history: settlements(20) })).range?.left?.key).toBe('kpi.range.settlements.many');
   });
 
-  it('dominance and liquidations keep their bars even if a history came', () => {
-    const v = kpiTileView(base('btc_dominance', { value: 59.3, source: COINGECKO, history: area([1, 2], 7 * DAY) }));
-    expect(v).toMatchObject({ chart: null, range: null, caption: null, bar: [{ pct: 59.3 }] });
+  it('liquidations keep their bar even if a history came', () => {
+    const v = kpiTileView(base('liquidations_24h', { value: 10, split: { long: 4, short: 6 }, history: area([1, 2], 7 * DAY) }));
+    expect(v).toMatchObject({ chart: null, range: null, caption: null, bar: [{ pct: 40 }, { pct: 60 }] });
   });
 
   it('ruPlural: 1, 21 one; 2–4, 22 few; 5–20, 11–14, 25 many', () => {
     expect([1, 21, 2, 4, 22, 5, 11, 12, 14, 20, 25, 111].map(ruPlural)).toEqual(['one', 'one', 'few', 'few', 'few', 'many', 'many', 'many', 'many', 'many', 'many', 'many']);
   });
-
-  it('the committed fixture: the three charts map, and every key the view can name exists in both languages', () => {
+  it('the committed fixture: the four charts map, and every key the view can name exists in both languages', () => {
     const views = WebKpisResponseSchema.parse(kpisFixture).tiles.map(kpiTileView);
-    expect(views.map((v) => v.chart?.kind ?? null)).toEqual(['area', null, null, 'area', 'bars']);
+    expect(views.map((v) => v.chart?.kind ?? null)).toEqual(['area', 'lines', null, 'area', 'bars']);
     const keys = views.flatMap((v): Array<string | undefined> => [v.range?.left?.key, v.range?.right?.key, v.caption?.text.key]).filter((k): k is string => !!k);
-    keys.push('kpi.range.min', 'kpi.range.min_7d', 'kpi.caption.7d', 'kpi.caption.span', 'kpi.note.collecting',
+    keys.push('kpi.range.min', 'kpi.range.min_7d', 'kpi.range.dominance_btc', 'kpi.range.dominance_btc_7d', 'kpi.range.dominance_eth', 'kpi.caption.7d', 'kpi.caption.span', 'kpi.note.collecting',
       'kpi.range.settlements.one', 'kpi.range.settlements.few', 'kpi.range.settlements.many');
     for (const t of [ru, en]) expect(keys.filter((k) => !(t as Record<string, string>)[k])).toEqual([]);
+  });
+});
+
+describe('IB-131: dominance — BTC and ETH strips, «7д BTC a–b %» / «ETH c–d %», the ETH note kept', () => {
+  const DAY = 86_400;
+  /** BTC and ETH every 10 min over `spanSec`; `ethSkip` drops those ETH indices (a BTC row without ETH). */
+  const lines = (btc: number[], eth: number[], spanSec: number, ethSkip: number[] = []): WebKpiTile['history'] => {
+    const step = spanSec / (btc.length - 1);
+    const t = (i: number) => 1_000_000 + Math.round(i * step);
+    const points = btc.map((value, i) => ({ time: t(i), value }));
+    const ethPoints = eth.map((value, i) => ({ time: t(i), value })).filter((_, i) => !ethSkip.includes(i));
+    const ev = ethPoints.map((p) => p.value);
+    return {
+      kind: 'lines', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...btc), max: Math.max(...btc), breakAfterSec: 1800,
+      second: { label: 'ETH', points: ethPoints, min: Math.min(...ev), max: Math.max(...ev) },
+    };
+  };
+  const ethNote = { key: 'kpi.note.eth_share' as const, params: { ethPct: 11.04 } };
+  const dom = (history: WebKpiTile['history']) =>
+    kpiTileView(base('btc_dominance', { value: 60.07, delta: 0.4, source: COINGECKO, history, note: ethNote }));
+
+  it('a week: the lines chart in place of the bar, the range from each line\'s own min / max (one decimal), the ETH note after the caption', () => {
+    const v = dom(lines([60.07, 59.84, 60.46, 60.12], [10.97, 11.31, 10.88, 11.04], 7 * DAY - 600));
+    expect(v.chart?.kind).toBe('lines');
+    expect(v.range).toEqual({ left: { key: 'kpi.range.dominance_btc_7d', params: { min: '59.8', max: '60.5' } }, right: { key: 'kpi.range.dominance_eth', params: { min: '10.9', max: '11.3' } } });
+    expect(v.caption).toEqual({ source: { ...COINGECKO, link: true }, text: { key: 'kpi.caption.7d', params: {} } });
+    expect(v.note).toEqual({ key: 'kpi.note.eth_share', params: { ethPct: '11.0' } }); // kept: the owner asked for it
+    expect(v.value).not.toBeNull(); // the value and its 24 h delta stay
+    expect(v.inline).toMatchObject({ text: expect.any(String), overKey: 'kpi.over.24h' });
+    expect(v.attribution).toBeNull(); // the caption carries the CoinGecko link
+  });
+
+  it('under 7 days the span is named and the range drops «7д», as on the cap tile', () => {
+    const v = dom(lines([60, 61], [11, 10], 1 * DAY + 3 * 3_600));
+    expect(v.range?.left?.key).toBe('kpi.range.dominance_btc');
+    expect(v.caption?.text).toEqual({ key: 'kpi.caption.span', params: { d: 1, h: 3 } });
+  });
+
+  it('null history leaves the tile exactly as before: the amber share bar and the ETH note, no range, no «копим историю»', () => {
+    const v = dom(null);
+    expect(v).toMatchObject({ chart: null, range: null, caption: null, bar: [{ pct: 60.07, colour: 'var(--amber-500)' }], attribution: COINGECKO });
+    expect(v.note).toEqual({ key: 'kpi.note.eth_share', params: { ethPct: '11.0' } });
+  });
+
+  it('the rendered words: «7д BTC 59.8–60.5 %» / «ETH 10.9–11.3 %» in Russian, «7d BTC …» in English', () => {
+    expect(ru['kpi.range.dominance_btc_7d']).toBe('7д BTC {min}–{max} %');
+    expect(en['kpi.range.dominance_btc_7d']).toBe('7d BTC {min}–{max} %');
+    expect(ru['kpi.range.dominance_btc']).not.toContain('7д');
+    expect([ru['kpi.range.dominance_eth'], en['kpi.range.dominance_eth']]).toEqual(['ETH {min}–{max} %', 'ETH {min}–{max} %']);
   });
 });

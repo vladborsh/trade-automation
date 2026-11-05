@@ -177,9 +177,9 @@ describe('MarketComponent shell (IB-088)', () => {
       TestBed.resetTestingModule();
       return out;
     };
-    // positive control: the same page with the fixture's histories draws three charts
+    // positive control: the same page with the fixture's histories draws four charts (IB-131: dominance too)
     const withHistory = await charts(kpisFixture);
-    expect(withHistory.charts).toBe(3);
+    expect(withHistory.charts).toBe(4);
     const old = { ...kpisFixture, tiles: kpisFixture.tiles.map(({ history: _absent, ...t }) => t) };
     expect(old.tiles.every((t) => !('history' in t))).toBe(true);
     const without = await charts(old);

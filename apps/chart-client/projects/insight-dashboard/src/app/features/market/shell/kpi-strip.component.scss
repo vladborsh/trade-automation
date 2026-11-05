@@ -21,6 +21,8 @@ h3 { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 // Sans, not the mono: IBM Plex Mono has no Cyrillic («7д мин» would fall back mid-line, IB-120)
 .range { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 8px; font: var(--type-small); color: var(--color-text-muted); min-width: 0; font-variant-numeric: tabular-nums; }
 .range .right { margin-left: auto; }
+// IB-131: a part never breaks inside itself («ETH 10.5–» / «11.7 %»); the row wraps between parts instead
+.range span { white-space: nowrap; }
 .note { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 .credit-row { display: flex; min-height: 0; }
 // §7.2 says --type-micro (11px) for attribution; IB-088's guard is text ≥ 12px on the page, so the credit is --type-small

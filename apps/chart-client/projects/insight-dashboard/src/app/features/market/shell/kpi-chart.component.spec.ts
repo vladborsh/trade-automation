@@ -14,7 +14,7 @@ function render(geometry: KpiChartGeometry): HTMLElement {
 }
 const h = (kind: WebKpiHistory['kind'], values: number[], times?: number[]): WebKpiHistory => {
   const points = values.map((value, i) => ({ time: times ? times[i] : i * 600, value }));
-  return { kind, points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec: kind === 'area' ? 1800 : null };
+  return { kind, points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec: kind === 'area' ? 1800 : null, second: null };
 };
 
 describe('KpiChartComponent', () => {
@@ -34,5 +34,22 @@ describe('KpiChartComponent', () => {
     const bars = [...el.querySelectorAll<HTMLElement>('.bar')];
     expect(bars.map((b) => [...b.classList].filter((c) => c !== 'bar').sort().join(' '))).toEqual(['longs_pay', 'shorts_pay', 'lit longs_pay']);
     expect(el.querySelector('.zero')).not.toBeNull();
+  });
+
+  it('IB-131 lines: two strips, BTC then ETH, each with its own path and min / max / last dots', () => {
+    const points = [{ time: 0, value: 60 }, { time: 600, value: 61 }];
+    const el = render(kpiChartGeometry({
+      kind: 'lines', points, from: 0, to: 600, min: 60, max: 61, breakAfterSec: 1800,
+      second: { label: 'ETH', points: [{ time: 0, value: 11 }, { time: 600, value: 10 }], min: 10, max: 11 },
+    }) as KpiChartGeometry);
+    const strips = [...el.querySelectorAll<HTMLElement>('[data-strip]')];
+    expect(strips.map((s) => s.dataset['strip'])).toEqual(['btc', 'eth']);
+    for (const s of strips) {
+      expect(s.querySelectorAll('path.line')).toHaveLength(1);
+      expect(s.querySelectorAll('[data-dot]')).toHaveLength(3);
+    }
+    expect(strips[0].querySelector<HTMLElement>('[data-dot="last"]')?.style.top).toBe('10%'); // BTC rose: its last is its max
+    expect(strips[1].querySelector<HTMLElement>('[data-dot="last"]')?.style.top).toBe('90%'); // ETH fell
+    expect(el.querySelector('.fill')).toBeNull(); // lines, not areas
   });
 });

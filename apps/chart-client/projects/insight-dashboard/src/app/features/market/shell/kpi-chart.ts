@@ -13,6 +13,10 @@ import type { WebKpiHistory } from '@trade-automation/contracts';
  *
  * `bars` (BTC funding): one bar per settlement, by index, around a zero line: above zero longs pay
  * (amber), below shorts pay (blue). The newest bar is lit.
+ *
+ * `lines` (IB-131, BTC dominance): two strips stacked, BTC (`points`) above and ETH (`second`) below,
+ * each on ITS OWN scale — at 57 % and 11 % a shared axis would draw a week's 1-point move flat. Both
+ * share the x axis (`from`/`to`) and the break rule; each has its min / max dots and the newest marked.
  */
 export interface KpiDot {
   x: number;
@@ -48,7 +52,21 @@ export interface KpiBarsGeometry {
   bars: KpiBar[];
 }
 
-export type KpiChartGeometry = KpiAreaGeometry | KpiBarsGeometry;
+/** One strip of a `lines` chart: its runs (a path each), and its own min / max / newest dots. */
+export interface KpiLineStrip {
+  segments: string[];
+  min: KpiDot;
+  max: KpiDot;
+  last: KpiDot;
+}
+
+export interface KpiLinesGeometry {
+  kind: 'lines';
+  /** Top (BTC, the tile's value) then bottom (ETH). */
+  strips: [KpiLineStrip, KpiLineStrip];
+}
+
+export type KpiChartGeometry = KpiAreaGeometry | KpiBarsGeometry | KpiLinesGeometry;
 
 /** Room above the max and below the min, so a dot is never cut in half by the box edge. */
 export const PAD_PCT = 10;
@@ -61,15 +79,22 @@ const BAR_GAP_SHARE = 0.25;
  */
 export function kpiChartGeometry(history: WebKpiHistory | null | undefined): KpiChartGeometry | null {
   if (history == null || history.points.length === 0) return null;
-  return history.kind === 'area' ? area(history) : bars(history);
+  switch (history.kind) {
+    case 'area': return area(history);
+    case 'bars': return bars(history);
+    // a `lines` without its second line cannot be drawn as two strips; the contract refuses it anyway
+    case 'lines': return history.second ? lines(history, history.second) : null;
+  }
 }
 
-function area(h: WebKpiHistory): KpiAreaGeometry {
-  const pts = h.points;
+type Points = WebKpiHistory['points'];
+
+/** One line in a 0–100 box: x by time over `from`–`to`, y over its own `min`–`max`, runs split by the break rule. */
+function trace(pts: Points, h: Pick<WebKpiHistory, 'from' | 'to' | 'breakAfterSec'>, min: number, max: number) {
   const span = h.to - h.from;
-  const range = h.max - h.min;
+  const range = max - min;
   const x = (t: number) => (span === 0 ? 100 : ((t - h.from) / span) * 100);
-  const y = (v: number) => (range === 0 ? 50 : PAD_PCT + ((h.max - v) / range) * (100 - 2 * PAD_PCT));
+  const y = (v: number) => (range === 0 ? 50 : PAD_PCT + ((max - v) / range) * (100 - 2 * PAD_PCT));
   const dot = (i: number): KpiDot => ({ x: r(x(pts[i].time)), y: r(y(pts[i].value)) });
 
   const runs: number[][] = [];
@@ -84,17 +109,31 @@ function area(h: WebKpiHistory): KpiAreaGeometry {
     const x1 = r(x(pts[run[run.length - 1]].time));
     return { line, area: `${line} L${x1} 100 L${x0} 100 Z` };
   });
+  return {
+    segments,
+    min: dot(pts.findIndex((p) => p.value === min)),
+    max: dot(pts.findIndex((p) => p.value === max)),
+    last: dot(pts.length - 1),
+  };
+}
 
+function area(h: WebKpiHistory): KpiAreaGeometry {
+  const pts = h.points;
   const first = pts[0].value;
   const lastValue = pts[pts.length - 1].value;
   return {
     kind: 'area',
-    segments,
-    min: dot(pts.findIndex((p) => p.value === h.min)),
-    max: dot(pts.findIndex((p) => p.value === h.max)),
-    last: dot(pts.length - 1),
+    ...trace(pts, h, h.min, h.max),
     tone: lastValue > first ? 'up' : lastValue < first ? 'down' : 'flat',
   };
+}
+
+function lines(h: WebKpiHistory, second: NonNullable<WebKpiHistory['second']>): KpiLinesGeometry {
+  const strip = (pts: Points, min: number, max: number): KpiLineStrip => {
+    const t = trace(pts, h, min, max);
+    return { segments: t.segments.map((s) => s.line), min: t.min, max: t.max, last: t.last };
+  };
+  return { kind: 'lines', strips: [strip(h.points, h.min, h.max), strip(second.points, second.min, second.max)] };
 }
 
 function bars(h: WebKpiHistory): KpiBarsGeometry {

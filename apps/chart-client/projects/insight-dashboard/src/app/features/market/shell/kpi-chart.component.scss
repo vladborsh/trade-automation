@@ -19,3 +19,13 @@ svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible
 .bar.longs_pay { background: var(--amber-500); }
 .bar.shorts_pay { background: var(--blue-400); }
 .bar.lit { opacity: 1; }
+// IB-131 dominance: two strips in the same 56 px, BTC amber (the bar's colour) over ETH muted; the
+// extremes stay muted dots, the newest takes its line's colour
+.chart[data-kind='lines'] { display: flex; flex-direction: column; gap: 3px; }
+// a hairline between the strips: two boxes, two scales — the lines' crossings mean nothing
+.strip.eth { border-top: 1px dashed var(--card-border); padding-top: 3px; }
+.strip { position: relative; flex: 1; min-height: 0; }
+.strip.btc { --line: var(--amber-500); }
+.strip.eth { --line: var(--color-text-muted); }
+.strip .line { stroke: var(--line); }
+.strip .dot.last { background: var(--line); }

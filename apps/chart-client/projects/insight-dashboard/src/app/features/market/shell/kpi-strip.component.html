@@ -17,7 +17,7 @@
           }
         }
       </div>
-      <!-- IB-118: cap, BTC OI and BTC funding draw a 7-day chart where the others keep their bar -->
+      <!-- IB-118: cap, BTC OI and BTC funding draw a 7-day chart; IB-131 dominance too, its bar only without one; liquidations keep theirs -->
       @if (tile.chart; as chart) {
         <app-kpi-chart class="viz" [geometry]="chart" [label]="rangeLabel(tile)" />
       } @else if (tile.id === 'btc_dominance' || tile.id === 'liquidations_24h') {
@@ -31,7 +31,7 @@
       }
       <!-- always six rows (empty ones too): the strip's subgrid lines every tile's chart, range and note up -->
       <div class="range">@if (tile.range; as r) {@if (r.left; as l) {<span>{{ t(l.key, l.params) }}</span>}@if (r.right; as rt) {<span class="right">{{ t(rt.key, rt.params) }}</span>}}</div>
-      <p class="note">@if (tile.caption; as c) {@if (c.source.link && c.source.url) {<a class="credit" [href]="c.source.url" target="_blank" rel="noopener" [attr.title]="t('kpi.source', { name: c.source.name })">{{ c.source.name }}</a>} @else {<span>{{ c.source.name }}</span>} {{ t(c.text.key, c.text.params) }}} @else if (tile.note; as n) { {{ t(n.key, n.params) }} }</p>
+      <p class="note">@if (tile.caption; as c) {@if (c.source.link && c.source.url) {<a class="credit" [href]="c.source.url" target="_blank" rel="noopener" [attr.title]="t('kpi.source', { name: c.source.name })">{{ c.source.name }}</a>} @else {<span>{{ c.source.name }}</span>} {{ t(c.text.key, c.text.params) }}@if (tile.note; as n) { · {{ t(n.key, n.params) }}}} @else if (tile.note; as n) { {{ t(n.key, n.params) }} }</p>
       <div class="credit-row">
         @if (tile.attribution; as a) {
           @if (a.url) {
