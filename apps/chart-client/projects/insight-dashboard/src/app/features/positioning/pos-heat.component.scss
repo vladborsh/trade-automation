@@ -1,3 +1,5 @@
+@use './heat';
+
 /* Dark-terminal palette (AGENTS.md). Heat is ONE hue (amber) by rarity, deliberately not the
    up/down green/red: a rare fall and a rare rise are equally worth a look. */
 :host { display: block; min-width: 0; }
@@ -20,15 +22,7 @@ tbody tr:hover td, tbody tr:hover .coin { background-color: rgb(48 54 61 / 40%);
 .coin { position: sticky; left: 0; background: var(--card-bg); z-index: 1; }
 .coin a { color: var(--color-text-strong); font-weight: 600; text-decoration: none; }
 .coin a:hover { color: #26a69a; text-decoration: underline; }
-td[data-heat='typical'] { color: #c9d1d9; }
-td[data-heat='notable'] { background: rgb(210 153 34 / 14%); }
-td[data-heat='unusual'] { background: rgb(210 153 34 / 30%); }
-td[data-heat='extreme'] { background: rgb(210 153 34 / 50%); color: #f0f6fc; }
-/* «cannot say» is not «normal»: muted and hatched */
-td[data-heat='none'] {
-  color: #8b949e;
-  background: repeating-linear-gradient(135deg, transparent 0 4px, rgb(139 148 158 / 12%) 4px 5px);
-}
+td { @include heat.fills; }
 .signal { color: #d29922; }
 .legend { margin: 8px 0 0; font: var(--type-small); color: var(--color-text-muted); }
 
