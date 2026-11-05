@@ -74,6 +74,11 @@ maybeDescribe('IB-123 the liquidation history run on real SQL', () => {
     await dropOwn(async () => admin, [name]);
   }, DB_HOOK_TIMEOUT_MS);
 
+  /**
+   * 8 h of tape at the live tick: 2 880 ticks of real SQL per replay since IB-143's 10 s tick (960 at 30 s). The
+   * two tests that replay take 13 s and 29 s alone on a Mac, so they get an explicit budget instead of jest's 30 s.
+   */
+  const REPLAY_TIMEOUT_MS = 180_000;
   const run = (handle: DbHandle) =>
     replayLiq({ store: historyStore(new PgLiqAlertStore(handle), { params: LIQ_DEFAULT_PARAMS, gapsSinceMs: T0 }), universe: UNIVERSE, build: 'dev' }, T0, T0 + 8 * 60 * MIN);
 
@@ -96,7 +101,7 @@ maybeDescribe('IB-123 the liquidation history run on real SQL', () => {
     })).rejects.toThrow('rollback');
     expect(inside).toMatchObject({ alerts: 2 });
     expect(await new PgLiqBackfillReads(db).backfillCounts()).toEqual({ alerts: 0, continuations: 0, events: 0, event_continuations: 0, controls_random: 0, controls_near_miss: 0, paths: 0, paths_measured: 0 });
-  });
+  }, REPLAY_TIMEOUT_MS);
 
   it('write: backfill rows, never sent, the old gap named on the 01:03 alert only; a rerun writes 0', async () => {
     const first = await run(db);
@@ -115,7 +120,7 @@ maybeDescribe('IB-123 the liquidation history run on real SQL', () => {
     const before = await new PgLiqBackfillReads(db).backfillCounts();
     expect(await run(db)).toMatchObject({ alerts: 0, events: 0, continuations: 0, controls: 0 });
     expect(await new PgLiqBackfillReads(db).backfillCounts()).toEqual(before);
-  });
+  }, REPLAY_TIMEOUT_MS);
 
   it('pathsDue subjects: oi ↔ market never cross; all takes both; the liq run measures only its own; windows due counted with weight', async () => {
     const oi = await db.query<{ id: string }>(
