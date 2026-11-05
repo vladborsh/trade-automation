@@ -49,4 +49,14 @@ describe('FlowsBlockComponent (IB-091)', () => {
     expect(help.querySelector('summary')?.textContent?.trim()).toBe('Как читать эти показатели?');
     expect(help.compareDocumentPosition(el.querySelector('.tiles') as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('IB-138 review: the tile notes say what the data shows — no «ждут движения», no «приходят деньги» (D20, design §5)', () => {
+    const ru = render(base);
+    expect(tile(ru, 'dvol').querySelector('.note')?.textContent?.trim()).toBe('индекс Deribit: чем выше, тем дороже опционы — за защиту и за ставки платят больше; о направлении не говорит');
+    expect(tile(ru, 'stablecoins').querySelector('.note')?.textContent?.trim()).toBe('по числу монет, все долларовые стейблкоины вместе: рост — выпустили новые, падение — погасили');
+    TestBed.resetTestingModule();
+    const en = render(base, 'en');
+    expect(tile(en, 'dvol').querySelector('.note')?.textContent).not.toMatch(/expect/i);
+    expect(tile(en, 'stablecoins').querySelector('.note')?.textContent).not.toMatch(/money/i);
+  });
 });
