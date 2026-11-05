@@ -54,6 +54,10 @@ test.describe('instrument page — desktop (IB-099)', () => {
     await expect(page.locator('.calendar-tooltip')).toBeVisible();
     await badge.click();
     await expect(page.locator('.calendar-tooltip')).toHaveCount(0);
+    // IB-BUG-045: the pointer is still ON the badge after that click, so a hover to its centre is no
+    // entry (a mousemove, no mouseenter); it passed only when the live tail rebuilt the badge under the
+    // pointer within the 5 s (measured 4.1–4.4 s after the hover, 6 of 6). Leave, then enter.
+    await page.mouse.move(10, 10);
     await badge.hover();
     await expect(page.locator('.calendar-tooltip')).toContainText('Congressional Elections');
   });
