@@ -2,7 +2,7 @@ import { WEB_MARKET_PERIOD_SECONDS, type WebInsightChart, type WebInsightChartPo
 import type { OiPoint } from '../divergence/oi-per-bar';
 import type { InsightSnapshot } from '../types';
 import {
-  flowsChart, klinesToLine, r1Chart, r2Chart, r3Chart, r3Window, r4Bars, r4Chart, r5Chart, r6Chart, r7Chart, r11Bars, r11Chart, R4_BAR_SEC,
+  flowsChart, klinesToLine, r1Chart, r2Chart, r3Chart, r3Window, r4Chart, r4Window, r5Chart, r6Chart, r7Chart, r11Bars, r11Chart, R4_BAR_SEC,
 } from './rule-charts';
 
 /**
@@ -14,7 +14,7 @@ import {
  * |---|---|---|---|
  * | R1 R2 R7 R8 R9 R10 | the snapshot the rule read | 0 | with the snapshot (60 s) |
  * | R3 | 1-minute sums of our liquidation tape, ±15 min | 0 (DB) | 5 min per cascade |
- * | R4 | 7d: the positioning baseline's hourly closes; below: 5 m klines at exactly 12 / 48 / 288 (weight 1 / 1 / 2). OI: `/futures/data` (weight 0) | ≤ 2 per (coin, period) | 5 min per (coin, period) |
+ * | R4 | from the rule's reference close: 7d the positioning baseline's hourly closes; below, 5 m klines at exactly 12–23 / 48–59 / 288–299 (weight 1 / 1 / 2). OI: `/futures/data` (weight 0) | ≤ 2 per (coin, period) | 5 min per (coin, period) |
  * | R5 | the positioning baseline's 30-day settlements (IB-118) | 0 | the baseline's hour |
  * | R6 | `/futures/data` L/S ×2 (weight 0) | 0 | 5 min per (coin, period) |
  * | R11 | klines on the alert's TF at exactly A − 2 … B + N (≤ W + N + 3 → weight ≤ 2); OI from our DB | ≤ 2 per alert | 1 h per alert id |
@@ -93,10 +93,10 @@ export async function chartFor(st: WebInsightStatement, s: InsightSnapshot, read
       if (!reads || coin === null) return null;
       const data = await cache.getOrLoad(`insights:chart:r4:${coin}:${s.period}`, CHART_CACHE_MS, async () => {
         const fromMs = s.nowMs - WEB_MARKET_PERIOD_SECONDS[s.period] * 1000;
-        const bars = r4Bars(s.period, s.nowMs);
+        const { refMs, bars } = r4Window(s.period, s.nowMs);
         const [price, oi] = await Promise.all([
           bars === null
-            ? reads.hourlyCloses(coin, fromMs)
+            ? reads.hourlyCloses(coin, refMs)
             : reads.closedKlines(coin, '5m', bars.fromMs, bars.limit).then((k) => klinesToLine(k, R4_BAR_SEC)),
           reads.openInterest(coin, fromMs, s.nowMs, s.period === '7d' ? H : 0),
         ]);

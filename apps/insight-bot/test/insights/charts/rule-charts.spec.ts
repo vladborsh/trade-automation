@@ -4,12 +4,13 @@ import {
 } from '@trade-automation/contracts';
 import { levelBand, pctFromFirst, thin, upperBand } from '../../../src/insights/charts/chart-math';
 import { attachCharts, chartFor, type ChartReads } from '../../../src/insights/charts/insight-charts';
-import { r11Bars, r4Bars } from '../../../src/insights/charts/rule-charts';
+import { r11Bars, r4Window } from '../../../src/insights/charts/rule-charts';
 import { runInsights } from '../../../src/insights/engine';
 import { levelRarity, rarity } from '../../../src/insights/rarity';
 import { R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, RULES } from '../../../src/insights/rules';
 import { isRefusal, type InsightSnapshot, type Rule } from '../../../src/insights/types';
 import { TtlCache } from '../../../src/venues/ttl-cache';
+import { refClose } from '../../../src/web/market/positioning/positioning.service';
 
 /**
  * IB-119 (market round 2 §3) — one spec per rule: WHICH series the chart draws and WHICH reference
@@ -147,21 +148,33 @@ describe('R4 OI vs price: two lines as % from the period start, ref 0', () => {
     const s = snapshot({ positioning: [r4row] });
     const { r, calls } = reads();
     const chart = valid(await chartFor(said(R4, s), s, r, cache()));
-    const bars = r4Bars('24h', NOW) as { fromMs: number; limit: number };
-    expect(bars.limit).toBe(288);
+    const bars = r4Window('24h', NOW).bars as { fromMs: number; limit: number };
+    expect(bars.limit).toBe(288); // NOW is 12:02: from yesterday's 12:00 close to today's 11:55 bar
     expect(calls.sort()).toEqual([`klines:SOLUSDT:5m:${bars.fromMs}:288`, 'oi:SOLUSDT:0'].sort());
-    expect(chart).toMatchObject({ kind: 'lines', unit: 'pct', ref: 0, band: null, span: { from: NOW_S - 86_400, to: NOW_S } });
+    expect(chart).toMatchObject({ kind: 'lines', unit: 'pct', ref: 0, band: null, span: { from: bars.fromMs / 1000, to: NOW_S } }); // from the reference close
     expect(keys(chart)).toEqual(['price', 'oi']);
     expect(chart.series[0]?.points[0]).toEqual({ time: bars.fromMs / 1000, value: 0 });
     expect(chart.series[0]?.points.at(-1)?.value).toBeCloseTo((51 + 287) / 50 * 100 - 100, 6);
     expect(chart.series[1]?.points[0]?.value).toBe(0);
     expect(chart.series[1]?.points.at(-1)?.value).toBeCloseTo((1_000 - 288) / 1_000 * 100 - 100, 6);
   });
-  it('the exact bar count per period: 12 / 48 / 288 — and the last bar is the last CLOSED one', () => {
-    expect(['1h', '4h', '24h'].map((p) => r4Bars(p as '1h', NOW)?.limit)).toEqual([12, 48, 288]);
-    const b = r4Bars('1h', NOW) as { fromMs: number; limit: number };
-    expect(b.fromMs + b.limit * 300_000).toBeLessThanOrEqual(NOW);
-    expect(b.fromMs + (b.limit + 1) * 300_000).toBeGreaterThan(NOW);
+  it('the price starts at the RULE\'s reference close (the last whole hour ending ≤ now − P), and ends at the last CLOSED bar', () => {
+    expect(['1h', '4h', '24h'].map((p) => r4Window(p as '1h', NOW).bars?.limit)).toEqual([12, 48, 288]);
+    // 12:40: the rule's 24h reference is still yesterday's 12:00 close — 296 bars, weight still 2 (< 500)
+    const late = NOW + 38 * 60_000;
+    const w = r4Window('24h', late);
+    expect(w.refMs).toBe(Date.UTC(2026, 10, 4, 12));
+    expect(w.bars).toEqual({ fromMs: w.refMs, limit: 296 });
+    const b = r4Window('1h', late).bars as { fromMs: number; limit: number };
+    expect(b.fromMs).toBe(Date.UTC(2026, 10, 5, 11));
+    expect(b.fromMs + b.limit * 300_000).toBeLessThanOrEqual(late);
+    expect(b.fromMs + (b.limit + 1) * 300_000).toBeGreaterThan(late);
+    expect(['1h', '4h', '24h'].map((p) => r4Window(p as '1h', Date.UTC(2026, 10, 5, 12, 59, 59)).bars?.limit)).toEqual([23, 59, 299]); // the widest: 11 bars more
+  });
+  it('the reference close agrees with the rule\'s own refClose', () => {
+    const closeTimes = ramp(48, 0).map((i) => Date.UTC(2026, 10, 3, 12) + i * 3_600_000); // bar opens
+    const late = NOW + 38 * 60_000;
+    expect(refClose({ closes: ramp(48, 100), closeTimes }, late - 86_400_000)).toBe(100 + closeTimes.findIndex((t) => t + 3_600_000 === r4Window('24h', late).refMs));
   });
   it('7d: the baseline\'s hourly closes (no klines) and OI at ≥ 1 h', async () => {
     const s = snapshot({ period: '7d', positioning: [r4row] });
@@ -170,7 +183,7 @@ describe('R4 OI vs price: two lines as % from the period start, ref 0', () => {
     valid(await chartFor(st, s, r, cache()));
     expect(calls.some((x) => x.startsWith('klines'))).toBe(false);
     expect(calls).toContain('oi:SOLUSDT:3600000');
-    expect(calls).toContain(`closes:SOLUSDT:${NOW - 7 * 86_400_000}`);
+    expect(calls).toContain(`closes:SOLUSDT:${r4Window('7d', NOW).refMs}`);
   });
   it('a second request for the same (coin, period) inside 5 minutes reads nothing', async () => {
     const s = snapshot({ positioning: [r4row] });

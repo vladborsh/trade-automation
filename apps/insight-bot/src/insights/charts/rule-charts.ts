@@ -38,8 +38,9 @@ export const R9_DAYS = 30;
 export const R10_MINUTES = 60;
 /** R11: bars before A, and the alert's own N after B (capped at the last closed bar). */
 export const R11_BARS_BEFORE_A = 2;
-/** R4 below 7d: 5 m price bars at exactly the period's count (12 / 48 / 288 → weight 1 / 1 / 2). */
+/** R4 below 7d: 5 m price bars from the rule's own reference close (12–23 / 48–59 / 288–299 → weight 1 / 1 / 2). */
 export const R4_BAR_SEC = 300;
+const HOUR_MS = 3_600_000;
 
 const symbolOf = (st: WebInsightStatement) => (typeof st.params['symbol'] === 'string' ? st.params['symbol'] : null);
 
@@ -104,12 +105,18 @@ export function r3Chart(win: { fromMs: number; toMs: number; start: number; end:
   });
 }
 
-/** R4 below 7d: exactly the period's 5 m bars, so one klines call at the IB-115 exact limit. */
-export function r4Bars(period: WebMarketPeriod, nowMs: number): { fromMs: number; limit: number } | null {
-  if (period === '7d') return null;
-  const limit = WEB_MARKET_PERIOD_SECONDS[period] / R4_BAR_SEC;
+/**
+ * R4's price line starts where the RULE's price change starts: `refClose` — the close of the last whole
+ * hour that ended at or before now − P (positioning.service.ts). Starting at now − P instead put the
+ * chart's «цена +1.9 %» beside the title's «+1.5 %» (found live, BNB 24h, 2026-11-05). So `refMs` is
+ * that hour's end, and below 7d the 5 m bars run from it to the last closed bar: one klines call at
+ * exactly that count (IB-115's exact limit), at most P/5m + 11 bars.
+ */
+export function r4Window(period: WebMarketPeriod, nowMs: number): { refMs: number; bars: { fromMs: number; limit: number } | null } {
+  const refMs = Math.floor((nowMs - WEB_MARKET_PERIOD_SECONDS[period] * 1000) / HOUR_MS) * HOUR_MS;
+  if (period === '7d') return { refMs, bars: null };
   const lastOpen = Math.floor(nowMs / (R4_BAR_SEC * 1000)) * R4_BAR_SEC * 1000 - R4_BAR_SEC * 1000;
-  return { fromMs: lastOpen - (limit - 1) * R4_BAR_SEC * 1000, limit };
+  return { refMs, bars: { fromMs: refMs, limit: (lastOpen - refMs) / (R4_BAR_SEC * 1000) + 1 } };
 }
 
 /** 5 m klines → a price line: the first bar's open, then each close at its bar's end. */
@@ -119,11 +126,16 @@ export function klinesToLine(klines: ReadonlyArray<{ time: number; open: number;
   return [{ time: first.time, value: first.open }, ...klines.map((k) => ({ time: k.time + barSec, value: k.close }))];
 }
 
+/**
+ * Each line is % from ITS title figure's start: price from the reference close (`r4Window`), OI from its
+ * first reading at or after now − P (`currentFor`'s OI change) — so the corner agrees with the title.
+ */
 export function r4Chart(s: InsightSnapshot, price: readonly WebInsightChartPoint[], oi: readonly WebInsightChartPoint[]): WebInsightChart | null {
+  const from = Math.min(price[0]?.time ?? now(s), now(s) - WEB_MARKET_PERIOD_SECONDS[s.period]);
   return chartOf({
     kind: 'lines', unit: 'pct', ref: 0, band: null,
     series: [{ key: 'price', points: pctFromFirst(price) }, { key: 'oi', points: pctFromFirst(oi) }],
-    highlight: null, marks: [], span: { from: now(s) - WEB_MARKET_PERIOD_SECONDS[s.period], to: now(s) },
+    highlight: null, marks: [], span: { from, to: now(s) },
   });
 }
 
