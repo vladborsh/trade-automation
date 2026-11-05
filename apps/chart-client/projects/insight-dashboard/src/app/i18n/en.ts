@@ -619,7 +619,7 @@ export const en: Strings = {
   'liqPage.help.sides.lead': 'Shorts above the line, longs below.',
   'liqPage.help.sides.text': 'A short liquidation is a forced buy, it pushes the price up; a long one is a forced sell, down.',
   'liqPage.help.series.lead': 'Series',
-  'liqPage.help.series.text': '(«137 in 8 min») — how many liquidations in a row. A series is a cascade: the price was pushed through stops. After a cascade the move often runs out of steam, but that is not a rule — look at the chart.',
+  'liqPage.help.series.text': '(«137 in 8 min») — how many liquidations in a row across the whole market (all coins together). A series is a cascade: the price was pushed through stops. After a cascade the move often runs out of steam, but that is not a rule — look at the chart.',
   'liqPage.help.read.lead': 'How to read it.',
   'liqPage.help.read.text': 'One big liquidation is noise. A cluster of circles on one side means many were wrong at once. Tap a row to open the coin\'s chart at that minute.',
   'liqPage.help.venues.lead': 'Venues.',
@@ -641,5 +641,5 @@ export const en: Strings = {
   'liqPage.truncated': 'showing the latest {shown} of {total}',
   'liqPage.count': 'liquidations: {total} · sort by any column',
   'liqPage.empty': 'No liquidations match these filters.',
-  'liqPage.marketLink': 'All liquidations ({count}) →',
+  'liqPage.marketLink': 'All liquidations →',
 };

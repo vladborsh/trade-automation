@@ -64,7 +64,7 @@ describe('LiquidationsBlockComponent (IB-089)', () => {
     expect(el.querySelector('app-liq-large')?.textContent).toContain('normal appears on 2026-11-10');
   });
 
-  it('IB-120: «All liquidations (N) →» is a router link to /liquidations at Market\'s period — a real route, never a bare #href', () => {
+  it('IB-120: «All liquidations →» is a router link to /liquidations at Market\'s period — a real route, never a bare #href', () => {
     const link = (p: '1h' | '24h' | '7d') => {
       TestBed.resetTestingModule();
       return render(overview(), null, 1_793_700_000, p).querySelector('app-liq-large a.more') as HTMLAnchorElement;
@@ -73,7 +73,8 @@ describe('LiquidationsBlockComponent (IB-089)', () => {
     expect(link('1h').getAttribute('href')).toBe('/liquidations?p=24h');
     const a = link('24h');
     expect(a.getAttribute('href')).toBe('/liquidations?p=24h');
-    expect(a.textContent?.trim()).toBe(`All liquidations (${block.large.length}) →`);
+    // TL ruling (IB-120 review): no count — Market's capped 50 and the 1h/4h → 24h view would both make N wrong
+    expect(a.textContent?.trim()).toBe('All liquidations →');
     expect(routes.some((r) => r.path === 'liquidations' && r.loadComponent !== undefined)).toBe(true);
     // the fold stays at 8 cards; the rest are on the page
     expect(a.closest('app-liq-large')?.querySelectorAll('.card').length).toBeLessThanOrEqual(8);

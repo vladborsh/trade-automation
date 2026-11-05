@@ -21,7 +21,7 @@
       </li>
     }
   </ol>
-  <a class="more" [routerLink]="pageLink().commands" [queryParams]="pageLink().queryParams">{{ t('liqPage.marketLink', { count: cards().length }) }}</a>
+  <a class="more" [routerLink]="pageLink().commands" [queryParams]="pageLink().queryParams">{{ t('liqPage.marketLink') }}</a>
 }
 @if (note(); as n) {
   <p class="muted">{{ n }}</p>

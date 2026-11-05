@@ -15,7 +15,7 @@ import { formatUsd } from './liquidations.format';
  * IB-108 (§7.6): the cards four across (`minmax(240px, 1fr)`), folded at 8 at every width with
  * IB-101's `collapseRows`; IB-089's context lines stay on each card.
  * IB-120 (market-round2 §4): the fold stays at 8, and «Показать все (N)» became a router link
- * «Все ликвидации (N) →» to /liquidations at Market's period — never a bare `#href` (IB-BUG-035).
+ * «Все ликвидации →» to /liquidations at Market's period — never a bare `#href` (IB-BUG-035).
  */
 @Component({
   selector: 'app-liq-large',
@@ -36,7 +36,7 @@ export class LiqLargeComponent {
   readonly to = input.required<number>();
   readonly bucketSec = input(3_600);
   readonly note = input<string | null>(null);
-  /** Market's period: «Все ликвидации (N) →» opens /liquidations at it (IB-120). */
+  /** Market's period: «Все ликвидации →» opens /liquidations at it (IB-120). */
   readonly period = input<WebMarketPeriod>('24h');
 
   readonly cards = computed(() => largeCards(this.large()));

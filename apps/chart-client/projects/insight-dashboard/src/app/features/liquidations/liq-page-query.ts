@@ -45,7 +45,7 @@ export function liqPageParams(state: LiqPageState): Record<string, string | null
 }
 
 /**
- * Market's «Все ликвидации (N) →»: /liquidations at Market's period. The page has 24h and 7d only
+ * Market's «Все ликвидации →»: /liquidations at Market's period. The page has 24h and 7d only
  * (§4), so Market's 1h and 4h open the 24h view, which contains them; the link never names a
  * period the page would silently replace.
  */

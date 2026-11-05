@@ -21,7 +21,7 @@ export const LIQ_HELP_ITEMS = ['what', 'sides', 'series', 'read', 'venues'] as c
 /**
  * IB-120 (market-round2 design §4) — /liquidations: every large liquidation of the period from our
  * tape, as Market's bubble chart and a sortable table, with filter chips. Reached from Market's
- * «Все ликвидации (N) →» and by link; no nav item (§4).
+ * «Все ликвидации →» and by link; no nav item (§4).
  *
  * The filters and the sort live in the URL (`liq-page-query.ts`), so a link reproduces the view and
  * a reload keeps it. Refreshed by the Market scheduler at the liquidation block's 10 s — the
