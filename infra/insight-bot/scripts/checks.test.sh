@@ -264,6 +264,14 @@ fixture liq-new "$LIQ
 d['output'] = out.replace('controls 0;', 'controls 2;')"
 run liq-weekly liq-new
 check 'liq-weekly a rerun that wrote rows (once-keys broken) → FLAG:new_rows' '[ "$(verdict liq-new liq-weekly)" = FLAG:new_rows ] && [ "$(sent)" = 0 ]'
+fixture liq-ev0 "$LIQ
+d['output'] = out.replace('controls 0;', 'controls 0, events 0;')"
+run liq-weekly liq-ev0
+check 'liq-weekly an IB-143 CLI line with «events 0» → PASS' '[ "$(verdict liq-ev0 liq-weekly)" = PASS ]'
+fixture liq-ev "$LIQ
+d['output'] = out.replace('controls 0;', 'controls 0, events 3;')"
+run liq-weekly liq-ev
+check 'liq-weekly a rerun that wrote only event rows (IB-143 once-keys broken) → FLAG:new_rows' '[ "$(verdict liq-ev liq-weekly)" = FLAG:new_rows ]'
 fixture liq-short "$LIQ
 d['output'] = out.replace('\"days\": 7', '\"days\": 6.8')"
 run liq-weekly liq-short

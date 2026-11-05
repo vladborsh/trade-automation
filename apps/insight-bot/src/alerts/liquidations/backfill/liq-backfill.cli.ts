@@ -44,7 +44,7 @@ import { PgLiqAlertStore } from '../pg/liq-alerts.repo';
 import { BOOT_LOOKBACK_MS } from '../liq-alert-loop';
 import {
   DAY_MS, LIQ_HISTORY_MULTIPLIERS, LIQ_HISTORY_PARAMS, MemoryJournalStore, countRows, firstFullDay, historyStore, replayLiq,
-  scaleParams, crossCheck, type LiqCountRow, type LiqReplayTotals,
+  scaleParams, crossCheck, replayedEvents, type LiqCountRow, type LiqReplayTotals, type ReplayedEvent,
 } from './liq-history';
 
 /** V31's budget, as IB-116: ≈ 8 % of the IP's 2 400 a minute while it runs. */
@@ -159,10 +159,15 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
       const t = await replay(db, scaleParams(LIQ_HISTORY_PARAMS, k), args.countsToMs, (s) => (mem = new MemoryJournalStore(s)));
       if (Object.keys(t.warnings).length > 0) exit = 1;
       table.push(...countRows(mem as unknown as MemoryJournalStore, scaleParams(LIQ_HISTORY_PARAMS, k), k, days));
-      say(`counts ×${k}: ${t.ticks} ticks, ${t.alerts} alerts, ${t.continuations} continuations, ${t.controls} controls, ${t.reads} reads`);
+      say(`counts ×${k}: ${t.ticks} ticks, ${t.alerts} alerts, ${t.events} events, ${t.continuations} event closes, ${t.controls} controls, ${t.reads} reads`);
       // same range only: a longer counts range (the weekly rerun) holds days the write never covers
       const mismatch = k === 1 && args.countsToMs === args.untilMs ? crossCheck(t, counts) : null;
       if (mismatch) { say(`MISMATCH: ${mismatch}`); exit = 1; }
+      if (k === 1) {
+        const events = replayedEvents(mem as unknown as MemoryJournalStore);
+        printEvents(events);
+        if (events.some((e) => !e.continuationNotBeforeFirst)) { say('L15 BROKEN: a continuation dated before its first message'); exit = 1; }
+      }
     }
     printTable(table, fromMs, args.countsToMs, days);
     say(`LIQ_HISTORY_JSON ${JSON.stringify({ mode: args.mode, from: iso(fromMs), until: iso(args.untilMs), countsTo: iso(args.countsToMs), days: Math.round(days * 1000) / 1000, written: counts, table })}`);
@@ -174,14 +179,30 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
 }
 
 function printTotals(t: LiqReplayTotals, counts: Record<string, number>, mode: string): void {
-  say(`${mode} ×1: ${t.ticks} ticks over (${iso(t.fromMs)}, ${iso(t.toMs)}]; new rows: alerts ${t.alerts}, continuations ${t.continuations}, controls ${t.controls}; ${t.reads} reads, at most ${t.maxPrints} prints held`);
+  say(`${mode} ×1: ${t.ticks} ticks over (${iso(t.fromMs)}, ${iso(t.toMs)}]; new rows: alerts ${t.alerts}, continuations ${t.continuations}, controls ${t.controls}, events ${t.events}; ${t.reads} reads, at most ${t.maxPrints} prints held`);
   say(`rows with source = backfill now: ${JSON.stringify(counts)}`);
   for (const [m, n] of Object.entries(t.warnings)) say(`  WARNING ×${n}: ${m}`);
 }
 
+/** L15 (IB-143): the ×1 events, one line each, then the message count against IB-123's 25 + 19. */
+function printEvents(events: readonly ReplayedEvent[]): void {
+  const hm = (ms: number) => new Date(ms).toISOString().slice(5, 19).replace('T', ' ');
+  const m = (usd: number) => `$${(usd / 1e6).toFixed(1)}M`;
+  say('events ×1: side  T0 (UTC)        S−T0  settled  first message coins              continuation');
+  for (const e of events) {
+    const c = e.continuation;
+    const why = !c ? '—' : c.news ? `SENT at +${Math.round((c.at - e.t0) / 1000)} s (${[...c.newCoins.map((x) => `+${x}`), ...c.addedCoins.map((x) => `${x} +threshold`)].join(', ')}), ${m(c.totalUsd)}`
+      : `journalled only (closed by ${c.closedBy} at +${Math.round((c.at - e.t0) / 1000)} s, nothing new), ${m(c.totalUsd)}`;
+    say(`  ${e.side.padEnd(5)} ${hm(e.t0)}  ${String(Math.round((e.sentAt - e.t0) / 1000)).padStart(4)}s  ${e.settled.padEnd(7)}  ${`${m(e.firstTotalUsd)} ${e.first.map((x) => `${x.symbol.replace(/USDT$/, '')} ${m(x.sumUsd)}`).join(' · ')}`.padEnd(32)}  ${why}`);
+  }
+  const sent = events.length + events.filter((e) => e.continuation?.news).length;
+  say(`messages ×1: ${sent} = ${events.length} first + ${sent - events.length} continuations (IB-123 under IB-122: 25 + 19 = 44)`);
+  say(`LIQ_EVENTS_JSON ${JSON.stringify({ messages: sent, events })}`);
+}
+
 function printTable(rows: readonly LiqCountRow[], fromMs: number, toMs: number, days: number): void {
   say(`counts over (${iso(fromMs)}, ${iso(toMs)}] = ${days.toFixed(2)} days; per week = count / days × 7`);
-  say('coin      ×    threshold   alerts (long/short)  /week  continuations  /week  with-gap  not-collected');
+  say('coin      ×    threshold   alerts (long/short)  /week  event closes  /week  with-gap  not-collected');
   for (const r of rows) {
     say(`${r.symbol.padEnd(9)} ${String(r.multiplier).padEnd(4)} ${String(r.thresholdUsd).padStart(9)}   ${String(r.alerts).padStart(4)} (${r.longs}/${r.shorts})`.padEnd(51)
       + `${String(r.perWeek).padStart(6)}  ${String(r.continuations).padStart(13)}  ${String(r.continuationsPerWeek).padStart(5)}  ${String(r.withGap).padStart(8)}  ${String(r.notCollected).padStart(13)}`);

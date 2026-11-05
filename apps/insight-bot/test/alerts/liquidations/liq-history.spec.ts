@@ -1,6 +1,6 @@
 import { LIQ_DEFAULT_PARAMS, type LiqVenue } from '@trade-automation/contracts';
 import {
-  MemoryJournalStore, countRows, crossCheck, firstFullDay, historyStore, replayLiq, scaleParams,
+  MemoryJournalStore, countRows, crossCheck, firstFullDay, historyStore, replayLiq, replayedEvents, scaleParams,
 } from '../../../src/alerts/liquidations/backfill/liq-history';
 import { parseLiqCliArgs } from '../../../src/alerts/liquidations/backfill/liq-backfill.cli';
 import { BOOT_LOOKBACK_MS, LiqAlertLoop } from '../../../src/alerts/liquidations/liq-alert-loop';
@@ -8,8 +8,8 @@ import { MemoryLiqStore } from './memory-liq-store';
 
 /**
  * IB-123 (design L9, C4) — the history run drives the live loop's own code over the tape. Pinned here:
- * - it journals exactly what the live loop, ticking every 30 s over the same tape, journals (alerts with their
- *   `at`, keys and details, continuations, controls) — only `source` differs;
+ * - it journals exactly what the live loop, ticking every 10 s over the same tape, journals (crossings with their
+ *   `at`, keys and details, events and their closes, controls) — only `source` differs;
  * - it never sends and never marks late, even with the switch on in the database;
  * - a rerun writes 0 rows;
  * - the counts' in-memory journal is blind to rows already in the database (a ½× count after the ×1 write);
@@ -26,8 +26,11 @@ const UNIVERSE = [{ id: 'BTCUSDT', base: 'BTC', binance_perp: 'BTCUSDT', bybit_l
 function tape(store: MemoryLiqStore): void {
   const p = (ts: number, usd: number, venue: LiqVenue = 'binance', side: 'long' | 'short' = 'long', base = 'BTC') =>
     store.tape.push({ venue, symbol: venue === 'okx' ? `${base}-USDT-SWAP` : `${base}USDT`, side, ts, usd });
-  // 01:00 — 6M longs over 2 min (alert), then 5M more inside the quiet period (continuation at 2×)
+  // 01:00 — 6M longs over 2 min (crossing at 01:02), still printing at the cap (01:05), 6M more after it: the
+  // event's continuation at its close (01:07); then 5M more inside the coin's quiet period, after the close
   p(T0 + 60 * MIN, 2e6); p(T0 + 61 * MIN, 2e6, 'bybit'); p(T0 + 62 * MIN, 2e6, 'okx');
+  for (let t = T0 + 62.5 * MIN; t <= T0 + 65 * MIN; t += 30 * S) p(t, 1e5);
+  p(T0 + 65.5 * MIN, 3e6); p(T0 + 66 * MIN, 3e6, 'bybit');
   p(T0 + 70 * MIN, 3e6); p(T0 + 75 * MIN, 2e6, 'bybit');
   // 01:25 — inside the quiet period (to 01:32): no alert
   p(T0 + 85 * MIN, 5.5e6);
@@ -48,11 +51,11 @@ const strip = (s: MemoryLiqStore) => ({
 describe('IB-123 replayLiq: the live loop over the tape', () => {
   const to = T0 + 6 * 60 * MIN;
 
-  it('journals exactly what the live loop ticking every 30 s journals (only the source differs)', async () => {
+  it('journals exactly what the live loop ticking every 10 s journals (only the source differs)', async () => {
     const live = new MemoryLiqStore();
     tape(live);
     const loop = new LiqAlertLoop({ store: live, universe: UNIVERSE, webBaseUrl: '', build: 'dev', source: 'live', send: async () => true });
-    for (let t = T0 + BOOT_LOOKBACK_MS; ; t = Math.min(t + 30 * S, to)) { await loop.tick(t + 1); if (t >= to) break; } // +1 ms: never late
+    for (let t = T0 + BOOT_LOOKBACK_MS; ; t = Math.min(t + 10 * S, to)) { await loop.tick(t + 1); if (t >= to) break; } // +1 ms: never late
     const back = new MemoryLiqStore();
     tape(back);
     const totals = await replayLiq({ store: historyStore(back, { params: back.params, gapsSinceMs: T0 }), universe: UNIVERSE, build: 'dev' }, T0, to);
@@ -64,9 +67,13 @@ describe('IB-123 replayLiq: the live loop over the tape', () => {
     expect(back.alerts.filter((a) => a.event === 'alert').map((a) => [a.symbol, a.details.side, a.atMs])).toEqual([
       ['BTCUSDT', 'long', T0 + 62 * MIN], ['BTCUSDT', 'short', T0 + 183 * MIN], ['TRXUSDT', 'long', T0 + 301 * MIN],
     ]);
-    expect(back.alerts.filter((a) => a.event === 'continuing').map((a) => a.atMs)).toEqual([T0 + 75 * MIN]);
+    expect(back.alerts.filter((a) => a.event === 'event').map((a) => [a.symbol, a.details.side, a.atMs, a.details.settled])).toEqual([
+      ['BTCUSDT', 'long', T0 + 65 * MIN, 'cap'], ['BTCUSDT', 'short', T0 + 184 * MIN, 'quiet'], ['TRXUSDT', 'long', T0 + 302 * MIN, 'quiet'],
+    ]);
+    expect(back.alerts.filter((a) => a.event === 'event_continuing').map((a) => [a.atMs, a.details.news, a.details.addedCoins])).toEqual([[T0 + 67 * MIN, true, ['BTCUSDT']]]);
+    expect(back.alerts.filter((a) => a.event === 'continuing')).toEqual([]);
     expect(back.controls.some((c) => c.kind === 'near_miss' && c.atMs === T0 + 250 * MIN)).toBe(true);
-    expect(totals).toMatchObject({ alerts: 3, continuations: 1, warnings: {} });
+    expect(totals).toMatchObject({ alerts: 3, events: 3, continuations: 1, warnings: {} });
     expect(totals.controls).toBe(back.controls.length);
   });
 
@@ -80,7 +87,7 @@ describe('IB-123 replayLiq: the live loop over the tape', () => {
     expect(store.alerts.every((a) => a.firedAt === null && a.recipients === 0 && a.late === false)).toBe(true);
     const before = { a: store.alerts.length, c: store.controls.length, p: store.paths.length };
     const again = await replayLiq(ports, T0, to);
-    expect(again).toMatchObject({ alerts: 0, continuations: 0, controls: 0 });
+    expect(again).toMatchObject({ alerts: 0, events: 0, continuations: 0, controls: 0 });
     expect({ a: store.alerts.length, c: store.controls.length, p: store.paths.length }).toEqual(before);
   });
 
@@ -153,12 +160,29 @@ describe('IB-123 the counts: an in-memory journal over the database tape', () =>
 });
 
 describe('IB-123 pure helpers', () => {
-  it('crossCheck compares with the rows STORED, so a rerun (0 new rows) agrees; any table off by one disagrees', () => {
-    const stored = { alerts: 25, continuations: 19, controls_random: 18, controls_near_miss: 15, paths: 231 };
-    expect(crossCheck({ alerts: 25, continuations: 19, controls: 33 }, stored)).toBeNull();
-    expect(crossCheck({ alerts: 25, continuations: 19, controls: 32 }, stored)).toMatch(/25\/19\/32\) differs .* \(25\/19\/33\)/);
-    expect(crossCheck({ alerts: 24, continuations: 19, controls: 33 }, stored)).not.toBeNull();
-    expect(crossCheck({ alerts: 25, continuations: 18, controls: 33 }, stored)).not.toBeNull();
+  it('crossCheck compares with the rows STORED, so a rerun (0 new rows) agrees; any table off by one disagrees; IB-122\'s old per-coin continuations are not compared', () => {
+    const stored = { alerts: 25, continuations: 19, events: 10, event_continuations: 4, controls_random: 18, controls_near_miss: 15, paths: 231 };
+    const mem = { alerts: 25, events: 10, continuations: 4, controls: 33 };
+    expect(crossCheck(mem, stored)).toBeNull();
+    expect(crossCheck({ ...mem, controls: 32 }, stored)).toMatch(/25\/10\/4\/32\) differs .* \(25\/10\/4\/33\)/);
+    expect(crossCheck({ ...mem, alerts: 24 }, stored)).not.toBeNull();
+    expect(crossCheck({ ...mem, events: 9 }, stored)).not.toBeNull();
+    expect(crossCheck({ ...mem, continuations: 5 }, stored)).not.toBeNull();
+  });
+
+  it('replayedEvents (L15\'s report): per event side, T0, S, settled, the coins, the continuation and why; never dated before its first message', async () => {
+    const base = new MemoryLiqStore();
+    tape(base);
+    const mem = new MemoryJournalStore(historyStore(base, { params: LIQ_DEFAULT_PARAMS, gapsSinceMs: T0 }));
+    await replayLiq({ store: mem, universe: UNIVERSE, build: 'dev' }, T0, T0 + 6 * 60 * MIN);
+    const evs = replayedEvents(mem);
+    expect(evs.map((e) => [e.side, e.t0, e.sentAt - e.t0, e.settled, e.first.map((c) => c.symbol), e.continuation?.news ?? null])).toEqual([
+      ['long', T0 + 62 * MIN, 3 * MIN, 'cap', ['BTCUSDT'], true],
+      ['short', T0 + 183 * MIN, MIN, 'quiet', ['BTCUSDT'], null],
+      ['long', T0 + 301 * MIN, MIN, 'quiet', ['TRXUSDT'], null],
+    ]);
+    expect(evs[0]?.continuation).toMatchObject({ at: T0 + 67 * MIN, closedBy: 'quiet', addedCoins: ['BTCUSDT'], newCoins: [] });
+    expect(evs.every((e) => e.continuationNotBeforeFirst)).toBe(true);
   });
 
   it('scaleParams multiplies every threshold and keeps on/off', () => {

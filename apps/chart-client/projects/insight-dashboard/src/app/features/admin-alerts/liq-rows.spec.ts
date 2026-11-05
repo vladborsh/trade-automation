@@ -4,7 +4,7 @@ import { coinsToForm, parseUsd, perCoinPatch, toLiqRow, usdText } from './liq-ro
 describe('IB-122 liq-rows', () => {
   const row: WebLiqAlertRow = {
     id: 1, source: 'live', event: 'alert', symbol: 'BTCUSDT', side: 'long', at: Date.UTC(2026, 10, 5, 14, 7) / 1000,
-    sumUsd: 7.4e6, thresholdUsd: 5e6, firedAt: null, late: false, recipients: 0,
+    sumUsd: 7.4e6, thresholdUsd: 5e6, coins: ['BTCUSDT'], news: true, firedAt: null, late: false, recipients: 0,
   };
   const coins: WebLiqCoin[] = [
     { symbol: 'BTCUSDT', base: 'BTC', listed: true, enabled: true, thresholdUsd: 5e6 },
@@ -20,6 +20,13 @@ describe('IB-122 liq-rows', () => {
     expect(toLiqRow({ ...row, late: true }).status.key).toBe('alerts.status.late');
     expect(toLiqRow({ ...row, source: 'backfill' }).status.key).toBe('alerts.status.history');
     expect(toLiqRow({ ...row, event: 'continuing', side: 'short' })).toMatchObject({ side: 'liqAlerts.side.short', event: 'liqAlerts.event.continuing' });
+  });
+
+  it('IB-143: an event row lists its coins (a joiner marked «+»), its total, no single threshold; a close with nothing new says it was not sent', () => {
+    const ev: WebLiqAlertRow = { ...row, event: 'event', symbol: 'ETHUSDT', sumUsd: 21.2e6, thresholdUsd: null, coins: ['ETHUSDT', 'BTCUSDT'] };
+    expect(toLiqRow(ev)).toMatchObject({ symbol: 'ETHUSDT, BTCUSDT', event: 'liqAlerts.event.event', sum: '$21M', threshold: '—' });
+    expect(toLiqRow({ ...ev, event: 'event_continuing', coins: ['ETHUSDT', '+BNBUSDT'] })).toMatchObject({ symbol: 'ETHUSDT, +BNBUSDT', event: 'liqAlerts.event.eventContinuing' });
+    expect(toLiqRow({ ...ev, event: 'event_continuing', news: false }).event).toBe('liqAlerts.event.eventClosed');
   });
 
   it('money and typed thresholds', () => {

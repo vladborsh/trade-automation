@@ -1,11 +1,11 @@
-import { LIQ_DEFAULT_PARAMS, LIQ_TICK_SEC, type LiqParams, type LiqSide, type LiqSilentReason } from '@trade-automation/contracts';
+import { LIQ_DEFAULT_PARAMS, LIQ_TICK_SEC, type LiqAlertEvent, type LiqParams, type LiqSide, type LiqSilentReason } from '@trade-automation/contracts';
 import { BOOT_LOOKBACK_MS, LiqAlertLoop, type LiqTickReport } from '../liq-alert-loop';
-import type { JournalLiqRow, LiqAlertStore, LiqSettings, NewMarketAlert, NewMarketControl } from '../pg/liq-alerts.repo';
+import { journalRow, type JournalLiqRow, type LiqAlertStore, type LiqSettings, type NewMarketAlert, type NewMarketControl } from '../pg/liq-alerts.repo';
 import type { UniverseSpelling } from '../venue-symbols';
 
 /**
  * IB-123 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §2 L9, §1 C4) — the large-liquidation
- * history run. **The live loop's own code** (`LiqAlertLoop.tick`, at the live 30-s cadence) is driven over the
+ * history run. **The live loop's own code** (`LiqAlertLoop.tick`, at the live cadence, 10 s since IB-143) is driven over the
  * stored tape with `source = 'backfill'`, so it is never late and never sends (the loop gates both on
  * `source === 'live'`; the send port here throws if it is reached anyway).
  *
@@ -52,7 +52,6 @@ export function historyStore(base: LiqAlertStore, opts: { params: LiqParams; gap
     settings: async () => settings,
     listedCoins: () => base.listedCoins(),
     prints: (...a) => base.prints(...a),
-    runningSum: (...a) => base.runningSum(...a),
     journal: (...a) => base.journal(...a),
     venueStatus: () => base.venueStatus(opts.gapsSinceMs),
     insertAlert: (x) => base.insertAlert(x),
@@ -64,9 +63,9 @@ export function historyStore(base: LiqAlertStore, opts: { params: LiqParams; gap
   };
 }
 
-/** A journalled alert or continuation as the counts need it. */
+/** A journalled row as the counts need it. */
 export interface CountedAlert {
-  event: 'alert' | 'continuing';
+  event: LiqAlertEvent;
   symbol: string;
   side: LiqSide;
   atMs: number;
@@ -81,7 +80,7 @@ export interface CountedAlert {
  * Paths are counted, not kept.
  */
 export class MemoryJournalStore implements LiqAlertStore {
-  readonly alerts: Array<CountedAlert & { id: number; source: string; dedupeKey: string; windowStartMs: number; alertId: number | null }> = [];
+  readonly alerts: Array<CountedAlert & { id: number; source: string; dedupeKey: string; late: boolean; details: Record<string, unknown> }> = [];
   readonly controls: Array<{ id: number; kind: string; symbol: string; atMs: number; dedupeKey: string; source: string }> = [];
   paths = 0;
   private nextId = 1;
@@ -91,13 +90,11 @@ export class MemoryJournalStore implements LiqAlertStore {
   settings(): Promise<LiqSettings> { return this.base.settings(); }
   listedCoins(): ReturnType<LiqAlertStore['listedCoins']> { return this.base.listedCoins(); }
   prints(...a: Parameters<LiqAlertStore['prints']>): ReturnType<LiqAlertStore['prints']> { return this.base.prints(...a); }
-  runningSum(...a: Parameters<LiqAlertStore['runningSum']>): ReturnType<LiqAlertStore['runningSum']> { return this.base.runningSum(...a); }
   venueStatus(gapsSinceMs?: number): ReturnType<LiqAlertStore['venueStatus']> { return this.base.venueStatus(gapsSinceMs); }
 
   async journal(source: 'live' | 'backfill', sinceMs: number): Promise<JournalLiqRow[]> {
-    return this.alerts.filter((a) => a.source === source && a.atMs > sinceMs).sort((a, b) => a.atMs - b.atMs || a.id - b.id).map((a) => ({
-      id: a.id, event: a.event, symbol: a.symbol, side: a.side, at: a.atMs, windowStartMs: a.windowStartMs, thresholdUsd: a.thresholdUsd, alertId: a.alertId,
-    }));
+    return this.alerts.filter((a) => a.source === source && a.atMs > sinceMs).sort((a, b) => a.atMs - b.atMs || a.id - b.id)
+      .map((a) => journalRow({ id: a.id, event: a.event, symbol: a.symbol, atMs: a.atMs, late: a.late, details: a.details }));
   }
 
   async insertAlert(x: NewMarketAlert): Promise<number | null> {
@@ -105,9 +102,8 @@ export class MemoryJournalStore implements LiqAlertStore {
     const d = x.details;
     const id = this.nextId++;
     this.alerts.push({
-      id, source: x.source, dedupeKey: x.dedupeKey, event: x.event, symbol: x.symbol, atMs: x.atMs, side: d.side as LiqSide,
-      sumUsd: Number(d.sumUsd), thresholdUsd: Number(d.thresholdUsd), windowStartMs: Number(d.windowStartMs),
-      alertId: d.alertId === undefined ? null : Number(d.alertId),
+      id, source: x.source, dedupeKey: x.dedupeKey, event: x.event, symbol: x.symbol, atMs: x.atMs, side: d.side as LiqSide, late: x.late, details: d,
+      sumUsd: Number(d.sumUsd ?? d.totalUsd), thresholdUsd: Number(d.thresholdUsd ?? NaN),
       silent: Array.isArray(d.silentVenues) ? (d.silentVenues as CountedAlert['silent']) : [],
     });
     return id;
@@ -140,7 +136,10 @@ export interface LiqReplayTotals {
   fromMs: number;
   toMs: number;
   ticks: number;
+  /** Coin crossings (`alert` rows). */
   alerts: number;
+  /** First messages (`event` rows) and event closes (`event_continuing`, sent or not). */
+  events: number;
   continuations: number;
   controls: number;
   reads: number;
@@ -150,7 +149,7 @@ export interface LiqReplayTotals {
 }
 
 /**
- * Evaluates every moment in (fromMs, toMs] with the live loop, ticking every 30 s as live does. The first tick
+ * Evaluates every moment in (fromMs, toMs] with the live loop, ticking every LIQ_TICK_SEC as live does. The first tick
  * is the loop's boot tick, whose look-back (`BOOT_LOOKBACK_MS`) is placed to start exactly at `fromMs`.
  */
 export async function replayLiq(ports: LiqReplayPorts, fromMs: number, toMs: number): Promise<LiqReplayTotals> {
@@ -161,7 +160,7 @@ export async function replayLiq(ports: LiqReplayPorts, fromMs: number, toMs: num
     send: async () => { throw new Error('the history run never sends'); },
     log: { warn: (m) => { if (!(m in warnings)) ports.log?.(m); warnings[m] = (warnings[m] ?? 0) + 1; } },
   });
-  const out: LiqReplayTotals = { fromMs, toMs, ticks: 0, alerts: 0, continuations: 0, controls: 0, reads: 0, maxPrints: 0, warnings };
+  const out: LiqReplayTotals = { fromMs, toMs, ticks: 0, alerts: 0, events: 0, continuations: 0, controls: 0, reads: 0, maxPrints: 0, warnings };
   let nextHour = fromMs;
   for (let now = fromMs + BOOT_LOOKBACK_MS; ; now = Math.min(now + TICK_MS, toMs)) {
     if (now >= nextHour) {
@@ -171,6 +170,7 @@ export async function replayLiq(ports: LiqReplayPorts, fromMs: number, toMs: num
     const r = (await loop.tick(now)) as LiqTickReport; // sequential: never null
     out.ticks++;
     out.alerts += r.alerts;
+    out.events += r.events;
     out.continuations += r.continuations;
     out.controls += r.controls;
     out.reads += r.reads;
@@ -188,6 +188,7 @@ export interface LiqCountRow {
   alerts: number;
   longs: number;
   shorts: number;
+  /** Event closes (`event_continuing`) this coin was the link coin of — journalled, sent or not. */
   continuations: number;
   /** Alerts whose window had a venue named as silent (`stream_silent`: a collector gap or a stale heartbeat). */
   withGap: number;
@@ -203,7 +204,7 @@ export function countRows(store: MemoryJournalStore, params: LiqParams, multipli
   return Object.entries(params.perCoin).filter(([, p]) => p.enabled).map(([symbol, p]) => {
     const own = store.alerts.filter((a) => a.symbol === symbol);
     const alerts = own.filter((a) => a.event === 'alert');
-    const continuations = own.filter((a) => a.event === 'continuing').length;
+    const continuations = own.filter((a) => a.event === 'event_continuing').length;
     return {
       symbol, multiplier, thresholdUsd: p.thresholdUsd, alerts: alerts.length,
       longs: alerts.filter((a) => a.side === 'long').length, shorts: alerts.filter((a) => a.side === 'short').length,
@@ -220,12 +221,44 @@ export const LIQ_HISTORY_PARAMS: LiqParams = LIQ_DEFAULT_PARAMS;
 
 /**
  * The ×1 in-memory count against the backfill rows the database holds for the same range. Not against the
- * rows THIS run wrote: a rerun writes 0 and still holds every row (the 2026-11-11 check is a rerun). Null when
- * they agree, else the disagreement.
+ * rows THIS run wrote: a rerun writes 0 and still holds every row (the 2026-11-11 check is a rerun). IB-122's
+ * per-coin `continuing` rows are not compared: IB-143 no longer writes them, and the database keeps the old ones.
+ * Null when they agree, else the disagreement.
  */
-export function crossCheck(memory: { alerts: number; continuations: number; controls: number }, stored: Record<string, number>): string | null {
-  const db = { alerts: stored.alerts ?? 0, continuations: stored.continuations ?? 0, controls: (stored.controls_random ?? 0) + (stored.controls_near_miss ?? 0) };
-  return memory.alerts === db.alerts && memory.continuations === db.continuations && memory.controls === db.controls
-    ? null
-    : `the in-memory ×1 replay (${memory.alerts}/${memory.continuations}/${memory.controls}) differs from the backfill rows stored (${db.alerts}/${db.continuations}/${db.controls})`;
+export function crossCheck(memory: { alerts: number; events: number; continuations: number; controls: number }, stored: Record<string, number>): string | null {
+  const db = {
+    alerts: stored.alerts ?? 0, events: stored.events ?? 0, continuations: stored.event_continuations ?? 0,
+    controls: (stored.controls_random ?? 0) + (stored.controls_near_miss ?? 0),
+  };
+  const f = (x: typeof db) => `${x.alerts}/${x.events}/${x.continuations}/${x.controls}`;
+  return f(memory) === f(db) ? null : `the in-memory ×1 replay (${f(memory)}) differs from the backfill rows stored (${f(db)})`;
+}
+
+/** L15 (IB-143): one replayed event as the report needs it, from an in-memory journal. */
+export interface ReplayedEvent {
+  side: LiqSide;
+  t0: number;
+  sentAt: number;
+  settled: 'quiet' | 'cap';
+  /** The first message's coins, largest first, with their sums. */
+  first: Array<{ symbol: string; sumUsd: number }>;
+  firstTotalUsd: number;
+  continuation: null | { at: number; closedBy: string; news: boolean; newCoins: string[]; addedCoins: string[]; totalUsd: number };
+  /** L15's check: a continuation is never dated before its first message. */
+  continuationNotBeforeFirst: boolean;
+}
+
+export function replayedEvents(store: MemoryJournalStore): ReplayedEvent[] {
+  const conts = store.alerts.filter((a) => a.event === 'event_continuing');
+  return store.alerts.filter((a) => a.event === 'event').sort((a, b) => a.atMs - b.atMs).map((e) => {
+    const d = e.details as { eventAt: number; sentAt: number; settled: 'quiet' | 'cap'; totalUsd: number; coins: Array<{ symbol: string; sumUsd: number }> };
+    const c = conts.find((x) => x.side === e.side && (x.details as { eventAt: number }).eventAt === d.eventAt);
+    const cd = c?.details as undefined | { closedBy: string; news: boolean; newCoins: string[]; addedCoins: string[]; totalUsd: number };
+    return {
+      side: e.side, t0: d.eventAt, sentAt: d.sentAt, settled: d.settled, first: d.coins.map((x) => ({ symbol: x.symbol, sumUsd: x.sumUsd })),
+      firstTotalUsd: d.totalUsd,
+      continuation: c && cd ? { at: c.atMs, closedBy: cd.closedBy, news: cd.news, newCoins: cd.newCoins, addedCoins: cd.addedCoins, totalUsd: cd.totalUsd } : null,
+      continuationNotBeforeFirst: !c || c.atMs >= e.atMs,
+    };
+  });
 }

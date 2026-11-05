@@ -719,8 +719,11 @@ export const en: Strings = {
   'liqAlerts.invalid': 'A coin switched on needs a threshold, and a threshold must be a positive number — not saved.',
   'liqAlerts.side.long': 'longs',
   'liqAlerts.side.short': 'shorts',
-  'liqAlerts.event.alert': 'alert',
+  'liqAlerts.event.alert': 'threshold crossing',
   'liqAlerts.event.continuing': 'continuing',
+  'liqAlerts.event.event': 'event',
+  'liqAlerts.event.eventContinuing': 'continuation',
+  'liqAlerts.event.eventClosed': 'close, not sent',
   'settings.liqAlerts': 'Large liquidation alerts in Telegram: a coin\'s liquidations over 5 minutes reached its threshold',
   // IB-120: the /liquidations page
   'liqPage.title': 'Large liquidations',

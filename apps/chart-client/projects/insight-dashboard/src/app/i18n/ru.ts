@@ -725,8 +725,11 @@ export const ru: Strings = {
   'liqAlerts.invalid': 'Включённой монете нужен порог, а порог — положительное число. Не сохранено.',
   'liqAlerts.side.long': 'лонги',
   'liqAlerts.side.short': 'шорты',
-  'liqAlerts.event.alert': 'сигнал',
+  'liqAlerts.event.alert': 'пересечение порога',
   'liqAlerts.event.continuing': 'продолжается',
+  'liqAlerts.event.event': 'событие',
+  'liqAlerts.event.eventContinuing': 'продолжение',
+  'liqAlerts.event.eventClosed': 'итог, не отправлен',
   'settings.liqAlerts': 'Сигналы о крупных ликвидациях в Telegram: ликвидации монеты за 5 минут достигли её порога',
   // IB-120: the /liquidations page
   'liqPage.title': 'Крупные ликвидации',

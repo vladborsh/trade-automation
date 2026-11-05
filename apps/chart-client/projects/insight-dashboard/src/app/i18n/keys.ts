@@ -723,6 +723,9 @@ export type StringKey =
   | 'liqAlerts.side.short'
   | 'liqAlerts.event.alert'
   | 'liqAlerts.event.continuing'
+  | 'liqAlerts.event.event'
+  | 'liqAlerts.event.eventContinuing'
+  | 'liqAlerts.event.eventClosed'
   | 'settings.liqAlerts'
   // IB-120: the /liquidations page
   | 'liqPage.title'

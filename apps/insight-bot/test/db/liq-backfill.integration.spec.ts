@@ -95,7 +95,7 @@ maybeDescribe('IB-123 the liquidation history run on real SQL', () => {
       throw new Error('rollback');
     })).rejects.toThrow('rollback');
     expect(inside).toMatchObject({ alerts: 2 });
-    expect(await new PgLiqBackfillReads(db).backfillCounts()).toEqual({ alerts: 0, continuations: 0, controls_random: 0, controls_near_miss: 0, paths: 0, paths_measured: 0 });
+    expect(await new PgLiqBackfillReads(db).backfillCounts()).toEqual({ alerts: 0, continuations: 0, events: 0, event_continuations: 0, controls_random: 0, controls_near_miss: 0, paths: 0, paths_measured: 0 });
   });
 
   it('write: backfill rows, never sent, the old gap named on the 01:03 alert only; a rerun writes 0', async () => {
@@ -113,7 +113,7 @@ maybeDescribe('IB-123 the liquidation history run on real SQL', () => {
     expect((await new PgLiqAlertStore(db).venueStatus(T0)).gaps).toHaveLength(1);
 
     const before = await new PgLiqBackfillReads(db).backfillCounts();
-    expect(await run(db)).toMatchObject({ alerts: 0, continuations: 0, controls: 0 });
+    expect(await run(db)).toMatchObject({ alerts: 0, events: 0, continuations: 0, controls: 0 });
     expect(await new PgLiqBackfillReads(db).backfillCounts()).toEqual(before);
   });
 
