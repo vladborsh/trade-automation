@@ -60,6 +60,9 @@ An episode is a candidate with `usd ≥ T`. This is the brief's "percentile of e
 - **One threshold for both 24h and 7d.** With the same T, a 24h view shows about one episode on an ordinary day. «За 24 часа эпизодов не было» is a valid answer.
 - **Computed hourly, cached 1 h.** The work is one query over the trailing 30 days of prints ≥ $100K, grouped in SQL by window functions (the query below), and it returns only the candidate sums. Box rate: about 750 such prints on the hot day 2026-11-04, so ≤ ≈ 25 000 rows a month. The norm is market-wide and unfiltered, so a filter never moves T (E5).
 - **Short history.** `held` is what exists. On a tape shorter than 7 days the response says so («норма по {d} дн.»). Under **1 day** held there is no norm: the page shows the flat list and a line «копим историю для эпизодов: {h} ч».
+- **No minimum k on a short tape** (decided 2026-11-05 after IB-133's replay). Under about 1.5 days held, k = 1, so only the largest candidate shows. The box replay had T = $99M on 11-04 16–22 h. Today it is k = 2, T = $34.9M, with 2.1 days held: the late-venue rule starts the window at 11-03 12:47, and D6 drops 180 tradfi prints that this note's SQL counted. That is the target rate scaled to what is held, about 2 in 2 days, so the page is right, not sparse.
+  - A minimum k (for example 3) would show three episodes from one day of tape. That overstates the rate threefold, and it adds a constant and a spec for a state that ends on the box around 11-10 and otherwise exists only on fresh slot databases.
+  - The «норма по {d} дн.» label explains the small count.
 - **Venue set:** all three venues, and all were present from the box's first row. If a venue joins later, IB-038's rule applies: the window starts when the last venue started (`norm.ts`).
 
 ### Measured on the box (`insight`), read-only, 2026-11-05
