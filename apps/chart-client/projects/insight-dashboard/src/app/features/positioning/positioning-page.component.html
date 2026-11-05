@@ -13,8 +13,22 @@
     <app-pos-quadrant [rows]="d.rows" [maxHeight]="quadrantMaxHeight" />
   </app-card>
   <app-card [heading]="t('positioning.table.title')">
+    <!-- IB-136: the ticker search, in the URL as ?q=; a query shows every match (no phone limit). First in
+         the card: the help below it opens long on a first visit and would push the search off a phone's screen. -->
+    <label class="search">
+      <span class="visually-hidden">{{ t('positioning.search.label') }}</span>
+      <input type="search" autocomplete="off" spellcheck="false" [value]="query()" [placeholder]="t('positioning.search.label')"
+             (input)="onQuery($any($event.target).value)" />
+    </label>
     <app-pos-heat-help class="heat-help" />
-    <app-pos-heat [rows]="d.rows" [sort]="sort()" (sortChange)="onSortChange($event)" />
+    @if (tableRows().length > 0) {
+      <app-pos-heat [rows]="tableRows()" [sort]="sort()" [allRows]="searching()" (sortChange)="onSortChange($event)" />
+    } @else if (searching()) {
+      <p class="empty" role="status">
+        {{ t('positioning.search.none', { q: query().trim() }) }}
+        <button type="button" class="clear" (click)="onQuery('')">{{ t('positioning.search.clear') }}</button>
+      </p>
+    }
   </app-card>
 } @else if (!error()) {
   <app-loader variant="block" [label]="t('market.loading')" />

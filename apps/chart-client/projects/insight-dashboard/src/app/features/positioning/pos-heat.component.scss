@@ -26,13 +26,25 @@ th button:disabled { cursor: default; }
 .by-rarity { margin-left: 4px; padding: 0 3px; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; }
 .by-rarity.on { border-color: #d29922; color: #d29922; }
 tbody tr { cursor: pointer; }
-tbody tr:hover td, tbody tr:hover .coin { background-color: rgb(48 54 61 / 40%); }
+tbody tr:hover td { background-color: rgb(48 54 61 / 40%); }
+/* the pinned cell stays opaque when hovered: the same tint laid over the card's fill, so the cells
+   scrolled under it never show through */
+tbody tr:hover .coin { background: linear-gradient(rgb(48 54 61 / 40%), rgb(48 54 61 / 40%)), var(--card-bg); }
 .num { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 /* IB-108: the table sits in a card, so the pinned ticker column takes the card's fill */
 .coin { position: sticky; left: 0; background: var(--card-bg); z-index: 1; }
 .coin a { color: var(--color-text-strong); font-weight: 600; text-decoration: none; }
 .coin a:hover { color: #26a69a; text-decoration: underline; }
 td { @include heat.fills; }
+
+/* IB-136: on /positioning only (not Market's compact top 5, which has nothing to stick) the box scrolls
+   on BOTH axes, so the header row can stick to it: a sticky header inside an overflow box sticks to
+   that box, never to the page. The top nav is not sticky, so the box may take the whole screen but
+   16 px. Opaque fills over the translucent heat cells, so nothing shows through. Layers: body ticker
+   column 1, header 2, the corner cell (sticky both ways) 3, IB-BUG-041's fade 4. */
+.scroll.page { overflow: auto; max-height: calc(100dvh - 16px); }
+.scroll.page thead th { position: sticky; top: 0; background: var(--card-bg); z-index: 2; }
+.scroll.page thead th.coin { left: 0; z-index: 3; }
 .signal { color: #d29922; }
 
 .more {

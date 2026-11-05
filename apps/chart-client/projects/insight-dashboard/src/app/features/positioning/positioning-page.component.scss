@@ -16,3 +16,18 @@ h1 { margin: 0; font: var(--type-h1); color: var(--color-text-strong); }
 }
 /* IB-121: the help sits above the table, the mockup's 12 px apart */
 .heat-help { margin-bottom: 12px; }
+
+/* IB-136: «Найти монету» above the table; ≥ 40 px to tap, 16 px text so a phone does not zoom in */
+.search { display: block; margin-bottom: 12px; }
+.search input {
+  box-sizing: border-box; width: 100%; max-width: 320px; min-height: 40px; padding: 0 12px;
+  background: var(--card-bg); color: var(--color-text); border: 1px solid var(--seg-border); border-radius: var(--seg-radius);
+  font: inherit; font-size: 16px;
+}
+.search input:focus { outline: none; border-color: #8b949e; }
+.empty { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font: var(--type-note); color: var(--color-text-muted); }
+.clear {
+  min-height: 40px; padding: 0 12px; background: transparent; color: var(--color-text);
+  border: 1px solid var(--seg-border); border-radius: var(--seg-radius); font: inherit; cursor: pointer;
+}
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

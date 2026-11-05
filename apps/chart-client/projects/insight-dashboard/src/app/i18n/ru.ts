@@ -349,6 +349,10 @@ export const ru: Strings = {
   'positioning.fullTable': 'Вся таблица →',
   'positioning.page.intro': 'Кто сейчас необычен — по бессрочным фьючерсам Binance. Нажмите на заголовок, чтобы отсортировать, на строку — чтобы открыть монету.',
   'positioning.noValue': '—',
+  // IB-136 — поиск по тикеру над таблицей
+  'positioning.search.label': 'Найти монету',
+  'positioning.search.none': 'Нет монет по «{q}»',
+  'positioning.search.clear': 'Очистить',
   'positioning.signal.squeeze': 'сквиз',
   'positioning.signal.capitulation': 'капитуляция',
   'positioning.signal.crowded_long': 'толпа в лонгах',

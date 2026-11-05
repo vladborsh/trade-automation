@@ -1,7 +1,7 @@
 <!-- D16: the table scrolls inside its own box, ticker column pinned. IB-BUG-041: the frame holds the
      box and, beside it (not inside, so it stays put whichever way the box scrolls), the right-edge fade. -->
 <div class="frame">
-<div #box class="scroll" [class.expanded]="expanded() || compact()" (scroll)="updateFade()">
+<div #box class="scroll" [class.page]="!compact()" [class.expanded]="expanded() || compact() || allRows()" (scroll)="updateFade()">
   <table>
     <thead>
       <tr>
@@ -39,7 +39,7 @@
 </div>
 <div class="fade" [class.on]="moreRight()" aria-hidden="true"></div>
 </div>
-@if (!compact() && view().length > phoneLimit) {
+@if (!compact() && !allRows() && view().length > phoneLimit) {
   <button type="button" class="more" (click)="expanded.set(!expanded())">
     {{ expanded() ? t('liq.large.showFewer') : t('liq.large.showAll', { count: view().length }) }}
   </button>

@@ -343,6 +343,10 @@ export const en: Strings = {
   'positioning.fullTable': 'Full table →',
   'positioning.page.intro': 'Who is unusual right now, by Binance perpetuals: tap a header to sort, a row to open the coin.',
   'positioning.noValue': '—',
+  // IB-136 — the ticker search above the table
+  'positioning.search.label': 'Find a coin',
+  'positioning.search.none': 'No coins match «{q}»',
+  'positioning.search.clear': 'Clear',
   'positioning.signal.squeeze': 'squeeze',
   'positioning.signal.capitulation': 'capitulation',
   'positioning.signal.crowded_long': 'crowd in longs',

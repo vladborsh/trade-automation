@@ -19,6 +19,7 @@ import { hasMoreRight } from './scroll-fade';
  * - /positioning (`limit` null): every row; a header sorts by its value, its «r» button by its rarity,
  *   «OI, $» by open interest, the ticker A→Z. The sort is the PAGE's (it lives in the URL): this
  *   component takes it as `sort` and asks for a new one through `sortChange`. A row opens the coin.
+ *   IB-136: here the box also scrolls vertically, with the header row sticky inside it (see the scss).
  */
 @Component({
   selector: 'app-pos-heat',
@@ -38,6 +39,8 @@ export class PosHeatComponent {
   readonly limit = input<number | null>(null);
   readonly sort = input<SortState>(DEFAULT_SORT);
   readonly sortChange = output<SortState>();
+  /** IB-136: the rows are a search's matches — show them all, past the phone limit, with no «show all». */
+  readonly allRows = input(false);
 
   readonly columns = HEAT_COLUMNS;
   readonly compact = computed(() => this.limit() !== null);

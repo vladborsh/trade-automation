@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { WebMarketPeriod, WebPositioningResponse } from '@trade-automation/contracts';
@@ -13,6 +13,7 @@ import { PeriodSwitchComponent } from '../market/shell/period-switch.component';
 import { PosHeatComponent } from './pos-heat.component';
 import { PosHeatHelpComponent } from './pos-heat-help.component';
 import { PosQuadrantComponent } from './pos-quadrant.component';
+import { filterByTicker, normalizeQuery } from './pos-search';
 import { parseSort, sortQuery, type SortState } from './pos-sort';
 
 /** IB-103: the quadrant on its own page may grow taller than the Market block's 360 px cap. */
@@ -23,7 +24,8 @@ export const PAGE_QUADRANT_MAX_HEIGHT = 520;
  * table, sortable. It reads the SAME endpoint as the Market block (`/market/positioning?period=`),
  * so the server's per-period cache serves both: no extra venue weight and no extra memory.
  *
- * The period (`?p=`) and the sort (`?sort=&dir=`) live in the URL, so a link opens the same view.
+ * The period (`?p=`), the sort (`?sort=&dir=`) and the ticker search (`?q=`, IB-136) live in the URL,
+ * so a link opens the same view. The search filters the table only, never the quadrant.
  * Refreshed by the same `BlockScheduler` as Market, at the positioning block's cadence, paused while
  * the tab is hidden.
  */
@@ -44,7 +46,11 @@ export class PositioningPageComponent {
 
   readonly period = signal<WebMarketPeriod>(parsePeriod(this.route.snapshot.queryParamMap.get('p')));
   readonly sort = signal<SortState>(parseSort(this.route.snapshot.queryParamMap.get('sort'), this.route.snapshot.queryParamMap.get('dir')));
+  /** IB-136: what the reader typed, as typed; the filter and the URL use it trimmed. */
+  readonly query = signal<string>(normalizeQuery(this.route.snapshot.queryParamMap.get('q')));
   readonly data = signal<WebPositioningResponse | null>(null);
+  readonly searching = computed(() => normalizeQuery(this.query()) !== '');
+  readonly tableRows = computed(() => filterByTicker(this.data()?.rows ?? [], this.query()));
   readonly error = signal<string | null>(null);
   readonly quadrantMaxHeight = PAGE_QUADRANT_MAX_HEIGHT;
   private readonly scheduler: BlockScheduler;
@@ -82,10 +88,15 @@ export class PositioningPageComponent {
     this.syncUrl();
   }
 
+  onQuery(q: string): void {
+    this.query.set(q);
+    this.syncUrl();
+  }
+
   private syncUrl(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { p: this.period(), ...sortQuery(this.sort()) },
+      queryParams: { p: this.period(), ...sortQuery(this.sort()), q: normalizeQuery(this.query()) || null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

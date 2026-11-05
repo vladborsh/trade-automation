@@ -94,11 +94,11 @@ describe('PositioningPageComponent (IB-103)', () => {
     coinHeader.click();
     f.detectChanges();
     expect(tickers()).toEqual(['BTC', 'DOGE', 'ETH', 'SOL']);
-    expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({ p: '24h', sort: 'base', dir: 'asc' });
+    expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({ p: '24h', sort: 'base', dir: 'asc', q: null });
     coinHeader.click();
     f.detectChanges();
     expect(tickers()).toEqual(['SOL', 'ETH', 'DOGE', 'BTC']);
-    expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({ p: '24h', sort: 'base', dir: 'desc' });
+    expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({ p: '24h', sort: 'base', dir: 'desc', q: null });
   });
 
   it('a column\'s «rare» button sorts by that column\'s rarity', async () => {
@@ -115,5 +115,61 @@ describe('PositioningPageComponent (IB-103)', () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     (el.querySelector('app-pos-heat tbody tr') as HTMLElement).click();
     expect(navigate).toHaveBeenCalledWith(['/instrument', 'SOLUSDT']);
+  });
+});
+
+describe('PositioningPageComponent search (IB-136)', () => {
+  const type = (f: { detectChanges(): void }, el: HTMLElement, text: string) => {
+    const input = el.querySelector('input[type="search"]') as HTMLInputElement;
+    input.value = text;
+    input.dispatchEvent(new Event('input'));
+    f.detectChanges();
+  };
+
+  it('typing filters the table by ticker and writes ?q= (trimmed) beside p and the sort; the quadrant keeps every coin', async () => {
+    const { f, el, router, tickers } = await open('/positioning?p=24h&sort=base&dir=asc');
+    const navigate = vi.spyOn(router, 'navigate');
+    type(f, el, ' o ');
+    expect(tickers()).toEqual(['DOGE', 'SOL']); // still in the URL's sort
+    expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({ p: '24h', sort: 'base', dir: 'asc', q: 'o' });
+    expect(el.querySelectorAll('app-pos-quadrant circle')).toHaveLength(4);
+    type(f, el, '');
+    expect(tickers()).toHaveLength(4);
+    expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({ p: '24h', sort: 'base', dir: 'asc', q: null });
+  });
+
+  it('a query lifts the phone limit (the box is «expanded»); no query keeps it', async () => {
+    const { f, el } = await open('/positioning');
+    const box = () => el.querySelector('app-pos-heat .scroll') as HTMLElement;
+    expect(box().classList.contains('expanded')).toBe(false);
+    type(f, el, 'b');
+    expect(box().classList.contains('expanded')).toBe(true);
+    type(f, el, '   ');
+    expect(box().classList.contains('expanded')).toBe(false); // spaces are no query
+  });
+
+  it('opens on the URL\'s query — a link (and a reload) shows the same search', async () => {
+    const { el, tickers } = await open('/positioning?q=eth');
+    expect((el.querySelector('input[type="search"]') as HTMLInputElement).value).toBe('eth');
+    expect(tickers()).toEqual(['ETH']);
+  });
+
+  it('no match: «No coins match «q»», no table, and «Clear» brings every row back', async () => {
+    const { f, el, tickers } = await open('/positioning?q=zzz');
+    expect(el.querySelector('app-pos-heat')).toBeNull();
+    const empty = el.querySelector('.empty') as HTMLElement;
+    expect(empty.textContent).toContain('No coins match «zzz»');
+    (empty.querySelector('button') as HTMLButtonElement).click();
+    f.detectChanges();
+    expect(tickers()).toHaveLength(4);
+    expect((el.querySelector('input[type="search"]') as HTMLInputElement).value).toBe('');
+  });
+
+  it('in Russian', async () => {
+    const { f, el } = await open('/positioning?q=zzz');
+    TestBed.inject(I18nService).setLang('ru');
+    f.detectChanges();
+    expect(el.querySelector('.empty')?.textContent).toContain('Нет монет по «zzz»');
+    expect((el.querySelector('input[type="search"]') as HTMLInputElement).placeholder).toBe('Найти монету');
   });
 });

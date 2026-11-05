@@ -819,3 +819,114 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
   });
 }
 
+
+/**
+ * IB-136 — /positioning: the header row sticks while the table's box scrolls down, together with the
+ * pinned ticker column, and the ticker search lives in the URL.
+ *
+ * A sticky header inside an overflow box sticks to THAT box, so the box itself scrolls vertically
+ * (max-height ≈ the screen) on this page. «Sticks» is measured: after scrolling the box down, the
+ * header row's top equals the box's top — and the box really scrolled, or that proves nothing.
+ */
+const STICKY_SIZES = [
+  { width: 1240, height: 800, phone: false },
+  { width: 390, height: 844, phone: true },
+] as const;
+
+/** Every other coin's ticker gets a «Q» (QNT already has one): 16 of 30 match «q», more than the phone's 10. */
+async function withManyQ(page: Page): Promise<void> {
+  await page.route('**/api/web/market/positioning**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    ...positioning, rows: positioning.rows.map((r, i) => (i % 2 === 0 ? { ...r, base: `${r.base}Q` } : r)),
+  }) }));
+}
+
+for (const { width, height, phone } of STICKY_SIZES) {
+  test.describe(`IB-136 /positioning — ${width}`, () => {
+    test.use(phone ? { viewport: { width, height }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width, height } });
+
+    test('the header row stays at the top of the box when it scrolls down, the corner cell and the ticker column stay pinned on the left', async ({ page }, info) => {
+      await openPositioning(page);
+      if (phone) {
+        await page.locator('app-pos-heat .more').click(); // every row, so the box has something to scroll
+        await page.clock.runFor(100);
+      }
+      const box = page.locator('app-positioning-page app-pos-heat .scroll');
+      await box.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      const scrolled = await box.evaluate((el) => { el.scrollTop = 300; if (el.scrollWidth > el.clientWidth) el.scrollLeft = 200; return { top: el.scrollTop, left: el.scrollLeft }; });
+      expect(scrolled.top).toBeGreaterThan(0); // the box really scrolls vertically
+      if (phone) expect(scrolled.left).toBeGreaterThan(0); // and, on a phone, sideways too
+      await page.clock.runFor(100);
+      const m = await box.evaluate((el) => {
+        const r = (q: string) => el.querySelector(q)!.getBoundingClientRect();
+        const b = el.getBoundingClientRect();
+        // what is ON TOP at a point: the layers, not only the positions
+        // the cells stick, not the <tr> (its own box scrolls away), so «the header row» is its cells
+        const head = r('thead th:nth-child(2)');
+        const corner = r('thead th.coin');
+        const hit = document.elementFromPoint(corner.left + 4, corner.top + corner.height / 2);
+        const bodyHit = document.elementFromPoint(b.left + 4, head.bottom + 12);
+        const midHit = document.elementFromPoint(b.left + b.width / 2, head.top + head.height / 2); // mid-box: a scrolled-left cell is off-screen
+        return {
+          box: { top: b.top, left: b.left }, headTop: head.top, corner: { top: corner.top, left: corner.left },
+          cornerOnTop: !!hit?.closest('thead th.coin'), bodyColumnOnTop: !!bodyHit?.closest('tbody th.coin'),
+          headerOnTop: !!midHit?.closest('thead'), lastHeadBg: getComputedStyle(el.querySelector('thead th:last-child')!).backgroundColor,
+          thTops: [...el.querySelectorAll('thead th')].map((th) => th.getBoundingClientRect().top),
+          docWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(m.headTop).toBeCloseTo(m.box.top, 0);
+      for (const t of m.thTops) expect(t).toBeCloseTo(m.box.top, 0); // every header cell, the whole row
+      expect(m.corner.top).toBeCloseTo(m.box.top, 0);
+      expect(m.corner.left).toBeCloseTo(m.box.left, 0);
+      expect(m.cornerOnTop).toBe(true); // the corner is above the pinned body column (z 3 > 1)
+      expect(m.bodyColumnOnTop).toBe(true); // the body's ticker column is above the cells scrolled under it
+      expect(m.headerOnTop).toBe(true); // the header is above the rows scrolled under it
+      expect(m.lastHeadBg).not.toBe('rgba(0, 0, 0, 0)'); // opaque: no heat fill or hatch shows through
+      expect(m.docWidth).toBe(width); // IB-BUG-041 still holds
+      await shot(info, `ib136-positioning-${width}-scrolled.png`, await page.screenshot());
+    });
+
+    test('Market\'s compact table does not scroll vertically and has no sticky header', async ({ page }) => {
+      await openMarket(page);
+      const box = page.locator('app-positioning-block app-pos-heat .scroll');
+      // (overflow-x: auto alone already computes overflow-y to auto, so the cap is what tells them apart)
+      expect(await box.evaluate((el) => getComputedStyle(el).maxHeight)).toBe('none');
+      expect(await box.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+      expect(await box.evaluate((el) => getComputedStyle(el.querySelector('thead th:not(.coin)')!).position)).toBe('static');
+    });
+
+    test('search: the URL carries ?q= and a reload keeps it; the quadrant keeps every coin; no match says so in words and «Clear» brings the table back', async ({ page }, info) => {
+      await openPositioning(page, '/positioning?p=24h', withManyQ);
+      const rows = page.locator('app-pos-heat tbody tr');
+      const search = page.locator('app-positioning-page input[type="search"]');
+      await expect(search).toHaveAttribute('placeholder', 'Find a coin');
+      expect((await search.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+      await search.fill('q');
+      await page.clock.runFor(100);
+      await expect(page).toHaveURL(/[?&]q=q(&|$)/);
+      await expect(page).toHaveURL(/[?&]p=24h/);
+      await expect(rows).toHaveCount(16);
+      // a query shows every match, past the phone's ten, with no «show all»
+      await expect(rows.filter({ visible: true })).toHaveCount(16);
+      await expect(page.locator('app-pos-heat .more')).toHaveCount(0);
+      await expect(page.locator('app-pos-quadrant circle')).toHaveCount(positioning.rows.length);
+      await search.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await page.locator('app-positioning-page app-pos-heat-help summary').click(); // fold the first-visit help for the picture
+      await page.clock.runFor(100);
+      await shot(info, `ib136-positioning-${width}-search.png`, await page.screenshot());
+      await page.reload();
+      await page.clock.runFor(2_000);
+      await expect(search).toHaveValue('q');
+      await expect(rows).toHaveCount(16);
+      await search.fill('zzz');
+      await page.clock.runFor(100);
+      await expect(page.locator('app-positioning-page .empty')).toContainText('No coins match «zzz»');
+      await expect(page.locator('app-pos-heat')).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      await page.locator('app-positioning-page .empty button').click();
+      await page.clock.runFor(100);
+      await expect(rows).toHaveCount(positioning.rows.length);
+      await expect(page).not.toHaveURL(/[?&]q=/);
+    });
+  });
+}
