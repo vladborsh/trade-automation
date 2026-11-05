@@ -3,6 +3,7 @@ import {
   type WebLiquidationsOverviewResponse,
   type WebLiquidationCoinPeriod,
   type WebLiquidationHourly,
+  type WebLiquidationFeedEvent,
   type WebLiquidationLargeEvent,
   type WebLiquidationNormBasis,
   type WebMarketPeriod,
@@ -164,8 +165,8 @@ export const BUBBLE_R_MIN = 3;
 export const BUBBLE_R_MAX = 18;
 export const BUBBLE_PAD_X = 20;
 
-export interface BubbleView {
-  event: WebLiquidationLargeEvent;
+export interface BubbleView<E extends WebLiquidationFeedEvent = WebLiquidationFeedEvent> {
+  event: E;
   cx: number;
   cy: number;
   r: number;
@@ -176,18 +177,18 @@ export interface BubbleView {
  * longs below. A bubble that would overlap one already placed on its side moves outward, so a
  * cascade reads as a column rather than one blot; the biggest are placed first, nearest the axis.
  */
-export function bubbleLayout(
-  large: readonly WebLiquidationLargeEvent[],
+export function bubbleLayout<E extends WebLiquidationFeedEvent>(
+  large: readonly E[],
   window: { from: number; to: number },
   size: Size,
-): { axisY: number; bubbles: BubbleView[]; ticks: Array<{ x: number; time: number }> } {
+): { axisY: number; bubbles: Array<BubbleView<E>>; ticks: Array<{ x: number; time: number }> } {
   const axisY = (size.height - HOURLY_PAD_BOTTOM) / 2;
   const span = Math.max(1, window.to - window.from);
   const plotW = Math.max(0, size.width - 2 * BUBBLE_PAD_X);
   const xOf = (t: number) => BUBBLE_PAD_X + (Math.min(Math.max(t, window.from), window.to) - window.from) / span * plotW;
   const usdMax = Math.max(0, ...large.map((e) => e.usd));
   const rMax = Math.min(BUBBLE_R_MAX, Math.max(BUBBLE_R_MIN, axisY / 2));
-  const placed: Array<BubbleView & { offset: number; up: boolean }> = [];
+  const placed: Array<BubbleView<E> & { offset: number; up: boolean }> = [];
 
   for (const event of [...large].sort((a, b) => b.usd - a.usd)) {
     const r = usdMax > 0 ? Math.max(BUBBLE_R_MIN, rMax * Math.sqrt(event.usd / usdMax)) : BUBBLE_R_MIN;
@@ -211,13 +212,24 @@ export function bubbleLayout(
   };
 }
 
+/** The instrument at an event's minute: IB-088's link format, `/instrument/<sym>?at=<unix sec>`. */
+export interface InstrumentLink {
+  commands: string[];
+  queryParams: { at: number };
+}
+
+/** One builder for every liquidation that opens the chart: Market's bubbles and cards, /liquidations' rows. */
+export function instrumentLink(event: Pick<WebLiquidationFeedEvent, 'symbol' | 'time'>): InstrumentLink {
+  return { commands: ['/instrument', event.symbol], queryParams: { at: event.time } };
+}
+
 export interface LargeCard {
   event: WebLiquidationLargeEvent;
   /** «×180 медианы»; null under 7 days of history (the block's note says so once). */
   xMedian: { key: StringKey; params: { x: string } } | null;
   /** «серия: 4 за 9 мин» for an event in an R3 cascade. */
   series: { key: StringKey; params: { count: number; minutes: number } } | null;
-  link: { commands: string[]; queryParams: { at: number } };
+  link: InstrumentLink;
   /** The venue as its owner spells it («OKX»), never the key (IB-BUG-033). */
   venue: string;
 }
@@ -234,7 +246,7 @@ export function largeCards(large: readonly WebLiquidationLargeEvent[]): LargeCar
       key: 'liq.large.series',
       params: { count: event.seriesCount, minutes: Math.max(1, Math.round(event.seriesSpanSec / 60)) },
     },
-    link: { commands: ['/instrument', event.symbol], queryParams: { at: event.time } },
+    link: instrumentLink(event),
     venue: venueName(event.venue),
   }));
 }

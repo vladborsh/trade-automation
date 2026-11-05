@@ -2,12 +2,6 @@
 :host { display: block; min-width: 0; }
 p { margin: 8px 0 0; font: var(--type-small); }
 .muted { color: var(--color-text-muted); }
-.chart { display: block; border-top: 1px solid var(--card-border); border-bottom: 1px solid var(--card-border); }
-.axis { stroke: var(--card-border); }
-circle { cursor: pointer; fill-opacity: 0.85; stroke-width: 1; }
-circle.long { fill: var(--color-down); stroke: var(--color-down); }
-circle.short { fill: var(--color-up); stroke: var(--color-up); }
-.tick { fill: var(--color-text-muted); font-size: 12px; text-anchor: middle; }
 
 .cards {
   list-style: none; margin: 12px 0 0; padding: 0;

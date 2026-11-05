@@ -1,19 +1,7 @@
 @if (cards().length === 0) {
   <p class="muted">{{ t('liq.large.empty', { usd: usd(minUsd()) }) }}</p>
 } @else {
-  @let l = layout();
-  <svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height" [attr.width]="width()" [attr.height]="height"
-       role="img" [attr.aria-label]="t('liq.large.legend')">
-    <line class="axis" x1="0" [attr.x2]="width()" [attr.y1]="l.axisY" [attr.y2]="l.axisY" />
-    @for (b of l.bubbles; track b.event.time + b.event.symbol + b.event.venue + b.event.usd) {
-      <circle [class]="b.event.side" [attr.cx]="b.cx" [attr.cy]="b.cy" [attr.r]="b.r" (click)="open(b.event)">
-        <title>{{ b.event.base }} · {{ side(b.event) }} · {{ usd(b.event.usd) }} · {{ time(b.event) }}</title>
-      </circle>
-    }
-    @for (tick of l.ticks; track tick.time) {
-      <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
-    }
-  </svg>
+  <app-liq-bubbles [events]="large()" [from]="from()" [to]="to()" [bucketSec]="bucketSec()" />
   <ol class="cards">
     @for (card of visible(); track card.event.time + card.event.symbol + card.event.venue + card.event.usd) {
       <li>
