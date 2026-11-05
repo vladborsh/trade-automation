@@ -1,4 +1,4 @@
-import { WEB_INSIGHT_BLOCKS, WEB_INSIGHT_KEYS, WEB_INSIGHT_SOURCES, WebInsightBlockLineSchema, WebInsightSparkSchema, WebInsightStatementSchema, WebInsightsResponseSchema } from '../src/insight';
+import { WEB_INSIGHT_BLOCKS, WEB_INSIGHT_KEYS, WEB_INSIGHT_SOURCES, WEB_INSIGHT_CHART_MAX_POINTS, WebInsightBlockLineSchema, WebInsightChartSchema, WebInsightStatementSchema, WebInsightsResponseSchema } from '../src/insight';
 
 /** IB-086 — «Главное сейчас» (design D1–D5, D15). Fixtures are what IB-088 builds against. */
 describe('IB-086 contracts', () => {
@@ -48,25 +48,51 @@ describe('IB-BUG-028: a block line that could not look says so, and names the so
 });
 
 
-describe('IB-107 (D24): a statement carries the series behind it, or says it had none', () => {
+describe('IB-119 (round 2 §3): a statement carries a real chart, or says it has none', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const s = require('./fixtures/insights.24h.json').top[0];
-  const spark = (values: number[], highlight: number | null) => WebInsightSparkSchema.safeParse({ values, highlight }).success;
+  const day = require('./fixtures/insights.24h.json');
+  const s = day.top[0];
+  const chart = s.chart;
+  const ok = (c: unknown) => WebInsightChartSchema.safeParse(c).success;
+  const points = (n: number) => Array.from({ length: n }, (_, i) => ({ time: 1_793_700_000 + i * 60, value: i }));
 
-  it('spark is required on the wire and may be null', () => {
-    expect(WebInsightStatementSchema.safeParse({ ...s, spark: null }).success).toBe(true);
-    const { spark: _omitted, ...without } = s;
+  it('chart is required on the wire and may be null; the old spark field is gone', () => {
+    expect(WebInsightStatementSchema.safeParse({ ...s, chart: null }).success).toBe(true);
+    const { chart: _omitted, ...without } = s;
     expect(WebInsightStatementSchema.safeParse(without).success).toBe(false);
+    expect(WebInsightStatementSchema.parse({ ...s, spark: { values: [1, 2], highlight: null } })).not.toHaveProperty('spark');
   });
 
-  it('2 to 30 values; highlight is an index inside them, or null', () => {
-    expect(spark([1, 2], null)).toBe(true);
-    expect(spark(Array.from({ length: 30 }, (_, i) => i), 29)).toBe(true);
-    expect(spark([1], null)).toBe(false);
-    expect(spark(Array.from({ length: 31 }, (_, i) => i), null)).toBe(false);
-    expect(spark([1, 2, 3], 3)).toBe(false);
-    expect(spark([1, 2, 3], -1)).toBe(false);
-    expect(spark([1, 2, 3], 1.5)).toBe(false);
+  it('the fixture charts parse: R4 two lines from 0, R5 bars with a band, R3 mirrored minutes', () => {
+    const top = WebInsightsResponseSchema.parse(day).top;
+    expect(top.map((t) => [t.ruleId, t.chart?.kind])).toEqual([['R4', 'lines'], ['R5', 'bars'], ['R3', 'bars_mirror']]);
+    expect(top[1]?.chart?.band).not.toBeNull();
+  });
+
+  it('at most 300 points a series and at most 2 series; at least one point', () => {
+    const one = { key: 'price', points: points(300) };
+    expect(ok({ ...chart, series: [one] })).toBe(true);
+    expect(ok({ ...chart, series: [{ ...one, points: points(301) }] })).toBe(false);
+    expect(ok({ ...chart, series: [one, { ...one, key: 'oi' }, { ...one, key: 'funding' }] })).toBe(false);
+    expect(ok({ ...chart, series: [] })).toBe(false);
+    expect(ok({ ...chart, series: [{ key: 'price', points: [] }] })).toBe(false);
+    expect(WEB_INSIGHT_CHART_MAX_POINTS).toBe(300);
+  });
+
+  it('kinds, units and series keys are closed lists; no non-finite value', () => {
+    expect(ok({ ...chart, kind: 'pie' })).toBe(false);
+    expect(ok({ ...chart, unit: 'btc' })).toBe(false);
+    expect(ok({ ...chart, series: [{ key: 'made_up', points: points(2) }] })).toBe(false);
+    expect(ok({ ...chart, series: [{ key: 'price', points: [{ time: 1, value: Number.NaN }] }] })).toBe(false);
+  });
+
+  it('band lo ≤ hi, span and highlight from ≤ to, at most two marks', () => {
+    expect(ok({ ...chart, band: { lo: 1, hi: 0 } })).toBe(false);
+    expect(ok({ ...chart, span: { from: 2, to: 1 } })).toBe(false);
+    expect(ok({ ...chart, highlight: { from: 5, to: 5 } })).toBe(true);
+    expect(ok({ ...chart, highlight: { from: 6, to: 5 } })).toBe(false);
+    expect(ok({ ...chart, marks: [1, 2] })).toBe(true);
+    expect(ok({ ...chart, marks: [1, 2, 3] })).toBe(false);
   });
 });
 

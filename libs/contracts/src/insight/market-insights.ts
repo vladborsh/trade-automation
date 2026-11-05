@@ -69,15 +69,64 @@ export const WebInsightLinkSchema = z.union([
 ]);
 
 /**
- * IB-107 (market-page design D24, §7.3) — the series behind a statement, for the card's mini-chart:
- * numbers the rule already read, never a fetch of its own. `highlight` is the index of the bar the
- * statement is about (the cascade's hour, "now"), or null; it must point inside `values`.
+ * IB-119 (market round 2 §3) — the chart beside a «Главное сейчас» card: a real chart with an axis, a
+ * reference line, a named span and the current value, replacing IB-107's 30-value spark (owner:
+ * «не информативная инфографика»). Built by the server AFTER ranking, only for the statements the page
+ * shows. Times are epoch seconds; values are in `unit`, already scaled for display:
+ * - `pct`   percent (`-0.0332` is −0.0332 %): funding, OI/price change, Coinbase premium;
+ * - `usd`   dollars: liquidations, stablecoin supply;
+ * - `ratio` a plain ratio: long/short;
+ * - `share` percent of coins, 0–100: breadth;
+ * - `index` index points: DVOL.
  */
-export const WebInsightSparkSchema = z.object({
-  values: z.array(z.number()).min(2).max(30),
-  highlight: z.number().int().nonnegative().nullable(),
-}).refine((s) => s.highlight === null || s.highlight < s.values.length, { message: 'highlight points past the last value', path: ['highlight'] });
-export type WebInsightSpark = z.infer<typeof WebInsightSparkSchema>;
+export const WEB_INSIGHT_CHART_KINDS = ['bars', 'lines', 'bars_mirror'] as const;
+export const WEB_INSIGHT_CHART_UNITS = ['pct', 'usd', 'ratio', 'share', 'index'] as const;
+/**
+ * What a series is, so the client can name it in the legend: `long` / `short` liquidations (in
+ * `bars_mirror` the FIRST series is drawn above zero, the second below — the page's convention, shorts
+ * above), a coin's liquidations `usd`, `price` and `oi` (R4/R11: % from the first point), `funding`,
+ * `ls_global` / `ls_top`, `up_share`, `dvol`, `stablecoins`, `premium`.
+ */
+export const WEB_INSIGHT_CHART_SERIES = [
+  'long', 'short', 'usd', 'price', 'oi', 'funding', 'ls_global', 'ls_top', 'up_share', 'dvol', 'stablecoins', 'premium',
+] as const;
+/** The schema refuses a longer series: ≤ 2 × 300 points bounds a chart (≈ 10 per period response). */
+export const WEB_INSIGHT_CHART_MAX_POINTS = 300;
+
+const SpanSchema = z.object({ from: TimeSec, to: TimeSec }).refine((s) => s.from <= s.to, { message: 'from after to' });
+
+export const WebInsightChartPointSchema = z.object({ time: TimeSec, value: z.number().finite() });
+export type WebInsightChartPoint = z.infer<typeof WebInsightChartPointSchema>;
+
+export const WebInsightChartSeriesSchema = z.object({
+  key: z.enum(WEB_INSIGHT_CHART_SERIES),
+  points: z.array(WebInsightChartPointSchema).min(1).max(WEB_INSIGHT_CHART_MAX_POINTS),
+});
+export type WebInsightChartSeries = z.infer<typeof WebInsightChartSeriesSchema>;
+
+export const WebInsightChartSchema = z.object({
+  kind: z.enum(WEB_INSIGHT_CHART_KINDS),
+  unit: z.enum(WEB_INSIGHT_CHART_UNITS),
+  /** The reference line: 0, 1.0 (L/S), 50 (breadth); null when the rule has none (R9's supply level). */
+  ref: z.number().finite().nullable(),
+  /**
+   * The shaded "normal" strip, from THE SAME sample the rule's rarity used (R2, R5): a value outside it
+   * is exactly a value the rule calls rare. Null when the rule measured no level band.
+   */
+  band: z.object({ lo: z.number().finite(), hi: z.number().finite() }).refine((b) => b.lo <= b.hi, { message: 'lo above hi' }).nullable(),
+  /** One or two series (`bars_mirror` and `lines` with two: price/OI, crowd/top). */
+  series: z.array(WebInsightChartSeriesSchema).min(1).max(2),
+  /**
+   * What the statement is about, as a time range (a single moment is `from === to`): the current hour
+   * (R1), the cascade's minutes (R3), A … B of an OI divergence (R11), "now" (R2, R5). Null: nothing.
+   */
+  highlight: SpanSchema.nullable(),
+  /** Moments marked on every line: R11's pivots A and B. Empty for every other rule. */
+  marks: z.array(TimeSec).max(2),
+  /** The x axis: the time range the chart covers, named on the axis («30д … сейчас»). */
+  span: SpanSchema,
+});
+export type WebInsightChart = z.infer<typeof WebInsightChartSchema>;
 
 export const WebInsightStatementSchema = z.object({
   ruleId: WebInsightRuleSchema,
@@ -94,10 +143,13 @@ export const WebInsightStatementSchema = z.object({
   magnitude: z.number(),
   basis: WebInsightBasisSchema,
   link: WebInsightLinkSchema,
-  /** D24: null is honest — the rule had no series in hand. No rule fetches anything for a spark. */
-  spark: WebInsightSparkSchema.nullable(),
+  /**
+   * IB-119: the card's chart, built after ranking for the statements shown. Null is honest: the
+   * series could not be read, or the statement is not displayed (the rules themselves emit null).
+   */
+  chart: WebInsightChartSchema.nullable(),
 });
-export type WebInsightStatement =z.infer<typeof WebInsightStatementSchema>;
+export type WebInsightStatement = z.infer<typeof WebInsightStatementSchema>;
 
 /**
  * D15: one line per block — its best statement, or a neutral line saying WHY there is none:
