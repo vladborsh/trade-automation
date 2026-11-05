@@ -44,7 +44,7 @@ d = {'from': '2026-11-04T21:41:43Z', 'to': '2026-11-05T21:41:43Z', 'now': '2026-
                ['live', '24h', '130', '0', '0', '0', '0', '0', '0', ''],
                ['live', '72h', '130', '0', '0', '0', '0', '0', '0', ''],
                ['backfill', '24h', '2566', '2508', '0', '49', '7384', '0', '0', '1793843000']],
-     'sizes': [['oi_divergence_paths', '1200000', '8000']],
+     'sizes': [['oi_divergence_paths', '1200000', '8000', '1000000']],  # 150 B/row total, 125 heap
      'builds': [['4e405719ea49', '1793828503'], ['d8a0cdc19b6d', '1793835367']],
      'sar': [{'t': 1793829000 + 600 * i, 'avail': 240 - i % 7, 'swap': 80 + i % 5} for i in range(140)],
      'weight_now': 1.0}
@@ -104,7 +104,12 @@ check 'v28 memory < 100 MB, swap > 500 MB, overdue paths → each FLAGged' \
   '[ "$(verdict mem v28)" = FLAG:paths_overdue,mem_available_min_mb,swap_used_max_mb ]'
 v28_input bytes "d['sizes'][0][1] = str(301 * 8000)"
 run v28 bytes
-check 'v28 301 B/row → FLAG:path_bytes_per_row' '[ "$(verdict bytes v28)" = FLAG:path_bytes_per_row ]'
+check 'v28 301 B/row with indexes, heap 125 → FLAG names the total only' '[ "$(verdict bytes v28)" = FLAG:path_bytes_per_row ]'
+
+v28_input heap "d['sizes'][0][1] = str(400 * 8000); d['sizes'][0][3] = str(301 * 8000)"
+run v28 heap
+check 'v28 heap-only 301 B/row → both figures FLAG, each named' '[ "$(verdict heap v28)" = FLAG:path_bytes_per_row,path_heap_bytes_per_row ]'
+check 'v28 the md shows the path-weight formula' 'grep -q "E = (1 100/8 subjects/day)" $work/out-pass/v28.md'
 
 v28_input early "d['now'] = '2026-11-05T21:40:00Z'"
 run v28 early

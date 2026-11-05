@@ -110,7 +110,8 @@ def v28_gather():
         " from oi_divergence_paths p left join oi_divergence_alerts a on a.id = p.alert_id"
         " left join oi_divergence_controls c on c.id = p.control_id left join oi_divergence_near_misses n on n.id = p.near_miss_id"
         " group by 1, 2 order by 1, 2" % win('p.measured_at'))
-    raw['sizes'] = psql("select c.relname, pg_total_relation_size(c.oid), (select count(*) from oi_divergence_paths) from pg_class c"
+    # total (heap + indexes + toast) and heap only: V28's ≈ 150 B may have been heap only (TL review, IB-140 a)
+    raw['sizes'] = psql("select c.relname, pg_total_relation_size(c.oid), (select count(*) from oi_divergence_paths), pg_relation_size(c.oid) from pg_class c"
                         " where relname in ('oi_divergence_paths','oi_divergence_controls','oi_divergence_near_misses','oi_divergence_alerts') order by 1")
     # builds that wrote live rows inside the window: each first row marks a deploy (or the boot)
     raw['builds'] = psql("select build, extract(epoch from min(created_at)) from (select build, created_at from oi_divergence_controls where source = 'live' and %s"
@@ -192,14 +193,19 @@ def v28_evaluate(raw):
     share = sum(w * max(0.0, 1 - WIN_SEC[k] / span) for k, w in PATH_WEIGHT.items()) if span > 0 else 0
     expect = V28_SUBJECTS_PER_DAY * share / 1440
     rows.append(band(flags, 'path_weight_per_min', round(weight, 3), round(expect / 2, 3), round(expect * 2, 3)))
-    notes.append('path weight band = 2× around V28\'s share for windows that could close since live rows began (%s): '
-                 '%.2f of 8 weight units per subject (steady state 0.4–1.6/min)' % (utc(live_since), share))
+    notes.append('path weight band = [E/2, 2E], E = (1 100/8 subjects/day) × Σ_win weight × max(0, 1 − win/span) / 1440, '
+                 'span = window end − first live row (%s); weights 4h 1, 24h 2, 72h 5. Today Σ = %.2f of 8 → E = %.3f/min '
+                 '(steady state, Σ = 8: 0.4–1.6/min)' % (utc(live_since), share, expect))
     total = None if raw.get('weight_now') is None else round(raw['weight_now'] + weight, 2)
     rows.append(band(flags, 'binance_weight_per_min', total, 0, 4))
     sizes = {r[0]: int(r[1]) for r in raw['sizes']}
     n_paths = int(raw['sizes'][0][2]) if raw['sizes'] else 0
     per_row = round(sizes.get('oi_divergence_paths', 0) / n_paths) if n_paths else None
-    rows.append(band(flags, 'path_bytes_per_row', per_row, 75, 300, ' B'))
+    heap = {r[0]: int(r[3]) for r in raw['sizes'] if len(r) > 3}
+    heap_row = round(heap['oi_divergence_paths'] / n_paths) if n_paths and 'oi_divergence_paths' in heap else None
+    # both against the same band, so the verdict names which one breaks (the band is not widened)
+    rows.append(band(flags, 'path_bytes_per_row', per_row, 75, 300, ' B (heap + indexes)'))
+    rows.append(band(flags, 'path_heap_bytes_per_row', heap_row, 75, 300, ' B (heap only)'))
     if per_row:
         notes.append('paths table: %d rows (all sources) → %.1f MB per 145 k rows/year at this size' % (n_paths, per_row * 145000 / 1e6))
     sar = raw.get('sar') or []
