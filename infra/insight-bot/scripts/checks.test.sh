@@ -203,6 +203,28 @@ d['link_code'] = 502"
 run first-live-alert fla-link
 check 'first-live-alert link answering 502 → FLAG:link_http' '[ "$(verdict fla-link first-live-alert)" = FLAG:link_http ]'
 
+# ------------------------------------------------------------------------------------ first-live-liq (IB-143)
+LIQMSG='
+d = {"now": "2026-11-06T02:00:00Z", "eligible": [["1"]], "link": "https://x/instrument/BTCUSDT?at=1793921000&tf=5m", "link_code": 200,
+     "msg": [["130", "event", "BTCUSDT", "1793921180", "1793921187", "1", "f", "da9ed8899f2f", "BTCUSDT", "1793921000123", "2", "12500000"]]}
+'
+fixture fll-pending 'd = {"now": "2026-11-06T01:00:00Z", "msg": [], "eligible": [["1"]], "link_code": None}'
+run first-live-liq fll-pending
+check 'first-live-liq none yet → PENDING: no sentinel, nothing sent, exit 0' \
+  '[ ! -e $work/out-fll-pending/first-live-liq.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-fll-pending/first-live-liq.json && [ "$(sent)" = 0 ] && [ "$(cat $work/fll-pending.rc)" = 0 ]'
+fixture fll-pass "$LIQMSG"
+run first-live-liq fll-pass
+check 'first-live-liq the owner only, 7 s after S, link 200 → PASS with the facts; the owner is NOT told' \
+  '[ "$(verdict fll-pass first-live-liq)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"fired_after_moment_s\": 7" $work/out-fll-pass/first-live-liq.json && grep -q "\"coins\": 2" $work/out-fll-pass/first-live-liq.json'
+fixture fll-two "$LIQMSG
+d['msg'][0][5] = '2'; d['eligible'] = [['2']]"
+run first-live-liq fll-two
+check 'first-live-liq sent to 2 (not owner-only) → FLAG:recipients,liq_alerts_users' '[ "$(verdict fll-two first-live-liq)" = FLAG:recipients,liq_alerts_users ]'
+fixture fll-slow "$LIQMSG
+d['msg'][0][4] = '1793921250'; d['link_code'] = 502"
+run first-live-liq fll-slow
+check 'first-live-liq 70 s after S and a 502 link → FLAG:fired_after_moment_s,link_http' '[ "$(verdict fll-slow first-live-liq)" = FLAG:fired_after_moment_s,link_http ]'
+
 # ------------------------------------------------------------------------------------ oi-4h-first-eval
 # IB-141 batch 3: the lines are the bot's own shape, as pinned by apps/insight-bot/test/delivery/oi-alerts-log-line.spec.ts.
 OI4H='

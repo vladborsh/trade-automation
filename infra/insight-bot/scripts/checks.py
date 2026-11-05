@@ -345,6 +345,49 @@ def first_alert_evaluate(raw):
     return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the alert itself'], 'measured': m, 'done': True}
 
 
+# -------------------------------------------------------------------------------------- first-live-liq
+# IB-143: the first live LIQUIDATION message (an `event`, or a continuation that was news) with fired_at set: its
+# facts go to a file. Bands for the owner-only go-live: recipients exactly 1, exactly one user with liq_alerts,
+# not late, sent within 60 s of its moment (S or the close; the loop ticks every 10 s), and the link (the largest
+# coin at its crossing, tf 5m) answers 200 through Caddy. PENDING until one exists; then the timer removes itself.
+# The owner is NOT told — he got the message.
+
+def first_liq_gather():
+    raw = {'now': utc(time.time())}
+    raw['msg'] = psql("select id, event, symbol, extract(epoch from at), extract(epoch from fired_at), recipients, late, build,"
+                      " details->'coins'->0->>'symbol', details->'coins'->0->>'crossedAt', jsonb_array_length(details->'coins'), details->>'totalUsd'"
+                      " from market_alerts where type = 'liq' and source = 'live' and event in ('event', 'event_continuing')"
+                      " and fired_at is not null order by fired_at, id limit 1")
+    raw['eligible'] = psql("select count(*) from users where liq_alerts and not disabled and chat_id is not null")
+    raw['link_code'] = None
+    if raw['msg']:
+        m = raw['msg'][0]
+        base = env_value(os.path.join(DEPLOY_DIR, '.env'), 'WEB_BASE_URL') or ''
+        raw['link'] = '%s/instrument/%s?at=%d&tf=5m' % (base.rstrip('/'), m[8], int(float(m[9]) // 1000)) if base and m[8] and m[9] else None
+        if raw['link']:
+            out = subprocess.run(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '15', raw['link']],
+                                 capture_output=True, text=True, timeout=30).stdout.strip()
+            raw['link_code'] = int(out) if out.isdigit() else None
+    return raw
+
+
+def first_liq_evaluate(raw):
+    if not raw['msg']:
+        return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live liquidation message sent yet at %s' % raw['now']], 'measured': None}
+    m = raw['msg'][0]
+    at, fired = float(m[3]), float(m[4])
+    flags, rows = [], []
+    rows.append(band(flags, 'recipients', int(m[5]), 1, 1))
+    rows.append(band(flags, 'liq_alerts_users', int(raw['eligible'][0][0]), 1, 1))
+    rows.append(band(flags, 'late', 1 if m[6] == 't' else 0, 0, 0))
+    rows.append(band(flags, 'fired_after_moment_s', round(fired - at), 0, 60, ' s'))
+    rows.append(band(flags, 'link_http', raw.get('link_code'), 200, 200))
+    measured = {'id': int(m[0]), 'event': m[1], 'symbol': m[2], 'at': utc(at), 'fired_at': utc(fired), 'fired_after_moment_s': round(fired - at),
+                'recipients': int(m[5]), 'liq_alerts_users': int(raw['eligible'][0][0]), 'late': m[6] == 't', 'build': m[7],
+                'coins': int(m[10]), 'total_usd': float(m[11]) if m[11] else None, 'link': raw.get('link'), 'link_http': raw.get('link_code')}
+    return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the message itself'], 'measured': measured, 'done': True}
+
+
 # ---------------------------------------------------------------------------------------- backfill-rerun
 # IB-116's rerun after 2026-11-07 22:00 UTC: /root/box-backfill.sh --write measures the windows that were
 # open at the first run (314) and writes no new subject (the once-keys hold). The script carries its own
@@ -616,6 +659,7 @@ CHECKS = {
     'v28': (v28_gather, v28_evaluate, 'IB-115 V28 live day [%s, %s)' % (V28_FROM, V28_TO)),
     'cap-24h': (cap_gather, cap_evaluate, 'IB-118 / IB-130: a day of market_cap_total'),
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
+    'first-live-liq': (first_liq_gather, first_liq_evaluate, 'IB-143: the first live liquidation message (owner only): facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
     'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),
     'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
