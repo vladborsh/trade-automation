@@ -9,7 +9,7 @@ import { TelegramSender } from './telegram-sender';
 
 /**
  * IB-122 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §2) — schedules `LiqAlertLoop` every
- * 30 s, beside the OI loop (same sender, same DB). Venue weight 0: the loop reads our liquidation tape.
+ * LIQ_TICK_SEC (10 s since IB-143), beside the OI loop (same sender, same DB). Venue weight 0: the loop reads our liquidation tape.
  * Price paths of its rows are measured by the OI loop's measurer (one queue, IB-115).
  * Nothing is sent until the admin page's 'liq' switch is on (default off).
  */
@@ -64,7 +64,7 @@ export class LiqAlertsService implements OnApplicationBootstrap, OnModuleDestroy
     try {
       const r = await this.loop.tick(nowMs);
       if (!r) { this.heartbeat.skippedTick(); return null; }
-      if (r.alerts + r.continuations + r.controls > 0 || r.failed.length > 0) this.logger.log(liqTickLine(r));
+      if (r.alerts + r.events + r.continuations + r.controls > 0 || r.failed.length > 0) this.logger.log(liqTickLine(r));
       const beat = this.heartbeat.record(r, this.now());
       if (beat) this.logger.log(beat);
       return r;
@@ -78,7 +78,7 @@ export class LiqAlertsService implements OnApplicationBootstrap, OnModuleDestroy
 
 /** «liq alerts (…→…]: 5 coins, 1 alert, 0 continuing (late 0), sent 0, controls 2, reads 7, prints ≤ 312» */
 export function liqTickLine(r: LiqTickReport): string {
-  return `liq alerts (${new Date(r.fromMs).toISOString()} → ${new Date(r.toMs).toISOString()}]: ${r.coins} coins, ${r.alerts} alert(s), `
-    + `${r.continuations} continuing (late ${r.late}), sent ${r.sent}, controls ${r.controls}, reads ${r.reads}, prints ≤ ${r.maxPrints}`
+  return `liq alerts (${new Date(r.fromMs).toISOString()} → ${new Date(r.toMs).toISOString()}]: ${r.coins} coins, ${r.alerts} crossing(s), `
+    + `${r.events} event(s), ${r.continuations} event close(s) (late ${r.late}), sent ${r.sent}, controls ${r.controls}, reads ${r.reads}, prints ≤ ${r.maxPrints}`
     + `${r.failed.length ? `, failed ${r.failed.join(',')}` : ''}`;
 }

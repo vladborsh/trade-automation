@@ -1,7 +1,7 @@
-import { LIQ_DEFAULT_PARAMS, type LiqParams, type LiqSide } from '@trade-automation/contracts';
+import { LIQ_DEFAULT_PARAMS, type LiqParams } from '@trade-automation/contracts';
 import type { VenueStatus } from '../../../src/alerts/liquidations/coverage';
-import type {
-  JournalLiqRow, LiqAlertStore, LiqSettings, NewMarketAlert, NewMarketControl, TapePrint, VenuePair,
+import {
+  journalRow, type JournalLiqRow, type LiqAlertStore, type LiqSettings, type NewMarketAlert, type NewMarketControl, type TapePrint, type VenuePair,
 } from '../../../src/alerts/liquidations/pg/liq-alerts.repo';
 
 /** IB-122 — the loop's store in memory, with the same once-keys as migration 031 (source, type, dedupe_key). */
@@ -15,7 +15,7 @@ export class MemoryLiqStore implements LiqAlertStore {
   paths: Array<{ subject: string; symbol: string; t0: number }> = [];
   users = [{ chatId: 7, lang: 'ru' as const }];
   status: VenueStatus = MemoryLiqStore.allAlive();
-  reads = { prints: 0, runningSum: 0 };
+  reads = { prints: 0 };
   private nextId = 1;
 
   static allAlive(): VenueStatus {
@@ -44,23 +44,9 @@ export class MemoryLiqStore implements LiqAlertStore {
     return this.tape.filter((p) => this.match(pairs)(p) && p.ts > fromMs && p.ts <= toMs).sort((a, b) => a.ts - b.ts);
   }
 
-  async runningSum(pairs: readonly VenuePair[], side: LiqSide, fromMs: number, toMs: number, target: number) {
-    this.reads.runningSum++;
-    let run = 0;
-    let crossedAt: number | null = null;
-    for (const p of this.tape.filter((x) => this.match(pairs)(x) && x.side === side && x.ts > fromMs && x.ts <= toMs).sort((a, b) => a.ts - b.ts)) {
-      run += p.usd;
-      if (crossedAt === null && run >= target) crossedAt = p.ts;
-    }
-    return { crossedAt, total: run };
-  }
-
   async journal(source: 'live' | 'backfill', sinceMs: number): Promise<JournalLiqRow[]> {
-    return this.alerts.filter((a) => a.source === source && a.atMs > sinceMs).map((a) => ({
-      id: a.id, event: a.event, symbol: a.symbol, side: a.details.side as LiqSide, at: a.atMs,
-      windowStartMs: Number(a.details.windowStartMs), thresholdUsd: Number(a.details.thresholdUsd),
-      alertId: a.details.alertId === undefined ? null : Number(a.details.alertId),
-    }));
+    return this.alerts.filter((a) => a.source === source && a.atMs > sinceMs).sort((a, b) => a.atMs - b.atMs || a.id - b.id)
+      .map((a) => journalRow({ id: a.id, event: a.event, symbol: a.symbol, atMs: a.atMs, late: a.late, details: a.details }));
   }
 
   async venueStatus(): Promise<VenueStatus> {

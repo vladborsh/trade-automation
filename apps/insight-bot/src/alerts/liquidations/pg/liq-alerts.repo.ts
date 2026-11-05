@@ -1,6 +1,6 @@
 import {
-  LiqParamsSchema, OI_RESEARCH_WINDOWS, type LiqParams, type LiqSide, type LiqVenue, type MarketAlertControlKind, type MarketAlertSource,
-  type WebLiqAlertRow,
+  LiqParamsSchema, OI_RESEARCH_WINDOWS, type LiqAlertEvent, type LiqParams, type LiqSide, type LiqVenue, type MarketAlertControlKind,
+  type MarketAlertSource, type WebLiqAlertRow,
 } from '@trade-automation/contracts';
 import type { DbHandle } from '../../../db/db.port';
 import { BINANCE_LIQUIDATION_STREAM } from '../../../collectors/uptime/liquidation-streams';
@@ -27,22 +27,43 @@ export interface TapePrint { venue: LiqVenue; symbol: string; side: LiqSide; ts:
 
 export interface LiqSettings { enabled: boolean; membersVisible: boolean; params: LiqParams; updatedAt: number }
 
-/** A journal row as the loop needs it: quiet periods and continuations. Times epoch ms. */
+/** A journal row as the loop needs it: quiet periods (L2) and market events (L11–L14). Times epoch ms. */
 export interface JournalLiqRow {
   id: number;
-  event: 'alert' | 'continuing';
+  event: LiqAlertEvent;
   symbol: string;
   side: LiqSide;
   at: number;
+  late: boolean;
+  /** `alert` rows; for an event row its link coin's window. */
   windowStartMs: number;
   thresholdUsd: number;
-  /** For a continuation: the alert it continues. */
+  /** For an old `continuing` row: the alert it continues. */
   alertId: number | null;
+  /** IB-143: the event's T0 (`alert` rows from IB-143 on, and every event row); null on older `alert` rows. */
+  eventAt: number | null;
+  /** `event` rows: S and how it came, and the coins of the first message. */
+  sentAt: number | null;
+  settled: 'quiet' | 'cap' | null;
+  coins: string[];
+}
+
+/** One journal row from its stored columns; shared by the Pg store and the in-memory ones. */
+export function journalRow(r: { id: number; event: LiqAlertEvent; symbol: string; atMs: number; late: boolean; details: Record<string, unknown> }): JournalLiqRow {
+  const d = r.details;
+  const num = (v: unknown): number | null => (v === undefined || v === null ? null : Number(v));
+  const coins = Array.isArray(d.coins) ? (d.coins as Array<{ symbol: string }>).map((c) => c.symbol) : [];
+  return {
+    id: r.id, event: r.event, symbol: r.symbol, side: d.side as LiqSide, at: r.atMs, late: r.late,
+    windowStartMs: Number(d.windowStartMs ?? NaN), thresholdUsd: Number(d.thresholdUsd ?? NaN),
+    alertId: num(d.alertId), eventAt: num(d.eventAt), sentAt: num(d.sentAt),
+    settled: d.settled === 'quiet' || d.settled === 'cap' ? d.settled : null, coins,
+  };
 }
 
 export interface NewMarketAlert {
   source: MarketAlertSource;
-  event: 'alert' | 'continuing';
+  event: LiqAlertEvent;
   symbol: string;
   atMs: number;
   details: Record<string, unknown>;
@@ -71,8 +92,6 @@ export interface LiqAlertStore {
   listedCoins(): Promise<Array<{ symbol: string; base: string }>>;
   /** All prints of these pairs with ts in (fromMs, toMs], oldest first — the loop's one tape read per tick. */
   prints(pairs: readonly VenuePair[], fromMs: number, toMs: number): Promise<TapePrint[]>;
-  /** L2: over (fromMs, toMs] for one side: the first moment the running sum reached `target`, and the total. */
-  runningSum(pairs: readonly VenuePair[], side: LiqSide, fromMs: number, toMs: number, target: number): Promise<{ crossedAt: number | null; total: number }>;
   /** Journal rows of `source` with `at` after `sinceMs`. */
   journal(source: MarketAlertSource, sinceMs: number): Promise<JournalLiqRow[]>;
   /**
@@ -121,30 +140,12 @@ export class PgLiqAlertStore implements LiqAlertStore {
     return rows.map((r) => ({ venue: r.venue, symbol: r.symbol, side: r.side, ts: ms(r.ts), usd: Number(r.notional) }));
   }
 
-  async runningSum(pairs: readonly VenuePair[], side: LiqSide, fromMs: number, toMs: number, target: number): Promise<{ crossedAt: number | null; total: number }> {
-    if (pairs.length === 0 || toMs <= fromMs) return { crossedAt: null, total: 0 };
-    const [r] = await this.db.query<{ crossed_at: Date | null; total: string | null }>(
-      `with r as (
-         select l.ts, sum(l.notional) over (order by l.ts, l.id) as run
-           from liquidations l
-           join unnest($1::text[], $2::text[]) as p(venue, symbol) on l.venue = p.venue and l.symbol = p.symbol
-          where l.side = $3 and l.ts > $4 and l.ts <= $5 and ${NOT_COIN_M})
-       select (select min(ts) from r where run >= $6) as crossed_at, (select max(run) from r) as total`,
-      [pairs.map((p) => p.venue), pairs.map((p) => p.symbol), side, new Date(fromMs), new Date(toMs), target],
-    );
-    return { crossedAt: r?.crossed_at ? ms(r.crossed_at) : null, total: Number(r?.total ?? 0) };
-  }
-
   async journal(source: MarketAlertSource, sinceMs: number): Promise<JournalLiqRow[]> {
-    const rows = await this.db.query<{ id: string; event: 'alert' | 'continuing'; symbol: string; at: Date; details: Record<string, unknown> }>(
-      `select id, event, symbol, at, details from market_alerts where type = 'liq' and source = $1 and at > $2 order by at, id`,
+    const rows = await this.db.query<{ id: string; event: LiqAlertEvent; symbol: string; at: Date; late: boolean; details: Record<string, unknown> }>(
+      `select id, event, symbol, at, late, details from market_alerts where type = 'liq' and source = $1 and at > $2 order by at, id`,
       [source, new Date(sinceMs)],
     );
-    return rows.map((r) => ({
-      id: Number(r.id), event: r.event, symbol: r.symbol, side: r.details.side as LiqSide, at: ms(r.at),
-      windowStartMs: Number(r.details.windowStartMs), thresholdUsd: Number(r.details.thresholdUsd),
-      alertId: r.details.alertId === undefined ? null : Number(r.details.alertId),
-    }));
+    return rows.map((r) => journalRow({ id: Number(r.id), event: r.event, symbol: r.symbol, atMs: ms(r.at), late: r.late, details: r.details }));
   }
 
   async venueStatus(gapsSinceMs?: number): Promise<VenueStatus> {
@@ -225,13 +226,13 @@ export class PgLiqAlertStore implements LiqAlertStore {
 
   async journalPage(limit = 50): Promise<WebLiqAlertRow[]> {
     const rows = await this.db.query<{
-      id: string; source: MarketAlertSource; event: 'alert' | 'continuing'; symbol: string; at: Date; details: Record<string, unknown>;
+      id: string; source: MarketAlertSource; event: LiqAlertEvent; symbol: string; at: Date; details: Record<string, unknown>;
       fired_at: Date | null; late: boolean; recipients: number;
     }>(`select id, source, event, symbol, at, details, fired_at, late, recipients from market_alerts where type = 'liq' order by at desc, id desc limit $1`, [limit]);
     return rows.map((r) => ({
       id: Number(r.id), source: r.source, event: r.event, symbol: r.symbol, side: r.details.side as LiqSide, at: Math.floor(ms(r.at) / 1000),
-      sumUsd: Number(r.details.sumUsd), thresholdUsd: Number(r.details.thresholdUsd),
       firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients,
+      ...adminFigures(r.event, r.symbol, r.details),
     }));
   }
 
@@ -246,6 +247,17 @@ export class PgLiqAlertStore implements LiqAlertStore {
       [patch.enabled ?? null, patch.membersVisible ?? null, patch.params === undefined ? null : JSON.stringify(patch.params), by],
     );
   }
+}
+
+/**
+ * The admin row's figures (IB-143): a crossing or an old continuation shows its own sum and threshold; an event row
+ * its total and its coins, largest first, a coin that joined after the first message marked «+».
+ */
+export function adminFigures(event: LiqAlertEvent, symbol: string, d: Record<string, unknown>): Pick<WebLiqAlertRow, 'sumUsd' | 'thresholdUsd' | 'coins' | 'news'> {
+  if (event !== 'event' && event !== 'event_continuing') return { sumUsd: Number(d.sumUsd), thresholdUsd: Number(d.thresholdUsd), coins: [symbol], news: true };
+  const fresh = new Set(Array.isArray(d.newCoins) ? (d.newCoins as string[]) : []);
+  const coins = (Array.isArray(d.coins) ? (d.coins as Array<{ symbol: string }>) : []).map((c) => (fresh.has(c.symbol) ? `+${c.symbol}` : c.symbol));
+  return { sumUsd: Number(d.totalUsd), thresholdUsd: null, coins, news: event === 'event' || d.news === true };
 }
 
 /** §1 Recipients: whether members see the liquidation-alerts toggle (`/me/settings`). */

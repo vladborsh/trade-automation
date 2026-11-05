@@ -41,7 +41,7 @@ export class LiqHeartbeat {
   record(r: LiqTickReport, doneMs: number): string | null {
     this.ticks++;
     this.prints += r.prints;
-    this.journalled += r.alerts + r.continuations + r.controls;
+    this.journalled += r.alerts + r.events + r.continuations + r.controls;
     this.lagMs = Math.max(this.lagMs, doneMs - r.toMs);
     const slot = Math.floor(r.toMs / SLOT_MS) * SLOT_MS;
     if (this.slot !== null && slot <= this.slot) return null;

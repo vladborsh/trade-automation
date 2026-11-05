@@ -434,7 +434,7 @@ def liq_md_table(table, days):
     for r in table:
         by.setdefault(r['symbol'], {})[r['multiplier']] = r
     L = ['## Alerts per week, per coin (%.2f days of tape; ×1 = L4 defaults)' % days, '',
-         '| coin | ×½ threshold | ×½ /week | ×1 threshold | ×1 /week (long/short) | ×1 continuing /week | ×2 threshold | ×2 /week | ×1 with a gap | ×1 venue not collected |',
+         '| coin | ×½ threshold | ×½ /week | ×1 threshold | ×1 /week (long/short) | ×1 event closes /week | ×2 threshold | ×2 /week | ×1 with a gap | ×1 venue not collected |',
          '|---|---|---|---|---|---|---|---|---|---|']
     for sym, m in by.items():
         h, one, two = m.get(0.5, {}), m.get(1, {}), m.get(2, {})
@@ -454,19 +454,20 @@ def liq_evaluate(raw):
     if raw['rc'] != 0 or not cli or cli.group(1) != '0':
         raise CheckFailed('liq-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
     js = re.search(r'^LIQ_HISTORY_JSON (\{.*\})$', out, re.M)
-    new = re.search(r'write ×1: .*new rows: alerts (\d+), continuations (\d+), controls (\d+)', out)
+    # IB-143 appends «, events N» (first messages); a CLI from before it has none
+    new = re.search(r'write ×1: .*new rows: alerts (\d+), continuations (\d+), controls (\d+)(?:, events (\d+))?', out)
     paths = re.search(r'paths: measured (\d+), failed (\d+), weight (\d+), \d+ s; left (\d+)', out)
     mem = re.search(r'min MemAvailable (\d+) MB', out)
     if not js or not new or not paths or not mem:
         raise CheckFailed('liq-backfill.sh output lacks a LIQ_HISTORY_JSON, «write ×1», «paths:» or «min MemAvailable» line')
     summary = json.loads(js.group(1))
     flags, rows = [], []
-    rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups()), 0, 0))
+    rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups() if x is not None), 0, 0))
     rows.append(band(flags, 'days_counted', summary['days'], 6.9, 10 ** 6))
     rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
     rows.append(band(flags, 'paths_left_open', int(paths.group(4)), 0, 0))
     rows.append(band(flags, 'min_mem_available_mb', int(mem.group(1)), 100, 10 ** 6))
-    notes = ['counts over (%s, %s]: the live loop\'s code at the 30 s cadence, into memory; nothing from it is written' % (summary['from'], summary['countsTo']),
+    notes = ['counts over (%s, %s]: the live loop\'s code at its live cadence (10 s since IB-143), into memory; nothing from it is written' % (summary['from'], summary['countsTo']),
              'written rows (source = backfill) stop at %s, where the live journal starts; live and backfill are never pooled (V32)' % summary['until'],
              'TRX: Binance only until 2026-11-05 17:34 UTC (L5); Bybit and OKX after',
              'path weight this run: %s (measured %s windows)' % (paths.group(3), paths.group(1)),

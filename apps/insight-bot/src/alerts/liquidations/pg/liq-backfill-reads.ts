@@ -39,6 +39,8 @@ export class PgLiqBackfillReads {
     const rows = await this.db.query<{ t: string; n: string }>(
       `select 'alerts' as t, count(*) as n from market_alerts where type = 'liq' and source = 'backfill' and event = 'alert'
        union all select 'continuations', count(*) from market_alerts where type = 'liq' and source = 'backfill' and event = 'continuing'
+       union all select 'events', count(*) from market_alerts where type = 'liq' and source = 'backfill' and event = 'event'
+       union all select 'event_continuations', count(*) from market_alerts where type = 'liq' and source = 'backfill' and event = 'event_continuing'
        union all select 'controls_random', count(*) from market_alert_controls where type = 'liq' and source = 'backfill' and kind = 'random'
        union all select 'controls_near_miss', count(*) from market_alert_controls where type = 'liq' and source = 'backfill' and kind = 'near_miss'
        union all select 'paths', count(*) from oi_divergence_paths p

@@ -146,8 +146,6 @@ maybeDescribe('IB-122 migration 031: market alerts, per-type settings, liq recip
     const pairs = [{ venue: 'binance' as const, symbol: 'BTCUSDT' }, { venue: 'bybit' as const, symbol: 'BTCUSDT' }, { venue: 'okx' as const, symbol: 'BTC-USDT-SWAP' }];
     const prints = await store.prints([...pairs, { venue: 'binance', symbol: 'BTCUSD_PERP' }], NOW - 5 * MIN, NOW);
     expect(prints.map((p) => `${p.venue}:${p.side}:${p.usd}`)).toEqual(['binance:long:2000000', 'bybit:long:2000000', 'okx:long:2000000', 'okx:short:9000000']);
-    expect(await store.runningSum(pairs, 'long', NOW - 5 * MIN, NOW, 4e6)).toEqual({ crossedAt: NOW - 3 * MIN, total: 6e6 });
-    expect(await store.runningSum(pairs, 'long', NOW - 5 * MIN, NOW, 7e6)).toEqual({ crossedAt: null, total: 6e6 });
     expect(await store.prints(pairs, NOW - 3 * MIN, NOW - 2 * MIN)).toHaveLength(1); // (from, to]
   });
 
@@ -164,8 +162,28 @@ maybeDescribe('IB-122 migration 031: market alerts, per-type settings, liq recip
     expect(await store.footnoteSent(day)).toBe(true);
     expect(await store.footnoteSent(day + 86_400_000)).toBe(false);
     expect((await store.journal('live', NOW - 1)).find((j) => j.id === id)).toEqual({
-      id, event: 'alert', symbol: 'ETHUSDT', side: 'short', at: NOW, windowStartMs: NOW - 5 * MIN, thresholdUsd: 3e6, alertId: null,
+      id, event: 'alert', symbol: 'ETHUSDT', side: 'short', at: NOW, late: false, windowStartMs: NOW - 5 * MIN, thresholdUsd: 3e6, alertId: null,
+      eventAt: null, sentAt: null, settled: null, coins: [],
     });
+  });
+
+  it('IB-143: an event row reads back its T0, S, settled and coins; the admin page shows its total and coins, «+» for a joiner', async () => {
+    const store = new PgLiqAlertStore(db);
+    const coin = (symbol: string) => ({ symbol, crossedAt: NOW, windowStartMs: NOW - 5 * MIN, sumUsd: 6e6, thresholdUsd: 5e6, byVenue: { binance: 6e6, bybit: 0, okx: 0 }, count: 1, largest: { usd: 6e6, venue: 'binance' }, silentVenues: [] });
+    const shape = { side: 'long', eventAt: NOW, sentAt: NOW + 3 * MIN, coins: [coin('BTCUSDT'), coin('BNBUSDT')], totalUsd: 12e6, count: 2, largest: { usd: 6e6, venue: 'binance', symbol: 'BTCUSDT' }, binanceFootnote: false };
+    const first = await store.insertAlert({
+      source: 'live', event: 'event', symbol: 'BTCUSDT', atMs: NOW + 3 * MIN, details: { ...shape, settled: 'cap' }, params: LIQ_DEFAULT_PARAMS, build: 'dev',
+      confirmedAtMs: NOW, late: false, dedupeKey: `liq-ev:long:${NOW}`,
+    }) as number;
+    await store.insertAlert({
+      source: 'live', event: 'event_continuing', symbol: 'BTCUSDT', atMs: NOW + 7 * MIN, params: LIQ_DEFAULT_PARAMS, build: 'dev', confirmedAtMs: NOW, late: false,
+      details: { ...shape, closedAt: NOW + 7 * MIN, closedBy: 'quiet', firstMessageId: first, newCoins: ['BNBUSDT'], addedCoins: [], news: true }, dedupeKey: `liq-ev-cont:long:${NOW}`,
+    });
+    expect((await store.journal('live', NOW)).find((j) => j.id === first)).toMatchObject({ event: 'event', eventAt: NOW, sentAt: NOW + 3 * MIN, settled: 'cap', coins: ['BTCUSDT', 'BNBUSDT'] });
+    const page = await store.journalPage();
+    expect(page.filter((r) => r.event.startsWith('event')).map((r) => [r.event, r.sumUsd, r.thresholdUsd, r.coins, r.news])).toEqual([
+      ['event_continuing', 12e6, null, ['BTCUSDT', '+BNBUSDT'], true], ['event', 12e6, null, ['BTCUSDT', 'BNBUSDT'], true],
+    ]);
   });
 
   it('L5: the collectors track universe ∪ enabled alert coins; a new coin joins with its own since, a removed one leaves', async () => {

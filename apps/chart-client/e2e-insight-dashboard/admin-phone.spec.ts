@@ -12,7 +12,7 @@ import liqPage from './fixtures/admin-alerts-liq.json';
 
 const liqWithRow = {
   ...liqPage,
-  alerts: [{ id: 1, source: 'live', event: 'continuing', symbol: '1000PEPEUSDT', side: 'short', at: 1_793_888_888, sumUsd: 12_345_678, thresholdUsd: 5_000_000, firedAt: null, late: true, recipients: 0 }],
+  alerts: [{ id: 1, source: 'live', event: 'continuing', symbol: '1000PEPEUSDT', side: 'short', at: 1_793_888_888, sumUsd: 12_345_678, thresholdUsd: 5_000_000, coins: ['1000PEPEUSDT'], news: true, firedAt: null, late: true, recipients: 0 }],
 };
 
 /**

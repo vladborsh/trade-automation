@@ -3,7 +3,7 @@ import type { StringKey } from '../../i18n/keys';
 import { utcMinute } from './alert-rows';
 
 /**
- * IB-122 (liq design L2–L4) — the «Large liquidations» section's mapping, pure and spec'd: journal rows as
+ * IB-122 / IB-143 (liq design L2–L4, L12–L13) — the «Large liquidations» section's mapping, pure and spec'd: journal rows as
  * shown, the per-coin form both ways, and the patch that carries only the coins that changed.
  */
 
@@ -28,15 +28,28 @@ export interface LiqRow {
   status: { key: StringKey; recipients: number };
 }
 
+/**
+ * IB-143: a crossing (`alert`) is no longer sent by itself; the message is the market event (`event`), and its
+ * close (`event_continuing`) is sent only when it is news — otherwise it is the event's journalled final size.
+ */
+function eventKey(r: WebLiqAlertRow): StringKey {
+  switch (r.event) {
+    case 'alert': return 'liqAlerts.event.alert';
+    case 'continuing': return 'liqAlerts.event.continuing';
+    case 'event': return 'liqAlerts.event.event';
+    case 'event_continuing': return r.news ? 'liqAlerts.event.eventContinuing' : 'liqAlerts.event.eventClosed';
+  }
+}
+
 export function toLiqRow(r: WebLiqAlertRow): LiqRow {
   return {
     id: r.id,
     at: utcMinute(r.at),
-    symbol: r.symbol,
+    symbol: r.coins.length > 0 ? r.coins.join(', ') : r.symbol,
     side: r.side === 'long' ? 'liqAlerts.side.long' : 'liqAlerts.side.short',
-    event: r.event === 'alert' ? 'liqAlerts.event.alert' : 'liqAlerts.event.continuing',
+    event: eventKey(r),
     sum: usdText(r.sumUsd),
-    threshold: usdText(r.thresholdUsd),
+    threshold: r.thresholdUsd === null ? '—' : usdText(r.thresholdUsd),
     status: r.source === 'backfill'
       ? { key: 'alerts.status.history', recipients: 0 }
       : r.late

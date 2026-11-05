@@ -1,13 +1,13 @@
-import { LIQ_DEFAULT_PARAMS, type LiqAlertDetails, type LiqVenue } from '@trade-automation/contracts';
+import { LIQ_DEFAULT_PARAMS, type LiqAlertDetails, type LiqEventContinuingDetails, type LiqEventDetails, type LiqVenue } from '@trade-automation/contracts';
 import { randomWindowEnds } from '../../../src/alerts/liquidations/controls';
 import { LiqAlertLoop } from '../../../src/alerts/liquidations/liq-alert-loop';
 import { MemoryLiqStore } from './memory-liq-store';
 
 /**
- * IB-122 (L1–L8) — the loop over an in-memory store, ticking every 30 s like the service. Every rule the
- * task row lists as a spec: a cascade across a minute/tick boundary is one alert; `at` is the exact
- * crossing; quiet + exactly one continuation; a fresh alert after 30 min; late; a silent venue named;
- * dedupe across a restart; sending off by default.
+ * IB-122 (L1–L8) and IB-143 (L10–L15) — the loop over an in-memory store, ticking every 10 s like the service.
+ * Crossings: a cascade across a minute/tick boundary is one crossing at the exact moment; journalled, never sent
+ * by itself. Events: one message per side at S (60 s quiet or the 3-min cap); at most one continuation at the
+ * close, only with news; long and short independent; a restart mid-event does not send twice; late.
  */
 const T = Date.UTC(2026, 10, 5, 12, 0, 0);
 const S = 1_000;
@@ -16,6 +16,11 @@ const UNIVERSE = [{ id: 'BTCUSDT', base: 'BTC', binance_perp: 'BTCUSDT', bybit_l
 
 function setup() {
   const store = new MemoryLiqStore();
+  store.coins = [{ symbol: 'BTCUSDT', base: 'BTC' }, { symbol: 'ETHUSDT', base: 'ETH' }, { symbol: 'BNBUSDT', base: 'BNB' }, { symbol: 'TRXUSDT', base: 'TRX' }];
+  store.status = {
+    ...store.status,
+    tracked: new Map([['bybit', new Map(['BTC', 'TRX', 'ETH', 'BNB'].map((b) => [`${b}USDT`, 0]))], ['okx', new Map(['BTC', 'TRX', 'ETH', 'BNB'].map((b) => [`${b}-USDT-SWAP`, 0]))]]),
+  };
   const sent: Array<{ chatId: number; text: string }> = [];
   const make = () => new LiqAlertLoop({
     store, universe: UNIVERSE, webBaseUrl: 'https://insight.example', build: 'dev', source: 'live',
@@ -26,14 +31,16 @@ function setup() {
     const sym = venue === 'okx' ? `${symbol}-USDT-SWAP` : `${symbol}USDT`;
     store.tape.push({ venue, symbol: sym, side, ts: atMs, usd });
   };
-  /** Ticks every 30 s over [fromMs, toMs], as the service does. */
+  /** Ticks every 10 s over [fromMs, toMs], as the service does. */
   const run = async (l: LiqAlertLoop, fromMs: number, toMs: number) => {
-    for (let t = fromMs; t <= toMs; t += 30 * S) await l.tick(t);
+    for (let t = fromMs; t <= toMs; t += 10 * S) await l.tick(t);
   };
   return { store, sent, loop, make, print, run };
 }
 
-const alertsOf = (store: MemoryLiqStore, event: 'alert' | 'continuing' = 'alert') => store.alerts.filter((a) => a.event === event);
+type Ev = 'alert' | 'continuing' | 'event' | 'event_continuing';
+const alertsOf = (store: MemoryLiqStore, event: Ev = 'alert') => store.alerts.filter((a) => a.event === event);
+const firstLine = (m: { text: string }) => m.text.split('\n')[0];
 
 describe('LiqAlertLoop (L1): one cascade, one alert, at the exact crossing', () => {
   it('a $6M BTC cascade straddling the 12:00 minute, a 5-min boundary and two ticks is ONE alert at the print that crossed $5M', async () => {
@@ -54,26 +61,14 @@ describe('LiqAlertLoop (L1): one cascade, one alert, at the exact crossing', () 
     expect(h.store.paths.filter((p) => p.subject === `alert:${alerts[0]?.id}`).map((p) => p.t0)).toEqual([(T + 5 * MIN) / 1000]);
   });
 
-  it('sending is OFF by default: journalled, never sent', async () => {
+  it('L10: the crossing is journalled with its event\'s T0 and is never sent by itself; sending is OFF by default', async () => {
     const h = setup();
     h.print(T, 6e6);
-    await h.run(h.loop, T - 30 * S, T + MIN);
-    expect(alertsOf(h.store)).toHaveLength(1);
+    await h.run(h.loop, T - 30 * S, T + 3 * MIN);
+    expect(alertsOf(h.store)).toEqual([expect.objectContaining({ atMs: T, firedAt: null, recipients: 0 })]);
+    expect((alertsOf(h.store)[0]?.details as LiqAlertDetails).eventAt).toBe(T);
+    expect(alertsOf(h.store, 'event')).toEqual([expect.objectContaining({ atMs: T + MIN, firedAt: null })]);
     expect(h.sent).toEqual([]);
-    expect(alertsOf(h.store)[0]).toMatchObject({ firedAt: null, recipients: 0 });
-  });
-
-  it('switched on: sent once to each recipient, the Binance footnote with the first message of the UTC day only', async () => {
-    const h = setup();
-    h.store.enabled = true;
-    h.print(T, 6e6);
-    h.print(T + 40 * MIN, 6e6);
-    await h.run(h.loop, T - 30 * S, T + 45 * MIN);
-    expect(h.sent).toHaveLength(2);
-    expect(h.sent[0]?.text).toContain('Крупные ликвидации лонгов BTC: $6M за 5 мин');
-    expect(h.sent[0]?.text).toContain('Binance публикует');
-    expect(h.sent[1]?.text).not.toContain('Binance публикует');
-    expect(alertsOf(h.store).map((a) => a.recipients)).toEqual([1, 1]);
   });
 
   it('L4: a listed coin without a threshold, or switched off, is not evaluated', async () => {
@@ -81,64 +76,152 @@ describe('LiqAlertLoop (L1): one cascade, one alert, at the exact crossing', () 
     h.store.params = { perCoin: { BTCUSDT: { enabled: false, thresholdUsd: 5e6 } } };
     h.print(T, 9e6);
     h.print(T, 9e6, 'binance', 'long', 'TRX');
-    await h.run(h.loop, T - 30 * S, T + MIN);
+    await h.run(h.loop, T - 30 * S, T + 3 * MIN);
     expect(h.store.alerts).toEqual([]);
   });
 });
 
-describe('LiqAlertLoop (L2): quiet 30 min, one continuation, fresh after', () => {
-  it('more liquidations inside 30 min: no second alert, ONE «продолжается» when the sum since the window start reaches 2×', async () => {
+describe('LiqAlertLoop (L11–L13): one message per market event', () => {
+  it('one coin, settled: ONE message at the last print + 60 s, with the true size, reading like the old alert', async () => {
     const h = setup();
     h.store.enabled = true;
-    h.print(T, 6e6); // alert at T, window start T − 5 min
-    h.print(T + 3 * MIN, 2e6);
-    h.print(T + 9 * MIN, 2.5e6); // 10.5M since T − 5 min: continuation here
-    h.print(T + 12 * MIN, 6e6); // a full new window inside the quiet period: no alert, no 2nd continuation
-    await h.run(h.loop, T - 30 * S, T + 29 * MIN);
-    expect(alertsOf(h.store)).toHaveLength(1);
-    const cont = alertsOf(h.store, 'continuing');
-    expect(cont).toHaveLength(1);
-    expect(cont[0]).toMatchObject({ atMs: T + 9 * MIN, dedupeKey: `liq-cont:BTCUSDT:long:${alertsOf(h.store)[0]?.id}` });
-    expect(h.sent.map((m) => m.text.split('\n')[0])).toEqual(['Крупные ликвидации лонгов BTC: $6M за 5 мин', 'Ликвидации лонгов BTC — продолжается: уже $11M с 11:55 UTC']);
-  });
-
-  it('the running sum stops at the end of the quiet period; the cascade still going gets a fresh alert after it', async () => {
-    const h = setup();
     h.print(T, 6e6);
-    h.print(T + 31 * MIN, 5.5e6); // after the quiet period: 11.5M since T − 5 min, but outside it — no continuation
-    await h.run(h.loop, T - 30 * S, T + 40 * MIN);
-    expect(alertsOf(h.store, 'continuing')).toEqual([]);
-    expect(alertsOf(h.store).map((a) => a.atMs)).toEqual([T, T + 31 * MIN]);
+    h.print(T + 20 * S, 1.5e6, 'bybit');
+    await h.run(h.loop, T - 30 * S, T + 10 * MIN);
+    const ev = alertsOf(h.store, 'event');
+    expect(ev).toEqual([expect.objectContaining({ symbol: 'BTCUSDT', atMs: T + 80 * S, dedupeKey: `liq-ev:long:${T}`, recipients: 1 })]);
+    expect(ev[0]?.details).toMatchObject({ eventAt: T, sentAt: T + 80 * S, settled: 'quiet', totalUsd: 7.5e6, count: 2, binanceFootnote: true });
+    expect(alertsOf(h.store, 'event_continuing')).toEqual([]);
+    expect(h.sent.map(firstLine)).toEqual(['Крупные ликвидации лонгов BTC: $7.5M за 7 мин']);
+    expect(h.sent[0]?.text).toContain('Binance $6M · Bybit $1.5M · OKX $0');
+    expect(h.sent[0]?.text).toContain(`https://insight.example/instrument/BTCUSDT?at=${T / 1000}&tf=5m`);
   });
 
-  it('the two sides are separate: a long alert does not quiet the shorts', async () => {
+  it('two coins of one side within the minute: ONE message listing both, largest first; the link is the largest coin', async () => {
+    const h = setup();
+    h.store.enabled = true;
+    h.print(T, 6e6);
+    h.print(T + 40 * S, 9e6, 'okx', 'long', 'ETH'); // ETH crosses before S (T + 60 s): resets the silence
+    await h.run(h.loop, T - 30 * S, T + 10 * MIN);
+    const ev = alertsOf(h.store, 'event');
+    expect(ev).toHaveLength(1);
+    expect(ev[0]).toMatchObject({ symbol: 'ETHUSDT', atMs: T + 100 * S });
+    expect((ev[0]?.details as LiqEventDetails).coins.map((c) => [c.symbol, c.sumUsd])).toEqual([['ETHUSDT', 9e6], ['BTCUSDT', 6e6]]);
+    expect(alertsOf(h.store).map((a) => (a.details as LiqAlertDetails).eventAt)).toEqual([T, T]);
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]?.text.split('\n').slice(0, 4)).toEqual([
+      'Крупные ликвидации лонгов: $15M за 7 мин',
+      'ETH $9M — Binance $0 · Bybit $0 · OKX $9M',
+      'BTC $6M — Binance $6M · Bybit $0 · OKX $0',
+      '2 ликвидации, крупнейшая $9M (ETH, OKX)',
+    ]);
+  });
+
+  it('long and short are independent events', async () => {
     const h = setup();
     h.print(T, 6e6, 'binance', 'long');
-    h.print(T + MIN, 6e6, 'binance', 'short');
-    await h.run(h.loop, T - 30 * S, T + 3 * MIN);
-    expect(alertsOf(h.store).map((a) => (a.details as LiqAlertDetails).side)).toEqual(['long', 'short']);
+    h.print(T + 10 * S, 6e6, 'binance', 'short');
+    await h.run(h.loop, T - 30 * S, T + 5 * MIN);
+    expect(alertsOf(h.store, 'event').map((e) => [e.dedupeKey, e.atMs])).toEqual([[`liq-ev:long:${T}`, T + MIN], [`liq-ev:short:${T + 10 * S}`, T + 70 * S]]);
+  });
+
+  it('cap: a cascade still printing at T0 + 3 min is sent then; the dribble after it ends silently, its size journalled', async () => {
+    const h = setup();
+    h.store.enabled = true;
+    h.print(T, 6e6);
+    for (let t = T + 30 * S; t <= T + 5 * MIN; t += 30 * S) h.print(t, 1e5); // + $1M, under a threshold more
+    await h.run(h.loop, T - 30 * S, T + 15 * MIN);
+    expect(alertsOf(h.store, 'event')[0]).toMatchObject({ atMs: T + 3 * MIN });
+    expect(alertsOf(h.store, 'event')[0]?.details).toMatchObject({ settled: 'cap', totalUsd: 6.6e6 });
+    const cont = alertsOf(h.store, 'event_continuing');
+    expect(cont).toEqual([expect.objectContaining({ atMs: T + 6 * MIN, dedupeKey: `liq-ev-cont:long:${T}`, firedAt: null })]);
+    expect(cont[0]?.details).toMatchObject({ closedAt: T + 6 * MIN, closedBy: 'quiet', news: false, newCoins: [], addedCoins: [], totalUsd: 7e6 });
+    expect(h.sent).toHaveLength(1);
+  });
+
+  it('cap, then a member adds its threshold again: ONE continuation at the close, dated after the first message', async () => {
+    const h = setup();
+    h.store.enabled = true;
+    h.print(T, 6e6);
+    for (let t = T + 30 * S; t <= T + 3 * MIN; t += 30 * S) h.print(t, 1e5); // still printing at the cap
+    for (let t = T + 3.5 * MIN; t <= T + 5 * MIN; t += 30 * S) h.print(t, 1.5e6); // $6M more after S
+    await h.run(h.loop, T - 30 * S, T + 15 * MIN);
+    const [first] = alertsOf(h.store, 'event');
+    const [cont] = alertsOf(h.store, 'event_continuing');
+    expect(cont).toMatchObject({ atMs: T + 6 * MIN, recipients: 1 });
+    expect((cont?.details as LiqEventContinuingDetails)).toMatchObject({ addedCoins: ['BTCUSDT'], newCoins: [], news: true, firstMessageId: first?.id });
+    expect((cont?.atMs ?? 0) >= (first?.atMs ?? Infinity)).toBe(true);
+    expect(h.sent.map(firstLine)).toEqual(['Крупные ликвидации лонгов BTC: $6.6M за 8 мин', 'Ликвидации лонгов BTC продолжаются: уже $13M за 11 мин']);
+  });
+
+  it('cap, then a coin crossing after S: the continuation names it «+BNB»', async () => {
+    const h = setup();
+    h.store.enabled = true;
+    h.print(T, 6e6);
+    for (let t = T + 30 * S; t <= T + 4 * MIN; t += 30 * S) h.print(t, 1e4);
+    h.print(T + 4 * MIN + 10 * S, 4e5, 'bybit', 'long', 'BNB');
+    await h.run(h.loop, T - 30 * S, T + 15 * MIN);
+    expect(alertsOf(h.store, 'event')).toHaveLength(1);
+    const cont = alertsOf(h.store, 'event_continuing');
+    expect(cont[0]?.details).toMatchObject({ newCoins: ['BNBUSDT'], news: true, closedAt: T + 5 * MIN + 10 * S });
+    expect(h.sent[1]?.text).toContain('+BNB $400k — Binance $0 · Bybit $400k · OKX $0');
+    expect(firstLine(h.sent[1] as { text: string })).toBe('Ликвидации лонгов продолжаются: уже $6.5M за 11 мин');
+  });
+
+  it('a crossing after the close opens a new event (and its own message)', async () => {
+    const h = setup();
+    h.print(T, 6e6);
+    h.print(T + 3 * MIN, 4e6, 'binance', 'long', 'ETH');
+    await h.run(h.loop, T - 30 * S, T + 10 * MIN);
+    expect(alertsOf(h.store, 'event').map((e) => (e.details as LiqEventDetails).eventAt)).toEqual([T, T + 3 * MIN]);
   });
 });
 
 describe('LiqAlertLoop: restarts, late, dedupe', () => {
-  it('a restart (a new loop over the same journal) neither journals nor sends the alert again, and keeps the quiet period', async () => {
+  it('a restart mid-event resumes it from the journal: no crossing, message or continuation twice', async () => {
     const h = setup();
     h.store.enabled = true;
     h.print(T, 6e6);
-    await h.run(h.loop, T - 30 * S, T + MIN);
-    h.print(T + 4 * MIN, 6e6);
-    await h.run(h.make(), T + 2 * MIN, T + 6 * MIN); // boots with a 35-min look-back over the same prints
-    expect(alertsOf(h.store)).toHaveLength(1);
-    expect(h.sent).toHaveLength(2); // the alert, then the continuation (12M ≥ 10M) — not the alert again
-    expect(alertsOf(h.store, 'continuing')).toHaveLength(1);
+    for (let t = T + 30 * S; t <= T + 3 * MIN; t += 30 * S) h.print(t, 1e5);
+    for (let t = T + 3.5 * MIN; t <= T + 5 * MIN; t += 30 * S) h.print(t, 1.5e6);
+    await h.run(h.loop, T - 30 * S, T + 4 * MIN); // the first message (cap) is out, the event still open
+    expect(h.sent).toHaveLength(1);
+    await h.run(h.make(), T + 4 * MIN, T + 10 * MIN); // boots with a 35-min look-back
+    await h.run(h.make(), T + 10 * MIN, T + 11 * MIN); // and again after the close
+    expect([alertsOf(h.store), alertsOf(h.store, 'event'), alertsOf(h.store, 'event_continuing')].map((r) => r.length)).toEqual([1, 1, 1]);
+    expect(h.sent).toHaveLength(2);
   });
 
-  it('L6: a cascade the process slept through (at > 5 min ago) is journalled late and never sent', async () => {
+  it('a crossing written before IB-143 (no eventAt) is placed in time order: a later coin joins its event', async () => {
+    const h = setup();
+    h.print(T, 6e6);
+    h.print(T + 30 * S, 4e6, 'binance', 'long', 'ETH');
+    await h.store.insertAlert({
+      source: 'live', event: 'alert', symbol: 'BTCUSDT', atMs: T, params: h.store.params, build: 'old', confirmedAtMs: T, late: false, dedupeKey: `liq:BTCUSDT:long:${T - 5 * MIN}`,
+      details: { side: 'long', windowStartMs: T - 5 * MIN, sumUsd: 6e6, thresholdUsd: 5e6, byVenue: { binance: 6e6, bybit: 0, okx: 0 }, count: 1, largest: { usd: 6e6, venue: 'binance' }, silentVenues: [], binanceFootnote: false },
+    });
+    await h.run(h.loop, T + 20 * S, T + 5 * MIN);
+    expect(alertsOf(h.store).map((a) => [a.symbol, (a.details as LiqAlertDetails).eventAt])).toEqual([['BTCUSDT', undefined], ['ETHUSDT', T]]);
+    expect(alertsOf(h.store, 'event').map((e) => (e.details as LiqEventDetails).coins.map((c) => c.symbol))).toEqual([['BTCUSDT', 'ETHUSDT']]);
+  });
+
+  it('L14 late: a first message whose S is more than 5 min old is journalled late, never sent', async () => {
     const h = setup();
     h.store.enabled = true;
     h.print(T, 6e6);
     await h.loop.tick(T + 10 * MIN); // first tick after boot
     expect(alertsOf(h.store)).toEqual([expect.objectContaining({ atMs: T, late: true, firedAt: null })]);
+    expect(alertsOf(h.store, 'event')).toEqual([expect.objectContaining({ atMs: T + MIN, late: true, firedAt: null })]);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('L14 late T0: a crossing found late makes the whole event late, even when its S is recent', async () => {
+    const h = setup();
+    h.store.enabled = true;
+    h.print(T, 6e6);
+    for (let t = T + 30 * S; t <= T + 4 * MIN; t += 30 * S) h.print(t, 1e4);
+    await h.loop.tick(T + 5 * MIN + 30 * S); // the crossing 5.5 min old; S (cap, T + 3 min) 2.5 min old
+    expect(alertsOf(h.store, 'event')).toEqual([expect.objectContaining({ atMs: T + 3 * MIN, late: true })]);
     expect(h.sent).toEqual([]);
   });
 
@@ -148,7 +231,9 @@ describe('LiqAlertLoop: restarts, late, dedupe', () => {
     await h.loop.tick(T + 10 * S);
     await h.loop.tick(T + 15 * S);
     await h.loop.tick(T + 20 * S);
-    expect(alertsOf(h.store)).toHaveLength(1);
+    await h.loop.tick(T + 2 * MIN);
+    await h.loop.tick(T + 2 * MIN);
+    expect([alertsOf(h.store), alertsOf(h.store, 'event')].map((r) => r.length)).toEqual([1, 1]);
   });
 });
 
@@ -163,7 +248,7 @@ describe('LiqAlertLoop (L3, L5): a venue that could not report is named', () => 
     };
     h.print(T, 6e6);
     h.print(T, 4e5, 'binance', 'long', 'TRX');
-    await h.run(h.loop, T - 30 * S, T + MIN);
+    await h.run(h.loop, T - 30 * S, T + 3 * MIN);
     const by = Object.fromEntries(alertsOf(h.store).map((a) => [a.symbol, (a.details as LiqAlertDetails).silentVenues]));
     expect(by.BTCUSDT).toEqual([{ venue: 'okx', reason: 'stream_silent' }]);
     expect(by.TRXUSDT).toEqual([{ venue: 'bybit', reason: 'not_collected' }, { venue: 'okx', reason: 'not_collected' }]);
@@ -212,14 +297,26 @@ describe('LiqAlertLoop (L8): controls', () => {
 });
 
 describe('LiqAlertLoop (L7): cost', () => {
-  it('steady state: one tape read per tick over ≤ 6 min, no continuation reads without an open quiet period', async () => {
+  it('steady state: one tape read per tick over ≤ 5 min 20 s; no event read while no event is undecided', async () => {
     const h = setup();
     await h.run(h.loop, T, T + 10 * MIN); // the first tick catches up 35 min in 7 reads, then one per tick
     const before = h.store.reads.prints;
-    const report = await h.loop.tick(T + 10 * MIN + 30 * S);
+    const report = await h.loop.tick(T + 10 * MIN + 10 * S);
     expect(h.store.reads.prints - before).toBe(1);
-    expect(report).toMatchObject({ fromMs: T + 9 * MIN + 30 * S, toMs: T + 10 * MIN + 30 * S });
-    expect(h.store.reads.runningSum).toBe(0);
+    expect(report).toMatchObject({ fromMs: T + 10 * MIN - 10 * S, toMs: T + 10 * MIN + 10 * S }); // 10 s of overlap
+  });
+
+  it('an undecided event adds ONE read a tick; once decided, none', async () => {
+    const h = setup();
+    h.print(T, 6e6);
+    await h.run(h.loop, T - 30 * S, T + 30 * S);
+    let before = h.store.reads.prints;
+    await h.loop.tick(T + 40 * S);
+    expect(h.store.reads.prints - before).toBe(2);
+    await h.run(h.loop, T + 50 * S, T + 2 * MIN); // S at T + 60 s, settled: closed
+    before = h.store.reads.prints;
+    await h.loop.tick(T + 2 * MIN + 10 * S);
+    expect(h.store.reads.prints - before).toBe(1);
   });
 
   it('defaults: the five coins of L4', () => {
