@@ -1,9 +1,9 @@
 // IB-106 (§7.5): tiles fill the row — five across at 1240 since IB-117, one column at 390 — on the §7.2 tokens
 .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--card-gap); }
-// subgrid: a tile's five rows (label, figure, bar, note, credit) are the strip's rows, so a value
+// subgrid: a tile's six rows (label, figure, chart-or-bar, range, note, credit) are the strip's rows, so a value
 // whose word wraps («0.0100 % платят лонги») moves its row for the whole strip, not one tile's bar
 .tile {
-  display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 6px; align-content: start; min-width: 0;
+  display: grid; grid-row: span 6; grid-template-rows: subgrid; row-gap: 6px; align-content: start; min-width: 0;
   background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--tile-pad);
 }
 h3 { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
@@ -15,7 +15,12 @@ h3 { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 .inline.down { color: var(--color-down); }
 // width 100%: in the subgrid `align-self: center` centres the bar in its row; in the phone's flex
 // column the same property centres it ACROSS and shrinks it to its content — 0px (TL review, 390)
+.viz { min-width: 0; }
 .bar { align-self: center; width: 100%; display: flex; height: var(--bar-h); border-radius: var(--bar-radius); overflow: hidden; background: var(--bar-track); }
+// IB-118: «7д мин $2.61T» left, «макс $2.79T» right; wraps under itself in a narrow tile rather than overflow.
+// Sans, not the mono: IBM Plex Mono has no Cyrillic («7д мин» would fall back mid-line, IB-120)
+.range { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 8px; font: var(--type-small); color: var(--color-text-muted); min-width: 0; font-variant-numeric: tabular-nums; }
+.range .right { margin-left: auto; }
 .note { margin: 0; font: var(--type-small); color: var(--color-text-muted); }
 .credit-row { display: flex; min-height: 0; }
 // §7.2 says --type-micro (11px) for attribution; IB-088's guard is text ≥ 12px on the page, so the credit is --type-small
@@ -26,7 +31,7 @@ a.credit:focus-visible { text-decoration: underline; outline: 1px solid var(--co
 // one column: nothing to line up across tiles, so a tile is a plain column and its empty rows go
 @media (max-width: 480px) {
   .tile { display: flex; flex-direction: column; gap: 6px; }
-  .note:empty, .credit-row:empty { display: none; }
+  .note:empty, .credit-row:empty, .range:empty, .viz:empty:not(.bar) { display: none; }
 }
 @media (max-width: 767px) {
   // the credit link is a touch target: ≥ 40 px tall on a phone (IB-088), without growing its text

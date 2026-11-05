@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { WEB_KPI_IDS, WebKpisResponseSchema, type WebKpiTile } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { kpiTileView } from './kpi-tile';
+import { FULL_SPAN_SEC, kpiTileView, ruPlural } from './kpi-tile';
 import kpisFixture from '../../../../../../../../../libs/contracts/test/fixtures/kpis.json';
 
 /** IB-106 (§7.5) — what goes where on a KPI tile: inline word or delta, bar, note, visible credit. */
 const base = (id: WebKpiTile['id'], over: Partial<WebKpiTile> = {}): WebKpiTile => ({
   id, value: 1, delta: null, deltaBasis: '24h', split: null, context: null, note: null,
-  source: { name: 'Binance', url: null }, unavailable: null, asOf: 1, ...over,
+  source: { name: 'Binance', url: null }, unavailable: null, asOf: 1, history: null, ...over,
 });
 const COINGECKO = { name: 'CoinGecko', url: 'https://www.coingecko.com' };
 
@@ -59,6 +59,82 @@ describe('kpiTileView', () => {
     expect(tiles.map((t) => t.id)).toEqual([...WEB_KPI_IDS]);
     const keys = tiles.map(kpiTileView).flatMap((v): Array<string | null | undefined> => [v.labelKey, v.inline?.key, v.inline?.overKey, v.note?.key]).filter((k): k is string => !!k);
     keys.push('kpi.note.venue_over.7d');
+    for (const t of [ru, en]) expect(keys.filter((k) => !(t as Record<string, string>)[k])).toEqual([]);
+  });
+});
+
+describe('IB-118: the 7-day chart, its min / max row and its caption', () => {
+  const DAY = 86_400;
+  const area = (values: number[], spanSec: number, breakAfterSec = 1800): WebKpiTile['history'] => {
+    const step = spanSec / (values.length - 1);
+    const points = values.map((value, i) => ({ time: 1_000_000 + Math.round(i * step), value }));
+    return { kind: 'area', points, from: points[0].time, to: points[points.length - 1].time, min: Math.min(...values), max: Math.max(...values), breakAfterSec };
+  };
+  const settlements = (n: number): WebKpiTile['history'] => {
+    const points = Array.from({ length: n }, (_, i) => ({ time: 1_000_000 + i * 28_800, value: (i % 5 - 1) / 1e5 }));
+    const v = points.map((p) => p.value);
+    return { kind: 'bars', points, from: points[0].time, to: points[n - 1].time, min: Math.min(...v), max: Math.max(...v), breakAfterSec: null };
+  };
+
+  it('null history draws no chart: the tile is as before (cap: CoinGecko credited, no range)', () => {
+    const v = kpiTileView(base('market_cap', { value: 2.68e12, source: COINGECKO, history: null }));
+    expect(v).toMatchObject({ chart: null, range: null, caption: null, attribution: COINGECKO });
+  });
+
+  it('cap over 7 days: the chart, «7д мин $2.61T» / «макс $2.79T» (the points\' own min and max), «CoinGecko · 7 дней» with the link', () => {
+    const history = area([2.70e12, 2.79e12, 2.61e12, 2.68e12], 7 * DAY - 600);
+    const v = kpiTileView(base('market_cap', { value: 2.68e12, source: COINGECKO, history }));
+    expect(v.chart?.kind).toBe('area');
+    expect(v.range).toEqual({ left: { key: 'kpi.range.min_7d', params: { value: '$2.61T' } }, right: { key: 'kpi.range.max', params: { value: '$2.79T' } } });
+    expect(v.caption).toEqual({ source: { ...COINGECKO, link: true }, text: { key: 'kpi.caption.7d', params: {} } });
+    expect(v.attribution).toBeNull(); // the caption carries the credit
+  });
+
+  it('a shorter span is named, not passed off as 7 days: «мин» and «за 2 д 5 ч»', () => {
+    const v = kpiTileView(base('market_cap', { value: 2.68e12, source: COINGECKO, history: area([2.6e12, 2.7e12], 2 * DAY + 5 * 3_600 + 1_200) }));
+    expect(v.range?.left).toEqual({ key: 'kpi.range.min', params: { value: '$2.60T' } });
+    expect(v.caption?.text).toEqual({ key: 'kpi.caption.span', params: { d: 2, h: 5 } });
+    expect(kpiTileView(base('market_cap', { history: area([1, 2], FULL_SPAN_SEC) })).caption?.text.key).toBe('kpi.caption.7d');
+    expect(kpiTileView(base('market_cap', { history: area([1, 2], FULL_SPAN_SEC - 1) })).caption?.text.key).toBe('kpi.caption.span');
+  });
+
+  it('cap table still filling: no chart, «копим историю: 3 ч» in the range row, no note', () => {
+    const v = kpiTileView(base('market_cap', { value: 2.68e12, source: COINGECKO, history: null, note: { key: 'kpi.note.collecting', params: { hours: 3 } } }));
+    expect(v).toMatchObject({ chart: null, note: null, range: { left: { key: 'kpi.note.collecting', params: { hours: 3 } }, right: null }, attribution: COINGECKO });
+  });
+
+  it('BTC OI: USD min / max ($7.4B), «Binance · 7 дней» as plain text in place of «Binance, за 24ч»', () => {
+    const v = kpiTileView(base('btc_oi', { value: 7.7e9, delta: -0.65, history: area([7.9e9, 7.4e9, 8.1e9, 7.7e9], 7 * DAY - 3_600, 5_400) }));
+    expect(v.range).toEqual({ left: { key: 'kpi.range.min_7d', params: { value: '$7.4B' } }, right: { key: 'kpi.range.max', params: { value: '$8.1B' } } });
+    expect(v.caption).toEqual({ source: { name: 'Binance', url: null, link: false }, text: { key: 'kpi.caption.7d', params: {} } });
+    expect(v.note).toBeNull();
+    expect(v.inline).toMatchObject({ text: '−0.65 %', overKey: 'kpi.over.24h' }); // the delta stays 24 h
+  });
+
+  it('BTC funding: bars, «последние 21 выплата» / «L/S счета 1.40» (the L/S note moves to the range row)', () => {
+    const v = kpiTileView(base('btc_funding', { value: 0.0001, history: settlements(21), note: { key: 'kpi.note.ls_accounts', params: { ratio: 1.4 } } }));
+    expect(v.chart?.kind).toBe('bars');
+    expect(v.range).toEqual({ left: { key: 'kpi.range.settlements.one', params: { n: 21 } }, right: { key: 'kpi.range.ls_accounts', params: { ratio: '1.40' } } });
+    expect(v.caption?.text.key).toBe('kpi.caption.funding');
+    expect(v.note).toBeNull();
+    expect(kpiTileView(base('btc_funding', { history: settlements(20) })).range?.left?.key).toBe('kpi.range.settlements.many');
+  });
+
+  it('dominance and liquidations keep their bars even if a history came', () => {
+    const v = kpiTileView(base('btc_dominance', { value: 59.3, source: COINGECKO, history: area([1, 2], 7 * DAY) }));
+    expect(v).toMatchObject({ chart: null, range: null, caption: null, bar: [{ pct: 59.3 }] });
+  });
+
+  it('ruPlural: 1, 21 one; 2–4, 22 few; 5–20, 11–14, 25 many', () => {
+    expect([1, 21, 2, 4, 22, 5, 11, 12, 14, 20, 25, 111].map(ruPlural)).toEqual(['one', 'one', 'few', 'few', 'few', 'many', 'many', 'many', 'many', 'many', 'many', 'many']);
+  });
+
+  it('the committed fixture: the three charts map, and every key the view can name exists in both languages', () => {
+    const views = WebKpisResponseSchema.parse(kpisFixture).tiles.map(kpiTileView);
+    expect(views.map((v) => v.chart?.kind ?? null)).toEqual(['area', null, null, 'area', 'bars']);
+    const keys = views.flatMap((v): Array<string | undefined> => [v.range?.left?.key, v.range?.right?.key, v.caption?.text.key]).filter((k): k is string => !!k);
+    keys.push('kpi.range.min', 'kpi.range.min_7d', 'kpi.caption.7d', 'kpi.caption.span', 'kpi.note.collecting',
+      'kpi.range.settlements.one', 'kpi.range.settlements.few', 'kpi.range.settlements.many');
     for (const t of [ru, en]) expect(keys.filter((k) => !(t as Record<string, string>)[k])).toEqual([]);
   });
 });

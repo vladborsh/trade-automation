@@ -1,0 +1,21 @@
+@let g = geometry();
+<div class="chart" role="img" [attr.aria-label]="label() || null" [attr.data-kind]="g.kind">
+  @if (g.kind === 'area') {
+    <svg class="area" [class.up]="g.tone === 'up'" [class.down]="g.tone === 'down'" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      @for (s of g.segments; track $index) {
+        <path class="fill" [attr.d]="s.area" />
+        <path class="line" [attr.d]="s.line" vector-effect="non-scaling-stroke" />
+      }
+    </svg>
+    <span class="dot extreme" data-dot="min" [style.left.%]="g.min.x" [style.top.%]="g.min.y"></span>
+    <span class="dot extreme" data-dot="max" [style.left.%]="g.max.x" [style.top.%]="g.max.y"></span>
+    <span class="dot last" data-dot="last" [class.up]="g.tone === 'up'" [class.down]="g.tone === 'down'"
+          [style.left.%]="g.last.x" [style.top.%]="g.last.y"></span>
+  } @else {
+    <span class="zero" [style.top.%]="g.zero"></span>
+    @for (b of g.bars; track $index) {
+      <span class="bar" [class]="'bar ' + b.side" [class.lit]="b.lit"
+            [style.left.%]="b.x" [style.width.%]="b.width" [style.top.%]="b.top" [style.height.%]="b.height"></span>
+    }
+  }
+</div>
