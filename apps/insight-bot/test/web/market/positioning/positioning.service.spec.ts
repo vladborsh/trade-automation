@@ -1,4 +1,5 @@
 import { WEB_KPI_IDS } from '@trade-automation/contracts';
+import { Logger } from '@nestjs/common';
 import { TtlCache } from '../../../../src/venues/ttl-cache';
 import { KpisService } from '../../../../src/web/market/positioning/kpis.service';
 import { PositioningService } from '../../../../src/web/market/positioning/positioning.service';
@@ -181,5 +182,112 @@ describe('KpisService', () => {
     expect(Object.values(tiles).map((t) => t.source.name)).not.toContain('alternative.me');
     expect(tiles.market_cap).toMatchObject({ value: 2.62e12, delta: -2.97 });
     expect(tiles.btc_oi).toMatchObject({ value: 110, delta: 10 });
+  });
+});
+
+describe('IB-118: fundingSettlements — the baseline keeps each settlement\'s time next to its rate', () => {
+  const counted = () => {
+    const f = fakes(30 * 24);
+    const calls = { funding: 0 };
+    const svc = new PositioningService({
+      symbols: SYMBOLS as never, cache: new TtlCache({ now: () => NOW }), summary: f.summary as never, candles: f.candles as never,
+      funding: { binanceSettledHistory: async () => { calls.funding++; return Array.from({ length: 90 }, (_, i) => ({ time: 1_790_000_000 + i * 28_800, rate: i / 1e6 })); } } as never,
+      oiLs: f.oiLs as never, liquidations: null, now: () => NOW,
+    });
+    return { svc, calls };
+  };
+
+  it('{time, rate} per settlement, oldest first, all 90 of the 30 days — the shape R5 (IB-119) reads', async () => {
+    const { svc } = counted();
+    const btc = (await svc.fundingSettlements()).get('BTCUSDT');
+    expect(btc).toHaveLength(90);
+    expect(btc?.[0]).toEqual({ time: 1_790_000_000, rate: 0 });
+    expect(btc?.[89]).toEqual({ time: 1_790_000_000 + 89 * 28_800, rate: 89 / 1e6 });
+  });
+
+  it('held: null before anything built the baselines, and it starts no build (no venue call)', async () => {
+    const { svc, calls } = counted();
+    expect(await svc.fundingSettlements({ held: true })).toBeNull();
+    expect(calls.funding).toBe(0);
+    await svc.positioning('24h');
+    const before = calls.funding;
+    expect((await svc.fundingSettlements({ held: true }))?.get('BTCUSDT')).toHaveLength(90);
+    expect(calls.funding).toBe(before);
+  });
+});
+
+describe('IB-118: KpisService — the three charts, each its own soft read', () => {
+  const down = async () => { throw new Error('down'); };
+  afterEach(() => jest.restoreAllMocks());
+  const cards = { cards: async () => ({
+    fearGreed: null,
+    dominance: { btcPct: 59.2, ethPct: 10.6, totalUsd: 2.62e12, atMs: NOW, changePct24h: 0.4, changePct7d: null, totalChangePct24h: -2.97, coverageDays: 0, source: 'coingecko' },
+    btcVsTop: null, caps: [], capsDay: null, capsSource: 'coingecko', live: true,
+  }) };
+  const oiCalls: unknown[][] = [];
+  const oiLs = {
+    longShort: down,
+    openInterest: async (...args: unknown[]) => {
+      oiCalls.push(args);
+      const hourly = args[3] === H;
+      const n = hourly ? 168 : 2;
+      const step = hourly ? H : 24 * H;
+      return { points: Array.from({ length: n }, (_, i) => ({ time: (NOW - (n - 1 - i) * step) / 1000, value: 1, notional: 7e9 + i * 1e6 })) };
+    },
+  };
+  const settlements = Array.from({ length: 90 }, (_, i) => ({ time: 1_790_000_000 + i * 28_800, rate: (i % 7 - 2) / 1e5 }));
+  const make = (over: Record<string, unknown>) => new KpisService({
+    cache: new TtlCache({ now: () => NOW }), cards: cards as never, liquidations: null, oiLs: oiLs as never, summary: { summary: down } as never,
+    btcSymbol: 'BTCUSDT', now: () => NOW, ...over,
+  });
+  const byId = async (k: KpisService) => Object.fromEntries((await k.kpis()).tiles.map((t) => [t.id, t]));
+  const capRows = (n: number) => async (sinceMs: number) => {
+    expect(sinceMs).toBe(NOW - 7 * 24 * H);
+    return Array.from({ length: n }, (_, i) => ({ tsMs: NOW - (n - 1 - i) * 600_000, totalUsd: 2.6e12 + i * 1e9 }));
+  };
+
+  it('OI: ONE 7-day read at a 1 h floor, 168 USD points; the 24 h tile value and delta still from its own read', async () => {
+    oiCalls.length = 0;
+    const tiles = await byId(make({}));
+    expect(oiCalls.filter((a) => a[3] === H)).toEqual([['BTCUSDT', NOW - 7 * 24 * H, NOW, H]]);
+    expect(tiles.btc_oi.history).toMatchObject({ kind: 'area', min: 7e9, max: 7e9 + 167e6, breakAfterSec: 5400 });
+    expect(tiles.btc_oi.history?.points).toHaveLength(168);
+    expect(tiles.btc_oi.value).toBe(7e9 + 1e6); // the 24 h read's last point, unchanged
+  });
+
+  it('funding: the last 21 settlements as bars, from the HELD baseline only', async () => {
+    const asked: unknown[] = [];
+    const positioning = { fundingSettlements: async (o: unknown) => { asked.push(o); return new Map([['BTCUSDT', settlements]]); } };
+    const tiles = await byId(make({ positioning }));
+    expect(asked).toEqual([{ held: true }]);
+    expect(tiles.btc_funding.history?.kind).toBe('bars');
+    expect(tiles.btc_funding.history?.points.map((p) => p.time)).toEqual(settlements.slice(-21).map((s) => s.time));
+  });
+
+  it('funding baseline not held yet: no chart, nothing else lost', async () => {
+    const tiles = await byId(make({ positioning: { fundingSettlements: async () => null } }));
+    expect(tiles.btc_funding.history).toBeNull();
+    expect(tiles.btc_oi.history).not.toBeNull();
+  });
+
+  it('cap: a week of rows is a chart; under 6 h is no chart and «копим историю: {h} ч»', async () => {
+    const week = await byId(make({ capRows: capRows(1008) }));
+    expect(week.market_cap.history?.points).toHaveLength(1008);
+    expect(week.market_cap.note).toBeNull();
+    const fresh = await byId(make({ capRows: capRows(20) })); // 3 h 10 min
+    expect(fresh.market_cap.history).toBeNull();
+    expect(fresh.market_cap.note).toEqual({ key: 'kpi.note.collecting', params: { hours: 3 } });
+    expect(fresh.market_cap.value).toBe(2.62e12); // the value is the cards', untouched
+  });
+
+  it('every history read failing: all three null, values and notes as before', async () => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const tiles = await byId(make({
+      oiLs: { longShort: down, openInterest: down },
+      positioning: { fundingSettlements: down },
+      capRows: down,
+    }));
+    expect(Object.values(tiles).map((t) => t.history)).toEqual([null, null, null, null, null]);
+    expect(tiles.market_cap).toMatchObject({ value: 2.62e12, note: null });
   });
 });

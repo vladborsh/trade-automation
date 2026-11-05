@@ -90,7 +90,8 @@ export class OiLsService {
     this.now = options.now ?? Date.now;
   }
 
-  async openInterest(symbol: string, fromMs: number, toMs: number): Promise<WebOpenInterestResponse> {
+  /** `minPeriodMs` (IB-118): the coarsest grain the caller needs at least — see `periodFor`. */
+  async openInterest(symbol: string, fromMs: number, toMs: number, minPeriodMs = 0): Promise<WebOpenInterestResponse> {
     const reader = this.options.stored ?? null;
     const source: StoredSource<WebOpenInterestPoint> | null = reader === null ? null : {
       has: (from, to) => reader.hasOi(symbol, from, to),
@@ -100,7 +101,7 @@ export class OiLsService {
     const series = await this.series<OpenInterestHistRow, WebOpenInterestPoint>('openInterestHist', symbol, fromMs, toMs, (rows) =>
       mapOpenInterestHist(rows, symbol, 'rest').map((r) => ({
         time: Math.floor(r.ts.getTime() / 1000), value: r.oiBase, notional: r.oiQuote ?? null,
-      })), source);
+      })), source, minPeriodMs);
     return { symbol, venue: 'binance', downsampled: false, ...series };
   }
 
@@ -121,19 +122,19 @@ export class OiLsService {
 
   private async series<Row extends { timestamp: number }, P extends { time: number }>(
     endpoint: string, symbol: string, fromMs: number, toMs: number, toPoints: (rows: Row[]) => P[],
-    source: StoredSource<P> | null,
+    source: StoredSource<P> | null, minPeriodMs = 0,
   ): Promise<Series<P>> {
     const now = this.now();
     const endMs = Math.min(toMs, now);
     // IB-080: the joined path only when the poller has something in the window; otherwise WD-009's
     // answer exactly (same period, same fields) — a fresh box answers as it did before.
     if (source !== null && endMs > fromMs && await source.has(fromMs, endMs)) {
-      return this.joined(endpoint, symbol, fromMs, endMs, now, toPoints, source);
+      return this.joined(endpoint, symbol, fromMs, endMs, now, toPoints, source, minPeriodMs);
     }
     const window = clipToRetention(fromMs, endMs, now);
     if (window.empty) return { points: [], coverageFrom: sec(window.fromMs), truncated: true };
 
-    const { period, periodMs } = periodFor(window.fromMs, window.toMs);
+    const { period, periodMs } = periodFor(window.fromMs, window.toMs, minPeriodMs);
     const points = await this.venuePoints(endpoint, symbol, window, period, periodMs, toPoints);
 
     // The series starts later than asked when we clipped it, or when the venue had nothing older
@@ -147,9 +148,9 @@ export class OiLsService {
   /** IB-080: venue for what it still has, stored rows before its first point, one period P throughout. */
   private async joined<Row extends { timestamp: number }, P extends { time: number }>(
     endpoint: string, symbol: string, fromMs: number, endMs: number, now: number,
-    toPoints: (rows: Row[]) => P[], source: StoredSource<P>,
+    toPoints: (rows: Row[]) => P[], source: StoredSource<P>, minPeriodMs: number,
   ): Promise<Series<P>> {
-    const { period, periodMs } = periodFor(fromMs, endMs);
+    const { period, periodMs } = periodFor(fromMs, endMs, minPeriodMs);
     const window = clipToRetention(fromMs, endMs, now);
     const venue = window.empty ? [] : await this.venuePoints(endpoint, symbol, window, period, periodMs, toPoints);
     const boundaryMs = venue.length > 0 ? venue[0].time * 1000 : endMs;

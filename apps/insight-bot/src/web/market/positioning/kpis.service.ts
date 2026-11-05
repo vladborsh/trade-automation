@@ -6,7 +6,10 @@ import type { LiquidationsOverviewService } from '../../liquidations/overview.se
 import type { MarketCardsService } from '../market-cards.service';
 import type { OiLsService } from '../oi-ls.service';
 import type { UniverseSummaryService } from '../universe-summary.service';
+import type { MarketCapRow } from '../pg/market-cap.repo';
+import { capHistory, fundingHistory, KPI_HISTORY_MS, OI_PERIOD_MS, oiHistory } from './kpis.history';
 import { fundingSide, liqSide } from './kpis.rules';
+import type { PositioningService } from './positioning.service';
 
 /**
  * IB-085 (market-page design D10) — `GET /api/web/market/kpis`: the five tiles, from reads the page
@@ -26,6 +29,14 @@ import { fundingSide, liqSide } from './kpis.rules';
  * **weight 0**, at most one request per compute (this cache, 60 s) and in practice one per 5 minutes
  * (OiLsService caches the 5-minute-snapped window 300 s): ≤ 5 of the endpoint's 1 000 per 5 min.
  * It is soft: a failure leaves the note null and never touches a tile's value.
+ *
+ * IB-118 (market round 2 §2) — `history`, the 7-day chart of three tiles, each soft like the note:
+ * | tile | read | venue cost |
+ * |---|---|---|
+ * | BTC OI | `oiLs.openInterest(btc, now − 7 d, now, 1 h)`: 168 hourly points, USD | `/futures/data`, weight 0; its 300 s cache on an hour-snapped key, so ≤ 1 request per 5 min |
+ * | BTC funding | the positioning baseline's last 21 settlements, **held only** (never builds it) | 0 |
+ * | market cap | `market_cap_total`, our own table, `ts > now − 7 d` (≤ 1 008 rows) | 0 (the recorder pays ≤ 0.1 CoinGecko call/min) |
+ * Under 6 h of cap rows: no chart, the note «копим историю: {h} ч». All inside this 60 s cache.
  */
 export interface KpisOptions {
   cache: TtlCache;
@@ -33,6 +44,10 @@ export interface KpisOptions {
   liquidations: LiquidationsOverviewService | null;
   oiLs: OiLsService;
   summary: UniverseSummaryService;
+  /** IB-118: the funding baseline (held settlements only). Null: no funding chart. */
+  positioning?: Pick<PositioningService, 'fundingSettlements'> | null;
+  /** IB-118: `market_cap_total` rows with `ts > sinceMs`, oldest first. Null (no database): no cap chart. */
+  capRows?: ((sinceMs: number) => Promise<MarketCapRow[]>) | null;
   /** The universe's BTC perp symbol (canonical id). */
   btcSymbol: string;
   now?: () => number;
@@ -61,12 +76,17 @@ export class KpisService {
     const soft = <T>(label: string, p: Promise<T>): Promise<T | null> =>
       p.catch((error: unknown) => { this.logger.warn(`kpis ${label}: ${(error as Error).message}`); return null; });
     const btc = this.options.btcSymbol;
-    const [cards, overview, oi, summary, ls] = await Promise.all([
+    const positioning = this.options.positioning ?? null;
+    const capRows = this.options.capRows ?? null;
+    const [cards, overview, oi, summary, ls, oi7d, funding, caps] = await Promise.all([
       soft('cards', this.options.cards.cards([])),
       this.options.liquidations ? soft('liquidations', this.options.liquidations.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 1, period: '24h' })) : Promise.resolve(null),
       soft('oi', this.options.oiLs.openInterest(btc, now - 24 * 3_600_000 - 15 * 60_000, now)),
       soft('summary', this.options.summary.summary([{ id: btc, base: 'BTC', volumeRank: 1 }])),
       soft('ls_accounts', this.options.oiLs.longShort(btc, 'global_account', now - LS_NOTE_WINDOW_MS, now)),
+      soft('oi_7d', this.options.oiLs.openInterest(btc, now - KPI_HISTORY_MS, now, OI_PERIOD_MS)),
+      positioning ? soft('funding_history', positioning.fundingSettlements({ held: true })) : Promise.resolve(null),
+      capRows ? soft('cap_history', capRows(now - KPI_HISTORY_MS)) : Promise.resolve(null),
     ]);
 
     const tiles: Record<WebKpiId, WebKpiTile> = {
@@ -113,12 +133,22 @@ export class KpisService {
     const lastLs = ls?.points.at(-1);
     if (lastLs && Number.isFinite(lastLs.ratio)) tiles.btc_funding.note = { key: 'kpi.note.ls_accounts', params: { ratio: round(lastLs.ratio, 2) } };
 
+    // IB-118: each chart is its own read; a failure leaves `history` null and touches nothing else
+    if (oi7d) tiles.btc_oi.history = oiHistory(oi7d.points);
+    const btcFunding = funding?.get(btc);
+    if (btcFunding) tiles.btc_funding.history = fundingHistory(btcFunding);
+    if (caps) {
+      const cap = capHistory(caps);
+      tiles.market_cap.history = cap.history;
+      if (cap.collectingHours !== null) tiles.market_cap.note = { key: 'kpi.note.collecting', params: { hours: cap.collectingHours } };
+    }
+
     return { asOf: Math.floor(now / 1000), tiles: WEB_KPI_IDS.map((id) => tiles[id]) };
   }
 }
 
 function tile(id: WebKpiId, source: { name: string; url: string | null }): WebKpiTile {
-  return { id, value: null, delta: null, deltaBasis: '24h', split: null, context: null, note: null, source: { ...source }, unavailable: 'venue_unavailable', asOf: null };
+  return { id, value: null, delta: null, deltaBasis: '24h', split: null, context: null, note: null, source: { ...source }, unavailable: 'venue_unavailable', asOf: null, history: null };
 }
 
 function available(value: number, delta: number | null | undefined, asOf: number): Partial<WebKpiTile> {

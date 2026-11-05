@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import {
-  WEB_MARKET_PERIOD_SECONDS, type WebMarketPeriod, type WebPositioningCell, type WebPositioningResponse, type WebPositioningRow,
+  WEB_MARKET_PERIOD_SECONDS, type WebFundingPoint, type WebMarketPeriod, type WebPositioningCell, type WebPositioningResponse, type WebPositioningRow,
 } from '@trade-automation/contracts';
 import type { UniverseSymbol } from '../../../config/universe.schema';
 import {
@@ -53,6 +53,11 @@ interface Baseline {
   lsGlobalHourly: number[];
   lsTopHourly: number[];
   fundingSettled: number[];
+  /**
+   * IB-118: each settlement's time (s), index-aligned with `fundingSettled` — a parallel array of
+   * doubles (8 B a settlement, ≈ 22 KB at 30 coins × 90), not an array of objects, as `closeTimes`.
+   */
+  fundingTimes: number[];
 }
 
 const H = 3_600_000;
@@ -60,6 +65,7 @@ const CONCURRENCY = 4;
 /** IB-107 (§7.3): a day of hourly points (R4, R6) and 7 days of 8-hourly settlements (R5) per coin. */
 const SPARK_HOURS = 24;
 const SPARK_SETTLEMENTS = 21;
+const BASELINES_KEY = 'positioning:baselines';
 
 export class PositioningService {
   private readonly logger = new Logger(PositioningService.name);
@@ -181,9 +187,26 @@ export class PositioningService {
     }] as const));
   }
 
+  /**
+   * IB-118 — each coin's settled funding over the 30-day baseline, `{time (s), rate}` oldest first: the
+   * BTC KPI tile's bars (the last 21) and IB-119's R5 chart (all of them, with their times) read this,
+   * no venue call of their own. Built on demand from the baseline's parallel arrays.
+   *
+   * `held: true` reads only what the cache already holds and never starts a build (null when nothing is
+   * held): the KPI strip must not wait the baseline's 30-coin build, nor kick one off — the positioning
+   * table on the same page does. Without it, waits for the baselines like `sparkSeries()`.
+   */
+  async fundingSettlements(options: { held: true }): Promise<Map<string, WebFundingPoint[]> | null>;
+  async fundingSettlements(options?: { held?: false }): Promise<Map<string, WebFundingPoint[]>>;
+  async fundingSettlements(options: { held?: boolean } = {}): Promise<Map<string, WebFundingPoint[]> | null> {
+    const base = options.held ? this.options.cache.get<Map<string, Baseline>>(BASELINES_KEY) ?? null : await this.baselines();
+    if (base === null) return null;
+    return new Map([...base.entries()].map(([id, b]) => [id, b.fundingTimes.map((time, i) => ({ time, rate: b.fundingSettled[i] }))] as const));
+  }
+
   /** The hourly baselines for every coin, rebuilt once an hour (D9). A coin whose reads fail is absent. */
   private async baselines(): Promise<Map<string, Baseline>> {
-    return this.options.cache.getOrLoad('positioning:baselines', POSITIONING_BASELINE_CACHE_MS, async () => {
+    return this.options.cache.getOrLoad(BASELINES_KEY, POSITIONING_BASELINE_CACHE_MS, async () => {
       const now = this.now();
       const from = Math.floor((now - POSITIONING_BASELINE_DAYS * 24 * H) / H) * H;
       const coins = this.coins;
@@ -204,6 +227,7 @@ export class PositioningService {
             lsGlobalHourly: lsG.points.map((p) => p.ratio),
             lsTopHourly: lsT.points.map((p) => p.ratio),
             fundingSettled: funding.map((p) => p.rate),
+            fundingTimes: funding.map((p) => p.time),
           };
         } catch (error) {
           this.logger.warn(`positioning baseline ${c.id}: ${(error as Error).message}`);

@@ -34,6 +34,8 @@ import { LiquidationsOverviewService } from './liquidations/overview.service';
 import { LiquidationsLargeController } from './liquidations/liquidations-large.controller';
 import { LiquidationsLargeService } from './liquidations/large.service';
 import { MarketCardsService } from './market/market-cards.service';
+import { MarketCapRecorderService } from './market/market-cap/market-cap-recorder.service';
+import { marketCapSince } from './market/pg/market-cap.repo';
 import { CandlesService } from './market/candles.service';
 import { BinanceWeightTracker } from '../venues/binance/binance-weight.tracker';
 import { MetricsService } from '../ops/metrics.service';
@@ -99,6 +101,8 @@ export class WebModule {
         WebAuthService,
         // IB-BUG-017: expired sessions, spent login tokens and the 90-day login journal are purged hourly
         SessionSweeperService,
+        // IB-118: the total market cap into market_cap_total every 10 min, viewers or not
+        MarketCapRecorderService,
         // IB-078: one hasher (its ScryptGate is the process-wide cap of 2 concurrent scrypt) and one
         // throttle (in-memory, per process — P7)
         { provide: PasswordHasher, useFactory: () => new PasswordHasher() },
@@ -192,10 +196,15 @@ export class WebModule {
         {
           // IB-085 (D10): the KPI strip, from existing reads
           provide: KpisService,
-          inject: [AppConfigService, TtlCache, MarketCardsService, LiquidationsOverviewService, OiLsService, UniverseSummaryService],
+          // IB-118: plus the funding baseline (held settlements) and market_cap_total for the 7-day charts
+          inject: [AppConfigService, TtlCache, MarketCardsService, LiquidationsOverviewService, OiLsService, UniverseSummaryService, PositioningService, DB],
           useFactory: (config: AppConfigService, cache: TtlCache, cards: MarketCardsService, liquidations: LiquidationsOverviewService,
-            oiLs: OiLsService, summary: UniverseSummaryService) =>
-            new KpisService({ cache, cards, liquidations, oiLs, summary, btcSymbol: config.symbols.find((s) => s.base === 'BTC')?.id ?? 'BTCUSDT' }),
+            oiLs: OiLsService, summary: UniverseSummaryService, positioning: PositioningService, db: Db | null) =>
+            new KpisService({
+              cache, cards, liquidations, oiLs, summary, positioning,
+              capRows: db ? (sinceMs) => marketCapSince(db, sinceMs) : null,
+              btcSymbol: config.symbols.find((s) => s.base === 'BTC')?.id ?? 'BTCUSDT',
+            }),
         },
         {
           // IB-091: «Деривативы и потоки» — Deribit, OKX rubik, DefiLlama, Coinbase; cache only (D7), D18 premium

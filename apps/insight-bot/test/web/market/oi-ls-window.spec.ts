@@ -54,3 +54,14 @@ describe('IB-080 joinAtBoundary', () => {
     expect(joinAtBoundary([p(5, 9)], [p(3, 1000), p(6, 1000)], 3_000)).toEqual([p(3, 1000), p(6, 1000)]);
   });
 });
+
+describe('IB-118: periodFor with a floor', () => {
+  const H = 3_600_000;
+  it('7 days with no floor is 15 m (672 rows); with a 1 h floor, 1 h (168 rows, one page)', () => {
+    expect(periodFor(0, 7 * 24 * H).period).toBe('15m');
+    expect(periodFor(0, 7 * 24 * H, H)).toEqual({ period: '1h', periodMs: H });
+  });
+  it('a floor never makes a window finer than its span needs: 60 days at a 1 h floor is still 2 h', () => {
+    expect(periodFor(0, 60 * 24 * H, H).period).toBe(periodFor(0, 60 * 24 * H).period);
+  });
+});

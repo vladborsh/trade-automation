@@ -13,9 +13,12 @@ export const PERIODS: ReadonlyArray<readonly [string, number]> = [
 ];
 export const MAX_ROWS = 1_000;
 
-export function periodFor(fromMs: number, toMs: number): { period: string; periodMs: number } {
+export function periodFor(fromMs: number, toMs: number, minPeriodMs = 0): { period: string; periodMs: number } {
   const span = Math.max(0, toMs - fromMs);
   for (const [period, periodMs] of PERIODS) {
+    // IB-118: a caller that needs no finer grain (the KPI tile's 7-day line: 168 hourly points, one
+    // page) names a floor; without one, 7 days would be 672 points at 15 m over two pages
+    if (periodMs < minPeriodMs) continue;
     if (Math.ceil(span / periodMs) <= MAX_ROWS) return { period, periodMs };
   }
   const [period, periodMs] = PERIODS[PERIODS.length - 1];
