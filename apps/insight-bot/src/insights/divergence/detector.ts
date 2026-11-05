@@ -170,6 +170,7 @@ export function detectDivergences(input: DivergenceInput): DivergenceResult {
         skips.push({ barTime: bars[b.price].time, reason: 'no_oi_data', holeFrom: hole.from, holeTo: hole.to });
         continue;
       }
+      if (!bOiHolds(series, b)) continue; // IB-141 option 1: an OI pivot before B must still stand on B's own bar
       const noise = noiseAt(bars, series, b.price, params);
       if (noise === null) continue;
       const candidates = sidePairs.filter((a) => a.price < b.price && a.price >= b.price - params.w
@@ -208,6 +209,24 @@ export function pair(price: readonly number[], oi: readonly number[], side: Side
     if (best !== null) out.push({ side, price: i, oi: best, confirmIndex: Math.max(i, best) + p.nRight });
   }
   return out;
+}
+
+/**
+ * IB-141 option 1 (TL review 2026-11-05; the owner rules on it) — **B's OI pivot must hold on the bars up to B.**
+ * Pairing lets B's OI pivot lie up to k bars BEFORE the price pivot. With equal sides (k ≤ N) its right side always
+ * covers B's own bar; with 6/2 and k = 3 it does not, so B's bar could already carry OI beyond A's while the alert
+ * says «OI did not follow» (V39's BNB 4h 2026-10-27: OI pivot at B − 3, B's bar above A's OI). So the OI pivot's
+ * right side reaches max(nRight, B − oiB): every bar after it, through B, ties or is worse (V5's non-strict right
+ * side; an unknown bar is not a tie). Bars up to B are closed by B's confirmation. A no-op when nRight ≥ k.
+ */
+export function bOiHolds(series: ReadonlyArray<number | null>, b: Pick<PivotPair, 'side' | 'price' | 'oi'>): boolean {
+  const v = series[b.oi];
+  if (v === null || v === undefined) return false;
+  for (let j = b.oi + 1; j <= b.price; j++) {
+    const x = series[j];
+    if (x === null || x === undefined || (b.side === 'low' ? x < v : x > v)) return false;
+  }
+  return true;
 }
 
 /**

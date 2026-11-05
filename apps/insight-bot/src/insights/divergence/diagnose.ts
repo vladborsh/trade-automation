@@ -1,6 +1,6 @@
 import { OI_NEAR_MISS_UNIT, type OiNearMissRule, type OiNearMissUnit } from '@trade-automation/contracts';
 import {
-  aEligibility, atrAt, holeFinder, lineAt, noiseAt, pair, type Bar, type Direction, type DivergenceEnd, type DivergenceInput, type DivergenceParams,
+  aEligibility, atrAt, bOiHolds, holeFinder, lineAt, noiseAt, pair, type Bar, type Direction, type DivergenceEnd, type DivergenceInput, type DivergenceParams,
   type DivergenceResult, type Noise, type PivotPair,
 } from './detector';
 import { oiPerBar } from './oi-per-bar';
@@ -73,6 +73,7 @@ export function diagnose(input: DivergenceInput, result: DivergenceResult): Near
       const lo = Math.max(0, b.price - reach.w - p.nLeft);
       const hi = Math.min(bars.length - 1, b.price + reach.k + p.nRight);
       if (holes(bars[lo].time, bars[hi].time + input.tfSec)) continue;
+      if (!bOiHolds(series, b)) continue; // the same B the detector could judge (IB-141 option 1)
       const noise = noiseAt(bars, series, b.price, p);
       if (noise === null) continue;
       let best: { a: PivotPair; f: Failure } | null = null;

@@ -1,6 +1,6 @@
-import { aEligibility, detectDivergences, type Bar, type DivergenceInput, type DivergenceParams, type PivotPair } from '../../../src/insights/divergence/detector';
+import { aEligibility, bOiHolds, detectDivergences, type Bar, type DivergenceInput, type DivergenceParams, type PivotPair } from '../../../src/insights/divergence/detector';
 import { diagnose } from '../../../src/insights/divergence/diagnose';
-import type { OiPoint } from '../../../src/insights/divergence/oi-per-bar';
+import { oiPerBar, type OiPoint } from '../../../src/insights/divergence/oi-per-bar';
 import { pivots } from '../../../src/insights/divergence/pivots';
 
 /**
@@ -180,5 +180,73 @@ describe('V36: fast B, full A', () => {
       const fullIn = input(near, mirror);
       expect(diagnose(fullIn, detectDivergences(fullIn))).toEqual([]);
     }
+  });
+});
+
+/**
+ * IB-141 option 1 (TL review 2026-11-05) — B's OI pivot must hold on the bars up to B. With 6/2 and k = 3 an OI pivot
+ * up to 3 bars BEFORE B is confirmed by 2 bars only, so B's own bar can be beyond it. A scene: B's OI pivot at B − 3
+ * (980); bar B's OI 975 (below it: the pivot does not stand on B) or 985 (it does). OI after B keeps falling to a low
+ * at B + 4, beyond k, so B pairs with B − 3 and nothing else.
+ */
+describe('option 1: B’s OI pivot holds through B', () => {
+  const oiBeforeB = (atB: number, bOi = 980) => scene(O + 80, {
+    [A]: { low: 95 }, [A + 1]: { oi: 960 }, [B - 3]: { oi: bOi }, [B]: { low: 93, oi: atB },
+    [B + 1]: { oi: atB - 5 }, [B + 2]: { oi: atB - 6 }, [B + 3]: { oi: atB - 7 }, [B + 4]: { oi: atB - 8 },
+  });
+
+  it('B’s bar beyond its OI pivot: no divergence; the same pair with B’s bar tying or not beyond: found', () => {
+    both(oiBeforeB(975), (r) => {
+      expect(r.pairs.find((p) => p.price === B)?.oi).toBe(B - 3); // the pairing happened: the rule refused it
+      expect(lines(r)).toEqual([]);
+    });
+    both(oiBeforeB(985), (r) => expect(lines(r)).toEqual([[A, B]]));
+    both(oiBeforeB(980), (r) => expect(lines(r)).toEqual([[A, B]])); // a tie stands (V5's non-strict right side)
+  });
+
+  it('diagnose applies it too: a B whose OI pivot does not stand on B is no near-miss either', () => {
+    const nm = (atB: number) => {
+      const inp = input(oiBeforeB(atB, 962), false); // 962 against A's 960: fails δoi only — a near-miss scene
+      return diagnose(inp, detectDivergences(inp)).filter((m) => m.bIndex === B).map((m) => m.rule);
+    };
+    expect(nm(965)).toEqual(['oi_delta']);
+    expect(nm(958)).toEqual([]);
+  });
+
+  it('bOiHolds: through B inclusive, ties stand, an unknown bar does not', () => {
+    const s = [10, 8, 9, 8, 12];
+    expect(bOiHolds(s, { side: 'low', oi: 1, price: 4 })).toBe(true);
+    expect(bOiHolds([10, 8, 9, 7.9, 12], { side: 'low', oi: 1, price: 3 })).toBe(false);
+    expect(bOiHolds([10, 8, 9, 7.9, 12], { side: 'low', oi: 1, price: 2 })).toBe(true); // bar 3 is after B
+    expect(bOiHolds([10, 8, null, 9], { side: 'low', oi: 1, price: 3 })).toBe(false);
+    expect(bOiHolds([1, 8, null, 8], { side: 'high', oi: 1, price: 3 })).toBe(false); // null is no tie on either side
+    expect(bOiHolds([1, 8, 7, 8.1], { side: 'high', oi: 1, price: 3 })).toBe(false);
+    expect(bOiHolds([1, 8, 2, 8], { side: 'high', oi: 1, price: 3 })).toBe(true);
+  });
+
+  it('a no-op with nRight ≥ k (6/6): every pair on a random walk holds; at 6/2 some do not', () => {
+    let seed = 5;
+    const rnd = () => ((seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31) / 2 ** 31);
+    const bars: Bar[] = [];
+    const oi5m: OiPoint[] = [];
+    let px = 100;
+    let oi = 1_000;
+    for (let i = 0; i < 3_000; i++) {
+      px += rnd() - 0.5;
+      oi += (rnd() - 0.5) * 20;
+      bars.push({ time: T0 + i * TF, open: px + 1, high: px + 2, low: px, close: px + 1 });
+      for (let k = 1; k <= 3; k++) oi5m.push({ time: T0 + i * TF + k * 300, oi: oi + (rnd() - 0.5) * 4 });
+    }
+    const series = oiPerBar(bars.map((b) => b.time), oi5m, TF);
+    const failing = (nRight: number) => {
+      const r = detectDivergences({ tfSec: TF, bars, oi5m, params: { ...P62, nLeft: 6, nRight } });
+      return [r.pairs.length, r.pairs.filter((p) => !bOiHolds(p.side === 'low' ? series.min : series.max, p)).length];
+    };
+    const [n66, f66] = failing(6);
+    const [n62, f62] = failing(2);
+    expect(n66).toBeGreaterThan(50);
+    expect(f66).toBe(0);
+    expect(n62).toBeGreaterThan(50);
+    expect(f62).toBeGreaterThan(0);
   });
 });
