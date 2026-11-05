@@ -260,7 +260,7 @@ def adjacent(samples, i, bad):
     return i >= 1 and bad(samples[i]) and bad(samples[i - 1])
 
 
-def alarms_at(samples, i, expected_sha, now, loop_enabled=True, liq_enabled=True):
+def alarms_at(samples, i, expected_sha, now, loop_enabled=True):
     """The alarm reasons firing at sample i (taken at `now`): {reason: plain-Russian detail}. Pure."""
     s, base = samples[i], samples[0]
     out = {}
@@ -272,7 +272,8 @@ def alarms_at(samples, i, expected_sha, now, loop_enabled=True, liq_enabled=True
         if missing:
             out['oi_loop_missing'] = 'цикл OI-сигналов молчит: нет проверки %s — сигналы участникам не уходят' % (
                 ', '.join('%s за %s' % (tf, utc(c)[11:16]) for tf, c in missing))
-    if log is not None and boot and liq_enabled and log.get('liq_on'):
+    # The bot announces the heartbeat only while LIQ_ALERTS_LOOP_ENABLED is on, so the announcement is the gate.
+    if log is not None and boot and log.get('liq_on'):
         missing = missing_heartbeats(boot, now, log.get('liq', []))
         if missing:
             out['liq_loop_missing'] = 'цикл оповещений о ликвидациях молчит: нет пульса %s — крупные ликвидации не журналируются' % (
@@ -488,7 +489,7 @@ class Watch:
             raw = probe(self.deploy_start)
         raw.update({'i': i, 't_min': int(round(i * INTERVAL / 60.0)), 'time': utc(t), 'seconds': round(time.time() - t, 2)})
         self.doc['samples'].append(raw)
-        for reason, detail in sorted(alarms_at(self.doc['samples'], i, self.sha, t, self.loop_enabled, self.liq_enabled).items()):
+        for reason, detail in sorted(alarms_at(self.doc['samples'], i, self.sha, t, self.loop_enabled).items()):
             if any(a['reason'] == reason for a in self.doc['alarms']):
                 continue  # one message per reason per deploy
             text = 'Инсайт: тревога после выкладки %s: %s. Откат пока не делали — решает Tech Lead. Команда отката: %s' % (

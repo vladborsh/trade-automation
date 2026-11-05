@@ -187,8 +187,8 @@ check "liq-missing boundary: the 14:30 heartbeat absent → silent at 14:34:59, 
   "[ \"\$(liq_pure 'b = T(14, 13, 13); seen = [T(14, 0), T(14, 15)]; print(alarm(b, T(14, 34, 59), seen), alarm(b, T(14, 35), seen))')\" = 'False True' ]"
 check "liq boot: no heartbeat at all → silent at boot + 4:59, ALARM at boot + 5:00" \
   "[ \"\$(liq_pure 'b = T(14, 13, 13); print(alarm(b, b + 299, []), alarm(b, b + 300, []))')\" = 'False True' ]"
-check "liq boot straddling a slot: boot 14:14:59, the boot tick stamped 14:15 only → no alarm at 14:20:00; a line from before boot does not count" \
-  "[ \"\$(liq_pure 'b = T(14, 14, 59); print(alarm(b, T(14, 20), [T(14, 15)]), alarm(b, T(14, 20), [T(13, 45)]))')\" = 'False True' ]"
+check "liq boot straddling a slot: boot 14:14:59, the boot tick stamped 14:15 only → no alarm at 14:20:00; a line from before boot does not count (14:19:59, only boot owed)" \
+  "[ \"\$(liq_pure 'b = T(14, 14, 59); print(alarm(b, T(14, 20), [T(14, 15)]), alarm(b, T(14, 19, 59), [T(13, 45)]))')\" = 'False True' ]"
 check "liq lines: the committed fixture (written by the bot spec) parses — announcement seen, slots 14:00 and 14:15" "[ \"\$(python3 -I - '$WATCH' '$HERE/../../../apps/insight-bot/test/fixtures/liq-heartbeat-lines.txt' <<'PY'
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
