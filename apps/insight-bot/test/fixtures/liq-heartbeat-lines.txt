@@ -1,0 +1,3 @@
+liq alerts loop on: tick 30 s, heartbeat every 15 min
+liq alerts heartbeat @2026-11-05T14:00:00.000Z: 1 ticks, 40 prints read, 0 journalled, cursor lag ≤ 0.1 s
+liq alerts heartbeat @2026-11-05T14:15:00.000Z: 3 ticks, 120 prints read, 3 journalled, cursor lag ≤ 2.5 s, failed 1, skipped 1

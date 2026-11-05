@@ -4,6 +4,7 @@ import { LiqAlertLoop, type LiqTickReport } from '../alerts/liquidations/liq-ale
 import { PgLiqAlertStore } from '../alerts/liquidations/pg/liq-alerts.repo';
 import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
+import { LiqHeartbeat, LIQ_LOOP_ON_LINE } from './liq-heartbeat';
 import { TelegramSender } from './telegram-sender';
 
 /**
@@ -17,6 +18,9 @@ export class LiqAlertsService implements OnApplicationBootstrap, OnModuleDestroy
   private readonly logger = new Logger(LiqAlertsService.name);
   private timer: ReturnType<typeof setInterval> | null = null;
   readonly loop: LiqAlertLoop | null;
+  private readonly heartbeat = new LiqHeartbeat();
+  /** The wall clock at a tick's end (the heartbeat's cursor lag); a seam for the specs. */
+  now: () => number = Date.now;
 
   constructor(
     private readonly config: AppConfigService,
@@ -42,6 +46,7 @@ export class LiqAlertsService implements OnApplicationBootstrap, OnModuleDestroy
     if (!this.loop || !this.config.env.get('LIQ_ALERTS_LOOP_ENABLED')) return;
     this.timer = setInterval(() => void this.tick(), LIQ_TICK_SEC * 1_000);
     this.timer.unref?.();
+    this.logger.log(LIQ_LOOP_ON_LINE);
     void this.tick();
   }
 
@@ -50,13 +55,21 @@ export class LiqAlertsService implements OnApplicationBootstrap, OnModuleDestroy
     this.timer = null;
   }
 
-  /** One check; `nowMs` is the seam. Logs only a tick that journalled something or failed (every 30 s otherwise). */
+  /**
+   * One check; `nowMs` is the seam. Logs a tick that journalled something or failed (every 30 s otherwise),
+   * and the heartbeat line on the first completed tick of each 15-min slot (IB-BUG-044).
+   */
   async tick(nowMs = Date.now()): Promise<LiqTickReport | null> {
+    if (!this.loop) return null;
     try {
-      const r = (await this.loop?.tick(nowMs)) ?? null;
-      if (r && (r.alerts + r.continuations + r.controls > 0 || r.failed.length > 0)) this.logger.log(liqTickLine(r));
+      const r = await this.loop.tick(nowMs);
+      if (!r) { this.heartbeat.skippedTick(); return null; }
+      if (r.alerts + r.continuations + r.controls > 0 || r.failed.length > 0) this.logger.log(liqTickLine(r));
+      const beat = this.heartbeat.record(r, this.now());
+      if (beat) this.logger.log(beat);
       return r;
     } catch (error) {
+      this.heartbeat.failedTick();
       this.logger.warn(`liq alerts tick failed: ${(error as Error).message}`);
       return null;
     }

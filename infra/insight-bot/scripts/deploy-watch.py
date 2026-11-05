@@ -18,12 +18,16 @@
 # in the bot log (IB-BUG-031 guard); (8) BUILD_SHA in the container env == the deployed sha.
 # Check 5's OI-loop part: an «oi alerts <tf> @<close>» line for every 15m/1h/4h close whose evaluation
 # (close + 6 min) plus the loop's lag fell inside the window — and the one the loop runs at boot.
+# Check 5's liq-loop part (IB-BUG-044): a «liq alerts heartbeat @<slot>» line for every 15-min UTC slot whose
+# start plus the lag fell inside the window, and one by boot + lag. Checked only for an image whose log says
+# «liq alerts loop on: … heartbeat every 15 min» at bootstrap: an older image (a rollback past IB-BUG-044, or
+# an old tag deployed after sync-box) has no heartbeat, and its silence is recorded as a warning, not an alarm.
 #
 # ALARM (the existing rollback rule, unchanged): MemAvailable < 100 MB on 2 ADJACENT samples; swap
 # > 500 MB; any restart or OOM (or the container not running); /healthz failing on 2 adjacent samples;
 # any raw cookie line; a BUILD_SHA mismatch. Plus two from check 5 (TL review, IB-139): an alert sent to more
 # members than are eligible (`alert_oversend`), and an owed OI evaluation line missing (`oi_loop_missing`:
-# the loop is dead or stuck). Error lines and the Σ sent mismatch stay WARNINGS in the files.
+# the loop is dead or stuck). Plus an owed liq heartbeat missing (`liq_loop_missing`, IB-BUG-044). Error lines and the Σ sent mismatch stay WARNINGS in the files.
 #
 # Outputs (written after EVERY sample, so a lost watch still shows how far it got):
 #   /var/log/insight-watch/<sha12>.json — samples, alarms, warnings, verdict (null while running)
@@ -49,8 +53,13 @@ SWAP_HIGH_MB = 500
 EVALUATE_AFTER_CLOSE_SEC = 6 * 60  # apps/insight-bot/src/alerts/oi-divergence/timing.ts
 OI_LOOP_LAG_SEC = 5 * 60  # the loop ticks once a minute; an evaluation of 5 coins takes seconds
 TF_SEC = {'15m': 900, '1h': 3600, '4h': 14400}
+LIQ_HEARTBEAT_SEC = 15 * 60  # apps/insight-bot/src/delivery/liq-heartbeat.ts: first completed tick of each slot
+LIQ_LOOP_LAG_SEC = 5 * 60  # the loop ticks every 30 s; a tick takes well under a second
 RAW_COOKIE = re.compile(r'ib_session=(?!\[Redacted\])[^;\s"\']+')
 OI_LINE = re.compile(r'oi alerts (15m|1h|4h) @(\S+?Z): (\d+) coins, (\d+) found \(late (\d+)\), sent (\d+)')
+# Both pinned by apps/insight-bot/test/fixtures/liq-heartbeat-lines.txt (the bot spec writes it, the test parses it).
+LIQ_LINE = re.compile(r'liq alerts heartbeat @(\S+?Z): (\d+) ticks')
+LIQ_ON = re.compile(r'liq alerts loop on: tick \d+ s, heartbeat every 15 min')
 
 DEPLOY_DIR = os.environ.get('DEPLOY_DIR', '/opt/insight-bot')
 WATCH_DIR = os.environ.get('WATCH_DIR', '/var/log/insight-watch')
@@ -181,7 +190,7 @@ def probe(deploy_start):
 
 
 def scan_log(text):
-    errors, first, cookie, oi = 0, [], 0, []
+    errors, first, cookie, oi, liq, liq_on = 0, [], 0, [], [], False
     for line in text.splitlines():
         if RAW_COOKIE.search(line):
             cookie += 1  # counted, never copied: the line IS the leak
@@ -203,7 +212,12 @@ def scan_log(text):
             oi.append({'tf': m.group(1), 'bar_close': int(parse_docker_time(m.group(2)) or 0),
                        'found': int(m.group(4)), 'sent': int(m.group(6)),
                        'at': (at / 1000.0) if isinstance(at, (int, float)) else None})
-    return {'errors': errors, 'first_errors': first, 'cookie_lines': cookie, 'oi': oi}
+        m = LIQ_LINE.search(msg)
+        if m:
+            liq.append(int(parse_docker_time(m.group(1)) or 0))
+        elif LIQ_ON.search(msg):
+            liq_on = True
+    return {'errors': errors, 'first_errors': first, 'cookie_lines': cookie, 'oi': oi, 'liq': liq, 'liq_on': liq_on}
 
 
 def db_probe(pg, since):
@@ -246,7 +260,7 @@ def adjacent(samples, i, bad):
     return i >= 1 and bad(samples[i]) and bad(samples[i - 1])
 
 
-def alarms_at(samples, i, expected_sha, now, loop_enabled=True):
+def alarms_at(samples, i, expected_sha, now, loop_enabled=True, liq_enabled=True):
     """The alarm reasons firing at sample i (taken at `now`): {reason: plain-Russian detail}. Pure."""
     s, base = samples[i], samples[0]
     out = {}
@@ -258,6 +272,11 @@ def alarms_at(samples, i, expected_sha, now, loop_enabled=True):
         if missing:
             out['oi_loop_missing'] = 'цикл OI-сигналов молчит: нет проверки %s — сигналы участникам не уходят' % (
                 ', '.join('%s за %s' % (tf, utc(c)[11:16]) for tf, c in missing))
+    if log is not None and boot and liq_enabled and log.get('liq_on'):
+        missing = missing_heartbeats(boot, now, log.get('liq', []))
+        if missing:
+            out['liq_loop_missing'] = 'цикл оповещений о ликвидациях молчит: нет пульса %s — крупные ликвидации не журналируются' % (
+                ', '.join('после старта' if c == 'boot' else 'за ' + utc(c)[11:16] for c in missing))
     if db and db.get('eligible') is not None:
         over = [a for a in db['alerts'] if a['recipients'] > db['eligible']]
         if over:
@@ -306,13 +325,36 @@ def expected_evaluations(boot, now):
     return out
 
 
-def warnings_at(s):
+def expected_heartbeats(boot, now):
+    """The liq heartbeats owed by `now`: 'boot' (any line from the boot tick's slot on, by boot + lag — the boot
+    tick may land in the next slot when the bootstrap straddles a boundary), then every slot start after boot
+    whose start plus the lag falls inside the window. Pure."""
+    out = ['boot'] if boot + LIQ_LOOP_LAG_SEC <= now else []
+    c = int(boot // LIQ_HEARTBEAT_SEC) * LIQ_HEARTBEAT_SEC + LIQ_HEARTBEAT_SEC
+    while c + LIQ_LOOP_LAG_SEC <= now:
+        out.append(c)
+        c += LIQ_HEARTBEAT_SEC
+    return out
+
+
+def missing_heartbeats(boot, now, seen):
+    """expected_heartbeats minus the slots logged (`seen`: slot starts, epoch seconds). Pure."""
+    first = int(boot // LIQ_HEARTBEAT_SEC) * LIQ_HEARTBEAT_SEC
+    seen = set(seen)
+    return [e for e in expected_heartbeats(boot, now)
+            if (e == 'boot' and not any(x >= first for x in seen)) or (e != 'boot' and e not in seen)]
+
+
+def warnings_at(s, liq_enabled=True):
     """Error lines (check 3) and the Σ sent mismatch (check 5): findings, never alarms. Cumulative: the last
     sample's list is the watch's."""
     out = []
     log = s.get('log')
     if log and log['errors']:
         out.append('error_lines: %d (first: %s)' % (log['errors'], ' | '.join(log['first_errors'])))
+    if log is not None and liq_enabled and not log.get('liq_on'):
+        out.append('liq_loop_unchecked: the bot never logged «liq alerts loop on» — an image without the heartbeat '
+                   '(before IB-BUG-044), so liq_loop_missing was not checked')
     db = s.get('db')
     if db and log is not None:
         last_line = max([o['at'] for o in log['oi'] if o['at']] or [0])
@@ -366,6 +408,7 @@ class Watch:
         self.sha = tag[len('sha-'):]
         self.deploy_start = deploy_start
         self.loop_enabled = (env_value(ENV_FILE, 'OI_ALERTS_LOOP_ENABLED') or 'true').lower() not in ('false', '0', 'no', 'off')
+        self.liq_enabled = (env_value(ENV_FILE, 'LIQ_ALERTS_LOOP_ENABLED') or 'true').lower() not in ('false', '0', 'no', 'off')
         self.json_path = os.path.join(WATCH_DIR, self.sha + '.json')
         self.md_path = os.path.join(WATCH_DIR, self.sha + '.md')
         self.marker = os.path.join(WATCH_DIR, self.sha + '.superseded-by')
@@ -422,6 +465,14 @@ class Watch:
         if db:
             L.append('- eligible members now: %s; alerts fired since boot: %s' % (
                 db['eligible'], ', '.join('#%d → %d' % (a['id'], a['recipients']) for a in db['alerts']) or 'none'))
+        lg = last.get('log') or {}
+        L += ['', '## Liquidation-alert loop (heartbeats)', '']
+        if not self.liq_enabled:
+            L.append('- LIQ_ALERTS_LOOP_ENABLED is off: nothing owed')
+        elif not lg.get('liq_on'):
+            L.append('- not checked: the bot did not announce the heartbeat')
+        else:
+            L += ['- @%s' % utc(c) for c in lg.get('liq', [])] or ['- no heartbeat yet']
         L += ['', '## Warnings (recorded, never an alarm)', ''] + (['- ' + w for w in d['warnings']] or ['- none'])
         fp = d['footprint'] or {}
         L += ['', 'Footprint: max RSS %s KB (self) / %s KB (children), CPU %s s, slowest sample %s s.' % (
@@ -437,7 +488,7 @@ class Watch:
             raw = probe(self.deploy_start)
         raw.update({'i': i, 't_min': int(round(i * INTERVAL / 60.0)), 'time': utc(t), 'seconds': round(time.time() - t, 2)})
         self.doc['samples'].append(raw)
-        for reason, detail in sorted(alarms_at(self.doc['samples'], i, self.sha, t, self.loop_enabled).items()):
+        for reason, detail in sorted(alarms_at(self.doc['samples'], i, self.sha, t, self.loop_enabled, self.liq_enabled).items()):
             if any(a['reason'] == reason for a in self.doc['alarms']):
                 continue  # one message per reason per deploy
             text = 'Инсайт: тревога после выкладки %s: %s. Откат пока не делали — решает Tech Lead. Команда отката: %s' % (
@@ -445,7 +496,7 @@ class Watch:
             self.doc['alarms'].append({'reason': reason, 'at': raw['time'], 'sample': i, 'detail': detail,
                                        'telegram': send_owner(text, self.dry_run)})
             say('ALARM %s: %s' % (reason, detail))
-        self.doc['warnings'] = warnings_at(raw)
+        self.doc['warnings'] = warnings_at(raw, self.liq_enabled)
         self.write()
 
     def finish(self, state):

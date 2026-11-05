@@ -11,7 +11,8 @@
 # leaves no verdict; the files are written at every sample; the token is on curl's stdin only — never
 # in argv, stdout, stderr (the systemd journal is exactly those two) or the files. An over-send and a
 # missing owed OI evaluation are alarms (TL review); error lines and the Σ sent mismatch are warnings only;
-# the OI-loop expectation covers only closes inside the window plus the lag.
+# the OI-loop expectation covers only closes inside the window plus the lag. IB-BUG-044: a missing owed liq
+# heartbeat is an alarm, but only for an image that announced it; an older image is a warning (rollback safe).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -49,10 +50,11 @@ def expected():
             out.append((tf, c)); c += sec
     return out
 oi = [{'tf': tf, 'bar_close': c, 'found': 0, 'sent': 0, 'at': c + 400} for tf, c in expected()]
+liq = list(range(int(boot // 900) * 900, int(now) + 1, 900))  # every slot's heartbeat since boot
 def base():
     return {'bot': {'id': 'aaaaaaaaaaaa', 'restarts': 0, 'oom': False, 'state': 'running', 'started_at': started, 'started_epoch': boot},
             'mem': {'available_mb': 220, 'swap_mb': 100}, 'rss_mib': {'bot': 150.0, 'postgres': 270.0},
-            'log': {'errors': 0, 'first_errors': [], 'cookie_lines': 0, 'oi': [dict(o) for o in oi]},
+            'log': {'errors': 0, 'first_errors': [], 'cookie_lines': 0, 'oi': [dict(o) for o in oi], 'liq': list(liq), 'liq_on': True},
             'weight_1m': 25.0, 'build_sha': sha, 'healthz': {'ok': True, 'code': 200, 'url': 'https://x/healthz'},
             'db': {'eligible': 2, 'alerts': [], 'last_fired': None}, 'errors': []}
 samples = []
@@ -154,6 +156,48 @@ s = [{'bot': {'id': 'a', 'state': 'running', 'restarts': 0, 'started_at': 'x', '
 print(sorted(w.alarms_at(s, 0, 'x', T(14, 40, 59)).keys() - {'build_sha_mismatch'}), sorted(w.alarms_at(s, 0, 'x', T(14, 41)).keys() - {'build_sha_mismatch'}))
 PY
 )\" = \"[] ['oi_loop_missing']\" ]"
+# liq_loop_missing (IB-BUG-044): an owed heartbeat absent → ALARM (once); an image that never announced the
+# heartbeat (a rollback past IB-BUG-044) → warning only; LIQ_ALERTS_LOOP_ENABLED=false → nothing owed.
+case_is liq-missing "$(seven "$G" "$G" "$G" '{"log.liq": []}' '{"log.liq": []}' '{"log.liq": []}' '{"log.liq": []}')" ALARM:liq_loop_missing 1
+check "liq-missing: the message names the boot heartbeat and the owed slots" "grep -q 'цикл оповещений о ликвидациях молчит: нет пульса после старта, за ' '$work/liq-missing/curl-args'"
+U='{"log.liq": [], "log.liq_on": false}'
+case_is liq-old-image "$(seven "$U" "$U" "$U" "$U" "$U" "$U" "$U")" CLEAN 0
+check "liq-old-image: recorded as liq_loop_unchecked in the files" "grep -q 'liq_loop_unchecked' '$work/liq-old-image/out/$SHA.json' && grep -q 'not checked: the bot did not announce' '$work/liq-old-image/out/$SHA.md'"
+check "liq-off: LIQ_ALERTS_LOOP_ENABLED=false owes nothing and warns nothing → CLEAN" "[ \"\$(fixtures liq-off '[{\"log.liq\": [], \"log.liq_on\": false}, {}, {}, {}, {}, {}, {\"log.liq\": [], \"log.liq_on\": false}]'; d='$work/liq-off'; mkdir -p \$d; \
+  printf \"LIQ_ALERTS_LOOP_ENABLED='false'\\n\" >\$d/env; PATH='$work/bin':\$PATH WATCH_FAKE_SAMPLES='$work/liq-off.samples.json' WATCH_INTERVAL=0 WATCH_DIR=\$d/out \
+  WATCH_ENV_FILE=\$d/env DEPLOY_DIR=\$d STUB_CURL_ARGS=\$d/curl-args STUB_CURL_STDIN=\$d/curl-stdin python3 -I '$WATCH' watch --tag sha-$SHA </dev/null >/dev/null 2>&1; \
+  python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d[\"verdict\"], d[\"warnings\"])' \$d/out/$SHA.json)\" = 'CLEAN []' ]"
+# The liq expectation and its boundaries (pure). Boot 14:13:13; slot 14:15 owed from 14:20:00, 14:30 from 14:35:00.
+liq_pure() { python3 -I - "$WATCH" "$1" <<'PY'
+import importlib.util, sys
+from datetime import datetime, timezone
+spec = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
+T = lambda h, m, s=0: datetime(2026, 11, 5, h, m, s, tzinfo=timezone.utc).timestamp()
+hm = lambda e: e if e == 'boot' else w.utc(e)[11:16]
+def alarm(boot, now, seen):
+    s = [{'bot': {'id': 'a', 'state': 'running', 'restarts': 0, 'started_at': 'x', 'started_epoch': boot},
+          'log': {'oi': [], 'liq': [int(x) for x in seen], 'liq_on': True, 'cookie_lines': 0}}]
+    return 'liq_loop_missing' in w.alarms_at(s, 0, 'x', now, loop_enabled=False)
+exec(sys.argv[2])
+PY
+}
+check "liq expectation: boot 14:13:13 → nothing at 14:18:12, boot at 14:18:13, +14:15 at 14:20:00 (not 14:19:59), 30 min on → boot 14:15 14:30" \
+  "[ \"\$(liq_pure 'b = T(14, 13, 13); print(*[\" \".join(map(hm, w.expected_heartbeats(b, t))) or \"-\" for t in (T(14, 18, 12), T(14, 18, 13), T(14, 19, 59), T(14, 20), b + 1800)], sep=\"|\")')\" = '-|boot|boot|boot 14:15|boot 14:15 14:30' ]"
+check "liq-missing boundary: the 14:30 heartbeat absent → silent at 14:34:59, ALARM at 14:35:00" \
+  "[ \"\$(liq_pure 'b = T(14, 13, 13); seen = [T(14, 0), T(14, 15)]; print(alarm(b, T(14, 34, 59), seen), alarm(b, T(14, 35), seen))')\" = 'False True' ]"
+check "liq boot: no heartbeat at all → silent at boot + 4:59, ALARM at boot + 5:00" \
+  "[ \"\$(liq_pure 'b = T(14, 13, 13); print(alarm(b, b + 299, []), alarm(b, b + 300, []))')\" = 'False True' ]"
+check "liq boot straddling a slot: boot 14:14:59, the boot tick stamped 14:15 only → no alarm at 14:20:00; a line from before boot does not count" \
+  "[ \"\$(liq_pure 'b = T(14, 14, 59); print(alarm(b, T(14, 20), [T(14, 15)]), alarm(b, T(14, 20), [T(13, 45)]))')\" = 'False True' ]"
+check "liq lines: the committed fixture (written by the bot spec) parses — announcement seen, slots 14:00 and 14:15" "[ \"\$(python3 -I - '$WATCH' '$HERE/../../../apps/insight-bot/test/fixtures/liq-heartbeat-lines.txt' <<'PY'
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
+lines = open(sys.argv[2], encoding='utf-8').read().splitlines()
+assert len(lines) == 3, lines
+log = w.scan_log('\n'.join(json.dumps({'level': 30, 'time': 1, 'context': 'LiqAlertsService', 'msg': l}) for l in lines))
+print(log['liq_on'], ' '.join(w.utc(c)[11:16] for c in log['liq']))
+PY
+)\" = 'True 14:00 14:15' ]"
 case_is send-in-flight "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"db.alerts": [{"id": 8, "recipients": 1}], "db.last_fired": 9999999999}')" CLEAN 0
 check "send-in-flight: an alert newer than the last evaluation line is not a mismatch yet" "! grep -q 'oi_sent_mismatch' '$work/send-in-flight/out/$SHA.json'"
 

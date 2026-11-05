@@ -58,6 +58,8 @@ export interface LiqTickReport {
   /** L7, measured: DB round trips this tick, and the most prints held at once. */
   reads: number;
   maxPrints: number;
+  /** Tape rows read this tick, summed over its chunks (IB-BUG-044's heartbeat). */
+  prints: number;
   failed: string[];
 }
 
@@ -90,7 +92,7 @@ export class LiqAlertLoop {
     this.running = true;
     try {
       const from = this.cursor === null ? nowMs - BOOT_LOOKBACK_MS : Math.min(this.cursor, nowMs) - OVERLAP_MS;
-      const report: LiqTickReport = { fromMs: from, toMs: nowMs, coins: 0, alerts: 0, continuations: 0, late: 0, sent: 0, controls: 0, reads: 0, maxPrints: 0, failed: [] };
+      const report: LiqTickReport = { fromMs: from, toMs: nowMs, coins: 0, alerts: 0, continuations: 0, late: 0, sent: 0, controls: 0, reads: 0, maxPrints: 0, prints: 0, failed: [] };
       const { store } = this.ports;
       const settings = await store.settings();
       const coins = this.coins(await store.listedCoins(), settings.params);
@@ -131,6 +133,7 @@ export class LiqAlertLoop {
     const journal = await store.journal(source, fromMs - QUIET_MS - WINDOW_MS);
     report.reads += 2;
     report.maxPrints = Math.max(report.maxPrints, prints.length);
+    report.prints += prints.length;
     let status: VenueStatus | null = null;
     for (const coin of coins) {
       try {
