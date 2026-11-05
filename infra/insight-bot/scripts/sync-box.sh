@@ -34,6 +34,7 @@ FILES=(
   "scripts/render-env.sh:/opt/insight-bot/render-env.sh:0755"
   "scripts/deploy.sh:/opt/insight-bot/deploy.sh:0755"
   "scripts/deploy-watch.py:/opt/insight-bot/deploy-watch.py:0755"
+  "scripts/checks.py:/opt/insight-bot/checks.py:0755"
   "scripts/backup.sh:/opt/insight-bot/backup.sh:0755"
   "scripts/restore.sh:/opt/insight-bot/restore.sh:0755"
   "systemd/insight-bot-backup.service:/etc/systemd/system/insight-bot-backup.service:0644"
