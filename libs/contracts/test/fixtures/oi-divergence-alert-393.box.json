@@ -1,0 +1,14 @@
+{
+  "_source": "the box's oi_divergence_alerts row id 393 (live alert ETHUSDT 4h bearish), read 2026-11-05 with default_transaction_read_only=on; params::text verbatim. Written before migration 032: one n per TF.",
+  "id": 393,
+  "source": "live",
+  "symbol": "ETHUSDT",
+  "tf": "4h",
+  "direction": "bearish",
+  "a_time": "2026-11-02 00:00:00+00",
+  "b_time": "2026-11-04 12:00:00+00",
+  "confirmed_at": "2026-11-05 16:00:00+00",
+  "fired_at": "2026-11-05 16:06:42+00",
+  "build": "caa595788ec0",
+  "params": {"perTf": {"1h": {"k": 3, "n": 6, "w": 168}, "4h": {"k": 3, "n": 6, "w": 90}, "15m": {"k": 3, "n": 6, "w": 96}}, "atrMult": 0.25, "oiMedianMult": 0.5, "oiLineTolMedianMult": 0.5, "priceLineTolAtrMult": 0.25}
+}

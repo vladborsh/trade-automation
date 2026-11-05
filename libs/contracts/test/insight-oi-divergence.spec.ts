@@ -2,6 +2,7 @@ import {
   OI_DIVERGENCE_DEFAULT_PARAMS, OI_DIVERGENCE_TF_SEC, OI_DIVERGENCE_TFS, OiDivergenceJournalParamsSchema, OiDivergenceParamsSchema, WebAlertSymbolSchema,
   WebOiDivergenceAlertSchema, WebOiDivergenceLineSchema, WebOiDivergenceSeriesResponseSchema,
 } from '../src/insight';
+import box393Row from './fixtures/oi-divergence-alert-393.box.json';
 
 /** IB-109 — the divergence contracts: the defaults are valid, and each guard refuses what it should. */
 const point = (time: number, price: number, oi: number) => ({ time, price, oiTime: time, oi });
@@ -11,9 +12,11 @@ const line = {
 };
 
 describe('OI divergence contracts (IB-109)', () => {
-  it('the defaults parse: N 6, k 3, W 96/168/90 (V19), δp 0.25 × ATR, δoi 0.5 × median, line tolerances 0.25 / 0.5 (V18)', () => {
+  it('the defaults parse: N 6/6 on 15m and 1h, 6/2 on 4h (V34), k 3, W 96/168/90 (V19), δp 0.25 × ATR, δoi 0.5 × median, line tolerances 0.25 / 0.5 (V18)', () => {
     expect(OiDivergenceParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual({
-      perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 168 }, '4h': { n: 6, k: 3, w: 90 } },
+      perTf: {
+        '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 168 }, '4h': { nLeft: 6, nRight: 2, k: 3, w: 90 },
+      },
       atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0.25, oiLineTolMedianMult: 0.5,
     });
     expect(OI_DIVERGENCE_TFS.map((tf) => OI_DIVERGENCE_TF_SEC[tf])).toEqual([900, 3_600, 14_400]);
@@ -35,6 +38,30 @@ describe('OI divergence contracts (IB-109)', () => {
     expect(OiDivergenceJournalParamsSchema.parse(round1)).toEqual({ ...round1, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 });
     expect(OiDivergenceJournalParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
     expect(OiDivergenceJournalParamsSchema.safeParse({ ...round1, priceLineTolAtrMult: 6 }).success).toBe(false);
+  });
+
+  it('V34: settings and admin writes are strict — every TF needs nLeft and nRight (1 … 50), and an old n alone is refused', () => {
+    const withTf = (tf: Record<string, number>) => ({ ...OI_DIVERGENCE_DEFAULT_PARAMS, perTf: { ...OI_DIVERGENCE_DEFAULT_PARAMS.perTf, '4h': tf } });
+    const ok = (tf: Record<string, number>) => OiDivergenceParamsSchema.safeParse(withTf(tf)).success;
+    expect(ok({ nLeft: 6, nRight: 2, k: 3, w: 90 })).toBe(true);
+    expect(ok({ n: 6, k: 3, w: 90 })).toBe(false);
+    expect(ok({ nLeft: 6, k: 3, w: 90 })).toBe(false);
+    expect(ok({ nRight: 2, k: 3, w: 90 })).toBe(false);
+    expect([ok({ nLeft: 1, nRight: 50, k: 3, w: 90 }), ok({ nLeft: 0, nRight: 2, k: 3, w: 90 }), ok({ nLeft: 6, nRight: 51, k: 3, w: 90 }),
+      ok({ nLeft: 6, nRight: 2.5, k: 3, w: 90 })]).toEqual([true, false, false, false]);
+  });
+
+  it('V34: a journal row from before 032 (one n per TF) reads as nLeft = nRight = n; a new row reads as written, unequal sides kept', () => {
+    // live alert #393 (ETHUSDT 4h) exactly as the box's journal holds it
+    const box393 = box393Row.params;
+    expect(OiDivergenceJournalParamsSchema.parse(box393).perTf).toEqual({
+      '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 }, '1h': { nLeft: 6, nRight: 6, k: 3, w: 168 }, '4h': { nLeft: 6, nRight: 6, k: 3, w: 90 },
+    });
+    const old5 = { ...box393, perTf: { ...box393.perTf, '4h': { n: 5, k: 3, w: 90 } } };
+    expect(OiDivergenceJournalParamsSchema.parse(old5).perTf['4h']).toEqual({ nLeft: 5, nRight: 5, k: 3, w: 90 });
+    expect(OiDivergenceJournalParamsSchema.parse(OI_DIVERGENCE_DEFAULT_PARAMS)).toEqual(OI_DIVERGENCE_DEFAULT_PARAMS);
+    expect(OiDivergenceJournalParamsSchema.safeParse({ ...box393, perTf: { ...box393.perTf, '4h': { n: 0, k: 3, w: 90 } } }).success).toBe(false);
+    expect(OiDivergenceJournalParamsSchema.safeParse({ ...box393, perTf: { ...box393.perTf, '4h': { k: 3, w: 90 } } }).success).toBe(false);
   });
 
   it('a line parses; a repeat must say a run of at least 3 pivots', () => {

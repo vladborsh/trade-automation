@@ -23,13 +23,33 @@ export type OiDivergenceDirection = z.infer<typeof OiDivergenceDirectionSchema>;
 // -------------------------------------------------------------------------------------------------
 // Params (V5–V7): editable in the admin page, kept with every journal row
 
-/** Per TF: pivot reach N (bars each side), pairing reach k (±bars), lookback W (bars from B back to A). */
+const PivotReachSchema = z.number().int().min(1).max(50);
+const PairReachSchema = z.number().int().min(0).max(20);
+const LookbackSchema = z.number().int().min(2).max(1_000);
+
+/**
+ * Per TF: pivot reach on the left `nLeft` and on the right `nRight` (bars; IB-141, V34 — was one `n` for both
+ * sides), pairing reach k (±bars), lookback W (bars from B back to A). `nLeft` is how far back a pivot looks;
+ * `nRight` is how long it waits to be confirmed.
+ */
 export const OiDivergenceTfParamsSchema = z.object({
-  n: z.number().int().min(1).max(50),
-  k: z.number().int().min(0).max(20),
-  w: z.number().int().min(2).max(1_000),
+  nLeft: PivotReachSchema,
+  nRight: PivotReachSchema,
+  k: PairReachSchema,
+  w: LookbackSchema,
 });
 export type OiDivergenceTfParams = z.infer<typeof OiDivergenceTfParamsSchema>;
+
+/**
+ * V34 — a TF's params as READ from a journal, control or near-miss row. A row written before migration 032 carries
+ * one `n`: it was found with N bars on both sides, so it reads as `nLeft = nRight = n`. The rows themselves are
+ * never rewritten (each is the record of what was used). New-shape rows parse first.
+ */
+const OiDivergenceJournalTfParamsSchema = z.union([
+  OiDivergenceTfParamsSchema,
+  z.object({ n: PivotReachSchema, k: PairReachSchema, w: LookbackSchema })
+    .transform(({ n, k, w }): OiDivergenceTfParams => ({ nLeft: n, nRight: n, k, w })),
+]);
 
 /** V18: a line tolerance multiplier. 0 is the round-1 rule (no crossing at all). */
 const LineTolSchema = z.number().nonnegative().max(5);
@@ -57,26 +77,34 @@ export const OiDivergenceParamsSchema = z.object(paramsShape);
 export type OiDivergenceParams = z.infer<typeof OiDivergenceParamsSchema>;
 
 /**
- * V20 — a journal row's `params`, as READ. Rows written before migration 026 lack the two tolerances;
+ * V20, V34 — a journal row's `params`, as READ. Rows written before migration 032 carry `n` per TF and read as
+ * `nLeft = nRight = n` (above). Rows written before migration 026 lack the two tolerances;
  * they were found under the round-1 rule, so an absent tolerance reads as **0**, never as today's
  * default (a hit rate split by params would otherwise credit the new rule with the old signals).
  * The output type is `OiDivergenceParams`: what the API sends always carries both keys.
  */
 export const OiDivergenceJournalParamsSchema = z.object({
   ...paramsShape,
+  perTf: z.object({ '15m': OiDivergenceJournalTfParamsSchema, '1h': OiDivergenceJournalTfParamsSchema, '4h': OiDivergenceJournalTfParamsSchema }),
   priceLineTolAtrMult: LineTolSchema.default(0),
   oiLineTolMedianMult: LineTolSchema.default(0),
 });
 
 /**
- * V5–V7's defaults: N = 6 on every TF (owner: "n > 5"), k = 3 (half of N), W = 24 h on 15m, **7 days
+ * V5–V7's defaults: N = 6 on every TF (owner: "n > 5") — **except 4h's right side, 2** (owner 2026-11-05, IB-141
+ * V34: 4h confirmation took 24 h; it now takes 8 h), k = 3 (half of N), W = 24 h on 15m, **7 days
  * on 1h** (owner, round 2, V19; was 5), 15 days on 4h. Line tolerances 0.25 × ATR14 and 0.5 × the
  * median (owner, round 2, V18). **Starting values, not measured**: IB-111 / IB-114 report counts with
  * them and the owner judges. Migration 025 seeded round 1's values; 026 brings an untouched row to
- * exactly this (`migration-026.integration.spec.ts` compares the end of the chain with it).
+ * exactly this, and 032 splits N (`migration-026` / `migration-032.integration.spec.ts` compare the end of the chain
+ * with it).
  */
 export const OI_DIVERGENCE_DEFAULT_PARAMS: OiDivergenceParams = {
-  perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 168 }, '4h': { n: 6, k: 3, w: 90 } },
+  perTf: {
+    '15m': { nLeft: 6, nRight: 6, k: 3, w: 96 },
+    '1h': { nLeft: 6, nRight: 6, k: 3, w: 168 },
+    '4h': { nLeft: 6, nRight: 2, k: 3, w: 90 },
+  },
   atrMult: 0.25,
   oiMedianMult: 0.5,
   priceLineTolAtrMult: 0.25,
@@ -100,7 +128,7 @@ export const WebOiDivergenceLineSchema = z.object({
   direction: OiDivergenceDirectionSchema,
   a: WebOiDivergencePointSchema,
   b: WebOiDivergencePointSchema,
-  /** When the pair at B was confirmed: the close of bar max(B price, B OI) + N. */
+  /** When the pair at B was confirmed: the close of bar max(B price, B OI) + nRight. */
   confirmedAt: TimeSec,
   /** B against A, in percent: price (negative for a bullish one) and OI. */
   pricePct: z.number(),
