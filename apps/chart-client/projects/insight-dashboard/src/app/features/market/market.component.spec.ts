@@ -1,3 +1,4 @@
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import type { WebCapsResponse, WebFlowsResponse, WebInsightsResponse, WebKpisResponse, WebPositioningResponse, WebLiquidationBlock, WebLiquidationsOverviewResponse, WebMarketPeriod } from '@trade-automation/contracts';
@@ -33,7 +34,23 @@ const caps = (period: WebMarketPeriod): WebCapsResponse => ({
 
 interface Call { endpoint: string; period?: WebMarketPeriod }
 
-function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean; cards?: unknown; kpis?: unknown } = {}) {
+/**
+ * IB-BUG-045 — the budget of a test that draws the WHOLE page with every block loaded (≈ 900 nodes).
+ * Measured as CPU, which load does not change (2026-11-05, 3 runs): 0.5–0.6 s per render, 1.2–1.5 s
+ * for the first one in a file. Wall time is that × the machine's contention: at load 120–400 on 8
+ * cores these tests took 6–8 s and timed out under vitest's 5 s default. The cost grows with every
+ * block the page gains, so the budget is per whole-page render and named, not the default.
+ * A test that only asks WHICH ENDPOINTS were called does not draw the blocks at all (`draw: false`).
+ */
+const WHOLE_PAGE_MS = 20_000;
+
+/**
+ * `draw: false` — the shell without its blocks: the children are not imported, so their tags stay
+ * empty elements. The scheduler, the period and the requests are the shell's own and run unchanged;
+ * the render drops from ≈ 540 to ≈ 7 ms CPU, and the page's 1 s clock re-renders 16 nodes, not 900
+ * (600 s of fake time: ≈ 2.2 s → ≈ 0.25 s CPU).
+ */
+function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean; noStatements?: boolean; cards?: unknown; kpis?: unknown; draw?: boolean } = {}) {
   const calls: Call[] = [];
   const navigate = vi.fn(async () => true);
   const api = {
@@ -57,6 +74,7 @@ function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean;
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.p ? { p: opts.p } : {}) } } },
     ],
   });
+  if (opts.draw === false) TestBed.overrideComponent(MarketComponent, { set: { imports: [], schemas: [CUSTOM_ELEMENTS_SCHEMA] } });
   TestBed.inject(I18nService).setLang('en');
   const fixture = TestBed.createComponent(MarketComponent);
   fixture.detectChanges();
@@ -70,7 +88,7 @@ describe('MarketComponent shell (IB-088)', () => {
   afterEach(() => { TestBed.resetTestingModule(); vi.useRealTimers(); });
 
   it('reads ?p= and asks every block once, each with the page period', async () => {
-    const { calls } = setup({ p: '4h' });
+    const { calls } = setup({ p: '4h' , draw: false });
     await vi.advanceTimersByTimeAsync(0);
     expect(calls).toEqual(expect.arrayContaining([
       { endpoint: 'liquidations', period: '4h' }, { endpoint: 'insights', period: '4h' }, { endpoint: 'kpis' },
@@ -81,13 +99,13 @@ describe('MarketComponent shell (IB-088)', () => {
   });
 
   it('an unknown ?p= is 24h, not an error', async () => {
-    const { calls } = setup({ p: '1y' });
+    const { calls } = setup({ p: '1y' , draw: false });
     await vi.advanceTimersByTimeAsync(0);
     expect(calls.find((c) => c.endpoint === 'insights')?.period).toBe('24h');
   });
 
   it('one minute: liquidations 7×, insights / KPIs / positioning 2×, caps and sentiment once — the cadences reach the endpoints', async () => {
-    const { calls } = setup();
+    const { calls } = setup({ draw: false });
     await vi.advanceTimersByTimeAsync(60_000);
     const n = (e: string) => count(calls, e);
     expect({ liq: n('liquidations'), ins: n('insights'), kpis: n('kpis'), pos: n('positioning'), caps: n('caps'), sent: n('sentiment') })
@@ -95,7 +113,7 @@ describe('MarketComponent shell (IB-088)', () => {
   });
 
   it('a period switch DURING a request: the old answer is dropped, the new period is asked at once, the URL carries it', async () => {
-    const { cmp, calls, navigate } = setup({ insightsDelayMs: 3_000 });
+    const { cmp, calls, navigate } = setup({ insightsDelayMs: 3_000 , draw: false });
     await vi.advanceTimersByTimeAsync(1_000); // 24h insights request still running
     cmp.onPeriodChange('1h');
     await vi.advanceTimersByTimeAsync(2_000); // the 24h answer lands now
@@ -118,10 +136,10 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(errors[0]).toContain('502 from CoinGecko');
     expect(cmp.blockError('kpis')).toBeNull();
     expect(el.querySelector('app-kpi-strip')?.textContent).toMatch(/\$2\.62T|2\.62/);
-  });
+  }, WHOLE_PAGE_MS);
 
   it('a hidden tab asks nothing; coming back asks every block once', async () => {
-    const { calls } = setup();
+    const { calls } = setup({ draw: false });
     await vi.advanceTimersByTimeAsync(0);
     const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     document.dispatchEvent(new Event('visibilitychange'));
@@ -137,7 +155,7 @@ describe('MarketComponent shell (IB-088)', () => {
 
   it('IB-BUG-021: LOADED in a background tab it asks nothing until shown, then every block once', async () => {
     const vis = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    const { calls } = setup();
+    const { calls } = setup({ draw: false });
     await vi.advanceTimersByTimeAsync(180_000);
     expect(calls).toEqual([]);
     vis.mockReturnValue('visible');
@@ -161,7 +179,7 @@ describe('MarketComponent shell (IB-088)', () => {
     day.fixture.detectChanges();
     expect(text(day.fixture)).not.toContain('No 24h data');
     expect(text(day.fixture)).toMatch(/Nothing unusual over 24h|Not enough history/);
-  });
+  }, 2 * WHOLE_PAGE_MS);
 
   it('IB-BUG-038: a KPI answer with NO history field (a pre-IB-118 server) still draws the page — five tiles, no chart, the rest intact', async () => {
     const charts = async (kpis: unknown) => {
@@ -187,7 +205,7 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(without.charts).toBe(0);
     expect(without.positioning).toBe(withHistory.positioning);
     expect(without.positioning).toBeGreaterThan(0);
-  });
+  }, 2 * WHOLE_PAGE_MS);
 
   it('IB-117: five KPI tiles, none of them Fear & Greed — and the gauge panel still draws the index', async () => {
     const { fixture } = setup({ cards: { fearGreed: fearGreedFixture, dominance: null, btcVsTop: null, caps: [], capsDay: null, capsSource: 'coingecko', live: true } });
@@ -202,7 +220,7 @@ describe('MarketComponent shell (IB-088)', () => {
     expect(gauge).not.toBeNull();
     expect(gauge?.querySelector('svg.gauge')).not.toBeNull();
     expect(gauge?.textContent).toContain('26');
-  });
+  }, WHOLE_PAGE_MS);
 
   it('there is no Refresh button: the page refreshes itself', () => {
     const { fixture } = setup();

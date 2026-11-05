@@ -9,6 +9,7 @@ import caps24h from './fixtures/market-caps.24h.json';
 // the acceptance is a side-by-side with the mockup, so the data mirrors the mockup's.
 import insights from './fixtures/market-insights-charts.24h.json';
 import flows from '../../../libs/contracts/test/fixtures/flows.24h.json';
+import { gotoReady } from './ready';
 
 /**
  * IB-119 acceptance (market round 2 §3): every «Главное сейчас» card is two columns at 1240 — text
@@ -50,10 +51,11 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
     test('every card carries its chart, laid out per width, with axis, reference, span, value and legend', async ({ page }, info) => {
       await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
       await mockApi(page);
-      await page.goto('/market?p=24h');
-      await page.clock.runFor(2_000);
       const block = page.locator('app-insights-block');
       const items = block.locator('app-insight-card');
+      // IB-BUG-045: wait for the insights answer and the third card, not for 5 s after `load`
+      await gotoReady(page, '/market?p=24h', { served: ['/market/insights'], ready: items.nth(2) });
+      await page.clock.runFor(2_000);
       await expect(items).toHaveCount(3);
 
       for (let i = 0; i < 3; i++) {

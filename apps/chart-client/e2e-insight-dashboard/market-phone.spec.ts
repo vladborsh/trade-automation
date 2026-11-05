@@ -13,6 +13,7 @@ import positioning from './fixtures/market-positioning.24h.json';
 import normBlock from '../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
 // IB-091: the contract's example, built from one real probe of each source (2026-11-04)
 import flows from '../../../libs/contracts/test/fixtures/flows.24h.json';
+import { gotoReady } from './ready';
 
 /**
  * IB-088 acceptance (Architect dd91ada): the market page on a 390×844 phone — no page horizontal
@@ -71,15 +72,15 @@ async function openPositioning(page: Page, url = '/positioning?p=24h', setup?: (
   await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
   await mockApi(page);
   if (setup) await setup(page);
-  await page.goto(url);
+  await gotoReady(page, url, { served: ['/market/positioning'], ready: page.locator('app-pos-heat tbody tr').first() }); // IB-BUG-045
   await page.clock.runFor(2_000);
-  await expect(page.locator('app-pos-heat tbody tr').first()).toBeAttached();
 }
 async function openMarket(page: Page, setup?: (page: Page) => Promise<void>): Promise<void> {
   await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
   await mockApi(page);
   if (setup) await setup(page);
-  await page.goto('/market?p=24h');
+  // IB-BUG-045: both answers served and the insights cards drawn, then the clock — not 5 s after `load`
+  await gotoReady(page, '/market?p=24h', { served: ['/market/kpis', '/market/insights'], ready: page.locator('#insights .cards') });
   await page.clock.runFor(2_000);
   await expect(page.locator('app-kpi-strip')).toContainText('2.62');
   // IB-107: the card names the coin as a member does (§7.4 {base}), not the instrument id
@@ -799,9 +800,9 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
       await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
       await mockApi(page);
       await asRussianMember(page); // after mockApi: the later route answers first
-      await page.goto('/market?p=24h');
-      await page.clock.runFor(2_000);
       const card = page.locator('#positioning');
+      await gotoReady(page, '/market?p=24h', { served: ['/market/positioning'], ready: card.locator('app-pos-heat tbody tr').first() }); // IB-BUG-045
+      await page.clock.runFor(2_000);
       const help = card.locator('app-pos-heat-help');
       await expect(help.locator('summary')).toHaveText('Что значит подсветка?');
       expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
@@ -820,9 +821,8 @@ for (const [width, height] of [[1240, 900], [390, 844]] as const) {
       await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
       await mockApi(page);
       await asRussianMember(page); // after mockApi: the later route answers first
-      await page.goto('/positioning?p=24h');
+      await gotoReady(page, '/positioning?p=24h', { served: ['/market/positioning'], ready: page.locator('app-pos-heat tbody tr').first() }); // IB-BUG-045
       await page.clock.runFor(2_000);
-      await expect(page.locator('app-pos-heat tbody tr').first()).toBeAttached();
       const help = page.locator('app-positioning-page app-pos-heat-help');
       await expect(help.locator('summary')).toHaveText('Что значит подсветка и как читать таблицу');
       expect(await help.locator('details').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(true);
@@ -977,9 +977,9 @@ for (const width of [1240, 390, 320]) {
       await page.clock.install({ time: overview.asOf * 1000 + 30_000 });
       await mockApi(page);
       await page.route('**/api/web/auth/me', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ user: { ...MEMBER.user, lang } }) }));
-      await page.goto('/market?p=24h');
-      await page.clock.runFor(2_000);
       const card = page.locator('app-flows-block');
+      await gotoReady(page, '/market?p=24h', { served: ['/market/flows'], ready: card.locator('article.tile').first() }); // IB-BUG-045
+      await page.clock.runFor(2_000);
       await expect(card.locator('article.tile')).toHaveCount(4);
       await page.clock.runFor(100); // the mini-charts' re-render at their box width (see IB-BUG-041 above)
       const details = card.locator('app-flows-help details');

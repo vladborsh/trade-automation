@@ -64,6 +64,14 @@ const caps = (period: WebMarketPeriod): WebCapsResponse => ({
   source: { name: 'CoinGecko', url: 'https://www.coingecko.com' }, generatedAt: '2026-11-03T17:00:00Z',
 });
 
+/**
+ * IB-BUG-045 — a test here draws the WHOLE Market page under the real router (≈ 900 nodes, the
+ * route's lazy chunk loaded inside the test): 0.5–1.5 s CPU per render (2026-11-05, 3 runs), and
+ * 6–8 s wall at load 120–400 on 8 cores, past vitest's 5 s default. It cannot be lighter: the
+ * question is what the whole page has. The budget is per whole-page render (as market.component.spec).
+ */
+const WHOLE_PAGE_MS = 20_000;
+
 /** The Market page at `/market?p=24h` under the real routes, every block loaded from the contract fixtures. */
 async function marketPage(): Promise<HTMLElement> {
   const api = {
@@ -104,7 +112,7 @@ describe('IB-BUG-035 — every card link target exists', () => {
       if (t.kind === 'block' && page.querySelector(`[id="${t.id}"]`) === null) missing.push(`#${t.id} on /market`);
     }
     expect(missing).toEqual([]);
-  });
+  }, WHOLE_PAGE_MS);
 
   it('on the page, no card link is a bare #href; the fixture\'s R5 card opens /positioning with its period', async () => {
     const page = await marketPage();
@@ -113,7 +121,7 @@ describe('IB-BUG-035 — every card link target exists', () => {
     for (const a of links) expect(a.getAttribute('href')).toMatch(/^\//);
     const all = links.find((a) => a.textContent?.trim() === 'Все монеты →');
     expect(all?.getAttribute('href')).toBe(`/positioning?p=${PERIOD}`);
-  });
+  }, WHOLE_PAGE_MS);
 
   it('routeExists: the matcher is not the `**` fallback', () => {
     expect(routeExists(routes, ['/instrument', 'BTCUSDT'])).toBe(true);

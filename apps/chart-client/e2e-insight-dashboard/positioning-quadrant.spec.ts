@@ -1,5 +1,6 @@
 import { expect, test, type CDPSession, type Page, type TestInfo } from '@playwright/test';
 import positioning from './fixtures/market-positioning.24h.json';
+import { gotoReady } from './ready';
 
 /**
  * IB-137 (market round 3 §2) — the «Цена × OI» quadrant's views, zoom, pan and click, in a real
@@ -25,9 +26,8 @@ async function open(page: Page): Promise<void> {
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
     else await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'NOT_FOUND', message: path }) });
   });
-  await page.goto('/positioning?p=24h');
+  await gotoReady(page, '/positioning?p=24h', { served: ['/market/positioning'], ready: page.locator('app-pos-quadrant g.dot').first() }); // IB-BUG-045
   await page.clock.runFor(2_000);
-  await expect(page.locator('app-pos-quadrant g.dot').first()).toBeAttached();
 }
 
 async function shot(info: TestInfo, name: string, body: Buffer): Promise<void> {

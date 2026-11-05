@@ -5,6 +5,7 @@ import box7d from './fixtures/liquidation-episodes.box-7d.json';
 import box24h from './fixtures/liquidation-episodes.box-24h.json';
 import collecting from '../../../libs/contracts/test/fixtures/liquidation-episodes.collecting.json';
 import large from '../../../libs/contracts/test/fixtures/liquidations-large.24h.json';
+import { gotoReady } from './ready';
 
 /**
  * IB-134 acceptance (liquidation-episodes design E3–E6, E11): /liquidations as episodes at 1240 and
@@ -37,7 +38,7 @@ async function openLiquidations(page: Page, url: string, variant: Variant = 'box
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
     else await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'NOT_FOUND', message: path }) });
   });
-  await page.goto(url);
+  await gotoReady(page, url, { served: ['/liquidations/episodes'], ready: page.locator('app-liquidations-page h1') }); // IB-BUG-045
   await page.clock.runFor(2_000);
   await expect(page.locator('app-liquidations-page h1')).toBeVisible();
 }
