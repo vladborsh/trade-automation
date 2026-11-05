@@ -62,9 +62,6 @@ interface Baseline {
 
 const H = 3_600_000;
 const CONCURRENCY = 4;
-/** IB-107 (§7.3): a day of hourly points (R4, R6) and 7 days of 8-hourly settlements (R5) per coin. */
-const SPARK_HOURS = 24;
-const SPARK_SETTLEMENTS = 21;
 const BASELINES_KEY = 'positioning:baselines';
 
 export class PositioningService {
@@ -162,6 +159,7 @@ export class PositioningService {
     };
     const history = Array.from({ length: n }, (_, k) => at(k));
     const now = history[history.length - 1] as { upShare: number; altGapPct: number };
+    const btcBase = base.get(btc.id) as Baseline;
     return {
       upShare: now.upShare,
       altGapPct: now.altGapPct,
@@ -169,22 +167,19 @@ export class PositioningService {
       altGapSample: history.slice(0, -1).map((h) => h.altGapPct),
       days: (n + steps) / 24,
       coins: series.length,
+      // the series end at each coin's last closed hour; BTC's stands for them all
+      lastHourEnd: Math.floor(((btcBase.closeTimes.at(-1) ?? this.now() - H) + H) / 1000),
     };
   }
 
   /**
-   * IB-107 (market-page design D24, §7.3) — the tails of the hourly baselines this service already
-   * holds, for the insight cards' mini-charts: the last 24 OI and global account L/S points and the
-   * last 21 funding settlements per coin. The row's server-side twin: never on `WebPositioningRow`.
-   * Reads the same cached baselines as `positioning()` — no venue call of its own.
+   * IB-119 (R4 on 7d): a coin's hourly closes since `fromMs`, `{time: the bar's close (s), value}` —
+   * from the same cached baselines as `positioning()`, no venue call of its own.
    */
-  async sparkSeries(): Promise<Map<string, { oi: number[]; lsGlobal: number[]; funding: number[] }>> {
-    const base = await this.baselines();
-    return new Map([...base.entries()].map(([id, b]) => [id, {
-      oi: b.oiHourly.slice(-SPARK_HOURS),
-      lsGlobal: b.lsGlobalHourly.slice(-SPARK_HOURS),
-      funding: b.fundingSettled.slice(-SPARK_SETTLEMENTS),
-    }] as const));
+  async hourlyCloses(coin: string, fromMs: number): Promise<Array<{ time: number; value: number }>> {
+    const b = (await this.baselines()).get(coin);
+    if (!b) return [];
+    return b.closeTimes.flatMap((t, i) => (t + H >= fromMs ? [{ time: Math.floor((t + H) / 1000), value: b.closes[i] as number }] : []));
   }
 
   /**
@@ -194,7 +189,7 @@ export class PositioningService {
    *
    * `held: true` reads only what the cache already holds and never starts a build (null when nothing is
    * held): the KPI strip must not wait the baseline's 30-coin build, nor kick one off — the positioning
-   * table on the same page does. Without it, waits for the baselines like `sparkSeries()`.
+   * table on the same page does. Without it, waits for the baselines.
    */
   async fundingSettlements(options: { held: true }): Promise<Map<string, WebFundingPoint[]> | null>;
   async fundingSettlements(options?: { held?: false }): Promise<Map<string, WebFundingPoint[]>>;
@@ -273,6 +268,8 @@ export interface Breadth {
   altGapSample: number[];
   days: number;
   coins: number;
+  /** IB-119: when the hour "now" stands for ended (s). */
+  lastHourEnd: number;
 }
 
 interface Current {

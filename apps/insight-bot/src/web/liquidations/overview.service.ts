@@ -105,6 +105,25 @@ export class LiquidationsOverviewService {
     return { keys: keys.crypto, aliases: this.classifier.aliases() };
   }
 
+  /**
+   * IB-119 (R3's chart): market-wide CRYPTO liquidation USD per minute and side over [fromMs, toMs) —
+   * the cascade's population (D6, the same keys and aliases as every Market total), one indexed read of
+   * our tape. Empty minutes are absent; the caller fills them with 0.
+   */
+  async minuteSides(fromMs: number, toMs: number): Promise<Array<{ time: number; long: number; short: number }>> {
+    const db = this.db;
+    if (!db) throw new Error('no database');
+    const { keys, aliases } = await this.cryptoScope(this.now());
+    const rows = await repo.alignedBuckets(db, { windowSec: 60, fromMs, toMs, keys, aliases });
+    const by = new Map<number, { time: number; long: number; short: number }>();
+    for (const r of rows) {
+      const m = by.get(r.bucketMs) ?? { time: r.bucketMs / 1000, long: 0, short: 0 };
+      m[r.side] += r.usd;
+      by.set(r.bucketMs, m);
+    }
+    return [...by.values()].sort((a, b) => a.time - b.time);
+  }
+
   /** IB-BUG-025: the coin of an unmapped row's `venue:symbol` (Binance base asset when known). */
   private coinOfKey(venueKey: string | null): string {
     if (venueKey === null) return 'unknown';

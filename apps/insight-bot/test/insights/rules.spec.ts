@@ -20,12 +20,11 @@ function snapshot(over: Partial<InsightSnapshot> = {}): InsightSnapshot {
       hourly: days(30, true), hourlyDays: 30, venues: ['binance', 'bybit', 'okx'], fromMs: NOW - 30 * 86_400_000,
       coins: new Map([['BTCUSDT', { usd: 300_000, sample: days(30).map((x) => x * 2_000), days: 30 }]]),
       large: [],
-      // IB-107: 24 hourly bars, the two sides different so a spark can say which side it drew
+      // IB-107: 24 hourly bars, the two sides different so a chart can say which side it drew
       bars: Array.from({ length: 24 }, (_, i) => ({ time: NOW / 1000 - (23 - i) * 3_600, long: 1_000 + i, short: 5_000 + i })),
     },
     positioning: [row('BTCUSDT', {})],
-    positioningSeries: null,
-    breadth: { upShare: 0.5, altGapPct: 0.1, upShareSample: Array.from({ length: 696 }, (_, i) => 0.3 + (i % 5) * 0.1), altGapSample: Array.from({ length: 696 }, (_, i) => (i % 7) - 3), days: 30, coins: 30 },
+    breadth: { upShare: 0.5, altGapPct: 0.1, upShareSample: Array.from({ length: 696 }, (_, i) => 0.3 + (i % 5) * 0.1), altGapSample: Array.from({ length: 696 }, (_, i) => (i % 7) - 3), days: 30, coins: 30, lastHourEnd: NOW / 1000 },
     fng: 50,
     flows: null,
     oiDivergence: null,
@@ -248,94 +247,6 @@ describe('IB-BUG-028: a block whose rules could not look says so, and names the 
 });
 
 
-/**
- * IB-107 (design D24, §7.3) — every rule's spark: non-null when it speaks, drawn from ITS OWN series
- * (each fixture holds a neighbouring series that differs, so a rule reading the wrong one fails),
- * the §7.3 length and highlight, and null when the series is not in hand. No rule fetches for it.
- */
-describe('IB-107 sparks: each rule draws its mini-chart from the series it already read', () => {
-  const ramp = (n: number, from: number, step = 1) => Array.from({ length: n }, (_, i) => from + i * step);
-  const series = (oi: number[], lsGlobal: number[], funding: number[]) => new Map([['SOLUSDT', { oi, lsGlobal, funding }], ['ETHUSDT', { oi, lsGlobal, funding }]]);
-
-  it('R1: the named side\'s bars, last 24, now lit; one bar (1h) is no chart', () => {
-    const big = { ...snapshot().liquidations!, short: { usd: 5_000, sample: days(30) } };
-    const out = shown(R1.run(snapshot({ liquidations: big })));
-    expect(out?.params['side']).toBe('short');
-    expect(out?.spark).toEqual({ values: ramp(24, 5_000), highlight: 23 });
-    const one = shown(R1.run(snapshot({ liquidations: { ...big, bars: big.bars.slice(-1) } })));
-    expect(one).not.toBeNull();
-    expect(one?.spark).toBeNull();
-  });
-
-  it('R2: the coin\'s own sample, last 14 windows, then the current one, lit', () => {
-    const sample = ramp(30, 10_000, 1_000);
-    const out = shown(R2.run(snapshot({ liquidations: { ...snapshot().liquidations!, coins: new Map([['SOLUSDT', { usd: 2_000_000, sample, days: 30 }]]) } })));
-    expect(out?.spark).toEqual({ values: [...sample.slice(-14), 2_000_000], highlight: 14 });
-  });
-
-  it('R3: the market\'s bars of the cascade\'s side, the cascade\'s hour lit (not "now")', () => {
-    const ev = (minute: number, usd: number) => ({
-      time: NOW / 1000 - 5 * 3_600 + minute * 60, symbol: 'ETHUSDT', base: 'ETH', side: 'long' as const, usd, price: 1, venue: 'binance',
-      xMedian: null, seriesId: 'long-1', seriesCount: 4, seriesSpanSec: 540,
-    });
-    const out = shown(R3.run(snapshot({ liquidations: { ...snapshot().liquidations!, large: [ev(0, 1e6), ev(3, 9e5), ev(6, 8e5), ev(9, 4e5)] } })));
-    expect(out).not.toBeNull();
-    expect(out?.spark).toEqual({ values: ramp(24, 1_000), highlight: 18 }); // bar 18 starts 5 h before NOW
-  });
-
-  it('R4: the coin\'s hourly OI, last 24, nothing lit (points ≤ 1 h old; the title\'s figure is current)', () => {
-    const r = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
-    const out = shown(R4.run(snapshot({ positioning: [r], positioningSeries: series(ramp(30, 100), ramp(30, 1.5, 0.01), ramp(30, 0.0001, 0.00001)) })));
-    expect(out?.spark).toEqual({ values: ramp(24, 106), highlight: null });
-    expect(shown(R4.run(snapshot({ positioning: [r], positioningSeries: null })))?.spark).toBeNull();
-  });
-
-  it('R5: the named coin\'s last 21 funding settlements, last lit', () => {
-    const rows = [row('SOLUSDT', { funding: c(0.001, 0.97, 90) }), row('C', {})];
-    const funding = ramp(90, 0.0001, 0.00001);
-    const out = shown(R5.run(snapshot({ positioning: rows, positioningSeries: series(ramp(30, 100), ramp(30, 1.5, 0.01), funding) })));
-    expect(out?.spark).toEqual({ values: funding.slice(-21), highlight: 20 });
-  });
-
-  it('R6: the coin\'s global ACCOUNT L/S, last 24 hourly points', () => {
-    const lsG = ramp(30, 1.5, 0.01);
-    const out = shown(R6.run(snapshot({ positioning: [row('ETHUSDT', { lsG: c(2.6, 0.95, 720), lsT: c(0.7, 0.92, 720) })], positioningSeries: series(ramp(30, 100), lsG, ramp(30, 0.0001)) })));
-    expect(out?.spark).toEqual({ values: lsG.slice(-24), highlight: null });
-  });
-
-  it('R7: the series that made it speak — share up (in %), or the signed alt gap — with now lit', () => {
-    const up = shown(R7.run(snapshot({ fng: 20, breadth: { ...snapshot().breadth!, upShare: 0.05 } })));
-    expect(up?.spark?.values).toHaveLength(24);
-    expect(up?.spark?.values.at(-1)).toBeCloseTo(5);
-    expect(up?.spark?.values.slice(0, -1)).toEqual(snapshot().breadth!.upShareSample.slice(-23).map((x) => x * 100));
-    expect(up?.spark?.highlight).toBe(23);
-    const gap = shown(R7.run(snapshot({ breadth: { ...snapshot().breadth!, altGapPct: -9 } })));
-    expect(gap?.spark).toEqual({ values: [...snapshot().breadth!.altGapSample.slice(-23), -9], highlight: 23 });
-  });
-
-  it('R8 / R9: the tile\'s own series, last 30 points, last lit', () => {
-    const r8 = shown(R8.run(snapshot({ flows: flows({ dvol: { change: ch(6.5, 0.97) } }) })));
-    expect(r8?.spark).toEqual({ values: flowsExample.dvol.series.slice(-30).map((p) => p.value), highlight: flowsExample.dvol.series.slice(-30).length - 1 });
-    const r9 = shown(R9.run(snapshot({ flows: flows({ stablecoins: { changeUsd: ch(-4e9, 0.98), changePct: -1.4, changeDays: 1 } }) })));
-    expect(r9?.spark).toEqual({ values: flowsExample.stablecoins.series.slice(-30).map((p) => p.value), highlight: 29 });
-  });
-
-  it('R10: the last hour\'s minutes as 30 two-minute means (signed), last lit', () => {
-    const t0 = 1_793_758_000;
-    const minutes = Array.from({ length: 75 }, (_, i) => ({ time: t0 + i * 60, value: i < 15 ? 9 : -(i - 15) }));
-    const out = shown(R10.run(snapshot({ flows: flows({ coinbasePremium: { premiumPct: ch(-0.18, 0.96), minutes: 60, sameSignMinutes: 58, unavailable: null, series: minutes } }) })));
-    // the 15 older minutes (value 9) are outside the last hour: the means are of −0…−59, pairwise
-    expect(out?.spark).toEqual({ values: Array.from({ length: 30 }, (_, k) => -(2 * k + 0.5)), highlight: 29 });
-  });
-
-  it('no series in hand → null, and the statement still speaks', () => {
-    const r = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
-    const empty = series([], [], []);
-    expect(shown(R4.run(snapshot({ positioning: [r], positioningSeries: empty })))).toMatchObject({ key: 'insight.oi_vs_price', spark: null });
-    expect(shown(R8.run(snapshot({ flows: flows({ dvol: { change: ch(6.5, 0.97), series: [] } }) })))).toMatchObject({ key: 'insight.dvol_spike', spark: null });
-  });
-});
-
 describe('R11 the OI divergence alert (IB-113, V16)', () => {
   const alert = {
     id: 9, source: 'live' as const, symbol: 'BTCUSDT', tf: '1h' as const, direction: 'bullish' as const,
@@ -344,13 +255,13 @@ describe('R11 the OI divergence alert (IB-113, V16)', () => {
     runOf: null, runLength: 2, params: { perTf: { '15m': { n: 6, k: 3, w: 96 }, '1h': { n: 6, k: 3, w: 120 }, '4h': { n: 6, k: 3, w: 90 } }, atrMult: 0.25, oiMedianMult: 0.5, priceLineTolAtrMult: 0, oiLineTolMedianMult: 0 }, // a round-1 row as read (V20)
     confirmedAt: NOW / 1000 - 3_600, firedAt: null, late: false, recipients: 0, priceAtFire: null, price4h: null, price24h: null, outcomeAt: null,
   };
-  it('shows the journal\'s alert: B against A, an EVENT (rarity 1, ranks first), the chart at B, the OI series as its spark', () => {
-    const out = R11.run(snapshot({ oiDivergence: { alert, oiSeries: [1_000, 990, 1_010, 1_032] } })) as WebInsightStatement;
+  it('shows the journal\'s alert: B against A, an EVENT (rarity 1, ranks first), the chart at B; its chart is built after ranking (IB-119)', () => {
+    const out = R11.run(snapshot({ oiDivergence: { alert } })) as WebInsightStatement;
     expect(out).toMatchObject({ ruleId: 'R11', block: 'positioning', key: 'insight.oi_divergence', rarity: 1, link: { route: 'instrument', symbol: 'BTCUSDT', timeSec: alert.b.time } });
     expect(out.params).toMatchObject({ symbol: 'BTCUSDT', tf: '1h', direction: 'bullish', runLength: 2 });
     expect(out.params['pricePct'] as number).toBeCloseTo(-1.8, 6);
     expect(out.params['oiPct'] as number).toBeCloseTo(3.2, 6);
-    expect(out.spark).toEqual({ values: [1_000, 990, 1_010, 1_032], highlight: 3 });
+    expect(out.chart).toBeNull();
     expect(shown(out)).not.toBeNull(); // the 0.90 gate lets an event through
   });
   it('no alert in the window → silent (null), not a refusal: the block\'s other rules decide its line', () => {
@@ -360,13 +271,13 @@ describe('R11 the OI divergence alert (IB-113, V16)', () => {
     const rows = [row('TRUMPUSDT', { funding: c(-0.0004, 1, 90) }), row('A', { funding: c(0.002, 1, 90) }), row('B', { funding: c(0.003, 1, 90) })];
     // the live numbers: OI +0.2 % (magnitude 0.2) against three coins (magnitude 3) — magnitude alone would put R5 first
     const small = { ...alert, b: { ...alert.b, oi: 1_002 } };
-    const out = runInsights(RULES, snapshot({ positioning: rows, oiDivergence: { alert: small, oiSeries: [1, 2] } }));
+    const out = runInsights(RULES, snapshot({ positioning: rows, oiDivergence: { alert: small } }));
     expect(out.top.map((x) => x.ruleId).slice(0, 2)).toEqual(['R11', 'R5']);
     expect(out.blocks.find((b) => b.block === 'positioning')?.statement?.ruleId).toBe('R11');
   });
   it('ranks first in its block over a rare-but-not-certain statement', () => {
     const r4row = { ...row('SOLUSDT', { oi: c(26, 0.99), price: c(0.1, 0.2) }), quadrant: 'new_longs' as const };
-    const out = runInsights(RULES, snapshot({ positioning: [r4row], oiDivergence: { alert, oiSeries: [1, 2] } }));
+    const out = runInsights(RULES, snapshot({ positioning: [r4row], oiDivergence: { alert } }));
     expect(out.blocks.find((b) => b.block === 'positioning')?.statement?.ruleId).toBe('R11');
     expect(out.top[0]?.ruleId).toBe('R11');
   });

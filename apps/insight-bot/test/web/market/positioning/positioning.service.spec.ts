@@ -86,31 +86,26 @@ describe('PositioningService', () => {
   });
 });
 
-describe('IB-107: sparkSeries — the baselines\' tails, from the same cached read', () => {
-  it('per coin: last 24 OI and global L/S points, last 21 settlements; no venue call beyond positioning()\'s', async () => {
+describe('IB-119: hourlyCloses (R4 on 7d) and breadth\'s last hour (R7), from the same cached read', () => {
+  it('closes since a moment, stamped at each bar\'s CLOSE; no venue call beyond positioning()\'s', async () => {
     const f = fakes(30 * 24);
-    const calls = { oi: 0, ls: 0, funding: 0 };
-    const counted = {
-      ...f,
-      oiLs: {
-        openInterest: async (...a: Parameters<typeof f.oiLs.openInterest>) => { calls.oi++; return f.oiLs.openInterest(...a); },
-        longShort: async (...a: Parameters<typeof f.oiLs.longShort>) => { calls.ls++; return f.oiLs.longShort(...a); },
-      },
-      funding: { binanceSettledHistory: async () => { calls.funding++; return Array.from({ length: 90 }, (_, i) => ({ time: i, rate: i / 1e6 })); } },
-    };
+    const calls = { candles: 0 };
+    const counted = { ...f, candles: { candles: async (...a: Parameters<typeof f.candles.candles>) => { calls.candles++; return f.candles.candles(...a); } } };
+    // breadth needs three coins
     const svc = new PositioningService({
-      symbols: SYMBOLS as never, cache: new TtlCache({ now: () => NOW }), summary: counted.summary as never, candles: counted.candles as never,
-      funding: counted.funding as never, oiLs: counted.oiLs as never, liquidations: null, now: () => NOW,
+      symbols: [...SYMBOLS, sym('SOLUSDT', 'SOL', 'crypto')] as never, cache: new TtlCache({ now: () => NOW }), summary: counted.summary as never,
+      candles: counted.candles as never, funding: counted.funding as never, oiLs: counted.oiLs as never, liquidations: null, now: () => NOW,
     });
     await svc.positioning('24h');
-    const before = { ...calls };
-    const tails = await svc.sparkSeries();
-    expect(calls).toEqual(before); // the cached baselines, not a read of its own
-    const btc = tails.get('BTCUSDT');
-    expect(btc?.oi).toHaveLength(24);
-    expect(btc?.oi.at(-1)).toBe(1260); // the OI jump is the newest point
-    expect(btc?.lsGlobal).toEqual(Array.from({ length: 24 }, () => 1.5));
-    expect(btc?.funding).toEqual(Array.from({ length: 21 }, (_, i) => (69 + i) / 1e6));
+    const before = calls.candles;
+    const closes = await svc.hourlyCloses('BTCUSDT', NOW - 7 * 86_400_000);
+    expect(calls.candles).toBe(before); // the cached baselines, not a read of its own
+    const lastClose = Date.UTC(2026, 10, 3, 12) / 1000; // NOW is 12:30: the 11:00 bar closed at 12:00
+    expect(closes.at(-1)?.time).toBe(lastClose);
+    expect(closes[0]?.time).toBeGreaterThanOrEqual((NOW - 7 * 86_400_000) / 1000);
+    expect(closes).toHaveLength(168);
+    expect(await svc.hourlyCloses('NOPEUSDT', 0)).toEqual([]);
+    expect((await svc.breadth('24h'))?.lastHourEnd).toBe(lastClose);
   });
 });
 

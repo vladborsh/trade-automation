@@ -37,7 +37,7 @@ maybeDescribe('IB-086 liquidation rules on the crypto-only read path', () => {
   const r1 = async () => {
     const svc = new LiquidationsOverviewService(db, stubClassifier(universe), () => NOW);
     const m = await svc.marketSamples('24h');
-    const snap = { period: '24h', nowMs: NOW, liquidations: { ...m, coins: new Map(), large: [], bars: [] }, positioning: null, positioningSeries: null, oiDivergence: null, breadth: null, fng: null, flows: null } as InsightSnapshot;
+    const snap = { period: '24h', nowMs: NOW, liquidations: { ...m, coins: new Map(), large: [], bars: [] }, positioning: null, oiDivergence: null, breadth: null, fng: null, flows: null } as InsightSnapshot;
     const out = R1.run(snap);
     return out && !isRefusal(out) && out.rarity >= 0.9 ? out : null;
   };
@@ -74,5 +74,14 @@ maybeDescribe('IB-086 liquidation rules on the crypto-only read path', () => {
   it('the same spike on BTC: R1 speaks', async () => {
     await liq().write([{ venue: 'bybit', symbol: 'BTCUSDT', ts: new Date(NOW - 2 * H + 1), side: 'long', price: 1, qty: 50_000_000, notional: 50_000_000, source: 'ws' }]);
     expect(await r1()).toMatchObject({ key: 'insight.liq_surge', params: { side: 'long' } });
+  });
+
+  it('IB-119 (R3\'s chart): minute sums per side, crypto only — the gold in the same minute is not counted', async () => {
+    const svc = new LiquidationsOverviewService(db, stubClassifier(universe), () => NOW);
+    const m0 = (NOW - 2 * H) / 1000;
+    expect(await svc.minuteSides(NOW - 2 * H - 120_000, NOW - 2 * H + 180_000)).toEqual([
+      { time: m0, long: 50_000_000, short: 0 },
+      { time: m0 + 60, long: 1_000, short: 0 },
+    ]);
   });
 });

@@ -1,6 +1,5 @@
 import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow, type WebVenueKey } from '@trade-automation/contracts';
 import { levelRarity, rarity } from './rarity';
-import { bucketMeans, sparkOf, sparkWithNow } from './spark';
 import { fngBand } from './sentiment';
 import { LIQ_RULE_MIN_DAYS, PREMIUM_SUSTAINED_MIN, R2_MIN_USD, RARITY_SHOW, VENUE_RULE_MIN_DAYS } from './thresholds';
 import type { InsightSnapshot, Refusal, Rule } from './types';
@@ -52,15 +51,6 @@ function cellBasis(s: InsightSnapshot, sample: number): WebInsightBasis {
 
 const refuse = (refused: Refusal['refused'], basis: WebInsightBasis | null = null): Refusal => ({ refused, basis });
 
-/**
- * IB-107 (design D24, §7.3) — each statement's mini-chart, from the series the rule itself read:
- * the tail lengths of the table in §7.3. "Now" (the last value) is highlighted unless a rule names
- * another bar (R3's cascade hour) or none (R4/R6: hourly points up to an hour old, the title's figure
- * is current).
- */
-const SPARK = { bars: 24, coinWindows: 14, hours: 24, settlements: 21, flows: 30, premiumWindowSec: 3_600, premiumStepSec: 120 } as const;
-const lastLit = (xs: readonly number[], max: number) => sparkOf(xs.slice(-max), Math.min(xs.length, max) - 1, max);
-
 export const R1: Rule = {
   id: 'R1', block: 'liquidations', sources: ['tape'],
   run(s) {
@@ -78,7 +68,7 @@ export const R1: Rule = {
       ruleId: 'R1', block: 'liquidations', key: 'insight.liq_surge',
       params: { side: top.side, usd: top.usd, ratio: top.ratio },
       rarity: top.r, magnitude: top.ratio ?? top.usd, basis: liqBasis(s, l[top.side].sample), link: { anchor: 'liquidations' },
-      spark: lastLit(l.bars.map((b) => b[top.side]), SPARK.bars),
+      chart: null,
     };
   },
 };
@@ -102,7 +92,7 @@ export const R2: Rule = {
       params: { symbol: best.symbol, usd: best.c.usd, ratio: m && m > 0 ? best.c.usd / m : null },
       rarity: best.r, magnitude: best.c.usd, basis: liqBasis(s, best.c.sample),
       link: { route: 'instrument', symbol: best.symbol, timeSec: null },
-      spark: sparkWithNow(best.c.sample, best.c.usd, SPARK.coinWindows + 1),
+      chart: null,
     };
   },
 };
@@ -130,17 +120,10 @@ export const R3: Rule = {
       params: { side: top.side, count: top.count, minutes: Math.max(1, Math.ceil(top.spanSec / 60)), usd: top.usd, symbol: top.symbol },
       rarity: rarity(top.usd, l.hourly) ?? 0, magnitude: top.usd, basis: liqBasis(s, l.hourly),
       link: { route: 'instrument', symbol: top.symbol, timeSec: top.start },
-      spark: cascadeSpark(l.bars, top.side, top.start),
+      chart: null,
     };
   },
 };
-
-/** R3: the market's bars of the cascade's side over the period, the cascade's own bar lit. */
-function cascadeSpark(bars: readonly { time: number; long: number; short: number }[], side: 'long' | 'short', startSec: number) {
-  let at: number | null = null;
-  bars.forEach((b, i) => { if (b.time <= startSec) at = i; });
-  return sparkOf(bars.map((b) => b[side]), at);
-}
 
 /** The positioning rules refuse together when no row has the cell measured (under 20 days, or 7d). */
 function measuredRows(s: InsightSnapshot, has: (r: WebPositioningRow) => boolean): WebPositioningRow[] | Refusal {
@@ -169,7 +152,7 @@ export const R4: Rule = {
       // IB-BUG-023: a change over the period has no single moment — it links to the period's start
       basis: cellBasis(s, best.oiChangePct.sample),
       link: { route: 'instrument', symbol: best.symbol, timeSec: Math.floor(s.nowMs / 1000) - WEB_MARKET_PERIOD_SECONDS[s.period] },
-      spark: sparkOf((s.positioningSeries?.get(best.symbol)?.oi ?? []).slice(-SPARK.hours), null),
+      chart: null,
     };
   },
 };
@@ -188,7 +171,7 @@ export const R5: Rule = {
       params: { count: extreme.length, total: rows.length, symbol: top.symbol, rate: top.fundingRate.value },
       rarity: top.fundingRate.rarity as number, magnitude: extreme.length,
       basis: cellBasis(s, top.fundingRate.sample), link: { anchor: 'positioning' },
-      spark: lastLit(s.positioningSeries?.get(top.symbol)?.funding ?? [], SPARK.settlements),
+      chart: null,
     };
   },
 };
@@ -209,7 +192,7 @@ export const R6: Rule = {
       params: { symbol: r.symbol, global: r.lsGlobal.value, top: r.lsTopPosition.value },
       rarity: rar, magnitude: Math.abs(Math.log((r.lsGlobal.value as number) / (r.lsTopPosition.value as number))),
       basis: cellBasis(s, Math.min(r.lsGlobal.sample, r.lsTopPosition.sample)), link: { route: 'instrument', symbol: r.symbol, timeSec: null },
-      spark: sparkOf((s.positioningSeries?.get(r.symbol)?.lsGlobal ?? []).slice(-SPARK.hours), null),
+      chart: null,
     };
   },
 };
@@ -227,10 +210,7 @@ export const R7: Rule = {
       ruleId: 'R7', block: 'sentiment', key: 'insight.breadth',
       params: { upPct: Math.round(b.upShare * 100), altGapPct: Math.round(b.altGapPct * 100) / 100, fngBand: s.fng === null ? null : fngBand(s.fng) },
       rarity: Math.max(rUp, rGap), magnitude: Math.abs(b.altGapPct), basis, link: { anchor: 'sentiment' },
-      // the series that made it speak: the alt gap (signed) when it is the rarer, else the share up
-      spark: rGap >= rUp
-        ? sparkWithNow(b.altGapSample, b.altGapPct, SPARK.hours)
-        : sparkWithNow(b.upShareSample.map((x) => x * 100), b.upShare * 100, SPARK.hours),
+      chart: null,
     };
   },
 };
@@ -255,7 +235,7 @@ export const R8: Rule = {
       ruleId: 'R8', block: 'flows', key: 'insight.dvol_spike',
       params: { value: t.value, change: t.change.value },
       rarity: t.change.rarity, magnitude: t.change.value, basis, link: { anchor: 'flows' },
-      spark: lastLit(t.series.map((p) => p.value), SPARK.flows),
+      chart: null,
     };
   },
 };
@@ -273,7 +253,7 @@ export const R9: Rule = {
       ruleId: 'R9', block: 'flows', key: 'insight.stablecoin_supply',
       params: { usd: t.changeUsd.value, pct: t.changePct, days: t.changeDays },
       rarity: t.changeUsd.rarity, magnitude: Math.abs(t.changeUsd.value), basis, link: { anchor: 'flows' },
-      spark: lastLit(t.series.map((p) => p.value), SPARK.flows),
+      chart: null,
     };
   },
 };
@@ -296,8 +276,7 @@ export const R10: Rule = {
       ruleId: 'R10', block: 'flows', key: 'insight.coinbase_premium',
       params: { pct: t.premiumPct.value, minutes: t.sameSignMinutes },
       rarity: t.premiumPct.rarity, magnitude: Math.abs(t.premiumPct.value), basis, link: { anchor: 'flows' },
-      // 60 minutes → 30 two-minute means (signed)
-      spark: lastLit(bucketMeans(t.series, SPARK.premiumWindowSec, SPARK.premiumStepSec), SPARK.flows),
+      chart: null,
     };
   },
 };
@@ -323,7 +302,7 @@ export const R11: Rule = {
       rarity: 1, magnitude: Math.abs(oiPct),
       basis: { window: '24h', venues: ['binance'], sampleWindows: 0, observedWindows: 0, from: null },
       link: { route: 'instrument', symbol: a.symbol, timeSec: a.b.time },
-      spark: lastLit(d.oiSeries, SPARK.flows),
+      chart: null,
     };
   },
 };

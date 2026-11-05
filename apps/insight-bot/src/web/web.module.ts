@@ -17,9 +17,7 @@ import { WebMembersController } from './members/members.controller';
 import { OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
 import { PgOiAlertStore, PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
 import { AlertsAdmin, cachedExchangeInfo } from '../alerts/oi-divergence/alerts-admin';
-import { cardOiSeries } from '../alerts/oi-divergence/card-series';
 import { OiWindowReader } from '../insights/divergence/oi-window.reader';
-import { OI_DIVERGENCE_TF_SEC } from '@trade-automation/contracts';
 import { ALERTS_ADMIN, WebAlertsAdminController } from './admin/alerts.controller';
 import { UsersModule } from '../users/users.module';
 import { AssetClassifier } from './liquidations/asset-classes';
@@ -215,10 +213,12 @@ export class WebModule {
         {
           // IB-086 (D1): the insight engine lives in src/insights/; it reads these services through ports
           provide: InsightsService,
-          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService, FlowsService, DB],
+          inject: [TtlCache, LiquidationsOverviewService, PositioningService, MarketCardsService, FlowsService, DB, AppConfigService, CandlesService, OiLsService],
           useFactory: (cache: TtlCache, liquidations: LiquidationsOverviewService, positioning: PositioningService, cards: MarketCardsService,
-            flows: FlowsService, db: Db | null) =>
-            new InsightsService({
+            flows: FlowsService, db: Db | null, config: AppConfigService, candles: CandlesService, oiLs: OiLsService) => {
+            // IB-119: a coin id → its Binance perp; an alert's symbol (R11) is one already and passes through
+            const perp = (coin: string) => config.symbols.find((x) => x.id === coin)?.binance_perp ?? coin;
+            return new InsightsService({
               cache,
               ports: {
                 liquidations: async (period) => {
@@ -226,28 +226,39 @@ export class WebModule {
                     liquidations.marketSamples(period), liquidations.coinPeriodSamples(period),
                     liquidations.overview({ topN: 20, feedMinUsd: 100_000, feedLimit: 1, period }),
                   ]);
-                  // IB-107: the mirrored chart's bars from the same call — R1/R3's sparks, no read of their own
+                  // IB-107: the mirrored chart's bars from the same call — R1's chart (IB-119), no read of its own
                   const bars = overview.block.hourly.buckets.map((x) => ({ time: x.time, long: x.long, short: x.short }));
                   return { ...m, coins, large: overview.block.large, bars };
                 },
                 positioning: async (period) => (await positioning.positioning(period)).rows,
-                positioningSeries: () => positioning.sparkSeries(),
                 // IB-113 (TL): R11 owner-first — members see it only while the admin page's members_visible is on
                 oiAlertsMembersVisible: async () => (db ? new PgOiAlertsVisibility(db).membersVisible() : false),
                 // IB-113 (V16): the journal's newest on-time alert of 24 h, its OI per bar from our DB — no venue call
                 oiDivergence: async (nowMs) => {
                   if (!db) return null;
                   const alert = await new PgOiAlertStore(db).latestOnTime(Math.floor(nowMs / 1000));
-                  if (!alert) return null;
-                  const tfSec = OI_DIVERGENCE_TF_SEC[alert.tf];
-                  const { oi5m } = await new OiWindowReader(db).read(alert.symbol, alert.a.time, alert.b.time + tfSec);
-                  return { alert, oiSeries: cardOiSeries(alert, oi5m) };
+                  return alert ? { alert } : null;
                 },
                 breadth: (period) => positioning.breadth(period),
                 fng: async () => (await cards.cards([])).fearGreed?.now.value ?? null,
                 flows: (period) => flows.flows(period),
+                // IB-119 (round 2 §3): the charts' reads, for the displayed statements only (costs in insight-charts.ts)
+                charts: {
+                  fundingSettlements: () => positioning.fundingSettlements(),
+                  hourlyCloses: (coin, fromMs) => positioning.hourlyCloses(coin, fromMs),
+                  closedKlines: (coin, tf, fromMs, limit) => candles.closedKlines(perp(coin), tf, fromMs, limit),
+                  openInterest: async (coin, fromMs, toMs, minPeriodMs) =>
+                    (await oiLs.openInterest(perp(coin), fromMs, toMs, minPeriodMs)).points.map((p) => ({ time: p.time, value: p.value })),
+                  longShort: async (coin, kind, fromMs, toMs) => (await oiLs.longShort(perp(coin), kind, fromMs, toMs)).points,
+                  liquidationMinutes: (fromMs, toMs) => liquidations.minuteSides(fromMs, toMs),
+                  oiReadings: async (coin, fromSec, toSec) => {
+                    if (!db) return [];
+                    return (await new OiWindowReader(db).read(perp(coin), fromSec, toSec)).oi5m;
+                  },
+                },
               },
-            }),
+            });
+          },
         },
         {
           // IB-112 (V17): the alerts admin page; adding a coin checks Binance exchangeInfo (cached 10 min, weight 1)

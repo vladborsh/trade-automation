@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { WebInsightsResponse, WebMarketPeriod } from '@trade-automation/contracts';
+import { attachCharts, type ChartReads } from './charts/insight-charts';
 import { runInsights } from './engine';
 import { RULES } from './rules';
 import { INSIGHTS_CACHE_MS } from './thresholds';
@@ -15,8 +16,6 @@ import type { InsightSnapshot } from './types';
 export interface InsightPorts {
   liquidations?: (period: WebMarketPeriod) => Promise<InsightSnapshot['liquidations']>;
   positioning?: (period: WebMarketPeriod) => Promise<InsightSnapshot['positioning']>;
-  /** IB-107 (D24): the positioning baselines' tails for R4/R5/R6's sparks — the same cached read. */
-  positioningSeries?: () => Promise<InsightSnapshot['positioningSeries']>;
   /** IB-113 (V16): the OI divergence journal's newest on-time alert of the last 24 h, with its OI series. */
   oiDivergence?: (nowMs: number) => Promise<InsightSnapshot['oiDivergence']>;
   /** IB-113 (V16, TL): `alert_settings.members_visible` — whether a non-admin sees R11. Absent or failed → hidden. */
@@ -25,6 +24,8 @@ export interface InsightPorts {
   fng?: () => Promise<number | null>;
   /** IB-091: «Деривативы и потоки» for R8–R10. */
   flows?: (period: WebMarketPeriod) => Promise<InsightSnapshot['flows']>;
+  /** IB-119 (round 2 §3): the reads behind the charts of the DISPLAYED statements. Absent: every chart null. */
+  charts?: ChartReads;
 }
 
 export interface InsightsServiceOptions {
@@ -52,7 +53,10 @@ export class InsightsService {
     const { snapshot, membersVisible } = await this.snapshot(period);
     const sees = viewer.admin || membersVisible;
     const view: InsightSnapshot = sees ? snapshot : { ...snapshot, oiDivergence: null };
-    return { ...runInsights(RULES, view), asOf: Math.floor(snapshot.nowMs / 1000) };
+    // IB-119: charts after ranking, for the shown statements only — their reads are cached per subject
+    const ranked = await attachCharts(runInsights(RULES, view), view, this.options.ports.charts ?? null, this.options.cache,
+      (rule, error) => this.logger.warn(`insights chart ${rule}: ${error.message}`));
+    return { ...ranked, asOf: Math.floor(snapshot.nowMs / 1000) };
   }
 
   private snapshot(period: WebMarketPeriod): Promise<{ snapshot: InsightSnapshot; membersVisible: boolean }> {
@@ -68,17 +72,16 @@ export class InsightsService {
         }
       };
       const p = this.options.ports;
-      const [liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence, membersVisible] = await Promise.all([
+      const [liquidations, positioning, breadth, fng, flows, oiDivergence, membersVisible] = await Promise.all([
         soft('liquidations', p.liquidations && (() => (p.liquidations as NonNullable<InsightPorts['liquidations']>)(period))),
         soft('positioning', p.positioning && (() => (p.positioning as NonNullable<InsightPorts['positioning']>)(period))),
-        soft('positioning series', p.positioningSeries),
         soft('breadth', p.breadth && (() => (p.breadth as NonNullable<InsightPorts['breadth']>)(period))),
         soft('fng', p.fng),
         soft('flows', p.flows && (() => (p.flows as NonNullable<InsightPorts['flows']>)(period))),
         soft('oi divergence', p.oiDivergence && (() => (p.oiDivergence as NonNullable<InsightPorts['oiDivergence']>)(nowMs))),
         soft('oi alerts visibility', p.oiAlertsMembersVisible),
       ]);
-      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, positioningSeries, breadth, fng, flows, oiDivergence };
+      const snapshot: InsightSnapshot = { period, nowMs, liquidations, positioning, breadth, fng, flows, oiDivergence };
       return { snapshot, membersVisible: membersVisible === true };
     });
   }
