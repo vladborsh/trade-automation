@@ -54,7 +54,8 @@ EVALUATE_AFTER_CLOSE_SEC = 6 * 60  # apps/insight-bot/src/alerts/oi-divergence/t
 OI_LOOP_LAG_SEC = 5 * 60  # the loop ticks once a minute; an evaluation of 5 coins takes seconds
 TF_SEC = {'15m': 900, '1h': 3600, '4h': 14400}
 LIQ_HEARTBEAT_SEC = 15 * 60  # apps/insight-bot/src/delivery/liq-heartbeat.ts: first completed tick of each slot
-LIQ_LOOP_LAG_SEC = 5 * 60  # the loop ticks every 30 s; a tick takes well under a second
+LIQ_LOOP_LAG_SEC = 5 * 60  # ticks every 30 s, so a slot's line is due ≤ 30 s + one tick after its start; the rest
+# is margin (IB-122's slot replay put the slowest tick at 52–138 ms — one session, a note, not a rule)
 RAW_COOKIE = re.compile(r'ib_session=(?!\[Redacted\])[^;\s"\']+')
 OI_LINE = re.compile(r'oi alerts (15m|1h|4h) @(\S+?Z): (\d+) coins, (\d+) found \(late (\d+)\), sent (\d+)')
 # Both pinned by apps/insight-bot/test/fixtures/liq-heartbeat-lines.txt (the bot spec writes it, the test parses it).
