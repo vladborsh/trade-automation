@@ -15,9 +15,11 @@ const PAGE: WebLevelAlertsAdminResponse = {
     { symbol: 'BTCUSDT', base: 'BTC', listed: true, enabled: true, daily: false, stateRows: 4 },
     { symbol: 'TRXUSDT', base: 'TRX', listed: false, enabled: true, daily: true, stateRows: 0 },
   ],
-  alerts: [{ id: 3, source: 'live', event: 'breakout_up', symbol: 'BTCUSDT', kind: 'PWH', price: 71850, at: Date.UTC(2026, 10, 6, 1, 0) / 1000, close: 72140, firedAt: null, late: true, recipients: 0, customLevelId: null },
+  alerts: [{ id: 3, source: 'live', event: 'breakout_up', symbol: 'BTCUSDT', kind: 'PWH', price: 71850, at: Date.UTC(2026, 10, 6, 1, 0) / 1000, close: 72140, firedAt: null, late: true, recipients: 0, mutedBy: null, customLevelId: null },
     // IB-128: a custom level's row is named by its id
-    { id: 4, source: 'live', event: 'sweep_below', symbol: 'BTCUSDT', kind: 'custom', customLevelId: 7, price: 65000, at: Date.UTC(2026, 10, 6, 0, 45) / 1000, close: 65100, firedAt: null, late: false, recipients: 0 }],
+    { id: 4, source: 'live', event: 'sweep_below', symbol: 'BTCUSDT', kind: 'custom', customLevelId: 7, price: 65000, at: Date.UTC(2026, 10, 6, 0, 45) / 1000, close: 65100, firedAt: null, late: false, recipients: 0, mutedBy: null },
+    // IB-151: the weekly open's event switched off — journalled, muted, and the page says so (not as a failure)
+    { id: 5, source: 'live', event: 'breakout_down', symbol: 'BTCUSDT', kind: 'WO', customLevelId: null, price: 70100, at: Date.UTC(2026, 10, 6, 0, 30) / 1000, close: 70050, firedAt: null, late: false, recipients: 0, mutedBy: 'event' }],
 };
 
 async function setup() {
@@ -63,6 +65,12 @@ describe('AdminLevelAlertsComponent (IB-126)', () => {
     expect(journal).toContain('breakout up');
     expect(journal).toContain('late');
     expect(journal).toContain('custom #7');
+    const muted = [...([...el.querySelectorAll('tbody')].at(-1)?.querySelectorAll('tr') ?? [])].find((tr) => tr.textContent?.includes('WO'));
+    const cell = muted?.querySelectorAll('td');
+    expect(cell?.[cell.length - 1]?.textContent).toBe('muted: event off');
+    expect(cell?.[cell.length - 1]?.classList.contains('warn')).toBe(false);
+    // the owner's rule, on the page next to the switches
+    expect(el.textContent).toContain('Off = not sent; the journal records it always.');
     // IB-128: the custom levels block sits in the section, offered every coin of the list
     expect(el.querySelector('app-admin-custom-levels h3')?.textContent).toContain('Custom levels');
     expect([...el.querySelectorAll('[data-testid="custom-level-symbol"] option')].map((o) => o.textContent)).toEqual(['BTCUSDT', 'TRXUSDT']);

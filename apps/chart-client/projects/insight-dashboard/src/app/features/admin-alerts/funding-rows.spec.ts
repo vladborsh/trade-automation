@@ -9,7 +9,7 @@ const COINS: WebFundingCoin[] = [
 ];
 const ROW: WebFundingAlertRow = {
   id: 1, source: 'live', event: 'flip', symbol: 'BTCUSDT', side: 'high', at: Date.UTC(2026, 10, 6, 1, 5) / 1000,
-  rate: -0.00005, intervalH: 4, ratePer8h: -0.0001, episodeHours: 31.9, firedAt: null, late: false, recipients: 0,
+  rate: -0.00005, intervalH: 4, ratePer8h: -0.0001, episodeHours: 31.9, firedAt: null, late: false, recipients: 0, mutedBy: null,
 };
 
 describe('funding rows (IB-124)', () => {

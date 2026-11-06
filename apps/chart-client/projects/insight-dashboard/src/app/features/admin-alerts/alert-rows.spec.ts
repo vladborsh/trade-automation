@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OI_DIVERGENCE_DEFAULT_PARAMS, type WebOiDivergenceAlert } from '@trade-automation/contracts';
-import { alertKindKey, formToParams, movePct, normalizeSymbol, paramsToForm, pctText, symbolRefusalKey, toAlertRow, toSkipRow } from './alert-rows';
+import { MUTED_STATUS_KEY, alertKindKey, formToParams, marketAlertStatus, movePct, normalizeSymbol, paramsToForm, pctText, symbolRefusalKey, toAlertRow, toSkipRow } from './alert-rows';
 
 /** IB-112 (V12, V17) — the admin alerts page's mapping. */
 const ALERT: WebOiDivergenceAlert = {
@@ -11,6 +11,22 @@ const ALERT: WebOiDivergenceAlert = {
   confirmedAt: Date.UTC(2026, 10, 4, 18, 0) / 1000, firedAt: Date.UTC(2026, 10, 4, 18, 6) / 1000, late: false, recipients: 1,
   priceAtFire: 0.295, price4h: 0.3009, price24h: null, outcomeAt: null,
 };
+
+describe('IB-151 marketAlertStatus (liq, funding, level rows)', () => {
+  const live = { source: 'live' as const, late: false, firedAt: null, recipients: 0, mutedBy: null };
+  it('a muted row names its switch first — not «journal only», not late, not history', () => {
+    expect(marketAlertStatus({ ...live, mutedBy: 'event' })).toEqual({ key: 'alerts.status.muted.event', recipients: 0 });
+    expect(marketAlertStatus({ ...live, mutedBy: 'coin', late: true })).toEqual({ key: 'alerts.status.muted.coin', recipients: 0 });
+    expect(marketAlertStatus({ ...live, mutedBy: 'daily', source: 'backfill' })).toEqual({ key: 'alerts.status.muted.daily', recipients: 0 });
+    expect(MUTED_STATUS_KEY.custom_event).toBe('alerts.status.muted.custom_event');
+  });
+  it('unmuted: history, late, sent, journal only — as before', () => {
+    expect(marketAlertStatus({ ...live, source: 'backfill' }).key).toBe('alerts.status.history');
+    expect(marketAlertStatus({ ...live, late: true }).key).toBe('alerts.status.late');
+    expect(marketAlertStatus({ ...live, firedAt: 1, recipients: 2 })).toEqual({ key: 'alerts.status.sent', recipients: 2 });
+    expect(marketAlertStatus(live).key).toBe('alerts.status.journalOnly');
+  });
+});
 
 describe('toAlertRow', () => {
   it('B against A for price and OI, the delivery, and the move after sending', () => {

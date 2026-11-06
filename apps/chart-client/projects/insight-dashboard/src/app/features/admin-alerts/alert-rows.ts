@@ -1,6 +1,6 @@
 import {
   OI_DIVERGENCE_TFS, OiDivergenceParamsSchema, type OiDivergenceParams, type OiDivergenceTf, type WebAlertSymbolRefusal,
-  type WebOiDivergenceAlert, type WebOiDivergenceSkipRow,
+  type MarketAlertMutedBy, type WebOiDivergenceAlert, type WebOiDivergenceSkipRow,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 
@@ -24,6 +24,27 @@ export function pctText(value: number | null): string {
 /** The move from the price at sending to a later close, in percent; null when either is missing. */
 export const movePct = (from: number | null, to: number | null): number | null =>
   from === null || to === null || from <= 0 ? null : (to / from - 1) * 100;
+
+/**
+ * IB-122/IB-151 — a liq, funding or level journal row's «отправка» cell. A row an admin switch muted says so first
+ * («заглушено: …», whatever else is true of it), so a muted row never reads as a failure or as «только в журнале».
+ */
+export function marketAlertStatus(r: {
+  source: 'live' | 'backfill'; late: boolean; firedAt: number | null; recipients: number; mutedBy: MarketAlertMutedBy | null;
+}): { key: StringKey; recipients: number } {
+  if (r.mutedBy !== null) return { key: MUTED_STATUS_KEY[r.mutedBy], recipients: 0 };
+  if (r.source === 'backfill') return { key: 'alerts.status.history', recipients: 0 };
+  if (r.late) return { key: 'alerts.status.late', recipients: 0 };
+  if (r.firedAt !== null) return { key: 'alerts.status.sent', recipients: r.recipients };
+  return { key: 'alerts.status.journalOnly', recipients: 0 };
+}
+
+export const MUTED_STATUS_KEY: Record<MarketAlertMutedBy, StringKey> = {
+  coin: 'alerts.status.muted.coin',
+  daily: 'alerts.status.muted.daily',
+  event: 'alerts.status.muted.event',
+  custom_event: 'alerts.status.muted.custom_event',
+};
 
 export interface AlertRow {
   id: number;

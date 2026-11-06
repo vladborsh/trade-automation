@@ -1,6 +1,6 @@
 import { LiqCoinParamsSchema, type LiqCoinParams, type WebLiqAlertRow, type WebLiqCoin } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
-import { utcMinute } from './alert-rows';
+import { marketAlertStatus, utcMinute } from './alert-rows';
 
 /**
  * IB-122 / IB-143 (liq design L2–L4, L12–L13) — the «Large liquidations» section's mapping, pure and spec'd: journal rows as
@@ -51,13 +51,7 @@ export function toLiqRow(r: WebLiqAlertRow): LiqRow {
     event: eventKey(r),
     sum: usdText(r.sumUsd),
     threshold: r.thresholdUsd === null ? '—' : usdText(r.thresholdUsd),
-    status: r.source === 'backfill'
-      ? { key: 'alerts.status.history', recipients: 0 }
-      : r.late
-      ? { key: 'alerts.status.late', recipients: 0 }
-      : r.firedAt !== null
-      ? { key: 'alerts.status.sent', recipients: r.recipients }
-      : { key: 'alerts.status.journalOnly', recipients: 0 },
+    status: marketAlertStatus(r),
   };
 }
 

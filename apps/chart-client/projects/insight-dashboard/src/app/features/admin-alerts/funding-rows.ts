@@ -1,6 +1,6 @@
 import { WebFundingCoinPatchSchema, type WebFundingAlertRow, type WebFundingCoin, type WebFundingCoinPatch } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
-import { utcMinute } from './alert-rows';
+import { marketAlertStatus, utcMinute } from './alert-rows';
 
 /**
  * IB-124 (alerts design §1, F3, F5) — the «Funding» section's mapping, pure and spec'd: journal rows as shown, the per-coin
@@ -42,13 +42,7 @@ export function toFundingRow(r: WebFundingAlertRow): FundingRow {
     rate: `${pctText(r.rate)} / ${r.intervalH ?? '?'}h`,
     per8h: pctText(r.ratePer8h),
     episode: r.episodeHours === null ? '—' : `${Math.floor(r.episodeHours)}h`,
-    status: r.source === 'backfill'
-      ? { key: 'alerts.status.history', recipients: 0 }
-      : r.late
-      ? { key: 'alerts.status.late', recipients: 0 }
-      : r.firedAt !== null
-      ? { key: 'alerts.status.sent', recipients: r.recipients }
-      : { key: 'alerts.status.journalOnly', recipients: 0 },
+    status: marketAlertStatus(r),
   };
 }
 

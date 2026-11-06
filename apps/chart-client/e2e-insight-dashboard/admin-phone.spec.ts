@@ -25,19 +25,19 @@ import customPage from './fixtures/admin-alerts-levels-custom.json';
 
 const liqWithRow = {
   ...liqPage,
-  alerts: [{ id: 1, source: 'live', event: 'continuing', symbol: '1000PEPEUSDT', side: 'short', at: 1_793_888_888, sumUsd: 12_345_678, thresholdUsd: 5_000_000, coins: ['1000PEPEUSDT'], news: true, firedAt: null, late: true, recipients: 0 }],
+  alerts: [{ id: 1, source: 'live', event: 'continuing', symbol: '1000PEPEUSDT', side: 'short', at: 1_793_888_888, sumUsd: 12_345_678, thresholdUsd: 5_000_000, coins: ['1000PEPEUSDT'], news: true, firedAt: null, late: true, recipients: 0, mutedBy: null }],
 };
 
 const fundingWithRow = {
   ...fundingPage,
-  alerts: [{ id: 1, source: 'live', event: 'flip', symbol: '1000PEPEUSDT', side: 'high', at: 1_793_888_888, rate: -0.00012345, intervalH: 4, ratePer8h: -0.0002469, episodeHours: 131.5, firedAt: null, late: false, recipients: 0 }],
+  alerts: [{ id: 1, source: 'live', event: 'flip', symbol: '1000PEPEUSDT', side: 'high', at: 1_793_888_888, rate: -0.00012345, intervalH: 4, ratePer8h: -0.0002469, episodeHours: 131.5, firedAt: null, late: false, recipients: 0, mutedBy: null }],
 };
 
 const levelsWithRow = {
   ...levelsPage,
-  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0, customLevelId: null },
+  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0, mutedBy: null, customLevelId: null },
     // IB-128: slot dev-3's REAL journal row of its first custom level alert (2026-11-06 08:15 bar, sending off)
-    { id: 57, source: 'live', event: 'sweep_above', symbol: 'BTCUSDT', price: 75676, kind: 'custom', customLevelId: 1, at: 1793952900, close: 75616.9, firedAt: null, late: false, recipients: 0 }],
+    { id: 57, source: 'live', event: 'sweep_above', symbol: 'BTCUSDT', price: 75676, kind: 'custom', customLevelId: 1, at: 1793952900, close: 75616.9, firedAt: null, late: false, recipients: 0, mutedBy: null }],
 };
 
 const customWithRow = {

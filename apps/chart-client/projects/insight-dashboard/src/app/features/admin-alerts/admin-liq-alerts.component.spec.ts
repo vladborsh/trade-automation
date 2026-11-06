@@ -12,7 +12,7 @@ const PAGE: WebLiqAlertsAdminResponse = {
     { symbol: 'BTCUSDT', base: 'BTC', listed: true, enabled: true, thresholdUsd: 5e6 },
     { symbol: 'DOGEUSDT', base: 'DOGE', listed: false, enabled: false, thresholdUsd: null },
   ],
-  alerts: [{ id: 3, source: 'live', event: 'alert', symbol: 'BTCUSDT', side: 'long', at: Date.UTC(2026, 10, 5, 14, 7) / 1000, sumUsd: 7.4e6, thresholdUsd: 5e6, coins: ['BTCUSDT'], news: true, firedAt: null, late: false, recipients: 0 }],
+  alerts: [{ id: 3, source: 'live', event: 'alert', symbol: 'BTCUSDT', side: 'long', at: Date.UTC(2026, 10, 5, 14, 7) / 1000, sumUsd: 7.4e6, thresholdUsd: 5e6, coins: ['BTCUSDT'], news: true, firedAt: null, late: false, recipients: 0, mutedBy: null }],
 };
 
 async function setup() {

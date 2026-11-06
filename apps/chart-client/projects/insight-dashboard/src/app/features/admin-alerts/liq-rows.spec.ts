@@ -4,7 +4,7 @@ import { coinsToForm, parseUsd, perCoinPatch, toLiqRow, usdText } from './liq-ro
 describe('IB-122 liq-rows', () => {
   const row: WebLiqAlertRow = {
     id: 1, source: 'live', event: 'alert', symbol: 'BTCUSDT', side: 'long', at: Date.UTC(2026, 10, 5, 14, 7) / 1000,
-    sumUsd: 7.4e6, thresholdUsd: 5e6, coins: ['BTCUSDT'], news: true, firedAt: null, late: false, recipients: 0,
+    sumUsd: 7.4e6, thresholdUsd: 5e6, coins: ['BTCUSDT'], news: true, firedAt: null, late: false, recipients: 0, mutedBy: null,
   };
   const coins: WebLiqCoin[] = [
     { symbol: 'BTCUSDT', base: 'BTC', listed: true, enabled: true, thresholdUsd: 5e6 },

@@ -13,7 +13,7 @@ const PAGE: WebFundingAlertsAdminResponse = {
     { symbol: 'BTCUSDT', base: 'BTC', listed: true, enabled: true, floorPer8h: null },
     { symbol: 'TRXUSDT', base: 'TRX', listed: false, enabled: true, floorPer8h: 0.0005 },
   ],
-  alerts: [{ id: 3, source: 'live', event: 'enter', symbol: 'BTCUSDT', side: 'high', at: Date.UTC(2026, 10, 6, 1, 5) / 1000, rate: 0.0002, intervalH: 4, ratePer8h: 0.0004, episodeHours: null, firedAt: null, late: false, recipients: 0 }],
+  alerts: [{ id: 3, source: 'live', event: 'enter', symbol: 'BTCUSDT', side: 'high', at: Date.UTC(2026, 10, 6, 1, 5) / 1000, rate: 0.0002, intervalH: 4, ratePer8h: 0.0004, episodeHours: null, firedAt: null, late: false, recipients: 0, mutedBy: null }],
 };
 
 async function setup() {

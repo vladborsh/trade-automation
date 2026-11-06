@@ -3,7 +3,7 @@ import {
   type WebLevelCoin,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
-import { utcMinute } from './alert-rows';
+import { marketAlertStatus, utcMinute } from './alert-rows';
 
 /**
  * IB-126 (alerts design §1, P2) — the «Levels» section's mapping, pure and spec'd: journal rows as shown, the per-coin
@@ -41,13 +41,7 @@ export interface LevelRow {
 export function toLevelRow(r: WebLevelAlertRow): LevelRow {
   return {
     id: r.id, at: utcMinute(r.at), symbol: r.symbol, kind: r.kind, customLevelId: r.customLevelId, event: LEVEL_EVENT_KEY[r.event], price: priceText(r.price), close: priceText(r.close),
-    status: r.source === 'backfill'
-      ? { key: 'alerts.status.history', recipients: 0 }
-      : r.late
-      ? { key: 'alerts.status.late', recipients: 0 }
-      : r.firedAt !== null
-      ? { key: 'alerts.status.sent', recipients: r.recipients }
-      : { key: 'alerts.status.journalOnly', recipients: 0 },
+    status: marketAlertStatus(r),
   };
 }
 
