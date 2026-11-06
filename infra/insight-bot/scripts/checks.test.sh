@@ -495,6 +495,8 @@ case "$1" in
            echo 'LIQ_HISTORY_JSON {"mode": "write", "from": "2026-11-04T00:00:00.000Z", "until": "2026-11-05T16:59:34.379Z", "countsTo": "2026-11-11T00:00:00.000Z", "days": 7, "written": {}, "table": []}'; }
          [ "$who" = funding ] && { u="${all#*--until }"; u="${u%% *}"; echo 'write ×1: 51744 checks; new rows: enter 0, flip 0, controls 0; stale 0, insufficient 0'
            echo "FUNDING_HISTORY_JSON {\"mode\": \"write\", \"until\": \"$u\", \"written\": {}, \"table\": []}"; }
+         [ "$who" = level ] && { u="${all#*--until }"; u="${u%% *}"; echo 'write ×1: 129586 ticks, 43200 coin-bars, 5 seeds; new rows: alerts 0, controls 0; failed 0'
+           echo "LEVEL_HISTORY_JSON {\"mode\": \"write\", \"until\": \"$u\", \"written\": {}, \"table\": []}"; }
          echo 'paths: measured 314, failed 0, weight 790, 1500 s; left 0'; echo 'done in 3 s'; exit 0 ;;
     esac ;;
 esac
@@ -646,6 +648,49 @@ d = {'rc': 3, 'tries': 6, 'output': 'start x\n== CLI output (exit 1)\nfunding ba
 run funding-rerun fund-deferred
 check 'funding-rerun refused on all tries → DEFERRED, NO Telegram' '[ "$(verdict fund-deferred funding-rerun)" = "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), 6 of 6 tries" ] && [ "$(sent)" = 0 ]'
 
+# ------------------------------------------------------------------------------------------ level-rerun (IB-127)
+LEV='
+import json
+summary = {"mode": "write", "from": "2026-08-08T04:45:00.000Z", "to": "2026-11-06T04:45:00.000Z", "until": "2026-11-06T05:00:00.000Z", "days": 90,
+           "written": {"alerts_breakout_up": 122, "controls_touch": 461, "controls_random": 902, "paths": 5652, "paths_measured": 5561}, "table": [], "alerts": []}
+def out(new=(0, 0), failed=0, left=0, rc_cli=0, js=True, killed=False):
+    return ("start 20261110T000000Z mode --write\n== CLI output (exit %d)\n" % rc_cli
+            + "write ×1: 129586 ticks, 43200 coin-bars, 5 seeds; new rows: alerts %d, controls %d; failed 0\n" % new
+            + "paths: measured 91, failed %d, weight 240, 40 s; left %d\n" % (failed, left)
+            + ("LEVEL_HISTORY_JSON " + json.dumps(summary) + "\n" if js else "")
+            + "== memory over 60 samples\nmin MemAvailable 150 MB; max bot RSS 120 MB; max CLI RSS 100 MB\n"
+            + ("KILLED for memory\n" if killed else "") + "== start gate: asked 140, the CLI applied 140\nfiles: /root/x.out /root/x.mem\n")
+'
+fixture lev-pass "$LEV
+d = {'started': 'x', 'until': '2026-11-06T05:00:00.000Z', 'until_from': '/root/ib127-write-1.out', 'rc': 0, 'output': out()}"
+run level-rerun lev-pass
+check 'level-rerun a clean rerun → PASS, nothing sent, the .md names the --until and where it came from' \
+  '[ "$(verdict lev-pass level-rerun)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "until 2026-11-06T05:00:00.000Z, read from /root/ib127-write-1.out" $work/out-lev-pass/level-rerun.md'
+fixture lev-new "$LEV
+d = {'rc': 0, 'output': out(new=(0, 1))}"
+run level-rerun lev-new
+check 'level-rerun a rerun that wrote a control (once-keys broken) → FLAG:new_rows, no Telegram' '[ "$(verdict lev-new level-rerun)" = FLAG:new_rows ] && [ "$(sent)" = 0 ]'
+fixture lev-paths "$LEV
+d = {'rc': 0, 'output': out(failed=2, left=3)}"
+run level-rerun lev-paths
+check 'level-rerun failed / open path windows → FLAG' '[ "$(verdict lev-paths level-rerun)" = FLAG:paths_failed,paths_left_open ] && [ "$(sent)" = 0 ]'
+fixture lev-killed "$LEV
+d = {'rc': 0, 'output': out(killed=True)}"
+run level-rerun lev-killed
+check 'level-rerun killed for memory → FAIL, the owner told once' '[ "$(verdict lev-killed level-rerun | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
+fixture lev-exit "$LEV
+d = {'rc': 0, 'output': out(rc_cli=1)}"
+run level-rerun lev-exit
+check 'level-rerun CLI exit 1 (a MISMATCH or a warning) → FAIL' '[ "$(verdict lev-exit level-rerun)" = "FAIL:level-backfill.sh exit 0, CLI exit 1" ] && [ "$(sent)" = 1 ]'
+fixture lev-nojson "$LEV
+d = {'rc': 0, 'output': out(js=False)}"
+run level-rerun lev-nojson
+check 'level-rerun no summary line → FAIL' '[ "$(verdict lev-nojson level-rerun | cut -c1-5)" = FAIL: ]'
+fixture lev-deferred "$LEV
+d = {'rc': 3, 'tries': 6, 'output': 'start x\n== CLI output (exit 1)\nlevel backfill failed: Error: memory gate: refused — MemAvailable 139 MB < 140 MB\n== start gate: asked 140, the CLI applied 140\nDEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)\n'}"
+run level-rerun lev-deferred
+check 'level-rerun refused on all tries → DEFERRED, NO Telegram' '[ "$(verdict lev-deferred level-rerun)" = "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), 6 of 6 tries" ] && [ "$(sent)" = 0 ]'
+
 # ------------------------------------------------- checks.py: DEFERRED, the floor it asks, the retries (IB-145)
 fixture bf-deferred "$BF
 d['rc'] = 3; d['tries'] = 6
@@ -740,7 +785,7 @@ compose_run() { # $1 = check, $2 = case, $3 = FAKE_CLI, $4 = runner, then extra 
   env PATH="$work/ohb-bin:$work/bin:$PATH" OHB_DOCKER_LOG="$work/cr-$c.docker" FAKE_CLI="$cli" RUN_DIR="$work/cr-$c" \
     MEMINFO="$work/ohb-meminfo" PID_TRIES=1 SAMPLE_S=0.1 CHECKS_DIR="$work/cr-$c" DEPLOY_DIR="$work/cr-$c" WATCH_ENV_FILE="$work/env" \
     STUB_CURL_ARGS="$work/curl-args" STUB_CURL_STDIN="$work/curl-stdin" CHECKS_DEFER_WAIT_S=0 CHECKS_FAKE_NOW=1793966400 FAKE_SLEEP=1.2 \
-    CHECKS_BACKFILL_SCRIPT="$BOX" CHECKS_LIQ_SCRIPT="$LIQR" CHECKS_FUNDING_SCRIPT="$FUNDR" CHECKS_FUNDING_RUN_DIR="$work/cr-$c" "$@" python3 -I "$CHECKS" run "$name" >"$work/cr-$c.stdout" 2>&1 || true
+    CHECKS_BACKFILL_SCRIPT="$BOX" CHECKS_LIQ_SCRIPT="$LIQR" CHECKS_FUNDING_SCRIPT="$FUNDR" CHECKS_FUNDING_RUN_DIR="$work/cr-$c" CHECKS_LEVEL_SCRIPT="$LEVR" CHECKS_LEVEL_RUN_DIR="$work/cr-$c" "$@" python3 -I "$CHECKS" run "$name" >"$work/cr-$c.stdout" 2>&1 || true
   cat "$work/cr-$c/$name.done" 2>/dev/null
 }
 check 'backfill-rerun → box-backfill.sh, gate refused on every try → DEFERRED, 6 docker execs, NO Telegram' \
@@ -776,5 +821,21 @@ check 'funding-rerun finds the write the REAL runner made (its own file name) an
 fwrite fudef 20261106T220000Z write 2026-11-06T22:05:00.000Z
 check 'funding-rerun → refused on every try → DEFERRED, NO Telegram' \
   '[ "$(compose_run funding-rerun fudef refused x | cut -c1-9)" = DEFERRED: ] && [ "$(sent)" = 0 ]'
+
+# level-rerun: the same composition, through the REAL level-backfill.sh. A real --write by the runner makes the file
+# the check must find; a newer dry run and a newer crashed write are not completed writes.
+mkdir -p "$work/cr-lvreal"
+env PATH="$work/ohb-bin:$PATH" OHB_DOCKER_LOG="$work/lvreal-write.docker" FAKE_CLI=ok RUN_DIR="$work/cr-lvreal" MEMINFO="$work/ohb-meminfo" \
+  PID_TRIES=1 SAMPLE_S=0.1 bash "$LEVR" --write --until 2026-11-06T05:00:00Z --start-floor 140 >/dev/null 2>&1
+printf '== CLI output (exit 0)\nLEVEL_HISTORY_JSON {"mode": "dry-run", "until": "2026-11-06T06:00:00Z"}\n' >"$work/cr-lvreal/ib127-write-29991230T000000Z.out"
+printf 'level backfill failed: Error: boom\n' >"$work/cr-lvreal/ib127-write-29991231T000000Z.out"
+printf '== CLI output (exit 0)\nLEVEL_HISTORY_JSON {"mode": "write", "until": "2026-11-01T00:00:00Z"}\n' >"$work/cr-lvreal/ib127-write-20261101T000000Z.out"   # an OLDER completed write
+check 'level-rerun finds the write the REAL runner made and reruns its --until (not an older write, a newer dry run or a crash) → PASS' \
+  'ls $work/cr-lvreal/ib127-write-2026*.out >/dev/null 2>&1 && v=$(compose_run level-rerun lvreal ok x); [ "$v" = PASS ] && grep -q -- "level-backfill.cli.js --write --until 2026-11-06T05:00:00Z\$" $work/cr-lvreal.docker'
+check 'level-rerun with no completed write on the box → FAIL before any docker exec, ONE Telegram' \
+  '[ "$(compose_run level-rerun lvnone ok x | cut -c1-5)" = FAIL: ] && [ ! -s $work/cr-lvnone.docker ] && [ "$(sent)" = 1 ] && grep -q "no completed level write" $work/cr-lvnone/level-rerun.md'
+mkdir -p "$work/cr-lvdef"; printf '== CLI output (exit 0)\nLEVEL_HISTORY_JSON {"mode": "write", "until": "2026-11-06T05:00:00Z"}\n' >"$work/cr-lvdef/ib127-write-20261106T080000Z.out"
+check 'level-rerun → refused on every try → DEFERRED, NO Telegram' \
+  '[ "$(compose_run level-rerun lvdef refused x | cut -c1-9)" = DEFERRED: ] && [ "$(sent)" = 0 ]'
 
 if [ "$fail" = 0 ]; then echo "checks.test.sh: all passed"; else echo "checks.test.sh: FAILURES"; exit 1; fi

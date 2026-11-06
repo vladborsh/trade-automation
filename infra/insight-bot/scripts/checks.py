@@ -439,8 +439,8 @@ def first_hidden_evaluate(raw):
 
 
 # ----------------------------------------------------------------------------- history runs (IB-145)
-# backfill-rerun, liq-weekly and funding-rerun start a history CLI on the box through its runner (box-backfill.sh,
-# liq-backfill.sh, funding-backfill.sh).
+# backfill-rerun, liq-weekly, funding-rerun and level-rerun start a history CLI on the box through its runner
+# (box-backfill.sh, liq-backfill.sh, funding-backfill.sh, level-backfill.sh).
 # The CLI refuses to START below its start gate (memory-guard.ts; default 170 MB, measured after its ~66 MB load);
 # the runner then prints «DEFERRED:memory gate refused (…)» and exits 3. Here:
 # - every run asks for HISTORY_START_FLOOR_MB (140; never below without a TL ruling — history-gate.sh refuses it).
@@ -650,16 +650,23 @@ FUNDING_SCRIPT = os.environ.get('CHECKS_FUNDING_SCRIPT', os.path.join(DEPLOY_DIR
 FUNDING_RUN_DIR = os.environ.get('CHECKS_FUNDING_RUN_DIR', '/root')
 
 
-def funding_until():
-    """The --until of the newest completed funding write: (until ISO, the file it came from)."""
+def newest_write_until(run_dir, pattern, key, what):
+    """The --until of the newest completed history WRITE: (until ISO, the file it came from). `pattern` is the RUNNER's
+    output name (its names carry a UTC stamp, so they sort by time); a dry run or a crashed write has no `key` line
+    with mode write and is skipped. Shared by funding-rerun (IB-125) and level-rerun (IB-127)."""
     import glob
     import re
-    for path in sorted(glob.glob(os.path.join(FUNDING_RUN_DIR, 'ib125-write-*.out')), reverse=True):  # names carry a UTC stamp
+    for path in sorted(glob.glob(os.path.join(run_dir, pattern)), reverse=True):
         with open(path, encoding='utf-8') as f:
-            m = re.search(r'^FUNDING_HISTORY_JSON (\{.*\})$', f.read(), re.M)
+            m = re.search(r'^%s (\{.*\})$' % key, f.read(), re.M)
         if m and json.loads(m.group(1)).get('mode') == 'write':
             return json.loads(m.group(1))['until'], path
-    raise CheckFailed('no completed funding write in %s/ib125-write-*.out: nothing to rerun' % FUNDING_RUN_DIR)
+    raise CheckFailed('no completed %s write in %s/%s: nothing to rerun' % (what, run_dir, pattern))
+
+
+def funding_until():
+    """The --until of the newest completed funding write: (until ISO, the file it came from)."""
+    return newest_write_until(FUNDING_RUN_DIR, 'ib125-write-*.out', 'FUNDING_HISTORY_JSON', 'funding')
 
 
 def funding_gather():
@@ -688,6 +695,59 @@ def funding_evaluate(raw):
     mem = re.search(r'min MemAvailable (\d+) MB', out)
     if not js or not new or not paths or not mem:
         raise CheckFailed('funding-backfill.sh output lacks a FUNDING_HISTORY_JSON, «write ×1», «paths:» or «min MemAvailable» line')
+    summary = json.loads(js.group(1))
+    rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups()), 0, 0))
+    rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
+    rows.append(band(flags, 'paths_left_open', int(paths.group(4)), 0, 0))
+    rows.append(band(flags, 'min_mem_available_mb', int(mem.group(1)), 100, 10 ** 6))
+    notes = ['--until %s, read from %s (the write\'s own output)' % (raw.get('until'), raw.get('until_from')),
+             'rows written (source = backfill): %s' % json.dumps(summary.get('written'), ensure_ascii=False),
+             'path weight this run: %s (measured %s windows)' % (paths.group(3), paths.group(1)),
+             'no hit rate: «worked» and the baseline are not defined yet (design §1 C5)', gate_note] + raw.get('waits', [])
+    return {'flags': flags, 'rows': rows, 'notes': notes,
+            'measured': {'until': raw.get('until'), 'written': summary.get('written'),
+                         'paths': {'measured': int(paths.group(1)), 'failed': int(paths.group(2)), 'weight': int(paths.group(3)), 'left': int(paths.group(4))},
+                         'min_mem_available_mb': int(mem.group(1)), 'tail': out[-1500:]}}
+
+
+# ------------------------------------------------------------------------------------------ level-rerun
+# IB-127: ≥ 72 h after the level history run's write, level-backfill.sh --write reruns it with the SAME --until (the
+# 15m close of the live level loop's first heartbeat). It writes 0 new rows (the once-keys hold) and measures the path
+# windows still open at the write (its last 72 h). --until is read from the write's own output (the newest
+# /root/ib127-write-*.out whose LEVEL_HISTORY_JSON says mode write). Bands and verdicts as funding-rerun: 0 new rows;
+# 0 failed and 0 open path windows; memory ≥ 100 MB. A killed run, a CLI exit ≠ 0, a missing write or no summary line
+# is FAIL (the owner hears); DEFERRED (the start gate refused 6 tries) and PASS are silent.
+
+LEVEL_SCRIPT = os.environ.get('CHECKS_LEVEL_SCRIPT', os.path.join(DEPLOY_DIR, 'level-backfill.sh'))
+LEVEL_RUN_DIR = os.environ.get('CHECKS_LEVEL_RUN_DIR', '/root')
+
+
+def level_gather():
+    if not os.path.exists(LEVEL_SCRIPT):
+        raise CheckFailed('%s is missing' % LEVEL_SCRIPT)
+    until, source = newest_write_until(LEVEL_RUN_DIR, 'ib127-write-*.out', 'LEVEL_HISTORY_JSON', 'level')
+    raw = {'started': utc(time.time()), 'until': until, 'until_from': source}
+    run = history_run(LEVEL_SCRIPT, ['--write', '--until', until])
+    raw.update(run, output=run['output'][-20000:])
+    return raw
+
+
+def level_evaluate(raw):
+    import re
+    out = raw['output']
+    if 'KILLED for memory' in out:
+        raise CheckFailed('the CLI was killed: MemAvailable < 100 MB (level-backfill.sh sampler)')
+    flags, rows = [], []
+    gate_note = history_deferred_or_gate(flags, rows, raw, 'level-backfill.sh')
+    cli = re.search(r'== CLI output \(exit (\d+)\)', out)
+    if raw['rc'] != 0 or not cli or cli.group(1) != '0':
+        raise CheckFailed('level-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
+    js = re.search(r'^LEVEL_HISTORY_JSON (\{.*\})$', out, re.M)
+    new = re.search(r'^write ×1: .*new rows: alerts (\d+), controls (\d+)', out, re.M)
+    paths = re.search(r'paths: measured (\d+), failed (\d+), weight (\d+), \d+ s; left (\d+)', out)
+    mem = re.search(r'min MemAvailable (\d+) MB', out)
+    if not js or not new or not paths or not mem:
+        raise CheckFailed('level-backfill.sh output lacks a LEVEL_HISTORY_JSON, «write ×1», «paths:» or «min MemAvailable» line')
     summary = json.loads(js.group(1))
     rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups()), 0, 0))
     rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
@@ -848,6 +908,7 @@ CHECKS = {
     'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),
     'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
     'funding-rerun': (funding_gather, funding_evaluate, 'IB-125: the funding history run rerun ≥ 72 h after its write — 0 new rows, the path windows that were open measured'),
+    'level-rerun': (level_gather, level_evaluate, 'IB-127: the level history run rerun ≥ 72 h after its write — 0 new rows, the path windows that were open measured'),
     'random-controls-day': (rcd_gather, rcd_evaluate, 'IB-BUG-047: the previous UTC day of live OI random controls — exactly enabled coins × 3 TFs × 2'),
 }
 
