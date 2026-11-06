@@ -145,7 +145,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
       const pacer = new WeightPacer(LIQ_BACKFILL_WEIGHT_PER_MIN, now);
       const paths = await measureBackfillPaths(
         { store: new PgOiAlertStore(db), build: env.BUILD_SHA, log: say, klines5m: async (symbol, from, limit) => candles.closedKlines(symbol, '5m', from * 1000, limit) },
-        { take: async (w) => { await guard.every30s('path measuring'); await pacer.take(w); } }, now, 50, 'market',
+        { take: async (w) => { await guard.every30s('path measuring'); await pacer.take(w); } }, now, 50, 'liq',
       );
       const left = await reads.unmeasuredPaths();
       say(`paths: measured ${paths.measured}, failed ${paths.failed}, weight ${paths.weight}, ${paths.durationSec} s; left ${left.count}`

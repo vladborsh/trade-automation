@@ -100,8 +100,12 @@ export interface NewPaths {
   atr14: number;
   stopPrice: number | null;
 }
-/** IB-123: which subjects a `pathsDue` read takes (see the port). */
-export type PathSubjects = 'all' | 'oi' | 'market';
+/**
+ * IB-123: which subjects a `pathsDue` read takes (see the port). IB-125 adds one market type at a time (`liq`,
+ * `funding`): `market` takes every type, so the liquidation run's weekly rerun would have measured the funding
+ * run's backlog too, with its weight and its bands.
+ */
+export type PathSubjects = 'all' | 'oi' | 'market' | 'liq' | 'funding';
 
 export interface PathDue {
   id: number;
@@ -166,8 +170,8 @@ export interface OiAlertStore {
   /**
    * `subjects` (IB-123): which subjects' windows — `all` (the live tick: one queue, one measurer), `oi` (the OI
    * divergence journal, controls and near-misses: IB-116's history run) or `market` (market_alerts and their
-   * controls: IB-123's). Each history run measures only its own backlog, so its weight and its check's bands
-   * are its own.
+   * controls), or one market type, `liq` (IB-123's run) or `funding` (IB-125's). Each history run measures only its
+   * own backlog, so its weight and its check's bands are its own.
    */
   pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number, subjects?: PathSubjects): Promise<PathDue[]>;
   setPath(id: number, m: PathMeasurement, measuredAt: number): Promise<void>;
@@ -322,7 +326,9 @@ export class PgOiAlertStore implements OiAlertStore {
           and coalesce(a.source, c.source, n.source, ma.source, mc.source) = $8
           and p.t0 + (case p.win when '4h' then $4::int when '24h' then $5::int else $6::int end) * interval '1 second' + $7 * interval '1 second' <= $1
           and (p.tried_at is null or p.tried_at + $3 * interval '1 second' <= $1)
-          and ($9 = 'all' or ($9 = 'market') = (p.market_alert_id is not null or p.market_control_id is not null))
+          and ($9 = 'all'
+               or ($9 in ('oi', 'market') and ($9 = 'market') = (p.market_alert_id is not null or p.market_control_id is not null))
+               or coalesce(ma.type, mc.type) = $9)
         order by p.tried_at nulls first, p.t0, p.id limit $2`,
       [at(nowSec), limit, retryAfterSec, OI_RESEARCH_WINDOW_SEC['4h'], OI_RESEARCH_WINDOW_SEC['24h'], OI_RESEARCH_WINDOW_SEC['72h'], PATH_SETTLE_SEC, source, subjects],
     );

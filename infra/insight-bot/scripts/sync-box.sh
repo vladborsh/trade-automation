@@ -38,6 +38,7 @@ FILES=(
   "scripts/backup.sh:/opt/insight-bot/backup.sh:0755"
   "scripts/restore.sh:/opt/insight-bot/restore.sh:0755"
   "scripts/liq-backfill.sh:/opt/insight-bot/liq-backfill.sh:0755"
+  "scripts/funding-backfill.sh:/opt/insight-bot/funding-backfill.sh:0755"
   "scripts/oi-hidden-backfill.sh:/opt/insight-bot/oi-hidden-backfill.sh:0755"
   "scripts/box-backfill.sh:/opt/insight-bot/box-backfill.sh:0755"
   "scripts/history-gate.sh:/opt/insight-bot/history-gate.sh:0644"

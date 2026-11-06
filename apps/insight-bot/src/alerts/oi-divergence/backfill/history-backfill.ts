@@ -417,7 +417,7 @@ export async function measureBackfillPaths(
   pacer: { take(weight: number): Promise<void> },
   now: () => number,
   batch = 50,
-  /** IB-123: whose backlog — IB-116's run measures `oi`, IB-123's `market`; `all` only in specs that want both. */
+  /** IB-123: whose backlog — IB-116's run measures `oi`, IB-123's `liq`, IB-125's `funding`; `all` only in specs that want both. */
   subjects: PathSubjects = 'oi',
 ): Promise<PathMeasureReport> {
   const loop = new OiAlertLoop({
