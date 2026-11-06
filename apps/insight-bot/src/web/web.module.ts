@@ -17,6 +17,7 @@ import { WebMembersController } from './members/members.controller';
 import { FUNDING_ALERTS_VISIBILITY, LEVEL_ALERTS_VISIBILITY, LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
 import { LEVEL_ALERTS_ADMIN, WebLevelAlertsAdminController } from './admin/level-alerts.controller';
 import { CUSTOM_LEVELS, WebCustomLevelsAdminController } from './admin/custom-levels.controller';
+import { withWeightCaller } from '../venues/binance/weight-caller';
 import { CustomLevelsSeriesController } from './series/custom-levels.controller';
 import { CustomLevels } from '../alerts/levels/custom-levels';
 import { PgCustomLevelStore } from '../alerts/levels/pg/custom-levels.repo';
@@ -152,7 +153,7 @@ export class WebModule {
               symbols: config.symbols,
               futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL'),
               // IB-147: always booked (weight 1, `exchange_info`), so the per-caller count sees it; the header still wins in used1m
-              onWeight: (header) => { weight.recordCall(1, Date.now(), 'exchange_info'); if (header !== null) weight.recordHeader(header); },
+              onWeight: (header) => { withWeightCaller('exchange_info', () => weight.recordCall(1)); if (header !== null) weight.recordHeader(header); },
             }),
         },
         {
@@ -308,7 +309,7 @@ export class WebModule {
             return new AlertsAdmin(new PgOiAlertStore(db), cachedExchangeInfo(async () => {
               const response = await fetch(url);
               const header = response.headers.get('x-mbx-used-weight-1m');
-              weight.recordCall(1, Date.now(), 'exchange_info'); // IB-147: always booked; the header still wins in used1m
+              withWeightCaller('exchange_info', () => weight.recordCall(1)); // IB-147: always booked; the header still wins in used1m
               if (header !== null) weight.recordHeader(Number(header));
               if (!response.ok) throw new Error(`exchangeInfo HTTP ${response.status}`);
               return response.json();
