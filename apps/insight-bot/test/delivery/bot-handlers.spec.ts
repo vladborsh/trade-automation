@@ -4,6 +4,8 @@ import type { User } from '../../src/users/user.model';
 import * as T from '../../src/delivery/templates/texts';
 import { oiAlertsToggled } from '../../src/delivery/templates/oi-divergence.texts';
 import { newInvite, settingsPatchFromWeb } from '../../src/users/members';
+import { CustomLevels } from '../../src/alerts/levels/custom-levels';
+import { MemoryCustomLevels } from '../alerts/levels/custom-levels.fixtures';
 
 /**
  * IB-021 — the handlers, driven through real grammY `Update` objects.
@@ -31,7 +33,7 @@ const admin: User = { ...member, id: 1, tgUserId: 111, chatId: 111, role: 'admin
 
 const CODE = 'abcdefghjkmnpqrs'; // 16 chars from the code alphabet
 
-function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}, oi: { membersVisible: boolean } | null = null) {
+function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}, oi: { membersVisible: boolean } | null = null, levels: CustomLevels | null = null) {
   const sent: string[] = [];
   const calls: Array<{ method: string; payload: Record<string, unknown> }> = [];
   const patches: Array<{ userId: number; patch: Record<string, unknown> }> = [];
@@ -63,6 +65,7 @@ function harness(over: Partial<UsersPort> = {}, users: Record<number, User> = {}
   registerHandlers(bot, {
     users: port, botUsername: 'insight_test_bot', now: () => new Date('2026-09-28T12:00:00Z'),
     ...(oi ? { oiAlerts: { membersVisible: async () => oi.membersVisible } } : {}),
+    ...(levels ? { customLevels: levels } : {}),
     web: {
       createCredentialsLink: (id) => (web ? web.createCredentialsLink(id) : Promise.resolve(null)),
       hasCredentials: async () => web?.hasCredentials ?? false,
@@ -369,6 +372,35 @@ describe('admin commands', () => {
     expect(h.sent[0]).toContain('Участники (2)');
     expect(h.sent[0]).toContain('111');
     expect(h.sent[0]).toContain('222');
+  });
+});
+
+describe('IB-128 /level — the owner\'s custom levels, admins only', () => {
+  it('a member is refused and nothing is added', async () => {
+    const store = new MemoryCustomLevels();
+    const h = harness({}, { 222: member }, null, new CustomLevels(store));
+    await h.bot.handleUpdate(text(222, '/level BTC 72000') as never);
+    await h.bot.handleUpdate(text(222, '/level del 1') as never);
+    await h.bot.handleUpdate(text(222, '/level') as never);
+    expect(h.sent).toEqual([T.ADMIN_ONLY.ru, T.ADMIN_ONLY.ru, T.ADMIN_ONLY.ru]);
+    expect(store.rows).toEqual([]);
+  });
+
+  it('the admin adds, gets the level and its id back in their language, and deletes it', async () => {
+    const store = new MemoryCustomLevels();
+    const h = harness({}, { 111: { ...admin, lang: 'en' } }, null, new CustomLevels(store));
+    await h.bot.handleUpdate(text(111, '/level BTC 72000') as never);
+    expect(h.sent[0]).toBe('Level added: #1 BTC 72,000\nDelete: /level del 1');
+    expect(store.rows[0]).toMatchObject({ symbol: 'BTCUSDT', price: 72_000, createdBy: 1 });
+    await h.bot.handleUpdate(text(111, '/level del 1') as never);
+    expect(h.sent[1]).toBe('Level deleted: #1 BTC 72,000');
+    expect(store.rows[0].deleted).toBe(true);
+  });
+
+  it('without the database /level does not exist', async () => {
+    const h = harness({}, { 111: admin });
+    await h.bot.handleUpdate(text(111, '/level BTC 72000') as never);
+    expect(h.sent).toEqual([T.UNKNOWN_COMMAND.ru]);
   });
 });
 

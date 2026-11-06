@@ -8,6 +8,8 @@ import { LOGIN_TOKEN_TTL_MS } from '../web/auth/session-cookie';
 import { registerHandlers } from './bot-handlers';
 import { DB, type Db } from '../db/db.port';
 import { PgOiAlertsVisibility } from '../alerts/oi-divergence/pg/oi-alerts.repo';
+import { CustomLevels } from '../alerts/levels/custom-levels';
+import { PgCustomLevelStore } from '../alerts/levels/pg/custom-levels.repo';
 
 /**
  * IB-021 — the member bot (design §8.6, D11): grammY **long polling**, so the instance opens no
@@ -54,6 +56,8 @@ export class TelegramBotService implements OnApplicationBootstrap, OnModuleDestr
       botUsername: this.config.env.get('TELEGRAM_BOT_USERNAME'),
       // IB-112 (V13): /oialerts is shown to members only while the admin page's members_visible is on
       ...(this.db ? { oiAlerts: new PgOiAlertsVisibility(this.db) } : {}),
+      // IB-128 (P9): /level for admins — the same service as /admin/alerts
+      ...(this.db ? { customLevels: new CustomLevels(new PgCustomLevelStore(this.db)) } : {}),
       logger: { warn: (m) => this.logger.warn(m) },
     });
 

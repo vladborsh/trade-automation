@@ -1,12 +1,15 @@
 import {
   LEVEL_BAR_SEC, LEVEL_DAILY_KINDS, LEVEL_EVENT_DIRECTION, LEVEL_LATE_SEC, LEVEL_SETTLE_SEC, levelEventOn,
-  type LevelAlertDetails, type LevelBar, type LevelInForce, type LevelKind, type LevelParams, type LevelRandomDetails, type LevelTouchDetails,
+  type CustomLevelAlertDetails, type LevelAlertDetails, type LevelBar, type LevelInForce, type LevelKind, type LevelParams, type LevelRandomDetails, type LevelTouchDetails,
   type MarketAlertSource, type WebCandle,
 } from '@trade-automation/contracts';
 import { levelsInForce } from '@trade-automation/market-data-core';
 import { barCloseMs, levelAlert } from '../../delivery/templates/level-alerts.texts';
+import { customLevelAlert } from '../../delivery/templates/custom-level-alerts.texts';
 import { isRandomBar } from './controls';
+import { customLevelAlerts } from './custom-level-step';
 import { freshState, hasState, levelStep, seedState, type LevelState } from './level-step';
+import type { CustomLevel } from './pg/custom-levels.repo';
 import { stateKey, type LevelAlertStore, type LevelSettings, type LevelStateRow, type NewLevelAlert } from './pg/level-alerts.repo';
 
 /**
@@ -28,6 +31,9 @@ import { stateKey, type LevelAlertStore, type LevelSettings, type LevelStateRow,
  *    crossover until then; breakouts and sweeps go on). One coin is seeded per tick, so ≤ 2 pages × weight 10 a minute.
  * 5. Sent only while the type's switch is on (default OFF), to users with `level_alerts`, in their language.
  * 6. P7: a `touch` per level and UTC day, 2 hash-picked `random` bars per coin and day; price paths for all, direction-free.
+ * 7. IB-128 (P9): the coin's custom levels (`custom`, read once per evaluating tick, so a deleted level never fires
+ *    after the tick that read it) on the same bar, as opens, once per (level, event, UTC day), in the same commit;
+ *    sent only to admins (`custom.recipients`). Absent `custom` (the history run) = none.
  *
  * Memory: per coin, 70 daily bars and a cursor; the state rows are re-read each tick that evaluates (≈ coins × 6).
  */
@@ -48,7 +54,16 @@ export interface LevelAlertLoopPorts {
   webBaseUrl: string;
   build: string;
   source: MarketAlertSource;
+  /** IB-128: the owner's custom levels and who hears about them; absent = none (the history run). */
+  custom?: CustomLevelPort;
   log?: { warn(message: string): void };
+}
+
+export interface CustomLevelPort {
+  /** Every active (not deleted) custom level. */
+  active(): Promise<CustomLevel[]>;
+  /** Admins with `level_alerts`, in their language. */
+  recipients(): Promise<Array<{ chatId: number; lang: 'ru' | 'en' }>>;
 }
 
 export interface LevelTickReport {
@@ -114,9 +129,10 @@ export class LevelAlertLoop {
       const behind = coins.filter((c) => (this.cursor.get(c.symbol) ?? -Infinity) < due);
       if (behind.length === 0 && this.pending.size === 0) return report;
       const states = await store.states(source);
+      const custom = behind.length > 0 ? (await this.ports.custom?.active()) ?? [] : [];
       for (const coin of behind) {
         try {
-          await this.evaluateCoin(coin, due, settings, states, nowMs, report);
+          await this.evaluateCoin(coin, due, settings, states, custom, nowMs, report);
         } catch (error) {
           report.failed.push(coin.symbol);
           this.ports.log?.warn(`level alerts ${coin.symbol}: ${(error as Error).message}`);
@@ -139,7 +155,9 @@ export class LevelAlertLoop {
     }
   }
 
-  private async evaluateCoin(coin: Coin, due: number, settings: LevelSettings, states: StateMap, nowMs: number, report: LevelTickReport): Promise<void> {
+  private async evaluateCoin(
+    coin: Coin, due: number, settings: LevelSettings, states: StateMap, custom: readonly CustomLevel[], nowMs: number, report: LevelTickReport,
+  ): Promise<void> {
     const known = this.cursor.get(coin.symbol) ?? cursorFromRows(states, coin.symbol);
     if (known !== null && known >= due) {
       // a restart between closes: the rows already saw the due bar, so nothing is read until the next close
@@ -153,8 +171,9 @@ export class LevelAlertLoop {
     report.weight += this.ports.weightOf(limit);
     if (bars.length < 2) return;
     const daily = await this.dailyOf(coin.symbol, nowMs, report);
+    const own = custom.filter((l) => l.symbol === coin.symbol);
     for (let i = 1; i < bars.length; i++) {
-      await this.evaluateBar(coin, bars[i], bars[i - 1].close, daily, settings, states, nowMs, report);
+      await this.evaluateBar(coin, bars[i], bars[i - 1].close, daily, settings, states, own, nowMs, report);
       this.cursor.set(coin.symbol, bars[i].openMs);
       report.bars++;
     }
@@ -162,7 +181,7 @@ export class LevelAlertLoop {
 
   private async evaluateBar(
     coin: Coin, bar: LevelBar, prevClose: number, daily: { fetchedAt: number; bars: WebCandle[] }, settings: LevelSettings, states: StateMap,
-    nowMs: number, report: LevelTickReport,
+    custom: readonly CustomLevel[], nowMs: number, report: LevelTickReport,
   ): Promise<void> {
     const { store, source, build } = this.ports;
     const params = settings.params;
@@ -198,6 +217,7 @@ export class LevelAlertLoop {
       }
       if (r.touch) touches.push({ ...lv, bar, from: r.touch.from, distance: r.touch.distance, touchBand: params.touchBand });
     }
+    alerts.push(...customLevelAlerts(coin.symbol, custom, bar, prevClose, late));
 
     const ids = rows.length > 0 || alerts.length > 0
       ? await store.commit({ source, build, params, confirmedAtMs: nowMs, symbol: coin.symbol, states: rows, alerts })
@@ -209,7 +229,9 @@ export class LevelAlertLoop {
       if (a.late) report.late++;
       await store.insertPaths({ marketAlertId: id }, coin.symbol, closeMs / 1000);
       if (source === 'live' && settings.enabled && !a.late) {
-        report.sent += await this.deliver(id, levelAlert(coin, a.event, a.details as LevelAlertDetails, this.ports.webBaseUrl), nowMs);
+        report.sent += a.details.kind === 'custom'
+          ? await this.deliver(id, customLevelAlert(coin, a.event, a.details as CustomLevelAlertDetails, this.ports.webBaseUrl), nowMs, 'custom')
+          : await this.deliver(id, levelAlert(coin, a.event, a.details as LevelAlertDetails, this.ports.webBaseUrl), nowMs, 'level');
       }
     }
 
@@ -295,9 +317,10 @@ export class LevelAlertLoop {
     }
   }
 
-  private async deliver(id: number, texts: { ru: string; en: string }, nowMs: number): Promise<number> {
+  private async deliver(id: number, texts: { ru: string; en: string }, nowMs: number, who: 'level' | 'custom'): Promise<number> {
     let delivered = 0;
-    for (const r of await this.ports.store.recipients()) if (await this.ports.send(r.chatId, texts[r.lang])) delivered++;
+    const recipients = who === 'custom' ? (await this.ports.custom?.recipients()) ?? [] : await this.ports.store.recipients();
+    for (const r of recipients) if (await this.ports.send(r.chatId, texts[r.lang])) delivered++;
     await this.ports.store.markFired(id, nowMs, delivered);
     return delivered;
   }

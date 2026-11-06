@@ -19,6 +19,7 @@ import type { ConsumeResult, SettingsPatch } from '../users/pg/users.repo';
 import * as T from './templates/texts';
 import { oiAlertsToggled } from './templates/oi-divergence.texts';
 import { oiAlertsVisible } from '../users/members';
+import { handleLevelCommand, type CustomLevelsPort } from './level-command';
 
 export interface UsersPort {
   findByTgUserId(tgUserId: number): Promise<User | null>;
@@ -49,6 +50,8 @@ export interface HandlerDeps {
   web?: WebAuthPort;
   /** IB-112 (V13): whether members see the OI alerts toggle. Absent → members do not; admins always do. */
   oiAlerts?: { membersVisible(): Promise<boolean> };
+  /** IB-128: the owner's custom levels behind `/level` (admins only). Absent (no database) → `/level` is unknown. */
+  customLevels?: CustomLevelsPort;
   botUsername: string;
   now?: () => Date;
   inviteTtlMs?: number;
@@ -222,6 +225,13 @@ export function registerHandlers(bot: Bot, deps: HandlerDeps): void {
         // P2: any member, any time — set up or reset; the newest link is the only one that works
         await sendCredentialsLink(ctx, user, { quietWhenUnconfigured: false });
         return;
+      case 'level': {
+        // IB-128 (P9): admins only, like /invite; without the database the command does not exist
+        if (!deps.customLevels) { await reply(ctx, T.UNKNOWN_COMMAND, lang); return; }
+        if (user.role !== 'admin') { await reply(ctx, T.ADMIN_ONLY, lang); return; }
+        await reply(ctx, await handleLevelCommand(deps.customLevels, args, user.id), lang);
+        return;
+      }
       case 'users': {
         if (user.role !== 'admin') { await reply(ctx, T.ADMIN_ONLY, lang); return; }
         const rows = await deps.users.listUsers();

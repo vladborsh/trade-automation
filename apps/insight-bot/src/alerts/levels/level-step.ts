@@ -51,7 +51,16 @@ export const freshState = (periodStartMs: number): LevelState => ({ lastSide: nu
 export function levelStep(
   kind: LevelKind, price: number, bar: LevelBar, prevClose: number, state: LevelState | null, touchBand: number,
 ): LevelStepResult {
-  const side = LEVEL_KIND_SIDE[kind];
+  return levelStepFrom(LEVEL_KIND_SIDE[kind], price, bar, prevClose, state, touchBand);
+}
+
+/**
+ * The same step by SIDE rather than kind. IB-128 (P9): a custom level is stepped as an open (`'open'`, no state):
+ * both breakouts and both sweeps, no crossunder/crossover.
+ */
+export function levelStepFrom(
+  side: 'high' | 'low' | 'open', price: number, bar: LevelBar, prevClose: number, state: LevelState | null, touchBand: number,
+): LevelStepResult {
   const L = price;
   const { high, low, close } = bar;
   const events: LevelEvent[] = [];

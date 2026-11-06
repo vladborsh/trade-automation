@@ -159,7 +159,9 @@ export class PgLevelAlertStore implements LevelAlertStore {
       fired_at: Date | null; late: boolean; recipients: number;
     }>(`select id, source, event, symbol, at, details, fired_at, late, recipients from market_alerts where type = 'level' order by at desc, id desc limit $1`, [limit]);
     return rows.map((r) => ({
-      id: Number(r.id), source: r.source, event: r.event, symbol: r.symbol, kind: r.details.kind as LevelKind, price: Number(r.details.price),
+      id: Number(r.id), source: r.source, event: r.event, symbol: r.symbol, price: Number(r.details.price),
+      // IB-128: a custom level's row names its level
+      kind: r.details.kind as LevelKind | 'custom', customLevelId: r.details.kind === 'custom' ? Number(r.details.levelId) : null,
       at: Math.floor(ms(r.at) / 1000), close: Number((r.details.bar as { close: number }).close),
       firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients,
     }));

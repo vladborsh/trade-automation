@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Op
 import { LEVEL_BAR_SEC, LEVEL_DAILY_BARS, LEVEL_SETTLE_SEC, type LevelBar } from '@trade-automation/contracts';
 import { LevelAlertLoop, type LevelTickReport, type LevelVenuePort } from '../alerts/levels/level-alert-loop';
 import { PgLevelAlertStore } from '../alerts/levels/pg/level-alerts.repo';
+import { PgCustomLevelStore } from '../alerts/levels/pg/custom-levels.repo';
 import { AppConfigService } from '../config/config.service';
 import { DB, type Db } from '../db/db.port';
 import { klinesWeight } from '../news/reaction-prices';
@@ -53,6 +54,8 @@ export class LevelAlertsService implements OnApplicationBootstrap, OnModuleDestr
       webBaseUrl: String(config.env.get('WEB_BASE_URL') ?? ''),
       build: config.env.get('BUILD_SHA'),
       source: 'live',
+      // IB-128 (P9): the owner's custom levels, heard by admins only
+      custom: new PgCustomLevelStore(db),
       log: { warn: (m) => this.logger.warn(m) },
     });
   }

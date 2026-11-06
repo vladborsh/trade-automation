@@ -16,6 +16,10 @@ import { WebAdminController } from './admin/login-events.controller';
 import { WebMembersController } from './members/members.controller';
 import { FUNDING_ALERTS_VISIBILITY, LEVEL_ALERTS_VISIBILITY, LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
 import { LEVEL_ALERTS_ADMIN, WebLevelAlertsAdminController } from './admin/level-alerts.controller';
+import { CUSTOM_LEVELS, WebCustomLevelsAdminController } from './admin/custom-levels.controller';
+import { CustomLevelsSeriesController } from './series/custom-levels.controller';
+import { CustomLevels } from '../alerts/levels/custom-levels';
+import { PgCustomLevelStore } from '../alerts/levels/pg/custom-levels.repo';
 import { LevelAlertsAdmin } from '../alerts/levels/level-alerts-admin';
 import { PgLevelAlertStore, PgLevelAlertsVisibility } from '../alerts/levels/pg/level-alerts.repo';
 import { FUNDING_ALERTS_ADMIN, WebFundingAlertsAdminController } from './admin/funding-alerts.controller';
@@ -109,6 +113,8 @@ export class WebModule {
         WebFundingAlertsAdminController,
         // IB-126: the «Levels» section
         WebLevelAlertsAdminController,
+        // IB-128: the owner's custom levels on that section, and their lines on the chart (admins)
+        WebCustomLevelsAdminController, CustomLevelsSeriesController,
         // IB-120: the /liquidations page
         LiquidationsLargeController,
         // IB-133: the /liquidations page as «episodes»
@@ -336,6 +342,12 @@ export class WebModule {
           provide: LEVEL_ALERTS_ADMIN,
           inject: [DB],
           useFactory: (db: Db | null) => (db ? new LevelAlertsAdmin(new PgLevelAlertStore(db)) : null),
+        },
+        {
+          // IB-128 (P9): the owner's custom levels, one service for the admin page, the chart and the bot
+          provide: CUSTOM_LEVELS,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new CustomLevels(new PgCustomLevelStore(db)) : null),
         },
         {
           // IB-126: the level alerts toggle, behind alert_type_settings('level').members_visible
