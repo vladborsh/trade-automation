@@ -251,6 +251,42 @@ d['alert'][0][8] = 't'; d['link_code'] = 502"
 run first-live-hidden flh-late
 check 'first-live-hidden late and a 502 link → FLAG:late,link_http' '[ "$(verdict flh-late first-live-hidden)" = FLAG:late,link_http ]'
 
+# ------------------------------------------------------------------------------------ first-live-level (levels ON 2026-11-06)
+# the row: id, event, symbol, at (bar open), confirmed_at, fired_at, recipients, late, build, kind, price,
+#          events[kind][event] (null = on), perCoin[symbol].daily, alert_type_settings.enabled
+LVL='
+d = {"now": "2026-11-06T13:20:00Z", "eligible": [["1"]], "link": "https://x/instrument/BTCUSDT?at=1793970000&tf=15m", "link_code": 200,
+     "alert": [["9001", "breakout_up", "BTCUSDT", "1793970000", "1793970905", "1793970906", "1", "f", "623a09d6390a", "PWH", "104250.5", None, "false", "t"]]}
+'
+fixture fllv-pending 'd = {"now": "2026-11-06T13:10:00Z", "alert": [], "eligible": [["1"]], "link_code": None}'
+run first-live-level fllv-pending
+check 'first-live-level none yet → PENDING: no sentinel, nothing sent, exit 0' \
+  '[ ! -e $work/out-fllv-pending/first-live-level.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-fllv-pending/first-live-level.json && [ "$(sent)" = 0 ] && [ "$(cat $work/fllv-pending.rc)" = 0 ]'
+fixture fllv-pass "$LVL"
+run first-live-level fllv-pass
+check 'first-live-level the owner only, PWH breakout, link 200 → PASS with the facts (6 s after the close); the owner is NOT told' \
+  '[ "$(verdict fllv-pass first-live-level)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"fired_after_close_s\": 6" $work/out-fllv-pass/first-live-level.json && grep -q "\"kind\": \"PWH\"" $work/out-fllv-pass/first-live-level.json'
+fixture fllv-two "$LVL
+d['alert'][0][6] = '2'; d['eligible'] = [['2']]"
+run first-live-level fllv-two
+check 'first-live-level sent to 2 (not owner-only) → FLAG:recipients,level_alerts_users' '[ "$(verdict fllv-two first-live-level)" = FLAG:recipients,level_alerts_users ]'
+fixture fllv-wo "$LVL
+d['alert'][0][9] = 'WO'; d['alert'][0][11] = 'false'"
+run first-live-level fllv-wo
+check 'first-live-level a weekly-open alert sent while WO is switched off → FLAG:kind_event_allowed (the switch is broken)' '[ "$(verdict fllv-wo first-live-level)" = FLAG:kind_event_allowed ]'
+fixture fllv-pdh "$LVL
+d['alert'][0][9] = 'PDH'"
+run first-live-level fllv-pdh
+check 'first-live-level a PDH alert on a coin without daily → FLAG:kind_event_allowed' '[ "$(verdict fllv-pdh first-live-level)" = FLAG:kind_event_allowed ]'
+fixture fllv-pdh-daily "$LVL
+d['alert'][0][9] = 'PDH'; d['alert'][0][12] = 'true'"
+run first-live-level fllv-pdh-daily
+check 'first-live-level a PDH alert on a coin WITH daily → PASS' '[ "$(verdict fllv-pdh-daily first-live-level)" = PASS ]'
+fixture fllv-late "$LVL
+d['alert'][0][7] = 't'; d['alert'][0][13] = 'f'; d['link_code'] = 502"
+run first-live-level fllv-late
+check 'first-live-level late, type off and a 502 link → FLAG:late,type_enabled,link_http' '[ "$(verdict fllv-late first-live-level)" = FLAG:late,type_enabled,link_http ]'
+
 # ------------------------------------------------------------------------------------ oi-4h-first-eval
 # IB-141 batch 3: the lines are the bot's own shape, as pinned by apps/insight-bot/test/delivery/oi-alerts-log-line.spec.ts.
 OI4H='

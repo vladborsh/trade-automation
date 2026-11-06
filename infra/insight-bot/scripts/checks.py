@@ -394,11 +394,70 @@ def first_liq_evaluate(raw):
     return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the message itself'], 'measured': measured, 'done': True}
 
 
+# ------------------------------------------------------------------------------------- first-live-level
+# Owner ruling 2026-11-06 (levels ON, owner only, weekly open OFF): the first live LEVEL alert that was SENT (one of the
+# six events, fired_at set): its facts go to a file. Bands, all read from the box, none a measured number: recipients
+# exactly 1 and exactly one user with level_alerts (owner only); not late; the level type switched on; its kind and
+# event allowed by the settings NOW (the event switch not false — WO's are — and PDH/PDL only on a coin with `daily`;
+# a custom level has its own switches and passes this row); the link (the bar's open, tf 15m, as
+# levelAlertLink builds it) answers 200 through Caddy. How long after the bar's close it fired is measured, not
+# banded. The message text is not stored: the dev-side waiter renders it with the shipped levelAlert over this row.
+# PENDING until one exists; then the timer removes itself. The owner is NOT told — he got the alert.
+
+LEVEL_EVENTS = ('breakout_up', 'breakout_down', 'sweep_above', 'sweep_below', 'crossunder', 'crossover')
+
+
+def first_level_gather():
+    raw = {'now': utc(time.time())}
+    raw['alert'] = psql("select a.id, a.event, a.symbol, extract(epoch from a.at), extract(epoch from a.confirmed_at),"
+                        " extract(epoch from a.fired_at), a.recipients, a.late, a.build, a.details->>'kind', a.details->>'price',"
+                        " s.params->'events'->(a.details->>'kind')->>a.event, coalesce(s.params->'perCoin'->a.symbol->>'daily', 'false'),"
+                        " s.enabled"
+                        " from market_alerts a cross join alert_type_settings s"
+                        " where s.type = 'level' and a.type = 'level' and a.source = 'live' and a.fired_at is not null"
+                        " and a.event in (%s) order by a.fired_at, a.id limit 1" % ', '.join("'%s'" % e for e in LEVEL_EVENTS))
+    raw['eligible'] = psql("select count(*) from users where level_alerts and not disabled and chat_id is not null")
+    raw['link_code'] = None
+    if raw['alert']:
+        a = raw['alert'][0]
+        base = env_value(os.path.join(DEPLOY_DIR, '.env'), 'WEB_BASE_URL') or ''
+        raw['link'] = '%s/instrument/%s?at=%d&tf=15m' % (base.rstrip('/'), a[2], int(float(a[3]))) if base else None
+        if raw['link']:
+            out = subprocess.run(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '15', raw['link']],
+                                 capture_output=True, text=True, timeout=30).stdout.strip()
+            raw['link_code'] = int(out) if out.isdigit() else None
+    return raw
+
+
+def first_level_evaluate(raw):
+    if not raw['alert']:
+        return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live level alert sent yet at %s' % raw['now']], 'measured': None}
+    a = raw['alert'][0]
+    at, confirmed, fired = float(a[3]), float(a[4]), float(a[5])
+    kind, switch, daily = a[9], a[11], a[12] == 'true'
+    allowed = kind == 'custom' or (switch != 'false' and (kind not in ('PDH', 'PDL') or daily))
+    flags, rows = [], []
+    rows.append(band(flags, 'recipients', int(a[6]), 1, 1))
+    rows.append(band(flags, 'level_alerts_users', int(raw['eligible'][0][0]), 1, 1))
+    rows.append(band(flags, 'late', 1 if a[7] == 't' else 0, 0, 0))
+    rows.append(band(flags, 'type_enabled', 1 if a[13] == 't' else 0, 1, 1))
+    rows.append(band(flags, 'kind_event_allowed', 1 if allowed else 0, 1, 1))
+    rows.append(band(flags, 'link_http', raw.get('link_code'), 200, 200))
+    close = at + 900
+    m = {'id': int(a[0]), 'event': a[1], 'symbol': a[2], 'kind': kind, 'price': float(a[10]) if a[10] else None,
+         'bar_open': utc(at), 'confirmed_at': utc(confirmed), 'fired_at': utc(fired), 'fired_after_close_s': round(fired - close),
+         'recipients': int(a[6]), 'level_alerts_users': int(raw['eligible'][0][0]), 'late': a[7] == 't', 'build': a[8],
+         'event_switch': switch, 'coin_daily': daily, 'link': raw.get('link'), 'link_http': raw.get('link_code')}
+    return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the alert itself',
+                                                    'the message text is checked dev-side with the shipped levelAlert over this row'],
+            'measured': m, 'done': True}
+
+
 # ------------------------------------------------------------------------------------ first-live-hidden
 # IB-144 (V42, V47; TL ruling 2026-11-06): the first live HIDDEN OI divergence alert that was SENT (kind = 'hidden',
 # fired_at set). Bands: recipients exactly 1 and exactly one user with oi_alerts (owner only); not late; its TF's
-# perTf.sendHidden is on in alert_settings (a hidden alert sent on a TF that is off means the gate is broken — 4h is
-# off); and the link answers 200 through Caddy. PENDING until one exists; then the timer removes itself. The owner is
+# perTf.sendHidden is on in alert_settings (a hidden alert sent on a TF that is off means the gate is broken; all
+# three are on since 2026-11-06, the owner's 4h ruling); and the link answers 200 through Caddy. PENDING until one exists; then the timer removes itself. The owner is
 # NOT told — he got the alert.
 
 def first_hidden_gather():
@@ -904,6 +963,7 @@ CHECKS = {
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
     'first-live-hidden': (first_hidden_gather, first_hidden_evaluate, 'IB-144: the first live hidden OI divergence alert sent (owner only, its TF switched on): facts to a file, then the timer stops'),
     'first-live-liq': (first_liq_gather, first_liq_evaluate, 'IB-143: the first live liquidation message (owner only): facts to a file, then the timer stops'),
+    'first-live-level': (first_level_gather, first_level_evaluate, 'Levels ON 2026-11-06: the first live level alert sent (owner only, WO off): facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
     'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),
     'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
