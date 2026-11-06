@@ -165,7 +165,9 @@ export const WebInsightBlockLineSchema = z.object({
     // IB-091 (D18): R10 refuses with insufficient_minutes when the premium had < 45 valid minutes.
     // IB-BUG-028: source_unavailable — every rule of the block refused because its source did not
     // answer: the rules could not LOOK, which is not «nothing unusual».
-    reason: z.enum(['nothing_unusual', 'insufficient_history', 'insufficient_minutes', 'source_unavailable', 'no_rules']),
+    // IB-BUG-048: not_rated_at_period — every rule of the block never rates at this period (7d: 30 days hold four
+    // 7-day windows), however long the history; never «not enough history».
+    reason: z.enum(['nothing_unusual', 'insufficient_history', 'insufficient_minutes', 'source_unavailable', 'no_rules', 'not_rated_at_period']),
     basis: WebInsightBasisSchema.nullable(),
     /** IB-BUG-028: the sources that did not answer — set exactly when the reason is `source_unavailable`. */
     sources: z.array(WebInsightSourceSchema).min(1).optional(),

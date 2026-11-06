@@ -48,6 +48,14 @@ describe('IB-BUG-028: a block line that could not look says so, and names the so
 });
 
 
+describe('IB-BUG-048: a block whose rules never rate at this period says so', () => {
+  const line = (neutral: object) => WebInsightBlockLineSchema.safeParse({ block: 'sentiment', statement: null, neutral: { key: 'insight.neutral', basis: null, ...neutral } });
+  it('not_rated_at_period is a reason of its own, with no sources', () => {
+    expect(line({ reason: 'not_rated_at_period' }).success).toBe(true);
+    expect(line({ reason: 'not_rated_at_period', sources: ['binance'] }).success).toBe(false);
+  });
+});
+
 describe('IB-119 (round 2 §3): a statement carries a real chart, or says it has none', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const day = require('./fixtures/insights.24h.json');
