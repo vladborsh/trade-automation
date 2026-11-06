@@ -51,7 +51,7 @@ describe('R1 liquidation surge by side', () => {
     const out = R1.run(snapshot({ liquidations: { ...snapshot().liquidations!, long: { usd: 5_000, sample: days(3) }, days: 3 } }));
     expect(out).toMatchObject({ refused: 'insufficient_history' });
   });
-  it('SILENT for 7d (D14)', () => expect(R1.run(snapshot({ period: '7d' }))).toMatchObject({ refused: 'insufficient_history' }));
+  it('SILENT for 7d (D14)', () => expect(R1.run(snapshot({ period: '7d' }))).toMatchObject({ refused: 'not_rated_at_period' }));
 });
 
 describe('R2 the coin with the most unusual liquidations', () => {
@@ -257,10 +257,19 @@ describe('IB-BUG-028: a block whose rules could not look says so, and names the 
     expect(line(onlyDvol, 'flows')?.sources).toBeUndefined();
   });
   it('precedence: a thin history still says so before a missing source', () => {
-    const rules = [R8, R9];
-    expect(neutralReason(rules, [{ refused: 'insufficient_history', basis: null }, { refused: 'no_data', basis: null }]).reason).toBe('insufficient_history');
-    expect(neutralReason(rules, [{ refused: 'no_data', basis: null }, { refused: 'no_data', basis: null }])).toEqual({ reason: 'source_unavailable', sources: ['deribit', 'defillama'] });
-    expect(neutralReason(rules, [{ refused: 'no_data', basis: null }]).reason).toBe('nothing_unusual'); // one ran
+    const no = (refused: 'insufficient_history' | 'no_data' | 'not_rated_at_period') => ({ refused, basis: null });
+    expect(neutralReason([{ rule: R8, out: no('insufficient_history') }, { rule: R9, out: no('no_data') }]).reason).toBe('insufficient_history');
+    expect(neutralReason([{ rule: R8, out: no('no_data') }, { rule: R9, out: no('no_data') }])).toEqual({ reason: 'source_unavailable', sources: ['deribit', 'defillama'] });
+    expect(neutralReason([{ rule: R8, out: no('no_data') }, { rule: R9, out: null }]).reason).toBe('nothing_unusual'); // one ran
+  });
+  it('IB-BUG-048: rules that never rate at this period are left out — alone they say so, never «not enough history»', () => {
+    const no = (refused: 'insufficient_history' | 'no_data' | 'not_rated_at_period') => ({ refused, basis: null });
+    expect(neutralReason([{ rule: R1, out: no('not_rated_at_period') }, { rule: R2, out: no('not_rated_at_period') }])).toEqual({ reason: 'not_rated_at_period' });
+    // with a rule that applies: that rule decides — looked and found nothing / thin / could not look (and only ITS sources)
+    expect(neutralReason([{ rule: R1, out: no('not_rated_at_period') }, { rule: R3, out: null }]).reason).toBe('nothing_unusual');
+    expect(neutralReason([{ rule: R1, out: no('not_rated_at_period') }, { rule: R3, out: no('insufficient_history') }]).reason).toBe('insufficient_history');
+    expect(neutralReason([{ rule: R7, out: no('not_rated_at_period') }, { rule: R8, out: no('no_data') }])).toEqual({ reason: 'source_unavailable', sources: ['deribit'] });
+    expect(neutralReason([]).reason).toBe('nothing_unusual');
   });
 });
 
@@ -298,5 +307,52 @@ describe('R11 the OI divergence alert (IB-113, V16)', () => {
     const out = runInsights(RULES, snapshot({ positioning: [r4row], oiDivergence: { alert } }));
     expect(out.blocks.find((b) => b.block === 'positioning')?.statement?.ruleId).toBe('R11');
     expect(out.top[0]?.ruleId).toBe('R11');
+  });
+});
+
+/**
+ * IB-BUG-048 — at 7d the liquidation, OI/price and breadth rules never rate (D14: 30 days hold four 7-day windows,
+ * IB-BUG-037's `not_rated_at_period` cells). They used to refuse with `insufficient_history`, so the 7d Market page
+ * could say «Пока мало истории для выводов» over a full history. Now the refusal says what it is, and a block whose
+ * rules all refuse that way says `not_rated_at_period`; a genuinely short history still says so.
+ */
+describe('IB-BUG-048 rules never rated at 7d', () => {
+  const unrated = (value: number): WebPositioningCell => ({ value, rarity: null, unavailable: 'not_rated_at_period', sample: 0 });
+  const week = (over: Partial<InsightSnapshot> = {}) => snapshot({ period: '7d', positioning: [row('BTCUSDT', { price: unrated(2), oi: unrated(3) })], ...over });
+
+  it('R1, R2 and R7 refuse 7d as not rated — with 30 days of history', () => {
+    expect(R1.run(week())).toMatchObject({ refused: 'not_rated_at_period', basis: { window: '7d' } });
+    expect(R2.run(week())).toMatchObject({ refused: 'not_rated_at_period' });
+    expect(R7.run(week())).toMatchObject({ refused: 'not_rated_at_period' });
+  });
+
+  it('a short history at 24h still refuses as insufficient_history (R1, R7)', () => {
+    expect(R1.run(snapshot({ liquidations: { ...snapshot().liquidations!, days: 3 } }))).toMatchObject({ refused: 'insufficient_history' });
+    expect(R7.run(snapshot({ breadth: { ...snapshot().breadth!, days: 5 } }))).toMatchObject({ refused: 'insufficient_history' });
+  });
+
+  it('R4: every row\'s OI/price never rated at 7d → not_rated_at_period; a row under 20 days → insufficient_history', () => {
+    expect(R4.run(week())).toMatchObject({ refused: 'not_rated_at_period' });
+    // one row not rated, one row merely short: not every row is «never rated», so the history IS the reason
+    expect(R4.run(week({ positioning: [row('BTCUSDT', { price: unrated(2), oi: unrated(3) }), row('SOLUSDT', { oi: c(1, null), price: c(1, null) })] })))
+      .toMatchObject({ refused: 'insufficient_history' });
+    expect(R4.run(snapshot({ positioning: [row('SOLUSDT', { oi: c(26, null), price: c(0.1, null) })] }))).toMatchObject({ refused: 'insufficient_history' });
+  });
+
+  it('the engine at 7d over a full history: no block says insufficient_history; liquidations is decided by R3, which applies', () => {
+    const out = runInsights(RULES, week());
+    expect(out.blocks.map((b) => b.neutral?.reason ?? 'statement').filter((r) => r === 'insufficient_history')).toEqual([]);
+    expect(out.blocks.find((b) => b.block === 'liquidations')?.neutral?.reason).toBe('nothing_unusual'); // R3 looked
+    expect(out.blocks.find((b) => b.block === 'sentiment')?.neutral?.reason).toBe('not_rated_at_period'); // R7 alone
+  });
+
+  it('the engine at 24h over a short history still says insufficient_history', () => {
+    const short = snapshot({
+      liquidations: { ...snapshot().liquidations!, days: 3, hourlyDays: 3, coins: new Map([['BTCUSDT', { usd: 1, sample: days(3), days: 3 }]]) },
+      breadth: { ...snapshot().breadth!, days: 5 },
+    });
+    const out = runInsights(RULES, short);
+    expect(out.blocks.find((b) => b.block === 'liquidations')?.neutral?.reason).toBe('insufficient_history');
+    expect(out.blocks.find((b) => b.block === 'sentiment')?.neutral?.reason).toBe('insufficient_history');
   });
 });

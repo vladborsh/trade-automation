@@ -25,7 +25,7 @@ export function runInsights(rules: readonly Rule[], s: InsightSnapshot): Omit<We
     if (own.length === 0) return { block, statement: null, neutral: { key: 'insight.neutral', reason: 'no_rules', basis: null } };
     const refusals = own.map((x) => x.out).filter((o): o is Refusal => isRefusal(o));
     const ran = own.map((x) => x.out).find((o): o is WebInsightStatement => o !== null && !isRefusal(o));
-    const { reason, sources } = neutralReason(own.map((x) => x.rule), refusals);
+    const { reason, sources } = neutralReason(own);
     return {
       block,
       statement: null,
@@ -68,14 +68,19 @@ export type { WebInsightBlock };
  * about the refusal; one rule that looked and found nothing makes it «nothing unusual». Precedence:
  * thin history, then too few premium minutes (D18), then — IB-BUG-028 — every rule refused for
  * `no_data`: the rules could not look, so the line names the sources that did not answer instead of
- * claiming the market was quiet.
+ * claiming the market was quiet. IB-BUG-048: rules refusing `not_rated_at_period` are left out first.
  */
 export function neutralReason(
-  rules: readonly Rule[], refusals: readonly Refusal[],
-): { reason: 'nothing_unusual' | 'insufficient_history' | 'insufficient_minutes' | 'source_unavailable'; sources?: WebInsightSource[] } {
-  const all = refusals.length === rules.length && rules.length > 0;
+  own: ReadonlyArray<{ rule: Rule; out: WebInsightStatement | Refusal | null }>,
+): { reason: 'nothing_unusual' | 'insufficient_history' | 'insufficient_minutes' | 'source_unavailable' | 'not_rated_at_period'; sources?: WebInsightSource[] } {
+  // IB-BUG-048: a rule that never rates at this period does not apply to it: neither a thin history nor a rule that
+  // looked. The line is decided by the rules that DO apply; when none does, it says exactly that.
+  const applying = own.filter((x) => !(isRefusal(x.out) && x.out.refused === 'not_rated_at_period'));
+  if (own.length > 0 && applying.length === 0) return { reason: 'not_rated_at_period' };
+  const refusals = applying.map((x) => x.out).filter((o): o is Refusal => isRefusal(o));
+  const all = refusals.length === applying.length && applying.length > 0;
   if (all && refusals.some((r) => r.refused === 'insufficient_history')) return { reason: 'insufficient_history' };
   if (all && refusals.some((r) => r.refused === 'insufficient_minutes')) return { reason: 'insufficient_minutes' };
-  if (all && refusals.every((r) => r.refused === 'no_data')) return { reason: 'source_unavailable', sources: [...new Set(rules.flatMap((r) => r.sources))] };
+  if (all && refusals.every((r) => r.refused === 'no_data')) return { reason: 'source_unavailable', sources: [...new Set(applying.flatMap((x) => x.rule.sources))] };
   return { reason: 'nothing_unusual' };
 }

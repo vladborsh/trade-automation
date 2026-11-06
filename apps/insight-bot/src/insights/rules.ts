@@ -1,4 +1,4 @@
-import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningRow, type WebVenueKey } from '@trade-automation/contracts';
+import { WEB_MARKET_PERIOD_SECONDS, type WebFlowsChange, type WebInsightBasis, type WebInsightStatement, type WebPositioningCell, type WebPositioningRow, type WebVenueKey } from '@trade-automation/contracts';
 import { fundingExtreme, fundingPer8h } from './funding-extreme';
 import { levelRarity, rarity } from './rarity';
 import { fngBand } from './sentiment';
@@ -58,7 +58,9 @@ export const R1: Rule = {
   run(s) {
     const l = s.liquidations;
     if (!l) return refuse('no_data');
-    if (s.period === '7d' || l.days < LIQ_RULE_MIN_DAYS) return refuse('insufficient_history', liqBasis(s, l.long.sample));
+    // IB-BUG-048: 7d is never rated (D14: 30 days hold four 7-day windows) — not a thin history
+    if (s.period === '7d') return refuse('not_rated_at_period', liqBasis(s, l.long.sample));
+    if (l.days < LIQ_RULE_MIN_DAYS) return refuse('insufficient_history', liqBasis(s, l.long.sample));
     const sides = (['long', 'short'] as const).map((side) => {
       const r = rarity(l[side].usd, l[side].sample);
       const m = median(l[side].sample);
@@ -80,7 +82,7 @@ export const R2: Rule = {
   run(s) {
     const l = s.liquidations;
     if (!l) return refuse('no_data');
-    if (s.period === '7d') return refuse('insufficient_history', liqBasis(s, []));
+    if (s.period === '7d') return refuse('not_rated_at_period', liqBasis(s, []));
     const measured = [...l.coins.entries()].filter(([, c]) => c.days >= LIQ_RULE_MIN_DAYS);
     if (measured.length === 0) return refuse('insufficient_history', liqBasis(s, []));
     const best = measured
@@ -127,17 +129,25 @@ export const R3: Rule = {
   },
 };
 
-/** The positioning rules refuse together when no row has the cell measured (under 20 days, or 7d). */
-function measuredRows(s: InsightSnapshot, has: (r: WebPositioningRow) => boolean): WebPositioningRow[] | Refusal {
+/**
+ * The positioning rules refuse together when no row has the cell measured: under 20 days, or — IB-BUG-048 — a cell
+ * that is never rated at this period (`not_rated_at_period` on every row, IB-BUG-037's 7d changes), which is not a
+ * thin history and is said as such.
+ */
+function measuredRows(
+  s: InsightSnapshot, has: (r: WebPositioningRow) => boolean, cells: (r: WebPositioningRow) => readonly WebPositioningCell[],
+): WebPositioningRow[] | Refusal {
   if (!s.positioning) return refuse('no_data');
   const rows = s.positioning.filter(has);
-  return rows.length === 0 ? refuse('insufficient_history', cellBasis(s, 0)) : rows;
+  if (rows.length > 0) return rows;
+  const neverRated = s.positioning.length > 0 && s.positioning.every((r) => cells(r).some((c) => c.unavailable === 'not_rated_at_period'));
+  return refuse(neverRated ? 'not_rated_at_period' : 'insufficient_history', cellBasis(s, 0));
 }
 
 export const R4: Rule = {
   id: 'R4', block: 'positioning', sources: ['binance'],
   run(s) {
-    const rows = measuredRows(s, (r) => r.oiChangePct.rarity !== null && r.priceChangePct.rarity !== null);
+    const rows = measuredRows(s, (r) => r.oiChangePct.rarity !== null && r.priceChangePct.rarity !== null, (r) => [r.oiChangePct, r.priceChangePct]);
     if (!Array.isArray(rows)) return rows;
     const best = rows
       .filter((r) => (r.priceChangePct.rarity as number) < RARITY_SHOW)
@@ -162,7 +172,7 @@ export const R4: Rule = {
 export const R5: Rule = {
   id: 'R5', block: 'positioning', sources: ['binance'],
   run(s) {
-    const rows = measuredRows(s, (r) => r.fundingRate.rarity !== null && r.fundingRate.value !== null);
+    const rows = measuredRows(s, (r) => r.fundingRate.rarity !== null && r.fundingRate.value !== null, (r) => [r.fundingRate]);
     if (!Array.isArray(rows)) return rows;
     // IB-135: rare for the coin AND not trivial in absolute terms; the count is of the same set
     const intervalH = (r: WebPositioningRow) => s.fundingIntervalH?.get(r.symbol) ?? null;
@@ -185,7 +195,7 @@ export const R5: Rule = {
 export const R6: Rule = {
   id: 'R6', block: 'positioning', sources: ['binance'],
   run(s) {
-    const rows = measuredRows(s, (r) => r.lsGlobal.rarity !== null && r.lsTopPosition.rarity !== null);
+    const rows = measuredRows(s, (r) => r.lsGlobal.rarity !== null && r.lsTopPosition.rarity !== null, (r) => [r.lsGlobal, r.lsTopPosition]);
     if (!Array.isArray(rows)) return rows;
     const opposed = rows
       .filter((r) => r.lsGlobal.value !== null && r.lsTopPosition.value !== null && (r.lsGlobal.value - 1) * (r.lsTopPosition.value - 1) < 0)
@@ -209,7 +219,8 @@ export const R7: Rule = {
     const b = s.breadth;
     if (!b) return refuse('no_data');
     const basis = { ...cellBasis(s, b.upShareSample.length), venues: ['binance'] };
-    if (s.period === '7d' || b.days < VENUE_RULE_MIN_DAYS) return refuse('insufficient_history', basis);
+    if (s.period === '7d') return refuse('not_rated_at_period', basis); // IB-BUG-048: by design, not thin
+    if (b.days < VENUE_RULE_MIN_DAYS) return refuse('insufficient_history', basis);
     const rUp = levelRarity(b.upShare, b.upShareSample) ?? 0;
     const rGap = levelRarity(b.altGapPct, b.altGapSample) ?? 0;
     return {

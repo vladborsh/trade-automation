@@ -57,7 +57,11 @@ export interface InsightSnapshot {
 /** A rule that could not judge: its basis is too thin, or its data is absent. */
 export interface Refusal {
   /** `insufficient_minutes` (D18): R10's premium had fewer valid minutes than it needs to call a sign. */
-  refused: 'insufficient_history' | 'insufficient_minutes' | 'no_data';
+  /**
+   * IB-BUG-048: `not_rated_at_period` — the rule never rates at this period, however long the history (a 7d window:
+   * 30 days hold four of them). Not a thin basis, so the block line must not say «not enough history».
+   */
+  refused: 'insufficient_history' | 'insufficient_minutes' | 'no_data' | 'not_rated_at_period';
   basis: WebInsightBasis | null;
 }
 
