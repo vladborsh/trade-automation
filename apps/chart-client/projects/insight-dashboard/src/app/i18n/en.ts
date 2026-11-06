@@ -273,6 +273,7 @@ export const en: Strings = {
   'liq.large.series': 'series: {count} in {minutes} min',
   'liq.large.showAll': 'Show all ({count})',
   'liq.large.showFewer': 'Show fewer',
+  'liq.large.more': 'No room on the chart for {count} more here; every one is on the liquidations page',
   'liq.large.legend': 'shorts above the line, longs below; size = amount',
   'liq.norm.median': 'normal = median over {days} days ({observed} of {total} windows with data)',
   'liq.norm.from': 'normal appears on {date}: it needs 7 days of our own data',

@@ -6,3 +6,6 @@ circle { cursor: pointer; fill-opacity: 0.85; stroke-width: 1; }
 circle.long { fill: var(--color-down); stroke: var(--color-down); }
 circle.short { fill: var(--color-up); stroke: var(--color-up); }
 .tick { fill: var(--color-text-muted); font-size: 12px; text-anchor: middle; }
+.more { font-size: 12px; font-weight: 600; text-anchor: middle; }
+.more.long { fill: var(--color-down); }
+.more.short { fill: var(--color-up); }

@@ -540,6 +540,72 @@ for (const width of [390, 320]) {
   });
 }
 
+/**
+ * IB-BUG-042 — the bubble timeline never draws one bubble over another, and keeps each inside its half:
+ * the captured 24h block (45 events, 37 shorts: master drew 363 overlapping pairs at 390), and a
+ * synthetic tower — TEST DATA, 200 shorts in three hours beside the capture's own times — that cannot
+ * fit at any radius, so some are counted in «+N». Read from the drawn DOM, at 1240 and 390.
+ */
+async function withTower(page: Page): Promise<void> {
+  const t0 = Math.min(...overview.block.large.map((e) => e.time));
+  const tower = Array.from({ length: 200 }, (_, i) => ({
+    ...overview.block.large[0], side: 'short', time: t0 + (i % 3) * 3600 + (i % 50) * 60, usd: 5e5 + (i * 7919 % 1000) * 2e4,
+  }));
+  await page.route('**/api/web/liquidations/overview**', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...overview, block: { ...overview.block, large: tower } }) }));
+}
+async function bubbleDefects(page: Page) {
+  return page.locator('app-liq-bubbles svg.chart').evaluate((svg) => {
+    const h = Number(svg.getAttribute('height'));
+    const w = Number(svg.getAttribute('width'));
+    const axisY = Number(svg.querySelector('line.axis')!.getAttribute('y1'));
+    const cs = [...svg.querySelectorAll('circle')].map((c) => ({
+      x: Number(c.getAttribute('cx')), y: Number(c.getAttribute('cy')), r: Number(c.getAttribute('r')), side: c.getAttribute('class'),
+    }));
+    const out: string[] = [];
+    for (const c of cs) {
+      if (c.y - c.r - 0.5 < 0 || c.y + c.r + 0.5 > h - 18 || c.x - c.r < 0 || c.x + c.r > w) out.push(`outside: ${JSON.stringify(c)}`);
+      if (c.side === 'short' ? c.y + c.r > axisY : c.y - c.r < axisY) out.push(`across the axis: ${JSON.stringify(c)}`);
+    }
+    for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
+      const [a, b] = [cs[i], cs[j]];
+      if (Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r + 1 - 1e-3) out.push(`overlap ${JSON.stringify(a)} ${JSON.stringify(b)}`);
+    }
+    const more = [...svg.querySelectorAll('text.more')].map((t) => Number(t.getAttribute('data-count')));
+    return { out, circles: cs.length, more: more.reduce((n, m) => n + m, 0), marks: more.length };
+  });
+}
+
+for (const width of [1240, 390]) {
+  test.describe(`IB-BUG-042 Market ${width}: bubble towers`, () => {
+    test.use(width < 768 ? { viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width, height: 900 } });
+
+    test(`the captured 24h block: no bubble over another, all inside their half (${width})`, async ({ page }, info) => {
+      await openMarket(page);
+      await expect(page.locator('app-liq-bubbles circle').first()).toBeAttached();
+      const d = await bubbleDefects(page);
+      await info.attach(`bubbles-${width}-captured.png`, { body: await page.locator('app-liq-large').screenshot(), contentType: 'image/png' });
+      expect(d.out).toEqual([]);
+      expect(d.circles + d.more).toBe(overview.block.large.length);
+    });
+
+    test(`a 200-short tower (test data): no overlap, the rest counted in «+N» (${width})`, async ({ page }, info) => {
+      await openMarket(page, withTower);
+      await expect(page.locator('app-liq-bubbles text.more').first()).toBeAttached();
+      const d = await bubbleDefects(page);
+      await info.attach(`bubbles-${width}-tower.png`, { body: await page.locator('app-liq-large').screenshot(), contentType: 'image/png' });
+      expect(d.out).toEqual([]);
+      expect(d.circles + d.more).toBe(200);
+      expect(d.marks).toBeGreaterThan(0);
+      if (width < 768) {
+        const m = await page.evaluate(() => ({ innerWidth: window.innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+        expect(m.innerWidth).toBe(width);
+        expect(m.scrollWidth).toBe(width);
+      }
+    });
+  });
+}
+
 test.describe('market page — desktop 1440×900 (IB-088)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 

@@ -286,6 +286,7 @@ export type StringKey =
   | 'liq.large.showAll'
   | 'liq.large.showFewer'
   | 'liq.large.legend'
+  | 'liq.large.more'
   | 'liq.norm.median'
   | 'liq.norm.from'
   | 'liq.norm.week'

@@ -152,7 +152,7 @@ describe('bubbleLayout — nothing cut at the edges (IB-BUG-036)', () => {
     }
   };
 
-  it('a column taller than its side squeezes, but the outermost bubble and its stroke stay inside — both sides, 390 px', () => {
+  it('a column taller than its side shrinks (IB-BUG-042), and the outermost bubble and its stroke stay inside — both sides, 390 px', () => {
     const height = 140;
     const column = [0, 1, 2, 3, 4].flatMap((i) => [ev(day.to - 600 + i, 4e6 - i, 'short'), ev(day.to - 600 + i, 4e6 - i, 'long')]);
     const { bubbles } = bubbleLayout(column, day, { width: 324, height });
@@ -160,7 +160,11 @@ describe('bubbleLayout — nothing cut at the edges (IB-BUG-036)', () => {
       expect(b.cy - b.r - STROKE_HALF).toBeGreaterThanOrEqual(0);
       expect(b.cy + b.r + STROKE_HALF).toBeLessThanOrEqual(height - HOURLY_PAD_BOTTOM);
     }
-    expect(Math.min(...bubbles.map((b) => b.cy - b.r))).toBeCloseTo(BUBBLE_EDGE_PAD); // squeezed to the edge, not left far below it
+    // IB-BUG-042: no longer squeezed against the edge on top of each other — every pair on a side apart
+    for (const a of bubbles) for (const b of bubbles) {
+      if (a !== b && a.event.side === b.event.side) expect(Math.hypot(a.cx - b.cx, a.cy - b.cy)).toBeGreaterThanOrEqual(a.r + b.r);
+    }
+    expect(Math.min(...bubbles.map((b) => b.cy - b.r))).toBeGreaterThanOrEqual(BUBBLE_EDGE_PAD);
   });
 
   // The chart's width as measured live on 2026-11-05: 1158 px at a 1240 viewport, 324 px at 390.

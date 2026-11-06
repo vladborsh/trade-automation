@@ -279,6 +279,7 @@ export const ru: Strings = {
   'liq.large.series': 'серия: {count} за {minutes} мин',
   'liq.large.showAll': 'Показать все ({count})',
   'liq.large.showFewer': 'Свернуть',
+  'liq.large.more': 'Ещё {count} здесь не поместились на графике; все они — на странице ликвидаций',
   'liq.large.legend': 'шорты над линией, лонги под ней; размер — сумма',
   'liq.norm.median': 'норма: медиана за {days} дн. ({observed} из {total} окон с данными)',
   'liq.norm.from': 'норма появится {date}: нужно 7 дней собственных данных',

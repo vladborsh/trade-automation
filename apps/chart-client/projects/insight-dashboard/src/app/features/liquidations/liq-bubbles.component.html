@@ -8,6 +8,10 @@
         <title>{{ b.event.base }} · {{ side(b.event) }} · {{ usd(b.event.usd) }} · {{ time(b.event) }}</title>
       </circle>
     }
+    <!-- IB-BUG-042: what has no room even at the smallest radius, counted near its time -->
+    @for (m of l.more; track m.side + m.x) {
+      <text [class]="'more num ' + m.side" [attr.data-count]="m.count" [attr.x]="m.x" [attr.y]="m.y">{{ m.label }}<title>{{ t('liq.large.more', { count: m.count }) }}</title></text>
+    }
     @for (tick of l.ticks; track tick.time) {
       <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ tick.label }}</text>
     }

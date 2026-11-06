@@ -9,6 +9,7 @@ import {
   type WebMarketPeriod,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
+import { BUBBLE_EDGE_GAP, fittingScale, MORE_BAND_PX, moreLabel, packSide, type PackGeometry } from './bubble-pack';
 import { formatRatio, formatUsd } from './liquidations.format';
 import { presentNote, venueNote, type VenueNote } from './venue-note';
 
@@ -167,8 +168,9 @@ export const BUBBLE_PAD_X = 20;
 /**
  * IB-BUG-036 — the circles carry a 1 px stroke, half of it outside the radius: the outermost bubble
  * of a column stops this far from the edge (top) or the label band (bottom), so it is never cut.
+ * IB-BUG-042: the packing lives in `bubble-pack.ts`; this is its value, kept here for the specs.
  */
-export const BUBBLE_EDGE_PAD = 1;
+export const BUBBLE_EDGE_PAD = BUBBLE_EDGE_GAP;
 /** A time label's glyph advance: the axis font is IBM Plex Mono 12 px, 600/1000 em a glyph. */
 export const TICK_CHAR_PX = 7.2;
 /**
@@ -182,6 +184,16 @@ export interface BubbleView<E extends WebLiquidationFeedEvent = WebLiquidationFe
   cx: number;
   cy: number;
   r: number;
+}
+
+/** IB-BUG-042: «+N» — the bubbles of one side with no room at the minimum radius, near their time. */
+export interface BubbleMore {
+  side: 'short' | 'long';
+  /** The label's centre (`text-anchor: middle`) and baseline. */
+  x: number;
+  y: number;
+  count: number;
+  label: string;
 }
 
 export interface BubbleTick {
@@ -203,35 +215,46 @@ export interface BubbleAxis {
 
 /**
  * D8(c): the bubble timeline over the period. Radius ∝ √USD (area ∝ money), shorts above the axis,
- * longs below. A bubble that would overlap one already placed on its side moves outward, so a
- * cascade reads as a column rather than one blot; the biggest are placed first, nearest the axis.
+ * longs below; the biggest are placed first, nearest the axis, so a cascade reads as a column.
+ * IB-BUG-042: `packSide` places them — no two overlap, all inside their half; a column taller than its
+ * half shrinks every radius alike, and what still has no room is counted in a «+N» mark at the edge.
  */
 export function bubbleLayout<E extends WebLiquidationFeedEvent>(
   large: readonly E[],
   window: { from: number; to: number },
   size: Size,
   axis: BubbleAxis = { days: false, offset: LOCAL_OFFSET },
-): { axisY: number; bubbles: Array<BubbleView<E>>; ticks: BubbleTick[] } {
+): { axisY: number; bubbles: Array<BubbleView<E>>; more: BubbleMore[]; ticks: BubbleTick[] } {
   const axisY = (size.height - HOURLY_PAD_BOTTOM) / 2;
   const span = Math.max(1, window.to - window.from);
   const plotW = Math.max(0, size.width - 2 * BUBBLE_PAD_X);
   const xOf = (t: number) => BUBBLE_PAD_X + (Math.min(Math.max(t, window.from), window.to) - window.from) / span * plotW;
-  const usdMax = Math.max(0, ...large.map((e) => e.usd));
-  const rMax = Math.min(BUBBLE_R_MAX, Math.max(BUBBLE_R_MIN, axisY / 2));
-  const placed: Array<BubbleView<E> & { offset: number; up: boolean }> = [];
-
-  for (const event of [...large].sort((a, b) => b.usd - a.usd)) {
-    const r = usdMax > 0 ? Math.max(BUBBLE_R_MIN, rMax * Math.sqrt(event.usd / usdMax)) : BUBBLE_R_MIN;
-    const cx = xOf(event.time);
-    const up = event.side === 'short';
-    let offset = r + 2;
-    for (const p of placed) {
-      if (p.up === up && Math.abs(p.cx - cx) < p.r + r) offset = Math.max(offset, p.offset + p.r + r + 1);
+  const geometry: PackGeometry = {
+    // Room on each side, from the axis to the top edge (shorts) or to the label band (longs): equal halves.
+    room: axisY,
+    rMax: Math.min(BUBBLE_R_MAX, Math.max(BUBBLE_R_MIN, axisY / 2)),
+    rMin: BUBBLE_R_MIN,
+    usdMax: Math.max(0, ...large.map((e) => e.usd)),
+    width: size.width,
+  };
+  const sides = (['short', 'long'] as const).map((side) => {
+    const events = large.filter((e) => e.side === side);
+    return { side, events, items: events.map((e) => ({ cx: xOf(e.time), usd: e.usd })) };
+  });
+  // one scale for both sides: the same money is the same size above and below the axis
+  const scale = Math.min(...sides.map((s) => fittingScale(s.items, geometry)));
+  const bubbles: Array<BubbleView<E>> = [];
+  const more: BubbleMore[] = [];
+  for (const s of sides) {
+    const up = s.side === 'short';
+    const packed = packSide(s.items, geometry, scale);
+    for (const b of packed.bubbles) {
+      bubbles.push({ event: s.events[b.index], cx: s.items[b.index].cx, cy: up ? axisY - b.offset : axisY + b.offset, r: b.r });
     }
-    // Room on this side, from the axis to the top edge (shorts) or to the label band (longs).
-    const room = up ? axisY : size.height - HOURLY_PAD_BOTTOM - axisY;
-    offset = Math.min(offset, Math.max(r, room - r - BUBBLE_EDGE_PAD));
-    placed.push({ event, cx, cy: up ? axisY - offset : axisY + offset, r, offset, up });
+    for (const m of packed.more) {
+      // the label's baseline inside the band: 12 px glyphs, 1 px off the edge
+      more.push({ side: s.side, x: m.x, y: up ? axisY - geometry.room + MORE_BAND_PX - 2 : axisY + geometry.room - 3, count: m.count, label: moreLabel(m.count) });
+    }
   }
 
   const times = axis.days
@@ -239,7 +262,8 @@ export function bubbleLayout<E extends WebLiquidationFeedEvent>(
     : evenTimes(window, Math.max(1, Math.floor(plotW / (TICK_MIN_GAP_PX * 1.6))));
   return {
     axisY,
-    bubbles: placed.map(({ event, cx, cy, r }) => ({ event, cx, cy, r })),
+    bubbles,
+    more,
     ticks: spacedTicks(times.map((time) => ({ time, x: xOf(time), label: axisLabel(time, axis) }))),
   };
 }
