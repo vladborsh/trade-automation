@@ -1,33 +1,35 @@
 @let l = layout();
 <div class="plot" [attr.title]="t('liq.hourly.tap')">
-  <svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height" [attr.width]="width()" [attr.height]="height"
-       role="img" [attr.aria-label]="t('liq.hourly.legend')">
-    @for (b of l.bars; track b.time) {
-      <g class="bucket" [class.partial]="b.partial" [class.outlier]="b.outlier" [class.selected]="b.time === selected()" (click)="pick(b.time)">
-        <rect class="hit" [attr.x]="b.x - 1" y="0" [attr.width]="b.w + 2" [attr.height]="height" />
-        <rect class="short" [attr.x]="b.x" [attr.y]="b.shortY" [attr.width]="b.w" [attr.height]="b.shortH" />
-        <rect class="long" [attr.x]="b.x" [attr.y]="b.longY" [attr.width]="b.w" [attr.height]="b.longH" />
-      </g>
+  @if (width()) { <!-- IB-BUG-043: nothing until the host is measured -->
+    <svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height" [attr.width]="width()" [attr.height]="height"
+         role="img" [attr.aria-label]="t('liq.hourly.legend')">
+      @for (b of l.bars; track b.time) {
+        <g class="bucket" [class.partial]="b.partial" [class.outlier]="b.outlier" [class.selected]="b.time === selected()" (click)="pick(b.time)">
+          <rect class="hit" [attr.x]="b.x - 1" y="0" [attr.width]="b.w + 2" [attr.height]="height" />
+          <rect class="short" [attr.x]="b.x" [attr.y]="b.shortY" [attr.width]="b.w" [attr.height]="b.shortH" />
+          <rect class="long" [attr.x]="b.x" [attr.y]="b.longY" [attr.width]="b.w" [attr.height]="b.longH" />
+        </g>
+      }
+      <line class="axis" x1="0" [attr.x2]="width()" [attr.y1]="l.axisY" [attr.y2]="l.axisY" />
+      @if (l.norm.shortY !== null) {
+        <line class="norm" x1="0" [attr.x2]="width()" [attr.y1]="l.norm.shortY" [attr.y2]="l.norm.shortY" />
+      }
+      @if (l.norm.longY !== null) {
+        <line class="norm" x1="0" [attr.x2]="width()" [attr.y1]="l.norm.longY" [attr.y2]="l.norm.longY" />
+      }
+      @for (c of l.callouts; track c.x) {
+        <text class="callout num" [attr.x]="c.x" y="12">{{ c.text }}</text>
+      }
+      @for (tick of l.ticks; track tick.time) {
+        <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
+      }
+    </svg>
+    <!-- IB-108: the largest and the latest bucket, beside their bars -->
+    @for (f of flags(); track f.kind) {
+      <span class="flag" [attr.data-flag]="f.kind" [attr.data-side]="f.side" [class.right]="f.anchor === 'right'"
+            [style.left.px]="f.anchor === 'left' ? f.x : null" [style.right.px]="f.anchor === 'right' ? width() - f.x : null"
+            [style.top.px]="f.y">{{ flagText(f) }}</span>
     }
-    <line class="axis" x1="0" [attr.x2]="width()" [attr.y1]="l.axisY" [attr.y2]="l.axisY" />
-    @if (l.norm.shortY !== null) {
-      <line class="norm" x1="0" [attr.x2]="width()" [attr.y1]="l.norm.shortY" [attr.y2]="l.norm.shortY" />
-    }
-    @if (l.norm.longY !== null) {
-      <line class="norm" x1="0" [attr.x2]="width()" [attr.y1]="l.norm.longY" [attr.y2]="l.norm.longY" />
-    }
-    @for (c of l.callouts; track c.x) {
-      <text class="callout num" [attr.x]="c.x" y="12">{{ c.text }}</text>
-    }
-    @for (tick of l.ticks; track tick.time) {
-      <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ label(tick.time) }}</text>
-    }
-  </svg>
-  <!-- IB-108: the largest and the latest bucket, beside their bars -->
-  @for (f of flags(); track f.kind) {
-    <span class="flag" [attr.data-flag]="f.kind" [attr.data-side]="f.side" [class.right]="f.anchor === 'right'"
-          [style.left.px]="f.anchor === 'left' ? f.x : null" [style.right.px]="f.anchor === 'right' ? width() - f.x : null"
-          [style.top.px]="f.y">{{ flagText(f) }}</span>
   }
 </div>
 @if (l.empty) {

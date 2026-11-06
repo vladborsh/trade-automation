@@ -446,10 +446,9 @@ for (const width of [390, 320]) {
 
     test(`Market with long numbers: no page scroll at ${width}; the compact box inside its card`, async ({ page }) => {
       await openMarket(page, withLongNumbers);
-      // The charts draw at hostWidth's fallback (342 px) and re-render at their box's width on the next
-      // tick; under page.clock that tick waits for the clock, and a stale 342 px chart widens a 320 px
-      // phone's layout viewport to 375 (7 of 15 runs before this line). Let the tick happen.
-      await page.clock.runFor(100);
+      // No `page.clock.runFor` here since IB-BUG-043: the charts used to draw at hostWidth's 342 px
+      // fallback and re-render on a clock-frozen tick, which widened a 320 px phone to 375. They now
+      // draw nothing until measured, and the first drawing is at the measured width.
       const f = await fit(page, 'app-positioning-block');
       expect(f.innerWidth).toBe(width);
       expect(f.scrollWidth).toBe(width);
@@ -471,6 +470,72 @@ for (const width of [390, 320]) {
       await expect(fade).toHaveCSS('opacity', '0');
       await box.evaluate((el) => { el.scrollLeft = 0; });
       await expect(fade).toHaveCSS('opacity', '1');
+    });
+  });
+}
+
+/**
+ * IB-BUG-043 — every hostWidth chart's FIRST drawing fits its host. An init script records each width
+ * an `svg.chart` inside one of them is ever given — at insertion and on every change, with the value it
+ * replaced — before the app boots, so a frame that lived for one tick is still seen. Before the fix
+ * each chart was inserted at 342 px (the fallback) and corrected on the next ResizeObserver tick,
+ * wider than a 320 or 390 phone's plot (≈ 324 at 390). No `page.clock.runFor` before measuring.
+ */
+const SVG_HOSTS = ['app-liq-hourly', 'app-liq-bubbles', 'app-caps-treemap', 'app-pos-quadrant'] as const;
+async function recordSvgWidths(page: Page): Promise<void> {
+  await page.addInitScript((hosts: readonly string[]) => {
+    const seen: { host: string; w: number }[] = [];
+    (window as unknown as { __svgWidths: typeof seen }).__svgWidths = seen;
+    const hostOf = (el: Element) => hosts.find((h) => el.closest(h)) ?? null;
+    const note = (el: Element, w: string | null) => {
+      const host = hostOf(el);
+      if (host && w !== null) seen.push({ host, w: Number(w) });
+    };
+    new MutationObserver((recs) => {
+      for (const r of recs) {
+        if (r.type === 'attributes') {
+          const el = r.target as Element;
+          if (el.matches('svg.chart')) { note(el, r.oldValue); note(el, el.getAttribute('width')); }
+        } else {
+          for (const n of r.addedNodes) {
+            if (!(n instanceof Element)) continue;
+            for (const svg of [n, ...n.querySelectorAll('svg.chart')]) if (svg.matches('svg.chart')) note(svg, svg.getAttribute('width'));
+          }
+        }
+      }
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeOldValue: true, attributeFilter: ['width'] });
+  }, SVG_HOSTS);
+}
+async function svgFit(page: Page) {
+  return page.evaluate((hosts: readonly string[]) => ({
+    innerWidth: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    seen: (window as unknown as { __svgWidths: { host: string; w: number }[] }).__svgWidths,
+    hostWidth: Object.fromEntries(hosts.map((h) => [h, document.querySelector(h)?.clientWidth ?? null])),
+  }), SVG_HOSTS);
+}
+
+for (const width of [390, 320]) {
+  test.describe(`IB-BUG-043 phone ${width}: a chart's first frame is no wider than its host`, () => {
+    test.use({ viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+
+    for (const [name, url, open, hosts] of [
+      ['Market', '/market?p=24h', openMarket, ['app-liq-hourly', 'app-liq-bubbles', 'app-caps-treemap']],
+      ['/positioning', '/positioning?p=24h', openPositioning, ['app-pos-quadrant']],
+    ] as const) test(`${name} (${url}): ${hosts.join(', ')} never drawn wider than the host`, async ({ page }) => {
+      await recordSvgWidths(page);
+      await open(page);
+      for (const h of hosts) await expect(page.locator(`${h} svg.chart`)).toBeVisible();
+      const f = await svgFit(page);
+      expect(f.innerWidth).toBe(width); // a mobile browser widens innerWidth to fit an overflow
+      expect(f.scrollWidth).toBe(width);
+      for (const h of hosts) {
+        const ws = f.seen.filter((s) => s.host === h).map((s) => s.w);
+        expect(ws.length, `${h}: no width recorded — the recorder proves nothing`).toBeGreaterThan(0);
+        expect(f.hostWidth[h]).toBeLessThan(342); // or the 342 fallback would fit and prove nothing
+        expect(Math.min(...ws), `${h}: drawn at 0 before it was measured (its template lacks @if (width()))`).toBeGreaterThan(0);
+        expect(Math.max(...ws), `${h} widths ever drawn: ${ws.join(', ')}; host ${f.hostWidth[h]}`).toBeLessThanOrEqual(f.hostWidth[h]!);
+      }
     });
   });
 }
@@ -981,7 +1046,7 @@ for (const width of [1240, 390, 320]) {
       await gotoReady(page, '/market?p=24h', { served: ['/market/flows'], ready: card.locator('article.tile').first() }); // IB-BUG-045
       await page.clock.runFor(2_000);
       await expect(card.locator('article.tile')).toHaveCount(4);
-      await page.clock.runFor(100); // the mini-charts' re-render at their box width (see IB-BUG-041 above)
+      await page.clock.runFor(100); // the flows mini-charts (lightweight-charts, not hostWidth) re-render at their box width
       const details = card.locator('app-flows-help details');
       await expect(details).not.toHaveAttribute('open');
       await expect(card.locator('app-flows-help summary')).toHaveText(lang === 'ru' ? 'Как читать эти показатели?' : 'How to read these figures?');

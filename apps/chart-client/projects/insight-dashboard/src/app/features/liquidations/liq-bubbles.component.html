@@ -1,13 +1,15 @@
 @let l = layout();
-<svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height" [attr.width]="width()" [attr.height]="height"
-     role="img" [attr.aria-label]="t('liq.large.legend')">
-  <line class="axis" x1="0" [attr.x2]="width()" [attr.y1]="l.axisY" [attr.y2]="l.axisY" />
-  @for (b of l.bubbles; track b.event.time + b.event.symbol + b.event.venue + b.event.usd) {
-    <circle [class]="b.event.side" [attr.cx]="b.cx" [attr.cy]="b.cy" [attr.r]="b.r" (click)="open(b.event)">
-      <title>{{ b.event.base }} · {{ side(b.event) }} · {{ usd(b.event.usd) }} · {{ time(b.event) }}</title>
-    </circle>
-  }
-  @for (tick of l.ticks; track tick.time) {
-    <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ tick.label }}</text>
-  }
-</svg>
+@if (width()) { <!-- IB-BUG-043: nothing until the host is measured -->
+  <svg class="chart" [attr.viewBox]="'0 0 ' + width() + ' ' + height" [attr.width]="width()" [attr.height]="height"
+       role="img" [attr.aria-label]="t('liq.large.legend')">
+    <line class="axis" x1="0" [attr.x2]="width()" [attr.y1]="l.axisY" [attr.y2]="l.axisY" />
+    @for (b of l.bubbles; track b.event.time + b.event.symbol + b.event.venue + b.event.usd) {
+      <circle [class]="b.event.side" [attr.cx]="b.cx" [attr.cy]="b.cy" [attr.r]="b.r" (click)="open(b.event)">
+        <title>{{ b.event.base }} · {{ side(b.event) }} · {{ usd(b.event.usd) }} · {{ time(b.event) }}</title>
+      </circle>
+    }
+    @for (tick of l.ticks; track tick.time) {
+      <text class="tick num" [attr.x]="tick.x" [attr.y]="height - 4">{{ tick.label }}</text>
+    }
+  </svg>
+}
