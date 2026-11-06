@@ -479,7 +479,7 @@ case "$1" in
     # IB-145: the CLI as the image would run it — its gate is MEM_START_FLOOR_MB when passed (-e), else 170;
     # FAKE_CLI=old plays an image from before 95366a24, which ignores the env and does not name its floor
     all="$*"; floor=170; case "$all" in *MEM_START_FLOOR_MB=*) floor="${all#*MEM_START_FLOOR_MB=}"; floor="${floor%% *}" ;; esac
-    who=oi; case "$*" in *liq-backfill.cli.js*) who=liq ;; *funding-backfill.cli.js*) who=funding ;; esac
+    who=oi; case "$*" in *liq-backfill.cli.js*) who=liq ;; *funding-backfill.cli.js*) who=funding ;; *level-backfill.cli.js*) who=level ;; esac
     n=0; [ -n "${FAKE_COUNT:-}" ] && { n=$(( $(cat "$FAKE_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$n" >"$FAKE_COUNT"; }
     cli="$FAKE_CLI"; [ -n "${FAKE_OK_FROM:-}" ] && [ "$n" -ge "$FAKE_OK_FROM" ] && cli=ok
     case "$cli" in
@@ -541,6 +541,7 @@ check 'check-wait.sh: DEFERRED:* exits 3 (not 4, which means «the owner already
 # box-backfill.sh and liq-backfill.sh take --start-floor N (history-gate.sh: 140–500), pass it as docker exec -e, report
 # which gate the CLI applied, and turn a gate refusal into «DEFERRED:…», exit 3. The same stub docker plays the CLI.
 BOX="$HERE/box-backfill.sh"; LIQR="$HERE/liq-backfill.sh"; FUNDR="$HERE/funding-backfill.sh"   # IB-125: the funding runner too
+LEVR="$HERE/level-backfill.sh"   # IB-127: the level runner too
 hr() { # $1 = case, $2 = FAKE_CLI, then the command → $work/hr-<case>.{stdout,rc,docker}
   local c="$1" cli="$2"; shift 2
   mkdir -p "$work/hr-$c"
@@ -550,11 +551,12 @@ hr() { # $1 = case, $2 = FAKE_CLI, then the command → $work/hr-<case>.{stdout,
 }
 last() { tail -1 "$work/hr-$1.stdout"; }
 rc_of() { cat "$work/hr-$1.rc"; }
-for r in box liq funding; do
+for r in box liq funding level; do
   case $r in
     box) S="$BOX"; A=(--write) ;;
     liq) S="$LIQR"; A=(--write --until 2026-11-05T16:59:34.379Z --counts-to 2026-11-11T00:00:00Z) ;;
     funding) S="$FUNDR"; A=(--write --until 2026-11-06T22:00:00Z) ;;
+    level) S="$LEVR"; A=(--write --until 2026-11-06T05:30:00Z) ;;
   esac
   hr $r-140 ok bash "$S" "${A[@]}" --start-floor 140
   check "$r: --start-floor 140 → docker exec -e MEM_START_FLOOR_MB=140, the CLI applied 140, exit 0" \
@@ -584,6 +586,8 @@ check 'liq: --start-floor reaches the env, never the CLI argv; --until / --count
   "! grep -q -- '--start-floor' $work/hr-liq-140.docker && grep -q -- 'liq-backfill.cli.js --write --until 2026-11-05T16:59:34.379Z --counts-to 2026-11-11T00:00:00Z\$' $work/hr-liq-140.docker"
 check 'funding: --start-floor reaches the env, never the CLI argv; --until does; the funding CLI is the one started' \
   "! grep -q -- '--start-floor' $work/hr-funding-140.docker && grep -q -- 'funding-backfill.cli.js --write --until 2026-11-06T22:00:00Z\$' $work/hr-funding-140.docker"
+check 'level: --start-floor reaches the env, never the CLI argv; --until does; the level CLI is the one started; output named ib127-write-*' \
+  "! grep -q -- '--start-floor' $work/hr-level-140.docker && grep -q -- 'level-backfill.cli.js --write --until 2026-11-06T05:30:00Z\$' $work/hr-level-140.docker && ls $work/hr-level-140/ib127-write-*.out >/dev/null"
 check 'box: the flag goes after the mode only; anything else → usage, exit 2' \
   "hr box-junk ok bash '$BOX' --write --bogus; [ \$(rc_of box-junk) = 2 ]"
 hr box-oldok old bash "$BOX" --write --start-floor 140
