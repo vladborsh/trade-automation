@@ -474,6 +474,72 @@ def first_level_evaluate(raw):
             'measured': m, 'done': True}
 
 
+# -------------------------------------------------------------------------------- first-live-liq-held
+# IB-148 (§2b, L17–L19): the first live liquidation `event` row that was HELD (details.heldUntil: a small event sent
+# after its hold) or MERGED (details.mergedInto: a small event taken in by a larger same-side one, never sent).
+# PENDING until one exists; then the timer removes itself. The owner is NOT told.
+# Bands:
+# - held: sent at heldUntil ± one tick (10 s; fired_at is the tick that sent it), recipients exactly 1, not late;
+# - merged: the row itself not sent (fired_at null, recipients 0), and the large event it names exists and was sent
+#   to exactly 1 (its first message, or a continuation that was news). For how = 'before' the large first message's
+#   details.merged must hold this row's T0 (its «Перед этим» line). For how = 'after' there is no such entry by
+#   design: the large message went out before the small one existed, and L17 forbids an edit.
+
+LIQ_HELD_TICK_S = 10
+
+
+def first_held_gather():
+    raw = {'now': utc(time.time())}
+    raw['row'] = psql("select id, symbol, extract(epoch from at), extract(epoch from fired_at), recipients, late, build,"
+                      " details->>'side', details->>'eventAt', details->>'heldUntil',"
+                      " details#>>'{mergedInto,eventAt}', details#>>'{mergedInto,how}', details->>'totalUsd'"
+                      " from market_alerts where type = 'liq' and source = 'live' and event = 'event'"
+                      " and (details ? 'heldUntil' or details ? 'mergedInto') order by id limit 1")
+    raw['large'] = []
+    if raw['row'] and raw['row'][0][10]:
+        r = raw['row'][0]
+        raw['large'] = psql("select id, event, extract(epoch from fired_at), recipients, coalesce(details->>'news', 'true'),"
+                            " coalesce((select string_agg(m->>'eventAt', ',') from jsonb_array_elements(details->'merged') m), '')"
+                            " from market_alerts where type = 'liq' and source = 'live' and event in ('event', 'event_continuing')"
+                            " and details->>'side' = '%s' and details->>'eventAt' = '%s' order by id" % (r[7], r[10]))
+    return raw
+
+
+def first_held_evaluate(raw):
+    if not raw['row']:
+        return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live held or merged liquidation event yet at %s' % raw['now']], 'measured': None}
+    r = raw['row'][0]
+    flags, rows, notes = [], [], []
+    at = float(r[2])
+    fired = float(r[3]) if r[3] else None
+    m = {'id': int(r[0]), 'symbol': r[1], 'side': r[7], 'at': utc(at), 'fired_at': utc(fired) if fired is not None else None,
+         'recipients': int(r[4]), 'late': r[5] == 't', 'build': r[6], 'total_usd': float(r[12]) if r[12] else None}
+    if r[9]:
+        due = float(r[9]) / 1000
+        m.update({'kind': 'held', 'held_until': utc(due), 'held_s': round(due - at)})
+        rows.append(band(flags, 'recipients', int(r[4]), 1, 1))
+        rows.append(band(flags, 'late', 1 if r[5] == 't' else 0, 0, 0))
+        rows.append(band(flags, 'fired_minus_held_until_s', None if fired is None else round(fired - due), -LIQ_HELD_TICK_S, LIQ_HELD_TICK_S, ' s'))
+        m['fired_minus_held_until_s'] = None if fired is None else round(fired - due)
+    else:
+        how, into = r[11], r[10]
+        m.update({'kind': 'merged', 'how': how, 'merged_into': utc(float(into) / 1000)})
+        rows.append(band(flags, 'merged_row_sent', 0 if fired is None and int(r[4]) == 0 else 1, 0, 0))
+        large = raw.get('large') or []
+        sent = [x for x in large if x[2] and (x[1] == 'event' or x[4] == 'true')]
+        rows.append(band(flags, 'large_rows', len(large), 1, 2))
+        rows.append(band(flags, 'large_sent_recipients', int(sent[0][3]) if sent else 0, 1, 1))
+        first = [x for x in large if x[1] == 'event']
+        m['large'] = [{'id': int(x[0]), 'event': x[1], 'fired': x[2] != '', 'recipients': int(x[3]), 'merged': x[5]} for x in large]
+        if how == 'before':
+            listed = first[0][5].split(',') if first and first[0][5] else []
+            rows.append(band(flags, 'large_lists_it', 1 if r[8] in listed else 0, 1, 1))
+        else:
+            notes.append("how = 'after': the large message went out before this row; by design (L17) it is not edited and lists nothing")
+    notes.append('the owner was not told')
+    return {'flags': flags, 'rows': rows, 'notes': notes, 'measured': m, 'done': True}
+
+
 # ------------------------------------------------------------------------------------ first-live-hidden
 # IB-144 (V42, V47; TL ruling 2026-11-06): the first live HIDDEN OI divergence alert that was SENT (kind = 'hidden',
 # fired_at set). Bands: recipients exactly 1 and exactly one user with oi_alerts (owner only); not late; its TF's
@@ -999,6 +1065,7 @@ CHECKS = {
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
     'first-live-hidden': (first_hidden_gather, first_hidden_evaluate, 'IB-144: the first live hidden OI divergence alert sent (owner only, its TF switched on): facts to a file, then the timer stops'),
     'first-live-liq': (first_liq_gather, first_liq_evaluate, 'IB-143: the first live liquidation message (owner only): facts to a file, then the timer stops'),
+    'first-live-liq-held': (first_held_gather, first_held_evaluate, 'IB-148: the first live HELD or MERGED liquidation event (owner only): facts to a file, then the timer stops'),
     'first-live-hidden-4h': (lambda: first_hidden_gather('4h', HIDDEN_4H_ENABLED_AT), first_hidden_4h_evaluate, 'Owner ruling 2026-11-06: the first live 4h hidden OI divergence alert sent since 4h was switched on: facts to a file, then the timer stops'),
     'first-live-level': (first_level_gather, first_level_evaluate, 'Levels ON 2026-11-06: the first live level alert sent (owner only, WO off): facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),

@@ -235,6 +235,56 @@ d['msg'][0][4] = '1793921371'; d['msg'][0].append('1793921300000')"
 run first-live-liq fll-held-slow
 check 'first-live-liq held, fired 71 s after its hold ended → FLAG:fired_after_moment_s' '[ "$(verdict fll-held-slow first-live-liq)" = FLAG:fired_after_moment_s ]'
 
+# --------------------------------------------------------------------------------- first-live-liq-held (IB-148)
+# row: id, symbol, at, fired_at, recipients, late, build, side, eventAt, heldUntil, mergedInto.eventAt, mergedInto.how, totalUsd
+# large: id, event, fired_at, recipients, news, merged eventAts
+HELD='
+d = {"now": "2026-11-07T02:00:00Z", "large": [],
+     "row": [["140", "BNBUSDT", "1793921180", "1793921307", "1", "f", "5d8f57fdc8d4", "long", "1793921100000", "1793921300000", "", "", "400000"]]}
+'
+MERGED='
+d = {"now": "2026-11-07T02:00:00Z",
+     "row": [["141", "BNBUSDT", "1793921180", "", "0", "f", "5d8f57fdc8d4", "long", "1793921100000", "", "1793921250000", "before", "400000"]],
+     "large": [["142", "event", "1793921440", "1", "true", "1793921100000"], ["143", "event_continuing", "", "0", "false", ""]]}
+'
+fixture flh-pending 'd = {"now": "2026-11-07T01:00:00Z", "row": [], "large": []}'
+run first-live-liq-held flh-pending
+check 'first-live-liq-held none yet → PENDING: no sentinel, nothing sent, exit 0' \
+  '[ ! -e $work/out-flh-pending/first-live-liq-held.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-flh-pending/first-live-liq-held.json && [ "$(sent)" = 0 ] && [ "$(cat $work/flh-pending.rc)" = 0 ]'
+fixture flh-held "$HELD"
+run first-live-liq-held flh-held
+check 'first-live-liq-held held, sent 7 s after heldUntil to the owner → PASS, held_s 120' \
+  '[ "$(verdict flh-held first-live-liq-held)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"held_s\": 120" $work/out-flh-held/first-live-liq-held.json && grep -q "\"fired_minus_held_until_s\": 7" $work/out-flh-held/first-live-liq-held.json'
+fixture flh-held-off "$HELD
+d['row'][0][3] = '1793921325'; d['row'][0][4] = '2'"
+run first-live-liq-held flh-held-off
+check 'first-live-liq-held held, sent 25 s after heldUntil to 2 → FLAG:recipients,fired_minus_held_until_s' \
+  '[ "$(verdict flh-held-off first-live-liq-held)" = FLAG:recipients,fired_minus_held_until_s ]'
+fixture flh-merged "$MERGED"
+run first-live-liq-held flh-merged
+check 'first-live-liq-held merged before: not sent, the large one sent to 1 and lists it → PASS' \
+  '[ "$(verdict flh-merged first-live-liq-held)" = PASS ] && grep -q "\"how\": \"before\"" $work/out-flh-merged/first-live-liq-held.json'
+fixture flh-merged-unlisted "$MERGED
+d['large'][0][5] = ''"
+run first-live-liq-held flh-merged-unlisted
+check 'first-live-liq-held merged before but the large message does not list it → FLAG:large_lists_it' \
+  '[ "$(verdict flh-merged-unlisted first-live-liq-held)" = FLAG:large_lists_it ]'
+fixture flh-merged-sent "$MERGED
+d['row'][0][3] = '1793921181'; d['row'][0][4] = '1'"
+run first-live-liq-held flh-merged-sent
+check 'first-live-liq-held a merged row that was sent → FLAG:merged_row_sent' \
+  '[ "$(verdict flh-merged-sent first-live-liq-held)" = FLAG:merged_row_sent ]'
+fixture flh-after "$MERGED
+d['row'][0][11] = 'after'; d['large'] = [['142', 'event', '1793921000', '1', 'true', ''], ['143', 'event_continuing', '1793921150', '1', 'true', '']]"
+run first-live-liq-held flh-after
+check 'first-live-liq-held merged after: the large event sent (first + news continuation), nothing listed by design → PASS' \
+  '[ "$(verdict flh-after first-live-liq-held)" = PASS ] && grep -q "not edited" $work/out-flh-after/first-live-liq-held.json'
+fixture flh-orphan "$MERGED
+d['large'] = []"
+run first-live-liq-held flh-orphan
+check 'first-live-liq-held merged into an event with no rows → FLAG' \
+  '[ "$(verdict flh-orphan first-live-liq-held)" = FLAG:large_rows,large_sent_recipients,large_lists_it ]'
+
 # ------------------------------------------------------------------------------------ first-live-hidden (IB-144)
 HID='
 d = {"now": "2026-11-06T03:00:00Z", "eligible": [["1"]], "link": "https://x/instrument/ETHUSDT?at=1793929500&tf=15m", "link_code": 200,
