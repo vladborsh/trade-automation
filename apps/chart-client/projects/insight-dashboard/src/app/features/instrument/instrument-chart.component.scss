@@ -72,6 +72,12 @@
 }
 @media (max-width: 767px) {
   .entry.toggle::before { content: ''; position: absolute; inset: -14px -6px; } /* a ≥ 40 px target, not a bigger legend */
+  /*
+   * IB-129: with several switches stacked, a neighbour's 40 px target reached over this one's label and took the
+   * tap (the later one in the DOM won). Under every button's own box (`-1` inside the legend's stacking context,
+   * still over its background): a tap on a label is that switch; only the gaps fall to the nearest target.
+   */
+  .entry.toggle::before { z-index: -1; }
 }
 
 .swatch {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DIVERGENCES_HIDDEN_KEY, HIDDEN_DIVERGENCES_HIDDEN_KEY, LEGENDS_HIDDEN_KEY, loadDivergencesHidden, loadLegendsHidden,
-  saveDivergencesHidden, saveLegendsHidden,
+  saveDivergencesHidden, saveLegendsHidden, CHART_LAYERS, layerHiddenKey, loadLayerHidden, saveLayerHidden,
 } from './chart-prefs';
 
 /** IB-099 item 2 — the legend toggle is remembered, and a hostile store costs nothing. */
@@ -45,5 +45,23 @@ describe('divergence switches (IB-110, IB-144) — one remembered pref per kind,
     expect(loadDivergencesHidden(throwing, 'hidden')).toBe(false);
     expect(() => saveDivergencesHidden(throwing, true, 'hidden')).not.toThrow();
     expect(loadDivergencesHidden(null, 'hidden')).toBe(false);
+  });
+});
+
+describe('layer switches (IB-129) — one remembered pref per kind, independent, shown by default', () => {
+  it('each layer has its own key; hiding one leaves the others shown, and the choice comes back', () => {
+    const s = memory();
+    for (const l of CHART_LAYERS) expect(loadLayerHidden(s, l)).toBe(false);
+    saveLayerHidden(s, 'fundingAlerts', true);
+    expect(CHART_LAYERS.filter((l) => loadLayerHidden(s, l))).toEqual(['fundingAlerts']);
+    expect(new Set(CHART_LAYERS.map(layerHiddenKey)).size).toBe(CHART_LAYERS.length);
+    expect(CHART_LAYERS.map(layerHiddenKey)).not.toContain(DIVERGENCES_HIDDEN_KEY);
+    saveLayerHidden(s, 'fundingAlerts', false);
+    expect(loadLayerHidden(s, 'fundingAlerts')).toBe(false);
+  });
+  it('a store that throws or is missing: shown, and saving does not throw', () => {
+    expect(loadLayerHidden(throwing, 'liqAlerts')).toBe(false);
+    expect(() => saveLayerHidden(throwing, 'liqAlerts', true)).not.toThrow();
+    expect(loadLayerHidden(null, 'liqAlerts')).toBe(false);
   });
 });

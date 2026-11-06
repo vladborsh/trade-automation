@@ -16,7 +16,7 @@ import type {
   WebLiquidationsLargeResponse,
   WebLiquidationEpisodesResponse,
 } from '@trade-automation/contracts';
-import { WebLiquidationEpisodesResponseSchema } from '@trade-automation/contracts';
+import { WebAlertMarksResponseSchema, WebLiquidationEpisodesResponseSchema, type WebAlertMarksResponse } from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
 import { toWebApiError } from './web-api-error';
@@ -90,6 +90,14 @@ export class InsightApiClient {
   /** IB-110 (V11): the OI divergence lines of a coin on 15m, 1h or 4h, computed by the server on open. */
   async oiDivergences(symbol: string, tf: OiDivergenceTf): Promise<WebOiDivergenceSeriesResponse> {
     return this.get<WebOiDivergenceSeriesResponse>('/series/oi-divergences', { symbol, tf });
+  }
+
+  /**
+   * IB-129 — the liquidation and funding alerts of one coin in a window, for the price pane's markers. Parsed
+   * by the contract: a mark is placed and labelled from these fields, so an answer that breaks them is an error.
+   */
+  async alertMarks(symbol: string, fromMs: number, toMs: number): Promise<WebAlertMarksResponse> {
+    return WebAlertMarksResponseSchema.parse(await this.get<unknown>('/series/alert-marks', { symbol, from: fromMs, to: toMs }));
   }
 
   async openInterest(symbol: string, fromMs: number, toMs: number): Promise<WebOpenInterestResponse> {

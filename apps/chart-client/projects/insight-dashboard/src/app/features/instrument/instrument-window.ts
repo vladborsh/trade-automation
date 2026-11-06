@@ -1,4 +1,5 @@
-import type { EconomicEvent, WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
+import type { EconomicEvent, WebAlertMark, WebCandle, WebLiquidationEventsResponse, WebTimeframe } from '@trade-automation/contracts';
+import { monthStart } from '@trade-automation/market-data-core';
 import type { InsightApiClient } from '../../core/insight-api.client';
 import { calendarWindow } from './future-bars';
 import type { PaneData } from './pane-data';
@@ -13,9 +14,19 @@ export interface WindowRequest {
   bucket: string;
 }
 
-/** How far before the window the daily candles reach: the first ISO week on screen needs the whole week before it. */
+/**
+ * How far before the window the daily candles reach. The first ISO week on screen needs the whole week before
+ * it (14 days covered that); IB-129: the first MONTH on screen needs the whole month before it, for PMH/PML.
+ * So: the 1st of the month before the window's first month, or 14 days back if that is earlier. A 1d read of
+ * ≤ 62 bars more than the window, one Binance page (weight 1–2, `candles.service.ts`).
+ */
 export const LEVELS_LOOKBACK_DAYS = 14;
-const LEVELS_LOOKBACK_MS = LEVELS_LOOKBACK_DAYS * 86_400_000;
+/** The most `levelsFromMs` reaches back: the 31st of a month after a 31-day month is 30 + 31 days past its start. */
+export const LEVELS_LOOKBACK_MAX_DAYS = 62;
+export function levelsFromMs(fromMs: number): number {
+  const previousMonth = monthStart(monthStart(Math.floor(fromMs / 1000)) - 1) * 1000;
+  return Math.min(previousMonth, fromMs - LEVELS_LOOKBACK_DAYS * 86_400_000);
+}
 
 /**
  * Everything the chart draws for one time window, in one round of parallel reads. Used for the
@@ -31,15 +42,16 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
   const { symbol, fromMs, toMs, timeframe, bucket } = req;
   // IB-065: every read but the candles covers at most the window's last 90 days (`sideWindow`)
   const side = sideWindow(fromMs, toMs);
-  const [candles, daily, oi, funding, longShort, liquidations, events, calendar] = await Promise.all([
+  const [candles, daily, oi, funding, longShort, liquidations, events, calendar, alertMarks] = await Promise.all([
     api.candles(symbol, fromMs, toMs, timeframe, 'perp'),
-    fetchDaily(api, symbol, fromMs - LEVELS_LOOKBACK_MS, toMs),
+    fetchDaily(api, symbol, levelsFromMs(fromMs), toMs),
     api.openInterest(symbol, side.fromMs, side.toMs),
     api.funding(symbol, side.fromMs, side.toMs),
     api.longShort(symbol, side.fromMs, side.toMs, 'global_account'),
     api.liquidations(symbol, side.fromMs, side.toMs, bucket),
     fetchLiquidationEvents(api, symbol, side.fromMs, side.toMs, timeframe),
     fetchCalendar(api, calendarWindow(side.fromMs, side.toMs)),
+    fetchAlertMarks(api, symbol, fromMs, toMs),
   ]);
   return {
     instrument: `binance:${symbol}`,
@@ -55,6 +67,7 @@ export async function fetchWindow(api: InsightApiClient, req: WindowRequest): Pr
     liquidationVenues: events.venuesPresent,
     dailyCandles: daily,
     calendarEvents: calendar,
+    ...(alertMarks ? { alertMarks } : {}),
   };
 }
 
@@ -129,5 +142,17 @@ async function fetchCalendar(api: InsightApiClient, range: { fromMs: number; toM
     return (await api.calendarEvents(range.fromMs, range.toMs)).events;
   } catch {
     return [];
+  }
+}
+
+/**
+ * IB-129 — the alert marks for the whole window (they are sparse: one DB read, no venue call). A failed read
+ * is undefined: no markers and no legend entries, the chart is whole without them.
+ */
+async function fetchAlertMarks(api: InsightApiClient, symbol: string, fromMs: number, toMs: number): Promise<readonly WebAlertMark[] | undefined> {
+  try {
+    return (await api.alertMarks(symbol, fromMs, toMs)).marks;
+  } catch {
+    return undefined;
   }
 }

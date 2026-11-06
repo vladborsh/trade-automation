@@ -1,7 +1,8 @@
-import { signal } from '@angular/core';
+import { inject, signal } from '@angular/core';
 import type { WebOiDivergenceLine } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
-import type { DivergencePrefs } from './divergence-prefs';
+import { DivergencePrefs } from './divergence-prefs';
+import { LayerPrefs, NO_LAYERS_OFF } from './layer-prefs';
 import { divergenceTf } from './oi-divergence-lines';
 import type { PaneData } from './pane-data';
 
@@ -13,6 +14,10 @@ import type { PaneData } from './pane-data';
  *
  * A switch only changes the lines, so its merge is marked `extendsLater`: the chart redraws on the
  * same time scale and the reader's zoom and scroll survive (`carried-view.ts`).
+ *
+ * IB-129: the merge also applies the other legend switches (`layer-prefs.ts`) the same way: a hidden alert
+ * kind is left out of `alertMarks` (an empty list keeps the legend's switch), the hidden level lines are named
+ * in `layersOff`, and flipping any of them redraws in place. One merge, so the in-place rule cannot differ.
  */
 export class DivergenceOverlay {
   readonly lines = signal<{ key: string; lines: readonly WebOiDivergenceLine[] } | null>(null);
@@ -20,7 +25,7 @@ export class DivergenceOverlay {
   private lastPanes: PaneData | null = null;
   private lastSwitches: string | null = null;
 
-  constructor(private readonly api: InsightApiClient, private readonly prefs: DivergencePrefs) {}
+  constructor(private readonly api: InsightApiClient, private readonly prefs: DivergencePrefs, private readonly layers?: LayerPrefs) {}
 
   /** For a symbol and chart frame; other frames, or a failed read, have none (and say nothing). */
   async load(symbol: string, timeframe: string): Promise<void> {
@@ -41,7 +46,8 @@ export class DivergenceOverlay {
     if (!panes) return null;
     const got = this.lines();
     const off = { regular: this.prefs.hidden(), hidden: this.prefs.hiddenKindHidden() };
-    const switches = `${off.regular}:${off.hidden}`;
+    const layersOff = this.layers?.off() ?? NO_LAYERS_OFF;
+    const switches = `${off.regular}:${off.hidden}:${Object.values(layersOff).join(':')}`;
     // `instrument` is the venue-qualified id (`binance:BTCUSDT`); the lines were asked for the bare symbol
     const symbol = panes.instrument.split(':').pop();
     const lines = got && got.key === `${symbol}:${panes.timeframe}` ? got.lines : undefined;
@@ -50,6 +56,11 @@ export class DivergenceOverlay {
     this.lastPanes = panes;
     this.lastSwitches = switches;
     const divergences = lines?.filter((l) => !off[l.kind]);
-    return { ...panes, divergences, ...(inPlace ? { extendsLater: true } : {}) };
+    const alertMarks = panes.alertMarks?.filter((m) => !(m.type === 'liq' ? layersOff.liqAlerts : layersOff.fundingAlerts));
+    return { ...panes, divergences, alertMarks, layersOff, ...(inPlace ? { extendsLater: true } : {}) };
   }
 }
+
+/** The page's overlay with both sets of switches injected; called in a field initializer (an injection context). */
+export const injectDivergenceOverlay = (api: InsightApiClient): DivergenceOverlay =>
+  new DivergenceOverlay(api, inject(DivergencePrefs), inject(LayerPrefs));

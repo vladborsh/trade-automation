@@ -3,6 +3,7 @@ import type { StringKey } from '../../i18n/keys';
 import { legendEntries, paneLegends } from './pane-legend';
 import { PANELS } from './panels.model';
 import { LEVEL_COLOURS } from './prior-levels';
+import { ALERT_MARK_COLOURS } from './alert-marks';
 import { SESSIONS } from './trading-sessions';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
 import { CLOSED_BAND_SWATCH } from './weekend-bands';
@@ -16,9 +17,11 @@ const funding = PANELS.find((p) => p.key === 'funding')!;
 describe('legendEntries', () => {
   it('keys the session bands, the level lines, the event lines and the closed bands on the price pane', () => {
     const entries = legendEntries(price, { timeframe: '15m' }, t);
-    expect(entries).toHaveLength(price.legend.length + SESSIONS.length + 4);
+    expect(entries).toHaveLength(price.legend.length + SESSIONS.length + 7);
     expect(entries.slice(price.legend.length).map((e) => e.colour)).toEqual([
-      ...SESSIONS.map((s) => s.swatch), LEVEL_COLOURS.day, LEVEL_COLOURS.week, EVENT_LINE_COLOUR, CLOSED_BAND_SWATCH,
+      ...SESSIONS.map((s) => s.swatch), LEVEL_COLOURS.day, LEVEL_COLOURS.week,
+      LEVEL_COLOURS.month, LEVEL_COLOURS.open, LEVEL_COLOURS.open, // IB-129: PMH/PML, WO, MO
+      EVENT_LINE_COLOUR, CLOSED_BAND_SWATCH,
     ]);
     expect(entries.at(-2)?.line).toBe(true);
     expect(entries.at(-1)?.line).toBe(false);
@@ -26,11 +29,30 @@ describe('legendEntries', () => {
   });
 
   it('drops the sessions where they are not drawn (4h, 1d), keeps the levels and the events', () => {
-    expect(legendEntries(price, { timeframe: '4h' }, t)).toHaveLength(price.legend.length + 4);
+    expect(legendEntries(price, { timeframe: '4h' }, t)).toHaveLength(price.legend.length + 7);
     // and on 1d the closed bands too: every bar is a day there
     const daily = legendEntries(price, { timeframe: '1d' }, t);
-    expect(daily).toHaveLength(price.legend.length + 3);
+    expect(daily).toHaveLength(price.legend.length + 6);
     expect(daily.map((e) => e.colour)).not.toContain(CLOSED_BAND_SWATCH);
+  });
+
+  it('IB-129: PMH/PML, WO and MO are switches, each its own, struck through while off', () => {
+    const off = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: true, monthOpen: false };
+    const layers = legendEntries(price, { timeframe: '15m' }, t, undefined, off).filter((e) => e.layer);
+    expect(layers.map((e) => [e.layer, e.off, e.line])).toEqual([['prevMonth', false, true], ['weekOpen', true, true], ['monthOpen', false, true]]);
+    expect(layers.map((e) => e.label)).toEqual([ru['instrument.legend.prevMonth'], ru['instrument.legend.weekOpen'], ru['instrument.legend.monthOpen']]);
+  });
+
+  it('IB-129: the two alert kinds appear once the marks answered (an empty list too), never when the read failed', () => {
+    const kinds = (marks: unknown) => legendEntries(price, { timeframe: '15m', alertMarks: marks as never }, t)
+      .filter((e) => e.layer === 'liqAlerts' || e.layer === 'fundingAlerts');
+    expect(kinds(undefined)).toEqual([]);
+    const [liq, fund] = kinds([]);
+    expect([liq.layer, fund.layer]).toEqual(['liqAlerts', 'fundingAlerts']);
+    expect(liq.colours).toEqual([ALERT_MARK_COLOURS.liqLong, ALERT_MARK_COLOURS.liqShort]); // one swatch per side
+    expect(fund.colours).toEqual([ALERT_MARK_COLOURS.funding]);
+    // on the price pane only
+    expect(legendEntries(funding, { timeframe: '15m', alertMarks: [] }, t).some((e) => e.layer)).toBe(false);
   });
 
   it('leaves the other panes alone', () => {

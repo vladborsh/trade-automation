@@ -46,6 +46,9 @@ export function prependEarlier(current: PaneData, earlier: PaneData): PaneData {
     // Calendar windows meet at the seam, and an event exactly on it can come back in both: one per
     // id, the current read winning (it may carry a later revision).
     calendarEvents: byId([...earlier.calendarEvents, ...current.calendarEvents]),
+    // IB-129: the two reads' windows meet at the seam (`to` exclusive), so a mark is in one of them; joined
+    // oldest first. Absent in both only when both reads failed; one failed read keeps the other's marks.
+    ...(earlier.alertMarks || current.alertMarks ? { alertMarks: [...(earlier.alertMarks ?? []), ...(current.alertMarks ?? [])] } : {}),
     extendsPrevious: true,
     extendsLater: false,
   };

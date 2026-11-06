@@ -1,7 +1,7 @@
 import {
   WEB_MAX_1M_RANGE_DAYS, WEB_MAX_CANDLE_BARS, WEB_MAX_POINTS, WebLiquidationBucketSchema, WebTimeframeSchema,
 } from '@trade-automation/contracts';
-import { LEVELS_LOOKBACK_DAYS } from './instrument-window';
+import { LEVELS_LOOKBACK_MAX_DAYS } from './instrument-window';
 import { bucketFor, isServed, sideWindow, TIMEFRAMES, timeframeLabel, WINDOW_DAYS, windowFor } from './time-range';
 
 const NOW = Date.UTC(2026, 9, 24, 12, 0, 0);
@@ -62,7 +62,7 @@ describe('sideWindow (IB-065: the reads that are not candles)', () => {
 
 describe('every offered timeframe is served (isServed)', () => {
   it('no frame\'s window has a read the server refuses or thins', () => {
-    for (const tf of TIMEFRAMES) expect(isServed(tf, LEVELS_LOOKBACK_DAYS)).toBe(true);
+    for (const tf of TIMEFRAMES) expect(isServed(tf, LEVELS_LOOKBACK_MAX_DAYS)).toBe(true); // IB-129: the month lookback
   });
 
   it('says no when a read would be refused: a levels lookback past the candle cap', () => {

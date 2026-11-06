@@ -13,8 +13,7 @@ import { InstrumentContextComponent } from './instrument-context.component';
 import { nowTiles } from './instrument-now';
 import { instrumentTailJobs } from './instrument-tail';
 import { focusFromQuery, parseTf, type FocusView } from './focus-at';
-import { DivergenceOverlay } from './divergence-overlay';
-import { DivergencePrefs } from './divergence-prefs';
+import { injectDivergenceOverlay } from './divergence-overlay';
 import { LegendToggleComponent } from './legend-toggle.component';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
@@ -61,7 +60,7 @@ export class InstrumentComponent {
 
   readonly panes = signal<PaneData | null>(null);
   /** IB-110: the OI divergence lines, merged into what the chart draws (`divergence-overlay.ts`). */
-  private readonly divergences = new DivergenceOverlay(this.api, inject(DivergencePrefs));
+  private readonly divergences = injectDivergenceOverlay(this.api); // IB-129: and the other legend switches
   readonly chartData = computed(() => this.divergences.merge(this.panes()));
   readonly top = signal<WebTopLiquidation[]>([]);
   /**

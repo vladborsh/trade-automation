@@ -13,6 +13,7 @@ import type { PaneData } from './pane-data';
 import { browserStore, loadPaneHeights, paneEdges, totalPaneHeight, type PaneHeights } from './pane-heights';
 import { PaneDrag } from './pane-drag';
 import { DivergencePrefs } from './divergence-prefs';
+import { LayerPrefs } from './layer-prefs';
 import { paneLegends } from './pane-legend';
 import {
   PANELS, PANEL_PRICE_SCALE, instrumentChartOptions, showWholeWindow,
@@ -108,8 +109,10 @@ export class InstrumentChartComponent implements OnDestroy {
 
   /** IB-110, IB-144: the two divergence legend entries are the switches for the lines (`divergence-prefs.ts`). */
   readonly divergencePrefs = inject(DivergencePrefs);
+  /** IB-129: the alert-mark kinds and the PMH/PML, WO, MO lines, one switch each (`layer-prefs.ts`). */
+  readonly layerPrefs = inject(LayerPrefs);
   readonly legends = computed(() => paneLegends(this.t, this.data(), this.symbol(), this.edges(),
-    { regular: this.divergencePrefs.hidden(), hidden: this.divergencePrefs.hiddenKindHidden() }));
+    { regular: this.divergencePrefs.hidden(), hidden: this.divergencePrefs.hiddenKindHidden() }, this.layerPrefs.off()));
 
   /** IB-060: the bar under the crosshair, and the economic events on it for the tooltip. */
   readonly hover = signal<{ time: number; x: number } | null>(null);

@@ -6,6 +6,7 @@ import {
   WebLiquidationsResponseSchema, WebLoginEventsResponseSchema, WebLongShortResponseSchema, WebMarketCardsResponseSchema, WebMeResponseSchema,
   WebMembersResponseSchema, WebOpenInterestResponseSchema, WebPositioningResponseSchema, WebStreamsResponseSchema, WebTopLiquidationSchema,
   WebUniverseSummaryResponseSchema, WebUniverseTopResponseSchema, WebLiqAlertsAdminResponseSchema, WebFundingAlertsAdminResponseSchema, WebLevelAlertsAdminResponseSchema,
+  WebAlertMarksResponseSchema,
 } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -60,6 +61,8 @@ const RECORDINGS: Record<string, Record<string, z.ZodTypeAny>> = {
     '/calendar/events': WebCalendarEventsResponseSchema,
     '/context/cards': WebMarketCardsResponseSchema,
     '/liquidations/overview': WebLiquidationsOverviewResponseSchema,
+    // IB-129: the alert marks (the box had no live rows in the recorded window, 2026-11-02/03)
+    '/series/alert-marks': WebAlertMarksResponseSchema,
     '/series/candles': WebCandlesResponseSchema,
     '/series/funding': WebFundingResponseSchema,
     '/series/liquidations': WebLiquidationsResponseSchema,

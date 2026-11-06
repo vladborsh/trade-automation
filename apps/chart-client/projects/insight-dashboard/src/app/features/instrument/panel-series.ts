@@ -1,6 +1,8 @@
 import {
-  CandlestickSeries, LineSeries, LineStyle, LineType, type IChartApi, type IPaneApi, type Time,
+  CandlestickSeries, LineSeries, LineStyle, LineType, createSeriesMarkers, type IChartApi, type IPaneApi,
+  type ISeriesMarkersPluginApi, type Time,
 } from 'lightweight-charts';
+import { toAlertMarkers } from './alert-marks';
 import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
 import { calendarMarks, EVENT_LINE_COLOUR, type CalendarMark } from './calendar-marks';
 import { daySeparatorTimes, showsDaySeparators } from './day-separators';
@@ -10,8 +12,7 @@ import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
 import { divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, OI_CONTRACTS_SCALE } from './oi-divergence-lines';
 import type { PaneData } from './pane-data';
 import { paneIndexOf, type PanelDef } from './panels.model';
-import { previousDayLevels, previousWeekLevels } from '@trade-automation/market-data-core';
-import { LEVEL_COLOURS, LEVEL_LINES, levelSteps } from './prior-levels';
+import { levelLines, type LevelDash } from './prior-levels';
 import {
   toCandleData, toCvdSegments, toFundingSteps, toLongShortLine, toOpenInterestPoints,
   toPredictedFunding, toTakerDelta,
@@ -37,10 +38,12 @@ export interface PanelRenderers {
   markers: LiquidationMarkersPrimitive;
   /** IB-066: the pane primitives drawn, so a redraw in place can take them off again. */
   paneMarks: Array<{ pane: IPaneApi<Time>; primitive: TimeMarksPrimitive }>;
+  /** IB-129: the alert markers on the candles (`alert-marks.ts`); null until the price pane is drawn. */
+  alertMarkers: ISeriesMarkersPluginApi<Time> | null;
 }
 
 export function createPanelRenderers(): PanelRenderers {
-  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive(), paneMarks: [] };
+  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive(), paneMarks: [], alertMarkers: null };
 }
 
 /**
@@ -77,26 +80,27 @@ function drawPrice(chart: IChartApi, data: PaneData, renderers: PanelRenderers, 
   renderers.markers.setMarkers(toLiquidationMarkers(data.liquidationEvents, {
     barSeconds: barSeconds(data.timeframe),
   }));
+
+  // IB-129 (alerts design §5): the liquidation and funding alerts, as the library's markers on the candles.
+  // They live on this series, so a redraw in place (a new series) takes them along and the old ones go with it.
+  renderers.alertMarkers = createSeriesMarkers(price, toAlertMarkers(data.alertMarks ?? [], candleTimes(data), barSeconds(data.timeframe)) as never);
 }
 
+const DASH: Record<LevelDash, LineStyle> = { dashed: LineStyle.Dashed, dotted: LineStyle.Dotted, sparse: LineStyle.SparseDotted };
+
 /**
- * PDH/PDL/PWH/PWL (prior-levels.ts): thin dashed steps, titled on the price axis. Left out of the
- * pane's autoscale: on 1m the previous week's range can be ten times the day's, and a scale
- * stretched to reach it would flatten the candles; a level off the visible scale is off screen.
+ * The level lines (`levelLines` in prior-levels.ts): thin steps, titled on the price axis. Left out of the
+ * pane's autoscale: on 1m the previous week's range can be ten times the day's, and a scale stretched to
+ * reach it would flatten the candles; a level off the visible scale is off screen. IB-129: PMH/PML, WO and
+ * MO join them, each left out while its legend switch is off (`data.layersOff`).
  */
 function drawLevels(chart: IChartApi, data: PaneData, pane: number): void {
-  const times = candleTimes(data);
-  const periods = { day: previousDayLevels(data.dailyCandles), week: previousWeekLevels(data.dailyCandles) };
-  for (const line of LEVEL_LINES) {
-    // IB-065: on 1w a day is inside a bar; its levels would land on Mondays only, as fragments
-    if (line.period === 'day' && data.timeframe === '1w') continue;
-    const points = levelSteps(periods[line.period], times, line.pick);
-    if (points.length === 0) continue;
+  for (const line of levelLines(data.dailyCandles, candleTimes(data), data.timeframe, data.layersOff)) {
     chart.addSeries(LineSeries, {
-      color: LEVEL_COLOURS[line.period], lineWidth: 1, lineStyle: LineStyle.Dashed, lineType: LineType.WithSteps,
+      color: line.colour, lineWidth: 1, lineStyle: DASH[line.dash], lineType: LineType.WithSteps,
       title: line.title, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
       autoscaleInfoProvider: () => null,
-    }, pane).setData(points as never);
+    }, pane).setData(line.points as never);
   }
 }
 

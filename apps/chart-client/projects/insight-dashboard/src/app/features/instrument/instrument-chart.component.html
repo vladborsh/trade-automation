@@ -4,7 +4,16 @@
     <div class="pane-legend" [attr.data-pane]="legend.key" [style.top.px]="legend.top">
       <span class="pane-title">{{ legend.heading }}</span>
       @for (entry of legend.entries; track entry.label) {
-        @if (entry.toggle) {
+        @if (entry.layer) {
+          <!-- IB-129: a switch for one layer (an alert kind, a level line); struck through while hidden -->
+          <button type="button" class="entry toggle" [class.off]="entry.off" [attr.aria-pressed]="!entry.off"
+                  [attr.data-layer]="entry.layer" [attr.title]="t('instrument.legend.layerToggle', { name: entry.label })"
+                  (click)="layerPrefs.toggle(entry.layer)">
+            @for (colour of entry.colours; track $index) {
+              <span class="swatch" [class.line]="entry.line" [style.background]="colour"></span>
+            }{{ entry.label }}
+          </button>
+        } @else if (entry.toggle) {
           <!-- IB-110: a switch for what it keys; struck through while the lines are hidden. IB-144: one per kind -->
           <button type="button" class="entry toggle" [class.off]="entry.off" [attr.aria-pressed]="!entry.off"
                   [attr.data-toggle]="entry.toggle"

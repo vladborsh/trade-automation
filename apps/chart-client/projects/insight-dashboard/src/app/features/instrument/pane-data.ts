@@ -1,8 +1,9 @@
 import type {
-  EconomicEvent, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
+  EconomicEvent, WebAlertMark, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
   WebLongShortResponse, WebOiDivergenceLine,
 } from '@trade-automation/contracts';
 import type { Coverage } from './coverage-labels';
+import type { LayersOff } from './layer-prefs';
 
 /**
  * One window of everything the instrument row draws. Lifted out of
@@ -48,6 +49,14 @@ export interface PaneData {
    * keeps its entry, which is how they are shown again.
    */
   divergences?: readonly WebOiDivergenceLine[];
+  /**
+   * IB-129 — the liquidation and funding alerts in the window (`/series/alert-marks`), for the price pane's
+   * markers. Absent when the read failed: no markers and no legend entries. Hidden kinds are left out of it
+   * (`layer-prefs.ts`), so the legend keeps its switch while the list has none of them.
+   */
+  alertMarks?: readonly WebAlertMark[];
+  /** IB-129 — the layers the reader switched off: the alert marks' kinds and the PMH/PML, WO and MO lines. */
+  layersOff?: LayersOff;
   /**
    * True when this is the previous window with earlier history prepended (scrolling left), so the
    * chart keeps the reader's view instead of jumping to the whole window. Absent on a fresh load.

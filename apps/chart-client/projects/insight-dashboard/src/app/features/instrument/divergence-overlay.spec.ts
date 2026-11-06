@@ -75,4 +75,27 @@ describe('DivergenceOverlay', () => {
     expect(onlyHidden.divergences).toEqual([hiddenLine]);
     expect(onlyHidden.extendsLater).toBe(true);
   });
+
+  it('IB-129: a hidden alert kind is left out of the marks (an empty list keeps the switch), the hidden lines are named, and each switch redraws in place', async () => {
+    const { overlay, prefs } = build();
+    let off = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: false, monthOpen: false };
+    const layers = { off: () => off };
+    const withLayers = new DivergenceOverlay({ oiDivergences: async () => ({ lines: [] }) } as never, prefs as never, layers as never);
+    const liq = { type: 'liq', at: 1 } as never;
+    const fund = { type: 'funding', at: 2 } as never;
+    const p = { ...panes('binance:BTCUSDT', '1m'), alertMarks: [liq, fund] } as PaneData;
+    expect(withLayers.merge(p)?.alertMarks).toEqual([liq, fund]);
+    off = { ...off, liqAlerts: true };
+    const noLiq = withLayers.merge(p)!;
+    expect(noLiq.alertMarks).toEqual([fund]);
+    expect(noLiq.extendsLater).toBe(true);
+    off = { ...off, fundingAlerts: true, monthOpen: true };
+    const none = withLayers.merge(p)!;
+    expect(none.alertMarks).toEqual([]);
+    expect(none.layersOff).toMatchObject({ monthOpen: true, prevMonth: false });
+    expect(none.extendsLater).toBe(true);
+    // a failed marks read stays absent; without layer prefs nothing is off
+    expect(withLayers.merge({ ...panes('binance:BTCUSDT', '1m') } as PaneData)?.alertMarks).toBeUndefined();
+    expect(overlay.merge(p)?.alertMarks).toEqual([liq, fund]);
+  });
 });

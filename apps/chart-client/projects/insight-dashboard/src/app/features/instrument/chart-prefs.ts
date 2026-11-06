@@ -50,3 +50,30 @@ export function saveDivergencesHidden(store: KeyValueStore | null, hidden: boole
     // blocked storage: the choice lasts until the page is closed
   }
 }
+
+/**
+ * IB-129 (alerts design §5) — the other chart layers with a legend switch: the liquidation and funding alert
+ * marks, and the PMH/PML, weekly-open and monthly-open lines. Each kind is its own switch, shown by default.
+ */
+export const CHART_LAYERS = ['liqAlerts', 'fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen'] as const;
+export type ChartLayer = (typeof CHART_LAYERS)[number];
+
+export const layerHiddenKey = (layer: ChartLayer): string => `insight.instrument.layerHidden.${layer}`;
+
+export function loadLayerHidden(store: KeyValueStore | null, layer: ChartLayer): boolean {
+  if (!store) return false;
+  try {
+    return store.getItem(layerHiddenKey(layer)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveLayerHidden(store: KeyValueStore | null, layer: ChartLayer, hidden: boolean): void {
+  if (!store) return;
+  try {
+    store.setItem(layerHiddenKey(layer), hidden ? '1' : '0');
+  } catch {
+    // blocked storage: the choice lasts until the page is closed
+  }
+}

@@ -62,6 +62,14 @@ describe('prependEarlier', () => {
     expect(out.dailyCandles.map((c) => [c.time, c.close])).toEqual([[-86_400, 1], [0, 5], [86_400, 6]]);
   });
 
+  it('IB-129: alert marks join oldest first; one failed read keeps the other\'s; both failed stays absent', () => {
+    const m = (at: number) => ({ type: 'liq' as const, at, side: 'long' as const, sumUsd: 1, thresholdUsd: 1, byVenue: { binance: 1, bybit: 0, okx: 0 } });
+    expect(prependEarlier(window(3_600, { alertMarks: [m(3_700)] }), window(0, { alertMarks: [m(100)] })).alertMarks?.map((x) => x.at)).toEqual([100, 3_700]);
+    expect(prependEarlier(window(3_600, { alertMarks: [m(3_700)] }), window(0)).alertMarks?.map((x) => x.at)).toEqual([3_700]);
+    expect(prependEarlier(window(3_600), window(0, { alertMarks: [m(100)] })).alertMarks?.map((x) => x.at)).toEqual([100]);
+    expect(prependEarlier(window(3_600), window(0)).alertMarks).toBeUndefined();
+  });
+
   it('venues are a union without repeats', () => {
     const out = prependEarlier(window(7_200), window(3_600, { liquidationVenues: ['binance', 'bybit'] }));
     expect([...out.liquidationVenues].sort()).toEqual(['binance', 'bybit']);
