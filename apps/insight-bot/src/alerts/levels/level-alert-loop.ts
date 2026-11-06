@@ -129,7 +129,8 @@ export class LevelAlertLoop {
       const behind = coins.filter((c) => (this.cursor.get(c.symbol) ?? -Infinity) < due);
       if (behind.length === 0 && this.pending.size === 0) return report;
       const states = await store.states(source);
-      const custom = behind.length > 0 ? (await this.ports.custom?.active()) ?? [] : [];
+      // read on every tick that does work (a seed-only tick too: one indexed read, a few minutes per coin, once)
+      const custom = (await this.ports.custom?.active()) ?? [];
       for (const coin of behind) {
         try {
           await this.evaluateCoin(coin, due, settings, states, custom, nowMs, report);
