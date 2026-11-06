@@ -52,6 +52,18 @@ export const LIQ_SETTLE_SEC = 60;
 export const LIQ_SEND_CAP_SEC = 180;
 /** L11: an event closes at the latest this long after T0 (= the quiet of its first coin). */
 export const LIQ_EVENT_MAX_SEC = LIQ_QUIET_SEC;
+/**
+ * L16 (IB-148): an event is "small" when it has one member whose sum at S is below this × its own threshold. Only a
+ * small event is ever held back or merged.
+ */
+export const LIQ_SMALL_MULT = 3;
+/** L16: another event takes a small one in when its `totalUsd` is at least this × the small one's sum. */
+export const LIQ_MERGE_RATIO = 10;
+/**
+ * L16–L18: the merge window, inclusive, both ways: a small event whose T0 is ≤ this after a large close is
+ * absorbed (L17); a small event is held this long after its S for a large one to open (L18).
+ */
+export const LIQ_MERGE_SEC = 120;
 /** L6: an `at` older than this when it is found is journalled `late` and never sent. */
 export const LIQ_LATE_SEC = 300;
 /** L8: a near-miss is the hour's largest window sum at ≥ this × the threshold that fired nothing. */
@@ -172,10 +184,23 @@ const liqEventShape = {
   binanceFootnote: z.boolean(),
 };
 
+/** L17 / L18 (IB-148): how a small event was merged: after a large event's close, or folded into the next one. */
+export const LIQ_MERGE_HOW = ['after', 'before'] as const;
+
 /** `event = 'event'` (L12): the first message of a market event, at S. The row's `at` is S. */
 export const LiqEventDetailsSchema = z.object({
   ...liqEventShape,
   settled: z.enum(LIQ_EVENT_SETTLED),
+  /**
+   * L18 (IB-148): a small event held back after S, then sent: the moment its message was due (S + 120 s, or the S
+   * of the same-side event that opened during the hold and did not take it in). `sentAt` stays S, the event's own
+   * settle moment, which the grouping reads. Absent: not held.
+   */
+  heldUntil: z.number().int().optional(),
+  /** L17 / L18: a small event taken in by the same-side event with this T0; journalled, never sent. */
+  mergedInto: z.object({ eventAt: z.number().int(), how: z.enum(LIQ_MERGE_HOW) }).strict().optional(),
+  /** L19: the small events this one took in (its text gains «Перед этим: …»); absent when none. */
+  merged: z.array(z.object({ symbol: z.string(), eventAt: z.number().int(), sumUsd: z.number().nonnegative(), how: z.enum(LIQ_MERGE_HOW) }).strict()).min(1).optional(),
 }).strict();
 export type LiqEventDetails = z.infer<typeof LiqEventDetailsSchema>;
 
@@ -239,7 +264,10 @@ export const WebLiqAlertRowSchema = z.object({
   thresholdUsd: z.number().nullable(),
   /** Event rows (IB-143): the members, largest first; new coins of a continuation prefixed «+». Else `[symbol]`. */
   coins: z.array(z.string()),
-  /** `event_continuing` (L13): false = journalled only (nothing new after S), never sent. True elsewhere. */
+  /**
+   * False = journalled only, never sent: an `event_continuing` with nothing new after S (L13), or an `event` taken
+   * in by a larger same-side event (L17 / L18, IB-148). True elsewhere.
+   */
   news: z.boolean(),
   firedAt: z.number().int().nullable(),
   late: z.boolean(),

@@ -1,7 +1,7 @@
 import {
   LIQ_ALERT_EVENTS, LIQ_EVENT_MAX_SEC, LIQ_QUIET_SEC, LIQ_SEND_CAP_SEC, LIQ_SETTLE_SEC, LIQ_TICK_SEC,
   LiqEventContinuingDetailsSchema, LiqEventDetailsSchema,
-  LIQ_DEFAULT_PARAMS, LiqAlertDetailsSchema, LiqNearMissDetailsSchema, LiqParamsSchema, WebLiqAlertSettingsPatchSchema,
+  LIQ_DEFAULT_PARAMS, LIQ_MERGE_RATIO, LIQ_MERGE_SEC, LIQ_SMALL_MULT, LiqAlertDetailsSchema, LiqNearMissDetailsSchema, LiqParamsSchema, WebLiqAlertSettingsPatchSchema,
   WebMemberSettingsPatchSchema,
 } from '../src/insight';
 
@@ -68,6 +68,16 @@ describe('liquidation event contracts (IB-143)', () => {
     expect(LiqEventDetailsSchema.parse(event)).toEqual(event);
     expect(LiqEventDetailsSchema.safeParse({ ...event, coins: [] }).success).toBe(false);
     expect(LiqEventDetailsSchema.safeParse({ ...event, settled: 'late' }).success).toBe(false);
+  });
+
+  it('IB-148 (L16–L19): the merge rulings are constants; an event row may say it was held, merged, or took small ones in', () => {
+    expect([LIQ_SMALL_MULT, LIQ_MERGE_RATIO, LIQ_MERGE_SEC]).toEqual([3, 10, 120]);
+    const held = { ...event, heldUntil: 1_220_000 };
+    const absorbed = { ...event, mergedInto: { eventAt: 900_000, how: 'after' } };
+    const taker = { ...event, merged: [{ symbol: 'BNBUSDT', eventAt: 950_000, sumUsd: 4e5, how: 'before' }] };
+    for (const x of [held, absorbed, taker]) expect(LiqEventDetailsSchema.parse(x)).toEqual(x);
+    expect(LiqEventDetailsSchema.safeParse({ ...event, mergedInto: { eventAt: 900_000, how: 'during' } }).success).toBe(false);
+    expect(LiqEventDetailsSchema.safeParse({ ...event, merged: [] }).success).toBe(false);
   });
 
   it('a continuation carries the close, the first message and why it is news; strict', () => {
