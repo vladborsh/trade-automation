@@ -5,7 +5,7 @@ import { noAnswerLabel, seriesStartLabel, type CoverageLabel } from './coverage-
 import type { PaneData } from './pane-data';
 import { PANELS, panelHeading, type PanelDef } from './panels.model';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
-import { LEVEL_COLOURS } from './prior-levels';
+import { CUSTOM_LEVEL_COLOUR, LEVEL_COLOURS } from './prior-levels';
 import { ALERT_MARK_COLOURS } from './alert-marks';
 import type { ChartLayer } from './chart-prefs';
 import { NO_LAYERS_OFF, type LayersOff } from './layer-prefs';
@@ -46,7 +46,7 @@ export type DivergencesOff = Readonly<Record<OiDivergenceKind, boolean>>;
 export const NONE_OFF: DivergencesOff = { regular: false, hidden: false };
 
 /** What the legend reads: the timeframe always, and (IB-081) the coverage the server stated. */
-export type LegendData = Pick<PaneData, 'timeframe'> & Partial<Pick<PaneData, 'funding' | 'longShort' | 'openInterestCoverage' | 'divergences' | 'alertMarks'>>;
+export type LegendData = Pick<PaneData, 'timeframe'> & Partial<Pick<PaneData, 'funding' | 'longShort' | 'openInterestCoverage' | 'divergences' | 'alertMarks' | 'customLevels'>>;
 
 type Translate = (key: StringKey, params?: Record<string, string>) => string;
 
@@ -89,6 +89,8 @@ export function legendEntries(
       layer('fundingAlerts', 'instrument.legend.fundingAlerts', [ALERT_MARK_COLOURS.funding], false),
     ]
     : [];
+  // IB-128: an admin's custom levels, whenever their read answered (an empty list included)
+  const custom = data.customLevels !== undefined ? [layer('customLevels', 'instrument.legend.customLevels', [CUSTOM_LEVEL_COLOUR], true)] : [];
   return [
     ...own,
     ...sessions,
@@ -97,6 +99,7 @@ export function legendEntries(
     layer('prevMonth', 'instrument.legend.prevMonth', [LEVEL_COLOURS.month], true),
     layer('weekOpen', 'instrument.legend.weekOpen', [LEVEL_COLOURS.open], true),
     layer('monthOpen', 'instrument.legend.monthOpen', [LEVEL_COLOURS.open], true),
+    ...custom,
     { label: t('instrument.legend.usdEvents'), colour: EVENT_LINE_COLOUR, line: true },
     ...closed,
     ...alerts,

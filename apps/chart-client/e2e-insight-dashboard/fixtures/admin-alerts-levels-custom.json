@@ -1,0 +1,34 @@
+{
+    "levels": [
+        {
+            "id": 1,
+            "symbol": "BTCUSDT",
+            "base": "BTC",
+            "price": 75676,
+            "note": "slot test: at the price",
+            "events": {
+                "breakout_up": true,
+                "breakout_down": true,
+                "sweep_above": true,
+                "sweep_below": true
+            },
+            "createdBy": 2,
+            "createdAt": 1793953409
+        },
+        {
+            "id": 2,
+            "symbol": "TRXUSDT",
+            "base": "TRX",
+            "price": 0.3125,
+            "note": null,
+            "events": {
+                "breakout_up": true,
+                "breakout_down": true,
+                "sweep_above": false,
+                "sweep_below": true
+            },
+            "createdBy": 2,
+            "createdAt": 1793953409
+        }
+    ]
+}

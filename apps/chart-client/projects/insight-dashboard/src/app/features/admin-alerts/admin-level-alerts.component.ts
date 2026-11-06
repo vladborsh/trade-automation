@@ -4,6 +4,7 @@ import { InsightApiClient } from '../../core/insight-api.client';
 import type { StringKey } from '../../i18n/keys';
 import { I18nService } from '../../i18n/i18n.service';
 import { utcMinute } from './alert-rows';
+import { AdminCustomLevelsComponent } from './admin-custom-levels.component';
 import {
   LEVEL_EVENT_KEY, bandText, coinsToLevelForm, eventGrid, eventsPatch, levelPerCoinPatch, parseBandPct, toLevelRow, type EventGridRow,
   type LevelCoinForm,
@@ -18,6 +19,7 @@ import {
 @Component({
   selector: 'app-admin-level-alerts',
   standalone: true,
+  imports: [AdminCustomLevelsComponent],
   templateUrl: './admin-level-alerts.component.html',
   styleUrl: './admin-level-alerts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,6 +57,8 @@ export class AdminLevelAlertsComponent {
     return p !== null && Object.keys(p).length > 0;
   });
   readonly alerts = computed(() => (this.page()?.alerts ?? []).map(toLevelRow));
+  /** IB-128: the coins a custom level can be added for. */
+  readonly symbols = computed(() => (this.page()?.coins ?? []).map((c) => c.symbol));
   readonly updated = computed(() => {
     const s = this.page()?.settings;
     return s ? utcMinute(s.updatedAt) : '';

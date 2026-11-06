@@ -6,7 +6,7 @@ import {
   WebLiquidationsResponseSchema, WebLoginEventsResponseSchema, WebLongShortResponseSchema, WebMarketCardsResponseSchema, WebMeResponseSchema,
   WebMembersResponseSchema, WebOpenInterestResponseSchema, WebPositioningResponseSchema, WebStreamsResponseSchema, WebTopLiquidationSchema,
   WebUniverseSummaryResponseSchema, WebUniverseTopResponseSchema, WebLiqAlertsAdminResponseSchema, WebFundingAlertsAdminResponseSchema, WebLevelAlertsAdminResponseSchema,
-  WebAlertMarksResponseSchema,
+  WebAlertMarksResponseSchema, WebCustomLevelsResponseSchema, WebChartCustomLevelsResponseSchema,
 } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -37,6 +37,9 @@ const SINGLE: Record<string, z.ZodTypeAny> = {
   'admin-alerts-funding.json': WebFundingAlertsAdminResponseSchema,
   // IB-126: slot dev-1's LevelAlertsAdmin answer (2026-11-06)
   'admin-alerts-levels.json': WebLevelAlertsAdminResponseSchema,
+  // IB-128: slot dev-3's custom levels admin and chart answers (2026-11-06, after three adds, a switch and a delete)
+  'admin-alerts-levels-custom.json': WebCustomLevelsResponseSchema,
+  'series-custom-levels-btcusdt.json': WebChartCustomLevelsResponseSchema,
   'admin-health-db.json': WebDbHealthResponseSchema,
   'admin-health-streams.json': WebStreamsResponseSchema,
   'admin-login-events.json': WebLoginEventsResponseSchema,

@@ -53,9 +53,10 @@ export function saveDivergencesHidden(store: KeyValueStore | null, hidden: boole
 
 /**
  * IB-129 (alerts design §5) — the other chart layers with a legend switch: the liquidation and funding alert
- * marks, and the PMH/PML, weekly-open and monthly-open lines. Each kind is its own switch, shown by default.
+ * marks, and the PMH/PML, weekly-open and monthly-open lines; IB-128: an admin's custom levels. Each kind is its own
+ * switch, shown by default.
  */
-export const CHART_LAYERS = ['liqAlerts', 'fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen'] as const;
+export const CHART_LAYERS = ['liqAlerts', 'fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen', 'customLevels'] as const;
 export type ChartLayer = (typeof CHART_LAYERS)[number];
 
 export const layerHiddenKey = (layer: ChartLayer): string => `insight.instrument.layerHidden.${layer}`;

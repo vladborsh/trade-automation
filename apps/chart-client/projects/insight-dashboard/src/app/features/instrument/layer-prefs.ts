@@ -5,7 +5,7 @@ import {
 } from './chart-prefs';
 
 export type LayersOff = Readonly<Record<ChartLayer, boolean>>;
-export const NO_LAYERS_OFF: LayersOff = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: false, monthOpen: false };
+export const NO_LAYERS_OFF: LayersOff = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: false, monthOpen: false, customLevels: false };
 
 /**
  * IB-129 — the legend switches for the alert marks and the month/open level lines, one per kind, remembered

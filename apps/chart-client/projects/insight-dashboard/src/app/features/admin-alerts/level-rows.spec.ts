@@ -3,10 +3,10 @@ import { bandText, coinsToLevelForm, eventGrid, eventsPatch, levelPerCoinPatch, 
 
 /** IB-126 — the «Levels» section's mapping. */
 describe('level rows', () => {
-  const row: WebLevelAlertRow = { id: 1, source: 'live', event: 'crossunder', symbol: 'BTCUSDT', kind: 'PWH', price: 71850, at: Date.UTC(2026, 10, 6, 14, 45) / 1000, close: 71600.5, firedAt: null, late: false, recipients: 0 };
+  const row: WebLevelAlertRow = { id: 1, source: 'live', event: 'crossunder', symbol: 'BTCUSDT', kind: 'PWH', price: 71850, at: Date.UTC(2026, 10, 6, 14, 45) / 1000, close: 71600.5, firedAt: null, late: false, recipients: 0, customLevelId: null };
 
   it('a journal row: UTC minute, kind as is, the event\'s key, the status', () => {
-    expect(toLevelRow(row)).toEqual({ id: 1, at: '2026-11-06 14:45', symbol: 'BTCUSDT', kind: 'PWH', event: 'levelAlerts.event.crossunder', price: '71850', close: '71600.5', status: { key: 'alerts.status.journalOnly', recipients: 0 } });
+    expect(toLevelRow(row)).toEqual({ id: 1, at: '2026-11-06 14:45', symbol: 'BTCUSDT', kind: 'PWH', customLevelId: null, event: 'levelAlerts.event.crossunder', price: '71850', close: '71600.5', status: { key: 'alerts.status.journalOnly', recipients: 0 } });
     expect(toLevelRow({ ...row, late: true }).status.key).toBe('alerts.status.late');
     expect(toLevelRow({ ...row, firedAt: 1, recipients: 3 }).status).toEqual({ key: 'alerts.status.sent', recipients: 3 });
     expect(toLevelRow({ ...row, source: 'backfill' }).status.key).toBe('alerts.status.history');

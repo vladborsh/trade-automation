@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 // IB-BUG-034: real answers from slot dev-3's bot (2026-11-04), signed in as its admin
 import streams from './fixtures/admin-health-streams.json';
@@ -16,6 +18,9 @@ import fundingPage from './fixtures/admin-alerts-funding.json';
 // closes and the five seeds). Its journal was empty, so ONE synthetic row (the widest: a crossunder of the monthly high on
 // the longest symbol) is appended below.
 import levelsPage from './fixtures/admin-alerts-levels.json';
+// IB-128: the custom levels block, the real answer of slot dev-3 (2026-11-06: three adds, a switch, a delete), plus ONE
+// synthetic row, the widest: the longest symbol, an 8-decimal price and a long note
+import customPage from './fixtures/admin-alerts-levels-custom.json';
 
 const liqWithRow = {
   ...liqPage,
@@ -29,7 +34,14 @@ const fundingWithRow = {
 
 const levelsWithRow = {
   ...levelsPage,
-  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0 }],
+  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0, customLevelId: null }],
+};
+
+const customWithRow = {
+  levels: [...customPage.levels, {
+    id: 99, symbol: '1000PEPEUSDT', base: '1000PEPE', price: 0.012345678, note: 'range high of the October squeeze, retested twice',
+    events: { breakout_up: true, breakout_down: false, sweep_above: true, sweep_below: false }, createdBy: 2, createdAt: 1_793_888_888,
+  }],
 };
 
 /**
@@ -55,11 +67,20 @@ async function mockApi(page: Page): Promise<void> {
       '/admin/alerts/liq': liqWithRow,
       '/admin/alerts/funding': fundingWithRow,
       '/admin/alerts/levels': levelsWithRow,
+      '/admin/alerts/levels/custom': customWithRow,
       '/calendar/upcoming': { events: [] },
     };
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
     else await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'NOT_FOUND', message: path }) });
   });
+}
+
+/** IB-128: `IB128_SHOTS` = a directory: the custom levels block is saved there as `name`. */
+async function customShot(page: Page, name: string): Promise<void> {
+  const dir = process.env['IB128_SHOTS'];
+  if (!dir) return;
+  mkdirSync(dir, { recursive: true });
+  await page.locator('app-admin-custom-levels').screenshot({ path: join(dir, name) });
 }
 
 /** The page's width, and every table: whether it fits, or else whether a scroll box of its own holds it. */
@@ -98,8 +119,9 @@ test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
       await expect(page.locator('table').first()).toBeVisible();
       if (path === '/admin/alerts') await expect(page.locator('app-admin-liq-alerts tbody tr')).toHaveCount(liqPage.coins.length + 1);
       if (path === '/admin/alerts') await expect(page.locator('app-admin-funding-alerts tbody tr')).toHaveCount(fundingPage.coins.length + 1);
-      // IB-126: the event grid (8 kinds), the coins, and the journal row
-      if (path === '/admin/alerts') await expect(page.locator('app-admin-level-alerts tbody tr')).toHaveCount(8 + levelsPage.coins.length + 1);
+      // IB-126: the event grid (8 kinds), the coins, and the journal row; IB-128: and the custom levels' rows inside it
+      if (path === '/admin/alerts') await expect(page.locator('app-admin-level-alerts tbody tr')).toHaveCount(8 + levelsPage.coins.length + 1 + customWithRow.levels.length);
+      if (path === '/admin/alerts') await expect(page.locator('app-admin-custom-levels tbody tr')).toHaveCount(customWithRow.levels.length);
       if (path === '/admin/alerts') {
         // IB-144 (V42, V44): a «скрытые» checkbox per TF, and the hidden journal row (the longest symbol) labelled
         await expect(page.getByRole('checkbox', { name: /^(15m|1h|4h) скрытые$/ })).toHaveCount(3);
@@ -110,6 +132,7 @@ test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
       expect(m.scrollWidth).toBeLessThanOrEqual(390);
       expect(m.tables.length).toBeGreaterThan(0);
       expect(m.tables.filter((t) => !t.fits && !t.boxed)).toEqual([]);
+      if (path === '/admin/alerts') await customShot(page, 'admin-custom-levels-390.png');
       await info.attach(`phone-390${path.replaceAll('/', '-')}.png`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     });
   }
@@ -127,6 +150,7 @@ test.describe('admin pages — desktop 1440×900 (IB-BUG-034)', () => {
       const m = await measure(page);
       expect(m.scrollWidth).toBeLessThanOrEqual(1440);
       expect(m.tables.every((t) => t.fits)).toBe(true);
+      if (path === '/admin/alerts') await customShot(page, 'admin-custom-levels-1440.png');
       await info.attach(`desktop-1440${path.replaceAll('/', '-')}.png`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     });
   }

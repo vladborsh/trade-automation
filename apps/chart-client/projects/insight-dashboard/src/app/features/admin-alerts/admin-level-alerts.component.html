@@ -76,6 +76,9 @@
       @if (patch() === null) { <span class="error">{{ t('levelAlerts.invalid') }}</span> }
     </div>
 
+    <!-- IB-128: the owner's custom levels; writes of their own, answered with their own list -->
+    <app-admin-custom-levels [symbols]="symbols()" />
+
     <h3>{{ t('alerts.journal') }}</h3>
     @if (alerts().length === 0) {
       <p class="muted">{{ t('alerts.journalEmpty') }}</p>
@@ -91,7 +94,7 @@
           <tbody>
             @for (r of alerts(); track r.id) {
               <tr>
-                <td class="nowrap">{{ r.at }}</td><td>{{ r.symbol }}</td><td>{{ r.kind }}</td><td>{{ t(r.event) }}</td>
+                <td class="nowrap">{{ r.at }}</td><td>{{ r.symbol }}</td><td>{{ r.customLevelId === null ? r.kind : t('customLevels.kind', { id: r.customLevelId }) }}</td><td>{{ t(r.event) }}</td>
                 <td class="num">{{ r.price }}</td><td class="num">{{ r.close }}</td>
                 <td [class.warn]="r.status.key === 'alerts.status.late'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
               </tr>

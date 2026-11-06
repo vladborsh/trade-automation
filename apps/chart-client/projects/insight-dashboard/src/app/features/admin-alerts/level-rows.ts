@@ -29,7 +29,9 @@ export interface LevelRow {
   id: number;
   at: string;
   symbol: string;
-  kind: LevelKind;
+  /** IB-128: `custom` for one of the owner's levels, named by `customLevelId`. */
+  kind: LevelKind | 'custom';
+  customLevelId: number | null;
   event: StringKey;
   price: string;
   close: string;
@@ -38,7 +40,7 @@ export interface LevelRow {
 
 export function toLevelRow(r: WebLevelAlertRow): LevelRow {
   return {
-    id: r.id, at: utcMinute(r.at), symbol: r.symbol, kind: r.kind, event: LEVEL_EVENT_KEY[r.event], price: priceText(r.price), close: priceText(r.close),
+    id: r.id, at: utcMinute(r.at), symbol: r.symbol, kind: r.kind, customLevelId: r.customLevelId, event: LEVEL_EVENT_KEY[r.event], price: priceText(r.price), close: priceText(r.close),
     status: r.source === 'backfill'
       ? { key: 'alerts.status.history', recipients: 0 }
       : r.late

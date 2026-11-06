@@ -13,6 +13,7 @@ import { divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, OI_CONTRACTS_SCAL
 import type { PaneData } from './pane-data';
 import { paneIndexOf, type PanelDef } from './panels.model';
 import { levelLines, type LevelDash } from './prior-levels';
+import { customLevelLines } from './custom-level-lines';
 import {
   toCandleData, toCvdSegments, toFundingSteps, toLongShortLine, toOpenInterestPoints,
   toPredictedFunding, toTakerDelta,
@@ -72,6 +73,11 @@ function drawPrice(chart: IChartApi, data: PaneData, renderers: PanelRenderers, 
   // IB-067: whitespace bars past the last candle, so the week's upcoming events have slots to sit on
   price.setData([...toCandleData(data.candles.candles), ...futureSlots(data).map((time) => ({ time }))] as never);
   drawLevels(chart, data, pane);
+  // IB-128: an admin's custom levels, price lines across the chart; they live on this series, so a redraw in place
+  // (a new series) takes them along. Price lines are not part of the autoscale: a far level never flattens the candles.
+  for (const l of customLevelLines(data.customLevels, data.layersOff?.customLevels ?? false)) {
+    price.createPriceLine({ price: l.price, color: l.colour, lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: l.title });
+  }
   drawDivergences(chart, data, 'price', pane);
 
   // IB-039 §12.5 — liquidations as bubbles ON the price, bucketed to the bar on screen so a

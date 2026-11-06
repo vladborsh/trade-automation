@@ -15,7 +15,9 @@ const PAGE: WebLevelAlertsAdminResponse = {
     { symbol: 'BTCUSDT', base: 'BTC', listed: true, enabled: true, daily: false, stateRows: 4 },
     { symbol: 'TRXUSDT', base: 'TRX', listed: false, enabled: true, daily: true, stateRows: 0 },
   ],
-  alerts: [{ id: 3, source: 'live', event: 'breakout_up', symbol: 'BTCUSDT', kind: 'PWH', price: 71850, at: Date.UTC(2026, 10, 6, 1, 0) / 1000, close: 72140, firedAt: null, late: true, recipients: 0 }],
+  alerts: [{ id: 3, source: 'live', event: 'breakout_up', symbol: 'BTCUSDT', kind: 'PWH', price: 71850, at: Date.UTC(2026, 10, 6, 1, 0) / 1000, close: 72140, firedAt: null, late: true, recipients: 0, customLevelId: null },
+    // IB-128: a custom level's row is named by its id
+    { id: 4, source: 'live', event: 'sweep_below', symbol: 'BTCUSDT', kind: 'custom', customLevelId: 7, price: 65000, at: Date.UTC(2026, 10, 6, 0, 45) / 1000, close: 65100, firedAt: null, late: false, recipients: 0 }],
 };
 
 async function setup() {
@@ -26,6 +28,7 @@ async function setup() {
       provide: InsightApiClient,
       useValue: {
         levelAlertsAdmin: async () => PAGE,
+        customLevels: async () => ({ levels: [] }),
         patchLevelAlerts: async (p: WebLevelAlertSettingsPatch) => {
           sent.push(p);
           return { ...PAGE, settings: { ...PAGE.settings, enabled: p.enabled ?? PAGE.settings.enabled } };
@@ -43,7 +46,9 @@ async function setup() {
 
 describe('AdminLevelAlertsComponent (IB-126)', () => {
   it('shows sending OFF, the event grid with a dash where an event does not apply, the coins with PDH/PDL and seed state, the journal', async () => {
-    const { el } = await setup();
+    const { el, fixture } = await setup();
+    await fixture.whenStable(); // the custom levels block loads its own list
+    fixture.detectChanges();
     expect(el.querySelector('h2')?.textContent).toContain('Levels');
     expect(el.querySelector('.switch strong')?.textContent).toContain('off');
     const rows = [...el.querySelectorAll('table.grid tbody tr')];
@@ -57,6 +62,10 @@ describe('AdminLevelAlertsComponent (IB-126)', () => {
     expect(journal).toContain('PWH');
     expect(journal).toContain('breakout up');
     expect(journal).toContain('late');
+    expect(journal).toContain('custom #7');
+    // IB-128: the custom levels block sits in the section, offered every coin of the list
+    expect(el.querySelector('app-admin-custom-levels h3')?.textContent).toContain('Custom levels');
+    expect([...el.querySelectorAll('[data-testid="custom-level-symbol"] option')].map((o) => o.textContent)).toEqual(['BTCUSDT', 'TRXUSDT']);
   });
 
   it('sends only what changed: an event switch, a coin\'s PDH/PDL and the band; a bad band cannot be saved', async () => {

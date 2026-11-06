@@ -2,7 +2,7 @@ import { ru } from '../../i18n/ru';
 import type { StringKey } from '../../i18n/keys';
 import { legendEntries, paneLegends } from './pane-legend';
 import { PANELS } from './panels.model';
-import { LEVEL_COLOURS } from './prior-levels';
+import { CUSTOM_LEVEL_COLOUR, LEVEL_COLOURS } from './prior-levels';
 import { ALERT_MARK_COLOURS } from './alert-marks';
 import { SESSIONS } from './trading-sessions';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
@@ -37,7 +37,7 @@ describe('legendEntries', () => {
   });
 
   it('IB-129: PMH/PML, WO and MO are switches, each its own, struck through while off', () => {
-    const off = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: true, monthOpen: false };
+    const off = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: true, monthOpen: false, customLevels: false };
     const layers = legendEntries(price, { timeframe: '15m' }, t, undefined, off).filter((e) => e.layer);
     expect(layers.map((e) => [e.layer, e.off, e.line])).toEqual([['prevMonth', false, true], ['weekOpen', true, true], ['monthOpen', false, true]]);
     expect(layers.map((e) => e.label)).toEqual([ru['instrument.legend.prevMonth'], ru['instrument.legend.weekOpen'], ru['instrument.legend.monthOpen']]);
@@ -53,6 +53,15 @@ describe('legendEntries', () => {
     expect(fund.colours).toEqual([ALERT_MARK_COLOURS.funding]);
     // on the price pane only
     expect(legendEntries(funding, { timeframe: '15m', alertMarks: [] }, t).some((e) => e.layer)).toBe(false);
+  });
+
+  it('IB-128: an admin\'s custom levels are one switch, once their read answered (an empty list too); none for a member', () => {
+    const entry = (levels: unknown, off = false) => legendEntries(price, { timeframe: '15m', customLevels: levels as never }, t, undefined,
+      { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: false, monthOpen: false, customLevels: off }).filter((e) => e.layer === 'customLevels');
+    expect(entry(undefined)).toEqual([]);
+    const [on] = entry([]);
+    expect([on.label, on.colours, on.line, on.off]).toEqual([ru['instrument.legend.customLevels'], [CUSTOM_LEVEL_COLOUR], true, false]);
+    expect(entry([{ id: 1, price: 1, note: null }], true)[0].off).toBe(true);
   });
 
   it('leaves the other panes alone', () => {

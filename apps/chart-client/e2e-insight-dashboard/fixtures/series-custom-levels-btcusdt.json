@@ -1,0 +1,10 @@
+{
+    "symbol": "BTCUSDT",
+    "levels": [
+        {
+            "id": 1,
+            "price": 75676,
+            "note": "slot test: at the price"
+        }
+    ]
+}

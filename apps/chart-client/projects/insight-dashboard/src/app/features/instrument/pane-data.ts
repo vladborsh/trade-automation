@@ -1,5 +1,5 @@
 import type {
-  EconomicEvent, WebAlertMark, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
+  EconomicEvent, WebAlertMark, WebChartCustomLevel, WebCandle, WebCandlesResponse, WebFundingResponse, WebLiquidationEvent, WebLiquidationsResponse,
   WebLongShortResponse, WebOiDivergenceLine,
 } from '@trade-automation/contracts';
 import type { Coverage } from './coverage-labels';
@@ -55,6 +55,12 @@ export interface PaneData {
    * (`layer-prefs.ts`), so the legend keeps its switch while the list has none of them.
    */
   alertMarks?: readonly WebAlertMark[];
+  /**
+   * IB-128 — an admin's custom levels for the coin (`/series/custom-levels`), horizontal lines on the price pane.
+   * Absent for a member, while loading, or when the read failed: no lines and no legend entry. Kept whole while
+   * their switch is off (`layersOff.customLevels`), so the legend keeps its entry.
+   */
+  customLevels?: readonly WebChartCustomLevel[];
   /** IB-129 — the layers the reader switched off: the alert marks' kinds and the PMH/PML, WO and MO lines. */
   layersOff?: LayersOff;
   /**

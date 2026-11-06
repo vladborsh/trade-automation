@@ -98,4 +98,29 @@ describe('DivergenceOverlay', () => {
     expect(withLayers.merge({ ...panes('binance:BTCUSDT', '1m') } as PaneData)?.alertMarks).toBeUndefined();
     expect(overlay.merge(p)?.alertMarks).toEqual([liq, fund]);
   });
+
+  it('IB-128: an admin\'s custom levels are asked for the bare symbol and merged; a member\'s page never asks', async () => {
+    const prefs = { hidden: signal(false), hiddenKindHidden: signal(false) };
+    const asked: string[] = [];
+    const levels = [{ id: 7, price: 72_000, note: null }];
+    const api = { oiDivergences: async () => ({ lines: [] }), chartCustomLevels: async (s: string) => { asked.push(s); return { symbol: s, levels }; } };
+    const admin = new DivergenceOverlay(api as never, prefs as never, undefined, () => true);
+    await admin.load('BTCUSDT', '1m');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(asked).toEqual(['BTCUSDT']);
+    expect(admin.merge(panes('binance:BTCUSDT', '1m'))?.customLevels).toEqual(levels);
+    expect(admin.merge(panes('binance:ETHUSDT', '1m'))?.customLevels).toBeUndefined();
+    const member = new DivergenceOverlay(api as never, prefs as never, undefined, () => false);
+    await member.load('BTCUSDT', '1m');
+    expect(asked).toEqual(['BTCUSDT']);
+    expect(member.merge(panes('binance:BTCUSDT', '1m'))?.customLevels).toBeUndefined();
+  });
+
+  it('IB-128: a failed custom-levels read leaves none (no lines, no legend entry)', async () => {
+    const api = { oiDivergences: async () => ({ lines: [] }), chartCustomLevels: async () => { throw new Error('403'); } };
+    const overlay = new DivergenceOverlay(api as never, { hidden: signal(false), hiddenKindHidden: signal(false) } as never, undefined, () => true);
+    await overlay.load('BTCUSDT', '1m');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(overlay.merge(panes('binance:BTCUSDT', '1m'))?.customLevels).toBeUndefined();
+  });
 });

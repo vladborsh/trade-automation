@@ -18,6 +18,12 @@ import { barsWithin } from './time-grid';
  */
 export const LEVEL_COLOURS = { day: '#bc8cff', week: '#f0883e', month: '#58a6ff', open: '#c9d1d9' } as const;
 
+/**
+ * IB-128: the owner's custom levels, the palette's amber (the funding marks' colour, `alert-marks.ts`; a line and a
+ * marker do not read alike), long-dashed so a custom line is never mistaken for a period level.
+ */
+export const CUSTOM_LEVEL_COLOUR = '#d29922';
+
 /** A point of a line series; no `value` is a gap the chart leaves undrawn. */
 export interface StepPoint {
   time: number;

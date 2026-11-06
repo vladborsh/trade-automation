@@ -17,6 +17,10 @@ import type {
   WebLiquidationEpisodesResponse,
 } from '@trade-automation/contracts';
 import { WebAlertMarksResponseSchema, WebLiquidationEpisodesResponseSchema, type WebAlertMarksResponse } from '@trade-automation/contracts';
+import {
+  WebChartCustomLevelsResponseSchema, type WebChartCustomLevelsResponse, type WebCustomLevelCreate, type WebCustomLevelPatch,
+  type WebCustomLevelsResponse,
+} from '@trade-automation/contracts';
 import { AppConfigService } from '@backtest-core/config/app-config.service';
 import { buildUrl } from '@backtest-core/api/api-error';
 import { toWebApiError } from './web-api-error';
@@ -325,6 +329,30 @@ export class InsightApiClient {
     return this.sendJson<WebLevelAlertsAdminResponse>('PATCH', '/admin/alerts/levels', patch);
   }
 
+  // ------------------------------------------------------ IB-128, the owner's custom levels (admin)
+
+  /** Admin only: the active custom levels; every write answers with the list again. */
+  async customLevels(): Promise<WebCustomLevelsResponse> {
+    return this.get<WebCustomLevelsResponse>('/admin/alerts/levels/custom');
+  }
+
+  async addCustomLevel(level: WebCustomLevelCreate): Promise<WebCustomLevelsResponse> {
+    return this.sendJson<WebCustomLevelsResponse>('POST', '/admin/alerts/levels/custom', level);
+  }
+
+  async patchCustomLevel(id: number, patch: WebCustomLevelPatch): Promise<WebCustomLevelsResponse> {
+    return this.sendJson<WebCustomLevelsResponse>('PATCH', `/admin/alerts/levels/custom/${id}`, patch);
+  }
+
+  async deleteCustomLevel(id: number): Promise<WebCustomLevelsResponse> {
+    return this.sendJson<WebCustomLevelsResponse>('DELETE', `/admin/alerts/levels/custom/${id}`, {});
+  }
+
+  /** Admin only: one coin's active custom levels, for the chart's lines. Parsed: a line is drawn from these fields. */
+  async chartCustomLevels(symbol: string): Promise<WebChartCustomLevelsResponse> {
+    return WebChartCustomLevelsResponseSchema.parse(await this.get<unknown>('/series/custom-levels', { symbol }));
+  }
+
   // ------------------------------------------------------ IB-035, members and own settings
 
   /** Admin only: everyone with access, with their site login, last sign-in and live sessions. */
@@ -377,7 +405,7 @@ export class InsightApiClient {
     return response;
   }
 
-  private async sendJson<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
+  private async sendJson<T>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body: unknown): Promise<T> {
     return (await (await this.send(method, path, body)).json()) as T;
   }
 

@@ -1,0 +1,65 @@
+<section class="custom">
+  <h3>{{ t('customLevels.title') }}</h3>
+  <p class="note">{{ t('customLevels.intro') }}</p>
+
+  @if (actionError(); as key) {
+    <p class="error" role="alert">{{ t(key) }}</p>
+  }
+
+  @if (loadError(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  } @else if (list()) {
+    <div class="add">
+      <label>{{ t('customLevels.symbol') }}
+        <select [value]="form().symbol || symbols()[0]" (change)="edit('symbol', $any($event.target).value)" data-testid="custom-level-symbol">
+          @for (s of symbols(); track s) { <option [value]="s">{{ s }}</option> }
+        </select>
+      </label>
+      <label>{{ t('customLevels.price') }}
+        <input inputmode="decimal" [value]="form().price" (input)="edit('price', $any($event.target).value)" data-testid="custom-level-price" />
+      </label>
+      <label class="grow">{{ t('customLevels.note') }}
+        <input maxlength="200" [value]="form().note" (input)="edit('note', $any($event.target).value)" data-testid="custom-level-note" />
+      </label>
+      <button type="button" class="primary" (click)="add()" [disabled]="busy() || body() === null" data-testid="custom-level-add">{{ t('customLevels.add') }}</button>
+    </div>
+    @if (priceBad()) { <p class="error">{{ t('customLevels.invalid') }}</p> }
+
+    @if (rows().length === 0) {
+      <p class="muted">{{ t('customLevels.empty') }}</p>
+    } @else {
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('customLevels.col.id') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('levelAlerts.col.price') }}</th>
+              @for (c of columns; track c.event) { <th class="ev">{{ t(c.key) }}</th> }
+              <th>{{ t('customLevels.col.added') }}</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of rows(); track r.id) {
+              <tr [attr.data-level]="r.id">
+                <td class="num">#{{ r.id }}</td>
+                <td>{{ r.symbol }}@if (r.note) {<span class="muted"> · {{ r.note }}</span>}</td>
+                <td class="num">{{ r.price }}</td>
+                @for (cell of r.cells; track cell.event) {
+                  <td class="ev">
+                    <input type="checkbox" [checked]="cell.on" [disabled]="busy()" (change)="setEvent(r.id, cell.event, $any($event.target).checked)"
+                           [attr.aria-label]="'#' + r.id + ' ' + t(columns[$index].key)" />
+                  </td>
+                }
+                <td class="nowrap muted">{{ r.added }}</td>
+                <td>
+                  <button type="button" [class.danger]="confirming() === r.id" (click)="remove(r.id)" [disabled]="busy()" [attr.data-testid]="'custom-level-delete-' + r.id">
+                    {{ confirming() === r.id ? t('customLevels.confirmDelete', { id: r.id, symbol: r.symbol, price: r.price }) : t('customLevels.delete') }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>
