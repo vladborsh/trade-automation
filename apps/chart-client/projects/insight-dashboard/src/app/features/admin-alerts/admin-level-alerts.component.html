@@ -87,7 +87,7 @@
         <table>
           <thead>
             <tr>
-              <th>{{ t('levelAlerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('levelAlerts.col.level') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
+              <th>{{ t('levelAlerts.col.at', { zone: (null | time: 'zone') }) }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('levelAlerts.col.level') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
               <th>{{ t('levelAlerts.col.price') }}</th><th>{{ t('levelAlerts.col.close') }}</th><th>{{ t('alerts.col.status') }}</th>
             </tr>
           </thead>

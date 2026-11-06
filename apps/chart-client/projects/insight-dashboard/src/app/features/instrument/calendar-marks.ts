@@ -1,3 +1,4 @@
+import { dateTime, zoneLabel, type Zone } from '../../shared/time-format';
 import type { EconomicEvent } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 import { barsWithin, snapTime } from './time-grid';
@@ -80,7 +81,7 @@ export function tooltipSide(x: number, width: number): { left: number | null; ri
   return { left: x + TOOLTIP_GAP, right: null };
 }
 
-/** `2026-10-28 12:30 UTC` — the tooltip's time: the feed's own clock, the same in both languages. */
-export function eventTimeLabel(ms: number): string {
-  return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+/** `28.10 14:30 UTC+2` — the tooltip's time (IB-152): the viewer's zone, named, the same in both languages. */
+export function eventTimeLabel(ms: number, zone?: Zone): string {
+  return `${dateTime(ms / 1000, zone)} ${zoneLabel(ms / 1000, zone)}`;
 }

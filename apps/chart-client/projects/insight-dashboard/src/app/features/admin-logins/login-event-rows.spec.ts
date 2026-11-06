@@ -1,9 +1,10 @@
 import { shortDevice, toLoginEventRow } from './login-event-rows';
+import { dateTimeSec } from '../../shared/time-format';
 
 describe('login journal rows (IB-079)', () => {
-  it('maps a row: UTC time, translated outcome key, failures flagged, nulls shown as a dash', () => {
+  it('maps a row: the viewer\'s time to the second (IB-152), translated outcome key, failures flagged, nulls shown as a dash', () => {
     const row = toLoginEventRow({ id: 7, at: Date.UTC(2026, 10, 3, 13, 5, 9), userId: null, loginAttempted: null, outcome: 'throttled', ip: null, userAgent: null });
-    expect(row).toEqual({ id: 7, time: '2026-11-03 13:05:09', login: '—', outcome: 'logins.outcome.throttled', failed: true, ip: '—', device: '—' });
+    expect(row).toEqual({ id: 7, time: dateTimeSec(Date.parse('2026-11-03T13:05:09Z') / 1000), login: '—', outcome: 'logins.outcome.throttled', failed: true, ip: '—', device: '—' });
     expect(toLoginEventRow({ id: 8, at: 0, userId: 1, loginAttempted: 'bob', outcome: 'success', ip: '1.2.3.4', userAgent: 'curl/8' }).failed).toBe(false);
   });
 

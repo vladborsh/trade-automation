@@ -6,6 +6,8 @@ import { SessionService } from '../../core/session.service';
 import type { StringKey } from '../../i18n/keys';
 import { I18nService } from '../../i18n/i18n.service';
 import { refusalKey, toMemberRow } from './member-rows';
+import { dateTime, zoneLabel } from '../../shared/time-format';
+import { TimePipe } from '../../shared/time.pipe';
 
 /**
  * IB-035 — the admin's members page: who has access, their site login, last sign-in and live
@@ -15,6 +17,7 @@ import { refusalKey, toMemberRow } from './member-rows';
 @Component({
   selector: 'app-admin-members',
   standalone: true,
+  imports: [TimePipe],
   templateUrl: './admin-members.component.html',
   styleUrl: './admin-members.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -100,6 +103,6 @@ export class AdminMembersComponent {
   }
 
   inviteUntil(ms: number): string {
-    return new Date(ms).toISOString().replace('T', ' ').slice(0, 16);
+    return `${dateTime(ms / 1000)} ${zoneLabel(ms / 1000)}`;
   }
 }

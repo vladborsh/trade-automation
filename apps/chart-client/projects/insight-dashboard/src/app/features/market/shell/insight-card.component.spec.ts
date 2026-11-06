@@ -4,6 +4,10 @@ import type { WebInsightStatement } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { I18nService } from '../../../i18n/i18n.service';
 import { InsightCardComponent } from './insight-card.component';
+import { dayMonth, timeOfDay } from '../../../shared/time-format';
+
+/** IB-152: the card's clock is the viewer's (time-format.spec pins the zones themselves). */
+const AT3 = timeOfDay(Date.UTC(2026, 10, 4, 3, 0) / 1000);
 
 /** IB-107 — the card as the page draws it: chip, words, figures in the number face; IB-119 — the chart beside them. */
 const NOW = Date.UTC(2026, 10, 4, 14) / 1000;
@@ -38,7 +42,7 @@ describe('InsightCardComponent (IB-107)', () => {
     const text = (sel: string) => el.querySelector(sel)?.textContent?.replace(/\s+/g, ' ').trim();
     expect(el.querySelector('.card')?.classList).toContain('tone-long');
     expect(text('.chip')).toBe('Ликвидации');
-    expect(text('.when')).toBe('сегодня 03:00 UTC');
+    expect(text('.when')).toBe(`сегодня ${AT3}`);
     expect(text('.title')).toBe('Каскад ликвидаций лонгов за 9 мин: 21, всего $14M');
     expect([...el.querySelectorAll('.title .num')].map((n) => n.textContent)).toEqual(['21', '$14M']);
     const bars = [...el.querySelectorAll('app-insight-chart .bar')];
@@ -48,10 +52,10 @@ describe('InsightCardComponent (IB-107)', () => {
     expect(bars.slice(4).every((b) => b.classList.contains('named'))).toBe(true);
     expect(bars.slice(0, 4).every((b) => b.classList.contains('other'))).toBe(true);
     expect(el.querySelector('.card')?.classList).toContain('has-chart');
-    expect(text('.link')).toBe('Открыть BTC в 03:00 UTC →');
+    expect(text('.link')).toBe(`Открыть BTC в ${AT3} →`);
     expect(el.querySelector('.link')?.getAttribute('href')).toBe('/instrument/BTCUSDT?at=' + Date.UTC(2026, 10, 4, 3) / 1000);
     expect(text('.basis')).toBe('за 24ч · Binance, Bybit, OKX');
-    expect(el.querySelector('.basis')?.getAttribute('title')).toBe('норма: 690 окон с данными из 697, с 2026-10-05');
+    expect(el.querySelector('.basis')?.getAttribute('title')).toBe(`норма: 690 окон с данными из 697, с ${dayMonth(Date.UTC(2026, 9, 5) / 1000)}`);
   });
 
   it('figures sit in the title with no added spaces: «… 52 (+6.1)»', () => {

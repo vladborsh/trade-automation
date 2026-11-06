@@ -3,12 +3,13 @@ import { LEVEL_EVENTS, type LevelKind, type WebLevelAlertSettingsPatch, type Web
 import { InsightApiClient } from '../../core/insight-api.client';
 import type { StringKey } from '../../i18n/keys';
 import { I18nService } from '../../i18n/i18n.service';
-import { utcMinute } from './alert-rows';
+import { atMinute } from './alert-rows';
 import { AdminCustomLevelsComponent } from './admin-custom-levels.component';
 import {
   LEVEL_EVENT_KEY, bandText, coinsToLevelForm, eventGrid, eventsPatch, levelPerCoinPatch, parseBandPct, toLevelRow, type EventGridRow,
   type LevelCoinForm,
 } from './level-rows';
+import { TimePipe } from '../../shared/time.pipe';
 
 /**
  * IB-126 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §1, P2, P7, P10) — the «Levels» section of
@@ -19,7 +20,7 @@ import {
 @Component({
   selector: 'app-admin-level-alerts',
   standalone: true,
-  imports: [AdminCustomLevelsComponent],
+  imports: [TimePipe, AdminCustomLevelsComponent],
   templateUrl: './admin-level-alerts.component.html',
   styleUrl: './admin-level-alerts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,7 +62,7 @@ export class AdminLevelAlertsComponent {
   readonly symbols = computed(() => (this.page()?.coins ?? []).map((c) => c.symbol));
   readonly updated = computed(() => {
     const s = this.page()?.settings;
-    return s ? utcMinute(s.updatedAt) : '';
+    return s ? atMinute(s.updatedAt) : '';
   });
 
   constructor() {

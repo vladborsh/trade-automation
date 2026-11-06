@@ -3,8 +3,9 @@ import type { WebLiqAlertSettingsPatch, WebLiqAlertsAdminResponse } from '@trade
 import { InsightApiClient } from '../../core/insight-api.client';
 import type { StringKey } from '../../i18n/keys';
 import { I18nService } from '../../i18n/i18n.service';
-import { utcMinute } from './alert-rows';
+import { atMinute } from './alert-rows';
 import { coinsToForm, perCoinPatch, toLiqRow, type LiqCoinForm } from './liq-rows';
+import { TimePipe } from '../../shared/time.pipe';
 
 /**
  * IB-122 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §1, L4) — the «Large liquidations»
@@ -15,6 +16,7 @@ import { coinsToForm, perCoinPatch, toLiqRow, type LiqCoinForm } from './liq-row
 @Component({
   selector: 'app-admin-liq-alerts',
   standalone: true,
+  imports: [TimePipe],
   templateUrl: './admin-liq-alerts.component.html',
   styleUrl: './admin-liq-alerts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,7 +43,7 @@ export class AdminLiqAlertsComponent {
   readonly alerts = computed(() => (this.page()?.alerts ?? []).map(toLiqRow));
   readonly updated = computed(() => {
     const s = this.page()?.settings;
-    return s ? utcMinute(s.updatedAt) : '';
+    return s ? atMinute(s.updatedAt) : '';
   });
 
   constructor() {

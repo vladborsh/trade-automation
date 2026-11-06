@@ -3,6 +3,7 @@ import { WEB_INSIGHT_KEYS, WEB_KPI_IDS, WEB_VENUE_NAMES } from '@trade-automatio
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
 import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, neutralSummary, sourceNames, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedFixed, signedPct } from './market-text';
+import { dayMonth } from '../../../shared/time-format';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -11,7 +12,8 @@ describe('period', () => {
   });
 
   it('a period whose availableFrom is in the future is not offered, with the day it will be', () => {
-    expect(periodAvailability({ '7d': 1_794_269_312 }, '7d', 1_793_700_000)).toEqual({ available: false, fromDay: '2026-11-10' });
+    expect(periodAvailability({ '7d': 1_794_269_312 }, '7d', 1_793_700_000, 'UTC')).toEqual({ available: false, fromDay: '10.11' });
+    expect(periodAvailability({ '7d': 1_794_269_312 }, '7d', 1_793_700_000, 'America/New_York').fromDay).toBe('09.11'); // the viewer's day (IB-152)
     expect(periodAvailability({ '7d': null }, '7d', 1)).toEqual({ available: true, fromDay: null });
     expect(periodAvailability(undefined, '24h', 1)).toEqual({ available: true, fromDay: null });
   });
@@ -76,7 +78,7 @@ describe('insightView', () => {
     expect(v.params).toMatchObject({ usd: '$3.1M', count: 4, minutes: 9, symbol: 'ETHUSDT' });
     expect(v.nested['side']).toBe('insight.side.short');
     expect(v.link).toEqual({ commands: ['/instrument', 'ETHUSDT'], queryParams: { at: 1_793_712_533 } });
-    expect(v.basis.params).toMatchObject({ venues: 'Binance+Bybit+OKX', sample: 720, observed: 690, from: '2026-10-04' });
+    expect(v.basis.params).toMatchObject({ venues: 'Binance+Bybit+OKX', sample: 720, observed: 690, from: dayMonth(1_791_127_530) });
     expect(v.basis.nested).toEqual({ window: 'market.period.24h' }); // IB-BUG-024: a word, translated
   });
 

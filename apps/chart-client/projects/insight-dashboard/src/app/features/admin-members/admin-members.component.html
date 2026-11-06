@@ -32,7 +32,7 @@
           <th>{{ t('members.col.role') }}</th>
           <th>{{ t('members.col.status') }}</th>
           <th>{{ t('members.col.joined') }}</th>
-          <th>{{ t('members.col.lastLogin') }}</th>
+          <th>{{ t('members.col.lastLogin', { zone: (null | time: 'zone') }) }}</th>
           <th>{{ t('members.col.sessions') }}</th>
           <th></th>
         </tr>

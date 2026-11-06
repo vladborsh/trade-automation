@@ -4,6 +4,7 @@ import { legendEntries, paneLegends } from './pane-legend';
 import { PANELS } from './panels.model';
 import { CUSTOM_LEVEL_COLOUR, LEVEL_COLOURS } from './prior-levels';
 import { ALERT_MARK_COLOURS } from './alert-marks';
+import { dayMonthYear } from '../../shared/time-format';
 import { SESSIONS } from './trading-sessions';
 import { EVENT_LINE_COLOUR } from './calendar-marks';
 import { CLOSED_BAND_SWATCH } from './weekend-bands';
@@ -97,11 +98,11 @@ describe('IB-081 — the coverage statements on the OI, long/short and funding p
 
   it('OI truncated: the pane says where its series begins, as a statement (no swatch)', () => {
     const last = legendEntries(oi, { timeframe: '1h', openInterestCoverage: { coverageFrom: OCT_5, truncated: true } }, tp).at(-1)!;
-    expect(last).toEqual({ label: 'данные с 2026-10-05', colour: null, line: false });
+    expect(last).toEqual({ label: `данные с ${dayMonthYear(OCT_5)}`, colour: null, line: false });
   });
 
   it('long/short truncated: the same statement from its own response', () => {
-    expect(legendEntries(longShort, { timeframe: '1h', longShort: lsWith({ coverageFrom: OCT_5, truncated: true }) }, tp).at(-1)?.label).toBe('данные с 2026-10-05');
+    expect(legendEntries(longShort, { timeframe: '1h', longShort: lsWith({ coverageFrom: OCT_5, truncated: true }) }, tp).at(-1)?.label).toBe(`данные с ${dayMonthYear(OCT_5)}`);
   });
 
   it('coverageFrom without truncated adds nothing (the spec that can disagree)', () => {
@@ -119,7 +120,7 @@ describe('IB-081 — the coverage statements on the OI, long/short and funding p
     const data = { timeframe: '1h', openInterestCoverage: { coverageFrom: OCT_5, truncated: true }, funding: fundingWith(), longShort: lsWith({}) };
     expect(legendEntries(longShort, data, tp)).toHaveLength(longShort.legend.length);
     expect(legendEntries(fundingPane, data, tp)).toHaveLength(fundingPane.legend.length);
-    expect(legendEntries(price, data, tp).map((e) => e.label)).not.toContain('данные с 2026-10-05');
+    expect(legendEntries(price, data, tp).map((e) => e.label)).not.toContain(`данные с ${dayMonthYear(OCT_5)}`);
   });
 });
 

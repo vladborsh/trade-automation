@@ -106,7 +106,7 @@
         <table>
           <thead>
             <tr>
-              <th>{{ t('alerts.col.confirmed') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.tf') }}</th><th>{{ t('alerts.col.direction') }}</th>
+              <th>{{ t('alerts.col.confirmed', { zone: (null | time: 'zone') }) }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.tf') }}</th><th>{{ t('alerts.col.direction') }}</th>
               <th>{{ t('alerts.col.price') }}</th><th>{{ t('alerts.col.oi') }}</th><th>{{ t('alerts.col.run') }}</th><th>{{ t('alerts.col.status') }}</th>
               <th>{{ t('alerts.col.after4h') }}</th><th>{{ t('alerts.col.after24h') }}</th>
             </tr>
@@ -133,7 +133,7 @@
     } @else {
       <div class="scroll">
         <table>
-          <thead><tr><th>{{ t('alerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.tf') }}</th><th>{{ t('alerts.col.bar') }}</th><th>{{ t('alerts.col.hole') }}</th></tr></thead>
+          <thead><tr><th>{{ t('alerts.col.at', { zone: (null | time: 'zone') }) }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('alerts.col.tf') }}</th><th>{{ t('alerts.col.bar') }}</th><th>{{ t('alerts.col.hole') }}</th></tr></thead>
           <tbody>
             @for (s of skips(); track $index) {
               <tr><td class="nowrap">{{ s.at }}</td><td>{{ s.symbol }}</td><td>{{ s.tf }}</td><td class="nowrap">{{ s.bar }}</td><td class="nowrap">{{ s.hole }}</td></tr>

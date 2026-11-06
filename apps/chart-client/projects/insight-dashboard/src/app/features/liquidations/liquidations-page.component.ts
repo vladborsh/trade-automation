@@ -17,6 +17,7 @@ import { liqPageParams, parseLiqPage, type LiqPageState } from './liq-page-query
 import { nextLiqSort, type LiqColumn } from './liq-table';
 import { LiqTableComponent } from './liq-table.component';
 import { formatUsd } from './liquidations.format';
+import { TimePipe } from '../../shared/time.pipe';
 
 /** The help's points (IB-134, design E9), each a bold lead and its text. */
 export const LIQ_HELP_ITEMS = ['what', 'norm', 'split', 'sides', 'min', 'chart', 'venues'] as const;
@@ -35,7 +36,7 @@ export const LIQ_HELP_ITEMS = ['what', 'norm', 'split', 'sides', 'min', 'chart',
 @Component({
   selector: 'app-liquidations-page',
   standalone: true,
-  imports: [RouterLink, HelpBlockComponent, LiqEpisodesComponent, LiqFiltersComponent, LiqTableComponent, LoaderComponent],
+  imports: [TimePipe, RouterLink, HelpBlockComponent, LiqEpisodesComponent, LiqFiltersComponent, LiqTableComponent, LoaderComponent],
   templateUrl: './liquidations-page.component.html',
   styleUrl: './liquidations-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import example from '../../../../../../../../libs/contracts/test/fixtures/flows.24h.json';
 import { flowsTiles, sourceNames, UNUSUAL } from './flows-layout';
 
+
 /** IB-091 — the tiles from the contract's example (one real probe of each source). */
 const base = example as unknown as WebFlowsResponse;
 const tile = (r: WebFlowsResponse, id: string) => flowsTiles(r, '24h').find((t) => t.id === id)!;
@@ -12,7 +13,7 @@ describe('flowsTiles', () => {
     const t = flowsTiles(base, '24h');
     expect(t.map((x) => x.id)).toEqual(['dvol', 'putCall', 'stablecoins', 'coinbasePremium']);
     expect(tile(base, 'dvol')).toMatchObject({ value: '39.7', detail: { key: 'flows.dvol.change', params: { change: '+1.1', period: '24h' } }, tone: 'up' });
-    expect(tile(base, 'putCall')).toMatchObject({ value: '0.99', note: { params: { volume: '1.79', date: '2026-11-03' } } });
+    expect(tile(base, 'putCall')).toMatchObject({ value: '0.99', note: { params: { volume: '1.79', date: '03.11' } } }); // a UTC day, named by its UTC date (IB-152)
     expect(tile(base, 'stablecoins')).toMatchObject({ value: '$296B', tone: 'down' }); // in coins (D19)
     expect(tile(base, 'stablecoins').detail?.params['days']).toBe(1);
     expect(tile(base, 'stablecoins').detail?.params['usd']).toBe('−$906M'); // the page's minus, not '-'

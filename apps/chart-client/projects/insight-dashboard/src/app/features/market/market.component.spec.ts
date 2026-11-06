@@ -12,6 +12,8 @@ import fearGreedFixture from '../../../../../../../../libs/contracts/test/fixtur
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { MarketComponent } from './market.component';
+import { TimePipe } from '../../shared/time.pipe';
+import { dayMonth } from '../../shared/time-format';
 
 /**
  * IB-088 — the shell as a COMPOSITION: the scheduler's rules are specced on their own
@@ -74,7 +76,7 @@ function setup(opts: { p?: string; insightsDelayMs?: number; capsFail?: boolean;
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.p ? { p: opts.p } : {}) } } },
     ],
   });
-  if (opts.draw === false) TestBed.overrideComponent(MarketComponent, { set: { imports: [], schemas: [CUSTOM_ELEMENTS_SCHEMA] } });
+  if (opts.draw === false) TestBed.overrideComponent(MarketComponent, { set: { imports: [TimePipe], schemas: [CUSTOM_ELEMENTS_SCHEMA] } }); // the page's own pipe (IB-152) stays
   TestBed.inject(I18nService).setLang('en');
   const fixture = TestBed.createComponent(MarketComponent);
   fixture.detectChanges();
@@ -170,7 +172,7 @@ describe('MarketComponent shell (IB-088)', () => {
     await vi.advanceTimersByTimeAsync(0);
     week.fixture.detectChanges();
     const text = (f: typeof week.fixture) => (f.nativeElement as HTMLElement).querySelector('#insights .neutral')?.textContent?.trim();
-    expect(text(week.fixture)).toBe('No 7d data yet — available from 2026-11-05');
+    expect(text(week.fixture)).toBe(`No 7d data yet — available from ${dayMonth(blockFixture.availableFrom['7d'])}`); // IB-152: the viewer's day
     expect((week.fixture.nativeElement as HTMLElement).querySelector('#insights .basis')).toBeNull();
     TestBed.resetTestingModule();
 

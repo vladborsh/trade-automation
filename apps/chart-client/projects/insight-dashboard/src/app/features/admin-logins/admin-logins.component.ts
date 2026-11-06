@@ -3,6 +3,7 @@ import type { WebLoginEvent } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
 import { toLoginEventRow } from './login-event-rows';
+import { TimePipe } from '../../shared/time.pipe';
 
 /**
  * IB-079 (password-login design P10) — the login journal, admin only (route guard + nav link, the
@@ -12,6 +13,7 @@ import { toLoginEventRow } from './login-event-rows';
 @Component({
   selector: 'app-admin-logins',
   standalone: true,
+  imports: [TimePipe],
   templateUrl: './admin-logins.component.html',
   styleUrl: './admin-logins.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,7 +24,7 @@ export class AdminLoginsComponent {
   readonly t = this.i18n.t.bind(this.i18n);
 
   private readonly events = signal<WebLoginEvent[]>([]);
-  readonly rows = computed(() => this.events().map(toLoginEventRow));
+  readonly rows = computed(() => this.events().map((e) => toLoginEventRow(e)));
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 

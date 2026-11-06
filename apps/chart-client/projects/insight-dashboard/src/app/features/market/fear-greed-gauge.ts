@@ -1,3 +1,4 @@
+import { utcDayKey } from '../../shared/time-format';
 import { FEAR_GREED_ZONES, type FearGreedBand, type WebFearGreedReading } from '@trade-automation/contracts';
 
 /**
@@ -73,7 +74,7 @@ export function historyLine(history: readonly WebFearGreedReading[] | null | und
     return band;
   });
   const newest = rows[rows.length - 1].day;
-  const weekAgoDay = new Date(dayMs(newest) - 7 * DAY_MS).toISOString().slice(0, 10);
+  const weekAgoDay = utcDayKey((dayMs(newest) - 7 * DAY_MS) / 1000);
   const weekAgo = rows.find((r) => r.day === weekAgoDay);
   return {
     points: rows.map((r) => `${x(r.day)},${y(r.value)}`).join(' '),

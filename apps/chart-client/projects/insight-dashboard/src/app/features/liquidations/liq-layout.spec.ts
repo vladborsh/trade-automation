@@ -1,4 +1,5 @@
 import type { WebLiquidationBlock, WebLiquidationHourly, WebLiquidationLargeEvent } from '@trade-automation/contracts';
+import { dayMonth } from '../../shared/time-format';
 import { describe, expect, it } from 'vitest';
 import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/liquidation-block.24h.json';
 import { en } from '../../i18n/en';
@@ -77,7 +78,7 @@ describe('hourlyLayout — mirrored bars', () => {
 
   it('labels: HH:MM for hourly buckets, DD/MM HH:MM for the 7d chart', () => {
     expect(tickLabel(1_793_721_600, 3600, 'UTC')).toBe('16:00');
-    expect(tickLabel(1_793_721_600, 14_400, 'UTC')).toBe('03/11 16:00');
+    expect(tickLabel(1_793_721_600, 14_400, 'UTC')).toBe('03.11 16:00');
   });
 });
 
@@ -171,7 +172,7 @@ describe('bubbleLayout — nothing cut at the edges (IB-BUG-036)', () => {
   it('7d at 1240: one DD/MM label per local midnight, no time', () => {
     for (const width of [1158]) {
       const { ticks } = bubbleLayout([], week, { width, height: 140 }, plus3);
-      expect(ticks.map((t) => t.label)).toEqual(['30/10', '31/10', '01/11', '02/11', '03/11', '04/11', '05/11']);
+      expect(ticks.map((t) => t.label)).toEqual(['30.10', '31.10', '01.11', '02.11', '03.11', '04.11', '05.11']);
       for (const t of ticks) expect((t.time + 3 * 3600) % 86_400).toBe(0); // the member's midnight, not UTC's
       expectFitted(ticks, width);
     }
@@ -185,7 +186,7 @@ describe('bubbleLayout — nothing cut at the edges (IB-BUG-036)', () => {
 
   it('7d at 390 (a 324 px chart, too narrow for a label a day): every other day, today kept, no overlap', () => {
     const { ticks } = bubbleLayout([], week, { width: 324, height: 140 }, plus3);
-    expect(ticks.map((t) => t.label)).toEqual(['30/10', '01/11', '03/11', '05/11']);
+    expect(ticks.map((t) => t.label)).toEqual(['30.10', '01.11', '03.11', '05.11']);
     expectFitted(ticks, 324);
   });
 
@@ -223,7 +224,9 @@ describe('normNote — no empty space where a norm would be', () => {
   });
   it('the first week: the day it will appear (= when 7 days of tape exist)', () => {
     const young = { ...basis, unavailable: 'insufficient_history' as const };
-    expect(normNote(young, '24h', 1_794_269_312, 1_793_700_000)).toEqual({ key: 'liq.norm.from', params: { date: '2026-11-10' } });
+    // 2026-11-10 00:08 UTC: the viewer's day (IB-152) — the 9th in New York
+    expect(normNote(young, '24h', 1_794_269_312, 1_793_700_000, 'UTC')).toEqual({ key: 'liq.norm.from', params: { date: '10.11' } });
+    expect(normNote(young, '24h', 1_794_269_312, 1_793_700_000, 'America/New_York').params).toEqual({ date: '09.11' });
     expect(normNote(young, '24h', null, 1_793_700_000).key).toBe('liq.norm.noHistory');
   });
   it('7d always refuses, with its own reason', () => {
@@ -269,6 +272,6 @@ describe('blockView — the facts around the charts', () => {
       hourly: { ...block.hourly, basis: young },
       availableFrom: { '1h': null, '4h': null, '24h': null, '7d': 1_794_269_312 },
     }), '24h', 1_793_700_000);
-    expect(v.largeNote).toEqual({ key: 'liq.norm.from', params: { date: '2026-11-10' } });
+    expect(v.largeNote).toEqual({ key: 'liq.norm.from', params: { date: dayMonth(1_794_269_312) } });
   });
 });

@@ -61,7 +61,7 @@
         <table>
           <thead>
             <tr>
-              <th>{{ t('fundingAlerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('fundingAlerts.col.side') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
+              <th>{{ t('fundingAlerts.col.at', { zone: (null | time: 'zone') }) }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('fundingAlerts.col.side') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
               <th>{{ t('fundingAlerts.col.rate') }}</th><th>{{ t('fundingAlerts.col.per8h') }}</th><th>{{ t('fundingAlerts.col.episode') }}</th><th>{{ t('alerts.col.status') }}</th>
             </tr>
           </thead>

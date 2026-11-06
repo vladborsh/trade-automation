@@ -1,3 +1,4 @@
+import { dayMonth, type Zone } from '../../../shared/time-format';
 import {
   WEB_MARKET_PERIODS, type WebInsightBasis, type WebInsightBlockLine, type WebInsightSource, type WebInsightStatement, type WebKpiTile, type WebMarketPeriod, venueName,
 } from '@trade-automation/contracts';
@@ -22,10 +23,11 @@ export function periodAvailability(
   availableFrom: Partial<Record<WebMarketPeriod, number | null>> | null | undefined,
   period: WebMarketPeriod,
   nowSec: number,
+  zone?: Zone,
 ): { available: boolean; fromDay: string | null } {
   const from = availableFrom?.[period] ?? null;
   if (from === null || from <= nowSec) return { available: true, fromDay: null };
-  return { available: false, fromDay: new Date(from * 1000).toISOString().slice(0, 10) };
+  return { available: false, fromDay: dayMonth(from, zone) };
 }
 
 const MINUS = '−';
@@ -188,7 +190,7 @@ export function basisView(b: WebInsightBasis | null, _nowSec: number): BasisView
       venues: b.venues.map(venueName).join('+'),
       sample: b.sampleWindows,
       observed: b.observedWindows,
-      from: b.from === null ? '—' : new Date(b.from * 1000).toISOString().slice(0, 10),
+      from: b.from === null ? '—' : dayMonth(b.from),
     },
   };
 }

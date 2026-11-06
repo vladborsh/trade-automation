@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DOCUMENT, DatePipe, DecimalPipe } from '@angular/common';
+import { DOCUMENT, DecimalPipe } from '@angular/common';
 import { AmountPipe } from './amount';
+import { TimePipe } from '../../shared/time.pipe';
 import type {
   WebLiquidationCoin, WebLiquidationsOverviewResponse, WebTimeframe, WebTopLiquidation,
   WebUniverseSummaryRow, WebUniverseSymbol,
@@ -37,7 +38,7 @@ import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [AmountPipe, DatePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LegendToggleComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
+  imports: [AmountPipe, TimePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LegendToggleComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -8,7 +8,7 @@
 </svg>
 <p class="value" [style.color]="band().colour">{{ card().now.value }}</p>
 <p class="label" [style.color]="band().colour">{{ t(band().key) }}</p>
-<p class="muted">{{ t('market.asOf', { when: card().now.day }) }} · {{ card().now.classification }} · {{ t('market.source', { source: card().source }) }}</p>
+<p class="muted">{{ t('market.asOf', { when: asOfDay() }) }} · {{ card().now.classification }} · {{ t('market.source', { source: card().source }) }}</p>
 @if (line(); as l) {
   <svg class="line" [attr.viewBox]="'0 0 ' + lineBox.w + ' ' + lineBox.h" preserveAspectRatio="none" role="img" [attr.aria-label]="t('market.fg.lineLabel')">
     @for (b of l.bands; track b.band) {

@@ -1,45 +1,34 @@
+import { TickMarkType } from 'lightweight-charts';
 import type { Lang } from '../../i18n/keys';
+import { dateTime, dayMonth, timeOfDay, utcDate, utcOffsetSec, weekdayShort, type Zone } from '../../shared/time-format';
 
 /**
- * IB-064 (user, 2026-10-29): the crosshair's label under the chart carries the day of the week.
+ * The instrument chart's time labels: the crosshair's (IB-064: with the weekday) and the axis ticks.
+ * IB-152 (owner ruling A): in the viewer's zone and the site's one format, through `time-format.ts`.
  *
- * `чт 29 окт 2026 14:35` / `Thu 29 Oct 2026 14:35`, and on 1d the date alone — a daily bar has no
- * time of day worth reading. Everything in UTC, like the rest of the chart: a reader east of
- * Greenwich hovering a bar at 23:00 UTC must see that bar's UTC weekday, not tomorrow's.
+ * - **intraday** (1m … 4h): a bar is a moment — `чт 06.11 17:15` in the viewer's zone;
+ * - **1d / 1w**: a bar is a UTC day (a week: its Monday) — a business period, named by its UTC date
+ *   and weekday, `чт 06.11.2026`, whatever the viewer's zone. The candle sits where it always did.
  *
- * Only the weekday and month names come from `Intl` (they are the language); the day, year and
- * time are assembled here so the order does not change with the locale's own date pattern.
+ * The DATA stays UTC seconds; only these strings move.
  */
-export function crosshairTimeLabel(timeSec: number, lang: Lang, timeframe: string): string {
-  const date = new Date(timeSec * 1000);
-  const names = namesFor(lang);
-  const weekday = names.weekday.format(date);
-  // ru's abbreviated months carry a full stop (`окт.`), which reads as clutter in a one-line label
-  const month = names.month.formatToParts(date).find((p) => p.type === 'month')?.value.replace(/\.$/, '') ?? '';
-  const day = `${weekday} ${date.getUTCDate()} ${month} ${date.getUTCFullYear()}`;
-  if (timeframe === '1d' || timeframe === '1w') return day; // a week's label is its Monday
-  return `${day} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+const DAILY = new Set(['1d', '1w']);
+
+export function crosshairTimeLabel(timeSec: number, lang: Lang, timeframe: string, zone?: Zone): string {
+  if (DAILY.has(timeframe)) return `${weekdayShort(timeSec, lang, 'UTC')} ${utcDate(timeSec, true)}`;
+  return `${weekdayShort(timeSec, lang, zone)} ${dateTime(timeSec, zone)}`;
 }
 
-const pad = (n: number): string => String(n).padStart(2, '0');
-
-interface Names {
-  weekday: Intl.DateTimeFormat;
-  /** Formatted with the day, so ru gives the month as it reads in a date (`мая`, not `май`). */
-  month: Intl.DateTimeFormat;
-}
-
-/** Built once per language: the label is formatted on every crosshair move. */
-const NAMES = new Map<Lang, Names>();
-
-function namesFor(lang: Lang): Names {
-  let names = NAMES.get(lang);
-  if (!names) {
-    names = {
-      weekday: new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: 'UTC' }),
-      month: new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', timeZone: 'UTC' }),
-    };
-    NAMES.set(lang, names);
-  }
-  return names;
+/**
+ * An axis tick's label. The library picks a tick's weight from the UTC calendar and places a DAY tick on the first bar of a UTC day (where the day
+ * separators are drawn too, `day-separators.ts`); in a zone that is not UTC that bar is not the local
+ * midnight, so the tick says so: `06.11 02:00` in Kyiv, not a bare `06.11` that a reader takes for
+ * local midnight. A local midnight that is not a UTC one gets an ordinary `00:00` time tick, if the
+ * library puts a tick there at all. On 1d / 1w every tick names a UTC day (`06.11`), or a year.
+ */
+export function axisTickLabel(timeSec: number, weight: TickMarkType, timeframe: string, zone?: Zone): string {
+  if (DAILY.has(timeframe)) return weight === TickMarkType.Year ? utcDate(timeSec, true).slice(6) : utcDate(timeSec);
+  if (weight === TickMarkType.Time || weight === TickMarkType.TimeWithSeconds) return timeOfDay(timeSec, zone);
+  const localMidnight = (timeSec + utcOffsetSec(timeSec, zone)) % 86_400 === 0;
+  return localMidnight ? dayMonth(timeSec, zone) : dateTime(timeSec, zone);
 }

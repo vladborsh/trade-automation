@@ -16,7 +16,7 @@
     <table>
       <thead>
         <tr>
-          <th>{{ t('logins.col.time') }}</th>
+          <th>{{ t('logins.col.time', { zone: (null | time: 'zone') }) }}</th>
           <th>{{ t('logins.col.login') }}</th>
           <th>{{ t('logins.col.outcome') }}</th>
           <th>{{ t('logins.col.ip') }}</th>

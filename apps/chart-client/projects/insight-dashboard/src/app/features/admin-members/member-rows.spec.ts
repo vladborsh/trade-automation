@@ -1,6 +1,15 @@
 import type { WebMember } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { refusalKey, toMemberRow } from './member-rows';
+import { dateTime, dayMonthYear } from '../../shared/time-format';
+
+describe('toMemberRow zones (IB-152)', () => {
+  it('23:59 UTC on the 3rd joined on the 4th in Kyiv', () => {
+    const row = (zone: string) => toMemberRow(m(), 1, zone);
+    expect([row('UTC').joined, row('Europe/Kyiv').joined]).toEqual(['03.11.2026', '04.11.2026']);
+    expect([row('UTC').lastLogin, row('Europe/Kyiv').lastLogin]).toEqual(['04.11 01:02', '04.11 03:02']);
+  });
+});
 
 const m = (over: Partial<WebMember> = {}): WebMember => ({
   id: 2, tgUserId: 900, login: 'alice', role: 'member', disabled: false,
@@ -8,10 +17,10 @@ const m = (over: Partial<WebMember> = {}): WebMember => ({
 });
 
 describe('toMemberRow (IB-035)', () => {
-  it('an active member: «disable» on the button, UTC dates, live sessions', () => {
+  it('an active member: «disable» on the button, the viewer\'s dates (IB-152), live sessions', () => {
     expect(toMemberRow(m(), 1)).toEqual({
       id: 2, tgUserId: 900, login: 'alice', role: 'members.role.member', disabled: false,
-      joined: '2026-11-03', lastLogin: '2026-11-04 01:02', sessions: 2, action: 'disable',
+      joined: dayMonthYear(Date.UTC(2026, 10, 3, 23, 59) / 1000), lastLogin: dateTime(Date.UTC(2026, 10, 4, 1, 2, 3) / 1000), sessions: 2, action: 'disable',
     });
   });
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { OI_DIVERGENCE_DEFAULT_PARAMS, type WebOiDivergenceAlert } from '@trade-automation/contracts';
 import { MUTED_STATUS_KEY, alertKindKey, formToParams, marketAlertStatus, movePct, normalizeSymbol, paramsToForm, pctText, symbolRefusalKey, toAlertRow, toSkipRow } from './alert-rows';
+import { dateTime } from '../../shared/time-format';
+
+/** IB-152: a UTC `YYYY-MM-DD HH:MM[:SS]` as the viewer sees it (time-format.spec pins the zones). */
+const local = (utc: string): string => dateTime(Date.parse(`${utc.replace(' ', 'T')}Z`) / 1000);
 
 /** IB-112 (V12, V17) — the admin alerts page's mapping. */
 const ALERT: WebOiDivergenceAlert = {
@@ -31,7 +35,7 @@ describe('IB-151 marketAlertStatus (liq, funding, level rows)', () => {
 describe('toAlertRow', () => {
   it('B against A for price and OI, the delivery, and the move after sending', () => {
     expect(toAlertRow(ALERT)).toEqual({
-      id: 7, confirmed: '2026-11-04 18:00', symbol: 'TRXUSDT', tf: '1h', direction: 'alerts.direction.bullish', kind: null,
+      id: 7, confirmed: local('2026-11-04 18:00'), symbol: 'TRXUSDT', tf: '1h', direction: 'alerts.direction.bullish', kind: null,
       price: '−2.0 %', oi: '+6.8 %', run: null,
       status: { key: 'alerts.status.sent', recipients: 1 },
       after4h: '+2.0 %', after24h: '—',
@@ -108,6 +112,6 @@ describe('symbols and refusals', () => {
   it('a skip row: when, the bar, and the hole as a range', () => {
     const at = Date.UTC(2026, 10, 4, 12, 6) / 1000;
     expect(toSkipRow({ symbol: 'TRXUSDT', tf: '15m', at, barTime: at - 6 * 60, reason: 'no_oi_data', holeFrom: at - 3_600, holeTo: at - 3_300 }))
-      .toEqual({ at: '2026-11-04 12:06', symbol: 'TRXUSDT', tf: '15m', bar: '2026-11-04 12:00', hole: '2026-11-04 11:06 – 2026-11-04 11:11' });
+      .toEqual({ at: local('2026-11-04 12:06'), symbol: 'TRXUSDT', tf: '15m', bar: local('2026-11-04 12:00'), hole: `${local('2026-11-04 11:06')} – ${local('2026-11-04 11:11')}` });
   });
 });

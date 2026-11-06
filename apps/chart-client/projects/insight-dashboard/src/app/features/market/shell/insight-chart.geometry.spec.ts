@@ -2,6 +2,7 @@ import type { WebInsightChart } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { chartGeometry, decimalsOf, niceTicks, tickLabel, valueText, xLabels } from './insight-chart.geometry';
 
+
 /**
  * IB-119 (market round 2 §3) — the chart's arithmetic: an axis a person reads (3–5 round ticks in the
  * unit), the reference line where the value is, the band's colours, the span named, the value printed.
@@ -61,9 +62,12 @@ describe('the span on the x axis', () => {
     ]);
     expect(xLabels({ from: NOW - H, to: NOW }, NOW)[0]?.text).toEqual({ kind: 'ago', unit: 'm', n: 60 });
   });
-  it('a span in the past (a cascade, an alert) names its UTC times', () => {
-    expect(xLabels({ from: NOW - 5 * H, to: NOW - 5 * H + 40 * 60 }, NOW).map((l) => l.text)).toEqual([
+  it('a span in the past (a cascade, an alert) names its times in the viewer\'s zone (IB-152)', () => {
+    expect(xLabels({ from: NOW - 5 * H, to: NOW - 5 * H + 40 * 60 }, NOW, 'UTC').map((l) => l.text)).toEqual([
       { kind: 'at', text: '07:00' }, { kind: 'at', text: '07:20' }, { kind: 'at', text: '07:40' },
+    ]);
+    expect(xLabels({ from: NOW - 5 * H, to: NOW - 5 * H + 40 * 60 }, NOW, 'Europe/Kyiv').map((l) => l.text)).toEqual([
+      { kind: 'at', text: '09:00' }, { kind: 'at', text: '09:20' }, { kind: 'at', text: '09:40' },
     ]);
   });
 });

@@ -1,5 +1,9 @@
 import type { WebLiqAlertRow, WebLiqCoin } from '@trade-automation/contracts';
 import { coinsToForm, parseUsd, perCoinPatch, toLiqRow, usdText } from './liq-rows';
+import { dateTime } from '../../shared/time-format';
+
+/** IB-152: a UTC `YYYY-MM-DD HH:MM[:SS]` as the viewer sees it (time-format.spec pins the zones). */
+const local = (utc: string): string => dateTime(Date.parse(`${utc.replace(' ', 'T')}Z`) / 1000);
 
 describe('IB-122 liq-rows', () => {
   const row: WebLiqAlertRow = {
@@ -13,7 +17,7 @@ describe('IB-122 liq-rows', () => {
 
   it('a journal row: money as the bot writes it, the status from source / late / fired', () => {
     expect(toLiqRow(row)).toEqual({
-      id: 1, at: '2026-11-05 14:07', symbol: 'BTCUSDT', side: 'liqAlerts.side.long', event: 'liqAlerts.event.alert',
+      id: 1, at: local('2026-11-05 14:07'), symbol: 'BTCUSDT', side: 'liqAlerts.side.long', event: 'liqAlerts.event.alert',
       sum: '$7.4M', threshold: '$5M', status: { key: 'alerts.status.journalOnly', recipients: 0 },
     });
     expect(toLiqRow({ ...row, firedAt: 1, recipients: 2 }).status).toEqual({ key: 'alerts.status.sent', recipients: 2 });

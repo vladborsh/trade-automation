@@ -6,6 +6,7 @@ import blockFixture from '../../../../../../../../libs/contracts/test/fixtures/l
 import { routes } from '../../app.routes';
 import { I18nService } from '../../i18n/i18n.service';
 import { LiquidationsBlockComponent } from './liquidations-block.component';
+import { dayMonth } from '../../shared/time-format';
 
 /**
  * IB-089 — the block as a COMPOSITION on the contract fixture (30-day norm, an outlier hour, a BTC
@@ -60,8 +61,8 @@ describe('LiquidationsBlockComponent (IB-089)', () => {
     expect(el.querySelector('app-liq-where .norm')).toBeNull();
     expect(el.querySelector('app-liq-where')?.textContent).not.toContain('of the norm');
     expect(el.querySelector('app-liq-where .side')).not.toBeNull();
-    expect(el.querySelector('app-liq-hourly')?.textContent).toContain('normal appears on 2026-11-10');
-    expect(el.querySelector('app-liq-large')?.textContent).toContain('normal appears on 2026-11-10');
+    expect(el.querySelector('app-liq-hourly')?.textContent).toContain(`normal appears on ${dayMonth(1_794_269_312)}`);
+    expect(el.querySelector('app-liq-large')?.textContent).toContain(`normal appears on ${dayMonth(1_794_269_312)}`);
   });
 
   it('IB-120: «All liquidations →» is a router link to /liquidations at Market\'s period — a real route, never a bare #href', () => {

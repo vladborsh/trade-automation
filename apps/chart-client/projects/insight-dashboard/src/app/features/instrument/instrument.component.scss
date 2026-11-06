@@ -161,3 +161,10 @@
 @media (max-width: 767px) {
   .group button { min-height: 40px; min-width: 40px; }
 }
+
+/* IB-152: the zone, named once — muted, it is a footnote to every time on the page */
+.zone {
+  margin: 0;
+  color: #8b949e;
+  font-size: 12px;
+}

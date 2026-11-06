@@ -6,6 +6,10 @@ import type { StringKey } from '../../../i18n/keys';
 import { ru } from '../../../i18n/ru';
 import { baseOf, basisOf, cardLinkTarget, cardView, chipOf, figureRuns, linkLabel, ratioText, whenOf, type Phrase } from './insight-card';
 import { wordInsight } from './market-text';
+import { dayMonth, timeOfDay } from '../../../shared/time-format';
+
+/** IB-152: the card's clock is the viewer's (time-format.spec pins the zones themselves). */
+const AT3 = timeOfDay(Date.UTC(2026, 10, 4, 3, 0) / 1000);
 
 /**
  * IB-107 (market-page design §7.3, §7.4, D20) — a card's words, against the design's worked examples:
@@ -57,19 +61,24 @@ describe('R2 liq_coin', () => {
 
 describe('R3 liq_cascade — the moment is the link and the «when»', () => {
   const r3 = (timeSec: number) => st({ ruleId: 'R3', block: 'liquidations', key: 'insight.liq_cascade', params: { side: 'long', count: 21, minutes: 9, usd: 14_400_000, symbol: 'BTCUSDT' }, link: { route: 'instrument', symbol: 'BTCUSDT', timeSec } });
-  it('«Каскад ликвидаций лонгов за 9 мин: 21, всего $14M» → «Открыть BTC в 03:00 UTC» (the count agrees with no noun: «3», «21» read right)', () => {
+  it('«Каскад ликвидаций лонгов за 9 мин: 21, всего $14M» → «Открыть BTC в 05:00» in Kyiv (the count agrees with no noun: «3», «21» read right)', () => {
     const w = words(r3(TODAY_3AM));
     expect(w.title).toBe('Каскад ликвидаций лонгов за 9 мин: 21, всего $14M');
     expect(words({ ...r3(TODAY_3AM), params: { ...r3(TODAY_3AM).params, count: 3 } }).title).toBe('Каскад ликвидаций лонгов за 9 мин: 3, всего $14M');
     expect(words(r3(TODAY_3AM), 'en').title).toBe('Cascade of long liquidations in 9 min: 21, $14M in total');
     expect(w.expl).toContain('больше всего по BTC');
-    expect(w.link).toBe('Открыть BTC в 03:00 UTC →');
-    expect(w.when).toBe('сегодня 03:00 UTC');
+    expect(w.link).toBe(`Открыть BTC в ${AT3} →`);
+    expect(w.when).toBe(`сегодня ${AT3}`);
     expect(w.chip.tone).toBe('long');
   });
+  it('IB-152: «today / yesterday» are the viewer\'s days — 23:30 UTC on the 3rd is already the 4th in Kyiv', () => {
+    const late = Date.UTC(2026, 10, 3, 23, 30) / 1000;
+    expect(say(whenOf(r3(late), NOW, 'UTC'))).toBe('вчера 23:30');
+    expect(say(whenOf(r3(late), NOW, 'Europe/Kyiv'))).toBe('сегодня 01:30');
+  });
   it('yesterday and older say so', () => {
-    expect(words(r3(TODAY_3AM - 86_400)).when).toBe('вчера 03:00 UTC');
-    expect(words(r3(TODAY_3AM - 3 * 86_400)).when).toBe('2026-11-01 03:00 UTC');
+    expect(words(r3(TODAY_3AM - 86_400)).when).toBe(`вчера ${AT3}`);
+    expect(words(r3(TODAY_3AM - 3 * 86_400)).when).toBe(`${dayMonth(TODAY_3AM - 3 * 86_400)} ${AT3}`);
   });
 });
 
@@ -183,8 +192,8 @@ describe('R11 oi_divergence (IB-113) — the alert, worded as what happened', ()
     expect(w.title).toBe('BTC 1h: цена ниже прошлого минимума (−1.8 %), OI выше (+3.2 %)');
     expect(w.expl).toBe('Цена обновила минимум, а открытых позиций стало больше: на падении набирают позиции.');
     expect(w.chip.tone).toBe('pos');
-    expect(w.when).toBe('сегодня 03:00 UTC');
-    expect(w.link).toBe('Открыть BTC в 03:00 UTC →');
+    expect(w.when).toBe(`сегодня ${AT3}`);
+    expect(w.link).toBe(`Открыть BTC в ${AT3} →`);
     expect(words(r11('bullish'), 'en').title).toBe('BTC 1h: price below the previous low (−1.8 %), OI higher (+3.2 %)');
   });
   it('bearish mirrors it', () => {
@@ -242,7 +251,7 @@ describe('the parts every card shares', () => {
   it('basis: «за 24ч · Binance», and the sample sizes with the start go into the tooltip', () => {
     const b = basisOf(st({ ruleId: 'R5', block: 'positioning', key: 'insight.funding_extremes', params: {} }).basis);
     expect(say(b.basis)).toBe('за 24ч · Binance');
-    expect(say(b.tip)).toBe('норма: 697 окон с данными из 697, с 2026-10-05');
+    expect(say(b.tip)).toBe(`норма: 697 окон с данными из 697, с ${dayMonth(Date.UTC(2026, 9, 5) / 1000)}`);
     expect(say(basisOf({ window: '1h', venues: ['coinbase', 'binance'], sampleWindows: 600, observedWindows: 580, from: null }).tip, 'en')).toBe('norm: 580 windows with data of 600');
     expect(say(basisOf({ window: '1h', venues: ['coinbase', 'binance'], sampleWindows: 600, observedWindows: 580, from: null }).basis, 'en')).toBe('over 1h · Coinbase, Binance');
   });

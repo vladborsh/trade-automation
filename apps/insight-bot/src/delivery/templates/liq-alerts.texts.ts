@@ -4,6 +4,7 @@ import {
 import { WEB_VENUE_NAMES } from '@trade-automation/contracts';
 import type { Lang } from '../../users/user.model';
 import type { Texts } from './texts';
+import { utc } from './utc-label';
 
 /**
  * IB-122 / IB-143 (design L3, L12, L13; C3) — the large-liquidation messages, as the bot sends them: plain text,
@@ -89,7 +90,7 @@ const eventLink = (t: LiqEventText, webBaseUrl: string): string => {
 /** `15:06 UTC`: the small event's T0, written as the other texts write a time. */
 export function utcHhmm(ms: number): string {
   const d = new Date(ms);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+  return utc(`${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`);
 }
 
 /**

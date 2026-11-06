@@ -9,6 +9,7 @@ import {
   type WebMarketPeriod,
 } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
+import { dateTime, dayMonth, timeOfDay, utcOffsetSec, type Zone } from '../../shared/time-format';
 import { BUBBLE_EDGE_GAP, fittingScale, MORE_BAND_PX, moreLabel, packSide, type PackGeometry } from './bubble-pack';
 import { formatRatio, formatUsd } from './liquidations.format';
 import { presentNote, venueNote, type VenueNote } from './venue-note';
@@ -113,14 +114,10 @@ function ticks(times: number[], slot: number, xOf: (i: number) => number): Array
 
 /**
  * A time label: `18:00` for hourly buckets, `03.11 16:00` for the 7d chart's 4-hour ones. The
- * member's clock (the feed it replaces did the same); `timeZone` exists for the spec.
+ * member's clock and the site's one format (IB-152, `time-format.ts`); `zone` exists for the spec.
  */
-export function tickLabel(time: number, bucketSec: number, timeZone?: string): string {
-  const d = new Date(time * 1000);
-  const hm = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone });
-  if (bucketSec <= 3_600) return hm;
-  const dm = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', timeZone });
-  return `${dm} ${hm}`;
+export function tickLabel(time: number, bucketSec: number, zone?: Zone): string {
+  return bucketSec <= 3_600 ? timeOfDay(time, zone) : dateTime(time, zone);
 }
 
 export interface WhereRow {
@@ -205,10 +202,10 @@ export interface BubbleTick {
 
 /** The member's clock, as seconds east of UTC at an instant. A spec passes a fixed one. */
 export type UtcOffset = (timeSec: number) => number;
-export const LOCAL_OFFSET: UtcOffset = (t) => -new Date(t * 1000).getTimezoneOffset() * 60;
+export const LOCAL_OFFSET: UtcOffset = (t) => utcOffsetSec(t);
 
 export interface BubbleAxis {
-  /** IB-BUG-036: the 7d chart labels days (`DD/MM`, one per local midnight), not `DD/MM HH:MM`. */
+  /** IB-BUG-036: the 7d chart labels days (`dd.MM`, one per local midnight), not `dd.MM HH:mm`. */
   days: boolean;
   offset: UtcOffset;
 }
@@ -285,13 +282,10 @@ function localMidnights(window: { from: number; to: number }, offset: UtcOffset)
   }
 }
 
-/** `HH:MM`, or `DD/MM` on the day axis — on the member's clock. */
+/** `HH:mm`, or `dd.MM` on the day axis — on the member's clock (the axis's offset: the spec passes a fixed one). */
 function axisLabel(time: number, axis: BubbleAxis): string {
-  const d = new Date((time + axis.offset(time)) * 1000);
-  const two = (n: number) => String(n).padStart(2, '0');
-  return axis.days
-    ? `${two(d.getUTCDate())}/${two(d.getUTCMonth() + 1)}`
-    : `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+  const wall = time + axis.offset(time); // the member's wall clock, read as if it were UTC
+  return axis.days ? dayMonth(wall, 'UTC') : timeOfDay(wall, 'UTC');
 }
 
 /**
@@ -373,11 +367,12 @@ export function normNote(
   period: WebMarketPeriod,
   weekFrom: number | null,
   nowSec: number,
+  zone?: Zone,
 ): NormNote {
   if (period === '7d') return { key: 'liq.norm.week', params: {} };
   if (basis.unavailable === 'insufficient_history') {
     return weekFrom !== null && weekFrom > nowSec
-      ? { key: 'liq.norm.from', params: { date: new Date(weekFrom * 1000).toISOString().slice(0, 10) } }
+      ? { key: 'liq.norm.from', params: { date: dayMonth(weekFrom, zone) } }
       : { key: 'liq.norm.noHistory', params: {} };
   }
   if (basis.unavailable === 'no_norm') {

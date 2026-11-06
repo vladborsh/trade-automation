@@ -1,3 +1,4 @@
+import { dateTime, type Zone } from '../../shared/time-format';
 import {
   OI_DIVERGENCE_TFS, OiDivergenceParamsSchema, type OiDivergenceParams, type OiDivergenceTf, type WebAlertSymbolRefusal,
   type MarketAlertMutedBy, type WebOiDivergenceAlert, type WebOiDivergenceSkipRow,
@@ -11,8 +12,8 @@ import type { StringKey } from '../../i18n/keys';
  */
 
 const MINUS = '−';
-/** UTC `YYYY-MM-DD HH:MM` of unix seconds. */
-export const utcMinute = (sec: number): string => new Date(sec * 1000).toISOString().replace('T', ' ').slice(0, 16);
+/** `dd.MM HH:mm` of unix seconds, the viewer's zone (IB-152); the column header names the zone. */
+export const atMinute = (sec: number, zone?: Zone): string => dateTime(sec, zone);
 
 /** `−2.4 %`, `+6.8 %`: one decimal, the page's minus; `—` when there is nothing to compare. */
 export function pctText(value: number | null): string {
@@ -71,7 +72,7 @@ export const alertKindKey = (kind: WebOiDivergenceAlert['kind']): StringKey | nu
 export function toAlertRow(a: WebOiDivergenceAlert): AlertRow {
   return {
     id: a.id,
-    confirmed: utcMinute(a.confirmedAt),
+    confirmed: atMinute(a.confirmedAt),
     symbol: a.symbol,
     tf: a.tf,
     direction: a.direction === 'bullish' ? 'alerts.direction.bullish' : 'alerts.direction.bearish',
@@ -102,7 +103,7 @@ export interface SkipRow {
 }
 
 export function toSkipRow(s: WebOiDivergenceSkipRow): SkipRow {
-  return { at: utcMinute(s.at), symbol: s.symbol, tf: s.tf, bar: utcMinute(s.barTime), hole: `${utcMinute(s.holeFrom)} – ${utcMinute(s.holeTo)}` };
+  return { at: atMinute(s.at), symbol: s.symbol, tf: s.tf, bar: atMinute(s.barTime), hole: `${atMinute(s.holeFrom)} – ${atMinute(s.holeTo)}` };
 }
 
 /**

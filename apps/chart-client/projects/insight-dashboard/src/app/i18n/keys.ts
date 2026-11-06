@@ -24,6 +24,8 @@ export type StringKey =
   | 'action.refresh'
   | 'state.loading'
   | 'state.never'
+  // IB-152: the zone, named once per page where times are shown
+  | 'time.zone'
   // login
   | 'login.title'
   | 'login.signingIn'

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { joinedCoverage, joinedUnavailable, noAnswerLabel, seriesStartLabel, utcDate } from './coverage-labels';
+import { joinedCoverage, joinedUnavailable, noAnswerLabel, seriesStartLabel, startDate } from './coverage-labels';
+import { dayMonthYear } from '../../shared/time-format';
 
 /**
  * IB-081 — the labels a panel shows from what the server said. Each case is built to disagree with
@@ -10,7 +11,7 @@ const OCT_5 = Date.UTC(2026, 9, 5, 13, 30) / 1000;
 
 describe('seriesStartLabel (OI, long/short)', () => {
   it('truncated with a start: «данные с <date>», the UTC day', () => {
-    expect(seriesStartLabel({ coverageFrom: OCT_5, truncated: true })).toEqual({ key: 'instrument.coverage.from', params: { date: '2026-10-05' } });
+    expect(seriesStartLabel({ coverageFrom: OCT_5, truncated: true })).toEqual({ key: 'instrument.coverage.from', params: { date: dayMonthYear(OCT_5) } });
   });
 
   it('coverageFrom WITHOUT truncated shows nothing: the server stating where the answer starts is not news', () => {
@@ -43,10 +44,10 @@ describe('noAnswerLabel (funding)', () => {
   });
 });
 
-describe('utcDate', () => {
-  it('is the UTC day, not the local one, at the edge of midnight', () => {
-    expect(utcDate(Date.UTC(2026, 9, 4, 23, 59, 59) / 1000)).toBe('2026-10-04');
-    expect(utcDate(Date.UTC(2026, 9, 5, 0, 0, 0) / 1000)).toBe('2026-10-05');
+describe('startDate (IB-152)', () => {
+  it('is the viewer\'s day: 22:30 UTC on the 4th is already the 5th in Kyiv', () => {
+    expect(startDate(Date.UTC(2026, 9, 4, 22, 30) / 1000, 'UTC')).toBe('04.10.2026');
+    expect(startDate(Date.UTC(2026, 9, 4, 22, 30) / 1000, 'Europe/Kyiv')).toBe('05.10.2026');
   });
 });
 

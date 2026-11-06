@@ -53,3 +53,10 @@ h1 { font: var(--type-h1); color: var(--color-text-strong); margin: 0; }
 @media (max-width: 480px) {
   :host { padding: calc(var(--page-pad-phone) - var(--shell-pad)) 0; }
 }
+
+/* IB-152: the zone, named once — muted, it is a footnote to every time on the page */
+.zone {
+  margin: 0;
+  color: #8b949e;
+  font-size: 12px;
+}

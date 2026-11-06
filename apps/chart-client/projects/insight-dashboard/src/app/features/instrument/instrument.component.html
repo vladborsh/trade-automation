@@ -16,6 +16,8 @@
         }
       </div>
     </div>
+    <!-- IB-152: the zone the chart and the tables are in, named once -->
+    <p class="zone">{{ t('time.zone', { zone: (null | time: 'zone') }) }}</p>
   </header>
   @if (downsampled()) {
     <p class="note">{{ t('instrument.downsampled') }}</p>
@@ -62,12 +64,12 @@
       <thead>
         <!-- §11 English-by-rule: field names in a table of raw data, which a reader matches
              against the venue's own data and our logs. Allow-listed in no-literals.spec.ts. -->
-        <tr><th>time (UTC)</th><th>venue</th><th>side</th><th class="num">price</th><th class="num">qty</th><th class="num">notional</th></tr>
+        <tr><th>time ({{ null | time: 'zone' }})</th><th>venue</th><th>side</th><th class="num">price</th><th class="num">qty</th><th class="num">notional</th></tr>
       </thead>
       <tbody>
         @for (row of top(); track row.time + row.venue + row.notional) {
           <tr>
-            <td>{{ row.time * 1000 | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}</td>
+            <td>{{ row.time | time }}</td>
             <td>{{ row.venue }}</td>
             <td [class.long]="row.side === 'long'" [class.short]="row.side === 'short'">
               {{ row.side }}

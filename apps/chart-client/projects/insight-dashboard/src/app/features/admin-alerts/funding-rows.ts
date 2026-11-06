@@ -1,6 +1,6 @@
 import { WebFundingCoinPatchSchema, type WebFundingAlertRow, type WebFundingCoin, type WebFundingCoinPatch } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
-import { marketAlertStatus, utcMinute } from './alert-rows';
+import { atMinute, marketAlertStatus } from './alert-rows';
 
 /**
  * IB-124 (alerts design §1, F3, F5) — the «Funding» section's mapping, pure and spec'd: journal rows as shown, the per-coin
@@ -35,7 +35,7 @@ export interface FundingRow {
 export function toFundingRow(r: WebFundingAlertRow): FundingRow {
   return {
     id: r.id,
-    at: utcMinute(r.at),
+    at: atMinute(r.at),
     symbol: r.symbol,
     side: r.side === 'high' ? 'fundingAlerts.side.high' : 'fundingAlerts.side.low',
     event: r.event === 'enter' ? 'fundingAlerts.event.enter' : 'fundingAlerts.event.flip',

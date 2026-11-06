@@ -1,3 +1,4 @@
+import { dateTime, dayMonthYear, type Zone } from '../../shared/time-format';
 import type { WebMember, WebMemberRefusal } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 
@@ -8,24 +9,24 @@ export interface MemberRow {
   login: string;
   role: StringKey;
   disabled: boolean;
-  /** UTC day, `YYYY-MM-DD`. */
+  /** `dd.MM.yyyy`, the viewer's zone (IB-152). */
   joined: string;
-  /** UTC, `YYYY-MM-DD HH:MM`, or a dash. */
+  /** `dd.MM HH:mm`, the viewer's zone, or a dash. */
   lastLogin: string;
   sessions: number;
   /** What the row's button does; null on the admin's own row (the server refuses it: 409). */
   action: 'disable' | 'enable' | null;
 }
 
-export function toMemberRow(m: WebMember, selfId: number | null): MemberRow {
+export function toMemberRow(m: WebMember, selfId: number | null, zone?: Zone): MemberRow {
   return {
     id: m.id,
     tgUserId: m.tgUserId,
     login: m.login ?? '—',
     role: m.role === 'admin' ? 'members.role.admin' : 'members.role.member',
     disabled: m.disabled,
-    joined: new Date(m.createdAt).toISOString().slice(0, 10),
-    lastLogin: m.lastLoginAt === null ? '—' : new Date(m.lastLoginAt).toISOString().replace('T', ' ').slice(0, 16),
+    joined: dayMonthYear(m.createdAt / 1000, zone),
+    lastLogin: m.lastLoginAt === null ? '—' : dateTime(m.lastLoginAt / 1000, zone),
     sessions: m.activeSessions,
     action: m.id === selfId ? null : m.disabled ? 'enable' : 'disable',
   };

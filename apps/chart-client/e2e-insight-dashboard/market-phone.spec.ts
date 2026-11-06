@@ -756,7 +756,7 @@ for (const [width, height, columns] of [[1440, 900, 5], [1240, 900, 5], [390, 84
       expect(fill['liquidations_24h']).toBeCloseTo(1, 1); // the long/short split fills the track
       // «7d: available from …» is the 7d button's description, not a visible line
       expect(m.weekDisabled).toBe(true);
-      expect(m.weekDesc).toMatch(/^7d: available from \d{4}-\d{2}-\d{2}$/);
+      expect(m.weekDesc).toMatch(/^7d: available from \d{2}\.\d{2}$/); // IB-152: dd.MM, the viewer's day
       expect(m.visibleWeekLines).toBe(0);
       expect(m.bodyFont).toMatch(/^"IBM Plex Sans"/);
       expect(m.valueFont).toMatch(/^"IBM Plex Mono"/);

@@ -3,7 +3,7 @@ import {
 } from '@trade-automation/contracts';
 import { ApiError } from '@backtest-core/api/api-error';
 import type { StringKey } from '../../i18n/keys';
-import { utcMinute } from './alert-rows';
+import { atMinute } from './alert-rows';
 import { LEVEL_EVENT_KEY, priceText } from './level-rows';
 
 /**
@@ -44,7 +44,7 @@ export interface CustomLevelRow {
 
 export function toCustomLevelRow(l: WebCustomLevel): CustomLevelRow {
   return {
-    id: l.id, symbol: l.symbol, price: priceText(l.price), note: l.note ?? '', added: utcMinute(l.createdAt),
+    id: l.id, symbol: l.symbol, price: priceText(l.price), note: l.note ?? '', added: atMinute(l.createdAt),
     cells: CUSTOM_LEVEL_EVENTS.map((event) => ({ event, on: l.events[event] })),
   };
 }

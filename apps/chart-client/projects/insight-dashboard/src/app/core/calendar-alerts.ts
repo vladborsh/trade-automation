@@ -1,3 +1,4 @@
+import { timeOfDay, zoneLabel, type Zone } from '../shared/time-format';
 import type { EconomicEvent } from '@trade-automation/contracts';
 import type { DueAlert } from '@trade-automation/calendar-core/due-alerts';
 
@@ -69,17 +70,16 @@ export function writeFired(store: AlertStore | null, ledger: Record<string, numb
   }
 }
 
-const hhmm = (ms: number): string => new Date(ms).toISOString().slice(11, 16);
-
 /** Title and body of one notification; `t` fills the translated title. */
 export function notificationFor(
   alert: DueAlert<EconomicEvent>,
   now: number,
   title: (minutes: number, time: string) => string,
+  zone?: Zone,
 ): { title: string; body: string } {
   const minutes = Math.max(0, Math.round((alert.scheduledAt - now) / 60_000));
   return {
-    title: title(minutes, `${hhmm(alert.scheduledAt)} UTC`),
+    title: title(minutes, `${timeOfDay(alert.scheduledAt / 1000, zone)} ${zoneLabel(alert.scheduledAt / 1000, zone)}`),
     body: alert.events.map((e) => e.title).join('\n'),
   };
 }

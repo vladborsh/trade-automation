@@ -1,6 +1,8 @@
 @let s = state();
 <section class="page">
   <h1>{{ t('liqPage.title') }}</h1>
+  <!-- IB-152: the zone the page's times are in, named once -->
+  <p class="zone">{{ t('time.zone', { zone: (null | time: 'zone') }) }}</p>
   <app-liq-filters [query]="s.query" [coins]="coins()" (queryChange)="onQuery($event)" />
   <app-help-block [title]="t('liqPage.help.title')" storageKey="liquidations">
     <ul class="help-list">

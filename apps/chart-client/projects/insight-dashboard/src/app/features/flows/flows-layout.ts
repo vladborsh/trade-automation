@@ -1,3 +1,4 @@
+import { utcDate } from '../../shared/time-format';
 import type { WebFlowsChange, WebFlowsPoint, WebFlowsResponse, WebFlowsUnavailable, WebMarketPeriod } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 import { formatUsd } from '../liquidations/liquidations.format';
@@ -46,7 +47,8 @@ const reasonWords = (r: WebFlowsUnavailable | null, minutes = 0): Words | null =
   r === null ? null : { key: `flows.reason.${r}` as StringKey, params: { minutes } };
 /** A signed USD amount with the page's minus sign («−», as `signedPct`), never the ASCII hyphen. */
 export const signedUsd = (v: number): string => `${v > 0 ? '+' : v < 0 ? '−' : ''}${formatUsd(Math.abs(v))}`;
-const day = (sec: number | null) => (sec === null ? '—' : new Date(sec * 1000).toISOString().slice(0, 10));
+/** A daily figure's day: a UTC day, named by its UTC date (IB-152: a business period, not a moment). */
+const day = (sec: number | null) => (sec === null ? '—' : utcDate(sec));
 
 export function flowsTiles(r: WebFlowsResponse, period: WebMarketPeriod): TileView[] {
   const dv = r.dvol;

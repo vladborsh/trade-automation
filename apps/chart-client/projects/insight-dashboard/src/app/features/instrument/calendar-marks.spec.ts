@@ -58,8 +58,9 @@ describe('calendarMarks', () => {
 });
 
 describe('eventTimeLabel', () => {
-  it('is UTC to the minute, whatever the browser zone', () => {
-    expect(eventTimeLabel(Date.UTC(2026, 9, 28, 12, 30, 59))).toBe('2026-10-28 12:30 UTC');
+  it('is the viewer\'s zone to the minute, the zone named (IB-152)', () => {
+    expect(eventTimeLabel(Date.UTC(2026, 9, 28, 12, 30, 59), 'UTC')).toBe('28.10 12:30 UTC');
+    expect(eventTimeLabel(Date.UTC(2026, 9, 28, 12, 30, 59), 'Europe/Kyiv')).toBe('28.10 14:30 UTC+2');
   });
 });
 

@@ -16,6 +16,7 @@
  */
 
 import type { Lang } from '../../users/user.model';
+import { utc } from './utc-label';
 
 export type Texts = Record<Lang, string>;
 
@@ -114,15 +115,15 @@ export const ADMIN_ONLY: Texts = {
 export function inviteCreated(link: string, expiresAt: Date): Texts {
   const until = expiresAt.toISOString().slice(0, 16).replace('T', ' ');
   return {
-    ru: `Одноразовая ссылка, действует до ${until} UTC:\n${link}`,
-    en: `Single-use link, valid until ${until} UTC:\n${link}`,
+    ru: `Одноразовая ссылка, действует до ${utc(until)}:\n${link}`,
+    en: `Single-use link, valid until ${utc(until)}:\n${link}`,
   };
 }
 
 export function userList(rows: ReadonlyArray<{ tgUserId: number; role: string; disabled: boolean; createdAt: Date }>): Texts {
   if (rows.length === 0) return { ru: 'Пока никого нет.', en: 'Nobody yet.' };
   const line = (r: (typeof rows)[number]) =>
-    `• ${r.tgUserId} — ${r.role}${r.disabled ? ' (disabled)' : ''}, ${r.createdAt.toISOString().slice(0, 10)}`;
+    `• ${r.tgUserId} — ${r.role}${r.disabled ? ' (disabled)' : ''}, ${utc(r.createdAt.toISOString().slice(0, 10))}`;
   const body = rows.map(line).join('\n');
   return {
     ru: `Участники (${rows.length}):\n${body}`,
@@ -224,7 +225,7 @@ const hhmm = (ms: number, timeZone: string): string =>
 
 /** `12:30 UTC / 14:30 Kyiv` — both, because the feed is UTC and the members live in Kyiv. */
 export function calendarTime(ms: number, lang: Lang): string {
-  return `${hhmm(ms, 'UTC')} UTC / ${hhmm(ms, 'Europe/Kyiv')} ${lang === 'ru' ? 'Киев' : 'Kyiv'}`;
+  return `${utc(hhmm(ms, 'UTC'))} / ${hhmm(ms, 'Europe/Kyiv')} ${lang === 'ru' ? 'Киев' : 'Kyiv'}`;
 }
 
 function figures(e: CalendarLine, lang: Lang): string {

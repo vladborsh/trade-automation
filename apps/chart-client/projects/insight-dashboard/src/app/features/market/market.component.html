@@ -6,6 +6,8 @@
     <span class="dot" aria-hidden="true"></span>
     @if (age(); as a) { {{ t('market.liveAge', { seconds: a.seconds }) }} } @else { {{ t('market.liveWaiting') }} }
   </p>
+  <!-- IB-152: the zone the page's times are in, named once -->
+  <p class="zone">{{ t('time.zone', { zone: (null | time: 'zone') }) }}</p>
   <span class="spacer"></span>
   <app-period-switch
     [period]="period()"

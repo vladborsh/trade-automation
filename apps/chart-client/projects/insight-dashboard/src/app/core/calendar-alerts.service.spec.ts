@@ -7,12 +7,15 @@ import { OPT_IN_KEY } from './calendar-alerts';
 import { CalendarAlertsService } from './calendar-alerts.service';
 import { InsightApiClient } from './insight-api.client';
 import { WebPushService } from './web-push.service';
+import { timeOfDay, zoneLabel } from '../shared/time-format';
 
 /**
  * IB-061 — the service against a fake API and a fake `Notification`: it rings once inside the
  * lead window, never while off or refused, and the toggle asks the browser before switching on.
  */
 const AT = Date.UTC(2026, 9, 29, 12, 30);
+/** IB-152: the viewer's zone, named (the run's TZ; time-format.spec pins the zones themselves). */
+const AT_LABEL = `${timeOfDay(AT / 1000)} ${zoneLabel(AT / 1000)}`;
 const CPI: EconomicEvent = {
   id: 'ff:1:2026-10-29', source: 'forexfactory', seriesId: '1', sourceUrl: null, title: 'CPI m/m',
   country: 'USD', impact: 'high', scheduledAt: AT, scheduledDay: '2026-10-29', forecast: null,
@@ -60,7 +63,7 @@ describe('CalendarAlertsService (IB-061)', () => {
 
     expect(await service.check(AT - 15 * 60_000)).toEqual([`alert:${AT}`]);
     expect(await service.check(AT - 14 * 60_000)).toEqual([]);
-    expect(FakeNotification.shown).toEqual([{ title: 'USD in 15 min, 12:30 UTC', tag: `alert:${AT}`, body: 'CPI m/m' }]);
+    expect(FakeNotification.shown).toEqual([{ title: `USD in 15 min, ${AT_LABEL}`, tag: `alert:${AT}`, body: 'CPI m/m' }]);
   });
 
   it('a reload inside the window does not ring again — the ledger is in localStorage', async () => {
@@ -133,7 +136,7 @@ describe('CalendarAlertsService (IB-061)', () => {
       const push = fakePush();
       const { service } = setup('granted', true, push);
       await service.check(AT - 15 * 60_000);
-      expect(push.show).toHaveBeenCalledWith('USD in 15 min, 12:30 UTC', { tag: `alert:${AT}`, body: 'CPI m/m' });
+      expect(push.show).toHaveBeenCalledWith(`USD in 15 min, ${AT_LABEL}`, { tag: `alert:${AT}`, body: 'CPI m/m' });
       expect(FakeNotification.shown).toEqual([]);
     });
 

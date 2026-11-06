@@ -55,7 +55,7 @@
         <table>
           <thead>
             <tr>
-              <th>{{ t('liqAlerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('liqAlerts.col.side') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
+              <th>{{ t('liqAlerts.col.at', { zone: (null | time: 'zone') }) }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('liqAlerts.col.side') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
               <th>{{ t('liqAlerts.col.sum') }}</th><th>{{ t('liqAlerts.col.threshold') }}</th><th>{{ t('alerts.col.status') }}</th>
             </tr>
           </thead>

@@ -63,9 +63,11 @@ describe('isAlertEvent', () => {
 });
 
 describe('notificationFor', () => {
-  it('names the minutes left and the UTC time, and lists the grouped titles', () => {
+  it('names the minutes left and the time in the viewer\'s zone, named, and lists the grouped titles (IB-152)', () => {
     const alert = { key: `alert:${AT}`, scheduledAt: AT, events: [ev(), ev({ id: 'b', title: 'Core CPI m/m' })] };
-    const n = notificationFor(alert, AT - 14 * 60_000 - 20_000, (minutes, time) => `${minutes}|${time}`);
+    const n = notificationFor(alert, AT - 14 * 60_000 - 20_000, (minutes, time) => `${minutes}|${time}`, 'UTC');
     expect(n).toEqual({ title: '14|12:30 UTC', body: 'CPI m/m\nCore CPI m/m' });
+    const kyiv = notificationFor(alert, AT - 14 * 60_000 - 20_000, (minutes, time) => `${minutes}|${time}`, 'Europe/Kyiv');
+    expect(kyiv.title).toBe('14|14:30 UTC+2'); // 29.10: Kyiv is back on +2 since the 25th
   });
 });

@@ -1,3 +1,4 @@
+import { dateTimeSec, type Zone } from '../../shared/time-format';
 import type { WebLoginEvent } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 import { outcomeKey } from '../auth/auth-messages';
@@ -5,7 +6,7 @@ import { outcomeKey } from '../auth/auth-messages';
 /** IB-079 — one journal row as the table shows it. Pure, so the mapping has its own spec. */
 export interface LoginEventRow {
   id: number;
-  /** UTC, `YYYY-MM-DD HH:MM:SS` — the journal is read against server logs, which are UTC. */
+  /** `dd.MM HH:mm:ss`, the viewer's zone (IB-152): the seconds matter, the journal is matched against server logs. */
   time: string;
   login: string;
   outcome: StringKey;
@@ -17,10 +18,10 @@ export interface LoginEventRow {
 
 const FAILED = new Set(['bad_credentials', 'throttled']);
 
-export function toLoginEventRow(e: WebLoginEvent): LoginEventRow {
+export function toLoginEventRow(e: WebLoginEvent, zone?: Zone): LoginEventRow {
   return {
     id: e.id,
-    time: new Date(e.at).toISOString().replace('T', ' ').slice(0, 19),
+    time: dateTimeSec(e.at / 1000, zone),
     login: e.loginAttempted ?? '—',
     outcome: outcomeKey(e.outcome),
     failed: FAILED.has(e.outcome),

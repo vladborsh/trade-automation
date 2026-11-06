@@ -1,5 +1,6 @@
 import type { WebUniverseSummaryRow } from '@trade-automation/contracts';
-import { hhmmUtc, nowTiles } from './instrument-now';
+import { nowTiles, settleTime } from './instrument-now';
+import { timeOfDay } from '../../shared/time-format';
 import type { PaneData } from './pane-data';
 
 const candle = (time: number, volume: number, takerBuyVolume: number | null) =>
@@ -37,7 +38,7 @@ describe('nowTiles', () => {
   it('prefers the live summary for funding and its settlement time', () => {
     const t = nowTiles(pane(), summary(), 'BTCUSDT');
     expect(t.funding).toBe('+0.0123');
-    expect(t.nextFunding).toBe('16:00');
+    expect(t.nextFunding).toBe(timeOfDay(Date.UTC(2026, 9, 24, 16, 0) / 1000)); // the viewer's zone (IB-152)
     expect(t.oiChange).toBe('−3.4');
     expect(t.oiChangeSign).toBe(-1);
   });
@@ -68,9 +69,10 @@ describe('nowTiles', () => {
   });
 });
 
-describe('hhmmUtc', () => {
-  it('prints the UTC clock, not the reader\'s', () => {
-    expect(hhmmUtc(Date.UTC(2026, 0, 1, 7, 5))).toBe('07:05');
-    expect(hhmmUtc(null)).toBeNull();
+describe('settleTime (IB-152)', () => {
+  it('prints the viewer\'s clock: the same settlement reads differently in two zones', () => {
+    expect(settleTime(Date.UTC(2026, 0, 1, 7, 5), 'UTC')).toBe('07:05');
+    expect(settleTime(Date.UTC(2026, 0, 1, 7, 5), 'Europe/Kyiv')).toBe('09:05');
+    expect(settleTime(null)).toBeNull();
   });
 });

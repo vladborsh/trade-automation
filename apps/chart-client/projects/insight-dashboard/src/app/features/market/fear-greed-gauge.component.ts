@@ -3,6 +3,7 @@ import type { WebFearGreedCard } from '@trade-automation/contracts';
 import { I18nService } from '../../i18n/i18n.service';
 import { captionAnchor, gaugeGeometry, historyLine } from './fear-greed-gauge';
 import { FEAR_GREED_STYLE, fearGreedBand } from './market.adapter';
+import { utcDate, utcDaySec } from '../../shared/time-format';
 
 /** The SVG boxes the geometry is laid out in (viewBox units; the SVGs scale to their container). */
 const GAUGE = { w: 200, h: 112, cx: 100, cy: 100, r: 84 };
@@ -30,6 +31,8 @@ export class FearGreedGaugeComponent {
   readonly box = GAUGE;
   readonly lineBox = LINE;
   readonly band = computed(() => fearGreedBand(this.card().now.value));
+  /** The reading's day is a UTC day (a business period), named by its UTC date (IB-152). */
+  readonly asOfDay = computed(() => utcDate(utcDaySec(this.card().now.day)));
   readonly gauge = computed(() => gaugeGeometry(this.card().now.value, GAUGE.cx, GAUGE.cy, GAUGE.r, GAUGE.r - 16));
   /** `history` is optional at runtime: a server from before IB-102 sends none, and then there is no line. */
   readonly line = computed(() => historyLine(this.card().history, LINE.w, LINE.h));

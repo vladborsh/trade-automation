@@ -1,6 +1,10 @@
 import { ApiError } from '@backtest-core/api/api-error';
 import { describe, expect, it } from 'vitest';
 import { CUSTOM_EVENT_COLUMNS, createBody, customLevelErrorKey, parsePriceText, toCustomLevelRow } from './custom-level-rows';
+import { dateTime } from '../../shared/time-format';
+
+/** IB-152: a UTC `YYYY-MM-DD HH:MM[:SS]` as the viewer sees it (time-format.spec pins the zones). */
+const local = (utc: string): string => dateTime(Date.parse(`${utc.replace(' ', 'T')}Z`) / 1000);
 
 /** IB-128 (alerts design §4 P9) — the custom levels block's mapping. */
 describe('custom level rows (IB-128)', () => {
@@ -24,7 +28,7 @@ describe('custom level rows (IB-128)', () => {
       events: { breakout_up: true, breakout_down: true, sweep_above: false, sweep_below: true },
     });
     expect(row).toEqual({
-      id: 7, symbol: 'BTCUSDT', price: '72000', note: '', added: '2026-11-06 09:30',
+      id: 7, symbol: 'BTCUSDT', price: '72000', note: '', added: local('2026-11-06 09:30'),
       cells: [{ event: 'breakout_up', on: true }, { event: 'breakout_down', on: true }, { event: 'sweep_above', on: false }, { event: 'sweep_below', on: true }],
     });
   });

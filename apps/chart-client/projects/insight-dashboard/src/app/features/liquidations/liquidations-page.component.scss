@@ -24,3 +24,10 @@ h1 { margin: 0; font: var(--type-h2); font-size: 20px; color: var(--color-text-s
   .box { padding: 12px; }
   .back { display: inline-flex; align-items: center; min-height: var(--touch-min); }
 }
+
+/* IB-152: the zone, named once — muted, it is a footnote to every time on the page */
+.zone {
+  margin: 0;
+  color: #8b949e;
+  font-size: 12px;
+}

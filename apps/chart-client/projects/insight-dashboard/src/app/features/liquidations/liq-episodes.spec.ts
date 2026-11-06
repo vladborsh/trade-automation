@@ -89,12 +89,12 @@ describe('IB-134 episode view (E3–E6)', () => {
   describe('time', () => {
     const tz = 'UTC';
     it('7d: day and range; a single print one time', () => {
-      expect(episodeTime({ from: Date.UTC(2026, 10, 4, 17, 4) / 1000, to: Date.UTC(2026, 10, 4, 17, 13) / 1000 }, true, tz)).toBe('04/11 17:04–17:13');
-      expect(episodeTime({ from: Date.UTC(2026, 10, 4, 17, 4) / 1000, to: Date.UTC(2026, 10, 4, 17, 4) / 1000 }, true, tz)).toBe('04/11 17:04');
+      expect(episodeTime({ from: Date.UTC(2026, 10, 4, 17, 4) / 1000, to: Date.UTC(2026, 10, 4, 17, 13) / 1000 }, true, tz)).toBe('04.11 17:04–17:13');
+      expect(episodeTime({ from: Date.UTC(2026, 10, 4, 17, 4) / 1000, to: Date.UTC(2026, 10, 4, 17, 4) / 1000 }, true, tz)).toBe('04.11 17:04');
     });
     it('across midnight the 7d view names both days; 24h shows times only', () => {
       const e = { from: Date.UTC(2026, 10, 4, 23, 58) / 1000, to: Date.UTC(2026, 10, 5, 0, 3) / 1000 };
-      expect(episodeTime(e, true, tz)).toBe('04/11 23:58–05/11 00:03');
+      expect(episodeTime(e, true, tz)).toBe('04.11 23:58–05.11 00:03');
       expect(episodeTime(e, false, tz)).toBe('23:58–00:03');
     });
   });

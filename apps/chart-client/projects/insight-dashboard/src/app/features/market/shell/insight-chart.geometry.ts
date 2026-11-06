@@ -1,3 +1,4 @@
+import { dayMonth, timeOfDay, type Zone } from '../../../shared/time-format';
 import type { WebInsightChart, WebInsightChartPoint } from '@trade-automation/contracts';
 import { formatUsd } from '../../liquidations/liquidations.format';
 
@@ -84,16 +85,13 @@ export function valueText(v: number, unit: WebInsightChart['unit']): string {
   }
 }
 
-/** The x axis: span start, middle and end — relative («−24ч … сейчас») when the span ends now, else UTC times. */
+/** The x axis: span start, middle and end — relative («−24ч … сейчас») when the span ends now, else the viewer's times (IB-152). */
 export type XLabel = { x: number; text: { kind: 'now' } | { kind: 'ago'; unit: 'd' | 'h' | 'm'; n: number } | { kind: 'at'; text: string } };
 
-export function xLabels(span: { from: number; to: number }, nowSec: number): XLabel[] {
+export function xLabels(span: { from: number; to: number }, nowSec: number, zone?: Zone): XLabel[] {
   const len = Math.max(1, span.to - span.from);
   const live = nowSec - span.to <= Math.max(300, len * 0.1);
-  const at = (t: number) => {
-    const iso = new Date(t * 1000).toISOString();
-    return len > 2 * 86_400 ? `${iso.slice(5, 10)}` : iso.slice(11, 16);
-  };
+  const at = (t: number) => (len > 2 * 86_400 ? dayMonth(t, zone) : timeOfDay(t, zone));
   return [0, 50, 100].map((x) => {
     const t = span.from + (len * x) / 100;
     if (!live) return { x, text: { kind: 'at' as const, text: at(t) } };

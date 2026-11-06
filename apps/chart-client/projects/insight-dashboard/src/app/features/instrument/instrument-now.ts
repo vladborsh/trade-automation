@@ -1,3 +1,4 @@
+import { timeOfDay, type Zone } from '../../shared/time-format';
 import type { WebUniverseSummaryRow } from '@trade-automation/contracts';
 import { fractionSigned, signed } from '../market/market.format';
 import type { PaneData } from './pane-data';
@@ -25,7 +26,7 @@ export interface NowTiles {
   /** Signed percentage per interval, four places: `+0.0123`. */
   funding: string | null;
   fundingSign: Sign | null;
-  /** `HH:mm`, UTC. Only from the live summary. */
+  /** `HH:mm`, the viewer's zone (IB-152). Only from the live summary. */
   nextFunding: string | null;
   /** Cumulative taker delta over the window, in the BASE asset. */
   cvd: string | null;
@@ -53,9 +54,10 @@ function signedGrouped(v: number): string {
   return `${v < 0 ? '−' : '+'}${body}`;
 }
 
-export function hhmmUtc(ms: number | null): string | null {
+/** The next funding settlement, `HH:mm` in the viewer's zone (IB-152; the settlement grid itself is the venue's UTC one). */
+export function settleTime(ms: number | null, zone?: Zone): string | null {
   if (ms === null || !Number.isFinite(ms)) return null;
-  return new Date(ms).toISOString().slice(11, 16);
+  return timeOfDay(ms / 1000, zone);
 }
 
 export function nowTiles(data: PaneData | null, row: WebUniverseSummaryRow | null, symbol: string): NowTiles {
@@ -74,7 +76,7 @@ export function nowTiles(data: PaneData | null, row: WebUniverseSummaryRow | nul
     oiChangeSign: sign(oiChange),
     funding: fractionSigned(funding, 4),
     fundingSign: sign(funding),
-    nextFunding: hhmmUtc(row?.nextFundingTimeMs ?? null),
+    nextFunding: settleTime(row?.nextFundingTimeMs ?? null),
     cvd: cvd === null ? null : signedGrouped(cvd),
     cvdSign: sign(cvd),
     cvdUnit: baseAsset(symbol),

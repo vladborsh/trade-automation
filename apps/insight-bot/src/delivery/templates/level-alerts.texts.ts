@@ -1,6 +1,7 @@
 import { LEVEL_ALERT_TF, LEVEL_BAR_SEC, LEVEL_KIND_LABEL, LEVEL_KIND_SIDE, type LevelAlertDetails, type LevelEvent } from '@trade-automation/contracts';
 import type { Lang } from '../../users/user.model';
 import type { Texts } from './texts';
+import { utc } from './utc-label';
 
 /**
  * IB-126 (design P6; C3) — the level messages, plain text in the recipient's language. Each says what the 15m bar DID
@@ -36,7 +37,7 @@ export function utcTime(epochMs: number, lang: Lang): string {
   const d = new Date(epochMs);
   const hh = String(d.getUTCHours()).padStart(2, '0');
   const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  return `${d.getUTCDate()} ${MONTHS[lang][d.getUTCMonth()]} ${hh}:${mm} UTC`;
+  return utc(`${d.getUTCDate()} ${MONTHS[lang][d.getUTCMonth()]} ${hh}:${mm}`);
 }
 
 /** The instrument page at the bar's open, on 15m (§1 «Link»). */

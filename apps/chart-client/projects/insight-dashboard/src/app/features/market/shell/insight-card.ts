@@ -1,3 +1,4 @@
+import { dayIndex, dayMonth, timeOfDay, type Zone } from '../../../shared/time-format';
 import type { WebInsightBasis, WebInsightBlock, WebInsightChart, WebInsightStatement } from '@trade-automation/contracts';
 import { venueName } from '@trade-automation/contracts';
 import type { StringKey } from '../../../i18n/keys';
@@ -77,9 +78,9 @@ export function ratioText(ratio: number): string {
   return ratio < 10 ? ratio.toFixed(1).replace(/\.0$/, '') : String(Math.round(ratio));
 }
 
-/** HH:MM of a UTC moment. */
-export function hhmm(sec: number): string {
-  return new Date(sec * 1000).toISOString().slice(11, 16);
+/** `HH:mm` of a moment, in the viewer's zone (IB-152). */
+export function hhmm(sec: number, zone?: Zone): string {
+  return timeOfDay(sec, zone);
 }
 
 export function chipOf(s: Pick<WebInsightStatement, 'block' | 'params'>): CardView['chip'] {
@@ -95,19 +96,18 @@ export function chipOf(s: Pick<WebInsightStatement, 'block' | 'params'>): CardVi
 const PERIOD_START = new Set(['R4']);
 
 /**
- * «when»: the moment the link points at («сегодня 03:00 UTC», «вчера …», or the date), R10 «последний
+ * «when»: the moment the link points at («сегодня 05:00», «вчера …», or the date — the viewer's days and clock, IB-152), R10 «последний
  * час», R9 «за сутки | за неделю», everything else the basis window («за 24ч»).
  */
-export function whenOf(s: WebInsightStatement, nowSec: number): Phrase {
+export function whenOf(s: WebInsightStatement, nowSec: number, zone?: Zone): Phrase {
   if (s.ruleId === 'R10') return phrase('card.when.last_hour');
   if (s.ruleId === 'R9') return phrase(s.params['days'] === 7 ? 'card.when.week' : 'card.when.day');
   if ('route' in s.link && s.link.timeSec !== null && !PERIOD_START.has(s.ruleId)) {
-    const day = (sec: number) => Math.floor(sec / 86_400);
-    const ago = day(nowSec) - day(s.link.timeSec);
-    const time = hhmm(s.link.timeSec);
+    const ago = dayIndex(nowSec, zone) - dayIndex(s.link.timeSec, zone);
+    const time = hhmm(s.link.timeSec, zone);
     if (ago === 0) return phrase('card.when.today', { time });
     if (ago === 1) return phrase('card.when.yesterday', { time });
-    return phrase('card.when.date', { time, date: new Date(s.link.timeSec * 1000).toISOString().slice(0, 10) });
+    return phrase('card.when.date', { time, date: dayMonth(s.link.timeSec, zone) });
   }
   return phrase('card.when.window', {}, { window: windowWord(s.basis) });
 }
@@ -129,7 +129,7 @@ export function basisOf(b: WebInsightBasis): { basis: Phrase; tip: Phrase } {
     basis: phrase('card.basis', { venues }, { window: windowWord(b) }),
     tip: b.from === null
       ? phrase('card.basis.tip_nofrom', counts)
-      : phrase('card.basis.tip', { ...counts, from: new Date(b.from * 1000).toISOString().slice(0, 10) }),
+      : phrase('card.basis.tip', { ...counts, from: dayMonth(b.from) }),
   };
 }
 

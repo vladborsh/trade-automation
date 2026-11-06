@@ -3,8 +3,9 @@ import type { WebFundingAlertSettingsPatch, WebFundingAlertsAdminResponse } from
 import { InsightApiClient } from '../../core/insight-api.client';
 import type { StringKey } from '../../i18n/keys';
 import { I18nService } from '../../i18n/i18n.service';
-import { utcMinute } from './alert-rows';
+import { atMinute } from './alert-rows';
 import { coinsToFundingForm, floorText, fundingPerCoinPatch, parseHours, toFundingRow, type FundingCoinForm } from './funding-rows';
+import { TimePipe } from '../../shared/time.pipe';
 
 /**
  * IB-124 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §1, F3, F5) — the «Funding» section of
@@ -15,6 +16,7 @@ import { coinsToFundingForm, floorText, fundingPerCoinPatch, parseHours, toFundi
 @Component({
   selector: 'app-admin-funding-alerts',
   standalone: true,
+  imports: [TimePipe],
   templateUrl: './admin-funding-alerts.component.html',
   styleUrl: './admin-funding-alerts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -57,7 +59,7 @@ export class AdminFundingAlertsComponent {
   readonly alerts = computed(() => (this.page()?.alerts ?? []).map(toFundingRow));
   readonly updated = computed(() => {
     const s = this.page()?.settings;
-    return s ? utcMinute(s.updatedAt) : '';
+    return s ? atMinute(s.updatedAt) : '';
   });
 
   constructor() {

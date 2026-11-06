@@ -1,8 +1,8 @@
 import {
-  LineSeries, createChart, type IChartApi, type ISeriesApi, type LogicalRange, type MouseEventParams, type Time,
+  LineSeries, createChart, type IChartApi, type ISeriesApi, type LogicalRange, type MouseEventParams, type TickMarkType, type Time,
 } from 'lightweight-charts';
 import type { Lang } from '../../i18n/keys';
-import { crosshairTimeLabel } from './crosshair-time-label';
+import { axisTickLabel, crosshairTimeLabel } from './crosshair-time-label';
 import { PANEL_TIME_SCALE } from './panels.model';
 
 /** The strip's height: the library's time axis at the default font, plus a hair of air. */
@@ -40,9 +40,9 @@ const sameRange = (a: LogicalRange | null, b: LogicalRange | null): boolean =>
  * Kept in step with the main chart in both directions (dragging the strip scrolls the panes), with
  * the crosshair's time label, and with the main chart's price-scale width so the bars line up.
  *
- * That crosshair label is this strip's, so its format lives here: weekday, date and time in UTC
- * (IB-064, `crosshair-time-label.ts`). The language is read on every move, so a switch shows on the
- * next hover. The tick labels keep the library's own format.
+ * That crosshair label and the tick labels are this strip's, so their format is set here: the
+ * viewer's zone and the site's one format (IB-152, `crosshair-time-label.ts`; IB-064's weekday kept).
+ * The language is read on every move, so a switch shows on the next hover.
  */
 export class TimeAxisStrip {
   private chart: IChartApi | null = null;
@@ -80,7 +80,10 @@ export class TimeAxisStrip {
       layout: { background: { color: colours.background }, textColor: colours.text, attributionLogo: false },
       grid: { vertLines: { visible: false }, horzLines: { visible: false } },
       rightPriceScale: { visible: true, borderVisible: false, ticksVisible: false },
-      timeScale: { ...PANEL_TIME_SCALE, visible: true, borderVisible: false },
+      timeScale: {
+        ...PANEL_TIME_SCALE, visible: true, borderVisible: false,
+        tickMarkFormatter: (time: Time, weight: TickMarkType) => axisTickLabel(time as number, weight, timeframe),
+      },
       crosshair: { horzLine: { visible: false, labelVisible: false }, vertLine: { visible: false } },
       localization: { timeFormatter: (time: Time) => crosshairTimeLabel(time as number, this.lang(), timeframe) },
     });

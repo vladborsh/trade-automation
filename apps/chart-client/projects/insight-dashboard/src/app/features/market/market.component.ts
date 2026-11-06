@@ -22,6 +22,7 @@ import { InsightsBlockComponent } from './shell/insights-block.component';
 import { KpiStripComponent } from './shell/kpi-strip.component';
 import { parsePeriod, periodAvailability } from './shell/market-text';
 import { PeriodSwitchComponent } from './shell/period-switch.component';
+import { TimePipe } from '../../shared/time.pipe';
 
 /**
  * The market page, and the dashboard's landing page (architecture/market-page-design-2026-11-03.md).
@@ -42,7 +43,7 @@ import { PeriodSwitchComponent } from './shell/period-switch.component';
   selector: 'app-market',
   standalone: true,
   imports: [
-    CardComponent, LiquidationsBlockComponent, PositioningBlockComponent, CapsBlockComponent, BlockConclusionComponent, LoaderComponent,
+    TimePipe, CardComponent, LiquidationsBlockComponent, PositioningBlockComponent, CapsBlockComponent, BlockConclusionComponent, LoaderComponent,
     PeriodSwitchComponent, KpiStripComponent, InsightsBlockComponent, FearGreedGaugeComponent, FlowsBlockComponent,
   ],
   templateUrl: './market.component.html',

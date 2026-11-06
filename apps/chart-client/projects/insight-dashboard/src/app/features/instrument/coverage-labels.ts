@@ -1,3 +1,4 @@
+import { dayMonthYear, type Zone } from '../../shared/time-format';
 import { venueName } from '@trade-automation/contracts';
 import type { StringKey } from '../../i18n/keys';
 
@@ -31,7 +32,7 @@ export interface CoverageLabel {
 /** «данные с 2026-10-05» when the series starts later than the window, else null. */
 export function seriesStartLabel(coverage: Coverage | undefined): CoverageLabel | null {
   if (coverage?.truncated !== true || coverage.coverageFrom === undefined) return null;
-  return { key: 'instrument.coverage.from', params: { date: utcDate(coverage.coverageFrom) } };
+  return { key: 'instrument.coverage.from', params: { date: startDate(coverage.coverageFrom) } };
 }
 
 /** «нет ответа: Bybit, OKX» when a venue did not answer, else null (names, not keys: IB-BUG-033). */
@@ -40,9 +41,9 @@ export function noAnswerLabel(unavailable: readonly string[] | undefined): Cover
   return { key: 'instrument.coverage.noAnswer', params: { venues: [...new Set(unavailable)].map(venueName).join(', ') } };
 }
 
-/** The UTC calendar day of an epoch second, `YYYY-MM-DD`: the format Market's «доступно с» uses. */
-export function utcDate(epochSec: number): string {
-  return new Date(epochSec * 1000).toISOString().slice(0, 10);
+/** Where a series starts, `dd.MM.yyyy` in the viewer's zone (IB-152; Market's «доступно с» reads the same). */
+export function startDate(epochSec: number, zone?: Zone): string {
+  return dayMonthYear(epochSec, zone);
 }
 
 /**

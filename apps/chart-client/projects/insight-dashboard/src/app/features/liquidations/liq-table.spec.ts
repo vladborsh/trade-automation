@@ -71,7 +71,7 @@ describe('cells', () => {
     expect(v.usd).toBe('$5.7M');
     expect(v.link).toEqual({ commands: ['/instrument', 'BTCUSDT'], queryParams: { at: rows[1].time } });
     expect(v.time).toMatch(/^\d\d:\d\d$/);
-    expect(liqRowView(rows[1], true, 'UTC').time).toMatch(/^\d\d\/\d\d \d\d:\d\d$/);
+    expect(liqRowView(rows[1], true, 'UTC').time).toMatch(/^\d\d\.\d\d \d\d:\d\d$/);
   });
 
   it('on a phone, exactly price and venue are dropped', () => {

@@ -183,7 +183,7 @@ describe('LiquidationsPageComponent — episodes (IB-134)', () => {
   it('the summary counts every episode ≥ T before the cap, with plurals and the largest (E4)', async () => {
     const { el } = await open('/liquidations?p=7d', 'ru');
     const headline = text(el.querySelector('.headline'));
-    expect(headline).toMatch(/^За 7 дней — 4 эпизода: 3 раза выбивали шортов, 1 раз лонгов\. Крупнейший — \d\d\/\d\d \d\d:\d\d, BTC, \$100M за 23 минуты\.$/);
+    expect(headline).toMatch(/^За 7 дней — 4 эпизода: 3 раза выбивали шортов, 1 раз лонгов\. Крупнейший — \d\d\.\d\d \d\d:\d\d, BTC, \$100M за 23 минуты\.$/);
     expect(text(el.querySelector('.anno'))).toContain('уже есть на «Рынке» — здесь их нет');
     expect(el.querySelector('.anno a')?.getAttribute('href')).toBe('/market?p=7d');
   });
