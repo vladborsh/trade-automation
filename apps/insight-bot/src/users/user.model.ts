@@ -23,6 +23,8 @@ export interface User {
   liqAlerts: boolean;
   /** IB-124 (design §1 Recipients): funding alerts in the DM. Migration 034: on for admins, off for members. */
   fundingAlerts: boolean;
+  /** IB-126 (design §1 Recipients): price-level alerts in the DM. Migration 035: on for admins, off for members. */
+  levelAlerts: boolean;
   invitedBy: number | null;
   disabled: boolean;
   createdAt: Date;

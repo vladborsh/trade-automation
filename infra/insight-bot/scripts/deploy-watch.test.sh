@@ -51,10 +51,11 @@ def expected():
     return out
 oi = [{'tf': tf, 'bar_close': c, 'found': 0, 'sent': 0, 'at': c + 400} for tf, c in expected()]
 liq = list(range(int(boot // 900) * 900, int(now) + 1, 900))  # every slot's heartbeat since boot
+level = list(range(int((boot - 5) // 900) * 900, int(now) + 1, 900))  # IB-126: every close's line since boot
 def base():
     return {'bot': {'id': 'aaaaaaaaaaaa', 'restarts': 0, 'oom': False, 'state': 'running', 'started_at': started, 'started_epoch': boot},
             'mem': {'available_mb': 220, 'swap_mb': 100}, 'rss_mib': {'bot': 150.0, 'postgres': 270.0},
-            'log': {'errors': 0, 'first_errors': [], 'cookie_lines': 0, 'oi': [dict(o) for o in oi], 'liq': list(liq), 'liq_on': True},
+            'log': {'errors': 0, 'first_errors': [], 'cookie_lines': 0, 'oi': [dict(o) for o in oi], 'liq': list(liq), 'liq_on': True, 'level': list(level), 'level_on': True},
             'weight_1m': 25.0, 'build_sha': sha, 'healthz': {'ok': True, 'code': 200, 'url': 'https://x/healthz'},
             'db': {'eligible': 2, 'alerts': [], 'last_fired': None}, 'errors': []}
 samples = []
@@ -198,6 +199,40 @@ log = w.scan_log('\n'.join(json.dumps({'level': 30, 'time': 1, 'context': 'LiqAl
 print(log['liq_on'], ' '.join(w.utc(c)[11:16] for c in log['liq']))
 PY
 )\" = 'True 14:00 14:15' ]"
+# level_loop_missing (IB-126): an owed close line absent → ALARM (once); an image that never announced the loop → warning.
+case_is level-missing "$(seven "$G" "$G" "$G" '{"log.level": []}' '{"log.level": []}' '{"log.level": []}' '{"log.level": []}')" ALARM:level_loop_missing 1
+check "level-missing: the message names the boot line and the owed closes" "grep -q 'цикл сигналов по уровням молчит: нет проверки после старта, закрытия ' '$work/level-missing/curl-args'"
+V='{"log.level": [], "log.level_on": false}'
+case_is level-old-image "$(seven "$V" "$V" "$V" "$V" "$V" "$V" "$V")" CLEAN 0
+check "level-old-image: recorded as level_loop_unchecked in the files" "grep -q 'level_loop_unchecked' '$work/level-old-image/out/$SHA.json' && grep -q 'not checked: the bot did not announce the level loop' '$work/level-old-image/out/$SHA.md'"
+level_pure() { python3 -I - "$WATCH" "$1" <<'PY'
+import importlib.util, sys
+from datetime import datetime, timezone
+spec = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
+T = lambda h, m, s=0: datetime(2026, 11, 5, h, m, s, tzinfo=timezone.utc).timestamp()
+hm = lambda e: e if e == 'boot' else w.utc(e)[11:16]
+def alarm(boot, now, seen):
+    s = [{'bot': {'id': 'a', 'state': 'running', 'restarts': 0, 'started_at': 'x', 'started_epoch': boot},
+          'log': {'oi': [], 'level': [int(x) for x in seen], 'level_on': True, 'cookie_lines': 0}}]
+    return 'level_loop_missing' in w.alarms_at(s, 0, 'x', now, loop_enabled=False)
+exec(sys.argv[2])
+PY
+}
+check "level expectation: boot 14:13:13 → nothing at 14:18:12, boot at 14:18:13, +14:15 at 14:20:05 (not 14:20:04), 30 min on → boot 14:15 14:30" \
+  "[ \"\$(level_pure 'b = T(14, 13, 13); print(*[\" \".join(map(hm, w.expected_level_lines(b, t))) or \"-\" for t in (T(14, 18, 12), T(14, 18, 13), T(14, 20, 4), T(14, 20, 5), b + 1800)], sep=\"|\")')\" = '-|boot|boot|boot 14:15|boot 14:15 14:30' ]"
+check "level-missing boundary: the 14:30 close's line absent → silent at 14:35:04, ALARM at 14:35:05" \
+  "[ \"\$(level_pure 'b = T(14, 13, 13); seen = [T(14, 0), T(14, 15)]; print(alarm(b, T(14, 35, 4), seen), alarm(b, T(14, 35, 5), seen))')\" = 'False True' ]"
+check "level boot: 14:15:03 boots (the 14:00 close is due), a boot tick stamped 14:15 counts; a line from before that close does not" \
+  "[ \"\$(level_pure 'b = T(14, 15, 3); print(alarm(b, b + 300, [T(14, 15)]), alarm(b, b + 300, [T(13, 45)]))')\" = 'False True' ]"
+check "level lines: the committed fixture (written by the bot spec) parses — announcement seen, closes 03:15 03:15 (the seed line is not one)" "[ \"\$(python3 -I - '$WATCH' '$HERE/../../../apps/insight-bot/test/fixtures/level-heartbeat-lines.txt' <<'PY'
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
+lines = open(sys.argv[2], encoding='utf-8').read().splitlines()
+assert len(lines) == 4, lines
+log = w.scan_log('\n'.join(json.dumps({'level': 30, 'time': 1, 'context': 'LevelAlertsService', 'msg': l}) for l in lines))
+print(log['level_on'], ' '.join(w.utc(c)[11:16] for c in log['level']))
+PY
+)\" = 'True 03:15 03:15' ]"
 case_is send-in-flight "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"db.alerts": [{"id": 8, "recipients": 1}], "db.last_fired": 9999999999}')" CLEAN 0
 check "send-in-flight: an alert newer than the last evaluation line is not a mismatch yet" "! grep -q 'oi_sent_mismatch' '$work/send-in-flight/out/$SHA.json'"
 

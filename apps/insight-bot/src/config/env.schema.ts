@@ -60,6 +60,9 @@ export const EnvSchema = z.object({
   // IB-124: the funding alert loop, every 5 min (state and journal always; sending is the admin page's 'funding'
   // switch, default off). ≈ 0.3 Binance weight / min for 5 coins.
   FUNDING_ALERTS_LOOP_ENABLED: booleanFlag(true),
+  // IB-126: the price-level alert loop, once a minute (evaluates each 15m close; state and journal always; sending is
+  // the admin page's 'level' switch, default off). ≈ 0.33 Binance weight / min for 5 coins, plus a one-time seed.
+  LEVEL_ALERTS_LOOP_ENABLED: booleanFlag(true),
   // IB-115 (design V27): the image's commit, 12 hex — stamped on every OI divergence journal, control and
   // near-miss row, so the statistics split by the code that produced them. The Dockerfile sets it from the
   // `BUILD_SHA` build arg (push-image.sh and the CI workflow pass it). In production a missing one is a boot

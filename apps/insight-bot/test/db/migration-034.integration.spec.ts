@@ -81,7 +81,8 @@ maybeDescribe('IB-124 migration 034: funding settings, recipients, state', () =>
     expect(FundingParamsSchema.safeParse(rows[0]?.params).success).toBe(true);
     expect(await new PgFundingAlertsVisibility(db).membersVisible()).toBe(false);
     // the liq row is untouched
-    expect((await db.query<{ type: string }>('select type from alert_type_settings order by type')).map((r) => r.type)).toEqual(['funding', 'liq']);
+    // `where type <> 'level'`: the chain runs to the end, and 035 (IB-126) adds the 'level' row (its own spec)
+    expect((await db.query<{ type: string }>(`select type from alert_type_settings where type <> 'level' order by type`)).map((r) => r.type)).toEqual(['funding', 'liq']);
   });
 
   it('§1 Recipients: funding_alerts on for the admin that existed, off for the member', async () => {

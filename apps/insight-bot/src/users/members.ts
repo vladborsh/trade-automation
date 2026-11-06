@@ -15,8 +15,8 @@ import { INVITE_TTL_MS, type User } from './user.model';
  * `parseOnOff` already knows (`'true'`/`'false'`).
  */
 export function settingsPatchFromWeb(
-  body: { lang?: string; calendarAlerts?: boolean | string; oiAlerts?: boolean | string; liqAlerts?: boolean | string; fundingAlerts?: boolean | string },
-): { ok: true; patch: SettingsPatch } | { ok: false; field: 'lang' | 'calendarAlerts' | 'oiAlerts' | 'liqAlerts' | 'fundingAlerts' } {
+  body: { lang?: string; calendarAlerts?: boolean | string; oiAlerts?: boolean | string; liqAlerts?: boolean | string; fundingAlerts?: boolean | string; levelAlerts?: boolean | string },
+): { ok: true; patch: SettingsPatch } | { ok: false; field: 'lang' | 'calendarAlerts' | 'oiAlerts' | 'liqAlerts' | 'fundingAlerts' | 'levelAlerts' } {
   const patch: SettingsPatch = {};
   if (body.lang !== undefined) {
     const lang = parseLang(body.lang);
@@ -42,6 +42,11 @@ export function settingsPatchFromWeb(
     const on = parseOnOff(String(body.fundingAlerts));
     if (!on.ok) return { ok: false, field: 'fundingAlerts' };
     patch.fundingAlerts = on.value;
+  }
+  if (body.levelAlerts !== undefined) {
+    const on = parseOnOff(String(body.levelAlerts));
+    if (!on.ok) return { ok: false, field: 'levelAlerts' };
+    patch.levelAlerts = on.value;
   }
   return { ok: true, patch };
 }

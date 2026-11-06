@@ -1,0 +1,4 @@
+level alerts loop on: tick 60 s, a line per 15m close
+level alerts @2026-11-06T03:15:00.000Z: 5 coins, 5 bars, calls 5 (weight 5), alerts 0 (late 0), sent 0, controls 1, seeded -, pending 0
+level alerts @2026-11-06T03:15:00.000Z: 5 coins, 0 bars, calls 5 (weight 5), alerts 0 (late 0), sent 0, controls 1, seeded -, pending 0, failed BTCUSDT
+level alerts seed @2026-11-06T03:15:05.000Z: seeded BTCUSDT, calls 5 (weight 5), pending 0

@@ -11,7 +11,8 @@ import * as users from '../../src/users/pg/users.repo';
 import { UsersService } from '../../src/users/users.service';
 import { WebAuthGuard } from '../../src/web/auth/web-auth.guard';
 import { WebAuthService } from '../../src/web/auth/web-auth.service';
-import { OI_ALERTS_VISIBILITY, WebMeSettingsController, LIQ_ALERTS_VISIBILITY, FUNDING_ALERTS_VISIBILITY } from '../../src/web/members/me-settings.controller';
+import { OI_ALERTS_VISIBILITY, WebMeSettingsController, LIQ_ALERTS_VISIBILITY, FUNDING_ALERTS_VISIBILITY, LEVEL_ALERTS_VISIBILITY } from '../../src/web/members/me-settings.controller';
+import { PgLevelAlertsVisibility } from '../../src/alerts/levels/pg/level-alerts.repo';
 import { PgFundingAlertsVisibility } from '../../src/alerts/funding/pg/funding-alerts.repo';
 import { PgLiqAlertsVisibility } from '../../src/alerts/liquidations/pg/liq-alerts.repo';
 import { PgOiAlertsVisibility } from '../../src/alerts/oi-divergence/pg/oi-alerts.repo';
@@ -79,6 +80,7 @@ maybeDescribe('IB-035 members admin against a real database', () => {
         { provide: OI_ALERTS_VISIBILITY, useFactory: () => new PgOiAlertsVisibility(db) },
         { provide: LIQ_ALERTS_VISIBILITY, useFactory: () => new PgLiqAlertsVisibility(db) },
         { provide: FUNDING_ALERTS_VISIBILITY, useFactory: () => new PgFundingAlertsVisibility(db) },
+        { provide: LEVEL_ALERTS_VISIBILITY, useFactory: () => new PgLevelAlertsVisibility(db) },
         { provide: APP_GUARD, useClass: WebAuthGuard },
       ],
     })
@@ -102,13 +104,13 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     expect((await call('POST', '/api/web/admin/members/1/disable', t)).status).toBe(403);
     const me = await call('GET', '/api/web/me/settings', t);
     expect(me.status).toBe(200);
-    expect(await me.json()).toEqual({ lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false });
+    expect(await me.json()).toEqual({ lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false, levelAlerts: false, levelAlertsVisible: false });
   });
 
   it('the settings PATCH writes the same column the bot reads; an unknown field or a bad value is 400', async () => {
     const t = await session(memberId);
     const ok = await call('PATCH', '/api/web/me/settings', t, { lang: 'EN', calendarAlerts: 'выкл' });
-    expect(await ok.json()).toEqual({ lang: 'en', calendarAlerts: false, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false });
+    expect(await ok.json()).toEqual({ lang: 'en', calendarAlerts: false, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false, levelAlerts: false, levelAlertsVisible: false });
     expect((await users.findByTgUserId(db, 222))).toMatchObject({ lang: 'en', calendarAlerts: false });
     expect((await call('PATCH', '/api/web/me/settings', t, { deposit: 1000 })).status).toBe(400);
     const bad = await call('PATCH', '/api/web/me/settings', t, { lang: 'de' });
@@ -144,7 +146,7 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     const member = await session(memberId);
     const adm = await session(adminId);
     expect(await (await call('GET', '/api/web/me/settings', adm)).json()).toMatchObject({ liqAlertsVisible: true });
-    expect(await (await call('GET', '/api/web/me/settings', member)).json()).toMatchObject({ liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false });
+    expect(await (await call('GET', '/api/web/me/settings', member)).json()).toMatchObject({ liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false, levelAlerts: false, levelAlertsVisible: false });
     const hidden = await call('PATCH', '/api/web/me/settings', member, { liqAlerts: 'on' });
     expect(hidden.status).toBe(403);
     expect(await hidden.json()).toMatchObject({ code: 'SETTING_NOT_AVAILABLE', field: 'liqAlerts' });
@@ -167,7 +169,7 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     const member = await session(memberId);
     const adm = await session(adminId);
     expect(await (await call('GET', '/api/web/me/settings', adm)).json()).toMatchObject({ fundingAlertsVisible: true });
-    expect(await (await call('GET', '/api/web/me/settings', member)).json()).toMatchObject({ fundingAlerts: false, fundingAlertsVisible: false });
+    expect(await (await call('GET', '/api/web/me/settings', member)).json()).toMatchObject({ fundingAlerts: false, fundingAlertsVisible: false, levelAlerts: false, levelAlertsVisible: false });
     const hidden = await call('PATCH', '/api/web/me/settings', member, { fundingAlerts: 'on' });
     expect(hidden.status).toBe(403);
     expect(await hidden.json()).toMatchObject({ code: 'SETTING_NOT_AVAILABLE', field: 'fundingAlerts' });
@@ -181,6 +183,27 @@ maybeDescribe('IB-035 members admin against a real database', () => {
     } finally {
       await db.query(`update alert_type_settings set members_visible = false where type in ('liq', 'funding')`);
       await db.query('update users set funding_alerts = (role = \'admin\')');
+    }
+  });
+
+  it('IB-126: the level alerts toggle — the same rule, behind alert_type_settings(level).members_visible; the funding switch does not open it', async () => {
+    const member = await session(memberId);
+    const adm = await session(adminId);
+    expect(await (await call('GET', '/api/web/me/settings', adm)).json()).toMatchObject({ levelAlertsVisible: true });
+    expect(await (await call('GET', '/api/web/me/settings', member)).json()).toMatchObject({ levelAlerts: false, levelAlertsVisible: false });
+    const hidden = await call('PATCH', '/api/web/me/settings', member, { levelAlerts: 'on' });
+    expect(hidden.status).toBe(403);
+    expect(await hidden.json()).toMatchObject({ code: 'SETTING_NOT_AVAILABLE', field: 'levelAlerts' });
+    await db.query(`update alert_type_settings set members_visible = true where type = 'funding'`);
+    try {
+      expect((await call('PATCH', '/api/web/me/settings', member, { levelAlerts: 'on' })).status).toBe(403);
+      await db.query(`update alert_type_settings set members_visible = true where type = 'level'`);
+      const shown = await call('PATCH', '/api/web/me/settings', member, { levelAlerts: 'вкл' });
+      expect(await shown.json()).toMatchObject({ levelAlerts: true, levelAlertsVisible: true });
+      expect((await users.findByTgUserId(db, 222))?.levelAlerts).toBe(true);
+    } finally {
+      await db.query(`update alert_type_settings set members_visible = false where type in ('funding', 'level')`);
+      await db.query('update users set level_alerts = (role = \'admin\')');
     }
   });
 

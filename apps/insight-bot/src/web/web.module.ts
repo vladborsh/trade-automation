@@ -14,7 +14,10 @@ import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
 import { WebMembersController } from './members/members.controller';
-import { FUNDING_ALERTS_VISIBILITY, LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { FUNDING_ALERTS_VISIBILITY, LEVEL_ALERTS_VISIBILITY, LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { LEVEL_ALERTS_ADMIN, WebLevelAlertsAdminController } from './admin/level-alerts.controller';
+import { LevelAlertsAdmin } from '../alerts/levels/level-alerts-admin';
+import { PgLevelAlertStore, PgLevelAlertsVisibility } from '../alerts/levels/pg/level-alerts.repo';
 import { FUNDING_ALERTS_ADMIN, WebFundingAlertsAdminController } from './admin/funding-alerts.controller';
 import { FundingAlertsAdmin } from '../alerts/funding/funding-alerts-admin';
 import { PgFundingAlertStore, PgFundingAlertsVisibility } from '../alerts/funding/pg/funding-alerts.repo';
@@ -103,6 +106,8 @@ export class WebModule {
         WebLiqAlertsAdminController,
         // IB-124: the «Funding» section
         WebFundingAlertsAdminController,
+        // IB-126: the «Levels» section
+        WebLevelAlertsAdminController,
         // IB-120: the /liquidations page
         LiquidationsLargeController,
         // IB-133: the /liquidations page as «episodes»
@@ -324,6 +329,18 @@ export class WebModule {
           provide: FUNDING_ALERTS_VISIBILITY,
           inject: [DB],
           useFactory: (db: Db | null) => (db ? new PgFundingAlertsVisibility(db) : { membersVisible: async () => false }),
+        },
+        {
+          // IB-126 (design §1): the «Levels» section of /admin/alerts
+          provide: LEVEL_ALERTS_ADMIN,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new LevelAlertsAdmin(new PgLevelAlertStore(db)) : null),
+        },
+        {
+          // IB-126: the level alerts toggle, behind alert_type_settings('level').members_visible
+          provide: LEVEL_ALERTS_VISIBILITY,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new PgLevelAlertsVisibility(db) : { membersVisible: async () => false }),
         },
         {
           // IB-112 (V13): /me/settings shows members the OI alerts toggle only while members_visible is on

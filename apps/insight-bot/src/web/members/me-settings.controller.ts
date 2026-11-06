@@ -14,6 +14,8 @@ export interface OiAlertsVisibility {
 export const LIQ_ALERTS_VISIBILITY = Symbol('LIQ_ALERTS_VISIBILITY');
 /** IB-124: reads `alert_type_settings('funding').members_visible`, the same way. */
 export const FUNDING_ALERTS_VISIBILITY = Symbol('FUNDING_ALERTS_VISIBILITY');
+/** IB-126: reads `alert_type_settings('level').members_visible`, the same way. */
+export const LEVEL_ALERTS_VISIBILITY = Symbol('LEVEL_ALERTS_VISIBILITY');
 
 /**
  * IB-035 — a member's own settings on the site: exactly the bot's `/lang`, `/calendar` and (IB-112)
@@ -22,7 +24,7 @@ export const FUNDING_ALERTS_VISIBILITY = Symbol('FUNDING_ALERTS_VISIBILITY');
  * column. The OI alerts toggle is shown to a member only while the admin page's `members_visible` is
  * on (an admin always sees it); changing it while hidden is refused, not ignored.
  */
-interface Visible { oi: boolean; liq: boolean; funding: boolean }
+interface Visible { oi: boolean; liq: boolean; funding: boolean; level: boolean }
 
 @Controller('api/web/me')
 export class WebMeSettingsController {
@@ -31,6 +33,7 @@ export class WebMeSettingsController {
     @Optional() @Inject(OI_ALERTS_VISIBILITY) private readonly oiVisibility?: OiAlertsVisibility,
     @Optional() @Inject(LIQ_ALERTS_VISIBILITY) private readonly liqVisibility?: OiAlertsVisibility,
     @Optional() @Inject(FUNDING_ALERTS_VISIBILITY) private readonly fundingVisibility?: OiAlertsVisibility,
+    @Optional() @Inject(LEVEL_ALERTS_VISIBILITY) private readonly levelVisibility?: OiAlertsVisibility,
   ) {}
 
   /** Who sees each hidden-by-default toggle: an admin always, a member while that type's `members_visible` is on. */
@@ -39,6 +42,7 @@ export class WebMeSettingsController {
       oi: oiAlertsVisible(user, (await this.oiVisibility?.membersVisible()) ?? false),
       liq: oiAlertsVisible(user, (await this.liqVisibility?.membersVisible()) ?? false),
       funding: oiAlertsVisible(user, (await this.fundingVisibility?.membersVisible()) ?? false),
+      level: oiAlertsVisible(user, (await this.levelVisibility?.membersVisible()) ?? false),
     };
   }
 
@@ -46,6 +50,7 @@ export class WebMeSettingsController {
     return {
       lang: u.lang, calendarAlerts: u.calendarAlerts, oiAlerts: u.oiAlerts, oiAlertsVisible: visible.oi, liqAlerts: u.liqAlerts, liqAlertsVisible: visible.liq,
       fundingAlerts: u.fundingAlerts, fundingAlertsVisible: visible.funding,
+      levelAlerts: u.levelAlerts, levelAlertsVisible: visible.level,
     };
   }
 
@@ -63,6 +68,7 @@ export class WebMeSettingsController {
     if (shape.data.oiAlerts !== undefined && !visible.oi) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'oiAlerts' });
     if (shape.data.liqAlerts !== undefined && !visible.liq) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'liqAlerts' });
     if (shape.data.fundingAlerts !== undefined && !visible.funding) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'fundingAlerts' });
+    if (shape.data.levelAlerts !== undefined && !visible.level) throw new ForbiddenException({ code: 'SETTING_NOT_AVAILABLE', field: 'levelAlerts' });
     const parsed = settingsPatchFromWeb(shape.data);
     if (!parsed.ok) throw new BadRequestException({ code: 'INVALID_SETTING', field: parsed.field });
     const updated = Object.keys(parsed.patch).length > 0 ? await this.users.updateSettings(user.id, parsed.patch) : user;

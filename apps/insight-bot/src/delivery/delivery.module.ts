@@ -6,6 +6,7 @@ import { CalendarNotifierService } from './calendar-notifier.service';
 import { OiAlertsService } from './oi-alerts.service';
 import { LiqAlertsService } from './liq-alerts.service';
 import { FundingAlertsService } from './funding-alerts.service';
+import { LevelAlertsService } from './level-alerts.service';
 import { VenuesModule } from '../venues/venues.module';
 import { TelegramSender } from './telegram-sender';
 import { TelegramBotService } from './telegram-bot.service';
@@ -36,8 +37,9 @@ export class DeliveryModule {
       // IB-035: UsersService comes from UsersModule, shared with the site's members page
       // IB-112: the OI divergence alert loop, beside the calendar DMs (same sender, same DB)
       // IB-122: the large-liquidation alert loop, beside it
+      // IB-126: the price-level alert loop, reading klines through WebModule's CandlesService as the OI loop does
       // IB-124: the funding alert loop; PerpRest and the ONE weight tracker come from VenuesModule (a static module)
-      providers: [TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService, OiAlertsService, LiqAlertsService, FundingAlertsService],
+      providers: [TelegramSender, TelegramBotService, WebPushSender, CalendarNotifierService, OiAlertsService, LiqAlertsService, FundingAlertsService, LevelAlertsService],
       exports: [UsersModule, TelegramSender],
     };
   }
