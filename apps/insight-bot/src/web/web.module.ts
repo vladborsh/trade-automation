@@ -41,6 +41,8 @@ import { CapsService } from './market/caps.service';
 import { FlowsService } from './market/flows.service';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
+import { LiqProfileController } from './series/liq-profile.controller';
+import { LiqProfileService } from './series/liq-profile.service';
 import { AlertMarksController } from './series/alert-marks.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
@@ -120,6 +122,8 @@ export class WebModule {
         LiquidationsLargeController,
         // IB-133: the /liquidations page as «episodes»
         LiquidationEpisodesController,
+        // IB-153: the instrument page's liquidation profile by price
+        LiqProfileController,
       ],
       providers: [
         WebAuthService,
@@ -135,6 +139,7 @@ export class WebModule {
         LiquidationsOverviewService,
         LiquidationsLargeService,
         LiquidationEpisodesService,
+        LiqProfileService,
         {
           // IB-133 (E8): an episode's price path — the universe's Binance perp, ONE exact-limit 1m read (weight 2)
           provide: EPISODE_PRICE_READER,

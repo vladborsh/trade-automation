@@ -41,11 +41,7 @@ export function liquidationUptime(
     const act = activity.get(venue) ?? null;
     const windows = UPTIME_WINDOWS_H.map((h): WebUptimeWindow => {
       const from = new Date(now.getTime() - h * HOUR_MS);
-      let covered = beat ? coveredMs({ from, to: now }, mine, beat.firstSeenAt) : 0;
-      if (beat && now.getTime() - beat.lastSeenAt.getTime() > STALE_AFTER_MS) {
-        covered -= now.getTime() - Math.max(beat.lastSeenAt.getTime(), from.getTime());
-      }
-      covered = Math.max(0, covered);
+      const covered = coveredInWindow(beat, mine, { from, to: now }, now);
       const elapsed = h * HOUR_MS;
       const rows = act ? (h === 24 ? act.rows24h : act.rows7d) : 0;
       const outages = mine.filter((g) => g.gapTo > from && g.gapFrom < now).length;
@@ -62,7 +58,27 @@ export function liquidationUptime(
   });
 }
 
-function stateOf(rows: number, coveredMs: number, elapsedMs: number): WebUptimeState {
+/**
+ * How much of `window` the collector was listening, in ms: `coveredMs` over its outage rows, minus the
+ * stretch since a stale heartbeat (not listening NOW, and not yet a gap row). No heartbeat → 0.
+ * IB-153: shared with the liquidation profile, whose window is the chart's, not 24 h / 7 d.
+ */
+export function coveredInWindow(
+  beat: Heartbeat | null,
+  gaps: ReadonlyArray<{ gapFrom: Date; gapTo: Date }>,
+  window: { from: Date; to: Date },
+  now: Date,
+): number {
+  if (!beat) return 0;
+  let covered = coveredMs(window, gaps, beat.firstSeenAt);
+  if (now.getTime() - beat.lastSeenAt.getTime() > STALE_AFTER_MS) {
+    const staleFrom = Math.max(beat.lastSeenAt.getTime(), window.from.getTime());
+    covered -= Math.max(0, Math.min(now.getTime(), window.to.getTime()) - staleFrom);
+  }
+  return Math.max(0, covered);
+}
+
+export function stateOf(rows: number, coveredMs: number, elapsedMs: number): WebUptimeState {
   if (rows > 0) return 'recorded';
   return coveredMs >= elapsedMs ? 'no_events' : 'not_recorded';
 }
