@@ -225,6 +225,32 @@ d['msg'][0][4] = '1793921250'; d['link_code'] = 502"
 run first-live-liq fll-slow
 check 'first-live-liq 70 s after S and a 502 link → FLAG:fired_after_moment_s,link_http' '[ "$(verdict fll-slow first-live-liq)" = FLAG:fired_after_moment_s,link_http ]'
 
+# ------------------------------------------------------------------------------------ first-live-hidden (IB-144)
+HID='
+d = {"now": "2026-11-06T03:00:00Z", "eligible": [["1"]], "link": "https://x/instrument/ETHUSDT?at=1793929500&tf=15m", "link_code": 200,
+     "alert": [["412", "ETHUSDT", "15m", "bullish", "1793929500", "1793935800", "1793936160", "1", "f", "9c0bb1fe8b8a", "true"]]}
+'
+fixture flh-pending 'd = {"now": "2026-11-06T01:10:00Z", "alert": [], "eligible": [["1"]], "link_code": None}'
+run first-live-hidden flh-pending
+check 'first-live-hidden none yet → PENDING: no sentinel, nothing sent, exit 0' \
+  '[ ! -e $work/out-flh-pending/first-live-hidden.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-flh-pending/first-live-hidden.json && [ "$(sent)" = 0 ] && [ "$(cat $work/flh-pending.rc)" = 0 ]'
+fixture flh-pass "$HID"
+run first-live-hidden flh-pass
+check 'first-live-hidden the owner only, on time, 15m switched on, link 200 → PASS with the facts; the owner is NOT told' \
+  '[ "$(verdict flh-pass first-live-hidden)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"fire_after_confirm_s\": 360" $work/out-flh-pass/first-live-hidden.json'
+fixture flh-two "$HID
+d['alert'][0][7] = '2'; d['eligible'] = [['2']]"
+run first-live-hidden flh-two
+check 'first-live-hidden sent to 2 (not owner-only) → FLAG:recipients,oi_alerts_users' '[ "$(verdict flh-two first-live-hidden)" = FLAG:recipients,oi_alerts_users ]'
+fixture flh-off "$HID
+d['alert'][0][2] = '4h'; d['alert'][0][10] = 'false'"
+run first-live-hidden flh-off
+check 'first-live-hidden sent on a TF whose sendHidden is off (4h) → FLAG:tf_send_hidden (the gate is broken)' '[ "$(verdict flh-off first-live-hidden)" = FLAG:tf_send_hidden ]'
+fixture flh-late "$HID
+d['alert'][0][8] = 't'; d['link_code'] = 502"
+run first-live-hidden flh-late
+check 'first-live-hidden late and a 502 link → FLAG:late,link_http' '[ "$(verdict flh-late first-live-hidden)" = FLAG:late,link_http ]'
+
 # ------------------------------------------------------------------------------------ oi-4h-first-eval
 # IB-141 batch 3: the lines are the bot's own shape, as pinned by apps/insight-bot/test/delivery/oi-alerts-log-line.spec.ts.
 OI4H='

@@ -388,6 +388,50 @@ def first_liq_evaluate(raw):
     return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the message itself'], 'measured': measured, 'done': True}
 
 
+# ------------------------------------------------------------------------------------ first-live-hidden
+# IB-144 (V42, V47; TL ruling 2026-11-06): the first live HIDDEN OI divergence alert that was SENT (kind = 'hidden',
+# fired_at set). Bands: recipients exactly 1 and exactly one user with oi_alerts (owner only); not late; its TF's
+# perTf.sendHidden is on in alert_settings (a hidden alert sent on a TF that is off means the gate is broken — 4h is
+# off); and the link answers 200 through Caddy. PENDING until one exists; then the timer removes itself. The owner is
+# NOT told — he got the alert.
+
+def first_hidden_gather():
+    raw = {'now': utc(time.time())}
+    raw['alert'] = psql("select a.id, a.symbol, a.tf, a.direction, extract(epoch from a.b_time), extract(epoch from a.confirmed_at),"
+                        " extract(epoch from a.fired_at), a.recipients, a.late, a.build, s.params->'perTf'->a.tf->>'sendHidden'"
+                        " from oi_divergence_alerts a cross join alert_settings s"
+                        " where s.id = 1 and a.source = 'live' and a.kind = 'hidden' and a.fired_at is not null order by a.fired_at, a.id limit 1")
+    raw['eligible'] = psql("select count(*) from users where oi_alerts and not disabled and chat_id is not null")
+    raw['link_code'] = None
+    if raw['alert']:
+        a = raw['alert'][0]
+        base = env_value(os.path.join(DEPLOY_DIR, '.env'), 'WEB_BASE_URL') or ''
+        raw['link'] = '%s/instrument/%s?at=%d&tf=%s' % (base.rstrip('/'), a[1], int(float(a[4])), a[2]) if base else None
+        if raw['link']:
+            out = subprocess.run(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '15', raw['link']],
+                                 capture_output=True, text=True, timeout=30).stdout.strip()
+            raw['link_code'] = int(out) if out.isdigit() else None
+    return raw
+
+
+def first_hidden_evaluate(raw):
+    if not raw['alert']:
+        return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live hidden alert sent yet at %s' % raw['now']], 'measured': None}
+    a = raw['alert'][0]
+    b_time, confirmed, fired = float(a[4]), float(a[5]), float(a[6])
+    flags, rows = [], []
+    rows.append(band(flags, 'recipients', int(a[7]), 1, 1))
+    rows.append(band(flags, 'oi_alerts_users', int(raw['eligible'][0][0]), 1, 1))
+    rows.append(band(flags, 'late', 1 if a[8] == 't' else 0, 0, 0))
+    rows.append(band(flags, 'tf_send_hidden', 1 if a[10] == 'true' else 0, 1, 1))
+    rows.append(band(flags, 'link_http', raw.get('link_code'), 200, 200))
+    m = {'id': int(a[0]), 'symbol': a[1], 'tf': a[2], 'direction': a[3], 'b_time': utc(b_time), 'confirmed_at': utc(confirmed),
+         'fired_at': utc(fired), 'fire_after_confirm_s': round(fired - confirmed), 'recipients': int(a[7]),
+         'oi_alerts_users': int(raw['eligible'][0][0]), 'late': a[8] == 't', 'build': a[9], 'tf_send_hidden': a[10],
+         'link': raw.get('link'), 'link_http': raw.get('link_code')}
+    return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the alert itself'], 'measured': m, 'done': True}
+
+
 # ---------------------------------------------------------------------------------------- backfill-rerun
 # IB-116's rerun after 2026-11-07 22:00 UTC: /root/box-backfill.sh --write measures the windows that were
 # open at the first run (314) and writes no new subject (the once-keys hold). The script carries its own
@@ -659,6 +703,7 @@ CHECKS = {
     'v28': (v28_gather, v28_evaluate, 'IB-115 V28 live day [%s, %s)' % (V28_FROM, V28_TO)),
     'cap-24h': (cap_gather, cap_evaluate, 'IB-118 / IB-130: a day of market_cap_total'),
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
+    'first-live-hidden': (first_hidden_gather, first_hidden_evaluate, 'IB-144: the first live hidden OI divergence alert sent (owner only, its TF switched on): facts to a file, then the timer stops'),
     'first-live-liq': (first_liq_gather, first_liq_evaluate, 'IB-143: the first live liquidation message (owner only): facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
     'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),
