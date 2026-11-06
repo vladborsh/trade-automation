@@ -124,6 +124,11 @@ describe('the words', () => {
     expect(outsideView(a, LO, HI)).toEqual({ above: '$7K', below: null }); // a side with none is not said
   });
 
+  it('a band\'s range prints without float noise (IB-BUG-024, which the old table\'s qty column pinned)', () => {
+    const tiny: WebLiqProfileResponse = { ...answer([]), step: 0.1, coverLo: 0, coverHi: 10, bands: [] };
+    expect(detailText(tiny, bandDetail(tiny, 3)).range).toBe('0.3 – 0.4'); // 3 × 0.1 = 0.30000000000000004
+  });
+
   it('the link names the coin, not the pair', () => {
     expect(coinOf('BTCUSDT')).toBe('BTC');
     expect(coinOf('1000PEPEUSDT')).toBe('1000PEPE');
