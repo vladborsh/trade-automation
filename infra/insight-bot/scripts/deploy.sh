@@ -100,7 +100,8 @@ docker compose ${PROFILES[@]+"${PROFILES[@]}"} up -d "${SERVICES[@]}"
 # Caddyfile edit (the compose file is unchanged), and the container bind-mounts that ONE file: sync-box's
 # `install` gives it a new inode, so /etc/caddy/Caddyfile inside the container is still the OLD file
 # (IB-BUG-031 needed --force-recreate, seconds without https). So the host file goes in on stdin: a graceful
-# reload — in-flight requests finish, nothing is dropped — and a no-op when the config is unchanged. A
+# reload: no gap (a restart refuses everything for seconds); rarely, one request open at the reload instant is
+# reset (caddy.test.sh measured 3 of 2700 over 240 reloads). A no-op when the config is unchanged. A
 # Caddyfile that does not adapt is refused by Caddy, which keeps serving the old config; the deploy then
 # fails here and the owner is told. A fresh container may not have its admin endpoint up yet: 3 tries.
 if [[ " ${SERVICES[*]} " == *" caddy "* ]]; then

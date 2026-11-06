@@ -9,8 +9,8 @@
 # (Cache-Control: immutable) pass through; /healthz still answers {"status":"ok"}; /metrics is still Caddy's
 # 404 and never reaches the app; a streamed answer (SSE, chunked JSON) still reaches the client before the
 # app finishes it. And that deploy.sh's apply path works: `caddy reload --config /dev/stdin` from the previous
-# Caddyfile (no encode) to this one drops none of the requests in flight during the reloads, and a Caddyfile
-# that does not adapt is refused while the running config keeps serving.
+# Caddyfile (no encode) to this one leaves no gap (every request is a 200, save a rare reset of one in flight at the
+# reload instant — see the reload case), and a Caddyfile that does not adapt is refused while the old config serves.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)" # infra/insight-bot
@@ -119,11 +119,24 @@ for p in /sse /chunked; do
     "[ '$(field "$r" 2)' = zstd ] && [ $(field "$r" 6) -ge 0 ] && [ $(field "$r" 6) -lt 1000 ] && [ $(field "$r" 7) -ge 1900 ]"
 done
 
-# Graceful: requests in flight while the config flips plain → encode ten times; none may fail.
-( for _ in $(seq 1 200); do field "$(get /api/web/market/kpis gzip)" 1; done >"$work/codes" ) & loop=$!
-for _ in 1 2 3 4 5; do reload "$work/Caddyfile.plain"; reload "$work/Caddyfile"; done
+# No gap: requests in flight while the config flips plain → encode ten times. A restart refuses every request for
+# seconds (ECONNREFUSED) or answers 502; a reload does neither. But it is not perfect: measured 2026-11-06, a request
+# whose connection is open at the instant of a reload is occasionally RESET (ECONNRESET) — 3 of 2700 requests over 240
+# reloads, both through Docker Desktop's port proxy and container-to-container, 0 of 2700 with no reload (dev-3
+# IB-142 report). So: no status but 200, no error but a reset, at most 3 resets in 200; the counts are printed always.
+( for _ in $(seq 1 200); do get /api/web/market/kpis gzip | cut -d" " -f1-2; done >"$work/codes" ) & loop=$!
+reloads=0
+for _ in 1 2 3 4 5; do
+  reload "$work/Caddyfile.plain" && reloads=$((reloads + 1))
+  reload "$work/Caddyfile" && reloads=$((reloads + 1))
+done
 wait "$loop"
-check "10 reloads under load: 200/200 answered 200" "[ \"\$(grep -cx 200 '$work/codes')\" = 200 ]"
+echo "     answers during the reloads: $(sed 's/^200 .*/200/' "$work/codes" | sort | uniq -c | tr -s ' \n' ' ')"
+resets="$(grep -c '^ERR ECONNRESET$' "$work/codes" || true)"
+check "10 reloads under load: all 10 accepted" "[ $reloads = 10 ]"
+check "10 reloads under load: 200 answers, every one a 200 or a reset (no 502, no refused connection)" \
+  "[ \"\$(wc -l <'$work/codes' | tr -d ' ')\" = 200 ] && ! grep -qv -e '^200 ' -e '^ERR ECONNRESET\$' '$work/codes'"
+check "10 reloads under load: at most 3 resets in 200 ($resets)" "[ $resets -le 3 ]"
 
 printf '{$SITE_ADDRESS} {\n\tnot_a_directive\n}\n' >"$work/Caddyfile.bad"
 check "a Caddyfile that does not adapt: reload refused" "! reload '$work/Caddyfile.bad'"
