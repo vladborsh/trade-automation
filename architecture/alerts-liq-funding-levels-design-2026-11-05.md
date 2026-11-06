@@ -84,7 +84,7 @@ In the 41-hour IB-123 run, 25 coin alerts made up 10 market events. 18 of 19 con
 
 | # | Decision | Why |
 |---|---|---|
-| F1 | **Inputs, every 5 min:**<br>• the coin's **current predicted rate**, `/fapi/v1/premiumIndex?symbol=`, weight 1 each, so 5 coins = 1 weight per 5 min;<br>• its **30-day settled history**, `/fapi/v1/fundingRate`, weight 1, refreshed hourly: 5 / h. That history is not stored (S1); the positioning baseline holds it only for universe coins, and the alert list can hold others.<br>**Total ≈ 0.3 weight / min.** | Funding is not in our tape (storage ruling S1). The cost is negligible. |
+| F1 | **Inputs, every 5 min:**<br>• the coin's **current predicted rate**, `/fapi/v1/premiumIndex?symbol=`, weight 1 each, so 5 coins = 5 weight per 5 min = 1.0 / min;<br>• its **30-day settled history**, `/fapi/v1/fundingRate`, weight 1, refreshed hourly: 5 / h ≈ 0.08 / min. That history is not stored (S1); the positioning baseline holds it only for universe coins, and the alert list can hold others.<br>**Total ≈ 1.08 weight / min** (corrected 2026-11-06: the first text said ≈ 0.3, an arithmetic slip that counted 5 coins × weight 1 as 1 per 5 min. Slot dev-3 measured 10 on the first check, then 5 per check, one run on 2026-11-06, a note: `reports/dev-3-IB-124.md` §Measured). | Funding is not in our tape (storage ruling S1). The cost is negligible: ≈ 0.05 % of 2 400. |
 | F2 | **Normalised to 8 h.** Some coins settle every 4 h or 1 h. The interval is read from the spacing of the last settlements (no extra call), and the rate is compared as `rate × 8 h / interval`. The message prints the venue's own rate and interval. | The owner's floor is "±0.03 % per 8 h". A 4 h coin at 0.02 % pays as much as an 8 h coin at 0.04 %. |
 | F3 | **"Extreme" = both:**<br>• beyond the coin's own **p95 / p5 of its 30-day settled rates**, normalised. This is the same sample and the same quantile function as rule R5 and the rarity: one shared helper, with a spec that R5 and the alert give the same band for the same sample;<br>• and beyond the **floor**, ±0.03 % / 8 h by default, editable per coin. *(Amended 2026-11-05, market round 3 §1: the default is `FUNDING_FLOOR_PER_8H` in `insights/thresholds.ts` and the check is `fundingExtreme`, both from IB-135, shared with R5. Do not declare a second constant.)*<br>High side: `r ≥ max(p95, +floor)`; low side: `r ≤ min(p5, −floor)`. | As ruled. Sharing the band means the Market card and the alert can never disagree about what "unusual" is. |
 | F4 | **Entry event:**<br>• a coin's state per side is `normal → extreme` when the condition holds at a check. One `enter` alert;<br>• it re-arms **only after the condition has been false for 3 consecutive checks (15 min)**, so a rate wobbling on the edge does not alert at every check;<br>• `dedupe_key`: `funding:{symbol}:{side}:{episode start}`. | "One alert per entry, re-armed after return to normal" (owner), with a stated hysteresis. |
@@ -120,11 +120,11 @@ In the 41-hour IB-123 run, 25 coin alerts made up 10 market events. 18 of 19 con
 | Part | Venue weight | DB |
 |---|---|---|
 | Liquidations | 0 (tape) | a few alerts a day, ≤ 240 near-misses a day at worst, 10 random a day |
-| Funding | ≈ 0.3 / min | a handful a week, 10 state rows |
+| Funding | ≈ 1.08 / min (F1, corrected 2026-11-06) | a handful a week, 10 state rows |
 | Levels | ≈ 0.33 / min | a few a day per coin |
 | Paths, all subjects | 8 per subject, spread out | 3 rows per subject |
 
-The stream adds **< 1 weight / min** to Binance in steady state and a few MB a year to disk.
+The stream adds **≈ 1.4 weight / min** to Binance in steady state (≈ 0.06 % of 2 400; the first text said < 1, from F1's slip) and a few MB a year to disk.
 
 ## 7. Order and tasks
 
