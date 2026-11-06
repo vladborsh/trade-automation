@@ -15,7 +15,8 @@
 # since boot: each alert's `recipients` ≤ the members eligible now, and Σ recipients == Σ «sent N» of
 # the evaluation lines (there is NO per-recipient send log line: TelegramSender.sendTo logs only a
 # failure); (6) GET https://<SITE_ADDRESS>/healthz from outside, through Caddy; (7) raw `ib_session=`
-# in the bot log (IB-BUG-031 guard); (8) BUILD_SHA in the container env == the deployed sha.
+# in the bot log (IB-BUG-031 guard); (8) BUILD_SHA in the container env == the deployed sha; (9) IB-142: the
+# Content-Encoding of / through Caddy for a gzip client (a warning when absent, never an alarm).
 # Check 5's OI-loop part: an «oi alerts <tf> @<close>» line for every 15m/1h/4h close whose evaluation
 # (close + 6 min) plus the loop's lag fell inside the window — and the one the loop runs at boot.
 # Check 5's liq-loop part (IB-BUG-044): a «liq alerts heartbeat @<slot>» line for every 15-min UTC slot whose
@@ -197,6 +198,7 @@ def probe(deploy_start):
     if ids['postgres']:
         s['db'] = db_probe(ids['postgres'], s.get('bot', {}).get('started_epoch') or deploy_start)
     s['healthz'] = healthz()
+    s['encoding'] = site_encoding(s['healthz'].get('url'))
     return s
 
 
@@ -269,6 +271,19 @@ def healthz():
     out = run(['curl', '-sS', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '10', url], timeout=20)
     code = int(out) if out and out.strip().isdigit() else 0
     return {'ok': code == 200, 'code': code, 'url': url}
+
+
+def site_encoding(healthz_url):
+    """IB-142: the Content-Encoding of the dashboard's index.html (~8 KB) through Caddy for a gzip-only client:
+    'gzip' while `encode` is applied, '' if Caddy is serving a config without it. None if unknown."""
+    if not healthz_url or not healthz_url.endswith('/healthz'):
+        return None
+    out = run(['curl', '-sS', '-o', '/dev/null', '-H', 'Accept-Encoding: gzip', '-w', '%{http_code} %header{content-encoding}',
+               '--max-time', '10', healthz_url[:-len('healthz')]], timeout=20)
+    parts = (out or '').split()
+    if not parts or parts[0] != '200':
+        return None
+    return parts[1] if len(parts) > 1 else ''
 
 
 # ----------------------------------------------------------------------------------------------- rules
@@ -403,6 +418,10 @@ def warnings_at(s, liq_enabled=True, level_enabled=True):
     if log is not None and level_enabled and not log.get('level_on'):
         out.append('level_loop_unchecked: the bot never logged «level alerts loop on» — an image without the level loop '
                    '(before IB-126), so level_loop_missing was not checked')
+    # IB-142: a Caddyfile edit that never reached the running Caddy is invisible otherwise (the site still answers)
+    if s.get('encoding') == '':
+        out.append('uncompressed: the site answered index.html without Content-Encoding to a gzip client — the running '
+                   'Caddy has no `encode` (a Caddyfile not reloaded?)')
     db = s.get('db')
     if db and log is not None:
         last_line = max([o['at'] for o in log['oi'] if o['at']] or [0])

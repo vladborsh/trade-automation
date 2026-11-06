@@ -23,6 +23,13 @@
 }
 
 {$SITE_ADDRESS} {
+	# IB-142: compress what the app sends — JSON from /api/web and the dashboard's JS/CSS/HTML. Caddy's
+	# defaults: only compressible types, only bodies of 512 B and over (so /healthz's 15 B is untouched), never
+	# a response the app already encoded; zstd when the browser offers it, else gzip, else identity. Proxied
+	# streams still flush per write (scripts/caddy.test.sh checks it). Pinned by scripts/caddy.test.sh: a
+	# change here must keep it green. On the box deploy.sh applies an edit here with a graceful `caddy reload`.
+	encode zstd gzip
+
 	# H7: the Prometheus endpoint never answers from outside. The app adds its own 404 too (WD-011): any
 	# request carrying CLIENT_IP_HEADER (x-real-ip, set below on every proxied request) gets 404.
 	@metrics path /metrics /metrics/*

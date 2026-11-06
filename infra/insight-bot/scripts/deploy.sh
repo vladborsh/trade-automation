@@ -96,6 +96,25 @@ echo "==> starting: ${SERVICES[*]}"
 STEP="docker compose up"
 docker compose ${PROFILES[@]+"${PROFILES[@]}"} up -d "${SERVICES[@]}"
 
+# IB-142: apply the Caddyfile sync-box installed, with no downtime. `up -d` does not recreate caddy for a
+# Caddyfile edit (the compose file is unchanged), and the container bind-mounts that ONE file: sync-box's
+# `install` gives it a new inode, so /etc/caddy/Caddyfile inside the container is still the OLD file
+# (IB-BUG-031 needed --force-recreate, seconds without https). So the host file goes in on stdin: a graceful
+# reload — in-flight requests finish, nothing is dropped — and a no-op when the config is unchanged. A
+# Caddyfile that does not adapt is refused by Caddy, which keeps serving the old config; the deploy then
+# fails here and the owner is told. A fresh container may not have its admin endpoint up yet: 3 tries.
+if [[ " ${SERVICES[*]} " == *" caddy "* ]]; then
+  echo "==> caddy reload (the synced Caddyfile, graceful)"
+  STEP="caddy reload (Caddy keeps serving its previous config)"
+  for try in 1 2 3; do
+    if docker compose exec -T caddy caddy reload --config /dev/stdin --adapter caddyfile <"$DIR/Caddyfile"; then
+      break
+    fi
+    [ "$try" -lt 3 ] || exit 1
+    sleep 2
+  done
+fi
+
 # IB-139: one watch at a time. A running one is told it was superseded (the marker file), then stopped
 # by unit name; it writes SUPERSEDED itself. WATCH_LAUNCHER is the test seam (deploy.test.sh has no
 # systemd): it replaces systemd-run and receives the exact launch line.

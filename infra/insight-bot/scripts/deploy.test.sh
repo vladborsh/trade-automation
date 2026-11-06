@@ -38,6 +38,13 @@ STUB
 # the fake app; every other docker call succeeds silently.
 cat >"$work/bin/docker" <<'STUB'
 #!/usr/bin/env bash
+if [ "${1:-}" = compose ] && [ "${2:-}" = exec ] && [ "${4:-}" = caddy ]; then
+  # IB-142: `docker compose exec -T caddy caddy reload …` — the args and the Caddyfile on stdin are recorded
+  echo "$*" >>"$STUB_CADDY"
+  cat >>"$STUB_CADDY"
+  [ "${STUB_CADDY_RELOAD:-ok}" = ok ]
+  exit
+fi
 if [ "${1:-}" = compose ] && [ "${2:-}" = exec ]; then
   shift 2
   while [ "$1" != node ]; do shift; done
@@ -94,8 +101,14 @@ http.createServer((req, res) => {
 APP
 
 run() { # $1 = case name, $2 = app mode or "none", $3 = previous IMAGE in .env (optional), $4 = a running watch unit (optional)
+  # IB-142: CADDY=ok|fail → the box has caddy.env with SITE_ADDRESS (caddy runs) and the reload succeeds or fails
   local dir="$work/$1"
   mkdir -p "$dir/box/pgdata"
+  : >"$dir/caddy"
+  if [ -n "${CADDY:-}" ]; then
+    echo "SITE_ADDRESS='1-2-3-4.sslip.io'" >"$dir/box/caddy.env"
+    printf '{$SITE_ADDRESS} {\n\tencode zstd gzip\n}\n' >"$dir/box/Caddyfile"
+  fi
   # like the real one: rewrites .env from SSM, so IMAGE= is gone after it
   cat >"$dir/box/render-env.sh" <<RENDER
 #!/usr/bin/env bash
@@ -116,7 +129,7 @@ RENDER
   set +e
   PATH="$work/bin:$PATH" DEPLOY_DIR="$dir/box" STUB_PORT="$port" STUB_PROBES="$dir/probes" \
     STUB_CURL_ARGS="$dir/curl-args" STUB_CURL_STDIN="$dir/curl-stdin" STUB_LAUNCH="$dir/launch" \
-    STUB_ACTIVE_WATCH="${4:-}" WATCH_LAUNCHER="$work/launcher" WATCH_DIR="$dir/watch" \
+    STUB_ACTIVE_WATCH="${4:-}" STUB_CADDY="$dir/caddy" STUB_CADDY_RELOAD="${CADDY:-ok}" WATCH_LAUNCHER="$work/launcher" WATCH_DIR="$dir/watch" \
     bash "$HERE/deploy.sh" sha-0123456789ab >"$dir/out" 2>&1
   echo $? >"$dir/exit"
   set -e
@@ -170,6 +183,24 @@ check "nothing listening: says /healthz did not answer" "grep -q '/healthz did n
 
 run rollback old
 check "rollback to a pre-WD-011 image (SPA answers /healthz): still healthy" "[ \"\$(cat '$work/rollback/exit')\" = 0 ]"
+
+check "no caddy.env (caddy not run): no reload" "[ ! -s '$work/healthy/caddy' ] && ! grep -q 'caddy reload' '$work/healthy/out'"
+
+# IB-142: with caddy running, the synced Caddyfile goes to `caddy reload` on stdin (the container's own copy is
+# the old inode), before the health wait; a reload Caddy refuses fails the deploy: no watch, one message.
+CADDY=ok run caddy-reload new "$PREV"
+check "caddy: reload through compose exec, config on stdin, caddyfile adapter" \
+  "grep -qxF 'compose exec -T caddy caddy reload --config /dev/stdin --adapter caddyfile' '$work/caddy-reload/caddy'"
+check "caddy: the box's Caddyfile is what went in" "grep -qF 'encode zstd gzip' '$work/caddy-reload/caddy'"
+check "caddy: reloaded once, then healthy and watched" \
+  "[ \"\$(grep -c 'caddy reload' '$work/caddy-reload/caddy')\" = 1 ] && [ \"\$(cat '$work/caddy-reload/exit')\" = 0 ] && grep -q '^LAUNCH' '$work/caddy-reload/launch'"
+check "caddy: the reload comes before the health wait" \
+  "[ \"\$(grep -n -e '==> caddy reload' -e '==> waiting for /healthz' '$work/caddy-reload/out' | cut -d: -f2 | tr '\n' '|')\" = '==> caddy reload (the synced Caddyfile, graceful)|==> waiting for /healthz|' ]"
+CADDY=fail run caddy-refused new "$PREV"
+check "caddy refused: 3 tries, exit 1, no watch" \
+  "[ \"\$(grep -c 'caddy reload' '$work/caddy-refused/caddy')\" = 3 ] && [ \"\$(cat '$work/caddy-refused/exit')\" = 1 ] && ! grep -q '^LAUNCH' '$work/caddy-refused/launch'"
+check "caddy refused: one message naming the step" \
+  "[ \"\$(wc -l <'$work/caddy-refused/curl-args' | tr -d ' ')\" = 1 ] && grep -q 'caddy reload (Caddy keeps serving its previous config)' '$work/caddy-refused/curl-args'"
 
 check "no case printed the token" "! grep -rqF '$TOKEN' $work/*/out $work/*/launch $work/*/curl-args"
 

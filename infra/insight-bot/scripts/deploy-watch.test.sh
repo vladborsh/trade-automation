@@ -133,6 +133,13 @@ case_is warnings "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"log.errors": 2, "log.
 check "warnings: error lines and Σ sent mismatch listed; recipients == eligible is no over-send" \
   "grep -q 'error_lines: 2 (first: boom | bang)' '$work/warnings/out/$SHA.md' && grep -q 'Σ recipients 2 ≠ Σ «sent» 0' '$work/warnings/out/$SHA.md'"
 
+# IB-142: the site answering a gzip client without Content-Encoding is a warning (a Caddyfile not reloaded), never an
+# alarm; 'gzip' and an unknown probe (None) warn nothing.
+case_is uncompressed "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"encoding": ""}')" CLEAN 0
+check "uncompressed: listed as a warning" "grep -q 'uncompressed: the site answered index.html without Content-Encoding' '$work/uncompressed/out/$SHA.md'"
+case_is compressed "$(seven "$G" "$G" "$G" "$G" "$G" "$G" '{"encoding": "gzip"}')" CLEAN 0
+check "compressed: no warning" "grep -q '\"warnings\": \\[\\]' '$work/compressed/out/$SHA.json'"
+
 # alert_oversend: recipients > eligible members → ALARM; == is the boundary (the warnings case above).
 O='{"db.eligible": 1, "db.alerts": [{"id": 7, "recipients": 2}], "db.last_fired": 1}'
 case_is oversend "$(seven "$G" "$G" "$G" "$O" "$O" "$O" "$O")" ALARM:alert_oversend 1
