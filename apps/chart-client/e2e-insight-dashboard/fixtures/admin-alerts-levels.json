@@ -1,0 +1,99 @@
+{
+  "settings": {
+    "enabled": false,
+    "membersVisible": false,
+    "params": {
+      "touchBand": 0.001,
+      "events": {},
+      "perCoin": {}
+    },
+    "updatedAt": 1793935813
+  },
+  "events": {
+    "PWH": {
+      "breakout_up": true,
+      "sweep_above": true,
+      "crossunder": true
+    },
+    "PWL": {
+      "breakout_down": true,
+      "sweep_below": true,
+      "crossover": true
+    },
+    "PMH": {
+      "breakout_up": true,
+      "sweep_above": true,
+      "crossunder": true
+    },
+    "PML": {
+      "breakout_down": true,
+      "sweep_below": true,
+      "crossover": true
+    },
+    "WO": {
+      "breakout_up": true,
+      "breakout_down": true,
+      "sweep_above": true,
+      "sweep_below": true
+    },
+    "MO": {
+      "breakout_up": true,
+      "breakout_down": true,
+      "sweep_above": true,
+      "sweep_below": true
+    },
+    "PDH": {
+      "breakout_up": true,
+      "sweep_above": true,
+      "crossunder": true
+    },
+    "PDL": {
+      "breakout_down": true,
+      "sweep_below": true,
+      "crossover": true
+    }
+  },
+  "alerts": [],
+  "coins": [
+    {
+      "symbol": "BNBUSDT",
+      "base": "BNB",
+      "listed": true,
+      "enabled": true,
+      "daily": false,
+      "stateRows": 4
+    },
+    {
+      "symbol": "BTCUSDT",
+      "base": "BTC",
+      "listed": true,
+      "enabled": true,
+      "daily": false,
+      "stateRows": 4
+    },
+    {
+      "symbol": "ETHUSDT",
+      "base": "ETH",
+      "listed": true,
+      "enabled": true,
+      "daily": false,
+      "stateRows": 4
+    },
+    {
+      "symbol": "SOLUSDT",
+      "base": "SOL",
+      "listed": true,
+      "enabled": true,
+      "daily": false,
+      "stateRows": 4
+    },
+    {
+      "symbol": "TRXUSDT",
+      "base": "TRX",
+      "listed": true,
+      "enabled": true,
+      "daily": false,
+      "stateRows": 4
+    }
+  ]
+}

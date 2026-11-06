@@ -9,7 +9,7 @@ import { MemberSettingsComponent } from './member-settings.component';
 /** IB-035 — the account page's settings: the bot's /lang and /calendar, on the site. */
 async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMemberSettings>, initial: Partial<WebMemberSettings> = {}) {
   const patches: WebMemberSettingsPatch[] = [];
-  let stored: WebMemberSettings = { lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false, ...initial };
+  let stored: WebMemberSettings = { lang: 'ru', calendarAlerts: true, oiAlerts: false, oiAlertsVisible: false, liqAlerts: false, liqAlertsVisible: false, fundingAlerts: false, fundingAlertsVisible: false, levelAlerts: false, levelAlertsVisible: false, ...initial };
   TestBed.configureTestingModule({
     imports: [MemberSettingsComponent],
     providers: [{
@@ -19,7 +19,7 @@ async function setup(patchImpl?: (p: WebMemberSettingsPatch) => Promise<WebMembe
         updateMemberSettings: async (p: WebMemberSettingsPatch) => {
           patches.push(p);
           if (patchImpl) return patchImpl(p);
-          stored = { ...stored, lang: (p.lang as 'ru' | 'en') ?? stored.lang, calendarAlerts: typeof p.calendarAlerts === 'boolean' ? p.calendarAlerts : stored.calendarAlerts, oiAlerts: typeof p.oiAlerts === 'boolean' ? p.oiAlerts : stored.oiAlerts, liqAlerts: typeof p.liqAlerts === 'boolean' ? p.liqAlerts : stored.liqAlerts, fundingAlerts: typeof p.fundingAlerts === 'boolean' ? p.fundingAlerts : stored.fundingAlerts };
+          stored = { ...stored, lang: (p.lang as 'ru' | 'en') ?? stored.lang, calendarAlerts: typeof p.calendarAlerts === 'boolean' ? p.calendarAlerts : stored.calendarAlerts, oiAlerts: typeof p.oiAlerts === 'boolean' ? p.oiAlerts : stored.oiAlerts, liqAlerts: typeof p.liqAlerts === 'boolean' ? p.liqAlerts : stored.liqAlerts, fundingAlerts: typeof p.fundingAlerts === 'boolean' ? p.fundingAlerts : stored.fundingAlerts, levelAlerts: typeof p.levelAlerts === 'boolean' ? p.levelAlerts : stored.levelAlerts };
           return stored;
         },
       },
@@ -106,5 +106,18 @@ describe('MemberSettingsComponent (IB-035)', () => {
     await shown.fixture.whenStable();
     expect(shown.patches).toEqual([{ fundingAlerts: true }]);
     expect(shown.cmp.settings()?.fundingAlerts).toBe(true);
+  });
+
+  it('IB-126: the level alerts switch is absent while hidden (also while funding is shown); when shown it sends exactly levelAlerts', async () => {
+    const hidden = await setup(undefined, { fundingAlertsVisible: true });
+    expect(hidden.el.textContent).not.toContain('Сигналы по уровням');
+    TestBed.resetTestingModule();
+    const shown = await setup(undefined, { levelAlertsVisible: true });
+    expect(shown.el.textContent).toContain('Сигналы по уровням в Telegram');
+    expect(shown.el.textContent).not.toContain('Сигналы о фандинге');
+    shown.cmp.setLevelAlerts(true);
+    await shown.fixture.whenStable();
+    expect(shown.patches).toEqual([{ levelAlerts: true }]);
+    expect(shown.cmp.settings()?.levelAlerts).toBe(true);
   });
 });

@@ -12,6 +12,10 @@ import liqPage from './fixtures/admin-alerts-liq.json';
 // IB-124: the «Funding» section, the real answer of slot dev-3's FundingAlertsAdmin (2026-11-06, after the loop's first live
 // check). Its journal was empty, so ONE synthetic row (the widest: a flip on the longest symbol) is appended below.
 import fundingPage from './fixtures/admin-alerts-funding.json';
+// IB-126: the «Levels» section, the real answer of slot dev-1's LevelAlertsAdmin (2026-11-06, after the loop's first live
+// closes and the five seeds). Its journal was empty, so ONE synthetic row (the widest: a crossunder of the monthly high on
+// the longest symbol) is appended below.
+import levelsPage from './fixtures/admin-alerts-levels.json';
 
 const liqWithRow = {
   ...liqPage,
@@ -21,6 +25,11 @@ const liqWithRow = {
 const fundingWithRow = {
   ...fundingPage,
   alerts: [{ id: 1, source: 'live', event: 'flip', symbol: '1000PEPEUSDT', side: 'high', at: 1_793_888_888, rate: -0.00012345, intervalH: 4, ratePer8h: -0.0002469, episodeHours: 131.5, firedAt: null, late: false, recipients: 0 }],
+};
+
+const levelsWithRow = {
+  ...levelsPage,
+  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0 }],
 };
 
 /**
@@ -45,6 +54,7 @@ async function mockApi(page: Page): Promise<void> {
       '/admin/alerts': alertsPage,
       '/admin/alerts/liq': liqWithRow,
       '/admin/alerts/funding': fundingWithRow,
+      '/admin/alerts/levels': levelsWithRow,
       '/calendar/upcoming': { events: [] },
     };
     if (path in body) await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body[path]) });
@@ -88,6 +98,8 @@ test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
       await expect(page.locator('table').first()).toBeVisible();
       if (path === '/admin/alerts') await expect(page.locator('app-admin-liq-alerts tbody tr')).toHaveCount(liqPage.coins.length + 1);
       if (path === '/admin/alerts') await expect(page.locator('app-admin-funding-alerts tbody tr')).toHaveCount(fundingPage.coins.length + 1);
+      // IB-126: the event grid (8 kinds), the coins, and the journal row
+      if (path === '/admin/alerts') await expect(page.locator('app-admin-level-alerts tbody tr')).toHaveCount(8 + levelsPage.coins.length + 1);
       if (path === '/admin/alerts') {
         // IB-144 (V42, V44): a «скрытые» checkbox per TF, and the hidden journal row (the longest symbol) labelled
         await expect(page.getByRole('checkbox', { name: /^(15m|1h|4h) скрытые$/ })).toHaveCount(3);

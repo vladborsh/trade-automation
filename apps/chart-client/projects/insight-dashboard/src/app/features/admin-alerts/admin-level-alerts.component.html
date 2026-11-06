@@ -1,0 +1,104 @@
+<section class="levels">
+  <h2>{{ t('levelAlerts.title') }}</h2>
+  <p class="note">{{ t('levelAlerts.intro') }}</p>
+
+  @if (actionError(); as key) {
+    <p class="error" role="alert">{{ t(key) }}</p>
+  }
+
+  @if (loadError(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  } @else if (page(); as p) {
+    <div class="switch">
+      <span>{{ t('alerts.enabled') }}: <strong [class.on]="p.settings.enabled">{{ t(p.settings.enabled ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" [class.primary]="!p.settings.enabled" (click)="setSwitch('enabled', !p.settings.enabled)" [disabled]="busy()" data-testid="level-enabled">
+        {{ t(p.settings.enabled ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('levelAlerts.enabledNote') }}</p>
+    <div class="switch">
+      <span>{{ t('alerts.membersVisible') }}: <strong [class.on]="p.settings.membersVisible">{{ t(p.settings.membersVisible ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" (click)="setSwitch('membersVisible', !p.settings.membersVisible)" [disabled]="busy()" data-testid="level-members-visible">
+        {{ t(p.settings.membersVisible ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('levelAlerts.membersVisibleNote') }} · {{ t('alerts.updated', { at: updated() }) }}</p>
+
+    <h3>{{ t('levelAlerts.events') }}</h3>
+    <p class="note">{{ t('levelAlerts.eventsNote') }}</p>
+    <div class="scroll">
+      <table class="grid">
+        <thead><tr><th>{{ t('levelAlerts.col.level') }}</th>@for (k of eventColumns; track k) { <th>{{ t(k) }}</th> }</tr></thead>
+        <tbody>
+          @for (row of grid(); track row.kind) {
+            <tr>
+              <td class="lvl">{{ row.kind }}</td>
+              @for (cell of row.cells; track $index) {
+                <td>
+                  @if (cell) {
+                    <input type="checkbox" [checked]="cell.on" (change)="editEvent(row.kind, $index, $any($event.target).checked)" [attr.aria-label]="row.kind + ' ' + t(eventColumns[$index])" />
+                  } @else {
+                    <span class="muted">—</span>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h3>{{ t('levelAlerts.coins') }}</h3>
+    <p class="note">{{ t('levelAlerts.coinsNote') }}</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('liqAlerts.col.on') }}</th><th>{{ t('levelAlerts.col.daily') }}</th><th>{{ t('levelAlerts.col.state') }}</th><th></th></tr></thead>
+        <tbody>
+          @for (c of coins(); track c.symbol) {
+            <tr [class.off]="!c.enabled">
+              <td>{{ c.symbol }}</td>
+              <td><input type="checkbox" [checked]="c.enabled" (change)="editCoin(c.symbol, 'enabled', $any($event.target).checked)" [attr.aria-label]="c.symbol + ' ' + t('liqAlerts.col.on')" /></td>
+              <td><input type="checkbox" [checked]="c.daily" (change)="editCoin(c.symbol, 'daily', $any($event.target).checked)" [attr.aria-label]="c.symbol + ' ' + t('levelAlerts.col.daily')" /></td>
+              <td class="muted">{{ c.stateRows > 0 ? t('levelAlerts.state.ready', { count: c.stateRows }) : t('levelAlerts.state.waiting') }}</td>
+              <td class="muted">{{ c.listed ? '' : t('liqAlerts.paused') }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bounds">
+      <label>{{ t('levelAlerts.touchBand') }} <input inputmode="decimal" [value]="band()" (input)="band.set($any($event.target).value)" data-testid="level-touch-band" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" (click)="save()" [disabled]="busy() || !changed()">{{ t('alerts.save') }}</button>
+      <button type="button" (click)="reset()" [disabled]="busy()">{{ t('alerts.reset') }}</button>
+      @if (patch() === null) { <span class="error">{{ t('levelAlerts.invalid') }}</span> }
+    </div>
+
+    <h3>{{ t('alerts.journal') }}</h3>
+    @if (alerts().length === 0) {
+      <p class="muted">{{ t('alerts.journalEmpty') }}</p>
+    } @else {
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('levelAlerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('levelAlerts.col.level') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
+              <th>{{ t('levelAlerts.col.price') }}</th><th>{{ t('levelAlerts.col.close') }}</th><th>{{ t('alerts.col.status') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of alerts(); track r.id) {
+              <tr>
+                <td class="nowrap">{{ r.at }}</td><td>{{ r.symbol }}</td><td>{{ r.kind }}</td><td>{{ t(r.event) }}</td>
+                <td class="num">{{ r.price }}</td><td class="num">{{ r.close }}</td>
+                <td [class.warn]="r.status.key === 'alerts.status.late'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>

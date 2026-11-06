@@ -4,7 +4,7 @@ import type {
   WebInviteResponse, WebMemberResponse, WebMemberSettings, WebMemberSettingsPatch, WebMembersResponse,
   WebAlertsAdminResponse,
   WebLiqAlertsAdminResponse,
-  WebFundingAlertsAdminResponse, WebFundingAlertSettingsPatch,
+  WebFundingAlertsAdminResponse, WebFundingAlertSettingsPatch, WebLevelAlertsAdminResponse, WebLevelAlertSettingsPatch,
   WebLiqAlertSettingsPatch, WebAlertSettingsPatch, WebAlertSymbolAdd, WebAlertSymbolPatch,
   WebOpenInterestResponse, OiDivergenceTf, WebOiDivergenceSeriesResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
@@ -304,6 +304,17 @@ export class InsightApiClient {
 
   async patchFundingAlerts(patch: WebFundingAlertSettingsPatch): Promise<WebFundingAlertsAdminResponse> {
     return this.sendJson<WebFundingAlertsAdminResponse>('PATCH', '/admin/alerts/funding', patch);
+  }
+
+  // ------------------------------------------------------ IB-126, price-level alerts (admin)
+
+  /** Admin only: the «Levels» section — switches, event switches per kind, per-coin PDH/PDL, the last 50 journal rows. */
+  async levelAlertsAdmin(): Promise<WebLevelAlertsAdminResponse> {
+    return this.get<WebLevelAlertsAdminResponse>('/admin/alerts/levels');
+  }
+
+  async patchLevelAlerts(patch: WebLevelAlertSettingsPatch): Promise<WebLevelAlertsAdminResponse> {
+    return this.sendJson<WebLevelAlertsAdminResponse>('PATCH', '/admin/alerts/levels', patch);
   }
 
   // ------------------------------------------------------ IB-035, members and own settings

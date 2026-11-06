@@ -30,6 +30,12 @@
         <span>{{ t('settings.fundingAlerts') }}</span>
       </label>
     }
+    @if (s.levelAlertsVisible) {
+      <label class="row">
+        <input type="checkbox" [checked]="s.levelAlerts" (change)="setLevelAlerts($any($event.target).checked)" [disabled]="busy()" />
+        <span>{{ t('settings.levelAlerts') }}</span>
+      </label>
+    }
     <p class="muted hint">{{ t('settings.hint') }}</p>
   }
   @if (status(); as key) {

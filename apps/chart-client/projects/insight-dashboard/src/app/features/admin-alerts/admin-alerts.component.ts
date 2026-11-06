@@ -6,6 +6,7 @@ import type { StringKey } from '../../i18n/keys';
 import { I18nService } from '../../i18n/i18n.service';
 import { AdminLiqAlertsComponent } from './admin-liq-alerts.component';
 import { AdminFundingAlertsComponent } from './admin-funding-alerts.component';
+import { AdminLevelAlertsComponent } from './admin-level-alerts.component';
 import { formToParams, normalizeSymbol, paramsToForm, symbolRefusalKey, toAlertRow, toSkipRow, utcMinute, type ParamsForm } from './alert-rows';
 
 /**
@@ -17,7 +18,7 @@ import { formToParams, normalizeSymbol, paramsToForm, symbolRefusalKey, toAlertR
 @Component({
   selector: 'app-admin-alerts',
   standalone: true,
-  imports: [AdminLiqAlertsComponent, AdminFundingAlertsComponent],
+  imports: [AdminLiqAlertsComponent, AdminFundingAlertsComponent, AdminLevelAlertsComponent],
   templateUrl: './admin-alerts.component.html',
   styleUrl: './admin-alerts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

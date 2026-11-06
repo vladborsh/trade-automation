@@ -55,6 +55,11 @@ export class MemberSettingsComponent {
     void this.save({ fundingAlerts: on });
   }
 
+  /** IB-126: price-level alerts — offered only while the server says this member may see them. */
+  setLevelAlerts(on: boolean): void {
+    void this.save({ levelAlerts: on });
+  }
+
   private async save(patch: WebMemberSettingsPatch): Promise<void> {
     if (this.busy()) return;
     this.busy.set(true);
