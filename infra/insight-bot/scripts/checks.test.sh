@@ -358,6 +358,17 @@ run first-live-level fllv-only-pre
 check 'first-live-level only a row fired 1 s before the enable → PENDING (no sentinel)' \
   '[ ! -e $work/out-fllv-only-pre/first-live-level.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-fllv-only-pre/first-live-level.json'
 
+# IB-151: a WO row journalled muted (fired_at null: migration 037 refuses a muted row with fired_at) ahead of the sent one
+fixture fllv-muted "$LVL
+d['alert'].insert(0, ['9000', 'breakout_up', 'BTCUSDT', '1793969100', '1793970005', None, '0', 'f', 'ib151000000a', 'WO', '103900', 'false', 'false', 't'])"
+run first-live-level fllv-muted
+check 'first-live-level a muted WO row (never fired) before a sent one → evaluates the sent one (PASS, id 9001), never the muted' \
+  '[ "$(verdict fllv-muted first-live-level)" = PASS ] && grep -q "\"id\": 9001" $work/out-fllv-muted/first-live-level.json'
+fixture fllv-only-muted "$LVL
+d['alert'][0][5] = None; d['alert'][0][9] = 'WO'; d['alert'][0][11] = 'false'"
+run first-live-level fllv-only-muted
+check 'first-live-level only a muted WO row → PENDING (no sentinel), not FLAG:kind_event_allowed' \
+  '[ ! -e $work/out-fllv-only-muted/first-live-level.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-fllv-only-muted/first-live-level.json'
 # ------------------------------------------------------------------------------------ first-live-hidden-4h (owner ruling 2026-11-06)
 # 4h switched on at 13:02:05Z = 1793970125; the row shape is first-live-hidden's
 H4='
