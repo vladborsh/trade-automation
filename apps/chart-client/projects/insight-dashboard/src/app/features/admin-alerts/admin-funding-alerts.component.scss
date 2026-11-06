@@ -1,0 +1,26 @@
+// IB-124 — the «Funding» section: the alerts page's look (admin-alerts.component.scss), scoped here
+:host { display: block; min-width: 0; }
+h2 { font-size: 13px; color: var(--color-text-muted); margin: 28px 0 6px; font-weight: normal; text-transform: uppercase; letter-spacing: 0.06em; }
+h3 { font-size: 13px; color: var(--color-text-muted); margin: 16px 0 6px; font-weight: normal; }
+button { background: transparent; border: 1px solid var(--card-border); color: var(--color-text); padding: 2px 10px; cursor: pointer; font: inherit; min-height: var(--touch-min, 40px); }
+button.primary { border-color: var(--teal-500); }
+button:disabled { color: var(--color-text-muted); cursor: default; }
+.note { margin: 4px 0 12px; color: var(--color-text-muted); font-size: 13px; }
+.switch { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.switch strong { font-weight: 600; color: var(--color-text-muted); }
+.switch strong.on { color: var(--teal-500); }
+input { background: var(--card-bg); border: 1px solid var(--card-border); color: var(--color-text); font: inherit; padding: 4px 6px; min-height: var(--touch-min, 40px); box-sizing: border-box; }
+input[inputmode='decimal'] { width: 7em; font-family: var(--font-num); }
+input[type='checkbox'] { min-height: 0; }
+.actions { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; flex-wrap: wrap; }
+.scroll { overflow-x: auto; max-width: 100%; }
+table { border-collapse: collapse; }
+th, td { padding: 4px 12px 4px 0; text-align: left; font-weight: normal; vertical-align: middle; }
+th { color: var(--color-text-muted); }
+tr.off td { color: var(--color-text-muted); }
+.nowrap { white-space: nowrap; }
+.num { font-family: var(--font-num); white-space: nowrap; }
+.muted { color: var(--color-text-muted); }
+.warn { color: var(--amber-500); }
+.error { color: var(--red-500); }
+.bounds { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }

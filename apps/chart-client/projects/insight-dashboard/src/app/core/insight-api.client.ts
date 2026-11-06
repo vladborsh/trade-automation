@@ -4,6 +4,7 @@ import type {
   WebInviteResponse, WebMemberResponse, WebMemberSettings, WebMemberSettingsPatch, WebMembersResponse,
   WebAlertsAdminResponse,
   WebLiqAlertsAdminResponse,
+  WebFundingAlertsAdminResponse, WebFundingAlertSettingsPatch,
   WebLiqAlertSettingsPatch, WebAlertSettingsPatch, WebAlertSymbolAdd, WebAlertSymbolPatch,
   WebOpenInterestResponse, OiDivergenceTf, WebOiDivergenceSeriesResponse,
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
@@ -292,6 +293,17 @@ export class InsightApiClient {
 
   async patchLiqAlerts(patch: WebLiqAlertSettingsPatch): Promise<WebLiqAlertsAdminResponse> {
     return this.sendJson<WebLiqAlertsAdminResponse>('PATCH', '/admin/alerts/liq', patch);
+  }
+
+  // ------------------------------------------------------ IB-124, funding alerts (admin)
+
+  /** Admin only: the «Funding» section — switches, F5 bounds, per-coin floors, the last 50 journal rows. */
+  async fundingAlertsAdmin(): Promise<WebFundingAlertsAdminResponse> {
+    return this.get<WebFundingAlertsAdminResponse>('/admin/alerts/funding');
+  }
+
+  async patchFundingAlerts(patch: WebFundingAlertSettingsPatch): Promise<WebFundingAlertsAdminResponse> {
+    return this.sendJson<WebFundingAlertsAdminResponse>('PATCH', '/admin/alerts/funding', patch);
   }
 
   // ------------------------------------------------------ IB-035, members and own settings

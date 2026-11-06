@@ -24,6 +24,12 @@
         <span>{{ t('settings.liqAlerts') }}</span>
       </label>
     }
+    @if (s.fundingAlertsVisible) {
+      <label class="row">
+        <input type="checkbox" [checked]="s.fundingAlerts" (change)="setFundingAlerts($any($event.target).checked)" [disabled]="busy()" />
+        <span>{{ t('settings.fundingAlerts') }}</span>
+      </label>
+    }
     <p class="muted hint">{{ t('settings.hint') }}</p>
   }
   @if (status(); as key) {

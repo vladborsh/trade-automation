@@ -50,6 +50,11 @@ export class MemberSettingsComponent {
     void this.save({ liqAlerts: on });
   }
 
+  /** IB-124: funding alerts — offered only while the server says this member may see them. */
+  setFundingAlerts(on: boolean): void {
+    void this.save({ fundingAlerts: on });
+  }
+
   private async save(patch: WebMemberSettingsPatch): Promise<void> {
     if (this.busy()) return;
     this.busy.set(true);

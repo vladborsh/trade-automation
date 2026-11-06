@@ -1,0 +1,81 @@
+<section class="funding">
+  <h2>{{ t('fundingAlerts.title') }}</h2>
+  <p class="note">{{ t('fundingAlerts.intro') }}</p>
+
+  @if (actionError(); as key) {
+    <p class="error" role="alert">{{ t(key) }}</p>
+  }
+
+  @if (loadError(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  } @else if (page(); as p) {
+    <div class="switch">
+      <span>{{ t('alerts.enabled') }}: <strong [class.on]="p.settings.enabled">{{ t(p.settings.enabled ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" [class.primary]="!p.settings.enabled" (click)="setSwitch('enabled', !p.settings.enabled)" [disabled]="busy()" data-testid="funding-enabled">
+        {{ t(p.settings.enabled ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('fundingAlerts.enabledNote') }}</p>
+    <div class="switch">
+      <span>{{ t('alerts.membersVisible') }}: <strong [class.on]="p.settings.membersVisible">{{ t(p.settings.membersVisible ? 'alerts.on' : 'alerts.off') }}</strong></span>
+      <button type="button" (click)="setSwitch('membersVisible', !p.settings.membersVisible)" [disabled]="busy()" data-testid="funding-members-visible">
+        {{ t(p.settings.membersVisible ? 'alerts.turnOff' : 'alerts.turnOn') }}
+      </button>
+    </div>
+    <p class="note">{{ t('fundingAlerts.membersVisibleNote') }} · {{ t('alerts.updated', { at: updated() }) }}</p>
+
+    <h3>{{ t('fundingAlerts.flipBounds') }}</h3>
+    <div class="bounds">
+      <label>{{ t('fundingAlerts.minEpisode') }} <input inputmode="decimal" [value]="minEpisode()" (input)="minEpisode.set($any($event.target).value)" data-testid="funding-min-episode" /></label>
+      <label>{{ t('fundingAlerts.flipWithin') }} <input inputmode="decimal" [value]="flipWithin()" (input)="flipWithin.set($any($event.target).value)" data-testid="funding-flip-within" /></label>
+    </div>
+
+    <h3>{{ t('fundingAlerts.floors') }}</h3>
+    <p class="note">{{ t('fundingAlerts.floorsNote', { floor: defaultFloor() }) }}</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('liqAlerts.col.on') }}</th><th>{{ t('fundingAlerts.col.floor') }}</th><th></th></tr></thead>
+        <tbody>
+          @for (c of form(); track c.symbol) {
+            <tr [class.off]="!c.enabled">
+              <td>{{ c.symbol }}</td>
+              <td><input type="checkbox" [checked]="c.enabled" (change)="edit(c.symbol, 'enabled', $any($event.target).checked)" [attr.aria-label]="c.symbol + ' ' + t('liqAlerts.col.on')" /></td>
+              <td><input inputmode="decimal" [value]="c.floor" (input)="edit(c.symbol, 'floor', $any($event.target).value)" [attr.aria-label]="c.symbol + ' ' + t('fundingAlerts.col.floor')" [placeholder]="defaultFloor()" /></td>
+              <td class="muted">{{ c.listed ? '' : t('liqAlerts.paused') }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" (click)="save()" [disabled]="busy() || !changed()">{{ t('alerts.save') }}</button>
+      <button type="button" (click)="reset()" [disabled]="busy()">{{ t('alerts.reset') }}</button>
+      @if (patch() === null) { <span class="error">{{ t('fundingAlerts.invalid') }}</span> }
+    </div>
+
+    <h3>{{ t('alerts.journal') }}</h3>
+    @if (alerts().length === 0) {
+      <p class="muted">{{ t('alerts.journalEmpty') }}</p>
+    } @else {
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('fundingAlerts.col.at') }}</th><th>{{ t('alerts.col.symbol') }}</th><th>{{ t('fundingAlerts.col.side') }}</th><th>{{ t('liqAlerts.col.event') }}</th>
+              <th>{{ t('fundingAlerts.col.rate') }}</th><th>{{ t('fundingAlerts.col.per8h') }}</th><th>{{ t('fundingAlerts.col.episode') }}</th><th>{{ t('alerts.col.status') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of alerts(); track r.id) {
+              <tr>
+                <td class="nowrap">{{ r.at }}</td><td>{{ r.symbol }}</td><td>{{ t(r.side) }}</td><td>{{ t(r.event) }}</td>
+                <td class="num">{{ r.rate }}</td><td class="num">{{ r.per8h }}</td><td class="num">{{ r.episode }}</td>
+                <td [class.warn]="r.status.key === 'alerts.status.late'">{{ t(r.status.key, { count: r.status.recipients }) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>
