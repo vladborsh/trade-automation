@@ -34,7 +34,9 @@ const fundingWithRow = {
 
 const levelsWithRow = {
   ...levelsPage,
-  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0, customLevelId: null }],
+  alerts: [{ id: 1, source: 'live', event: 'crossunder', symbol: '1000PEPEUSDT', kind: 'PMH', price: 0.012345678, at: 1_793_888_888, close: 0.012299991, firedAt: null, late: true, recipients: 0, customLevelId: null },
+    // IB-128: slot dev-3's REAL journal row of its first custom level alert (2026-11-06 08:15 bar, sending off)
+    { id: 57, source: 'live', event: 'sweep_above', symbol: 'BTCUSDT', price: 75676, kind: 'custom', customLevelId: 1, at: 1793952900, close: 75616.9, firedAt: null, late: false, recipients: 0 }],
 };
 
 const customWithRow = {
@@ -120,8 +122,9 @@ test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
       if (path === '/admin/alerts') await expect(page.locator('app-admin-liq-alerts tbody tr')).toHaveCount(liqPage.coins.length + 1);
       if (path === '/admin/alerts') await expect(page.locator('app-admin-funding-alerts tbody tr')).toHaveCount(fundingPage.coins.length + 1);
       // IB-126: the event grid (8 kinds), the coins, and the journal row; IB-128: and the custom levels' rows inside it
-      if (path === '/admin/alerts') await expect(page.locator('app-admin-level-alerts tbody tr')).toHaveCount(8 + levelsPage.coins.length + 1 + customWithRow.levels.length);
+      if (path === '/admin/alerts') await expect(page.locator('app-admin-level-alerts tbody tr')).toHaveCount(8 + levelsPage.coins.length + levelsWithRow.alerts.length + customWithRow.levels.length);
       if (path === '/admin/alerts') await expect(page.locator('app-admin-custom-levels tbody tr')).toHaveCount(customWithRow.levels.length);
+      if (path === '/admin/alerts') await expect(page.locator('app-admin-level-alerts > section > .scroll tbody tr', { hasText: '75616.9' })).toContainText('свой #1');
       if (path === '/admin/alerts') {
         // IB-144 (V42, V44): a «скрытые» checkbox per TF, and the hidden journal row (the longest symbol) labelled
         await expect(page.getByRole('checkbox', { name: /^(15m|1h|4h) скрытые$/ })).toHaveCount(3);
