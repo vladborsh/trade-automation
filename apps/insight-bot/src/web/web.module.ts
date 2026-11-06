@@ -36,6 +36,7 @@ import { CapsService } from './market/caps.service';
 import { FlowsService } from './market/flows.service';
 import { WebHealthController } from './health.controller';
 import { SeriesController } from './series/series.controller';
+import { AlertMarksController } from './series/alert-marks.controller';
 import { LiquidationsController } from './liquidations/liquidations.controller';
 import { LiquidationsOverviewService } from './liquidations/overview.service';
 import { LiquidationsLargeController } from './liquidations/liquidations-large.controller';
@@ -97,7 +98,7 @@ export class WebModule {
       // which is the whole point of it being module-wide.
       controllers: [
         WebAuthController, WebHealthController, WebAdminController,
-        SeriesController, UniverseController, LiquidationsController, WebContextController,
+        SeriesController, AlertMarksController, UniverseController, LiquidationsController, WebContextController,
         CalendarController, WebPushController, WebMarketController,
         // IB-035: the admin's members page and a member's own settings
         WebMembersController, WebMeSettingsController,
