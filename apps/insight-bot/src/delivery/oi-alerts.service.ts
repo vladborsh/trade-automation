@@ -7,6 +7,7 @@ import { OiWindowReader } from '../insights/divergence/oi-window.reader';
 import { CandlesService } from '../web/market/candles.service';
 import { TelegramSender } from './telegram-sender';
 import { SpendsWeightAs } from '../venues/binance/weight-caller';
+import { OI_DIVERGENCE_TF_SEC, type OiDivergenceTf, type WebCandle } from '@trade-automation/contracts';
 
 const CHECK_MS = 60_000;
 
@@ -39,7 +40,7 @@ export class OiAlertsService implements OnApplicationBootstrap, OnModuleDestroy 
     const reader = new OiWindowReader(db);
     this.loop = new OiAlertLoop({
       store: new PgOiAlertStore(db),
-      klines: async (symbol, tf, from, to) => candles.candles('perp', symbol, tf, from * 1000, to * 1000),
+      klines: (symbol, tf, from, to) => oiKlines(candles, symbol, tf, from, to),
       oiWindow: (symbol, from, to) => reader.read(symbol, from, to),
       closeAt: async (symbol, at) => (await candles.candles('perp', symbol, '1m', at * 1000, (at + 60) * 1000))[0]?.close ?? null,
       send: (chatId, text) => telegram.sendTo(chatId, text),
@@ -85,4 +86,20 @@ export class OiAlertsService implements OnApplicationBootstrap, OnModuleDestroy 
 export function evaluationLine(r: EvaluationReport): string {
   return `oi alerts ${r.tf} @${new Date(r.barClose * 1000).toISOString()}: ${r.coins} coins, ${r.journalled} found (late ${r.late}), sent ${r.sent}, `
     + `skipped ${r.skips}, controls ${r.controls}, near-misses ${r.nearMisses}${r.failed.length ? `, failed ${r.failed.join(',')}` : ''}`;
+}
+
+/**
+ * IB-147: the loop's bars for one evaluation, `[from, to)` in unix seconds, all closed: ONE request at exactly that many
+ * bars (`closedKlines`, weight 2 for the 240–440 bars `barsToFetch` asks since IB-141), not the chart's 1 500-bar pages at
+ * weight 10 (cold: 25 pages at a start; warm: the page holding the newest close re-read at every evaluation). Above
+ * 1 000 bars (only if an admin's reach grew that far) one request cannot hold it, and the paged read stays.
+ */
+export const OI_EXACT_READ_MAX = 1000;
+export function oiKlines(
+  candles: Pick<CandlesService, 'candles' | 'closedKlines'>, symbol: string, tf: OiDivergenceTf, from: number, to: number,
+): Promise<WebCandle[]> {
+  const count = Math.round((to - from) / OI_DIVERGENCE_TF_SEC[tf]);
+  return count <= OI_EXACT_READ_MAX
+    ? candles.closedKlines(symbol, tf, from * 1000, count)
+    : candles.candles('perp', symbol, tf, from * 1000, to * 1000);
 }

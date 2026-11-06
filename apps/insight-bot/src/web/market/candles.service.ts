@@ -149,6 +149,20 @@ export class CandlesService {
     }
   }
 
+  /**
+   * IB-147: `total` CLOSED bars from `fromMs` at the least documented weight — `closedKlines` in the chunks
+   * `cheapestChunks` picks (720 → 2 × 360 at weight 2 each = 4, against 5 for one request of 720), oldest first.
+   */
+  async closedKlinesCheapest(symbol: string, tf: WebTimeframe, fromMs: number, total: number): Promise<WebCandle[]> {
+    const out: WebCandle[] = [];
+    let from = fromMs;
+    for (const n of cheapestChunks(total)) {
+      out.push(...(await this.closedKlines(symbol, tf, from, n)));
+      from += n * timeframeMs(tf);
+    }
+    return out;
+  }
+
   /** IB-066: true when `[fromMs, toMs)` holds the bar still forming, by this service's clock. */
   reachesFormingBar(tf: WebTimeframe, fromMs: number, toMs: number): boolean {
     return reachesFormingBar(tf, fromMs, toMs, this.now());
@@ -277,4 +291,22 @@ function toWebCandle(row: BinanceRestKline): WebCandle {
     volume: Number(volume),
     takerBuyVolume: takerBuyVolume === undefined ? null : Number(takerBuyVolume),
   };
+}
+
+/**
+ * IB-147: how to read `total` bars in the fewest documented weight (`klinesWeight`: < 100 → 1, < 500 → 2, ≤ 1000 → 5):
+ * equal chunks, each ≤ 1000, choosing the chunk count with the least summed weight (fewer requests on a tie).
+ * 720 → [360, 360] (weight 4, against 5 for one request); 288 → [288] (2); 1000 → [1000] (5; three requests would be 6).
+ */
+export function cheapestChunks(total: number): number[] {
+  if (total <= 0) return [];
+  let best: number[] = [];
+  let bestWeight = Number.POSITIVE_INFINITY;
+  for (let k = Math.ceil(total / 1000); k <= Math.ceil(total / 99) + 1 && k <= total; k++) {
+    const size = Math.floor(total / k);
+    const chunks = Array.from({ length: k }, (_, i) => size + (i < total - size * k ? 1 : 0));
+    const w = chunks.reduce((sum, n) => sum + klinesWeight(n), 0);
+    if (w < bestWeight) { best = chunks; bestWeight = w; }
+  }
+  return best;
 }

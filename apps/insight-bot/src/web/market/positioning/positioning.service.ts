@@ -67,6 +67,14 @@ interface Baseline {
 
 const H = 3_600_000;
 const CONCURRENCY = 4;
+
+/**
+ * IB-147: the closed 1h bars from `from` up to `now` — the baseline's limit. `from` is the hour floor of 30 days back,
+ * so this is 720 (≤ 1000: weight 5 by `klinesWeight`), never more than `closedKlines` can ask in one request.
+ */
+export function baselineHours(from: number, now: number): number {
+  return Math.min(1000, Math.max(1, Math.floor((now - from) / 3_600_000)));
+}
 const BASELINES_KEY = 'positioning:baselines';
 
 export class PositioningService {
@@ -236,7 +244,9 @@ export class PositioningService {
       const built = await mapLimited(coins, CONCURRENCY, async (c): Promise<Baseline | null> => {
         try {
           const [candles, oi, lsG, lsT, funding] = await Promise.all([
-            this.options.candles.candles('perp', c.binance_perp, '1h', from, now),
+            // IB-147: exactly the closed hours since `from` at the least documented weight (720 → 2 × 360 = weight 4), not
+            // the chart's cached 1 500-bar pages (2 pages × 10 per coin cold, the forming page re-read every hourly rebuild)
+            this.options.candles.closedKlinesCheapest(c.binance_perp, '1h', from, baselineHours(from, now)),
             this.options.oiLs.openInterest(c.binance_perp, from, now),
             this.options.oiLs.longShort(c.binance_perp, 'global_account', from, now),
             this.options.oiLs.longShort(c.binance_perp, 'top_position', from, now),

@@ -29,8 +29,13 @@ function fakes(hours: number) {
     candles: {
       candles: async (_m: string, _s: string, _tf: string, from: number, to: number) => series(from, to - H, priceAt).map(({ t, v }) => ({ time: t / 1000, open: v, high: v, low: v, close: v, volume: 1 })),
       // IB-BUG-040: 5 m bars on their OWN price curve, so a change against an hourly close is visible
-      closedKlines: async (_s: string, _tf: string, fromMs: number, limit: number) => Array.from({ length: limit }, (_, i) => fromMs + i * 300_000)
-        .filter((t) => t + 300_000 <= NOW).map((t) => ({ time: t / 1000, open: 1, high: 1, low: 1, close: close5m(t), volume: 1 })),
+      // IB-147: the baselines' 1h bars come through the exact reads now, on the hourly curve and the fixture's history
+      closedKlinesCheapest(s: string, tf: string, fromMs: number, total: number) { return this.closedKlines(s, tf, fromMs, total); },
+      closedKlines: async (_s: string, tf: string, fromMs: number, limit: number) => tf === '1h'
+        ? Array.from({ length: limit }, (_, i) => fromMs + i * H).filter((t) => t + H <= NOW && t >= NOW - hours * H)
+          .map((t) => ({ time: t / 1000, open: priceAt(t), high: priceAt(t), low: priceAt(t), close: priceAt(t), volume: 1 }))
+        : Array.from({ length: limit }, (_, i) => fromMs + i * 300_000)
+          .filter((t) => t + 300_000 <= NOW).map((t) => ({ time: t / 1000, open: 1, high: 1, low: 1, close: close5m(t), volume: 1 })),
     },
     funding: { binanceSettledHistory: async () => hourly(Math.floor(hours / 8), (i) => ({ time: i, rate: 0.0001 })) },
     oiLs: {
@@ -153,7 +158,11 @@ describe('IB-BUG-040: the price change starts at the 5 m close nearest now − P
     const svc = new PositioningService({
       symbols: SYMBOLS as never, cache: new TtlCache({ now: () => now.ms }), summary: f.summary as never, funding: f.funding as never,
       oiLs: f.oiLs as never, liquidations: null, now: () => now.ms,
-      candles: { candles: f.candles.candles, closedKlines: async (...a: Parameters<typeof f.candles.closedKlines>) => { calls.push(a); return (closedKlines ?? f.candles.closedKlines)(...a); } } as never,
+      // IB-147: the baselines' 1h read goes through closedKlinesCheapest, not counted here (these specs count the 5 m reads)
+      candles: {
+        candles: f.candles.candles, closedKlinesCheapest: (...a: Parameters<typeof f.candles.closedKlines>) => f.candles.closedKlines(...a),
+        closedKlines: async (...a: Parameters<typeof f.candles.closedKlines>) => { calls.push(a); return (closedKlines ?? f.candles.closedKlines)(...a); },
+      } as never,
     });
     return { svc, calls };
   }
@@ -219,7 +228,8 @@ describe('IB-119: hourlyCloses (R4 on 7d) and breadth\'s last hour (R7), from th
   it('closes since a moment, stamped at each bar\'s CLOSE; no venue call beyond positioning()\'s', async () => {
     const f = fakes(30 * 24);
     const calls = { candles: 0 };
-    const counted = { ...f, candles: { candles: async (...a: Parameters<typeof f.candles.candles>) => { calls.candles++; return f.candles.candles(...a); } } };
+    // IB-147: the baselines read their hours through closedKlinesCheapest; that is the read counted here
+    const counted = { ...f, candles: { ...f.candles, closedKlinesCheapest: async (...a: Parameters<typeof f.candles.closedKlines>) => { calls.candles++; return f.candles.closedKlines(...a); } } };
     // breadth needs three coins
     const svc = new PositioningService({
       symbols: [...SYMBOLS, sym('SOLUSDT', 'SOL', 'crypto')] as never, cache: new TtlCache({ now: () => NOW }), summary: counted.summary as never,
