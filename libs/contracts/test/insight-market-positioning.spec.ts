@@ -1,5 +1,5 @@
 import {
-  WEB_KPI_IDS, WEB_POSITIONING_QUADRANTS, WEB_POSITIONING_SIGNALS,
+  WEB_KPI_IDS, WEB_POSITIONING_QUADRANTS, WEB_POSITIONING_SIGNALS, WEB_POSITIONING_UNAVAILABLE,
   WebKpisResponseSchema, WebPositioningCellSchema, WebPositioningResponseSchema,
 } from '../src/insight';
 
@@ -14,6 +14,11 @@ describe('IB-085 contracts', () => {
   it('a cell refuses rarity outside 0..1 and parses a stated absence', () => {
     expect(WebPositioningCellSchema.safeParse({ value: 1, rarity: 1.2, unavailable: null, sample: 3 }).success).toBe(false);
     expect(WebPositioningCellSchema.parse({ value: null, rarity: null, unavailable: 'insufficient_history', sample: 0 }).unavailable).toBe('insufficient_history');
+  });
+
+  it('IB-BUG-037: "never rated at this period" is its own reason, not "under 20 days"', () => {
+    expect([...WEB_POSITIONING_UNAVAILABLE]).toEqual(['insufficient_history', 'not_rated_at_period', 'venue_unavailable', 'not_listed']);
+    expect(WebPositioningCellSchema.parse({ value: 4.2, rarity: null, unavailable: 'not_rated_at_period', sample: 0 }).unavailable).toBe('not_rated_at_period');
   });
 
   it('the example positioning fixture parses', () => {

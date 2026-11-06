@@ -12,12 +12,14 @@ const TimeSec = z.number().int().nonnegative();
 
 /**
  * Why a cell has no value or no rarity. A missing number is never a 0.
- * - `insufficient_history` — under 20 days of the coin's own history for that series (D3), or a 7d
- *   change (30 days hold four 7-day windows, as D14 rules for liquidations).
+ * - `insufficient_history` — under 20 days of the coin's own history for that series (D3).
+ * - `not_rated_at_period` — the cell is never rated at this period, however long the history: a 7d
+ *   change or 7d liquidations (30 days hold four 7-day windows, as D14 rules for liquidations).
+ *   The value is still there (IB-BUG-037: these cells said «under 20 days»).
  * - `venue_unavailable` — the venue did not answer (or the weight ceiling refused the read).
  * - `not_listed` — the venue has no such series for this coin.
  */
-export const WEB_POSITIONING_UNAVAILABLE = ['insufficient_history', 'venue_unavailable', 'not_listed'] as const;
+export const WEB_POSITIONING_UNAVAILABLE = ['insufficient_history', 'not_rated_at_period', 'venue_unavailable', 'not_listed'] as const;
 export const WebPositioningUnavailableSchema = z.enum(WEB_POSITIONING_UNAVAILABLE);
 
 /**
