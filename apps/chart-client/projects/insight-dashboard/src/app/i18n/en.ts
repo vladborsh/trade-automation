@@ -747,6 +747,7 @@ export const en: Strings = {
   'liqAlerts.event.event': 'event',
   'liqAlerts.event.eventContinuing': 'continuation',
   'liqAlerts.event.eventClosed': 'close, not sent',
+  'liqAlerts.event.eventMerged': 'merged into a nearby event, not sent',
   'settings.liqAlerts': 'Large liquidation alerts in Telegram: a coin\'s liquidations over 5 minutes reached its threshold',
   'fundingAlerts.title': 'Funding',
   'fundingAlerts.intro': 'Every 5 minutes the bot reads each coin\'s predicted funding on Binance and compares it, per 8 hours, with the coin\'s own last 30 days and with the floor. One message when it becomes unusual for the coin AND passes the floor (the same rule as the Market card). It re-arms after 15 minutes back to normal. After an extreme that lasted at least the minimum, one more message when the sign changes and holds for 15 minutes.',

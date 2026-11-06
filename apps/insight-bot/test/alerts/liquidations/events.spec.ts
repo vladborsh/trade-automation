@@ -99,7 +99,7 @@ describe('groupEvents (L11)', () => {
 
   it('rows carrying eventAt stay where the journal put them; the journal\'s S wins over a recomputation', () => {
     const times = timesOf({ BTC: [T0], ETH: [T0 + 5 * MIN] });
-    const decided = new Map([[T0, { first: { id: 1, sentAt: T0 + CAP_MS, settled: 'cap' as const, coins: ['BTC'], late: false } }]]);
+    const decided = new Map([[T0, { first: { id: 1, sentAt: T0 + CAP_MS, settled: 'cap' as const, coins: ['BTC'], late: false, totalUsd: 6e6, mergedInto: null } }]]);
     const [e, ...rest] = groupEvents([row('BTC', T0, T0), row('ETH', T0 + 5 * MIN, T0)], times, T0 + 10 * MIN, decided);
     expect(rest).toEqual([]);
     expect(e?.s).toEqual({ at: T0 + CAP_MS, by: 'cap' });
@@ -107,7 +107,7 @@ describe('groupEvents (L11)', () => {
   });
 
   it('a journalled close is final: a later crossing opens a new event', () => {
-    const decided = new Map([[T0, { first: { id: 1, sentAt: T0 + CAP_MS, settled: 'cap' as const, coins: ['BTC'], late: false }, close: { closedAt: T0 + 4 * MIN } }]]);
+    const decided = new Map([[T0, { first: { id: 1, sentAt: T0 + CAP_MS, settled: 'cap' as const, coins: ['BTC'], late: false, totalUsd: 6e6, mergedInto: null }, close: { closedAt: T0 + 4 * MIN, totalUsd: 7e6 } }]]);
     const events = groupEvents([row('BTC', T0, T0), row('ETH', T0 + 4 * MIN)], timesOf({ BTC: [T0], ETH: [T0 + 4 * MIN] }), T0 + 10 * MIN, decided);
     expect(events.map((e) => e.t0)).toEqual([T0, T0 + 4 * MIN]);
   });

@@ -748,6 +748,7 @@ export type StringKey =
   | 'liqAlerts.event.event'
   | 'liqAlerts.event.eventContinuing'
   | 'liqAlerts.event.eventClosed'
+  | 'liqAlerts.event.eventMerged'
   | 'settings.liqAlerts'
   | 'fundingAlerts.title'
   | 'fundingAlerts.intro'

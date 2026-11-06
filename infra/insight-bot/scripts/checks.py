@@ -357,11 +357,14 @@ def first_alert_evaluate(raw):
 # not late, sent within 60 s of its moment (S or the close; the loop ticks every 10 s), and the link (the largest
 # coin at its crossing, tf 5m) answers 200 through Caddy. PENDING until one exists; then the timer removes itself.
 # The owner is NOT told — he got the message.
+# IB-148 (L18): a small event held back after S is due at details.heldUntil (S + 120 s, or the S of the event that
+# opened during its hold), so its 60 s are counted from there; `held_s` says how long it was held.
 
 def first_liq_gather():
     raw = {'now': utc(time.time())}
     raw['msg'] = psql("select id, event, symbol, extract(epoch from at), extract(epoch from fired_at), recipients, late, build,"
-                      " details->'coins'->0->>'symbol', details->'coins'->0->>'crossedAt', jsonb_array_length(details->'coins'), details->>'totalUsd'"
+                      " details->'coins'->0->>'symbol', details->'coins'->0->>'crossedAt', jsonb_array_length(details->'coins'), details->>'totalUsd',"
+                      " details->>'heldUntil'"
                       " from market_alerts where type = 'liq' and source = 'live' and event in ('event', 'event_continuing')"
                       " and fired_at is not null order by fired_at, id limit 1")
     raw['eligible'] = psql("select count(*) from users where liq_alerts and not disabled and chat_id is not null")
@@ -382,13 +385,16 @@ def first_liq_evaluate(raw):
         return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live liquidation message sent yet at %s' % raw['now']], 'measured': None}
     m = raw['msg'][0]
     at, fired = float(m[3]), float(m[4])
+    held_until = float(m[12]) / 1000 if len(m) > 12 and m[12] else None
+    due = held_until if held_until is not None else at
     flags, rows = [], []
     rows.append(band(flags, 'recipients', int(m[5]), 1, 1))
     rows.append(band(flags, 'liq_alerts_users', int(raw['eligible'][0][0]), 1, 1))
     rows.append(band(flags, 'late', 1 if m[6] == 't' else 0, 0, 0))
-    rows.append(band(flags, 'fired_after_moment_s', round(fired - at), 0, 60, ' s'))
+    rows.append(band(flags, 'fired_after_moment_s', round(fired - due), 0, 60, ' s'))
     rows.append(band(flags, 'link_http', raw.get('link_code'), 200, 200))
-    measured = {'id': int(m[0]), 'event': m[1], 'symbol': m[2], 'at': utc(at), 'fired_at': utc(fired), 'fired_after_moment_s': round(fired - at),
+    measured = {'id': int(m[0]), 'event': m[1], 'symbol': m[2], 'at': utc(at), 'fired_at': utc(fired), 'fired_after_moment_s': round(fired - due),
+                'held_s': round(due - at),
                 'recipients': int(m[5]), 'liq_alerts_users': int(raw['eligible'][0][0]), 'late': m[6] == 't', 'build': m[7],
                 'coins': int(m[10]), 'total_usd': float(m[11]) if m[11] else None, 'link': raw.get('link'), 'link_http': raw.get('link_code')}
     return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the message itself'], 'measured': measured, 'done': True}

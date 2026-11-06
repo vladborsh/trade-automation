@@ -91,6 +91,8 @@ describe('LiqAlertLoop (L11–L13): one message per market event', () => {
     const ev = alertsOf(h.store, 'event');
     expect(ev).toEqual([expect.objectContaining({ symbol: 'BTCUSDT', atMs: T + 80 * S, dedupeKey: `liq-ev:long:${T}`, recipients: 1 })]);
     expect(ev[0]?.details).toMatchObject({ eventAt: T, sentAt: T + 80 * S, settled: 'quiet', totalUsd: 7.5e6, count: 2, binanceFootnote: true });
+    // 1.5× its threshold, alone: small (IB-148, L18), so sent at the end of its hold, S + 120 s, with the content fixed at S
+    expect(ev[0]).toMatchObject({ firedAt: T + 200 * S, details: expect.objectContaining({ heldUntil: T + 200 * S }) });
     expect(alertsOf(h.store, 'event_continuing')).toEqual([]);
     expect(h.sent.map(firstLine)).toEqual(['Крупные ликвидации лонгов BTC: $7.5M за 7 мин']);
     expect(h.sent[0]?.text).toContain('Binance $6M · Bybit $1.5M · OKX $0');
@@ -181,7 +183,7 @@ describe('LiqAlertLoop: restarts, late, dedupe', () => {
   it('a restart mid-event resumes it from the journal: no crossing, message or continuation twice', async () => {
     const h = setup();
     h.store.enabled = true;
-    h.print(T, 6e6);
+    h.print(T, 16e6); // 3.2× its threshold: not small (L16, IB-148), so not held
     for (let t = T + 30 * S; t <= T + 3 * MIN; t += 30 * S) h.print(t, 1e5);
     for (let t = T + 3.5 * MIN; t <= T + 5 * MIN; t += 30 * S) h.print(t, 1.5e6);
     await h.run(h.loop, T - 30 * S, T + 4 * MIN); // the first message (cap) is out, the event still open
@@ -218,7 +220,7 @@ describe('LiqAlertLoop: restarts, late, dedupe', () => {
   it('L14 late S: a crossing found in time, then the process down until its S is more than 5 min old → late, never sent', async () => {
     const h = setup();
     h.store.enabled = true;
-    h.print(T, 6e6);
+    h.print(T, 16e6); // 3.2× its threshold: not small (L16, IB-148), so not held
     await h.run(h.loop, T - 30 * S, T + 30 * S); // the crossing is journalled in time; S (T + 60 s) not reached
     expect(alertsOf(h.store)).toEqual([expect.objectContaining({ late: false })]);
     await h.make().tick(T + 6 * MIN + 10 * S); // boots 5 min 10 s after S
@@ -238,7 +240,7 @@ describe('LiqAlertLoop: restarts, late, dedupe', () => {
 
   it('an overlapping tick re-sees the crossing: one row', async () => {
     const h = setup();
-    h.print(T, 6e6);
+    h.print(T, 16e6); // 3.2× its threshold: not small (L16, IB-148), so not held
     await h.loop.tick(T + 10 * S);
     await h.loop.tick(T + 15 * S);
     await h.loop.tick(T + 20 * S);
@@ -319,7 +321,7 @@ describe('LiqAlertLoop (L7): cost', () => {
 
   it('an undecided event adds ONE read a tick; once decided, none', async () => {
     const h = setup();
-    h.print(T, 6e6);
+    h.print(T, 16e6); // 3.2× its threshold: not small (L16, IB-148), so not held
     await h.run(h.loop, T - 30 * S, T + 30 * S);
     let before = h.store.reads.prints;
     await h.loop.tick(T + 40 * S);

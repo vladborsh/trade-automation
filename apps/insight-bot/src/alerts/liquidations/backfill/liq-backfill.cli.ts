@@ -44,7 +44,7 @@ import { PgLiqAlertStore } from '../pg/liq-alerts.repo';
 import { BOOT_LOOKBACK_MS } from '../liq-alert-loop';
 import {
   DAY_MS, LIQ_HISTORY_MULTIPLIERS, LIQ_HISTORY_PARAMS, MemoryJournalStore, countRows, firstFullDay, historyStore, replayLiq,
-  scaleParams, crossCheck, replayedEvents, type LiqCountRow, type LiqReplayTotals, type ReplayedEvent,
+  scaleParams, crossCheck, messageCount, replayedEvents, type LiqCountRow, type LiqReplayTotals, type ReplayedEvent,
 } from './liq-history';
 
 /** V31's budget, as IB-116: ≈ 8 % of the IP's 2 400 a minute while it runs. */
@@ -185,19 +185,28 @@ function printTotals(t: LiqReplayTotals, counts: Record<string, number>, mode: s
   for (const [m, n] of Object.entries(t.warnings)) say(`  WARNING ×${n}: ${m}`);
 }
 
-/** L15 (IB-143): the ×1 events, one line each, then the message count against IB-123's 25 + 19. */
+/**
+ * L15 (IB-143): the ×1 events, one line each, then the message count against IB-123's 25 + 19. IB-148 (L20): a
+ * merge column (absorbed / folded into which T0, or the small ones this event took in) and each held event's
+ * added seconds.
+ */
 function printEvents(events: readonly ReplayedEvent[]): void {
   const hm = (ms: number) => new Date(ms).toISOString().slice(5, 19).replace('T', ' ');
   const m = (usd: number) => `$${(usd / 1e6).toFixed(1)}M`;
-  say('events ×1: side  T0 (UTC)        S−T0  settled  first message coins              continuation');
+  const merge = (e: ReplayedEvent): string => e.mergedInto
+    ? `${e.mergedInto.how === 'after' ? 'ABSORBED after' : 'FOLDED into'} ${hm(e.mergedInto.eventAt)} (not sent)`
+    : e.merged.length > 0 ? `took ${e.merged.map((x) => `${x.symbol.replace(/USDT$/, '')} ${m(x.sumUsd)} ${x.how}`).join(', ')}`
+    : e.heldMs > 0 ? `held +${Math.round(e.heldMs / 1000)} s` : '—';
+  say('events ×1: side  T0 (UTC)        S−T0  settled  first message coins              merge                         continuation');
   for (const e of events) {
     const c = e.continuation;
     const why = !c ? '—' : c.news ? `SENT at +${Math.round((c.at - e.t0) / 1000)} s (${[...c.newCoins.map((x) => `+${x}`), ...c.addedCoins.map((x) => `${x} +threshold`)].join(', ')}), ${m(c.totalUsd)}`
       : `journalled only (closed by ${c.closedBy} at +${Math.round((c.at - e.t0) / 1000)} s, nothing new), ${m(c.totalUsd)}`;
-    say(`  ${e.side.padEnd(5)} ${hm(e.t0)}  ${String(Math.round((e.sentAt - e.t0) / 1000)).padStart(4)}s  ${e.settled.padEnd(7)}  ${`${m(e.firstTotalUsd)} ${e.first.map((x) => `${x.symbol.replace(/USDT$/, '')} ${m(x.sumUsd)}`).join(' · ')}`.padEnd(32)}  ${why}`);
+    say(`  ${e.side.padEnd(5)} ${hm(e.t0)}  ${String(Math.round((e.sentAt - e.t0) / 1000)).padStart(4)}s  ${e.settled.padEnd(7)}  ${`${m(e.firstTotalUsd)} ${e.first.map((x) => `${x.symbol.replace(/USDT$/, '')} ${m(x.sumUsd)}`).join(' · ')}`.padEnd(32)}  ${merge(e).padEnd(28)}  ${why}`);
   }
-  const sent = events.length + events.filter((e) => e.continuation?.news).length;
-  say(`messages ×1: ${sent} = ${events.length} first + ${sent - events.length} continuations (IB-123 under IB-122: 25 + 19 = 44)`);
+  const sent = messageCount(events);
+  const firsts = events.filter((e) => e.mergedInto === null).length;
+  say(`messages ×1: ${sent} = ${firsts} first + ${sent - firsts} continuations; ${events.length - firsts} small events merged (IB-123 under IB-122: 25 + 19 = 44; IB-143: 14)`);
   say(`LIQ_EVENTS_JSON ${JSON.stringify({ messages: sent, events })}`);
 }
 

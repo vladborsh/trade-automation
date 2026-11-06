@@ -224,6 +224,16 @@ fixture fll-slow "$LIQMSG
 d['msg'][0][4] = '1793921250'; d['link_code'] = 502"
 run first-live-liq fll-slow
 check 'first-live-liq 70 s after S and a 502 link → FLAG:fired_after_moment_s,link_http' '[ "$(verdict fll-slow first-live-liq)" = FLAG:fired_after_moment_s,link_http ]'
+# IB-148: a small event held 120 s after S, sent 7 s after its hold ended → PASS, measured from the hold's end
+fixture fll-held "$LIQMSG
+d['msg'][0][4] = '1793921307'; d['msg'][0].append('1793921300000')"
+run first-live-liq fll-held
+check 'first-live-liq held 120 s (heldUntil), fired 7 s after it → PASS, held_s 120' \
+  '[ "$(verdict fll-held first-live-liq)" = PASS ] && grep -q "\"fired_after_moment_s\": 7" $work/out-fll-held/first-live-liq.json && grep -q "\"held_s\": 120" $work/out-fll-held/first-live-liq.json'
+fixture fll-held-slow "$LIQMSG
+d['msg'][0][4] = '1793921371'; d['msg'][0].append('1793921300000')"
+run first-live-liq fll-held-slow
+check 'first-live-liq held, fired 71 s after its hold ended → FLAG:fired_after_moment_s' '[ "$(verdict fll-held-slow first-live-liq)" = FLAG:fired_after_moment_s ]'
 
 # ------------------------------------------------------------------------------------ first-live-hidden (IB-144)
 HID='

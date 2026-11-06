@@ -77,6 +77,15 @@ describe('liquidation event texts', () => {
     expect(liqEvent({ side: 'long', details: one, baseOf }, BASE).ru).not.toContain('Binance публикует');
   });
 
+  it('L19 (IB-148): a folded-in small event is one line after the count, before the link; the headline, {m} and link stay the event\'s own', () => {
+    const merged = { ...two, merged: [{ symbol: 'BNBUSDT', eventAt: Date.UTC(2026, 10, 5, 14, 6, 12, 138), sumUsd: 395_000, how: 'before' as const }] };
+    const t = liqEvent({ side: 'long', details: merged, baseOf }, BASE);
+    const plain = liqEvent({ side: 'long', details: two, baseOf }, BASE);
+    expect(t.ru.split('\n').slice(-3)).toEqual(['16 ликвидаций, крупнейшая $2M (ETH, Binance)', 'Перед этим: BNB $395k (14:06 UTC)', link]);
+    expect(t.en.split('\n').slice(-2)).toEqual(['Before it: BNB $395k (14:06 UTC)', link]);
+    expect(t.ru.split('\n').filter((l) => !l.startsWith('Перед этим'))).toEqual(plain.ru.split('\n'));
+  });
+
   it('money and plurals', () => {
     expect([950, 300_000, 1_250_000, 7_440_000, 12_600_000, 2.5e9].map(usd)).toEqual(['$950', '$300k', '$1.3M', '$7.4M', '$13M', '$2.5B']);
     expect([1, 2, 5, 11, 21, 22, 112].map(ruLiquidations)).toEqual(['1 ликвидация', '2 ликвидации', '5 ликвидаций', '11 ликвидаций', '21 ликвидация', '22 ликвидации', '112 ликвидаций']);
@@ -89,9 +98,10 @@ describe('liquidation event texts', () => {
     const all = [false, true].flatMap((binanceFootnote) => (['long', 'short'] as const).flatMap((side) => [
       liqEvent({ side, details: { ...one, binanceFootnote }, baseOf }, BASE),
       liqEvent({ side, details: { ...two, binanceFootnote }, baseOf }, BASE),
+      liqEvent({ side, details: { ...two, binanceFootnote, merged: [{ symbol: 'BNBUSDT', eventAt: T0, sumUsd: 4e5, how: 'before' }] }, baseOf }, BASE),
       liqEventContinuation({ side, details: { ...cont, binanceFootnote }, baseOf }, BASE),
     ])).flatMap((t) => [t.ru, t.en]);
-    expect(all).toHaveLength(24);
+    expect(all).toHaveLength(32);
     expect(all.filter((s) => FORECAST.some((re) => re.test(s)))).toEqual([]);
   });
 });

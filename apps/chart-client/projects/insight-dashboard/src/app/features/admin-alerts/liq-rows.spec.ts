@@ -27,6 +27,9 @@ describe('IB-122 liq-rows', () => {
     expect(toLiqRow(ev)).toMatchObject({ symbol: 'ETHUSDT, BTCUSDT', event: 'liqAlerts.event.event', sum: '$21M', threshold: '—' });
     expect(toLiqRow({ ...ev, event: 'event_continuing', coins: ['ETHUSDT', '+BNBUSDT'] })).toMatchObject({ symbol: 'ETHUSDT, +BNBUSDT', event: 'liqAlerts.event.eventContinuing' });
     expect(toLiqRow({ ...ev, event: 'event_continuing', news: false }).event).toBe('liqAlerts.event.eventClosed');
+    // IB-148: a small event taken in by a larger one
+    expect(toLiqRow({ ...ev, event: 'event', news: false }).event).toBe('liqAlerts.event.eventMerged');
+    expect(toLiqRow({ ...ev, event: 'event', news: true }).event).toBe('liqAlerts.event.event');
   });
 
   it('money and typed thresholds', () => {

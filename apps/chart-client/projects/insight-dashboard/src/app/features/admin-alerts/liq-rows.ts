@@ -31,12 +31,13 @@ export interface LiqRow {
 /**
  * IB-143: a crossing (`alert`) is no longer sent by itself; the message is the market event (`event`), and its
  * close (`event_continuing`) is sent only when it is news — otherwise it is the event's journalled final size.
+ * IB-148: an `event` with `news: false` is a small one taken in by a larger same-side event, never sent.
  */
 function eventKey(r: WebLiqAlertRow): StringKey {
   switch (r.event) {
     case 'alert': return 'liqAlerts.event.alert';
     case 'continuing': return 'liqAlerts.event.continuing';
-    case 'event': return 'liqAlerts.event.event';
+    case 'event': return r.news ? 'liqAlerts.event.event' : 'liqAlerts.event.eventMerged';
     case 'event_continuing': return r.news ? 'liqAlerts.event.eventContinuing' : 'liqAlerts.event.eventClosed';
   }
 }

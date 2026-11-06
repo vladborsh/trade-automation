@@ -46,6 +46,10 @@ export interface JournalLiqRow {
   sentAt: number | null;
   settled: 'quiet' | 'cap' | null;
   coins: string[];
+  /** Event rows: the total at S (`event`) or at the close (`event_continuing`); null elsewhere. */
+  totalUsd: number | null;
+  /** IB-148, `event` rows: taken in by the same-side event with this T0, and how (L17 / L18); null = not. */
+  mergedInto: { eventAt: number; how: 'after' | 'before' } | null;
 }
 
 /** One journal row from its stored columns; shared by the Pg store and the in-memory ones. */
@@ -58,7 +62,14 @@ export function journalRow(r: { id: number; event: LiqAlertEvent; symbol: string
     windowStartMs: Number(d.windowStartMs ?? NaN), thresholdUsd: Number(d.thresholdUsd ?? NaN),
     alertId: num(d.alertId), eventAt: num(d.eventAt), sentAt: num(d.sentAt),
     settled: d.settled === 'quiet' || d.settled === 'cap' ? d.settled : null, coins,
+    totalUsd: num(d.totalUsd), mergedInto: mergedOf(d.mergedInto),
   };
+}
+
+function mergedOf(v: unknown): JournalLiqRow['mergedInto'] {
+  if (v === null || typeof v !== 'object') return null;
+  const m = v as { eventAt?: unknown; how?: unknown };
+  return (m.how === 'after' || m.how === 'before') && m.eventAt !== undefined ? { eventAt: Number(m.eventAt), how: m.how } : null;
 }
 
 export interface NewMarketAlert {
@@ -257,7 +268,8 @@ export function adminFigures(event: LiqAlertEvent, symbol: string, d: Record<str
   if (event !== 'event' && event !== 'event_continuing') return { sumUsd: Number(d.sumUsd), thresholdUsd: Number(d.thresholdUsd), coins: [symbol], news: true };
   const fresh = new Set(Array.isArray(d.newCoins) ? (d.newCoins as string[]) : []);
   const coins = (Array.isArray(d.coins) ? (d.coins as Array<{ symbol: string }>) : []).map((c) => (fresh.has(c.symbol) ? `+${c.symbol}` : c.symbol));
-  return { sumUsd: Number(d.totalUsd), thresholdUsd: null, coins, news: event === 'event' || d.news === true };
+  // an `event` taken in by a larger one (IB-148) is journalled only, like a continuation that was not news
+  return { sumUsd: Number(d.totalUsd), thresholdUsd: null, coins, news: event === 'event' ? d.mergedInto === undefined : d.news === true };
 }
 
 /** §1 Recipients: whether members see the liquidation-alerts toggle (`/me/settings`). */

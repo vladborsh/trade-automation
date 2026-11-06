@@ -243,20 +243,35 @@ export interface ReplayedEvent {
   /** The first message's coins, largest first, with their sums. */
   first: Array<{ symbol: string; sumUsd: number }>;
   firstTotalUsd: number;
+  /** IB-148 (L17 / L18): taken in by the same-side event with this T0, and how; not a message of its own. */
+  mergedInto: null | { eventAt: number; how: 'after' | 'before' };
+  /** L18: a small event held after S and then sent: the added latency (heldUntil − S), ms; 0 when not held. */
+  heldMs: number;
+  /** L19: the small events this one took in (its text's «Перед этим» lines). */
+  merged: Array<{ symbol: string; eventAt: number; sumUsd: number; how: string }>;
   continuation: null | { at: number; closedBy: string; news: boolean; newCoins: string[]; addedCoins: string[]; totalUsd: number };
   /** L15's check: a continuation is never dated before its first message. */
   continuationNotBeforeFirst: boolean;
 }
 
+/** L15 / L20: the messages a replay would have sent — first messages not taken in by another (IB-148), plus news closes. */
+export function messageCount(events: readonly ReplayedEvent[]): number {
+  return events.filter((e) => e.mergedInto === null).length + events.filter((e) => e.continuation?.news).length;
+}
+
 export function replayedEvents(store: MemoryJournalStore): ReplayedEvent[] {
   const conts = store.alerts.filter((a) => a.event === 'event_continuing');
   return store.alerts.filter((a) => a.event === 'event').sort((a, b) => a.atMs - b.atMs).map((e) => {
-    const d = e.details as { eventAt: number; sentAt: number; settled: 'quiet' | 'cap'; totalUsd: number; coins: Array<{ symbol: string; sumUsd: number }> };
+    const d = e.details as {
+      eventAt: number; sentAt: number; settled: 'quiet' | 'cap'; totalUsd: number; coins: Array<{ symbol: string; sumUsd: number }>;
+      heldUntil?: number; mergedInto?: ReplayedEvent['mergedInto']; merged?: ReplayedEvent['merged'];
+    };
     const c = conts.find((x) => x.side === e.side && (x.details as { eventAt: number }).eventAt === d.eventAt);
     const cd = c?.details as undefined | { closedBy: string; news: boolean; newCoins: string[]; addedCoins: string[]; totalUsd: number };
     return {
       side: e.side, t0: d.eventAt, sentAt: d.sentAt, settled: d.settled, first: d.coins.map((x) => ({ symbol: x.symbol, sumUsd: x.sumUsd })),
       firstTotalUsd: d.totalUsd,
+      mergedInto: d.mergedInto ?? null, heldMs: d.heldUntil === undefined ? 0 : d.heldUntil - d.sentAt, merged: d.merged ?? [],
       continuation: c && cd ? { at: c.atMs, closedBy: cd.closedBy, news: cd.news, newCoins: cd.newCoins, addedCoins: cd.addedCoins, totalUsd: cd.totalUsd } : null,
       continuationNotBeforeFirst: !c || c.atMs >= e.atMs,
     };

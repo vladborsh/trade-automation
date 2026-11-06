@@ -164,7 +164,7 @@ maybeDescribe('IB-122 migration 031: market alerts, per-type settings, liq recip
     expect(await store.footnoteSent(day + 86_400_000)).toBe(false);
     expect((await store.journal('live', NOW - 1)).find((j) => j.id === id)).toEqual({
       id, event: 'alert', symbol: 'ETHUSDT', side: 'short', at: NOW, late: false, windowStartMs: NOW - 5 * MIN, thresholdUsd: 3e6, alertId: null,
-      eventAt: null, sentAt: null, settled: null, coins: [],
+      eventAt: null, sentAt: null, settled: null, coins: [], totalUsd: null, mergedInto: null,
     });
   });
 

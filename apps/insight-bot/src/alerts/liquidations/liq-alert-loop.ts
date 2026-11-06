@@ -9,6 +9,7 @@ import { silentVenues, type VenueStatus } from './coverage';
 import {
   EVENT_MAX_MS, continuationNews, eventSums, groupEvents, type CoinSum, type CrossingRow, type DecidedEvent, type LiqEvent, type SidePrint,
 } from './events';
+import { absorbedAfter, holdDecision, isSmall, opensDuringHold, type ClosedEvent, type FollowingEvent } from './merge';
 import type { JournalLiqRow, LiqAlertStore, TapePrint, VenuePair } from './pg/liq-alerts.repo';
 import { venuePairs, venueSymbols, type UniverseSpelling, type VenueSymbols } from './venue-symbols';
 import { QUIET_MS, WINDOW_MS, bestPerHour, quietAt, scanSide, statsAt, type LiqPrint, type NearMissCandidate } from './window';
@@ -32,7 +33,16 @@ import { QUIET_MS, WINDOW_MS, bestPerHour, quietAt, scanSide, statsAt, type LiqP
  *    (`liq-ev-cont:{side}:{T0}`) with the final size — sent only when a coin joined after S or a member added its
  *    threshold (L13). The journal is the state (L14): a restart resumes the event, the once-keys absorb repeats.
  * 4. A first message whose S, or a continuation whose close, is more than 5 min before now → `late`, journalled,
- *    never sent; a late T0 makes the whole event late (L6, L14).
+ *    never sent; a late T0 makes the whole event late (L6, L14). A held message (below) is measured from when it
+ *    was due.
+ * 3b. IB-148 (§2b, L16–L19, merge.ts): a SMALL event (one member, < 3 × its threshold at S) next to a same-side
+ *    event ≥ 10 × its sum. ≤ 120 s after such an event's close: its `event` row is written at S with
+ *    `mergedInto {how: 'after'}` and not sent. Otherwise it is held to S + 120 s: sent then if nothing opened on its
+ *    side; if something opened, it waits for that event's first message and is folded into it (`mergedInto
+ *    {how: 'before'}`, the large text gains «Перед этим: …», its `details.merged` lists it) or, below 10 ×, sent just
+ *    before it in the same tick. **The hold has no state of its own:** a held event is an open event with no
+ *    `event` row and a computable S, re-derived every tick from the tape and the journal like any other, so a
+ *    restart mid-hold resumes it and the once-key still writes (and sends) it once.
  * 5. Sent only while the type's switch is on (default OFF), to users with `liq_alerts`, in their language.
  * 6. Controls (L8): the hour's largest near-miss per coin and side, written once the hour has been fully
  *    evaluated; 2 hash-picked random windows per coin and day. Direction-free price paths for all three.
@@ -63,8 +73,10 @@ export interface LiqTickReport {
   coins: number;
   /** Coin crossings journalled (`alert` rows, never sent by themselves). */
   alerts: number;
-  /** First messages journalled (`event` rows). */
+  /** First messages journalled (`event` rows), including small ones taken in by a larger event (IB-148). */
   events: number;
+  /** Of those, taken in by a larger same-side event and not sent (L17 / L18). */
+  merged: number;
   /** Event closes journalled (`event_continuing` rows), sent or not. */
   continuations: number;
   late: number;
@@ -115,7 +127,7 @@ export class LiqAlertLoop {
     this.running = true;
     try {
       const from = this.cursor === null ? nowMs - BOOT_LOOKBACK_MS : Math.min(this.cursor, nowMs) - OVERLAP_MS;
-      const report: LiqTickReport = { fromMs: from, toMs: nowMs, coins: 0, alerts: 0, events: 0, continuations: 0, late: 0, sent: 0, controls: 0, reads: 0, maxPrints: 0, prints: 0, failed: [] };
+      const report: LiqTickReport = { fromMs: from, toMs: nowMs, coins: 0, alerts: 0, events: 0, merged: 0, continuations: 0, late: 0, sent: 0, controls: 0, reads: 0, maxPrints: 0, prints: 0, failed: [] };
       this.status = null;
       const pending: Pending[] = [];
       const { store } = this.ports;
@@ -243,9 +255,10 @@ export class LiqAlertLoop {
         list.push(p.ts);
         times.set(symbol, list);
       }
-      for (const event of groupEvents(x.rows, times, nowMs, x.decided)) {
+      const grouped = groupEvents(x.rows, times, nowMs, x.decided);
+      for (const event of grouped) {
         try {
-          await this.actOn(event, x, prints, coins, settings, nowMs, report);
+          await this.actOn(event, grouped, x, prints, coins, settings, nowMs, report);
         } catch (error) {
           const tag = `${x.side}@${new Date(event.t0).toISOString()}`;
           if (!report.failed.includes(tag)) report.failed.push(tag);
@@ -262,9 +275,23 @@ export class LiqAlertLoop {
     for (const j of own) {
       if (j.eventAt === null) continue;
       const d = decided.get(j.eventAt) ?? {};
-      if (j.event === 'event' && j.sentAt !== null && j.settled !== null) d.first = { id: j.id, sentAt: j.sentAt, settled: j.settled, coins: j.coins, late: j.late };
-      if (j.event === 'event_continuing') d.close = { closedAt: j.at };
+      if (j.event === 'event' && j.sentAt !== null && j.settled !== null) {
+        d.first = { id: j.id, sentAt: j.sentAt, settled: j.settled, coins: j.coins, late: j.late, totalUsd: j.totalUsd ?? 0, mergedInto: j.mergedInto?.eventAt ?? null };
+      }
+      if (j.event === 'event_continuing') d.close = { closedAt: j.at, totalUsd: j.totalUsd ?? 0 };
       decided.set(j.eventAt, d);
+    }
+    // IB-148: the closed events a small one may be absorbed into (L17), and the small ones folded into each event (L18)
+    const closed: ClosedEvent[] = [];
+    for (const [t0, d] of decided) {
+      if (!d.first || d.first.mergedInto !== null) continue;
+      if (d.first.settled === 'quiet') closed.push({ t0, closeAt: d.first.sentAt, totalUsd: d.first.totalUsd });
+      else if (d.close) closed.push({ t0, closeAt: d.close.closedAt, totalUsd: d.close.totalUsd });
+    }
+    const mergedBefore = new Map<number, NonNullable<LiqEventDetails['merged']>>();
+    for (const j of own) {
+      if (j.event !== 'event' || j.mergedInto?.how !== 'before' || j.eventAt === null) continue;
+      mergedBefore.set(j.mergedInto.eventAt, [...(mergedBefore.get(j.mergedInto.eventAt) ?? []), { symbol: j.symbol, eventAt: j.eventAt, sumUsd: j.totalUsd ?? 0, how: 'before' }]);
     }
     const alerts = own.filter((j) => j.event === 'alert');
     const newOnes = pending.filter((p) => p.side === side);
@@ -274,10 +301,10 @@ export class LiqAlertLoop {
     ];
     const final = (t0: number): boolean => {
       const d = decided.get(t0);
-      return d?.first?.settled === 'quiet' || d?.close !== undefined;
+      return d?.first?.settled === 'quiet' || d?.close !== undefined || (d?.first !== undefined && d.first.mergedInto !== null);
     };
     return {
-      side, rows, decided, alerts, pending: newOnes,
+      side, rows, decided, alerts, pending: newOnes, closed, mergedBefore,
       need: rows.filter((r) => r.eventAt === null || !final(r.eventAt)),
       threshold: new Map<string, number>([...alerts.map((j) => [j.symbol, j.thresholdUsd] as const), ...newOnes.map((p) => [p.coin.symbol, p.coin.thresholdUsd] as const)]),
       late: new Map<string, boolean>([...alerts.map((j) => [`id:${j.id}`, j.late] as const), ...newOnes.map((p) => [`new:${p.coin.symbol}:${p.at}`, p.late] as const)]),
@@ -285,8 +312,8 @@ export class LiqAlertLoop {
   }
 
   private async actOn(
-    event: LiqEvent, x: ReturnType<LiqAlertLoop['sideState']>, prints: readonly SidePrint[], coins: readonly Coin[], settings: Settings,
-    nowMs: number, report: LiqTickReport,
+    event: LiqEvent, grouped: readonly LiqEvent[], x: ReturnType<LiqAlertLoop['sideState']>, prints: readonly SidePrint[], coins: readonly Coin[],
+    settings: Settings, nowMs: number, report: LiqTickReport,
   ): Promise<void> {
     const { store, source, build } = this.ports;
     for (const m of event.members) {
@@ -303,14 +330,30 @@ export class LiqAlertLoop {
 
     let first = decided.first;
     if (!first && event.s) {
-      const members = event.members.filter((m) => m.at < (event.s as { at: number }).at);
-      const sums = eventSums(members, prints, event.s.at);
-      const late = source === 'live' && (lateT0 || nowMs - event.s.at > LATE_MS);
-      const sending = source === 'live' && settings.enabled && !late;
+      const sAt = event.s.at;
+      const members = event.members.filter((m) => m.at < sAt);
+      const sums = eventSums(members, prints, sAt);
+      // IB-148 (L16–L18): a small event is absorbed after a large close, or held for one that opens after it
+      let mergedInto: LiqEventDetails['mergedInto'];
+      let heldUntil: number | undefined;
+      if (isSmall(sums.coins.map((c) => ({ sumUsd: c.sumUsd, thresholdUsd: thresholdOf(c.symbol) })))) {
+        const after = absorbedAfter(event.t0, sums.totalUsd, x.closed);
+        if (after) mergedInto = { eventAt: after.t0, how: 'after' };
+        else {
+          const hold = holdDecision(sAt, sums.totalUsd, this.following(event, sAt, grouped, x, prints), nowMs);
+          if (hold.kind === 'wait') return;
+          if (hold.kind === 'fold') mergedInto = { eventAt: hold.into, how: 'before' };
+          else heldUntil = hold.dueAt;
+        }
+      }
+      const late = source === 'live' && (lateT0 || nowMs - (heldUntil ?? sAt) > LATE_MS);
+      const sending = source === 'live' && settings.enabled && !late && mergedInto === undefined;
       const binanceFootnote = sending && !(await store.footnoteSent(dayStartOf(nowMs)));
+      const merged = x.mergedBefore.get(event.t0);
       const details: LiqEventDetails = {
-        side: x.side, eventAt: event.t0, sentAt: event.s.at, settled: event.s.by, coins: await this.eventCoins(sums.coins, event.s.at, coins, thresholdOf, report),
+        side: x.side, eventAt: event.t0, sentAt: sAt, settled: event.s.by, coins: await this.eventCoins(sums.coins, sAt, coins, thresholdOf, report),
         totalUsd: sums.totalUsd, count: sums.count, largest: sums.largest, binanceFootnote,
+        ...(heldUntil !== undefined ? { heldUntil } : {}), ...(mergedInto ? { mergedInto } : {}), ...(merged ? { merged } : {}),
       };
       const link = sums.coins[0] as CoinSum;
       const id = await store.insertAlert({
@@ -320,10 +363,19 @@ export class LiqAlertLoop {
       if (id === null) return; // written by an overlapping tick: the next tick reads it from the journal
       report.events++;
       if (late) report.late++;
-      first = { id, sentAt: event.s.at, settled: event.s.by, coins: sums.coins.map((c) => c.symbol), late };
+      first = { id, sentAt: sAt, settled: event.s.by, coins: sums.coins.map((c) => c.symbol), late, totalUsd: sums.totalUsd, mergedInto: mergedInto?.eventAt ?? null };
+      x.decided.set(event.t0, { ...decided, first });
+      if (mergedInto) {
+        report.merged++;
+        if (mergedInto.how === 'before') {
+          x.mergedBefore.set(mergedInto.eventAt, [...(x.mergedBefore.get(mergedInto.eventAt) ?? []), { symbol: link.symbol, eventAt: event.t0, sumUsd: sums.totalUsd, how: 'before' }]);
+        }
+        return; // L17 / L18: the row closes it; no message, no continuation
+      }
+      if (event.s.by === 'quiet') x.closed.push({ t0: event.t0, closeAt: sAt, totalUsd: sums.totalUsd });
       if (sending) report.sent += await this.deliver(id, liqEvent({ side: x.side, details, baseOf: (s) => coinOf(s)?.base ?? s }, this.ports.webBaseUrl), nowMs);
     }
-    if (!first || first.settled !== 'cap' || decided.close || !event.close) return;
+    if (!first || first.settled !== 'cap' || first.mergedInto !== null || decided.close || !event.close) return;
 
     const close = event.close;
     const members = event.members.filter((m) => m.at < close.at);
@@ -344,8 +396,23 @@ export class LiqAlertLoop {
     });
     if (id === null) return;
     report.continuations++;
+    x.closed.push({ t0: event.t0, closeAt: close.at, totalUsd: sums.totalUsd });
     if (late) report.late++;
     if (sending) report.sent += await this.deliver(id, liqEventContinuation({ side: x.side, details, baseOf: (s) => coinOf(s)?.base ?? s }, this.ports.webBaseUrl), nowMs);
+  }
+
+  /**
+   * L18: the first same-side event opening during the hold of a small event settled at `sAt` (T0 in (S, S + 120 s]),
+   * with its total at its own S once reached; null when none has opened.
+   */
+  private following(event: LiqEvent, sAt: number, grouped: readonly LiqEvent[], x: ReturnType<LiqAlertLoop['sideState']>, prints: readonly SidePrint[]): FollowingEvent | null {
+    const next = grouped.find((e) => e !== event && opensDuringHold(sAt, e.t0));
+    if (!next) return null;
+    const written = x.decided.get(next.t0)?.first;
+    if (written) return { t0: next.t0, sAt: written.sentAt, totalUsd: written.totalUsd, written: true };
+    if (!next.s) return { t0: next.t0, sAt: null, totalUsd: null, written: false };
+    const nextS = next.s.at;
+    return { t0: next.t0, sAt: nextS, totalUsd: eventSums(next.members.filter((m) => m.at < nextS), prints, nextS).totalUsd, written: false };
   }
 
   /** L12's per-coin details: the sums plus each coin's threshold and the venues that could not report. */

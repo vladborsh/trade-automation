@@ -38,8 +38,12 @@ export interface CrossingRow {
 
 /** What the journal already holds for an event (keyed by T0). */
 export interface DecidedEvent {
-  first?: { id: number; sentAt: number; settled: 'quiet' | 'cap'; coins: readonly string[]; late: boolean };
-  close?: { closedAt: number };
+  /**
+   * `totalUsd`: the first message's total. `mergedInto`: taken in by another event (IB-148, L17 / L18) — its row
+   * also closes it, at S, whatever S was.
+   */
+  first?: { id: number; sentAt: number; settled: 'quiet' | 'cap'; coins: readonly string[]; late: boolean; totalUsd: number; mergedInto: number | null };
+  close?: { closedAt: number; totalUsd: number };
 }
 
 export interface Moment { at: number; by: 'quiet' | 'cap' }
@@ -90,7 +94,7 @@ export function phases(t0: number, members: readonly CrossingRow[], times: Print
     ? { at: decided.first.sentAt, by: decided.first.settled }
     : firstQuiet(own, t0, t0 + CAP_MS, nowMs);
   if (!s) return { s: null, close: null };
-  if (s.by === 'quiet') return { s, close: s };
+  if (s.by === 'quiet' || (decided?.first && decided.first.mergedInto !== null)) return { s, close: s };
   if (decided?.close) return { s, close: { at: decided.close.closedAt, by: decided.close.closedAt >= t0 + EVENT_MAX_MS ? 'cap' : 'quiet' } };
   return { s, close: firstQuiet(own, s.at, t0 + EVENT_MAX_MS, nowMs) };
 }

@@ -86,6 +86,21 @@ const eventLink = (t: LiqEventText, webBaseUrl: string): string => {
   return liqAlertLink(webBaseUrl, c.symbol, c.crossedAt);
 };
 
+/** `15:06 UTC`: the small event's T0, written as the other texts write a time. */
+export function utcHhmm(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+}
+
+/**
+ * L19 (IB-148): «Перед этим: BNB $0.4M (15:06 UTC)» — a small same-side event folded into this one, one line each.
+ * The headline total, {m} and the link stay this event's own.
+ */
+function mergedLines(t: LiqEventText, lang: Lang): string[] {
+  const merged = 'merged' in t.details ? t.details.merged ?? [] : [];
+  return merged.map((m) => `${lang === 'ru' ? 'Перед этим' : 'Before it'}: ${t.baseOf(m.symbol)} ${usd(m.sumUsd)} (${utcHhmm(m.eventAt)})`);
+}
+
 /**
  * L12, the first message: «Крупные ликвидации лонгов: $21.2M за 7 мин», a line per coin, the count and the
  * largest, the link. With one coin it reads like IB-122's single-coin alert: the coin in the title.
@@ -100,6 +115,7 @@ export function liqEvent(t: LiqEventText, webBaseUrl: string): Texts {
       : `Large ${one ? `${one} ` : ''}${SIDE.en[t.side]} liquidations: ${usd(d.totalUsd)} in ${m} min`,
     ...(one ? [venueLine((d.coins[0] as LiqEventDetails['coins'][number]).byVenue, (d.coins[0] as LiqEventDetails['coins'][number]).silentVenues, lang)] : coinLines(t, lang, new Set())),
     countLine(t, lang),
+    ...mergedLines(t, lang),
     ...(d.binanceFootnote ? [FOOTNOTE[lang]] : []),
     eventLink(t, webBaseUrl),
   ].join('\n');
