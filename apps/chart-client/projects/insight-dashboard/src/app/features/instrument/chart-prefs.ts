@@ -77,3 +77,27 @@ export function saveLayerHidden(store: KeyValueStore | null, layer: ChartLayer, 
     // blocked storage: the choice lasts until the page is closed
   }
 }
+
+/**
+ * IB-129 (TL review): on a phone (≤ 480 px) the price legend is folded behind one «Слои (N)» control, closed
+ * by default; whether the reader opened it is remembered here. Desktop ignores it (the legend is always open).
+ */
+export const PHONE_LAYERS_OPEN_KEY = 'insight.instrument.phoneLayersOpen';
+
+export function loadPhoneLayersOpen(store: KeyValueStore | null): boolean {
+  if (!store) return false;
+  try {
+    return store.getItem(PHONE_LAYERS_OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function savePhoneLayersOpen(store: KeyValueStore | null, open: boolean): void {
+  if (!store) return;
+  try {
+    store.setItem(PHONE_LAYERS_OPEN_KEY, open ? '1' : '0');
+  } catch {
+    // blocked storage: the choice lasts until the page is closed
+  }
+}

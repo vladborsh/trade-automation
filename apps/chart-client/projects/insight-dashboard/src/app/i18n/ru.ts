@@ -193,6 +193,7 @@ export const ru: Strings = {
   'instrument.legend.liqAlerts': 'Сигналы: крупные ликвидации',
   'instrument.legend.fundingAlerts': 'Сигналы: фандинг',
   'instrument.legend.layerToggle': 'Показать или скрыть: {name}',
+  'instrument.legend.layers': 'Слои ({n})',
   'calendar.tooltip.forecast': 'прогноз',
   'calendar.tooltip.previous': 'пред.',
   'calendar.tooltip.actual': 'факт',

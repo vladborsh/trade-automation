@@ -80,6 +80,49 @@
   .entry.toggle::before { z-index: -1; }
 }
 
+/*
+ * IB-129 (TL review): at 390 the price legend was 12 lines over the candles. On a phone it folds behind one
+ * control, «Слои (N)», closed by default and remembered (`layer-prefs.ts`). Desktop never shows the control.
+ */
+.layers-fold {
+  display: none;
+  position: relative;
+  pointer-events: auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  &::before { content: ''; position: absolute; inset: -12px -6px; z-index: -1; } /* a ≥ 40 px target */
+  &:focus-visible { outline: 1px solid var(--color-focus); outline-offset: 2px; }
+  &::after { content: '▾'; color: var(--color-text-muted); }
+  &[aria-expanded='true']::after { content: '▴'; }
+}
+@media (max-width: 480px) {
+  .layers-fold { display: inline-flex; }
+  .pane-legend.phone-folded .entry { display: none; }
+  /*
+   * Opened: one entry per 40 px row, so every switch owns a full 40 px of its own. Rows 28 px apart (a 12 px gap)
+   * let the next switch's target take the bottom of this one's (the e2e taps 19 px off each label's centre).
+   */
+  .pane-legend[data-pane='price']:not(.phone-folded) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    /* opened, it runs past the price pane: over the next panes' legends (3) and the pane handles (5), as the eye
+       and full-screen buttons are (6) — a tap on the list is the list's */
+    z-index: 6;
+    background: rgba(13, 17, 23, 0.94); /* it lies over other panes' lines and legends: they must not read through */
+    padding: 0 6px 4px;
+    .entry { min-height: 40px; }
+    .entry.toggle::before { inset: 0 -6px; }
+  }
+}
+
 .swatch {
   display: inline-block;
   width: 8px;

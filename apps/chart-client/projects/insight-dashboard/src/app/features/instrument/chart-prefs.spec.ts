@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DIVERGENCES_HIDDEN_KEY, HIDDEN_DIVERGENCES_HIDDEN_KEY, LEGENDS_HIDDEN_KEY, loadDivergencesHidden, loadLegendsHidden,
   saveDivergencesHidden, saveLegendsHidden, CHART_LAYERS, layerHiddenKey, loadLayerHidden, saveLayerHidden,
+  PHONE_LAYERS_OPEN_KEY, loadPhoneLayersOpen, savePhoneLayersOpen,
 } from './chart-prefs';
 
 /** IB-099 item 2 — the legend toggle is remembered, and a hostile store costs nothing. */
@@ -63,5 +64,22 @@ describe('layer switches (IB-129) — one remembered pref per kind, independent,
     expect(loadLayerHidden(throwing, 'liqAlerts')).toBe(false);
     expect(() => saveLayerHidden(throwing, 'liqAlerts', true)).not.toThrow();
     expect(loadLayerHidden(null, 'liqAlerts')).toBe(false);
+  });
+});
+
+describe('phone layers fold (IB-129 review) — closed by default, the opened state remembered', () => {
+  it('closed until opened; open comes back; closing again is remembered too', () => {
+    const s = memory();
+    expect(loadPhoneLayersOpen(s)).toBe(false);
+    savePhoneLayersOpen(s, true);
+    expect(s.m.get(PHONE_LAYERS_OPEN_KEY)).toBe('1');
+    expect(loadPhoneLayersOpen(s)).toBe(true);
+    savePhoneLayersOpen(s, false);
+    expect(loadPhoneLayersOpen(s)).toBe(false);
+  });
+  it('a store that throws or is missing: closed, and saving does not throw', () => {
+    expect(loadPhoneLayersOpen(throwing)).toBe(false);
+    expect(() => savePhoneLayersOpen(throwing, true)).not.toThrow();
+    expect(loadPhoneLayersOpen(null)).toBe(false);
   });
 });

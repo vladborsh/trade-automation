@@ -187,6 +187,7 @@ export const en: Strings = {
   'instrument.legend.liqAlerts': 'Alerts: large liquidations',
   'instrument.legend.fundingAlerts': 'Alerts: funding',
   'instrument.legend.layerToggle': 'Show or hide: {name}',
+  'instrument.legend.layers': 'Layers ({n})',
   'calendar.tooltip.forecast': 'forecast',
   'calendar.tooltip.previous': 'previous',
   'calendar.tooltip.actual': 'actual',

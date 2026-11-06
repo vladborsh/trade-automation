@@ -62,41 +62,98 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
 
 const layer = (page: Page, key: string) => page.locator(`.pane-legend[data-pane="price"] button[data-layer="${key}"]`);
 
-for (const [label, use] of [
-  ['desktop 1240', { viewport: { width: 1240, height: 1000 } }],
-  ['phone 390', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }],
-] as const) {
-  test.describe(`IB-129 alert marks and month/open lines — ${label}`, () => {
-    test.use(use);
+test.describe('IB-129 alert marks and month/open lines — desktop 1240', () => {
+  test.use({ viewport: { width: 1240, height: 1000 } });
 
-    test('the marks and the new lines are drawn; each switch hides its own kind only, and a reload keeps it', async ({ page }, info) => {
-      await open(page);
-      const before = await chart(page);
-      expect(before.markers).toEqual([
-        { position: 'belowBar', text: '$7.4M' }, // longs liquidated
-        { position: 'aboveBar', text: '+0.080%' }, // longs pay
-      ]);
-      for (const t of ['PMH', 'PML', 'WO', 'MO', 'PWH', 'PDH']) expect(before.titles).toContain(t);
-      for (const key of ['liqAlerts', 'fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen']) {
-        await expect(layer(page, key)).toHaveAttribute('aria-pressed', 'true');
-      }
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(use.viewport.width);
-      await shot(page, info, `instrument-alert-marks-${use.viewport.width}.png`);
+  test('the marks and the new lines are drawn; each switch hides its own kind only, and a reload keeps it', async ({ page }, info) => {
+    await open(page);
+    const before = await chart(page);
+    expect(before.markers).toEqual([
+      { position: 'belowBar', text: '$7.4M' }, // longs liquidated
+      { position: 'aboveBar', text: '+0.080%' }, // longs pay
+    ]);
+    for (const t of ['PMH', 'PML', 'WO', 'MO', 'PWH', 'PDH']) expect(before.titles).toContain(t);
+    for (const key of ['liqAlerts', 'fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen']) {
+      await expect(layer(page, key)).toHaveAttribute('aria-pressed', 'true');
+    }
+    await expect(page.locator('.layers-fold')).toBeHidden(); // desktop: the legend is never folded
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1240);
+    await shot(page, info, 'instrument-alert-marks-1240.png');
 
-      await layer(page, 'liqAlerts').click();
-      await expect(layer(page, 'liqAlerts')).toHaveAttribute('aria-pressed', 'false');
-      await expect.poll(async () => (await chart(page)).markers.map((m) => m.text)).toEqual(['+0.080%']);
-      await layer(page, 'prevMonth').click();
-      await expect.poll(async () => (await chart(page)).titles.filter((t) => t === 'PMH' || t === 'PML')).toEqual([]);
-      const after = await chart(page);
-      for (const t of ['WO', 'MO', 'PWH']) expect(after.titles).toContain(t); // the others stay
+    await layer(page, 'liqAlerts').click();
+    await expect(layer(page, 'liqAlerts')).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(async () => (await chart(page)).markers.map((m) => m.text)).toEqual(['+0.080%']);
+    await layer(page, 'prevMonth').click();
+    await expect.poll(async () => (await chart(page)).titles.filter((t) => t === 'PMH' || t === 'PML')).toEqual([]);
+    const after = await chart(page);
+    for (const t of ['WO', 'MO', 'PWH']) expect(after.titles).toContain(t); // the others stay
 
-      await page.reload();
-      await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
-      await expect(layer(page, 'liqAlerts')).toHaveAttribute('aria-pressed', 'false');
-      await expect(layer(page, 'prevMonth')).toHaveAttribute('aria-pressed', 'false');
-      await expect.poll(async () => (await chart(page)).markers.map((m) => m.text)).toEqual(['+0.080%']);
-      expect((await chart(page)).titles).not.toContain('PMH');
-    });
+    await page.reload();
+    await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
+    await expect(layer(page, 'liqAlerts')).toHaveAttribute('aria-pressed', 'false');
+    await expect(layer(page, 'prevMonth')).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(async () => (await chart(page)).markers.map((m) => m.text)).toEqual(['+0.080%']);
+    expect((await chart(page)).titles).not.toContain('PMH');
   });
-}
+});
+
+/**
+ * TL review: at 390 the price legend was 12 lines over the candles, where the newest marks sit. On a phone it is
+ * folded behind «Layers (N)», closed by default and remembered; opened, every entry is there and each switch is
+ * its own ≥ 40 px target.
+ */
+test.describe('IB-129 alert marks and month/open lines — phone 390', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('the legend is folded and leaves the candles clear; opened, it lists every entry and a tap flips one switch only; remembered', async ({ page }, info) => {
+    await open(page);
+    expect(await page.evaluate(() => window.innerWidth)).toBe(390);
+    const legend = page.locator('.pane-legend[data-pane="price"]');
+    const fold = legend.locator('.layers-fold');
+    const entries = legend.locator('.entry');
+    const n = await entries.count();
+    expect(n).toBeGreaterThanOrEqual(12);
+    // closed: one line, every entry hidden, the count on the control
+    await expect(fold).toHaveText(`Layers (${n})`);
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(entries.filter({ visible: true })).toHaveCount(0);
+    const closed = (await legend.boundingBox())!;
+    expect(closed.height).toBeLessThanOrEqual(30); // was ≈ 190 px (12 lines) before the fold
+    // the candles' top area is clear: below the folded legend's one line, the chart answers the pointer
+    const host = (await page.locator('.chart-host').boundingBox())!;
+    const probe = { x: closed.x + closed.width / 2, y: closed.y + closed.height + 30 };
+    expect(probe.y).toBeLessThan(host.y + 120);
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.chart-host'), [probe.x, probe.y])).toBe(true);
+    expect((await chart(page)).markers).toHaveLength(2); // the marks are drawn whatever the fold
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    await shot(page, info, 'instrument-alert-marks-390.png');
+
+    await fold.tap();
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(entries.filter({ visible: true })).toHaveCount(n);
+    // each switch: a tap at its label lands on it (no neighbour's target over it), and its target is ≥ 40 px tall
+    for (const key of ['liqAlerts', 'fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen']) {
+      const b = (await layer(page, key).boundingBox())!;
+      // what a tap there would hit: the switch's key, or the element that is in the way
+      const hits = await page.evaluate(([x, y]) => [-19, 0, 19].map((dy) => {
+        const el = document.elementFromPoint(x, y + dy);
+        const button = el?.closest('button') as HTMLElement | null;
+        return button?.dataset['layer'] ?? `${el?.tagName.toLowerCase()}.${el?.className}`;
+      }), [b.x + b.width / 2, b.y + b.height / 2]);
+      expect(hits, key).toEqual([key, key, key]);
+    }
+    await shot(page, info, 'instrument-alert-marks-390-open.png');
+
+    await layer(page, 'liqAlerts').tap();
+    await expect(layer(page, 'liqAlerts')).toHaveAttribute('aria-pressed', 'false');
+    for (const key of ['fundingAlerts', 'prevMonth', 'weekOpen', 'monthOpen']) await expect(layer(page, key)).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(async () => (await chart(page)).markers.map((m) => m.text)).toEqual(['+0.080%']);
+
+    await page.reload();
+    await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
+    await expect(fold).toHaveAttribute('aria-expanded', 'true'); // the opened fold is remembered
+    await expect(layer(page, 'liqAlerts')).toHaveAttribute('aria-pressed', 'false');
+    await fold.tap();
+    await expect(entries.filter({ visible: true })).toHaveCount(0);
+  });
+});

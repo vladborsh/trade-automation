@@ -1,8 +1,15 @@
 <div class="chart" [style.height.px]="chartHeight()" (pointermove)="drag.move($event)" (pointerup)="drag.end()" (pointercancel)="drag.end()">
   <div #chartHost class="chart-host"></div>
   @for (legend of legends(); track legend.key) {
-    <div class="pane-legend" [attr.data-pane]="legend.key" [style.top.px]="legend.top">
+    <div class="pane-legend" [attr.data-pane]="legend.key" [style.top.px]="legend.top"
+         [class.phone-folded]="legend.key === 'price' && !layerPrefs.phoneOpen()">
       <span class="pane-title">{{ legend.heading }}</span>
+      @if (legend.key === 'price') {
+        <!-- IB-129 (TL review): ≤ 480 px only (CSS): the price legend folded behind one control, remembered -->
+        <button type="button" class="layers-fold" [attr.aria-expanded]="layerPrefs.phoneOpen()" (click)="layerPrefs.togglePhone()">
+          {{ t('instrument.legend.layers', { n: '' + legend.entries.length }) }}
+        </button>
+      }
       @for (entry of legend.entries; track entry.label) {
         @if (entry.layer) {
           <!-- IB-129: a switch for one layer (an alert kind, a level line); struck through while hidden -->

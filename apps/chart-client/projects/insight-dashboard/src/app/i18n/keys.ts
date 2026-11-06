@@ -199,6 +199,7 @@ export type StringKey =
   | 'instrument.legend.liqAlerts'
   | 'instrument.legend.fundingAlerts'
   | 'instrument.legend.layerToggle'
+  | 'instrument.legend.layers'
   | 'calendar.tooltip.forecast'
   | 'calendar.tooltip.previous'
   | 'calendar.tooltip.actual'

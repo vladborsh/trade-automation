@@ -1,6 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 import { browserStore } from './pane-heights';
-import { CHART_LAYERS, loadLayerHidden, saveLayerHidden, type ChartLayer } from './chart-prefs';
+import {
+  CHART_LAYERS, loadLayerHidden, loadPhoneLayersOpen, saveLayerHidden, savePhoneLayersOpen, type ChartLayer,
+} from './chart-prefs';
 
 export type LayersOff = Readonly<Record<ChartLayer, boolean>>;
 export const NO_LAYERS_OFF: LayersOff = { liqAlerts: false, fundingAlerts: false, prevMonth: false, weekOpen: false, monthOpen: false };
@@ -14,6 +16,14 @@ export const NO_LAYERS_OFF: LayersOff = { liqAlerts: false, fundingAlerts: false
 export class LayerPrefs {
   private readonly store = browserStore();
   readonly off = signal<LayersOff>(Object.fromEntries(CHART_LAYERS.map((l) => [l, loadLayerHidden(this.store, l)])) as LayersOff);
+
+  /** TL review: on a phone the price legend is folded behind «Слои (N)»; opened = true. Desktop ignores it. */
+  readonly phoneOpen = signal(loadPhoneLayersOpen(this.store));
+
+  togglePhone(): void {
+    this.phoneOpen.update((o) => !o);
+    savePhoneLayersOpen(this.store, this.phoneOpen());
+  }
 
   toggle(layer: ChartLayer): void {
     const next = { ...this.off(), [layer]: !this.off()[layer] };
