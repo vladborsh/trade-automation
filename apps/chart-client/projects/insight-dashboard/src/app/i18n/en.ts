@@ -677,6 +677,7 @@ export const en: Strings = {
   'alerts.symbol.on': 'checked',
   'alerts.symbol.off': 'paused',
   'alerts.symbol.disable': 'Pause',
+  'alerts.pauseNote': 'Pause = the coin is not tracked at all: no data is collected, nothing is written to the journal. Not the same as switching a coin off in an alert section: there, off = not sent; the journal records it always.',
   'alerts.symbol.enable': 'Resume',
   'alerts.remove': 'Remove',
   'alerts.confirmRemove': 'Remove from the list? Collected data stays.',

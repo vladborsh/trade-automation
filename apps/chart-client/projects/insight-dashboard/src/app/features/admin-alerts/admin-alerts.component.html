@@ -33,6 +33,7 @@
 
   <section>
     <h2>{{ t('alerts.symbols') }}</h2>
+    <p class="note">{{ t('alerts.pauseNote') }}</p>
     <form class="add" (submit)="$event.preventDefault(); addSymbol()">
       <input [value]="newSymbol()" (input)="newSymbol.set($any($event.target).value)" [attr.aria-label]="t('alerts.addLabel')" [placeholder]="t('alerts.addPlaceholder')" autocomplete="off" />
       <button type="submit" class="primary" [disabled]="busy() || newSymbol().trim() === ''">{{ t('alerts.add') }}</button>

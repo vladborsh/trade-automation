@@ -678,6 +678,7 @@ export type StringKey =
   | 'alerts.symbol.on'
   | 'alerts.symbol.off'
   | 'alerts.symbol.disable'
+  | 'alerts.pauseNote'
   | 'alerts.symbol.enable'
   | 'alerts.remove'
   | 'alerts.confirmRemove'

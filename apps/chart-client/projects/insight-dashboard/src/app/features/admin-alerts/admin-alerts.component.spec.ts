@@ -61,6 +61,8 @@ describe('AdminAlertsComponent (IB-112)', () => {
     expect([...el.querySelectorAll('tbody tr')].map((r) => r.querySelector('td')?.textContent?.trim())).toContain('TRXUSDT');
     expect(text(el)).toContain('sent: 1');
     expect(text(el)).toContain('on lows');
+    // IB-151: «Пауза» is not a mute — the page says so next to the coins
+    expect(text(el)).toContain('Pause = the coin is not tracked at all: no data is collected, nothing is written to the journal.');
   });
 
   it('IB-141: the params table has N left and N right per TF — 4h shows 6 and 2', async () => {
