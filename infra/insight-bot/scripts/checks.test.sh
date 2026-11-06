@@ -493,6 +493,8 @@ case "$1" in
          echo "memory gate: 240 MB available (start gate $floor MB) — starting path measuring"
          [ "$who" = liq ] && { echo 'write ×1: 4851 ticks over (…]; new rows: alerts 0, continuations 0, controls 0, events 0; 24739 reads'
            echo 'LIQ_HISTORY_JSON {"mode": "write", "from": "2026-11-04T00:00:00.000Z", "until": "2026-11-05T16:59:34.379Z", "countsTo": "2026-11-11T00:00:00.000Z", "days": 7, "written": {}, "table": []}'; }
+         [ "$who" = funding ] && { u="${all#*--until }"; u="${u%% *}"; echo 'write ×1: 51744 checks; new rows: enter 0, flip 0, controls 0; stale 0, insufficient 0'
+           echo "FUNDING_HISTORY_JSON {\"mode\": \"write\", \"until\": \"$u\", \"written\": {}, \"table\": []}"; }
          echo 'paths: measured 314, failed 0, weight 790, 1500 s; left 0'; echo 'done in 3 s'; exit 0 ;;
     esac ;;
 esac
@@ -597,6 +599,49 @@ check 'oi-hidden: env MEM_START_FLOOR_MB=90 → exit 2 before any docker call' '
 ohb flag139 ok bash "$OHB" --dry-run --start-floor 139
 check 'oi-hidden: --start-floor 139 → exit 2 (below 140 only by a TL ruling, as a commit)' '[ "$(cat $work/ohb-flag139.rc)" = 2 ] && [ ! -s $work/ohb-flag139.docker ]'
 
+# ------------------------------------------------------------------------------------------ funding-rerun (IB-125)
+FUND='
+import json
+summary = {"mode": "write", "from": "2026-05-10T22:00:00.000Z", "to": "2026-11-06T16:00:00.000Z", "until": "2026-11-06T22:00:00.000Z", "days": 180,
+           "written": {"alerts_enter": 26, "alerts_flip": 2, "controls_random": 1795, "controls_near_miss": 239, "paths": 6186, "paths_measured": 6186}, "table": [], "alerts": []}
+def out(new=(0, 0, 0), failed=0, left=0, rc_cli=0, js=True, killed=False):
+    return ("start 20261110T000000Z mode --write\n== CLI output (exit %d)\n" % rc_cli
+            + "write ×1: 51744 checks; new rows: enter %d, flip %d, controls %d; stale 0, insufficient 0\n" % new
+            + "paths: measured 30, failed %d, weight 80, 20 s; left %d\n" % (failed, left)
+            + ("FUNDING_HISTORY_JSON " + json.dumps(summary) + "\n" if js else "")
+            + "== memory over 60 samples\nmin MemAvailable 150 MB; max bot RSS 120 MB; max CLI RSS 100 MB\n"
+            + ("KILLED for memory\n" if killed else "") + "== start gate: asked 140, the CLI applied 140\nfiles: /root/x.out /root/x.mem\n")
+'
+fixture fund-pass "$FUND
+d = {'started': 'x', 'until': '2026-11-06T22:00:00.000Z', 'until_from': '/root/ib125write-1.out', 'rc': 0, 'output': out()}"
+run funding-rerun fund-pass
+check 'funding-rerun a clean rerun → PASS, nothing sent, the .md names the --until and where it came from' \
+  '[ "$(verdict fund-pass funding-rerun)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "until 2026-11-06T22:00:00.000Z, read from /root/ib125write-1.out" $work/out-fund-pass/funding-rerun.md'
+fixture fund-new "$FUND
+d = {'rc': 0, 'output': out(new=(0, 1, 0))}"
+run funding-rerun fund-new
+check 'funding-rerun a rerun that wrote a row (once-keys broken) → FLAG:new_rows, no Telegram' '[ "$(verdict fund-new funding-rerun)" = FLAG:new_rows ] && [ "$(sent)" = 0 ]'
+fixture fund-paths "$FUND
+d = {'rc': 0, 'output': out(failed=2, left=3)}"
+run funding-rerun fund-paths
+check 'funding-rerun failed / open path windows → FLAG' '[ "$(verdict fund-paths funding-rerun)" = FLAG:paths_failed,paths_left_open ] && [ "$(sent)" = 0 ]'
+fixture fund-killed "$FUND
+d = {'rc': 0, 'output': out(killed=True)}"
+run funding-rerun fund-killed
+check 'funding-rerun killed for memory → FAIL, the owner told once' '[ "$(verdict fund-killed funding-rerun | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
+fixture fund-exit "$FUND
+d = {'rc': 0, 'output': out(rc_cli=1)}"
+run funding-rerun fund-exit
+check 'funding-rerun CLI exit 1 (a MISMATCH or a warning) → FAIL' '[ "$(verdict fund-exit funding-rerun)" = "FAIL:funding-backfill.sh exit 0, CLI exit 1" ] && [ "$(sent)" = 1 ]'
+fixture fund-nojson "$FUND
+d = {'rc': 0, 'output': out(js=False)}"
+run funding-rerun fund-nojson
+check 'funding-rerun no summary line → FAIL' '[ "$(verdict fund-nojson funding-rerun | cut -c1-5)" = FAIL: ]'
+fixture fund-deferred "$FUND
+d = {'rc': 3, 'tries': 6, 'output': 'start x\n== CLI output (exit 1)\nfunding backfill failed: Error: memory gate: refused — MemAvailable 139 MB < 140 MB\n== start gate: asked 140, the CLI applied 140\nDEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)\n'}"
+run funding-rerun fund-deferred
+check 'funding-rerun refused on all tries → DEFERRED, NO Telegram' '[ "$(verdict fund-deferred funding-rerun)" = "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), 6 of 6 tries" ] && [ "$(sent)" = 0 ]'
+
 # ------------------------------------------------- checks.py: DEFERRED, the floor it asks, the retries (IB-145)
 fixture bf-deferred "$BF
 d['rc'] = 3; d['tries'] = 6
@@ -691,7 +736,7 @@ compose_run() { # $1 = check, $2 = case, $3 = FAKE_CLI, $4 = runner, then extra 
   env PATH="$work/ohb-bin:$work/bin:$PATH" OHB_DOCKER_LOG="$work/cr-$c.docker" FAKE_CLI="$cli" RUN_DIR="$work/cr-$c" \
     MEMINFO="$work/ohb-meminfo" PID_TRIES=1 SAMPLE_S=0.1 CHECKS_DIR="$work/cr-$c" DEPLOY_DIR="$work/cr-$c" WATCH_ENV_FILE="$work/env" \
     STUB_CURL_ARGS="$work/curl-args" STUB_CURL_STDIN="$work/curl-stdin" CHECKS_DEFER_WAIT_S=0 CHECKS_FAKE_NOW=1793966400 FAKE_SLEEP=1.2 \
-    CHECKS_BACKFILL_SCRIPT="$BOX" CHECKS_LIQ_SCRIPT="$LIQR" "$@" python3 -I "$CHECKS" run "$name" >"$work/cr-$c.stdout" 2>&1 || true
+    CHECKS_BACKFILL_SCRIPT="$BOX" CHECKS_LIQ_SCRIPT="$LIQR" CHECKS_FUNDING_SCRIPT="$FUNDR" CHECKS_FUNDING_RUN_DIR="$work/cr-$c" "$@" python3 -I "$CHECKS" run "$name" >"$work/cr-$c.stdout" 2>&1 || true
   cat "$work/cr-$c/$name.done" 2>/dev/null
 }
 check 'backfill-rerun → box-backfill.sh, gate refused on every try → DEFERRED, 6 docker execs, NO Telegram' \
@@ -704,5 +749,21 @@ check 'liq-weekly → liq-backfill.sh, started at 140 → PASS, the .md names th
   'v=$(compose_run liq-weekly lqok ok x); [ "$v" = PASS ] && grep -q "start gate: asked 140 MB, the CLI applied 140" $work/cr-lqok/liq-weekly.md'
 check 'liq-weekly → a crashed CLI is still FAIL and ONE Telegram' \
   '[ "$(compose_run liq-weekly lqc crash x | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
+
+# funding-rerun reads --until from the newest completed WRITE's output in the run dir; a dry run or a broken write is not one
+fwrite() { # $1 = case dir, $2 = stamp, $3 = mode, $4 = until
+  mkdir -p "$work/cr-$1"; printf '== CLI output (exit 0)\nFUNDING_HISTORY_JSON {"mode": "%s", "until": "%s"}\n' "$3" "$4" >"$work/cr-$1/ib125write-$2.out"
+}
+fwrite fuok 20261106T220000Z write 2026-11-06T21:55:00.000Z
+fwrite fuok 20261107T010000Z write 2026-11-06T22:05:00.000Z
+fwrite fuok 20261107T020000Z dry-run 2026-11-06T23:00:00.000Z
+printf 'funding backfill failed: Error: boom\n' >"$work/cr-fuok/ib125write-20261107T030000Z.out"
+check 'funding-rerun → funding-backfill.sh with the --until of the newest completed write (not a dry run, not a crash) → PASS' \
+  'v=$(compose_run funding-rerun fuok ok x); [ "$v" = PASS ] && grep -q -- "funding-backfill.cli.js --write --until 2026-11-06T22:05:00.000Z\$" $work/cr-fuok.docker'
+check 'funding-rerun with no completed write on the box → FAIL before any docker exec, ONE Telegram' \
+  '[ "$(compose_run funding-rerun funone ok x | cut -c1-5)" = FAIL: ] && [ ! -s $work/cr-funone.docker ] && [ "$(sent)" = 1 ] && grep -q "no completed funding write" $work/cr-funone/funding-rerun.md'
+fwrite fudef 20261106T220000Z write 2026-11-06T22:05:00.000Z
+check 'funding-rerun → refused on every try → DEFERRED, NO Telegram' \
+  '[ "$(compose_run funding-rerun fudef refused x | cut -c1-9)" = DEFERRED: ] && [ "$(sent)" = 0 ]'
 
 if [ "$fail" = 0 ]; then echo "checks.test.sh: all passed"; else echo "checks.test.sh: FAILURES"; exit 1; fi

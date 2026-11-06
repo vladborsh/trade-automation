@@ -439,7 +439,8 @@ def first_hidden_evaluate(raw):
 
 
 # ----------------------------------------------------------------------------- history runs (IB-145)
-# backfill-rerun and liq-weekly start a history CLI on the box through its runner (box-backfill.sh, liq-backfill.sh).
+# backfill-rerun, liq-weekly and funding-rerun start a history CLI on the box through its runner (box-backfill.sh,
+# liq-backfill.sh, funding-backfill.sh).
 # The CLI refuses to START below its start gate (memory-guard.ts; default 170 MB, measured after its ~66 MB load);
 # the runner then prints «DEFERRED:memory gate refused (…)» and exits 3. Here:
 # - every run asks for HISTORY_START_FLOOR_MB (140; never below without a TL ruling — history-gate.sh refuses it).
@@ -637,6 +638,71 @@ def liq_evaluate(raw):
                          'min_mem_available_mb': int(mem.group(1)), 'tail': out[-1500:]}}
 
 
+# ------------------------------------------------------------------------------------------ funding-rerun
+# IB-125: ≥ 72 h after the funding history run's write, funding-backfill.sh --write reruns it with the SAME --until.
+# It writes 0 new rows (the once-keys hold; a different --until would move the 5-min grid, so it is never guessed)
+# and measures the path windows still open at the write (its last 72 h). --until is read from the write's own output
+# (the newest /root/ib125write-*.out whose FUNDING_HISTORY_JSON says mode write; no constant to edit, no manual step).
+# Bands: 0 new rows; 0 failed and 0 open path windows; memory ≥ 100 MB. A killed run, a CLI exit ≠ 0, a missing
+# write or no summary line is FAIL (the owner hears); DEFERRED (the start gate refused 6 tries) and PASS are silent.
+
+FUNDING_SCRIPT = os.environ.get('CHECKS_FUNDING_SCRIPT', os.path.join(DEPLOY_DIR, 'funding-backfill.sh'))
+FUNDING_RUN_DIR = os.environ.get('CHECKS_FUNDING_RUN_DIR', '/root')
+
+
+def funding_until():
+    """The --until of the newest completed funding write: (until ISO, the file it came from)."""
+    import glob
+    import re
+    for path in sorted(glob.glob(os.path.join(FUNDING_RUN_DIR, 'ib125write-*.out')), reverse=True):  # names carry a UTC stamp
+        with open(path, encoding='utf-8') as f:
+            m = re.search(r'^FUNDING_HISTORY_JSON (\{.*\})$', f.read(), re.M)
+        if m and json.loads(m.group(1)).get('mode') == 'write':
+            return json.loads(m.group(1))['until'], path
+    raise CheckFailed('no completed funding write in %s/ib125write-*.out: nothing to rerun' % FUNDING_RUN_DIR)
+
+
+def funding_gather():
+    if not os.path.exists(FUNDING_SCRIPT):
+        raise CheckFailed('%s is missing' % FUNDING_SCRIPT)
+    until, source = funding_until()
+    raw = {'started': utc(time.time()), 'until': until, 'until_from': source}
+    run = history_run(FUNDING_SCRIPT, ['--write', '--until', until])
+    raw.update(run, output=run['output'][-20000:])
+    return raw
+
+
+def funding_evaluate(raw):
+    import re
+    out = raw['output']
+    if 'KILLED for memory' in out:
+        raise CheckFailed('the CLI was killed: MemAvailable < 100 MB (funding-backfill.sh sampler)')
+    flags, rows = [], []
+    gate_note = history_deferred_or_gate(flags, rows, raw, 'funding-backfill.sh')
+    cli = re.search(r'== CLI output \(exit (\d+)\)', out)
+    if raw['rc'] != 0 or not cli or cli.group(1) != '0':
+        raise CheckFailed('funding-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
+    js = re.search(r'^FUNDING_HISTORY_JSON (\{.*\})$', out, re.M)
+    new = re.search(r'^write ×1: .*new rows: enter (\d+), flip (\d+), controls (\d+)', out, re.M)
+    paths = re.search(r'paths: measured (\d+), failed (\d+), weight (\d+), \d+ s; left (\d+)', out)
+    mem = re.search(r'min MemAvailable (\d+) MB', out)
+    if not js or not new or not paths or not mem:
+        raise CheckFailed('funding-backfill.sh output lacks a FUNDING_HISTORY_JSON, «write ×1», «paths:» or «min MemAvailable» line')
+    summary = json.loads(js.group(1))
+    rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups()), 0, 0))
+    rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
+    rows.append(band(flags, 'paths_left_open', int(paths.group(4)), 0, 0))
+    rows.append(band(flags, 'min_mem_available_mb', int(mem.group(1)), 100, 10 ** 6))
+    notes = ['--until %s, read from %s (the write\'s own output)' % (raw.get('until'), raw.get('until_from')),
+             'rows written (source = backfill): %s' % json.dumps(summary.get('written'), ensure_ascii=False),
+             'path weight this run: %s (measured %s windows)' % (paths.group(3), paths.group(1)),
+             'no hit rate: «worked» and the baseline are not defined yet (design §1 C5)', gate_note] + raw.get('waits', [])
+    return {'flags': flags, 'rows': rows, 'notes': notes,
+            'measured': {'until': raw.get('until'), 'written': summary.get('written'),
+                         'paths': {'measured': int(paths.group(1)), 'failed': int(paths.group(2)), 'weight': int(paths.group(3)), 'left': int(paths.group(4))},
+                         'min_mem_available_mb': int(mem.group(1)), 'tail': out[-1500:]}}
+
+
 # --------------------------------------------------------------------------------- random-controls-day
 # IB-BUG-047: one UTC day of live random controls, exact. The loop picks 2 bar closes per (coin, TF, UTC day of
 # the bar) by a hash of (symbol, tf, day) (apps/insight-bot/src/alerts/oi-divergence/research/controls.ts, design
@@ -781,6 +847,7 @@ CHECKS = {
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
     'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),
     'liq-weekly': (liq_gather, liq_evaluate, 'IB-123: a week of liquidation tape — alerts per coin per week at ×½, ×1, ×2; the open path windows'),
+    'funding-rerun': (funding_gather, funding_evaluate, 'IB-125: the funding history run rerun ≥ 72 h after its write — 0 new rows, the path windows that were open measured'),
     'random-controls-day': (rcd_gather, rcd_evaluate, 'IB-BUG-047: the previous UTC day of live OI random controls — exactly enabled coins × 3 TFs × 2'),
 }
 
