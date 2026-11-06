@@ -36,6 +36,8 @@ with open(sys.argv[1], "a") as f:
     for i in range(800): f.write("# IB-146 padding line %04d: sync-box.test.sh needs this file past one SSM command\n" % i)
 ' "$repo/scripts/checks.py"
 big_b64="$(base64 <"$repo/scripts/checks.py" | tr -d '\n' | wc -c | tr -d ' ')"
+# how many parts sync-box.sh cuts it into at its real chunk size: derived, so checks.py growing never breaks this test
+parts=$(( (big_b64 + 89999) / 90000 ))
 git -C "$work/repo" init -q
 git -C "$work/repo" -c user.name=t -c user.email=t@t add -A
 git -C "$work/repo" -c user.name=t -c user.email=t@t commit -qm fixture
@@ -119,7 +121,7 @@ sync() { # extra env assignments as args → exit code in $rc, output in $work/o
 }
 installs_sent() { grep -l ' install$' "$work"/ssm/*/comment 2>/dev/null | wc -l | tr -d ' '; }
 
-echo "# fixture: $nsrc files; checks.py base64 = $big_b64 B (limit 90000)"
+echo "# fixture: $nsrc files; checks.py base64 = $big_b64 B (limit 90000) → $parts parts"
 check "the fixture's checks.py is past one SSM command" '[ "$big_b64" -gt 90000 ]'
 
 # 1. a clean sync, real chunk size
@@ -130,8 +132,9 @@ for f in $(sed -n 's/^  "\([^:]*\):\([^:]*\):.*/\1:\2/p' "$repo/scripts/sync-box
   [ "$(sha "$repo/${f%%:*}")" = "$(sha "$work/box${f#*:}")" ] && same=$((same + 1))
 done
 check "all $nsrc files land with the source's sha256 (got $same)" '[ "$same" -eq "$nsrc" ]'
-check "checks.py went in 2 parts" '[ "$(grep -l "stage checks.py part" "$work"/ssm/*/comment | wc -l | tr -d " ")" -eq 2 ]'
-check "a file that fits is still one command ($nsrc files + 1 extra part + 1 install)" '[ "$(ls "$work/ssm" | wc -l | tr -d " ")" -eq $((nsrc + 2)) ]'
+check "checks.py went in $parts parts, reassembled with the source's sha256" \
+  '[ "$(grep -l "stage checks.py part .*/$parts\$" "$work"/ssm/*/comment | wc -l | tr -d " ")" -eq "$parts" ] && [ "$(sha "$repo/scripts/checks.py")" = "$(sha "$work/box/opt/insight-bot/checks.py")" ]'
+check "a file that fits is still one command ($nsrc files + $((parts - 1)) extra part(s) + 1 install)" '[ "$(ls "$work/ssm" | wc -l | tr -d " ")" -eq $((nsrc + parts)) ]'
 max_bytes="$(cat "$work"/ssm/*/bytes | sort -n | tail -1)"
 check "every SSM command is under 97 KB (largest $max_bytes B)" '[ "$max_bytes" -lt 97000 ]'
 check "SYNCED-FROM is the commit" '[ "$(cat "$work/box/opt/insight-bot/SYNCED-FROM")" = "$commit" ]'
@@ -145,13 +148,13 @@ check "chunk 7000: exits 0, checks.py in $(( (big_b64 + 6999) / 7000 )) parts, s
   '[ "$rc" -eq 0 ] && [ "$(grep -l "stage checks.py part" "$work"/ssm/*/comment | wc -l | tr -d " ")" -eq $(( (big_b64 + 6999) / 7000 )) ] && [ "$(sha "$repo/scripts/checks.py")" = "$(sha "$work/box/opt/insight-bot/checks.py")" ]'
 
 # 3. a failed part installs nothing
-new_box; sync STUB_FAIL_COMMENT="stage checks.py part 2/2"
-check "failed part: exit 1, says nothing installed" '[ "$rc" -eq 1 ] && grep -q "part 2/2 failed; nothing installed" "$work/out"'
+new_box; sync STUB_FAIL_COMMENT="stage checks.py part 2/$parts"
+check "failed part: exit 1, says nothing installed" '[ "$rc" -eq 1 ] && grep -q "part 2/$parts failed; nothing installed" "$work/out"'
 check "failed part: the box's files and SYNCED-FROM unchanged" 'untouched'
 check "failed part: no install command sent" '[ "$(installs_sent)" -eq 0 ]'
 
 # 4. a part corrupted in transit: the sha256 check refuses it
-new_box; sync STUB_CORRUPT_COMMENT="stage checks.py part 1/2"
+new_box; sync STUB_CORRUPT_COMMENT="stage checks.py part 1/$parts"
 check "corrupt part: exit 1, the box said sha256 mismatch" '[ "$rc" -eq 1 ] && grep -q "sha256 mismatch" "$work"/ssm/*/err'
 check "corrupt part: the box's files unchanged, no install command" 'untouched && [ "$(installs_sent)" -eq 0 ]'
 
