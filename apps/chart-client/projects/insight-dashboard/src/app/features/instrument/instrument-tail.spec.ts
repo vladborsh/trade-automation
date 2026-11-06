@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
-import type { WebTimeframe, WebTopLiquidation } from '@trade-automation/contracts';
+import type { WebTimeframe } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
 import { instrumentTailJobs } from './instrument-tail';
 import type { PaneData } from './pane-data';
@@ -33,7 +33,8 @@ function fakeApi() {
     longShort: vi.fn(async () => ({ symbol: 'BTCUSDT', kind: 'global_account', points: [{ time: at, ratio: 1.2 }], downsampled: false })),
     liquidations: vi.fn(async () => ({ symbol: 'BTCUSDT', bucket: '1m', venue: 'all', venuesPresent: ['binance'], bars: [{ time: at, long: 1, short: 0 }], downsampled: false, undercounted: false })),
     liquidationEvents: vi.fn(async () => ({ symbol: 'BTCUSDT', minUsd: 0, events: [{ time: at, side: 'long', usd: 1, price: 1, venue: 'binance' }], venuesPresent: ['binance'], undercounted: false })),
-    topLiquidations: vi.fn(async () => ({ symbol: 'BTCUSDT', rows: [{ time: at } as WebTopLiquidation] })),
+    // IB-153: no top-50 read any more — the profile follows the chart's view (`liq-profile.store.ts`); a job
+    // that still asked for the table would call a function this fake does not have, and fail
   };
   return api;
 }
@@ -42,7 +43,6 @@ function setup() {
   const api = fakeApi();
   const page = {
     panes: signal<PaneData | null>(window()),
-    top: signal<WebTopLiquidation[]>([]),
     symbol: signal('BTCUSDT'),
     timeframe: signal<WebTimeframe>('1m'),
     refreshSummary: vi.fn(),
@@ -62,13 +62,12 @@ describe('instrumentTailJobs (IB-066)', () => {
     expect(page.panes()!.extendsLater).toBe(true);
   });
 
-  it('the minute\'s job reads the database panes from the last bucket, the top table and the summary', async () => {
+  it('the minute\'s job reads the database panes from the last bucket and the summary', async () => {
     const { api, page, side } = setup();
     const apply = await side.read(NOW - 60_000, NOW);
     const bucketStart = Math.floor((NOW - 60_000) / 60_000) * 60_000;
     expect(api.openInterest).toHaveBeenCalledWith('BTCUSDT', bucketStart, NOW);
     expect(api.liquidations).toHaveBeenCalledWith('BTCUSDT', bucketStart, NOW, '1m');
-    expect(api.topLiquidations).toHaveBeenCalledWith('BTCUSDT', NOW - 86_400_000, NOW, 50);
     expect(api.candles).not.toHaveBeenCalled(); // same day: the daily candles are not re-read
     apply();
     const p = page.panes()!;
@@ -76,7 +75,6 @@ describe('instrumentTailJobs (IB-066)', () => {
     expect(p.liquidations.bars).toHaveLength(1);
     expect(p.liquidationEvents).toHaveLength(1);
     expect(p.longShort.points).toHaveLength(1);
-    expect(page.top()).toHaveLength(1);
     expect(page.refreshSummary).toHaveBeenCalledWith('BTCUSDT');
   });
 
