@@ -89,6 +89,26 @@ describe('Watchdog (§6.2)', () => {
   });
 });
 
+describe('IB-BUG-051 follow-up: the threshold per venue', () => {
+  const liq = (venue: string, ageSec: number) => stream({ id: `${venue}:liq`, venue, lastMessageAgeSec: ageSec });
+
+  it('a venue with its own threshold is judged by it; a venue without one by the global', () => {
+    const w = new Watchdog({ silenceMin: 3, silenceMinByVenue: { bybit: 30 } });
+    expect(w.check([liq('bybit', 29 * 60)], T)).toEqual([]); // a quiet 29 min on bybit's 35 coins is normal
+    expect(w.check([liq('okx', 181)], T)).toHaveLength(1); // okx has no entry: the global 3 min
+    expect(w.check([liq('bybit', 30 * 60 + 1)], T + MIN)).toHaveLength(1);
+    expect(w.silenceMinFor('bybit')).toBe(30);
+    expect(w.silenceMinFor('okx')).toBe(3);
+  });
+
+  it('a poller still gets two of its own cycles when that is longer than its venue threshold', () => {
+    const w = new Watchdog({ silenceMin: 3, silenceMinByVenue: { binance: 5 } });
+    const poller = (age: number) => stream({ id: 'binance-perp:oi-ls-5m', expectedIntervalSec: 300, lastMessageAgeSec: age });
+    expect(w.check([poller(550)], T)).toEqual([]);
+    expect(w.check([poller(601)], T + MIN)).toHaveLength(1);
+  });
+});
+
 describe('renderAlert', () => {
   it('says how long, against what threshold, and what the reader should do', () => {
     const text = renderAlert({ kind: 'silent', streamId: 'bybit:tickers', venue: 'bybit', seconds: 240 }, 3);

@@ -33,6 +33,12 @@ export interface WatchdogAlert {
 
 export interface WatchdogOptions {
   silenceMin: number;
+  /**
+   * IB-BUG-051: a venue's own threshold, overriding `silenceMin` for its streams. A liquidation stream's
+   * silence depends on how many coins it carries: bybit's is 35 subscribed coins, okx's and binance's the
+   * whole venue, so one flat 3 min reported bybit's ordinary quiet minutes as an incident (~100 a day).
+   */
+  silenceMinByVenue?: Readonly<Record<string, number>>;
   /** One alert per stream per this long while it stays silent. */
   repeatMs?: number;
 }
@@ -49,11 +55,13 @@ interface StreamMemory {
 
 export class Watchdog {
   private readonly memory = new Map<string, StreamMemory>();
-  private readonly silenceMs: number;
+  private readonly silenceMin: number;
+  private readonly byVenue: Readonly<Record<string, number>>;
   private readonly repeatMs: number;
 
   constructor(options: WatchdogOptions) {
-    this.silenceMs = options.silenceMin * 60_000;
+    this.silenceMin = options.silenceMin;
+    this.byVenue = options.silenceMinByVenue ?? {};
     this.repeatMs = options.repeatMs ?? DEFAULT_REPEAT_MS;
   }
 
@@ -101,7 +109,12 @@ export class Watchdog {
    */
   private thresholdFor(stream: StreamHealth): number {
     const cadenceMs = (stream.expectedIntervalSec ?? 0) * 1000 * MISSED_CYCLES;
-    return Math.max(this.silenceMs, cadenceMs);
+    return Math.max(this.silenceMinFor(stream.venue) * 60_000, cadenceMs);
+  }
+
+  /** The configured socket threshold for a venue, in minutes: its own entry, else the global. */
+  silenceMinFor(venue: string): number {
+    return Object.hasOwn(this.byVenue, venue) ? this.byVenue[venue] : this.silenceMin;
   }
 
   /** Streams currently in an alerted state (for the admin health page and specs). */

@@ -143,6 +143,7 @@ not a warning. The keys that matter here:
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_SERVICE_CHAT_ID` | none | supplied by the user; one test bot per slot, one production bot. Never committed |
 | `BINANCE_FUTURES_*`, `BINANCE_SPOT_REST_BASE_URL`, `BYBIT_WS_URL`, `OKX_WS_URL`, `OKX_REST_BASE_URL` | the public endpoints | overridable for a probe or a stand-in |
 | `WATCHDOG_SILENCE_MIN` | `3` | §6.2 |
+| `WATCHDOG_SILENCE_MIN_BY_VENUE` | `binance=5,bybit=45,okx=20` | IB-BUG-051: per-venue override of the above; an unknown venue or a zero fails the boot. Each default sits above the longest liquidation silence seen in **two days of live watchdog lines** (2026-11-07 Sat and 11-08 Sun, sha-86fb54dd: bybit 259 spells, max 39 min; okx 100, max 15; binance 1, 4 min) **plus 4.4 days of box tape** (2026-11-03 12:47 → 11-06: bybit max 28 min, binance max 2.9 min). Re-measure after a calmer or wilder week |
 
 **Never commit a `.env`**: it holds the slot's Telegram token and its `DATABASE_URL`.
 

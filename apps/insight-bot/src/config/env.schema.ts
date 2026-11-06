@@ -14,6 +14,26 @@ function booleanFlag(defaultValue: boolean) {
   }, z.boolean());
 }
 
+/** The venues whose streams the watchdog judges; a typo here would otherwise be silently ignored. */
+const WATCHDOG_VENUES = ['binance', 'bybit', 'okx'] as const;
+
+/**
+ * `binance=5,bybit=45` → `{ binance: 5, bybit: 45 }`; throws on a bad entry. The env keeps the raw string (so
+ * `.env.example` shows the schema default as written, test/env-example.spec.ts); the schema refuses a bad one at
+ * boot through this same function, and the watchdog service parses it here.
+ */
+export function parseSilenceByVenue(raw: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const part of raw.split(',').map((p) => p.trim()).filter((p) => p !== '')) {
+    const m = /^([a-z]+)=([1-9][0-9]*)$/u.exec(part);
+    if (!m || !(WATCHDOG_VENUES as readonly string[]).includes(m[1]) || Object.hasOwn(out, m[1])) {
+      throw new RangeError(`WATCHDOG_SILENCE_MIN_BY_VENUE: bad entry «${part}» (want ${WATCHDOG_VENUES.join('|')}=<minutes>, each venue once)`);
+    }
+    out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+
 export const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // AGENTS.md "Working in a worktree" — :3005 is the coordinator's slot; a dev slot overrides it
@@ -86,6 +106,21 @@ export const EnvSchema = z.object({
 
   // §6.2 — the watchdog alerts once when a stream has been silent for this many minutes.
   WATCHDOG_SILENCE_MIN: z.coerce.number().int().positive().default(3),
+  // IB-BUG-051: per-venue overrides, `venue=minutes` comma-separated; a venue not listed uses the global
+  // above. A liquidation stream's silence depends on what it carries (bybit: our 35 coins; okx and binance:
+  // the whole venue), and after IB-BUG-051 a dead route is caught by the socket's own 90 s liveness rule,
+  // so this only has to stay quiet in a quiet market. Measured, longest silence seen (minutes):
+  //   live watchdog spells, sha-86fb54dd, 2026-11-06 22:44 → 11-08 22:20 (47.6 h, two days):
+  //     bybit 259 spells, max 39 (3 over 30); okx 100 spells, max 15; binance 1 spell, 4
+  //   box tape 2026-11-03…06 (4 days): binance max 2.9; bybit max 28
+  // An unknown venue, a duplicate or a non-positive value fails the boot.
+  WATCHDOG_SILENCE_MIN_BY_VENUE: z.string().default('binance=5,bybit=45,okx=20').superRefine((raw, ctx) => {
+    try {
+      parseSilenceByVenue(raw);
+    } catch (error) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
+    }
+  }),
   // IB-094 (owner ruling 2026-11-03): the watchdog does NOT post to Telegram unless this is
   // explicitly true; when false it logs what it would have sent (WD-011 deleted the daily gap report). Detection and
   // storage are unchanged. The calendar notifier is not behind this switch (it shares only the sender).

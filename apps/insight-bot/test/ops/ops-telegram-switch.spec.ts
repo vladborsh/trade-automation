@@ -18,7 +18,8 @@ const T = Date.UTC(2026, 10, 3, 12, 0, 0);
 const MIN = 60_000;
 
 const configWith = (ops: unknown) =>
-  ({ env: { get: (k: string) => (k === 'OPS_TELEGRAM_ALERTS' ? ops : '3') } }) as never;
+  // '' = no per-venue override (IB-BUG-051), so every stream is judged by the global '3'
+  ({ env: { get: (k: string) => (k === 'OPS_TELEGRAM_ALERTS' ? ops : k === 'WATCHDOG_SILENCE_MIN_BY_VENUE' ? '' : '3') } }) as never;
 
 const spySender = () => {
   const sent: string[] = [];
