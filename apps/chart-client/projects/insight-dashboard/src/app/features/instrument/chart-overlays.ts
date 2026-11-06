@@ -1,5 +1,6 @@
 import type { IChartApi, Time } from 'lightweight-charts';
 import type { CalendarMark } from './calendar-marks';
+import { pinAfter, sameBadges } from './calendar-badge-key';
 import { flagFor } from './calendar-flags';
 import type { FocusView } from './focus-at';
 import { FocusMarker } from './focus-marker';
@@ -42,9 +43,18 @@ class CalendarBadges {
     container.appendChild(this.layer);
   }
 
+  /** IB-BUG-050: the buttons are built again only when the badges differ (`sameBadges`), never under a tap. */
   update(marks: readonly CalendarMark[]): void {
+    const rebuild = !sameBadges(this.marks, marks);
     this.marks = marks;
-    this.layer.replaceChildren(...marks.map((m) => this.badge(m)));
+    if (rebuild) {
+      this.layer.replaceChildren(...marks.map((m) => this.badge(m)));
+      const pin = pinAfter(this.pinned, marks);
+      if (pin !== this.pinned) {
+        this.pinned = pin;
+        this.onPick(null); // its mark is gone: the tooltip goes with it, and hover works again
+      }
+    }
     this.place();
   }
 

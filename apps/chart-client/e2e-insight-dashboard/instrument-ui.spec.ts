@@ -48,6 +48,8 @@ async function chartState(page: Page): Promise<{ panes: number; series: number; 
  * measures it in a second round trip: a replacement in between reads null (4 of 5 runs at ×8, on
  * master too), and under ×8 each round trip is slow enough that polling it ran out of time as well.
  * Found and measured in ONE page task, nothing can come in between, and no budget is needed.
+ * (Since IB-BUG-050 an answer with the same marks leaves the badge alone; the atomic read stays, as
+ * changed marks still rebuild it.)
  */
 async function boxOf(page: Page, selector: string): Promise<{ x: number; y: number; width: number; height: number }> {
   return page.evaluate((sel) => {
@@ -91,6 +93,34 @@ test.describe('instrument page — desktop (IB-099)', () => {
     await page.mouse.move(10, 10);
     await badge.hover();
     await expect(page.locator('.calendar-tooltip')).toContainText('Congressional Elections');
+  });
+
+  test('IB-BUG-050: a click whose press and release straddle a live-tail answer is still a click', async ({ page }) => {
+    await open(page);
+    const badge = page.locator('.calendar-badge');
+    const tooltip = page.locator('.calendar-tooltip');
+    await badge.click();
+    await expect(tooltip).toContainText('Congressional Elections'); // pinned
+    // Count the overlays' updates (every live-tail answer that extends the chart makes one), through
+    // Angular's dev-mode handle, on the class, so a re-created overlay is counted too.
+    await page.evaluate(() => {
+      const ng = (window as unknown as { ng: { getComponent(el: Element): unknown } }).ng;
+      const c = ng.getComponent(document.querySelector('app-instrument-chart')!) as { overlays: { update(...a: unknown[]): void } };
+      const proto = Object.getPrototypeOf(c.overlays) as { update(...a: unknown[]): void };
+      const original = proto.update;
+      const w = window as unknown as { ib050Updates: number };
+      w.ib050Updates = 0;
+      proto.update = function (this: unknown, ...a: unknown[]) { original.apply(this, a); w.ib050Updates++; };
+      document.querySelector('.calendar-badge')!.setAttribute('data-ib050', 'pressed');
+    });
+    const b = await boxOf(page, '.calendar-badge');
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.waitForFunction(() => (window as unknown as { ib050Updates: number }).ib050Updates > 0, undefined, { timeout: 20_000 });
+    await page.mouse.up(); // the pointer has not moved: the release lands on whatever is under it now
+    // the second click unpins: closed, and the pointer staying on the badge makes no new entry
+    await expect(tooltip).toHaveCount(0);
+    await expect(page.locator('.calendar-badge[data-ib050="pressed"]')).toHaveCount(1); // the badge pressed is the badge released
   });
 
   test('IB-105: the on-chart switch hides every legend and nothing else; same spot to show them; reload keeps it', async ({ page }) => {
@@ -157,6 +187,10 @@ test.describe('instrument page — desktop (IB-099)', () => {
   });
 
   test('item 3: full screen grows the SAME chart and gives the view back; the button and Esc both leave', async ({ page }) => {
+    // IB-BUG-050: the four width polls keep expect's default 5 s, no named budget. Timed on 2026-11-06,
+    // two occasions minutes apart: ×1, 3 runs, 27–235 ms each; CPU ×8, 6 runs, 53–1 202 ms (the
+    // entry to full screen is the slow one). The one ×8 timeout seen in IB-BUG-049 (1 of 3) did not
+    // recur in those 6 runs.
     await open(page);
     const canvas = page.locator('.chart-host canvas').first();
     await canvas.evaluate((el) => el.setAttribute('data-ib099', 'same'));
