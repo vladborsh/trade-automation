@@ -10,7 +10,8 @@ import { LiquidationMarkersPrimitive } from './liquidation-markers.primitive';
 import { divergenceStrokes, divergenceTf, OI_CONTRACTS_COLOUR, OI_CONTRACTS_SCALE } from './oi-divergence-lines';
 import type { PaneData } from './pane-data';
 import { paneIndexOf, type PanelDef } from './panels.model';
-import { LEVEL_COLOURS, LEVEL_LINES, levelSteps, previousDayLevels, previousWeekLevels } from './prior-levels';
+import { previousDayLevels, previousWeekLevels } from '@trade-automation/market-data-core';
+import { LEVEL_COLOURS, LEVEL_LINES, levelSteps } from './prior-levels';
 import {
   toCandleData, toCvdSegments, toFundingSteps, toLongShortLine, toOpenInterestPoints,
   toPredictedFunding, toTakerDelta,

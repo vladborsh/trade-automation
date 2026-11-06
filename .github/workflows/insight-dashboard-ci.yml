@@ -1,7 +1,7 @@
 # Insight dashboard CI — unit tests and a production build of the second Angular project in the
 # chart-client workspace (apps/chart-client/projects/insight-dashboard). The dashboard compiles
 # chart-client feature code through a path alias, so it needs every lib that code imports built
-# first: contracts, indicators, replay-core, calendar-core. The production build is the same
+# first: contracts, indicators, replay-core, calendar-core, market-data-core (IB-126: prior-levels). The production build is the same
 # command the insight-bot Dockerfile runs.
 name: insight-dashboard CI
 
@@ -48,7 +48,7 @@ jobs:
 
       - name: Build the libs the dashboard compiles against
         run: >-
-          npm run build -w libs/contracts -w libs/indicators -w libs/replay-core -w libs/calendar-core
+          npm run build -w libs/contracts -w libs/indicators -w libs/replay-core -w libs/calendar-core -w libs/market-data-core
 
       - name: Unit tests
         working-directory: apps/chart-client
