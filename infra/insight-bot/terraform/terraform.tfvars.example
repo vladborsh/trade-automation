@@ -4,6 +4,7 @@
 # S3 bucket names are globally unique — pick one with the account id or a suffix.
 backup_bucket_name = "vb-insight-bot-backups-apne1"   # the user's name; add a short suffix if taken
 budget_alert_email = ""                              # where the 18 USD alert goes; empty = no budget
+alarm_email        = ""                              # IB-150: where "the box is dead" goes (alarms.tf); empty = nobody is told
 
 # region                = "ap-northeast-1"
 # instance_type         = "t4g.small"

@@ -64,6 +64,20 @@ data "aws_iam_policy_document" "instance" {
     actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:GetObjectVersion", "s3:ListBucketVersions"]
     resources = [aws_s3_bucket.backups.arn, "${aws_s3_bucket.backups.arn}/*"]
   }
+
+  # IB-150 (proposal): the watchdog's dead-man heartbeat (alarms.tf). PutMetricData has no
+  # resource ARN for classic metrics, so "*" — fenced by the namespace: the box can write
+  # InsightBot/* and nothing else, never AWS/* nor another project's namespace.
+  statement {
+    sid       = "PutHeartbeat"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = [local.heartbeat_namespace]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "instance" {
