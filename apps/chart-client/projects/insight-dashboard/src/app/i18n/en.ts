@@ -463,6 +463,8 @@ export const en: Strings = {
   'insight.neutral': 'Nothing unusual',
   'insight.neutral.nothing_unusual': 'Nothing unusual over {period}',
   'insight.neutral.insufficient_history': 'Not enough history yet for conclusions',
+  // IB-BUG-048
+  'insight.neutral.not_rated_at_period': 'No conclusions over {period} by design: too few weekly windows to compare against; see 24h',
   'insight.neutral.unavailable': 'No {period} data yet — available from {date}',
   'insight.side.long': 'longs',
   'insight.side.short': 'shorts',

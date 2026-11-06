@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WEB_INSIGHT_KEYS, WEB_KPI_IDS, WEB_VENUE_NAMES } from '@trade-automation/contracts';
 import { en } from '../../../i18n/en';
 import { ru } from '../../../i18n/ru';
-import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, sourceNames, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedFixed, signedPct } from './market-text';
+import { basisView, conclusionView, fundingPct, insightView, kpiView, neutralLine, neutralSummary, sourceNames, wordInsight, parsePeriod, periodAvailability, restatesDelta, signedFixed, signedPct } from './market-text';
 
 /** IB-088 — the shell's text: periods, KPI tiles, insight cards. */
 describe('period', () => {
@@ -223,5 +223,42 @@ describe('IB-BUG-032: a basis line spells every venue as the credit line does, n
 
   it('the «could not read» list uses the same spelling', () => {
     expect(sourceNames(['deribit', 'defillama', 'coinbase', 'binance'], fill as never)).toBe('Deribit, DefiLlama, Coinbase, Binance');
+  });
+});
+
+/**
+ * IB-BUG-048 — the 7d page used to say «Пока мало истории для выводов» over a full history: the blocks' rules never rate
+ * at 7d by design, and they refused as if the history were short. Now a block says `not_rated_at_period`, and when
+ * every block with rules says so, «Главное сейчас» says that.
+ */
+describe('neutralSummary / neutralLine (IB-BUG-048)', () => {
+  type Reason = 'nothing_unusual' | 'insufficient_history' | 'not_rated_at_period' | 'no_rules' | 'source_unavailable';
+  const lines = (...reasons: Reason[]) => reasons.map((reason, i) => ({
+    block: (['liquidations', 'positioning', 'sentiment', 'flows', 'caps'] as const)[i],
+    statement: null,
+    neutral: { key: 'insight.neutral' as const, reason, basis: null, ...(reason === 'source_unavailable' ? { sources: ['binance' as const] } : {}) },
+  }));
+  const choose = (...r: Reason[]) => { const n = neutralSummary(lines(...r)); return neutralLine(null, n.history, n.down, n.notRated).key; };
+
+  it('every block with rules never rated at 7d (no_rules aside) → not_rated_at_period, never «мало истории»', () => {
+    expect(choose('not_rated_at_period', 'not_rated_at_period', 'not_rated_at_period', 'no_rules', 'no_rules')).toBe('insight.neutral.not_rated_at_period');
+  });
+
+  it('a block with a genuinely short history among them still says «мало истории»; one that looked says «ничего необычного»', () => {
+    expect(choose('not_rated_at_period', 'insufficient_history', 'not_rated_at_period')).toBe('insight.neutral.insufficient_history');
+    expect(choose('not_rated_at_period', 'nothing_unusual', 'not_rated_at_period')).toBe('insight.neutral.nothing_unusual');
+    expect(choose('insufficient_history', 'insufficient_history', 'no_rules')).toBe('insight.neutral.insufficient_history'); // 24h, short
+  });
+
+  it('an unavailable period and a source that did not answer still come first', () => {
+    expect(neutralLine('2026-11-10', true, [], true).key).toBe('insight.neutral.unavailable');
+    expect(choose('source_unavailable', 'source_unavailable')).toBe('insight.neutral.source_unavailable');
+  });
+
+  it('the text: honest in both languages, names the period, no «мало истории»', () => {
+    expect(ru['insight.neutral.not_rated_at_period']).toContain('{period}');
+    expect(ru['insight.neutral.not_rated_at_period']).not.toContain('мало истории');
+    expect(en['insight.neutral.not_rated_at_period']).toContain('{period}');
+    expect(en['insight.neutral.not_rated_at_period']).not.toMatch(/not enough history/i);
   });
 });

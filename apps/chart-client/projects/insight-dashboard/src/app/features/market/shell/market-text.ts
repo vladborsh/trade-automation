@@ -232,12 +232,32 @@ export function sourceNames(sources: readonly WebInsightSource[], t: (key: Strin
   return sources.map((src) => (src === 'tape' ? t('insight.source.tape') : venueName(src))).join(', ');
 }
 
+/**
+ * What the blocks' neutral lines add up to, for «Главное сейчас» (moved out of the component, IB-BUG-048):
+ * - `history`: no block found «nothing unusual» (the IB-BUG-022 rule, unchanged);
+ * - `down`: every block with rules could not look — the sources that did not answer (IB-BUG-028);
+ * - `notRated`: every block with rules never rates at this period (7d), IB-BUG-048.
+ */
+export function neutralSummary(lines: readonly WebInsightBlockLine[]): { history: boolean; down: WebInsightSource[]; notRated: boolean } {
+  const history = lines.length > 0 && lines.filter((l) => l.neutral).every((l) => l.neutral?.reason !== 'nothing_unusual');
+  const ruled = lines.filter((l) => l.neutral && l.neutral.reason !== 'no_rules');
+  const allDown = ruled.length > 0 && ruled.every((l) => l.neutral?.reason === 'source_unavailable');
+  const down = allDown ? [...new Set(ruled.flatMap((l) => l.neutral?.sources ?? []))] : [];
+  const notRated = ruled.length > 0 && ruled.every((l) => l.neutral?.reason === 'not_rated_at_period');
+  return { history, down, notRated };
+}
+
 export function neutralLine(
-  unavailableFromDay: string | null, history: boolean, down: readonly WebInsightSource[] = [],
-): { key: 'insight.neutral.unavailable' | 'insight.neutral.source_unavailable' | 'insight.neutral.insufficient_history' | 'insight.neutral.nothing_unusual'; date: string | null; basis: boolean; sources: WebInsightSource[] } {
+  unavailableFromDay: string | null, history: boolean, down: readonly WebInsightSource[] = [], notRated = false,
+): {
+  key: 'insight.neutral.unavailable' | 'insight.neutral.source_unavailable' | 'insight.neutral.not_rated_at_period' | 'insight.neutral.insufficient_history' | 'insight.neutral.nothing_unusual';
+  date: string | null; basis: boolean; sources: WebInsightSource[];
+} {
   if (unavailableFromDay !== null) return { key: 'insight.neutral.unavailable', date: unavailableFromDay, basis: false, sources: [] };
   // IB-BUG-028: nothing was said because nothing could be read — never «nothing unusual»
   if (down.length > 0) return { key: 'insight.neutral.source_unavailable', date: null, basis: false, sources: [...down] };
+  // IB-BUG-048: every block with rules never rates at this period (7d) — by design, not a thin history
+  if (notRated) return { key: 'insight.neutral.not_rated_at_period', date: null, basis: false, sources: [] };
   if (history) return { key: 'insight.neutral.insufficient_history', date: null, basis: true, sources: [] };
   return { key: 'insight.neutral.nothing_unusual', date: null, basis: true, sources: [] };
 }

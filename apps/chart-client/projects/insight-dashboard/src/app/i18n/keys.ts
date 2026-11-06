@@ -469,6 +469,8 @@ export type StringKey =
   | 'insight.neutral'
   | 'insight.neutral.nothing_unusual'
   | 'insight.neutral.insufficient_history'
+  // IB-BUG-048: the block's rules never rate at this period (7d)
+  | 'insight.neutral.not_rated_at_period'
   | 'insight.neutral.unavailable'
   | 'insight.side.long'
   | 'insight.side.short'

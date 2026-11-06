@@ -469,6 +469,8 @@ export const ru: Strings = {
   'insight.neutral': 'Ничего необычного',
   'insight.neutral.nothing_unusual': 'Ничего необычного за {period}',
   'insight.neutral.insufficient_history': 'Пока мало истории для выводов',
+  // IB-BUG-048
+  'insight.neutral.not_rated_at_period': 'За {period} выводов здесь нет по замыслу: недельных окон для сравнения слишком мало — смотрите 24ч',
   'insight.neutral.unavailable': 'За {period} данных пока нет — будут с {date}',
   'insight.side.long': 'лонгов',
   'insight.side.short': 'шортов',
