@@ -171,7 +171,6 @@ export class LevelAlertLoop {
       let state: LevelState | null = null;
       if (hasState(lv.kind)) {
         const row = states.get(stateKey(coin.symbol, lv.kind, lv.periodStartMs));
-        if (row && row.state.lastBarMs >= bar.openMs) continue; // seen (a restart re-reads from the cursor)
         if (row && row.state.lastBarMs === bar.openMs - BAR_MS) state = row.state;
         else if (!row && bar.openMs === lv.periodStartMs) state = freshState(lv.periodStartMs);
         else this.pending.add(coin.symbol);

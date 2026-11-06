@@ -195,11 +195,17 @@ describe('IB-126 level alert loop', () => {
       h.venue.closes.set(T + i * M, c);
       await h.bar(T + i * M);
     }
-    expect(events(h.store)).toEqual(['PWH:breakout_up', 'PWH:crossunder']);
+    // then a wick above with a close back below, coming from below: a sweep, whose details carry no first-beyond time
+    h.venue.bars.set(T + 5 * M, { open: 98, high: 100.6, low: 97.8, close: 99 });
+    await h.bar(T + 5 * M);
+    expect(events(h.store)).toEqual(['PWH:breakout_up', 'PWH:crossunder', 'PWH:sweep_above']);
     expect(h.store.alerts[1].details).toMatchObject({ firstBeyondAtMs: T + 2 * M });
+    expect(h.store.alerts[0].details).toMatchObject({ firstBeyondAtMs: null });
+    expect(h.store.alerts[2].details).toMatchObject({ firstBeyondAtMs: null });
     expect(h.sent.filter(([c]) => c === 7).map(([, t]) => t.split('\n')[0])).toEqual([
       'BTC: пробой PWH 100.00 — 15m закрылась на 101.00',
       'BTC: возврат под PWH 100.00 — 15m закрылась на 99.00; выше уровня закрывалась с 11 ноя 10:30 UTC',
+      'BTC: снятие ликвидности над PWH 100.00 — хвост до 100.60, закрытие 99.00',
     ]);
   });
 
@@ -214,8 +220,12 @@ describe('IB-126 level alert loop', () => {
     await h.bar(sun);
     h.venue.closes.set(utc(11, 16), 99);
     h.venue.closes.set(utc(11, 16) + M, 101);
-    await h.bar(utc(11, 16));
+    h.venue.calls = [];
+    const roll = await h.bar(utc(11, 16));
     await h.bar(utc(11, 16) + M);
+    // the new week's first bar starts its row fresh: no seed, no page read beyond limit 2
+    expect(roll).toMatchObject({ seeded: [], pendingSeed: 0 });
+    expect(h.venue.calls.filter((c) => c.what === '15m').map((c) => c.limit)).toEqual([2, 2]);
     expect(h.store.alerts.filter((a) => a.event === 'breakout_up' && (a.details as { kind: string }).kind === 'PWH').map((a) => a.dedupeKey)).toEqual([
       `level:BTCUSDT:PWH:${WEEK}:breakout_up`, `level:BTCUSDT:PWH:${utc(11, 16)}:breakout_up`,
     ]);
@@ -254,6 +264,18 @@ describe('IB-126 level alert loop', () => {
     expect(h.venue.calls[0]).toEqual({ what: '15m', from: later - (LEVEL_CATCHUP_BARS - 1) * M, limit: LEVEL_CATCHUP_BARS });
     expect(r?.seeded).toEqual(['BTCUSDT']);
     expect(h.store.row('PWH', WEEK)?.lastBarMs).toBe(later);
+  });
+
+  it('a seed whose pages lack the cursor bar still marks the row as at the cursor: the next close steps it, no second seed', async () => {
+    const h = harness();
+    const real = h.venue.bars15m.bind(h.venue);
+    // the seed's page (limit > 2) comes back without its last bar
+    h.venue.bars15m = async (s, from, limit) => (limit > 2 ? (await real(s, from, limit)).slice(0, -1) : real(s, from, limit));
+    await h.bar(T);
+    expect(h.store.row('PWH', WEEK)?.lastBarMs).toBe(T);
+    const r = await h.bar(T + M);
+    expect(r).toMatchObject({ seeded: [], pendingSeed: 0 });
+    expect(h.store.row('PWH', WEEK)?.lastBarMs).toBe(T + M);
   });
 
   it('an unseeded coin: no crossunder, breakouts still fire; seeding is one coin per tick', async () => {

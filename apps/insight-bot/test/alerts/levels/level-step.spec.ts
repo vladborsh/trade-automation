@@ -154,6 +154,9 @@ describe('P7 touch', () => {
     expect(touchOf(L, { high: 100, low: 99 }, 0.001)).toEqual({ from: 'below', distance: 0 });
     expect(touchOf(L, { high: 101, low: 100.05 }, 0.001)).toEqual({ from: 'above', distance: expect.closeTo(0.0005, 10) });
     expect(touchOf(L, { high: 99.8, low: 99 }, 0.001)).toBeNull(); // too far
+    // exactly at the band's edge is inside it, from either side (0.125 / 100 is exact in binary)
+    expect(touchOf(L, { high: 99.875, low: 99 }, 0.00125)).toEqual({ from: 'below', distance: 0.00125 });
+    expect(touchOf(L, { high: 101, low: 100.125 }, 0.00125)).toEqual({ from: 'above', distance: 0.00125 });
     expect(touchOf(L, { high: 100.01, low: 99.9 }, 0.001)).toBeNull(); // went beyond
   });
 });
