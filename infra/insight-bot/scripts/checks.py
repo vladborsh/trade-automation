@@ -642,7 +642,7 @@ def liq_evaluate(raw):
 # IB-125: ≥ 72 h after the funding history run's write, funding-backfill.sh --write reruns it with the SAME --until.
 # It writes 0 new rows (the once-keys hold; a different --until would move the 5-min grid, so it is never guessed)
 # and measures the path windows still open at the write (its last 72 h). --until is read from the write's own output
-# (the newest /root/ib125write-*.out whose FUNDING_HISTORY_JSON says mode write; no constant to edit, no manual step).
+# (the newest /root/ib125-write-*.out whose FUNDING_HISTORY_JSON says mode write; no constant to edit, no manual step).
 # Bands: 0 new rows; 0 failed and 0 open path windows; memory ≥ 100 MB. A killed run, a CLI exit ≠ 0, a missing
 # write or no summary line is FAIL (the owner hears); DEFERRED (the start gate refused 6 tries) and PASS are silent.
 
@@ -654,12 +654,12 @@ def funding_until():
     """The --until of the newest completed funding write: (until ISO, the file it came from)."""
     import glob
     import re
-    for path in sorted(glob.glob(os.path.join(FUNDING_RUN_DIR, 'ib125write-*.out')), reverse=True):  # names carry a UTC stamp
+    for path in sorted(glob.glob(os.path.join(FUNDING_RUN_DIR, 'ib125-write-*.out')), reverse=True):  # names carry a UTC stamp
         with open(path, encoding='utf-8') as f:
             m = re.search(r'^FUNDING_HISTORY_JSON (\{.*\})$', f.read(), re.M)
         if m and json.loads(m.group(1)).get('mode') == 'write':
             return json.loads(m.group(1))['until'], path
-    raise CheckFailed('no completed funding write in %s/ib125write-*.out: nothing to rerun' % FUNDING_RUN_DIR)
+    raise CheckFailed('no completed funding write in %s/ib125-write-*.out: nothing to rerun' % FUNDING_RUN_DIR)
 
 
 def funding_gather():

@@ -613,10 +613,10 @@ def out(new=(0, 0, 0), failed=0, left=0, rc_cli=0, js=True, killed=False):
             + ("KILLED for memory\n" if killed else "") + "== start gate: asked 140, the CLI applied 140\nfiles: /root/x.out /root/x.mem\n")
 '
 fixture fund-pass "$FUND
-d = {'started': 'x', 'until': '2026-11-06T22:00:00.000Z', 'until_from': '/root/ib125write-1.out', 'rc': 0, 'output': out()}"
+d = {'started': 'x', 'until': '2026-11-06T22:00:00.000Z', 'until_from': '/root/ib125-write-1.out', 'rc': 0, 'output': out()}"
 run funding-rerun fund-pass
 check 'funding-rerun a clean rerun → PASS, nothing sent, the .md names the --until and where it came from' \
-  '[ "$(verdict fund-pass funding-rerun)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "until 2026-11-06T22:00:00.000Z, read from /root/ib125write-1.out" $work/out-fund-pass/funding-rerun.md'
+  '[ "$(verdict fund-pass funding-rerun)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "until 2026-11-06T22:00:00.000Z, read from /root/ib125-write-1.out" $work/out-fund-pass/funding-rerun.md'
 fixture fund-new "$FUND
 d = {'rc': 0, 'output': out(new=(0, 1, 0))}"
 run funding-rerun fund-new
@@ -752,16 +752,23 @@ check 'liq-weekly → a crashed CLI is still FAIL and ONE Telegram' \
 
 # funding-rerun reads --until from the newest completed WRITE's output in the run dir; a dry run or a broken write is not one
 fwrite() { # $1 = case dir, $2 = stamp, $3 = mode, $4 = until
-  mkdir -p "$work/cr-$1"; printf '== CLI output (exit 0)\nFUNDING_HISTORY_JSON {"mode": "%s", "until": "%s"}\n' "$3" "$4" >"$work/cr-$1/ib125write-$2.out"
+  mkdir -p "$work/cr-$1"; printf '== CLI output (exit 0)\nFUNDING_HISTORY_JSON {"mode": "%s", "until": "%s"}\n' "$3" "$4" >"$work/cr-$1/ib125-write-$2.out"
 }
 fwrite fuok 20261106T220000Z write 2026-11-06T21:55:00.000Z
 fwrite fuok 20261107T010000Z write 2026-11-06T22:05:00.000Z
 fwrite fuok 20261107T020000Z dry-run 2026-11-06T23:00:00.000Z
-printf 'funding backfill failed: Error: boom\n' >"$work/cr-fuok/ib125write-20261107T030000Z.out"
+printf 'funding backfill failed: Error: boom\n' >"$work/cr-fuok/ib125-write-20261107T030000Z.out"
 check 'funding-rerun → funding-backfill.sh with the --until of the newest completed write (not a dry run, not a crash) → PASS' \
   'v=$(compose_run funding-rerun fuok ok x); [ "$v" = PASS ] && grep -q -- "funding-backfill.cli.js --write --until 2026-11-06T22:05:00.000Z\$" $work/cr-fuok.docker'
 check 'funding-rerun with no completed write on the box → FAIL before any docker exec, ONE Telegram' \
   '[ "$(compose_run funding-rerun funone ok x | cut -c1-5)" = FAIL: ] && [ ! -s $work/cr-funone.docker ] && [ "$(sent)" = 1 ] && grep -q "no completed funding write" $work/cr-funone/funding-rerun.md'
+# the file name is the RUNNER's, not this spec's: a real funding-backfill.sh --write (stub CLI) makes the file the
+# check must find (the first version globbed ib125write-*, a name only this spec's fixtures used; the box has ib125-write-*)
+mkdir -p "$work/cr-fureal"
+env PATH="$work/ohb-bin:$PATH" OHB_DOCKER_LOG="$work/fureal-write.docker" FAKE_CLI=ok RUN_DIR="$work/cr-fureal" MEMINFO="$work/ohb-meminfo" \
+  PID_TRIES=1 SAMPLE_S=0.1 bash "$FUNDR" --write --until 2026-11-06T02:14:39.290Z --start-floor 140 >/dev/null 2>&1
+check 'funding-rerun finds the write the REAL runner made (its own file name) and reruns its --until → PASS' \
+  'ls $work/cr-fureal/*.out >/dev/null 2>&1 && v=$(compose_run funding-rerun fureal ok x); [ "$v" = PASS ] && grep -q -- "funding-backfill.cli.js --write --until 2026-11-06T02:14:39.290Z\$" $work/cr-fureal.docker'
 fwrite fudef 20261106T220000Z write 2026-11-06T22:05:00.000Z
 check 'funding-rerun → refused on every try → DEFERRED, NO Telegram' \
   '[ "$(compose_run funding-rerun fudef refused x | cut -c1-9)" = DEFERRED: ] && [ "$(sent)" = 0 ]'
