@@ -45,6 +45,12 @@ function bars15m(from: number, to: number, closes: Map<number, number> = scenari
   return out;
 }
 
+/** Flat closes at 92; Monday 09:00 a wick down to 0.15 % above WO and MO (90); Tuesday 08:00 a high exactly at PDH 95. */
+function touchBars(): LevelBar[] {
+  return bars15m(utc(10, 31, 23, 45), utc(11, 12), new Map()).map((b) => (
+    b.openMs === utc(11, 9, 9) ? { ...b, low: 90 * 1.0015 } : b.openMs === utc(11, 10, 8) ? { ...b, high: 95 } : b));
+}
+
 const venue = (bars = bars15m(utc(10, 31, 23, 45), utc(11, 12)), daily = dailyCandles()) =>
   new HistoryLevelVenue(new Map([['BTCUSDT', bars]]), new Map([['BTCUSDT', daily]]));
 
@@ -129,6 +135,15 @@ describe('IB-127 replayLevels (the live loop, ticking once a minute)', () => {
     expect(second).toMatchObject({ alerts: 0, controls: 0 });
   });
 
+  it('the store keeps one P10 row per level: a new period\'s row deletes the older ones (as the repo, P10 rollover)', async () => {
+    const store = levelHistoryStore(new MemoryLevelJournal(), { params: LEVEL_DEFAULT_PARAMS, coins: COINS });
+    const row = (periodStartMs: number) => ({ kind: 'PWH' as const, periodStartMs, price: 100, state: { lastSide: null, firstBeyondAtMs: null, lastBarMs: periodStartMs } });
+    const commit = (periodStartMs: number) => store.commit({ source: 'backfill', build: 'dev', params: LEVEL_DEFAULT_PARAMS, confirmedAtMs: 0, symbol: 'BTCUSDT', states: [row(periodStartMs)], alerts: [] });
+    await commit(WEEK - 7 * DAY_MS);
+    await commit(WEEK);
+    expect([...(await store.states('backfill')).values()].map((r) => r.periodStartMs)).toEqual([WEEK]);
+  });
+
   it('never sends: the frozen settings say off, and markFired throws', async () => {
     const store = levelHistoryStore(new MemoryLevelJournal(), { params: LEVEL_DEFAULT_PARAMS, coins: COINS });
     expect((await store.settings()).enabled).toBe(false);
@@ -141,9 +156,22 @@ describe('IB-127 replayLevels (the live loop, ticking once a minute)', () => {
     const [half, one, two] = runs.map((r) => r.j);
     expect(names(half as MemoryLevelJournal)).toEqual(names(one as MemoryLevelJournal));
     expect(names(two as MemoryLevelJournal)).toEqual(names(one as MemoryLevelJournal));
-    const touches = runs.map((r) => levelTouchRows(r.j, ['BTCUSDT'], 1, 3)[0]?.touches ?? 0);
-    expect(touches[0]).toBeLessThanOrEqual(touches[1] as number);
-    expect(touches[1]).toBeLessThanOrEqual(touches[2] as number);
+  });
+
+  it('touches at the band: a wick 0.15 % above WO and MO (both 90) is a touch only at ×2; a PDH high exactly AT L is one at every band', async () => {
+    const touched = await Promise.all([0.5, 1, 2].map(async (k) => {
+      const { j } = await replay(WEEK, utc(11, 11), { bars: touchBars(), params: levelHistoryParams(['BTCUSDT'], k, true) });
+      return levelTouchRows(j, ['BTCUSDT'], k, 2)[0]?.byKind;
+    }));
+    expect(touched).toEqual([{ PDH: 1 }, { PDH: 1 }, { PDH: 1, WO: 1, MO: 1 }]);
+  });
+
+  it('PDH/PDL touches are dropped from what the shipped defaults journal (the cross-check\'s side)', async () => {
+    const on = await replay(WEEK, utc(11, 11), { bars: touchBars(), params: levelHistoryParams(['BTCUSDT'], 1, true) });
+    const off = await replay(WEEK, utc(11, 11), { bars: touchBars() });
+    expect(on.j.controls.filter((c) => c.kind === 'touch')).toHaveLength(1);
+    expect(levelShippedCounts(on.j)).toEqual(levelShippedCounts(off.j));
+    expect(levelShippedCounts(on.j).controls_touch).toBeUndefined();
   });
 
   it('both ends must be on the 15m grid', async () => {
@@ -169,9 +197,9 @@ describe('IB-127 fetchClosed', () => {
     const asked: Array<[number, number]> = [];
     const page = async (start: number, limit: number): Promise<WebCandle[]> => {
       asked.push([start, limit]);
-      // the venue skips one bar and repeats the page's first
+      // the venue skips one bar (and the first page's LAST bar) and repeats the page's first
       const out: WebCandle[] = [];
-      for (let i = 0; i < limit; i++) if (i !== 5) out.push({ time: (start + i * BAR_MS) / 1000, open: 1, high: 1, low: 1, close: 1, volume: 1 });
+      for (let i = 0; i < limit; i++) if (i !== 5 && !(start === 0 && i === limit - 1)) out.push({ time: (start + i * BAR_MS) / 1000, open: 1, high: 1, low: 1, close: 1, volume: 1 });
       return [out[0] as WebCandle, ...out];
     };
     const weights: number[] = [];
@@ -179,7 +207,7 @@ describe('IB-127 fetchClosed', () => {
     expect(asked).toEqual([[0, 1500], [1500 * BAR_MS, 1500], [3000 * BAR_MS, 200]]);
     expect(weights).toEqual([10, 10, 2]);
     expect(r).toMatchObject({ calls: 3, weight: 22 });
-    expect(r.candles).toHaveLength(3_200 - 3);
+    expect(r.candles).toHaveLength(3_200 - 4);
   });
 
   it('seedFrom: the bar before the month start of the replay\'s first bar', () => {
