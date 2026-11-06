@@ -315,7 +315,7 @@ counts = [["alerts", "54"], ["controls", "2424"], ["near_misses", "88"], ["paths
 after = [["alerts", "54"], ["controls", "2424"], ["near_misses", "88"], ["paths", "7698"], ["paths_open", "0"]]
 out = ("start 20261107T220500Z mode --write\n== CLI output (exit 0)\n"
        "paths: measured 314, failed 0, weight 790, 1500 s; left 0 (the last window closes -)\n"
-       "== memory over 1500 samples\nmin MemAvailable 150 MB; max bot RSS 120 MB; max CLI RSS 90 MB\nfiles: /root/x.out /root/x.mem\n")
+       "== memory over 1500 samples\nmin MemAvailable 150 MB; max bot RSS 120 MB; max CLI RSS 90 MB\n== start gate: asked 140, the CLI applied 140\nfiles: /root/x.out /root/x.mem\n")
 d = {"started": "2026-11-07T22:05:00Z", "before": counts, "after": after, "rc": 0, "output": out}
 '
 fixture bf-pass "$BF"
@@ -359,7 +359,7 @@ out = ("start 20261111T003000Z mode --write\n== CLI output (exit 0)\n"
        "write ×1: 4851 ticks over (…]; new rows: alerts 0, continuations 0, controls 0; 24739 reads, at most 2074 prints held\n"
        "paths: measured 120, failed 0, weight 600, 180 s; left 0\n"
        "LIQ_HISTORY_JSON " + json.dumps(summary) + "\n"
-       "== memory over 900 samples\nmin MemAvailable 140 MB; max bot RSS 120 MB; max CLI RSS 100 MB\nfiles: /root/x.out /root/x.mem\n")
+       "== memory over 900 samples\nmin MemAvailable 140 MB; max bot RSS 120 MB; max CLI RSS 100 MB\n== start gate: asked 140, the CLI applied 140\nfiles: /root/x.out /root/x.mem\n")
 d = {"started": "2026-11-11T00:30:00Z", "counts_to": "2026-11-11T00:00:00Z", "rc": 0, "output": out}
 '
 fixture liq-pass "$LIQ"
@@ -471,14 +471,29 @@ echo "$*" >>"$OHB_DOCKER_LOG"
 case "$1" in
   inspect) case "$3" in *Pid*) echo 999999 ;; *) echo 'ecr/insight-bot:sha-9c0bb1fe8b8a' ;; esac ;;
   cp) touch "$3" ;;
+  compose) printf 'alerts\t54\ncontrols\t2424\nnear_misses\t88\npaths\t7698\npaths_open\t0\n' ;;   # checks.py psql (backfill-rerun)
   exec)
     case "$*" in
       *hidden-guard.cli.js*) echo '| 15m | … | **PASS** |'; exit 0 ;;
     esac
-    case "$FAKE_CLI" in
-      refused) echo 'oi backfill failed: Error: memory gate: refused — MemAvailable 139 MB < 140 MB — not starting the replay; run it at a quieter hour'; exit 1 ;;
-      crash) echo 'oi backfill failed: Error: connect ECONNREFUSED'; exit 1 ;;
-      *) echo 'oi backfill dry-run: build 9c0bb1fe8b8a'; echo 'done in 3 s'; exit 0 ;;
+    # IB-145: the CLI as the image would run it — its gate is MEM_START_FLOOR_MB when passed (-e), else 170;
+    # FAKE_CLI=old plays an image from before 95366a24, which ignores the env and does not name its floor
+    all="$*"; floor=170; case "$all" in *MEM_START_FLOOR_MB=*) floor="${all#*MEM_START_FLOOR_MB=}"; floor="${floor%% *}" ;; esac
+    who=oi; case "$*" in *liq-backfill.cli.js*) who=liq ;; esac
+    n=0; [ -n "${FAKE_COUNT:-}" ] && { n=$(( $(cat "$FAKE_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$n" >"$FAKE_COUNT"; }
+    cli="$FAKE_CLI"; [ -n "${FAKE_OK_FROM:-}" ] && [ "$n" -ge "$FAKE_OK_FROM" ] && cli=ok
+    case "$cli" in
+      refused) echo "$who backfill failed: Error: memory gate: refused — MemAvailable 139 MB < $floor MB — not starting the replay; run it at a quieter hour"; exit 1 ;;
+      old-refused) echo "$who backfill failed: Error: memory gate: MemAvailable 150 MB < 170 MB — not starting the replay; run it at a quieter hour"; exit 1 ;;
+      badenv) echo "$who backfill failed: Error: MEM_START_FLOOR_MB=$floor: a whole number of MB, at least the pause floor 120"; exit 1 ;;
+      crash) echo "$who backfill failed: Error: connect ECONNREFUSED"; exit 1 ;;
+      old) echo "memory gate: 258 MB available — starting the replay"; echo 'done in 3 s'; exit 0 ;;
+      *) sleep "${FAKE_SLEEP:-0}"  # composition cases: a run long enough for the runner's sampler to take one sample
+         echo "$who backfill: build 9c0bb1fe8b8a"; echo "memory gate: 258 MB available (start gate $floor MB) — starting the replay"
+         echo "memory gate: 240 MB available (start gate $floor MB) — starting path measuring"
+         [ "$who" = liq ] && { echo 'write ×1: 4851 ticks over (…]; new rows: alerts 0, continuations 0, controls 0, events 0; 24739 reads'
+           echo 'LIQ_HISTORY_JSON {"mode": "write", "from": "2026-11-04T00:00:00.000Z", "until": "2026-11-05T16:59:34.379Z", "countsTo": "2026-11-11T00:00:00.000Z", "days": 7, "written": {}, "table": []}'; }
+         echo 'paths: measured 314, failed 0, weight 790, 1500 s; left 0'; echo 'done in 3 s'; exit 0 ;;
     esac ;;
 esac
 STUB
@@ -519,5 +534,169 @@ check 'oi-hidden: the window is there (200 MB ≥ 200) → the run starts and PA
 cw="$(sed -n 's/.*case "\$verdict" in \(.*\) esac.*/\1/p' "$HERE/check-wait.sh")"
 check 'check-wait.sh: DEFERRED:* exits 3 (not 4, which means «the owner already has a FAIL message»)' \
   '[ "$(verdict=DEFERRED:x; eval "case \"\$verdict\" in $cw esac" 2>/dev/null; echo $?)" = 3 ] || (verdict=DEFERRED:x; (eval "case \"\$verdict\" in $cw esac"); [ $? = 3 ])'
+
+# ----------------------------------------------------------------- the start floor, all three runners (IB-145)
+# box-backfill.sh and liq-backfill.sh take --start-floor N (history-gate.sh: 140–500), pass it as docker exec -e, report
+# which gate the CLI applied, and turn a gate refusal into «DEFERRED:…», exit 3. The same stub docker plays the CLI.
+BOX="$HERE/box-backfill.sh"; LIQR="$HERE/liq-backfill.sh"
+hr() { # $1 = case, $2 = FAKE_CLI, then the command → $work/hr-<case>.{stdout,rc,docker}
+  local c="$1" cli="$2"; shift 2
+  mkdir -p "$work/hr-$c"
+  env PATH="$work/ohb-bin:$PATH" OHB_DOCKER_LOG="$work/hr-$c.docker" FAKE_CLI="$cli" RUN_DIR="$work/hr-$c" \
+    MEMINFO="$work/ohb-meminfo" PID_TRIES=1 SAMPLE_S=0.1 "$@" >"$work/hr-$c.stdout" 2>&1 || rc=$?
+  echo "${rc:-0}" >"$work/hr-$c.rc"; unset rc
+}
+last() { tail -1 "$work/hr-$1.stdout"; }
+rc_of() { cat "$work/hr-$1.rc"; }
+for r in box liq; do
+  if [ $r = box ]; then S="$BOX"; A=(--write); else S="$LIQR"; A=(--write --until 2026-11-05T16:59:34.379Z --counts-to 2026-11-11T00:00:00Z); fi
+  hr $r-140 ok bash "$S" "${A[@]}" --start-floor 140
+  check "$r: --start-floor 140 → docker exec -e MEM_START_FLOOR_MB=140, the CLI applied 140, exit 0" \
+    "grep -q '^exec -e MEM_START_FLOOR_MB=140 insight-bot-insight-bot-1 node' $work/hr-$r-140.docker && grep -qx '== start gate: asked 140, the CLI applied 140' $work/hr-$r-140.stdout && [ \$(rc_of $r-140) = 0 ]"
+  hr $r-def ok bash "$S" "${A[@]}"
+  check "$r: no flag → no -e, the CLI's default 170 (asked default)" \
+    "! grep -q MEM_START_FLOOR_MB $work/hr-$r-def.docker && grep -qx '== start gate: asked default, the CLI applied 170' $work/hr-$r-def.stdout"
+  hr $r-ref refused bash "$S" "${A[@]}" --start-floor 140
+  check "$r: the gate refused → last line DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), exit 3" \
+    "[ \"\$(last $r-ref)\" = 'DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)' ] && [ \$(rc_of $r-ref) = 3 ]"
+  hr $r-old old-refused bash "$S" "${A[@]}" --start-floor 140
+  check "$r: an old image refused at its 170 → DEFERRED too, and the report says it applied 170, not 140" \
+    "[ \"\$(last $r-old)\" = 'DEFERRED:memory gate refused (MemAvailable 150 MB < 170 MB)' ] && grep -qx '== start gate: asked 140, the CLI applied 170' $work/hr-$r-old.stdout"
+  hr $r-crash crash bash "$S" "${A[@]}" --start-floor 140
+  check "$r: a crash is NOT a deferral (no DEFERRED line, the CLI's exit 1 for checks.py's FAIL)" \
+    "! grep -q '^DEFERRED' $work/hr-$r-crash.stdout && grep -q '^== CLI output (exit 1)' $work/hr-$r-crash.stdout && [ \$(rc_of $r-crash) != 3 ]"
+  hr $r-badenv badenv bash "$S" "${A[@]}" --start-floor 140
+  check "$r: the CLI refusing the env VALUE is NOT a deferral" "! grep -q '^DEFERRED' $work/hr-$r-badenv.stdout"
+  for n in 139 501 abc 1.5 ''; do
+    hr $r-bad bash bash "$S" "${A[@]}" --start-floor "$n"
+    check "$r: --start-floor '$n' → exit 2, the CLI never started" "[ \$(rc_of $r-bad) = 2 ] && ! grep -q '^exec' $work/hr-$r-bad.docker 2>/dev/null"
+  done
+  hr $r-500 ok bash "$S" "${A[@]}" --start-floor 500
+  check "$r: --start-floor 500 (the top) is accepted" "grep -q 'MEM_START_FLOOR_MB=500' $work/hr-$r-500.docker"
+done
+check 'liq: --start-floor reaches the env, never the CLI argv; --until / --counts-to do' \
+  "! grep -q -- '--start-floor' $work/hr-liq-140.docker && grep -q -- 'liq-backfill.cli.js --write --until 2026-11-05T16:59:34.379Z --counts-to 2026-11-11T00:00:00Z\$' $work/hr-liq-140.docker"
+check 'box: the flag goes after the mode only; anything else → usage, exit 2' \
+  "hr box-junk ok bash '$BOX' --write --bogus; [ \$(rc_of box-junk) = 2 ]"
+hr box-oldok old bash "$BOX" --write --start-floor 140
+check 'box: an image that ignores the env and ran → «applied old image» (checks.py FLAGs it)' \
+  "grep -qx '== start gate: asked 140, the CLI applied old image' $work/hr-box-oldok.stdout"
+ohb flag ok bash "$OHB" --dry-run --start-floor 150
+check 'oi-hidden: --start-floor 150 → -e MEM_START_FLOOR_MB=150; the .md says the CLI applied 150' \
+  'grep -q "^exec -e MEM_START_FLOOR_MB=150 " $work/ohb-flag.docker && grep -qx "== start gate: asked 150, the CLI applied 150" $work/ohb-flag/oi-hidden-dry-run.md'
+ohb flagwins ok env MEM_START_FLOOR_MB=200 bash "$OHB" --dry-run --start-floor 150
+check 'oi-hidden: the flag wins over env MEM_START_FLOOR_MB' 'grep -q "MEM_START_FLOOR_MB=150 " $work/ohb-flagwins.docker && ! grep -q "MEM_START_FLOOR_MB=200" $work/ohb-flagwins.docker'
+ohb env90 ok env MEM_START_FLOOR_MB=90 bash "$OHB" --dry-run
+check 'oi-hidden: env MEM_START_FLOOR_MB=90 → exit 2 before any docker call' '[ "$(cat $work/ohb-env90.rc)" = 2 ] && [ ! -s $work/ohb-env90.docker ]'
+ohb flag139 ok bash "$OHB" --dry-run --start-floor 139
+check 'oi-hidden: --start-floor 139 → exit 2 (below 140 only by a TL ruling, as a commit)' '[ "$(cat $work/ohb-flag139.rc)" = 2 ] && [ ! -s $work/ohb-flag139.docker ]'
+
+# ------------------------------------------------- checks.py: DEFERRED, the floor it asks, the retries (IB-145)
+fixture bf-deferred "$BF
+d['rc'] = 3; d['tries'] = 6
+d['output'] = 'start x\n== CLI output (exit 1)\noi backfill failed: Error: memory gate: refused — MemAvailable 139 MB < 140 MB\n== start gate: asked 140, the CLI applied 140\nDEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)\n'"
+run backfill-rerun bf-deferred
+check 'backfill-rerun refused on all 6 tries → DEFERRED:…, 6 of 6 tries; exit 0; NO Telegram; the .md says how to reschedule' \
+  '[ "$(verdict bf-deferred backfill-rerun)" = "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), 6 of 6 tries" ] && [ "$(cat $work/bf-deferred.rc)" = 0 ] && [ "$(sent)" = 0 ] && grep -q "Did not start" $work/out-bf-deferred/backfill-rerun.md && grep -q "checks.py schedule backfill-rerun" $work/out-bf-deferred/backfill-rerun.md'
+fixture bf-def-old "$BF
+d['rc'] = 3
+d['output'] = '== CLI output (exit 1)\n== start gate: asked 140, the CLI applied 170\nDEFERRED:memory gate refused (MemAvailable 150 MB < 170 MB)\n'"
+run backfill-rerun bf-def-old
+check 'backfill-rerun deferred under an image that ignored the floor → the verdict names it' \
+  'verdict bf-def-old backfill-rerun | grep -q "the image ignored the floor: asked 140, applied 170"'
+fixture bf-rc3 "$BF
+d['rc'] = 3"
+run backfill-rerun bf-rc3
+check 'backfill-rerun exit 3 with no DEFERRED line → FAIL (an exit code alone is not a deferral)' '[ "$(verdict bf-rc3 backfill-rerun)" = "FAIL:box-backfill.sh exit 3, CLI exit 0" ] && [ "$(sent)" = 1 ]'
+fixture bf-line1 "$BF
+d['rc'] = 1
+d['output'] = '== CLI output (exit 1)\n== start gate: asked 140, the CLI applied 140\nDEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)\n'"
+run backfill-rerun bf-line1
+check 'backfill-rerun a DEFERRED line but exit 1 → FAIL (the line alone is not a deferral), one Telegram' '[ "$(verdict bf-line1 backfill-rerun)" = "FAIL:box-backfill.sh exit 1, CLI exit 1" ] && [ "$(sent)" = 1 ]'
+fixture bf-ignored "$BF
+d['output'] = out.replace('the CLI applied 140', 'the CLI applied old image')"
+run backfill-rerun bf-ignored
+check 'backfill-rerun an image that ignored the floor → FLAG:start_floor_ignored (silent)' '[ "$(verdict bf-ignored backfill-rerun)" = FLAG:start_floor_ignored ] && [ "$(sent)" = 0 ]'
+fixture bf-nogate "$BF
+d['output'] = out.replace('== start gate: asked 140, the CLI applied 140\n', '')"
+run backfill-rerun bf-nogate
+check 'backfill-rerun output without «== start gate:» (an old runner) → FAIL' '[ "$(verdict bf-nogate backfill-rerun)" = "FAIL:box-backfill.sh output has no «== start gate:» line" ]'
+fixture liq-deferred "$LIQ
+d['rc'] = 3; d['tries'] = 6
+d['output'] = '== CLI output (exit 1)\n== start gate: asked 140, the CLI applied 140\nDEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)\n'"
+run liq-weekly liq-deferred
+check 'liq-weekly refused on all tries → DEFERRED, NO Telegram' '[ "$(verdict liq-deferred liq-weekly | cut -c1-9)" = DEFERRED: ] && [ "$(sent)" = 0 ]'
+fixture liq-ignored "$LIQ
+d['output'] = out.replace('the CLI applied 140', 'the CLI applied 170')"
+run liq-weekly liq-ignored
+check 'liq-weekly the CLI applied 170 when 140 was asked → FLAG:start_floor_ignored' '[ "$(verdict liq-ignored liq-weekly)" = FLAG:start_floor_ignored ]'
+
+# the retry loop and the backup window: checks.py imported, a stub runner, a fake clock and sleep
+cat >"$work/stub-runner.sh" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$STUB_RUNNER_LOG"
+n=$(( $(wc -l <"$STUB_RUNNER_LOG") ))
+if [ "$n" -lt "${OK_FROM:-999}" ]; then echo "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)"; exit 3; fi
+[ -n "${CRASH:-}" ] && { echo crash; exit 1; }
+echo "ran"; exit 0
+STUB
+pyc() { python3 -I - "$CHECKS" "$work" "$@" <<'PY'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location('c', sys.argv[1]); c = importlib.util.module_from_spec(spec); spec.loader.exec_module(c)
+work, case = sys.argv[2], sys.argv[3]
+log = os.path.join(work, 'runner-%s.log' % case); os.environ['STUB_RUNNER_LOG'] = log
+open(log, 'w').close()
+slept = []
+noon = 1793966400.0  # 2026-11-07T12:00:00Z
+if case == 'third':
+    os.environ['OK_FROM'] = '3'
+    r = c.history_run(os.path.join(work, 'stub-runner.sh'), ['--write'], sleep=slept.append, now=lambda: noon)
+    args = open(log).read().splitlines()
+    assert (r['rc'], r['tries'], slept) == (0, 3, [1800, 1800]), (r, slept)
+    assert args == ['--write --start-floor 140'] * 3, args
+elif case == 'never':
+    r = c.history_run(os.path.join(work, 'stub-runner.sh'), ['--write'], sleep=slept.append, now=lambda: noon)
+    assert (r['rc'], r['tries'], len(slept)) == (3, 6, 5), (r, slept)
+elif case == 'crash':
+    os.environ['OK_FROM'] = '1'; os.environ['CRASH'] = '1'
+    r = c.history_run(os.path.join(work, 'stub-runner.sh'), ['--write'], sleep=slept.append, now=lambda: noon)
+    assert (r['rc'], r['tries'], slept) == (1, 1, []), (r, slept)
+elif case == 'window':
+    day = 1793923200  # 2026-11-07T00:00:00Z
+    got = [c.backup_quiet_wait(day + s) for s in (54 * 60 + 59, 55 * 60, 3600, 89 * 60 + 59, 90 * 60, 22 * 3600 + 300)]
+    assert got == [0, 35 * 60, 30 * 60, 1, 0, 0], got
+    os.environ['OK_FROM'] = '1'
+    r = c.history_run(os.path.join(work, 'stub-runner.sh'), ['--write'], sleep=slept.append, now=lambda: day + 3600 + 20)
+    assert slept == [30 * 60 - 20] and r['waits'] and r['rc'] == 0, (slept, r)
+print('ok')
+PY
+}
+check 'history_run: refused twice then started → 3 tries, 30 min apart, every try asks --start-floor 140' '[ "$(pyc third | tail -1)" = ok ]'
+check 'history_run: refused on every try → 6 tries (5 waits), rc 3' '[ "$(pyc never | tail -1)" = ok ]'
+check 'history_run: a crash is not retried' '[ "$(pyc crash | tail -1)" = ok ]'
+check 'history_run: no try starts 00:55–01:30 UTC (the pg_dump); 00:54:59 and 01:30:00 start at once' '[ "$(pyc window | tail -1)" = ok ]'
+check 'the backup window follows the backup timer: insight-bot-backup.timer is 01:00:00 UTC, checks.py BACKUP_UTC_S = 3600' \
+  "grep -qx 'OnCalendar=\*-\*-\* 01:00:00 UTC' '$HERE/../systemd/insight-bot-backup.timer' && grep -q '^BACKUP_UTC_S = 3600 ' '$CHECKS'"
+
+# composition: checks.py → the REAL runner → the stub CLI (no CHECKS_FAKE_INPUT); a fake clock at noon UTC
+compose_run() { # $1 = check, $2 = case, $3 = FAKE_CLI, $4 = runner, then extra env
+  local name="$1" c="$2" cli="$3" runner="$4"; shift 4
+  mkdir -p "$work/cr-$c"; : >"$work/curl-stdin"
+  env PATH="$work/ohb-bin:$work/bin:$PATH" OHB_DOCKER_LOG="$work/cr-$c.docker" FAKE_CLI="$cli" RUN_DIR="$work/cr-$c" \
+    MEMINFO="$work/ohb-meminfo" PID_TRIES=1 SAMPLE_S=0.1 CHECKS_DIR="$work/cr-$c" DEPLOY_DIR="$work/cr-$c" WATCH_ENV_FILE="$work/env" \
+    STUB_CURL_ARGS="$work/curl-args" STUB_CURL_STDIN="$work/curl-stdin" CHECKS_DEFER_WAIT_S=0 CHECKS_FAKE_NOW=1793966400 FAKE_SLEEP=1.2 \
+    CHECKS_BACKFILL_SCRIPT="$BOX" CHECKS_LIQ_SCRIPT="$LIQR" "$@" python3 -I "$CHECKS" run "$name" >"$work/cr-$c.stdout" 2>&1 || true
+  cat "$work/cr-$c/$name.done" 2>/dev/null
+}
+check 'backfill-rerun → box-backfill.sh, gate refused on every try → DEFERRED, 6 docker execs, NO Telegram' \
+  '[ "$(compose_run backfill-rerun bfr refused x)" = "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), 6 of 6 tries" ] && [ "$(grep -c "^exec -e MEM_START_FLOOR_MB=140 " $work/cr-bfr.docker)" = 6 ] && [ "$(sent)" = 0 ]'
+check 'backfill-rerun → box-backfill.sh, refused twice then ran → PASS, 3 execs at 140' \
+  '[ "$(compose_run backfill-rerun bfok refused x FAKE_COUNT=$work/cr-bfok.n FAKE_OK_FROM=3)" = PASS ] && [ "$(grep -c "^exec -e MEM_START_FLOOR_MB=140 " $work/cr-bfok.docker)" = 3 ]'
+check 'liq-weekly → liq-backfill.sh, refused on every try → DEFERRED, NO Telegram' \
+  '[ "$(compose_run liq-weekly lqr refused x | cut -c1-9)" = DEFERRED: ] && [ "$(sent)" = 0 ]'
+check 'liq-weekly → liq-backfill.sh, started at 140 → PASS, the .md names the gate it applied' \
+  'v=$(compose_run liq-weekly lqok ok x); [ "$v" = PASS ] && grep -q "start gate: asked 140 MB, the CLI applied 140" $work/cr-lqok/liq-weekly.md'
+check 'liq-weekly → a crashed CLI is still FAIL and ONE Telegram' \
+  '[ "$(compose_run liq-weekly lqc crash x | cut -c1-5)" = FAIL: ] && [ "$(sent)" = 1 ]'
 
 if [ "$fail" = 0 ]; then echo "checks.test.sh: all passed"; else echo "checks.test.sh: FAILURES"; exit 1; fi

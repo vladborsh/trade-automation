@@ -2,7 +2,7 @@
 # IB-144 (design V45, V47) — the OI hidden-divergence history run on the box, with IB-116's memory guard around it,
 # as a unit that writes a sentinel (no agent waits by hand: check-wait.sh polls it).
 #
-#   oi-hidden-backfill.sh --dry-run|--write          (on the box, as root; run it as a systemd unit:)
+#   oi-hidden-backfill.sh --dry-run|--write [--start-floor N]    (on the box, as root; run it as a systemd unit:)
 #   systemd-run --unit ib144-dry-run --collect /opt/insight-bot/oi-hidden-backfill.sh --dry-run
 #   systemd-run --unit ib144-write --collect /opt/insight-bot/oi-hidden-backfill.sh --write
 #   (a rerun for the pairs still without a hidden-aware live control: --on-calendar '<UTC time>' on the same command)
@@ -18,12 +18,24 @@
 #   Telegram, checks.py's path).
 #
 # Env (TL ruling 2026-11-06, tl-ruling-history-runs-memory-2026-11-06.md):
-#   MEM_START_FLOOR_MB=140   the CLI's start gate for THIS run (passed into the container; default 170 there)
+#   MEM_START_FLOOR_MB=140   the CLI's start gate for THIS run (passed into the container; default 170 there);
+#                            IB-145: the same as --start-floor 140 (the flag wins), validated by history-gate.sh
 #   WAIT_FOR_MB=<n> WAIT_UNTIL=<epoch s>   wait (every 30 s) for host MemAvailable ≥ n before starting; none by
 #                                          WAIT_UNTIL → DEFERRED
 set -u
+. "$(dirname "$0")/history-gate.sh" || { echo "history-gate.sh is missing next to $0"; exit 2; }
+USAGE="usage: $0 --dry-run|--write [--start-floor N]"
 MODE="${1:-}"
-[ "$MODE" = "--dry-run" ] || [ "$MODE" = "--write" ] || { echo "usage: $0 --dry-run|--write"; exit 2; }
+[ "$MODE" = "--dry-run" ] || [ "$MODE" = "--write" ] || { echo "$USAGE"; exit 2; }
+shift
+FLOOR="${MEM_START_FLOOR_MB:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --start-floor) FLOOR="${2:-}"; [ -n "$FLOOR" ] || { echo "$USAGE"; exit 2; }; shift 2 ;;
+    *) echo "$USAGE"; exit 2 ;;
+  esac
+done
+if [ -n "$FLOOR" ]; then gate_floor "$FLOOR" || exit 2; fi
 NAME="oi-hidden${MODE#-}"   # oi-hidden-dry-run | oi-hidden-write
 DIR="${CHECKS_DIR:-/var/log/insight-checks}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/insight-bot}"
@@ -64,7 +76,6 @@ fi
 
 BOTPID=$(docker inspect -f '{{.State.Pid}}' $B) || { finish "FAIL:the bot container is not running"; exit 2; }
 SHA=$(docker inspect -f '{{.Config.Image}}' $B)
-GATE_ENV=(); [ -n "${MEM_START_FLOOR_MB:-}" ] && GATE_ENV=(-e "MEM_START_FLOOR_MB=$MEM_START_FLOOR_MB")
 
 docker exec ${GATE_ENV[@]+"${GATE_ENV[@]}"} $B node --max-old-space-size=40 --max-semi-space-size=1 --optimize-for-size "$CLI" "$MODE" --kinds hidden --dump "$IN_DUMP" > "$OUT" 2>&1 &
 EXEC=$!
@@ -98,11 +109,12 @@ docker cp "$B:$IN_DUMP" "$DIR/$NAME.jsonl" >/dev/null 2>&1 || true
   echo "## Memory over $(grep -c avail= "$MEM") samples"
   awk -F'[ =]' '/avail=/{a=$3; b=$5; c=$7; if (mina==""||a<mina) mina=a; if (b!="?" && b>maxb) maxb=b; if (c!="?" && c>maxc) maxc=c} END {print "min MemAvailable " mina " MB; max bot RSS " maxb " MB; max CLI RSS " maxc " MB"}' "$MEM"
   [ -n "$killed" ] && echo "KILLED for memory"
+  gate_report "$OUT"
 } > "$MD"
 if [ -n "$killed" ]; then finish "FAIL:killed for memory (MemAvailable < 100 MB)"; exit 1; fi
-if [ "$rc" -ne 0 ] && grep -q '^oi backfill failed: Error: memory gate: refused' "$OUT"; then
+if [ "$rc" -ne 0 ] && why=$(gate_refused "$OUT"); then
   # the CLI's start gate: nothing started, nothing is broken — a deferral, never the owner's Telegram (TL 2026-11-06)
-  finish "DEFERRED:memory gate refused ($(grep -o 'MemAvailable [0-9]* MB < [0-9]* MB' "$OUT" | head -1))"; exit 3
+  finish "DEFERRED:memory gate refused ($why)"; exit 3
 fi
 if [ "$rc" -ne 0 ]; then finish "FAIL:CLI exit $rc"; exit 1; fi
 if [ "$MODE" = "--dry-run" ]; then

@@ -9,8 +9,10 @@
 # Every check writes /var/log/insight-checks/<name>.json and .md (atomically), then the sentinel
 # <name>.done holding one line: the verdict. The dev's waiter (check-wait.sh) polls for the sentinel.
 #
-# Verdict: PASS | FLAG:<reason>[,<reason>…] | FAIL:<why>
+# Verdict: PASS | FLAG:<reason>[,<reason>…] | DEFERRED:<why> | FAIL:<why>
 #   PASS / FLAG — the check ran; FLAG names figures outside their band (a finding, for the TL to read).
+#   DEFERRED    — a history run did not START: the CLI's memory start gate refused on every try (IB-145). Nothing
+#                 is broken and nothing was written; no Telegram. Reschedule it at a quieter hour.
 #   FAIL        — the check itself broke (a query failed, an input was missing). Only FAIL reaches the
 #                 owner's Telegram (IB-139's path, operator chat); PASS and FLAG never do.
 #
@@ -47,6 +49,10 @@ def say(msg):
 
 class CheckFailed(Exception):
     """The check could not measure: its verdict is FAIL, and the owner hears about it."""
+
+
+class CheckDeferred(Exception):
+    """A history run did not start (its memory start gate refused): DEFERRED, no Telegram — nothing is broken."""
 
 
 def sh(args, timeout=120, cwd=None):
@@ -432,13 +438,85 @@ def first_hidden_evaluate(raw):
     return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the alert itself'], 'measured': m, 'done': True}
 
 
+# ----------------------------------------------------------------------------- history runs (IB-145)
+# backfill-rerun and liq-weekly start a history CLI on the box through its runner (box-backfill.sh, liq-backfill.sh).
+# The CLI refuses to START below its start gate (memory-guard.ts; default 170 MB, measured after its ~66 MB load);
+# the runner then prints «DEFERRED:memory gate refused (…)» and exits 3. Here:
+# - every run asks for HISTORY_START_FLOOR_MB (140; never below without a TL ruling — history-gate.sh refuses it).
+#   Why 140, not 170: sar 11-04/11-05, 10-min samples, host MemAvailable at rest ≥ 236 MB (what 170 needs) in 29/142
+#   and 87/143 samples, ≥ 206 MB (what 140 needs) in 128/142 and 133/143; at 22:xx on 11-05 (the rerun's hour)
+#   152–239 MB. The 120 MB pause, the 5-min abort and the 100 MB kill are unchanged, and tonight's two runs at 140
+#   had sampler minima 201 and 170 MB;
+# - a refusal is retried every DEFER_WAIT_S, DEFER_TRIES tries in all (2 h 30 min of retrying); still refused →
+#   DEFERRED. No try STARTS inside the nightly pg_dump's window (insight-bot-backup.timer, 01:00 UTC; it takes
+#   < 1 min): from BACKUP_QUIET[0] to BACKUP_QUIET[1] s after 00:00 UTC a try waits for the window's end (TL ruling
+#   2026-11-06: never during a pg_dump);
+# - the runner's «== start gate: asked N, the CLI applied M» line: M ≠ N means the image ignored the env (deployed
+#   before 95366a24) → FLAG:start_floor_ignored.
+
+HISTORY_START_FLOOR_MB = int(os.environ.get('CHECKS_START_FLOOR_MB', '140'))
+DEFER_TRIES = int(os.environ.get('CHECKS_DEFER_TRIES', '6'))
+DEFER_WAIT_S = int(os.environ.get('CHECKS_DEFER_WAIT_S', '1800'))
+BACKUP_UTC_S = 3600                                # insight-bot-backup.timer OnCalendar 01:00:00 UTC (checks.test.sh pins it)
+BACKUP_QUIET = (BACKUP_UTC_S - 5 * 60, BACKUP_UTC_S + 30 * 60)   # 00:55–01:30 UTC
+
+
+def backup_quiet_wait(now):
+    """Seconds a try starting at `now` must wait to leave the backup's window (0 outside it)."""
+    tod = now % 86400
+    return BACKUP_QUIET[1] - tod if BACKUP_QUIET[0] <= tod < BACKUP_QUIET[1] else 0
+
+
+def history_now():
+    """The clock for the backup window; CHECKS_FAKE_NOW (epoch s) pins it for checks.test.sh, which must not depend on
+    the hour it runs at."""
+    fake = os.environ.get('CHECKS_FAKE_NOW')
+    return float(fake) if fake else time.time()
+
+
+def history_run(script, args, timeout=4 * 3600, sleep=time.sleep, now=history_now):
+    """Runs a history runner with the start floor; retries a refusal (exit 3). → {rc, output, tries, waits}."""
+    waits = []
+    for t in range(1, DEFER_TRIES + 1):
+        w = backup_quiet_wait(now())
+        if w:
+            waits.append('try %d waited %d s for the pg_dump window (00:55–01:30 UTC)' % (t, w))
+            sleep(w)
+        try:
+            p = subprocess.run(['bash', script] + args + ['--start-floor', str(HISTORY_START_FLOOR_MB)],
+                               capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise CheckFailed('%s %s ran over %d h' % (script, args[0], timeout // 3600))
+        out = p.stdout + p.stderr
+        if p.returncode != 3 or t == DEFER_TRIES:
+            return {'rc': p.returncode, 'output': out, 'tries': t, 'waits': waits}
+        say('%s try %d of %d deferred (%s); next in %d s' % (os.path.basename(script), t, DEFER_TRIES, out.strip().splitlines()[-1][:120] if out.strip() else '?', DEFER_WAIT_S))
+        sleep(DEFER_WAIT_S)
+
+
+def history_deferred_or_gate(flags, rows, raw, script_name):
+    """Raises CheckDeferred on a refusal on every try; else the start-gate row (FLAG when the image ignored the floor)."""
+    import re
+    out = raw['output']
+    gate = re.search(r'^== start gate: asked (\S+), the CLI applied (.+)$', out, re.M)
+    d = re.search(r'^DEFERRED:(.+)$', out, re.M)
+    if raw['rc'] == 3 and d:
+        ignored = ' — the image ignored the floor: asked %s, applied %s' % (gate.group(1), gate.group(2)) if gate and gate.group(2) != gate.group(1) else ''
+        raise CheckDeferred('%s, %s of %s tries%s' % (d.group(1), raw.get('tries', 1), DEFER_TRIES, ignored))
+    if not gate:
+        raise CheckFailed('%s output has no «== start gate:» line' % script_name)
+    honoured = gate.group(1) == 'default' or gate.group(2) in (gate.group(1), 'none (no gate reached)')
+    rows.append(band(flags, 'start_floor_ignored', 0 if honoured else 1, 0, 0))
+    return 'start gate: asked %s MB, the CLI applied %s; %s tries' % (gate.group(1), gate.group(2), raw.get('tries', 1))
+
+
 # ---------------------------------------------------------------------------------------- backfill-rerun
-# IB-116's rerun after 2026-11-07 22:00 UTC: /root/box-backfill.sh --write measures the windows that were
+# IB-116's rerun after 2026-11-07 22:00 UTC: box-backfill.sh --write measures the windows that were
 # open at the first run (314) and writes no new subject (the once-keys hold). The script carries its own
 # 1 s sampler and kills the CLI below 100 MB MemAvailable. Bands: 0 new rows; measured 157–628 (2× of 314);
 # 0 failed; 0 left open; weight 400–1 600 (≈ 800). A killed or failed run is FAIL.
 
-BACKFILL_SCRIPT = os.environ.get('CHECKS_BACKFILL_SCRIPT', '/root/box-backfill.sh')
+BACKFILL_SCRIPT = os.environ.get('CHECKS_BACKFILL_SCRIPT', os.path.join(DEPLOY_DIR, 'box-backfill.sh'))  # IB-145: synced, was /root
 BACKFILL_OPEN = 314
 BACKFILL_COUNTS = ("select 'alerts', count(*) from oi_divergence_alerts where source = 'backfill' union all"
                    " select 'controls', count(*) from oi_divergence_controls where source = 'backfill' union all"
@@ -455,11 +533,8 @@ def backfill_gather():
     if not os.path.exists(BACKFILL_SCRIPT):
         raise CheckFailed('%s is missing' % BACKFILL_SCRIPT)
     raw = {'started': utc(time.time()), 'before': psql(BACKFILL_COUNTS)}
-    try:
-        p = subprocess.run(['bash', BACKFILL_SCRIPT, '--write'], capture_output=True, text=True, timeout=4 * 3600)
-    except subprocess.TimeoutExpired:
-        raise CheckFailed('%s --write ran over 4 h' % BACKFILL_SCRIPT)
-    raw['rc'], raw['output'] = p.returncode, (p.stdout + p.stderr)[-6000:]
+    run = history_run(BACKFILL_SCRIPT, ['--write'])
+    raw.update(run, output=run['output'][-6000:])
     raw['after'] = psql(BACKFILL_COUNTS)
     return raw
 
@@ -469,6 +544,8 @@ def backfill_evaluate(raw):
     out = raw['output']
     if 'KILLED for memory' in out:
         raise CheckFailed('the CLI was killed: MemAvailable < 100 MB (box-backfill.sh sampler)')
+    flags, rows = [], []
+    gate_note = history_deferred_or_gate(flags, rows, raw, 'box-backfill.sh')
     cli = re.search(r'== CLI output \(exit (\d+)\)', out)
     if raw['rc'] != 0 or not cli or cli.group(1) != '0':
         raise CheckFailed('box-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
@@ -478,7 +555,6 @@ def backfill_evaluate(raw):
     if not paths or not mem:
         raise CheckFailed('box-backfill.sh output has no «paths: measured …» or «min MemAvailable» line')
     before, after = dict((r[0], int(r[1])) for r in raw['before']), dict((r[0], int(r[1])) for r in raw['after'])
-    flags, rows = [], []
     new_rows = sum(after[k] - before[k] for k in ('alerts', 'controls', 'near_misses', 'paths'))
     rows.append(band(flags, 'new_rows', new_rows, 0, 0))
     rows.append(band(flags, 'paths_measured', int(paths.group(1)), BACKFILL_OPEN // 2, BACKFILL_OPEN * 2))
@@ -486,7 +562,7 @@ def backfill_evaluate(raw):
     rows.append(band(flags, 'paths_left_open', after['paths_open'], 0, 0))
     rows.append(band(flags, 'path_weight', int(paths.group(3)), 400, 1600))
     rows.append(band(flags, 'min_mem_available_mb', int(mem.group(1)), 100, 10 ** 6))
-    return {'flags': flags, 'rows': rows, 'notes': ['CLI «left» line: %s' % (left.group(1) if left else '—')],
+    return {'flags': flags, 'rows': rows, 'notes': ['CLI «left» line: %s' % (left.group(1) if left else '—'), gate_note] + raw.get('waits', []),
             'measured': {'before': before, 'after': after, 'tail': out[-1500:]}}
 
 
@@ -507,12 +583,8 @@ def liq_gather():
         raise CheckFailed('%s is missing' % LIQ_SCRIPT)
     now = time.time()
     raw = {'started': utc(now), 'counts_to': utc(now // 86400 * 86400)}
-    try:
-        p = subprocess.run(['bash', LIQ_SCRIPT, '--write', '--until', LIQ_UNTIL, '--counts-to', raw['counts_to']],
-                           capture_output=True, text=True, timeout=4 * 3600)
-    except subprocess.TimeoutExpired:
-        raise CheckFailed('%s --write ran over 4 h' % LIQ_SCRIPT)
-    raw['rc'], raw['output'] = p.returncode, (p.stdout + p.stderr)[-20000:]
+    run = history_run(LIQ_SCRIPT, ['--write', '--until', LIQ_UNTIL, '--counts-to', raw['counts_to']])
+    raw.update(run, output=run['output'][-20000:])
     return raw
 
 
@@ -537,6 +609,8 @@ def liq_evaluate(raw):
     out = raw['output']
     if 'KILLED for memory' in out:
         raise CheckFailed('the CLI was killed: MemAvailable < 100 MB (liq-backfill.sh sampler)')
+    flags, rows = [], []
+    gate_note = history_deferred_or_gate(flags, rows, raw, 'liq-backfill.sh')
     cli = re.search(r'== CLI output \(exit (\d+)\)', out)
     if raw['rc'] != 0 or not cli or cli.group(1) != '0':
         raise CheckFailed('liq-backfill.sh exit %s, CLI exit %s' % (raw['rc'], cli.group(1) if cli else '?'))
@@ -548,7 +622,6 @@ def liq_evaluate(raw):
     if not js or not new or not paths or not mem:
         raise CheckFailed('liq-backfill.sh output lacks a LIQ_HISTORY_JSON, «write ×1», «paths:» or «min MemAvailable» line')
     summary = json.loads(js.group(1))
-    flags, rows = [], []
     rows.append(band(flags, 'new_rows', sum(int(x) for x in new.groups() if x is not None), 0, 0))
     rows.append(band(flags, 'days_counted', summary['days'], 6.9, 10 ** 6))
     rows.append(band(flags, 'paths_failed', int(paths.group(2)), 0, 0))
@@ -558,7 +631,7 @@ def liq_evaluate(raw):
              'written rows (source = backfill) stop at %s, where the live journal starts; live and backfill are never pooled (V32)' % summary['until'],
              'TRX: Binance only until 2026-11-05 17:34 UTC (L5); Bybit and OKX after',
              'path weight this run: %s (measured %s windows)' % (paths.group(3), paths.group(1)),
-             'no hit rate: «worked» and the baseline are not defined yet (design §1 C5)']
+             'no hit rate: «worked» and the baseline are not defined yet (design §1 C5)', gate_note] + raw.get('waits', [])
     return {'flags': flags, 'rows': rows, 'notes': notes, 'md': liq_md_table(summary['table'], summary['days']),
             'measured': {'summary': summary, 'paths': {'measured': int(paths.group(1)), 'failed': int(paths.group(2)), 'weight': int(paths.group(3)), 'left': int(paths.group(4))},
                          'min_mem_available_mb': int(mem.group(1)), 'tail': out[-1500:]}}
@@ -731,6 +804,9 @@ def markdown(doc):
          'Ran %s → %s UTC on the box (`%s`).' % (doc['started'], doc['finished'], doc['unit']), '']
     if doc.get('error'):
         L += ['**The check broke:** %s' % doc['error'], '']
+    if doc.get('deferred'):
+        L += ['**Did not start** (the memory start gate refused on every try; nothing broke, nothing was written, no Telegram): %s' % doc['deferred'],
+              '', 'Reschedule it at a quieter hour: `checks.py schedule %s \'<UTC time>\'` (RUNBOOK §9b).' % doc['check'], '']
     res = doc.get('result') or {}
     if res.get('rows'):
         L += ['| figure | value | band | |', '|---|---|---|---|']
@@ -762,6 +838,8 @@ def run_check(name, dry_run):
         res = evaluate(raw)
         doc['result'] = res
         doc['verdict'] = 'PENDING' if res.get('pending') else ('FLAG:' + ','.join(res['flags'])) if res['flags'] else 'PASS'
+    except CheckDeferred as e:  # did not start: a verdict of its own, never the owner's Telegram (IB-145)
+        doc['verdict'], doc['deferred'] = 'DEFERRED:' + str(e)[:160], str(e)
     except CheckFailed as e:
         doc['error'] = str(e)
     except Exception as e:  # a bug in the check is a broken check: FAIL, and the owner hears
