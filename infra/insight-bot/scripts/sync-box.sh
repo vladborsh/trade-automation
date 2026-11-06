@@ -31,10 +31,13 @@ case "$INSTANCE" in i-*) ;; *) echo "sync-box.sh: no running insight-bot instanc
 FILES=(
   "compose/docker-compose.yml:/opt/insight-bot/docker-compose.yml:0644"
   "compose/Caddyfile:/opt/insight-bot/Caddyfile:0644"
+  "compose/logging-awslogs.yml:/opt/insight-bot/logging-awslogs.yml:0644"
+  "scripts/log-secret-scan.py:/opt/insight-bot/log-secret-scan.py:0755"
   "scripts/render-env.sh:/opt/insight-bot/render-env.sh:0755"
   "scripts/deploy.sh:/opt/insight-bot/deploy.sh:0755"
   "scripts/deploy-watch.py:/opt/insight-bot/deploy-watch.py:0755"
   "scripts/checks.py:/opt/insight-bot/checks.py:0755"
+  "scripts/watchdog.py:/opt/insight-bot/watchdog.py:0755"
   "scripts/backup.sh:/opt/insight-bot/backup.sh:0755"
   "scripts/restore.sh:/opt/insight-bot/restore.sh:0755"
   "scripts/liq-backfill.sh:/opt/insight-bot/liq-backfill.sh:0755"
@@ -45,6 +48,8 @@ FILES=(
   "scripts/history-gate.sh:/opt/insight-bot/history-gate.sh:0644"
   "systemd/insight-bot-backup.service:/etc/systemd/system/insight-bot-backup.service:0644"
   "systemd/insight-bot-backup.timer:/etc/systemd/system/insight-bot-backup.timer:0644"
+  "systemd/insight-watchdog.service:/etc/systemd/system/insight-watchdog.service:0644"
+  "systemd/insight-watchdog.timer:/etc/systemd/system/insight-watchdog.timer:0644"
 )
 
 # SSM caps one command at 97 KB (parameters + document), and the files together are past it (IB-140's

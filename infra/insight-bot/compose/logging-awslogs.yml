@@ -1,0 +1,38 @@
+# IB-149 — log shipping to CloudWatch Logs, OFF until switched on. sync-box.sh stages this file as
+# /opt/insight-bot/logging-awslogs.yml, which compose ignores. Switching it on (RUNBOOK §13) copies it to
+# /opt/insight-bot/docker-compose.override.yml, which `docker compose` merges by itself, then `docker compose up -d`
+# recreates the three containers. Off again = remove the override and `up -d`. Only after the secret scan
+# (scripts/log-secret-scan.py) has counted 0 over a day of the box's logs.
+#
+# The docker awslogs driver, not the CloudWatch agent: dockerd ships the lines itself, so no extra process runs on a
+# 1 GB box. `docker logs` keeps working through the engine's dual-logging cache (Docker ≥ 20.10), which deploy-watch.py,
+# checks.py and watchdog.py read. non-blocking + a 4 MB buffer: a CloudWatch outage drops lines, it never stalls the bot.
+# The groups and their retention are IB-150's (tofu); the box role has CreateLogStream + PutLogEvents only.
+x-awslogs: &awslogs
+  driver: awslogs
+  options: &opts
+    awslogs-region: ap-northeast-1
+    awslogs-create-group: 'false'
+    awslogs-stream: '{{.Name}}'
+    mode: non-blocking
+    max-buffer-size: 4m
+
+services:
+  insight-bot:
+    logging:
+      <<: *awslogs
+      options:
+        <<: *opts
+        awslogs-group: /insight-bot/bot
+  postgres:
+    logging:
+      <<: *awslogs
+      options:
+        <<: *opts
+        awslogs-group: /insight-bot/postgres
+  caddy:
+    logging:
+      <<: *awslogs
+      options:
+        <<: *opts
+        awslogs-group: /insight-bot/caddy

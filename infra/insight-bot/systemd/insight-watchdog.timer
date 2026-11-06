@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish the insight-bot box metrics every 5 min (IB-149)
+
+[Timer]
+# 30 s past each 5-minute mark: off the minute the bot's own loops tick on. 5 min, not 1: the alarms (IB-150) use
+# 5-minute periods, and each tick runs the aws CLI on a 1 GB box.
+OnCalendar=*:0/5:30
+AccuracySec=1s
+Unit=insight-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=insight-bot metric publisher, one tick: PutMetricData into CloudWatch InsightBot (IB-149; scripts/watchdog.py)
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=AWS_REGION=ap-northeast-1
+ExecStart=/usr/bin/python3 -I /opt/insight-bot/watchdog.py publish
+# The publisher exits 0 on every failure (it must never affect the bot); a hung probe is cut here.
+TimeoutStartSec=120
+# Below the bot and postgres when memory is short: the box sits at 170–240 MB available.
+OOMScoreAdjust=500
+Nice=10
+StandardOutput=journal
+StandardError=journal
