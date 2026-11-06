@@ -6,7 +6,7 @@ import {
   WebLiquidationsResponseSchema, WebLoginEventsResponseSchema, WebLongShortResponseSchema, WebMarketCardsResponseSchema, WebMeResponseSchema,
   WebMembersResponseSchema, WebOpenInterestResponseSchema, WebPositioningResponseSchema, WebStreamsResponseSchema, WebTopLiquidationSchema,
   WebUniverseSummaryResponseSchema, WebUniverseTopResponseSchema, WebLiqAlertsAdminResponseSchema, WebFundingAlertsAdminResponseSchema, WebLevelAlertsAdminResponseSchema,
-  WebAlertMarksResponseSchema, WebCustomLevelsResponseSchema, WebChartCustomLevelsResponseSchema,
+  WebAlertMarksResponseSchema, WebCustomLevelsResponseSchema, WebChartCustomLevelsResponseSchema, WEB_LIQUIDATION_VENUES,
 } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -28,8 +28,21 @@ const FIXTURES_DIR = join(process.cwd(), 'e2e-insight-dashboard', 'fixtures');
 /** `/series/liquidations/top` has a row schema but no response schema; this is the client's declared type (insight-api.client.ts). */
 const TopLiquidationsResponseSchema = z.object({ symbol: z.string(), rows: z.array(WebTopLiquidationSchema) });
 
+/**
+ * IB-153: the box tape's raw prints behind the instrument e2e's liquidation profile — not a response (the
+ * profile's request carries the chart's view, so the e2e folds these with the contract's own functions).
+ * Each print is [ms, price, side, venue, usd], the shape `groupRows` takes.
+ */
+const LiqProfilePrintsSchema = z.object({
+  recordedAt: z.string(),
+  source: z.string(),
+  note: z.string(),
+  prints: z.array(z.tuple([z.number().int().positive(), z.number().positive(), z.enum(['long', 'short']), z.enum(WEB_LIQUIDATION_VENUES), z.number().nonnegative()])).min(1),
+});
+
 /** One file, one response. */
 const SINGLE: Record<string, z.ZodTypeAny> = {
+  'liq-profile-prints-btcusdt.json': LiqProfilePrintsSchema,
   'admin-alerts.synthetic.json': WebAlertsAdminResponseSchema,
   // IB-122: slot dev-3's LiqAlertsAdmin answer (2026-11-05)
   'admin-alerts-liq.json': WebLiqAlertsAdminResponseSchema,

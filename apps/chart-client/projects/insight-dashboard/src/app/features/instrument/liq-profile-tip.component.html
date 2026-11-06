@@ -1,0 +1,7 @@
+@if (store?.hover(); as h) {
+  @if (store?.answer(); as answer) {
+    <div class="liq-profile-tip" role="tooltip" data-liq-profile-tip [style.left.px]="h.x" [style.top.px]="h.y">
+      <app-liq-profile-detail [answer]="answer" [detail]="h.detail" />
+    </div>
+  }
+}

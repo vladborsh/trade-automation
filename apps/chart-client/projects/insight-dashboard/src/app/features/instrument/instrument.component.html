@@ -59,29 +59,7 @@
     />
   </div>
   @if (panes()) {
-    <h2 class="table-title">{{ t('instrument.topTitle') }}</h2>
-    <table class="top">
-      <thead>
-        <!-- §11 English-by-rule: field names in a table of raw data, which a reader matches
-             against the venue's own data and our logs. Allow-listed in no-literals.spec.ts. -->
-        <tr><th>time ({{ null | time: 'zone' }})</th><th>venue</th><th>side</th><th class="num">price</th><th class="num">qty</th><th class="num">notional</th></tr>
-      </thead>
-      <tbody>
-        @for (row of top(); track row.time + row.venue + row.notional) {
-          <tr>
-            <td>{{ row.time | time }}</td>
-            <td>{{ row.venue }}</td>
-            <td [class.long]="row.side === 'long'" [class.short]="row.side === 'short'">
-              {{ row.side }}
-            </td>
-            <td class="num">{{ row.price | amount }}</td>
-            <td class="num">{{ row.qty | amount }}</td>
-            <td class="num">{{ row.notional | number: '1.0-0' }}</td>
-          </tr>
-        } @empty {
-          <tr><td colspan="6" class="muted">{{ t('instrument.noLiquidations') }}</td></tr>
-        }
-      </tbody>
-    </table>
+    <!-- IB-153: the liquidation profile's panel, where the «50 largest» table was -->
+    <app-liq-profile-panel [symbol]="symbol()" />
   }
 </section>

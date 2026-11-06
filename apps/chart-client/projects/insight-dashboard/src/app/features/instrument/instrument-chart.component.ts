@@ -24,6 +24,9 @@ import { focusLabelKey, type FocusView } from './focus-at';
 import { ChartOverlays } from './chart-overlays';
 import { FocusMarker } from './focus-marker';
 import { futureSlots } from './future-bars';
+import { attachProfile } from './liq-profile.primitive';
+import { LiqProfileStore } from './liq-profile.store';
+import { LiqProfileTipComponent } from './liq-profile-tip.component';
 
 export type { PaneData } from './pane-data';
 
@@ -66,7 +69,7 @@ export type { PaneData } from './pane-data';
 @Component({
   selector: 'app-instrument-chart',
   standalone: true,
-  imports: [LoaderComponent, CalendarTooltipComponent],
+  imports: [LoaderComponent, CalendarTooltipComponent, LiqProfileTipComponent],
   templateUrl: './instrument-chart.component.html',
   styleUrl: './instrument-chart.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -96,6 +99,8 @@ export class InstrumentChartComponent implements OnDestroy {
   private observer: ResizeObserver | null = null;
   private frame = 0;
   private readonly store = browserStore();
+  /** IB-153: the liquidation profile, provided by the page; absent (no strip) where the chart is used alone. */
+  private readonly profile = inject(LiqProfileStore, { optional: true });
 
   readonly heights = signal<PaneHeights>(loadPaneHeights(this.store));
   /** Dragging a pane's lower edge, and «reset heights» (`pane-drag.ts`). */
@@ -120,7 +125,8 @@ export class InstrumentChartComponent implements OnDestroy {
   /** IB-099: a calendar badge hovered or tapped — it wins over the crosshair until unpinned. */
   readonly badge = signal<{ time: number; x: number } | null>(null);
   readonly tipAt = computed(() => this.badge() ?? this.hover());
-  readonly hoverMark = computed(() => markAt(this.marks(), this.tipAt()?.time ?? null));
+  /** IB-153: not while the pointer reads a liquidation-profile band (its own tooltip); a pinned badge still wins. */
+  readonly hoverMark = computed(() => markAt(this.marks(), this.badge() || !this.profile?.hover() ? this.tipAt()?.time ?? null : null));
 
   /** IB-039: built from the venues the DATA came from, never from the filter the page sent. */
   readonly scopeLabel = (venues: readonly string[], undercounted: boolean): string =>
@@ -156,6 +162,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const current = this.chart;
     if (current && (data.extendsPrevious || data.extendsLater)) {
       keepView(current, data, () => (this.renderers = redrawPanels(current, data, this.renderers, PANELS.map((p) => p.key))));
+      attachProfile(this.renderers.price, this.profile, this.symbol(), data);
       this.overlays?.update(this.marks());
       return this.axis?.refresh(futureSlots(data));
     }
@@ -166,6 +173,7 @@ export class InstrumentChartComponent implements OnDestroy {
     const chart = createChart(host, instrumentChartOptions(host.clientWidth, this.chartHeight()));
     this.chart = chart;
     for (const panel of PANELS) drawPanel(panel.key, chart, data, this.renderers);
+    attachProfile(this.renderers.price, this.profile, this.symbol(), data);
     for (const pane of chart.panes()) pane.priceScale('right').applyOptions(PANEL_PRICE_SCALE);
     this.applyHeights();
     const focus = this.focus()?.timeframe === data.timeframe ? this.focus() : null;

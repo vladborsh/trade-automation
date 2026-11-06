@@ -1,0 +1,60 @@
+<section class="liq-profile" data-liq-profile>
+  <header class="head">
+    <h2 class="title">{{ t('instrument.profile.title') }}</h2>
+    <span class="legend long">{{ t('instrument.profile.legendLongs') }}</span>
+    <span class="legend short">{{ t('instrument.profile.legendShorts') }}</span>
+    @if (window(); as w) {
+      <span class="window">{{ t('instrument.profile.window', { from: w.from, to: w.to }) }}</span>
+    }
+  </header>
+  <p class="help">{{ t('instrument.profile.help') }}</p>
+  @if (store.failed()) {
+    <p class="note">{{ t('instrument.profile.failed') }}</p>
+  } @else if (answer(); as a) {
+    @if (missing(); as venues) {
+      <p class="missing" data-liq-profile-missing>{{ t('instrument.profile.missing', { venues }) }}</p>
+    }
+    @if (a.bands.length === 0 && !outside()) {
+      <p class="note">{{ t('instrument.profile.empty') }}</p>
+    } @else {
+      <!-- the phone's profile (≤ 767 px, CSS): high price on top, longs left, shorts right -->
+      <div class="histogram" data-liq-profile-histogram>
+        @for (row of rows(); track row.band) {
+          <button type="button" class="row" [class.current]="row.current" [class.selected]="row.band === selected()"
+                  [attr.data-band]="row.band" (click)="select(row.band)">
+            <span class="side long-side">
+              @if (row.longUsd > 0) {
+                <span class="amount">{{ usd(row.longUsd) }}</span>
+              }
+              <span class="bar long" [style.width.%]="row.longShare * 100"></span>
+            </span>
+            <span class="price">{{ price(row.price) }}</span>
+            <span class="side short-side">
+              <span class="bar short" [style.width.%]="row.shortShare * 100"></span>
+              @if (row.shortUsd > 0) {
+                <span class="amount">{{ usd(row.shortUsd) }}</span>
+              }
+            </span>
+          </button>
+          @if (row.band === selected() && detail(); as d) {
+            <app-liq-profile-detail class="tapped" data-liq-profile-tapped [answer]="a" [detail]="d" />
+          }
+        }
+        <p class="tap-hint">{{ t('instrument.profile.tapHint') }}</p>
+      </div>
+    }
+    @if (outside(); as o) {
+      @if (o.above) {
+        <p class="note">{{ t('instrument.profile.outsideAbove', { usd: o.above }) }}</p>
+      }
+      @if (o.below) {
+        <p class="note">{{ t('instrument.profile.outsideBelow', { usd: o.below }) }}</p>
+      }
+    }
+  } @else {
+    <app-loader variant="inline" [label]="t('instrument.profile.loading')" />
+  }
+  <a class="list-link" data-liq-profile-link routerLink="/liquidations" [queryParams]="listParams()">
+    {{ t('instrument.profile.link', { coin: coin() }) }}
+  </a>
+</section>

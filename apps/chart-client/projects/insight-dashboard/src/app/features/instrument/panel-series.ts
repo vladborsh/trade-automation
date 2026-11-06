@@ -1,6 +1,6 @@
 import {
   CandlestickSeries, LineSeries, LineStyle, LineType, createSeriesMarkers, type IChartApi, type IPaneApi,
-  type ISeriesMarkersPluginApi, type Time,
+  type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesType, type Time,
 } from 'lightweight-charts';
 import { toAlertMarkers } from './alert-marks';
 import { MetricSeriesRenderer } from '@backtest-features/chart/metric-series.renderer';
@@ -41,10 +41,12 @@ export interface PanelRenderers {
   paneMarks: Array<{ pane: IPaneApi<Time>; primitive: TimeMarksPrimitive }>;
   /** IB-129: the alert markers on the candles (`alert-marks.ts`); null until the price pane is drawn. */
   alertMarkers: ISeriesMarkersPluginApi<Time> | null;
+  /** IB-153: the candles, which the liquidation profile strip attaches to; null until the price pane is drawn. */
+  price: ISeriesApi<SeriesType> | null;
 }
 
 export function createPanelRenderers(): PanelRenderers {
-  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive(), paneMarks: [], alertMarkers: null };
+  return { oi: new MetricSeriesRenderer(), markers: new LiquidationMarkersPrimitive(), paneMarks: [], alertMarkers: null, price: null };
 }
 
 /**
@@ -72,6 +74,7 @@ function drawPrice(chart: IChartApi, data: PaneData, renderers: PanelRenderers, 
   }, pane);
   // IB-067: whitespace bars past the last candle, so the week's upcoming events have slots to sit on
   price.setData([...toCandleData(data.candles.candles), ...futureSlots(data).map((time) => ({ time }))] as never);
+  renderers.price = price as ISeriesApi<SeriesType>;
   drawLevels(chart, data, pane);
   // IB-128: an admin's custom levels, price lines across the chart; they live on this series, so a redraw in place
   // (a new series) takes them along. Price lines are not part of the autoscale: a far level never flattens the candles.

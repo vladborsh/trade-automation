@@ -10,8 +10,8 @@ import type {
   WebAuthContext, WebCandlesResponse, WebChangePasswordRequest, WebCredentialsInfoResponse, WebDbHealthResponse,
   WebLoginEventsResponse, WebLoginRequest, WebLoginResponse, WebMarketCardsResponse, WebSetCredentialsRequest,
   WebFundingResponse, WebLiquidationsResponse, WebCapsResponse, WebFlowsResponse, WebInsightsResponse, WebPositioningResponse, WebKpisResponse, WebMarketPeriod,
-  WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse,
-  WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebTopLiquidation, WebUniverseSummaryResponse, WebUniverseTopResponse,
+  WebLiquidationEventsResponse, WebLiquidationsOverviewResponse, WebLongShortResponse, WebLiqProfileResponse,
+  WebCalendarEventsResponse, WebPushSubscription, WebPushVapidKeyResponse, WebStreamsResponse, WebTimeframe, WebUniverseSummaryResponse, WebUniverseTopResponse,
   WebLiquidationsLargeQuery,
   WebLiquidationsLargeResponse,
   WebLiquidationEpisodesResponse,
@@ -116,8 +116,12 @@ export class InsightApiClient {
     return this.get<WebLiquidationsResponse>('/series/liquidations', { symbol, from: fromMs, to: toMs, bucket, venue });
   }
 
-  async topLiquidations(symbol: string, fromMs: number, toMs: number, n = 50): Promise<{ symbol: string; rows: WebTopLiquidation[] }> {
-    return this.get('/series/liquidations/top', { symbol, from: fromMs, to: toMs, n });
+  /**
+   * IB-153 — the coin's liquidations in [fromMs, toMs) by price band, banded on the server for the price span
+   * [lo, hi] the chart shows (`profileGrid`). Every print of the window, not a top-N; weight 0 (our tape).
+   */
+  async liquidationProfile(symbol: string, fromMs: number, toMs: number, lo: number, hi: number): Promise<WebLiqProfileResponse> {
+    return this.get<WebLiqProfileResponse>('/series/liquidations/profile', { symbol, from: fromMs, to: toMs, lo, hi });
   }
 
   /**

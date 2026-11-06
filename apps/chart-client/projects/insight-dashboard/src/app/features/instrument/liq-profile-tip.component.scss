@@ -1,0 +1,12 @@
+/* Over the price pane, left of the pointer: the strip it describes is at the pane's right edge. */
+.liq-profile-tip {
+  position: absolute;
+  z-index: 6;
+  min-width: 190px;
+  padding: 6px 8px;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: rgba(13, 17, 23, 0.94);
+  transform: translate(calc(-100% - 14px), -50%);
+  pointer-events: none;
+}

@@ -1,16 +1,15 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import type { WebTimeframe, WebTopLiquidation } from '@trade-automation/contracts';
+import type { WebTimeframe } from '@trade-automation/contracts';
 import type { InsightApiClient } from '../../core/insight-api.client';
 import { fetchCandleTail, fetchSideTail, type WindowRequest } from './instrument-window';
 import { CANDLES_EVERY_MS, SIDE_EVERY_MS, candleTailFrom, dailyTailFrom, sideTailFrom, type TailJob } from './live-tail';
 import type { PaneData } from './pane-data';
 import { appendLater } from './pane-merge';
-import { bucketFor, sideWindow, windowFor } from './time-range';
+import { bucketFor } from './time-range';
 
 /** What the instrument page lends its two tail jobs: its state, and how to refresh the summary. */
 export interface TailPage {
   panes: WritableSignal<PaneData | null>;
-  top: WritableSignal<WebTopLiquidation[]>;
   symbol: Signal<string>;
   timeframe: Signal<WebTimeframe>;
   refreshSummary: (symbol: string) => void;
@@ -39,22 +38,18 @@ export function instrumentTailJobs(api: InsightApiClient, page: TailPage): TailJ
   };
 
   /**
-   * The minute's poll: the database panes from where the last read ended; the top-50 table over
-   * the window the timeframe opens with, rolled forward to now; the summary under the chart.
+   * The minute's poll: the database panes from where the last read ended, and the summary under the
+   * chart. IB-153: the liquidation profile needs no job here — the bars this joins on move the chart's
+   * view, and the profile follows its view (`liq-profile.store.ts`).
    */
   const side: TailJob = {
     every: SIDE_EVERY_MS,
     read: async (sinceMs, nowMs) => {
       const panes = page.panes()!;
       const symbol = page.symbol();
-      const opening = sideWindow(windowFor(page.timeframe(), nowMs).fromMs, nowMs);
-      const [tail, top] = await Promise.all([
-        fetchSideTail(api, request(sideTailFrom(sinceMs, panes.timeframe, panes.bucket), nowMs), dailyTailFrom(panes, nowMs)),
-        api.topLiquidations(symbol, opening.fromMs, nowMs, 50),
-      ]);
+      const tail = await fetchSideTail(api, request(sideTailFrom(sinceMs, panes.timeframe, panes.bucket), nowMs), dailyTailFrom(panes, nowMs));
       return () => {
         join(tail);
-        page.top.set(top.rows);
         page.refreshSummary(symbol);
       };
     },

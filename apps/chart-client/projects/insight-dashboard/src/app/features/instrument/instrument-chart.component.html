@@ -41,6 +41,8 @@
     </div>
   }
   <app-calendar-tooltip [mark]="hoverMark()" [x]="tipAt()?.x ?? 0" />
+  <!-- IB-153: the band hovered on the liquidation profile strip -->
+  <app-liq-profile-tip />
   @for (handle of edges(); track handle.key) {
     <!-- A pane's lower edge: dragging it resizes that pane alone and moves the ones below. -->
     <div

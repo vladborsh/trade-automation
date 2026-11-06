@@ -1,0 +1,17 @@
+@let d = text();
+<p class="range">{{ d.range }}</p>
+<p class="sides">
+  <span class="long">{{ t('instrument.profile.longs', { usd: d.longUsd }) }}</span>
+  <span class="short">{{ t('instrument.profile.shorts', { usd: d.shortUsd }) }}</span>
+</p>
+<p class="count">{{ t('instrument.profile.count', { n: d.count }) }}</p>
+<ul class="venues">
+  @for (v of d.venues; track v.name) {
+    @if (v.longUsd === null) {
+      <li class="no-data" data-venue-missing>{{ t('instrument.profile.venueNoData', { venue: v.name }) }}</li>
+    } @else {
+      <!-- venue names are identifiers (§11); the sums are the band's per venue -->
+      <li><span class="name">{{ v.name }}</span><span class="long">{{ v.longUsd }}</span><span class="short">{{ v.shortUsd }}</span></li>
+    }
+  }
+</ul>

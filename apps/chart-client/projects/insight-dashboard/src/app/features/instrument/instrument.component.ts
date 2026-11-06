@@ -1,11 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DOCUMENT, DecimalPipe } from '@angular/common';
-import { AmountPipe } from './amount';
+import { DOCUMENT } from '@angular/common';
 import { TimePipe } from '../../shared/time.pipe';
 import type {
-  WebLiquidationCoin, WebLiquidationsOverviewResponse, WebTimeframe, WebTopLiquidation,
-  WebUniverseSummaryRow, WebUniverseSymbol,
+  WebLiquidationCoin, WebLiquidationsOverviewResponse, WebTimeframe, WebUniverseSummaryRow, WebUniverseSymbol,
 } from '@trade-automation/contracts';
 import { InsightApiClient } from '../../core/insight-api.client';
 import { I18nService } from '../../i18n/i18n.service';
@@ -16,6 +14,8 @@ import { instrumentTailJobs } from './instrument-tail';
 import { focusFromQuery, parseTf, type FocusView } from './focus-at';
 import { injectDivergenceOverlay } from './divergence-overlay';
 import { LegendToggleComponent } from './legend-toggle.component';
+import { LiqProfilePanelComponent } from './liq-profile-panel.component';
+import { LiqProfileStore } from './liq-profile.store';
 import { fetchWindow } from './instrument-window';
 import { LiveTail } from './live-tail';
 import { isBeforeHistory, prependEarlier } from './pane-merge';
@@ -23,13 +23,13 @@ import { FullscreenButtonComponent } from '../../ui/fullscreen-button.component'
 import { LoaderComponent } from '../../ui/loader.component';
 import { SymbolPickerComponent } from './symbol-picker.component';
 import { PICKER_SIZE } from './symbol-picker.rows';
-import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './time-range';
+import { bucketFor, TIMEFRAMES, timeframeLabel, windowFor } from './time-range';
 
 /**
  * architecture/insight-bot-web-dashboard.md §2 and §13 — one time-aligned screen for a symbol:
  * price with liquidation bubbles, sessions and previous day/week levels, open interest, taker delta and CVD, funding,
- * long/short; beside it the coin's current figures and the market context; below it the 50
- * largest liquidations in the window.
+ * long/short; beside it the coin's current figures and the market context; below it the liquidation
+ * profile's panel (IB-153: the profile itself is on the price pane, and under the chart on a phone).
  *
  * The class is wiring only; every mapping lives in `series.adapter.ts` and the window each
  * timeframe opens with in `time-range.ts`, each with its own spec (AGENTS.md). The charts are a child component so this
@@ -38,7 +38,9 @@ import { bucketFor, sideWindow, TIMEFRAMES, timeframeLabel, windowFor } from './
 @Component({
   selector: 'app-instrument',
   standalone: true,
-  imports: [AmountPipe, TimePipe, DecimalPipe, InstrumentChartComponent, InstrumentContextComponent, LegendToggleComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
+  imports: [TimePipe, InstrumentChartComponent, InstrumentContextComponent, LegendToggleComponent, LiqProfilePanelComponent, LoaderComponent, SymbolPickerComponent, FullscreenButtonComponent],
+  // IB-153: one liquidation profile per page, shared by the chart's strip, its tooltip and the panel under it
+  providers: [LiqProfileStore],
   templateUrl: './instrument.component.html',
   styleUrl: './instrument.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -63,7 +65,6 @@ export class InstrumentComponent {
   /** IB-110: the OI divergence lines, merged into what the chart draws (`divergence-overlay.ts`). */
   private readonly divergences = injectDivergenceOverlay(this.api); // IB-129: and the other legend switches
   readonly chartData = computed(() => this.divergences.merge(this.panes()));
-  readonly top = signal<WebTopLiquidation[]>([]);
   /**
    * IB-039 — this instrument's row out of IB-038's overview, for the summary under the chart.
    *
@@ -91,7 +92,7 @@ export class InstrumentComponent {
   /** IB-066 — the live tail: candles every 5 s, the rest every minute. The rules are `live-tail.ts`'s. */
   private readonly tail = new LiveTail({
     jobs: instrumentTailJobs(this.api, {
-      panes: this.panes, top: this.top, symbol: this.symbol, timeframe: this.timeframe,
+      panes: this.panes, symbol: this.symbol, timeframe: this.timeframe,
       refreshSummary: (symbol) => void this.loadSummary(symbol),
     }),
     generation: () => this.generation,
@@ -184,21 +185,16 @@ export class InstrumentComponent {
     void this.divergences.load(symbol, tf); // IB-110: beside the window, never holding it up
 
     try {
-      const [panes, top] = await Promise.all([
-        fetchWindow(this.api, { symbol, fromMs, toMs, timeframe: tf, bucket }),
-        this.api.topLiquidations(symbol, sideWindow(fromMs, toMs).fromMs, toMs, 50),
-      ]);
+      const panes = await fetchWindow(this.api, { symbol, fromMs, toMs, timeframe: tf, bucket });
       if (generation !== this.generation) return; // a newer choice was made while this was loading
       this.loadedFromMs = fromMs;
       this.panes.set(panes);
-      this.top.set(top.rows);
       this.tail.reset(toMs);
       void this.loadSummary(symbol);
     } catch (error) {
       if (generation !== this.generation) return;
       this.error.set((error as Error).message);
       this.panes.set(null);
-      this.top.set([]);
     } finally {
       if (generation === this.generation) this.loading.set(false);
     }
@@ -208,7 +204,6 @@ export class InstrumentComponent {
    * The reader scrolled to the left edge: fetch the window before the one on screen, the same
    * width, and join it on (2026-10-24 bug: scrolling left loaded nothing). One read at a time;
    * an empty earlier read means the venue's history starts there, and the page stops asking.
-   * The top-50 table stays about the opening window, not about however far the reader scrolled.
    */
   async loadEarlier(): Promise<void> {
     const current = this.panes();
