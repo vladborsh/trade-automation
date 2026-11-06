@@ -79,7 +79,8 @@ maybeDescribe('IB-122 migration 031: market alerts, per-type settings, liq recip
   }, DB_HOOK_TIMEOUT_MS);
 
   it('L4: one liq settings row, both switches OFF, params equal to the contracts\' defaults', async () => {
-    const rows = await db.query<{ type: string; enabled: boolean; members_visible: boolean; params: unknown }>('select type, enabled, members_visible, params from alert_type_settings');
+    // `where type = 'liq'`: the chain runs to the end, and 034 (IB-124) adds the 'funding' row (its own spec)
+    const rows = await db.query<{ type: string; enabled: boolean; members_visible: boolean; params: unknown }>(`select type, enabled, members_visible, params from alert_type_settings where type = 'liq'`);
     expect(rows).toEqual([{ type: 'liq', enabled: false, members_visible: false, params: LIQ_DEFAULT_PARAMS }]);
     expect(await new PgLiqAlertsVisibility(db).membersVisible()).toBe(false);
   });

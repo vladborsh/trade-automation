@@ -18,7 +18,7 @@ import { WEB_PUSH_SUBSCRIPTIONS, WebPushController } from '../../src/web/push/pu
  */
 const member: User = {
   id: 7, tgUserId: 777, chatId: 777, role: 'member', lang: 'ru', deposit: null, riskPct: 1,
-  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, oiAlerts: false, liqAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date(),
+  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, oiAlerts: false, liqAlerts: false, fundingAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date(),
 };
 const SUB: WebPushSubscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'BPk', auth: 'q1w' } };
 const KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';

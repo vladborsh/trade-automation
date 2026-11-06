@@ -21,6 +21,8 @@ export interface User {
   oiAlerts: boolean;
   /** IB-122 (liq design §1): large-liquidation alerts in the DM. Migration 031: on for admins, off for members. */
   liqAlerts: boolean;
+  /** IB-124 (design §1 Recipients): funding alerts in the DM. Migration 034: on for admins, off for members. */
+  fundingAlerts: boolean;
   invitedBy: number | null;
   disabled: boolean;
   createdAt: Date;

@@ -6,7 +6,7 @@ import type { UniverseSymbol } from '../../../config/universe.schema';
 import {
   POSITIONING_BASELINE_CACHE_MS, POSITIONING_BASELINE_DAYS, POSITIONING_CURRENT_CACHE_MS, POSITIONING_MIN_HISTORY_DAYS,
 } from '../../../insights/thresholds';
-import { fundingIntervalH } from '../../../insights/funding-extreme';
+import { fundingIntervalH, fundingSample } from '../../../insights/funding-extreme';
 import type { TtlCache } from '../../../venues/ttl-cache';
 import type { LiquidationsOverviewService } from '../../liquidations/overview.service';
 import type { CandlesService } from '../candles.service';
@@ -121,8 +121,8 @@ export class PositioningService {
     const priceChangePct = cell(priceChange, changeSample(base?.closes), changeRarity);
 
     const oiChangePct = cell(current.oiChangePct, changeSample(base?.oiHourly), changeRarity);
-    const fundingSample = base && base.fundingSettled.length >= POSITIONING_MIN_HISTORY_DAYS * 3 ? base.fundingSettled : null;
-    const fundingRate = cell(summary?.fundingRate ?? null, fundingSample, levelRarity);
+    const fundingSettled = base ? fundingSample(base.fundingSettled) : null;
+    const fundingRate = cell(summary?.fundingRate ?? null, fundingSettled, levelRarity);
     const levelSample = (s: readonly number[] | undefined) => (s && enoughHours(s.length) ? s : null);
     const lsGlobal = cell(current.lsGlobal, levelSample(base?.lsGlobalHourly), levelRarity);
     const lsTopPosition = cell(current.lsTop, levelSample(base?.lsTopHourly), levelRarity);

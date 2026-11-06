@@ -25,7 +25,7 @@ const BOT_INFO = {
 
 const member: User = {
   id: 2, tgUserId: 222, chatId: 222, role: 'member', lang: 'ru', deposit: null, riskPct: 1,
-  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, oiAlerts: false, liqAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date('2026-09-01'),
+  dailyLossLimitPct: null, dexAlerts: false, calendarAlerts: true, oiAlerts: false, liqAlerts: false, fundingAlerts: false, invitedBy: 1, disabled: false, createdAt: new Date('2026-09-01'),
 };
 const admin: User = { ...member, id: 1, tgUserId: 111, chatId: 111, role: 'admin' };
 

@@ -1,4 +1,4 @@
-import { FUNDING_FLOOR_PER_8H, RARITY_SHOW } from './thresholds';
+import { FUNDING_FLOOR_PER_8H, POSITIONING_MIN_HISTORY_DAYS, RARITY_SHOW } from './thresholds';
 
 /**
  * IB-135 (market round 3 §1, alerts design F2/F3) — is a coin's funding worth a word? Pure.
@@ -22,12 +22,29 @@ export function fundingPer8h(rate: number, intervalH: number | null): number {
   return rate * (8 / (intervalH ?? 8));
 }
 
-export function fundingExtreme(rate: number | null, rarity: number | null, intervalH: number | null): FundingExtreme | null {
+/**
+ * `floorPer8h`: IB-124's per-coin override (alerts design F3, "editable per coin"). Every other caller leaves it
+ * out and gets the ONE default, `FUNDING_FLOOR_PER_8H`.
+ */
+export function fundingExtreme(
+  rate: number | null, rarity: number | null, intervalH: number | null, floorPer8h: number = FUNDING_FLOOR_PER_8H,
+): FundingExtreme | null {
   if (rate === null || rarity === null || rarity < RARITY_SHOW) return null;
   const per8h = fundingPer8h(rate, intervalH);
-  if (per8h >= FUNDING_FLOOR_PER_8H) return 'high';
-  if (per8h <= -FUNDING_FLOOR_PER_8H) return 'low';
+  if (per8h >= floorPer8h) return 'high';
+  if (per8h <= -floorPer8h) return 'low';
   return null;
+}
+
+/** The fewest settlements a rarity is judged on: 20 days at 8 h (R5's rule, also the alert's). */
+export const FUNDING_MIN_SETTLEMENTS = POSITIONING_MIN_HISTORY_DAYS * 3;
+
+/**
+ * The sample a funding rarity is judged on, or null when it is too short. R5 (through the positioning table) and
+ * IB-124's alerts both take it from here, so the two cannot judge the same coin on different samples (F3).
+ */
+export function fundingSample<T>(settled: readonly T[]): readonly T[] | null {
+  return settled.length >= FUNDING_MIN_SETTLEMENTS ? settled : null;
 }
 
 /** How many of the latest settlement spacings the interval is the median of. */

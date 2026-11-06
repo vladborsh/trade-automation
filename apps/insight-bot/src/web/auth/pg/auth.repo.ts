@@ -69,11 +69,11 @@ export async function findLiveSession(db: DbHandle, id: string, now: Date): Prom
     id: string; user_id: number; last_seen_at: Date; expires_at: Date;
     tg_user_id: string; chat_id: string | null; role: 'admin' | 'member'; lang: 'ru' | 'en';
     deposit: string | null; risk_pct: number; daily_loss_limit_pct: number | null;
-    dex_alerts: boolean; calendar_alerts: boolean; oi_alerts: boolean; liq_alerts: boolean; invited_by: number | null; disabled: boolean; created_at: Date;
+    dex_alerts: boolean; calendar_alerts: boolean; oi_alerts: boolean; liq_alerts: boolean; funding_alerts: boolean; invited_by: number | null; disabled: boolean; created_at: Date;
   }>(
     `select s.id, s.user_id, s.last_seen_at, s.expires_at,
             u.tg_user_id, u.chat_id, u.role, u.lang, u.deposit, u.risk_pct,
-            u.daily_loss_limit_pct, u.dex_alerts, u.calendar_alerts, u.oi_alerts, u.liq_alerts, u.invited_by, u.disabled, u.created_at
+            u.daily_loss_limit_pct, u.dex_alerts, u.calendar_alerts, u.oi_alerts, u.liq_alerts, u.funding_alerts, u.invited_by, u.disabled, u.created_at
        from web_sessions s join users u on u.id = s.user_id
       where s.id = $1 and s.expires_at > $2`,
     [id, now],
@@ -86,7 +86,7 @@ export async function findLiveSession(db: DbHandle, id: string, now: Date): Prom
       id: r.user_id, tgUserId: Number(r.tg_user_id), chatId: r.chat_id === null ? null : Number(r.chat_id),
       role: r.role, lang: r.lang, deposit: r.deposit === null ? null : Number(r.deposit),
       riskPct: Number(r.risk_pct), dailyLossLimitPct: r.daily_loss_limit_pct === null ? null : Number(r.daily_loss_limit_pct),
-      dexAlerts: r.dex_alerts, calendarAlerts: r.calendar_alerts, oiAlerts: r.oi_alerts, liqAlerts: r.liq_alerts, invitedBy: r.invited_by, disabled: r.disabled, createdAt: new Date(r.created_at),
+      dexAlerts: r.dex_alerts, calendarAlerts: r.calendar_alerts, oiAlerts: r.oi_alerts, liqAlerts: r.liq_alerts, fundingAlerts: r.funding_alerts, invitedBy: r.invited_by, disabled: r.disabled, createdAt: new Date(r.created_at),
     },
   };
 }

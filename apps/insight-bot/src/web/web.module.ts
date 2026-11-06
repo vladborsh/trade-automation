@@ -14,7 +14,10 @@ import { LoginGuard } from './auth/login-throttle';
 import { PasswordHasher } from './auth/password';
 import { WebAdminController } from './admin/login-events.controller';
 import { WebMembersController } from './members/members.controller';
-import { LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { FUNDING_ALERTS_VISIBILITY, LIQ_ALERTS_VISIBILITY, OI_ALERTS_VISIBILITY, WebMeSettingsController } from './members/me-settings.controller';
+import { FUNDING_ALERTS_ADMIN, WebFundingAlertsAdminController } from './admin/funding-alerts.controller';
+import { FundingAlertsAdmin } from '../alerts/funding/funding-alerts-admin';
+import { PgFundingAlertStore, PgFundingAlertsVisibility } from '../alerts/funding/pg/funding-alerts.repo';
 import { LIQ_ALERTS_ADMIN, WebLiqAlertsAdminController } from './admin/liq-alerts.controller';
 import { LiqAlertsAdmin } from '../alerts/liquidations/liq-alerts-admin';
 import { PgLiqAlertStore, PgLiqAlertsVisibility } from '../alerts/liquidations/pg/liq-alerts.repo';
@@ -98,6 +101,8 @@ export class WebModule {
         // IB-112: the OI divergence alerts admin page
         WebAlertsAdminController,
         WebLiqAlertsAdminController,
+        // IB-124: the «Funding» section
+        WebFundingAlertsAdminController,
         // IB-120: the /liquidations page
         LiquidationsLargeController,
         // IB-133: the /liquidations page as «episodes»
@@ -307,6 +312,18 @@ export class WebModule {
           provide: LIQ_ALERTS_VISIBILITY,
           inject: [DB],
           useFactory: (db: Db | null) => (db ? new PgLiqAlertsVisibility(db) : { membersVisible: async () => false }),
+        },
+        {
+          // IB-124 (design §1): the «Funding» section of /admin/alerts
+          provide: FUNDING_ALERTS_ADMIN,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new FundingAlertsAdmin(new PgFundingAlertStore(db)) : null),
+        },
+        {
+          // IB-124: the funding alerts toggle, behind alert_type_settings('funding').members_visible
+          provide: FUNDING_ALERTS_VISIBILITY,
+          inject: [DB],
+          useFactory: (db: Db | null) => (db ? new PgFundingAlertsVisibility(db) : { membersVisible: async () => false }),
         },
         {
           // IB-112 (V13): /me/settings shows members the OI alerts toggle only while members_visible is on
