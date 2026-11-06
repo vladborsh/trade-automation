@@ -74,6 +74,10 @@ export const WebMemberSettingsSchema = z.object({
   fundingAlerts: z.boolean(),
   /** As `oiAlertsVisible`, for `fundingAlerts`, behind `alert_type_settings('funding').members_visible`. */
   fundingAlertsVisible: z.boolean(),
+  /** IB-126 (design §1 Recipients): price-level alerts in Telegram (`users.level_alerts`). Admins start on. */
+  levelAlerts: z.boolean(),
+  /** As `oiAlertsVisible`, for `levelAlerts`, behind `alert_type_settings('level').members_visible`. */
+  levelAlertsVisible: z.boolean(),
 });
 export type WebMemberSettings = z.infer<typeof WebMemberSettingsSchema>;
 
@@ -92,5 +96,7 @@ export const WebMemberSettingsPatchSchema = z.object({
   liqAlerts: z.union([z.boolean(), z.string()]).optional(),
   /** IB-124: as `liqAlerts`; 403 `SETTING_NOT_AVAILABLE` while hidden. */
   fundingAlerts: z.union([z.boolean(), z.string()]).optional(),
+  /** IB-126: as `liqAlerts`; 403 `SETTING_NOT_AVAILABLE` while hidden. */
+  levelAlerts: z.union([z.boolean(), z.string()]).optional(),
 }).strict();
 export type WebMemberSettingsPatch = z.infer<typeof WebMemberSettingsPatchSchema>;
