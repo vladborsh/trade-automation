@@ -141,6 +141,11 @@ export class LevelAlertLoop {
 
   private async evaluateCoin(coin: Coin, due: number, settings: LevelSettings, states: StateMap, nowMs: number, report: LevelTickReport): Promise<void> {
     const known = this.cursor.get(coin.symbol) ?? cursorFromRows(states, coin.symbol);
+    if (known !== null && known >= due) {
+      // a restart between closes: the rows already saw the due bar, so nothing is read until the next close
+      this.cursor.set(coin.symbol, known);
+      return;
+    }
     const from = known === null ? due - BAR_MS : Math.max(known, due - (LEVEL_CATCHUP_BARS - 1) * BAR_MS);
     const limit = (due - from) / BAR_MS + 1;
     const bars = await this.ports.venue.bars15m(coin.symbol, from, limit);

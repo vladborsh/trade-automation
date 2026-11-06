@@ -255,6 +255,18 @@ describe('IB-126 level alert loop', () => {
     expect(store.row('PWH', WEEK)).toEqual({ lastSide: 'below', firstBeyondAtMs: T + 3 * M, lastBarMs: T + 6 * M });
   });
 
+  it('a restart between closes reads nothing until the next close: the rows\' cursor is already the due bar', async () => {
+    const store = new MemoryStore();
+    const venue = new Venue();
+    await harness(store, venue).bar(T);
+    const b = harness(store, venue);
+    venue.calls = [];
+    expect(await b.at(evalAt(T) + 2 * 60_000)).toMatchObject({ calls: 0, bars: 0 });
+    expect(await b.at(evalAt(T) + 3 * 60_000)).toMatchObject({ calls: 0, bars: 0 });
+    expect(venue.calls).toEqual([]);
+    expect(await b.bar(T + M)).toMatchObject({ bars: 1, seeded: [] });
+  });
+
   it('a gap longer than the catch-up read is re-seeded, never stepped across', async () => {
     const h = harness();
     await h.bar(T);
