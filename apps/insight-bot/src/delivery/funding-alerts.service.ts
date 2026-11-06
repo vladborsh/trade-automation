@@ -15,8 +15,8 @@ import { TelegramSender } from './telegram-sender';
  * IB-124 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §3) — schedules `FundingAlertLoop` every
  * FUNDING_CHECK_SEC (5 min), beside the OI and liquidation loops (same sender, same DB).
  *
- * **Weight (F1):** per coin, `premiumIndex?symbol=` 1 every 5 min and `fundingRate` 1 an hour, so 5 coins ≈ 1 + 5/12
- * ≈ 1.4 per 5 min ≈ **0.3 / min**. Every call goes into the shared `BinanceWeightTracker`, and none is made while the
+ * **Weight (F1):** per coin, `premiumIndex?symbol=` 1 every 5 min and `fundingRate` 1 an hour, so 5 coins = 5 per
+ * 5 min + 5 an hour ≈ **1.08 / min** (measured on slot dev-3, IB-124: 10 on the first check, then 5 a check). Every call goes into the shared `BinanceWeightTracker`, and none is made while the
  * IP's last minute is above `WEIGHT_CEILING_1M` (the coin's check fails that tick and is retried at the next).
  * Nothing is sent until the admin page's 'funding' switch is on (default off).
  */
