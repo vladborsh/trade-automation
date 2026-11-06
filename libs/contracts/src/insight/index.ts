@@ -47,4 +47,5 @@ export * from './oi-divergence-research';
 export * from './market-alerts';
 export * from './funding-alerts';
 export * from './level-alerts';
+export * from './custom-levels';
 export * from './alert-marks';

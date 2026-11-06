@@ -171,7 +171,9 @@ export const WebLevelAlertRowSchema = z.object({
   source: z.enum(MARKET_ALERT_SOURCES),
   event: LevelEventSchema,
   symbol: z.string(),
-  kind: LevelKindSchema,
+  /** IB-128: `custom` for one of the owner's levels (`custom-levels.ts`), with its `customLevelId`. */
+  kind: z.union([LevelKindSchema, z.literal('custom')]),
+  customLevelId: z.number().int().positive().nullable(),
   price: z.number(),
   /** Unix seconds: the bar's open. */
   at: z.number().int(),

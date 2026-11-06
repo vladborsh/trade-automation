@@ -46,6 +46,9 @@ export const WEB_ERROR_CODES = [
   'LAST_ADMIN',
   'BOT_NOT_CONFIGURED',
   'INVALID_SETTING',
+  // IB-128 — the custom levels (custom-levels.ts): a body the schema refuses (400), a coin at its cap (409)
+  'INVALID_LEVEL',
+  'TOO_MANY_LEVELS',
 ] as const;
 export type WebErrorCode = (typeof WEB_ERROR_CODES)[number];
 
