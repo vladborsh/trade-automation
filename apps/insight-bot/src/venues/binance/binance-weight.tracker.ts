@@ -74,7 +74,7 @@ export class BinanceWeightTracker {
     return this.calls.reduce((sum, call) => sum + call.weight, 0);
   }
 
-  /** IB-147: documented weight spent per caller since start — for `ib_binance_weight_spent_total{caller}`. */
+  /** IB-147: documented weight spent per caller since start — for `ib_binance_weight_spent_by_caller{caller}`. */
   spentByCaller(): ReadonlyMap<WeightCaller, number> {
     return this.spent;
   }
