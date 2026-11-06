@@ -1,5 +1,6 @@
-# IB-145 — the history CLIs' START gate, shared by the box's three history runners (sourced, not run):
-# box-backfill.sh (IB-116 OI), liq-backfill.sh (IB-123 liquidations), oi-hidden-backfill.sh (IB-144 OI hidden).
+# IB-145 — the history CLIs' START gate, shared by the box's four history runners (sourced, not run):
+# box-backfill.sh (IB-116 OI), liq-backfill.sh (IB-123 liquidations), oi-hidden-backfill.sh (IB-144 OI hidden),
+# funding-backfill.sh (IB-125 funding).
 #
 # The CLI (memory-guard.ts) refuses to START a phase below its start gate, measured after the CLI has loaded:
 # 170 MB by default, per run through env MEM_START_FLOOR_MB (images from 95366a24 on; older ones ignore it).
@@ -37,7 +38,7 @@ gate_floor() {
 gate_refused() {
   # new image: «… failed: Error: memory gate: refused — MemAvailable 139 MB < 140 MB — not starting …»
   # old image: «… failed: Error: memory gate: MemAvailable 139 MB < 170 MB — not starting …»
-  grep -qE '^(oi|liq) backfill failed: Error: memory gate: (refused — )?MemAvailable [0-9]+ MB < [0-9]+ MB' "$1" || return 1
+  grep -qE '^(oi|liq|funding) backfill failed: Error: memory gate: (refused — )?MemAvailable [0-9]+ MB < [0-9]+ MB' "$1" || return 1
   grep -oE 'MemAvailable [0-9]+ MB < [0-9]+ MB' "$1" | sed -n 1p
 }
 
