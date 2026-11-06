@@ -38,7 +38,7 @@ import { CandlesService, PERP_PAGE_WEIGHT } from '../../../web/market/candles.se
 import { PgBackfillReads } from '../pg/backfill-reads';
 import { PgOiAlertStore } from '../pg/oi-alerts.repo';
 import { measureBackfillPaths, replayHistory, type BackfillReport, type HistoryBackfillPorts } from './history-backfill';
-import { MemoryGuard, parseMemAvailableMb } from './memory-guard';
+import { MemoryGuard, parseMemAvailableMb, startFloorFromEnv } from './memory-guard';
 import { WeightPacer } from './weight-pacer';
 import { readFile } from 'node:fs/promises';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -75,6 +75,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<void>
   const guard = new MemoryGuard({
     availableMb: async () => readFile('/proc/meminfo', 'utf8').then(parseMemAvailableMb, () => null),
     now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: say,
+    startFloorMb: startFloorFromEnv(process.env.MEM_START_FLOOR_MB), // TL ruling 2026-11-06: per run, default 170
   });
   const paced = { take: async (w: number) => { await guard.every30s('path measuring'); await pacer.take(w); } };
   const reader = new OiWindowReader(db);

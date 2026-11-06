@@ -13,13 +13,21 @@
 # - --dry-run then runs V47's guard (hidden-guard.cli.js) on the dump, WITHOUT --enable: the table only;
 # - files in /var/log/insight-checks/: oi-hidden-<mode>.md (the CLI's output, the guard's table, the memory minima),
 #   oi-hidden-<mode>.jsonl (the dump), oi-hidden-<mode>.guard.json; LAST the sentinel oi-hidden-<mode>.done:
-#   PASS (the run completed) or FAIL:<why>. A FAIL also goes to the owner's Telegram (checks.py's path).
+#   PASS (the run completed), DEFERRED:<why> (it did not start: the CLI's memory gate refused, or no memory window
+#   came before WAIT_UNTIL — nothing is wrong, run it later; NO Telegram), or FAIL:<why> (it broke: the owner's
+#   Telegram, checks.py's path).
+#
+# Env (TL ruling 2026-11-06, tl-ruling-history-runs-memory-2026-11-06.md):
+#   MEM_START_FLOOR_MB=140   the CLI's start gate for THIS run (passed into the container; default 170 there)
+#   WAIT_FOR_MB=<n> WAIT_UNTIL=<epoch s>   wait (every 30 s) for host MemAvailable ≥ n before starting; none by
+#                                          WAIT_UNTIL → DEFERRED
 set -u
 MODE="${1:-}"
 [ "$MODE" = "--dry-run" ] || [ "$MODE" = "--write" ] || { echo "usage: $0 --dry-run|--write"; exit 2; }
 NAME="oi-hidden${MODE#-}"   # oi-hidden-dry-run | oi-hidden-write
-DIR=/var/log/insight-checks
+DIR="${CHECKS_DIR:-/var/log/insight-checks}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/insight-bot}"
+MEMINFO="${MEMINFO:-/proc/meminfo}"
 mkdir -p "$DIR"; chmod 750 "$DIR"
 rm -f "$DIR/$NAME.done"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -44,13 +52,24 @@ PY
   echo "$NAME → $1"
 }
 
+if [ -n "${WAIT_FOR_MB:-}" ]; then
+  until [ "$(awk '/MemAvailable/{print int($2/1024)}' "$MEMINFO")" -ge "$WAIT_FOR_MB" ]; do
+    if [ "$(date +%s)" -ge "${WAIT_UNTIL:-0}" ]; then
+      echo "# $NAME — no MemAvailable ≥ $WAIT_FOR_MB MB window before $WAIT_UNTIL; not started" > "$MD"
+      finish "DEFERRED:no MemAvailable >= $WAIT_FOR_MB MB window"; exit 3
+    fi
+    sleep "${WAIT_POLL_S:-30}"
+  done
+fi
+
 BOTPID=$(docker inspect -f '{{.State.Pid}}' $B) || { finish "FAIL:the bot container is not running"; exit 2; }
 SHA=$(docker inspect -f '{{.Config.Image}}' $B)
+GATE_ENV=(); [ -n "${MEM_START_FLOOR_MB:-}" ] && GATE_ENV=(-e "MEM_START_FLOOR_MB=$MEM_START_FLOOR_MB")
 
-docker exec $B node --max-old-space-size=40 --max-semi-space-size=1 --optimize-for-size "$CLI" "$MODE" --kinds hidden --dump "$IN_DUMP" > "$OUT" 2>&1 &
+docker exec ${GATE_ENV[@]+"${GATE_ENV[@]}"} $B node --max-old-space-size=40 --max-semi-space-size=1 --optimize-for-size "$CLI" "$MODE" --kinds hidden --dump "$IN_DUMP" > "$OUT" 2>&1 &
 EXEC=$!
 CLIPID=""
-for _ in $(seq 1 20); do
+for _ in $(seq 1 "${PID_TRIES:-20}"); do
   CLIPID=$(ps -eo pid=,args= | awk -v m="$MODE" '$2 == "node" && /backfill\.cli\.js/ && /--kinds hidden/ && index($0, m) {print $1; exit}')
   [ -n "$CLIPID" ] && break
   sleep 0.5
@@ -58,7 +77,7 @@ done
 echo "start $STAMP image $SHA mode $MODE exec $EXEC cli pid ${CLIPID:-?} bot pid $BOTPID" | tee "$MEM"
 killed=""
 while kill -0 $EXEC 2>/dev/null; do
-  avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
+  avail=$(awk '/MemAvailable/{print int($2/1024)}' "$MEMINFO")
   bot=$(awk '/VmRSS/{print int($2/1024)}' /proc/$BOTPID/status 2>/dev/null)
   cli=$( [ -n "$CLIPID" ] && awk '/VmRSS/{print int($2/1024)}' /proc/$CLIPID/status 2>/dev/null)
   echo "$(date -u +%H:%M:%S) avail=${avail} bot=${bot:-?} cli=${cli:-?}" >> "$MEM"
@@ -66,7 +85,7 @@ while kill -0 $EXEC 2>/dev/null; do
     kill "$CLIPID" && killed="yes"
     echo "$(date -u +%H:%M:%S) MemAvailable ${avail} MB < 100 MB — killed the CLI pid $CLIPID" | tee -a "$MEM"
   fi
-  sleep 1
+  sleep "${SAMPLE_S:-1}"
 done
 wait $EXEC; rc=$?
 docker cp "$B:$IN_DUMP" "$DIR/$NAME.jsonl" >/dev/null 2>&1 || true
@@ -81,6 +100,10 @@ docker cp "$B:$IN_DUMP" "$DIR/$NAME.jsonl" >/dev/null 2>&1 || true
   [ -n "$killed" ] && echo "KILLED for memory"
 } > "$MD"
 if [ -n "$killed" ]; then finish "FAIL:killed for memory (MemAvailable < 100 MB)"; exit 1; fi
+if [ "$rc" -ne 0 ] && grep -q '^oi backfill failed: Error: memory gate: refused' "$OUT"; then
+  # the CLI's start gate: nothing started, nothing is broken — a deferral, never the owner's Telegram (TL 2026-11-06)
+  finish "DEFERRED:memory gate refused ($(grep -o 'MemAvailable [0-9]* MB < [0-9]* MB' "$OUT" | head -1))"; exit 3
+fi
 if [ "$rc" -ne 0 ]; then finish "FAIL:CLI exit $rc"; exit 1; fi
 if [ "$MODE" = "--dry-run" ]; then
   # V47 step 3: the guard's table on the dry run's dump — NOT --enable (the TL decides the enable)

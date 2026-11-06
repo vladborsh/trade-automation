@@ -1,4 +1,4 @@
-import { MEM_ABORT_AFTER_MS, MEM_FLOOR_MB, MEM_RECHECK_MS, MEM_START_FLOOR_MB, MemoryGuard, memoryDecision, parseMemAvailableMb, startGateDecision } from '../../../src/alerts/oi-divergence/backfill/memory-guard';
+import { MEM_ABORT_AFTER_MS, MEM_FLOOR_MB, MEM_RECHECK_MS, MEM_START_FLOOR_MB, MemoryGuard, memoryDecision, parseMemAvailableMb, startFloorFromEnv, startGateDecision } from '../../../src/alerts/oi-divergence/backfill/memory-guard';
 
 /** IB-116 (TL memory condition): the history run steps back when the box's MemAvailable is low. */
 describe('memoryDecision', () => {
@@ -31,14 +31,14 @@ describe('parseMemAvailableMb', () => {
 });
 
 describe('MemoryGuard', () => {
-  const guard = (readings: Array<number | null>) => {
+  const guard = (readings: Array<number | null>, startFloorMb?: number) => {
     let t = 0;
     const lines: string[] = [];
     const slept: number[] = [];
     let i = 0;
     const g = new MemoryGuard({
       availableMb: async () => readings[Math.min(i++, readings.length - 1)] ?? null,
-      now: () => t, sleep: async (ms) => { slept.push(ms); t += ms; }, log: (l) => lines.push(l),
+      now: () => t, sleep: async (ms) => { slept.push(ms); t += ms; }, log: (l) => lines.push(l), startFloorMb,
     });
     return { g, lines, slept, reads: () => i, advance: (ms: number) => { t += ms; } };
   };
@@ -88,11 +88,24 @@ describe('MemoryGuard', () => {
 
   it('gate: refuses a phase below 170 MB without waiting, and starts one at 170 with a line; the reading counts toward the minimum', async () => {
     const low = guard([169]);
-    await expect(low.g.gate('path measuring')).rejects.toThrow(/MemAvailable 169 MB < 170 MB — not starting path measuring/);
+    await expect(low.g.gate('path measuring')).rejects.toThrow(/^memory gate: refused — MemAvailable 169 MB < 170 MB — not starting path measuring/);
     expect(low.slept).toEqual([]);
     expect(low.g.minSeenMb).toBe(169);
     const ok = guard([170]);
     await ok.g.gate('the replay');
-    expect(ok.lines).toEqual(['memory gate: 170 MB available — starting the replay']);
+    expect(ok.lines).toEqual(['memory gate: 170 MB available (start gate 170 MB) — starting the replay']);
+  });
+
+  it('TL ruling 2026-11-06: a run may start at a lower gate (env MEM_START_FLOOR_MB) — 140 refuses 139, starts 140; the default stays 170', async () => {
+    expect([startFloorFromEnv(undefined), startFloorFromEnv(''), startFloorFromEnv('140'), startFloorFromEnv('120')]).toEqual([170, 170, 140, 120]);
+    for (const bad of ['119', '0', '140.5', '-140', 'abc', '140 ']) expect(() => startFloorFromEnv(bad)).toThrow(/at least the pause floor 120/);
+    const low = guard([139], 140);
+    await expect(low.g.gate('the replay')).rejects.toThrow(/^memory gate: refused — MemAvailable 139 MB < 140 MB/);
+    const ok = guard([140], 140);
+    await ok.g.gate('the replay');
+    expect(ok.lines).toEqual(['memory gate: 140 MB available (start gate 140 MB) — starting the replay']);
+    // the pause floor does not move with it: 119 still pauses
+    expect(memoryDecision(119, null, 0)).toBe('wait');
+    expect([startGateDecision(150), startGateDecision(150, 140)]).toEqual(['refuse', 'go']);
   });
 });

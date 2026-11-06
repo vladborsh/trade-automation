@@ -36,7 +36,7 @@ import type { DbHandle } from '../../../db/db.port';
 import { BinanceWeightTracker } from '../../../venues/binance/binance-weight.tracker';
 import { CandlesService } from '../../../web/market/candles.service';
 import { measureBackfillPaths } from '../../oi-divergence/backfill/history-backfill';
-import { MemoryGuard, parseMemAvailableMb } from '../../oi-divergence/backfill/memory-guard';
+import { MemoryGuard, parseMemAvailableMb, startFloorFromEnv } from '../../oi-divergence/backfill/memory-guard';
 import { WeightPacer } from '../../oi-divergence/backfill/weight-pacer';
 import { PgOiAlertStore } from '../../oi-divergence/pg/oi-alerts.repo';
 import { PgLiqBackfillReads } from '../pg/liq-backfill-reads';
@@ -90,6 +90,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
   const guard = new MemoryGuard({
     availableMb: async () => readFile('/proc/meminfo', 'utf8').then(parseMemAvailableMb, () => null),
     now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: say,
+    startFloorMb: startFloorFromEnv(process.env.MEM_START_FLOOR_MB), // TL ruling 2026-11-06: per run, default 170
   });
   const started = now();
   let exit = 0;

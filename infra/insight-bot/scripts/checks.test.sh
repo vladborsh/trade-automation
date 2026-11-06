@@ -433,4 +433,65 @@ check 'the token is never in argv, stdout, stderr or any file' \
   '! grep -rq "$TOKEN" $work/curl-args $work/*.stdout $work/*.stderr $work/out-*'
 check 'usage error → exit 2' '[ "$(python3 -I "$CHECKS" run nope 2>/dev/null; echo $?)" = 2 ]'
 
+# ------------------------------------------------------------------------------- oi-hidden-backfill.sh (IB-144)
+# TL ruling 2026-11-06: a run that did not START (the CLI's memory gate refused, or no memory window came) is
+# DEFERRED — the sentinel says so and the owner's Telegram is NOT called; a broken run is FAIL and is. A stub `docker`
+# plays the container (FAKE_CLI picks the CLI's behaviour); a stub deploy-watch.py records send_owner calls.
+OHB="$HERE/oi-hidden-backfill.sh"
+mkdir -p "$work/ohb-bin" "$work/ohb-deploy"
+cat >"$work/ohb-bin/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$OHB_DOCKER_LOG"
+case "$1" in
+  inspect) case "$3" in *Pid*) echo 999999 ;; *) echo 'ecr/insight-bot:sha-9c0bb1fe8b8a' ;; esac ;;
+  cp) touch "$3" ;;
+  exec)
+    case "$*" in
+      *hidden-guard.cli.js*) echo '| 15m | … | **PASS** |'; exit 0 ;;
+    esac
+    case "$FAKE_CLI" in
+      refused) echo 'oi backfill failed: Error: memory gate: refused — MemAvailable 139 MB < 140 MB — not starting the replay; run it at a quieter hour'; exit 1 ;;
+      crash) echo 'oi backfill failed: Error: connect ECONNREFUSED'; exit 1 ;;
+      *) echo 'oi backfill dry-run: build 9c0bb1fe8b8a'; echo 'done in 3 s'; exit 0 ;;
+    esac ;;
+esac
+STUB
+chmod +x "$work/ohb-bin/docker"
+cat >"$work/ohb-deploy/deploy-watch.py" <<'PY'
+import os
+def send_owner(text, dry_run):
+    with open(os.environ['OHB_TG'], 'a', encoding='utf-8') as f:
+        f.write(text + '\n')
+    return {'ok': True}
+PY
+printf 'MemAvailable:     204800 kB\n' >"$work/ohb-meminfo"   # 200 MB
+ohb() { # $1 = case, $2 = FAKE_CLI, then env assignments, then the mode
+  local c="$1" cli="$2"; shift 2
+  mkdir -p "$work/ohb-$c"
+  env PATH="$work/ohb-bin:$PATH" OHB_DOCKER_LOG="$work/ohb-$c.docker" OHB_TG="$work/ohb-$c.tg" FAKE_CLI="$cli" \
+    CHECKS_DIR="$work/ohb-$c" DEPLOY_DIR="$work/ohb-deploy" MEMINFO="$work/ohb-meminfo" PID_TRIES=1 SAMPLE_S=0.1 \
+    "$@" >"$work/ohb-$c.stdout" 2>&1 || rc=$?
+  echo "${rc:-0}" >"$work/ohb-$c.rc"; unset rc
+}
+ohb_v() { cat "$work/ohb-$1/oi-hidden-dry-run.done" 2>/dev/null; }
+ohb ok ok bash "$OHB" --dry-run
+check 'oi-hidden: a completed dry run → PASS, the guard table appended, no Telegram' \
+  '[ "$(ohb_v ok)" = PASS ] && grep -q "V47 guard" $work/ohb-ok/oi-hidden-dry-run.md && [ ! -s $work/ohb-ok.tg ]'
+ohb refused refused env MEM_START_FLOOR_MB=140 bash "$OHB" --dry-run
+check 'oi-hidden: the CLI memory gate refused → DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB), exit 3, NO Telegram' \
+  '[ "$(ohb_v refused)" = "DEFERRED:memory gate refused (MemAvailable 139 MB < 140 MB)" ] && [ "$(cat $work/ohb-refused.rc)" = 3 ] && [ ! -s $work/ohb-refused.tg ]'
+check 'oi-hidden: MEM_START_FLOOR_MB reaches the container (docker exec -e), and only when set' \
+  'grep -q "^exec -e MEM_START_FLOOR_MB=140 insight-bot-insight-bot-1 node" $work/ohb-refused.docker && ! grep -q "MEM_START_FLOOR_MB" $work/ohb-ok.docker'
+ohb crash crash bash "$OHB" --dry-run
+check 'oi-hidden: a CLI that broke → FAIL:CLI exit 1 and ONE Telegram to the owner' \
+  '[ "$(ohb_v crash)" = "FAIL:CLI exit 1" ] && [ "$(wc -l <$work/ohb-crash.tg | tr -d " ")" = 1 ] && grep -q "сломался" $work/ohb-crash.tg'
+ohb nowin ok env WAIT_FOR_MB=240 WAIT_UNTIL=0 bash "$OHB" --dry-run
+check 'oi-hidden: no memory window before WAIT_UNTIL → DEFERRED, exit 3, the CLI never ran, NO Telegram' \
+  '[ "$(ohb_v nowin)" = "DEFERRED:no MemAvailable >= 240 MB window" ] && [ "$(cat $work/ohb-nowin.rc)" = 3 ] && ! grep -q "^exec" $work/ohb-nowin.docker 2>/dev/null && [ ! -s $work/ohb-nowin.tg ]'
+ohb win ok env WAIT_FOR_MB=200 WAIT_UNTIL=0 bash "$OHB" --dry-run
+check 'oi-hidden: the window is there (200 MB ≥ 200) → the run starts and PASSes' '[ "$(ohb_v win)" = PASS ]'
+cw="$(sed -n 's/.*case "\$verdict" in \(.*\) esac.*/\1/p' "$HERE/check-wait.sh")"
+check 'check-wait.sh: DEFERRED:* exits 3 (not 4, which means «the owner already has a FAIL message»)' \
+  '[ "$(verdict=DEFERRED:x; eval "case \"\$verdict\" in $cw esac" 2>/dev/null; echo $?)" = 3 ] || (verdict=DEFERRED:x; (eval "case \"\$verdict\" in $cw esac"); [ $? = 3 ])'
+
 if [ "$fail" = 0 ]; then echo "checks.test.sh: all passed"; else echo "checks.test.sh: FAILURES"; exit 1; fi

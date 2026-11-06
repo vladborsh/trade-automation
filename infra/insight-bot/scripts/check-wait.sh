@@ -6,7 +6,8 @@
 #   infra/insight-bot/scripts/check-wait.sh <name> [<not-before-epoch>] [<instance-id>]
 #
 # <not-before-epoch>: a sentinel older than this is a PREVIOUS run's and is ignored (default: now).
-# Exit 0 PASS · 1 FLAG:… · 4 FAIL:… (the owner already has the Telegram message) · 2 usage / AWS error
+# Exit 0 PASS · 1 FLAG:… · 3 DEFERRED:… (did not start, nothing broke; no Telegram) · 4 FAIL:… (the owner already has
+# the Telegram message) · 2 usage / AWS error
 # · 5 LOST: no verdict LOST_AFTER_S after <not-before-epoch> + the check's own schedule (pass DEADLINE_EPOCH).
 # One SSM call every POLL_S (300 s). Uses AWS profile `insight-bot` unless set.
 set -euo pipefail
@@ -42,7 +43,7 @@ while :; do
   echo "$(date -u +%H:%M:%S) mtime=${mtime:-?} ${verdict:-}"
   if [ "${mtime:-0}" -ge "$NOT_BEFORE" ] 2>/dev/null; then
     echo "check-wait: ${NAME} → ${verdict} (/var/log/insight-checks/${NAME}.md)"
-    case "$verdict" in PASS) exit 0 ;; FLAG:*) exit 1 ;; *) exit 4 ;; esac
+    case "$verdict" in PASS) exit 0 ;; FLAG:*) exit 1 ;; DEFERRED:*) exit 3 ;; *) exit 4 ;; esac
   fi
   if [ "$(date +%s)" -gt "$DEADLINE" ]; then
     echo "check-wait: ${NAME} → LOST (no verdict by $(date -u -r "$DEADLINE" +%FT%TZ 2>/dev/null || echo "$DEADLINE"))"
