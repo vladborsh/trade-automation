@@ -15,6 +15,7 @@ import type { OiLsService } from '../oi-ls.service';
 import type { UniverseSummaryService } from '../universe-summary.service';
 import { cell, unratedCell, changeRarity, levelRarity, quadrantOf, rollingChangesPct, signalOf } from './positioning.rules';
 import { REF_BARS_CACHE_MS, hourlyRef, refBarCloseMs, refBarsWindow, refFromBars, type PriceRef } from './price-ref';
+import { SpendsWeightAs } from '../../../venues/binance/weight-caller';
 
 /**
  * IB-085 (market-page design D9) — `GET /api/web/market/positioning?period=`: one row per CRYPTO
@@ -81,6 +82,7 @@ export class PositioningService {
     return this.options.symbols.filter((s) => s.asset_class === 'crypto');
   }
 
+  @SpendsWeightAs('positioning')
   async positioning(period: WebMarketPeriod): Promise<WebPositioningResponse> {
     return this.options.cache.getOrLoad(`positioning:${period}`, POSITIONING_CURRENT_CACHE_MS, () => this.compute(period));
   }
@@ -149,6 +151,7 @@ export class PositioningService {
    * change minus BTC's — now and at every past hour of the baselines (rolling, same length), from the
    * hourly closes already held. `days` is the history behind the sample. Null without baselines.
    */
+  @SpendsWeightAs('positioning')
   async breadth(period: WebMarketPeriod): Promise<Breadth | null> {
     const base = await this.baselines();
     const coins = this.coins.filter((c) => base.has(c.id));
@@ -185,6 +188,7 @@ export class PositioningService {
    * IB-119 (R4 on 7d): a coin's hourly closes since `fromMs`, `{time: the bar's close (s), value}` —
    * from the same cached baselines as `positioning()`, no venue call of its own.
    */
+  @SpendsWeightAs('positioning')
   async hourlyCloses(coin: string, fromMs: number): Promise<Array<{ time: number; value: number }>> {
     const b = (await this.baselines()).get(coin);
     if (!b) return [];
@@ -202,6 +206,7 @@ export class PositioningService {
    */
   async fundingSettlements(options: { held: true }): Promise<Map<string, WebFundingPoint[]> | null>;
   async fundingSettlements(options?: { held?: false }): Promise<Map<string, WebFundingPoint[]>>;
+  @SpendsWeightAs('positioning')
   async fundingSettlements(options: { held?: boolean } = {}): Promise<Map<string, WebFundingPoint[]> | null> {
     const base = options.held ? this.options.cache.get<Map<string, Baseline>>(BASELINES_KEY) ?? null : await this.baselines();
     if (base === null) return null;
@@ -213,6 +218,7 @@ export class PositioningService {
    * venue call). R5 normalises to 8 h with it, as `signalOf` does for the table. A coin without
    * baselines or with too few settlements is absent, and `fundingExtreme` counts it as 8 h.
    */
+  @SpendsWeightAs('positioning')
   async fundingIntervals(): Promise<Map<string, number>> {
     const base = await this.baselines();
     return new Map([...base.entries()].flatMap(([id, b]) => {

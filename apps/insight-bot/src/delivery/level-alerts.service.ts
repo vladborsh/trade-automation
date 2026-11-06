@@ -8,6 +8,7 @@ import { DB, type Db } from '../db/db.port';
 import { klinesWeight } from '../news/reaction-prices';
 import { CandlesService } from '../web/market/candles.service';
 import { TelegramSender } from './telegram-sender';
+import { SpendsWeightAs } from '../venues/binance/weight-caller';
 
 const TICK_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -85,6 +86,7 @@ export class LevelAlertsService implements OnApplicationBootstrap, OnModuleDestr
   }
 
   /** One tick; `nowMs` is the seam. The heartbeat line once per 15m close; a seed line when a coin was seeded. */
+  @SpendsWeightAs('level_alerts')
   async tick(nowMs = Date.now()): Promise<LevelTickReport | null> {
     if (!this.loop) return null;
     try {

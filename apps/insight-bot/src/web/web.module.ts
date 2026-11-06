@@ -151,7 +151,8 @@ export class WebModule {
             new AssetClassifier({
               symbols: config.symbols,
               futuresBaseUrl: config.env.get('BINANCE_FUTURES_REST_BASE_URL'),
-              onWeight: (header) => (header === null ? weight.recordCall(1) : weight.recordHeader(header)),
+              // IB-147: always booked (weight 1, `exchange_info`), so the per-caller count sees it; the header still wins in used1m
+              onWeight: (header) => { weight.recordCall(1, Date.now(), 'exchange_info'); if (header !== null) weight.recordHeader(header); },
             }),
         },
         {
@@ -307,7 +308,8 @@ export class WebModule {
             return new AlertsAdmin(new PgOiAlertStore(db), cachedExchangeInfo(async () => {
               const response = await fetch(url);
               const header = response.headers.get('x-mbx-used-weight-1m');
-              if (header === null) weight.recordCall(1); else weight.recordHeader(Number(header));
+              weight.recordCall(1, Date.now(), 'exchange_info'); // IB-147: always booked; the header still wins in used1m
+              if (header !== null) weight.recordHeader(Number(header));
               if (!response.ok) throw new Error(`exchangeInfo HTTP ${response.status}`);
               return response.json();
             }));

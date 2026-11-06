@@ -10,6 +10,7 @@ import { binanceFundingPoints } from '../web/market/funding-points';
 import { FUNDING_CALL_WEIGHT, PREMIUM_INDEX_CALL_WEIGHT } from '../web/market/funding.service';
 import { WEIGHT_CEILING_1M } from '../web/market/universe-summary.service';
 import { TelegramSender } from './telegram-sender';
+import { SpendsWeightAs } from '../venues/binance/weight-caller';
 
 /**
  * IB-124 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §3) — schedules `FundingAlertLoop` every
@@ -62,6 +63,7 @@ export class FundingAlertsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** One check; `nowMs` is the seam. One info line per tick (12 an hour), so a live run is provable from the log. */
+  @SpendsWeightAs('funding_alerts')
   async tick(nowMs = Date.now()): Promise<FundingTickReport | null> {
     if (!this.loop) return null;
     try {

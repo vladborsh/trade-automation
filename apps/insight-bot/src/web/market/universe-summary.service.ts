@@ -7,6 +7,7 @@ import {
   OiHistRowSchema, PremiumIndexSummaryRowSchema, Ticker24hRowSchema,
   type OiHistRow, type PremiumIndexSummaryRow, type Ticker24hRow,
 } from './summary.payloads';
+import { SpendsWeightAs } from '../../venues/binance/weight-caller';
 
 /**
  * The instrument page's symbol dropdown, read LIVE from Binance USD-M. Nothing is stored: this is
@@ -87,6 +88,7 @@ export class UniverseSummaryService {
   }
 
   /** The summary for these symbols, assembled from the shared snapshot and the per-symbol OI cache. */
+  @SpendsWeightAs('universe_summary')
   async summary(symbols: readonly SummarySymbol[]): Promise<WebUniverseSummaryResponse> {
     const snap = await this.venueSnapshot();
     // Open interest is per symbol and optional: a symbol whose call fails shows a dash.

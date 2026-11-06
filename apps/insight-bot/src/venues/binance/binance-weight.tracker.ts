@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { currentWeightCaller, type WeightCaller } from './weight-caller';
 
 const MINUTE_MS = 60_000;
 
@@ -33,10 +34,16 @@ const MINUTE_MS = 60_000;
 export class BinanceWeightTracker {
   private calls: Array<{ at: number; weight: number }> = [];
   private header: { at: number; value: number } | null = null;
+  /** IB-147: documented weight spent per caller since the process started (a counter: it only grows). */
+  private readonly spent = new Map<WeightCaller, number>();
 
-  /** One request this app made, with the weight the venue documents for it. */
-  recordCall(weight: number, at = Date.now()): void {
+  /**
+   * One request this app made, with the weight the venue documents for it. IB-147: booked to the caller whose work it
+   * is (`withWeightCaller`), or to `caller` when the call site names one.
+   */
+  recordCall(weight: number, at = Date.now(), caller: WeightCaller = currentWeightCaller()): void {
     if (!Number.isFinite(weight) || weight < 0) throw new Error(`weight must be a non-negative number, got ${weight}`);
+    this.spent.set(caller, (this.spent.get(caller) ?? 0) + weight);
     // Pruned here, not only in used1m(): a process nobody reads (no scrape, no admin page open)
     // would otherwise keep every call it ever made. Until WD-011 the daily report's peak sampling
     // did this as a side effect, on every record.
@@ -65,6 +72,11 @@ export class BinanceWeightTracker {
     if (this.header !== null && now - this.header.at < MINUTE_MS) return this.header.value;
     this.calls = this.calls.filter((call) => now - call.at < MINUTE_MS);
     return this.calls.reduce((sum, call) => sum + call.weight, 0);
+  }
+
+  /** IB-147: documented weight spent per caller since start — for `ib_binance_weight_spent_total{caller}`. */
+  spentByCaller(): ReadonlyMap<WeightCaller, number> {
+    return this.spent;
   }
 
   /** True when `used1m` is our own estimate rather than the venue's header. */

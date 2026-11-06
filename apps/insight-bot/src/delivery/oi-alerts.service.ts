@@ -6,6 +6,7 @@ import { DB, type Db } from '../db/db.port';
 import { OiWindowReader } from '../insights/divergence/oi-window.reader';
 import { CandlesService } from '../web/market/candles.service';
 import { TelegramSender } from './telegram-sender';
+import { SpendsWeightAs } from '../venues/binance/weight-caller';
 
 const CHECK_MS = 60_000;
 
@@ -66,6 +67,7 @@ export class OiAlertsService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** One check; `nowMs` is the seam (production passes nothing). */
+  @SpendsWeightAs('oi_alerts')
   async tick(nowMs = Date.now()): Promise<void> {
     try {
       for (const r of (await this.loop?.tick(Math.floor(nowMs / 1000))) ?? []) this.logger.log(evaluationLine(r));

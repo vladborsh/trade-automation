@@ -21,6 +21,7 @@ import {
 import { OpenWindow, splitOpen } from './gap-classifier';
 import { GapRange, planGaps, RegisteredGap } from './gap-ledger';
 import { missingRanges, nextPollAt, SLOT_MS, slotForPoll, slotOf } from './slot-grid';
+import { SpendsWeightAs } from '../../venues/binance/weight-caller';
 
 export const STREAM_ID = 'binance-perp:oi-ls-5m';
 const PERIOD = '5m';
@@ -117,6 +118,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
     // Read live at scrape time, so the gauge decays with the trailing minute instead of holding
     // the last poll's figure for five minutes.
     this.metrics.setBinanceWeightSource(() => this.weight.used1m());
+    this.metrics.setBinanceSpentSource(() => this.weight.spentByCaller());
   }
 
   /**
@@ -139,6 +141,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
    * IB-109 (V3): universe ∪ the enabled alert-list coins, read now. If the list cannot be read, the
    * previous pass's list stands (a database hiccup must not stop collecting a listed coin).
    */
+  @SpendsWeightAs('oi_ls_poller')
   async collectSymbols(): Promise<string[]> {
     let listed: string[];
     try {
@@ -178,6 +181,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
    * its slot stays missing, is recorded in `collector_gaps`, and the next poll or the next boot's
    * backfill picks it up.
    */
+  @SpendsWeightAs('oi_ls_poller')
   async pollOnce(at = Date.now()): Promise<{ oi: number; longShort: number; failed: string[] }> {
     const slot = slotForPoll(at);
     const oiRows: OpenInterestRow[] = [];
@@ -226,6 +230,7 @@ export class OiLsPoller implements OnApplicationBootstrap, OnModuleDestroy {
    * stored row is older than 5 minutes". Pages backward by `endTime`; the venue's `-1130` is the
    * retention edge and ends a symbol's walk cleanly.
    */
+  @SpendsWeightAs('oi_ls_poller')
   async backfill(now = Date.now()): Promise<{ symbols: number; oi: number; longShort: number }> {
     const from = now - RETENTION_MS + SLOT_MS; // one slot inside the edge, so the last page is not a guaranteed -1130
 

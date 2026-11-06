@@ -23,6 +23,8 @@ export class MetricsService {
    * both `/metrics` and the admin health page (`/api/web/health/streams`) read it at the instant they are asked.
    */
   private weightSource: (() => number) | null = null;
+  /** IB-147: documented weight spent per caller since start (the tracker's map). */
+  private spentSource: (() => ReadonlyMap<string, number>) | null = null;
   private binanceWeightUsed1m = 0;
   /** IB-006: spot's own trailing-minute weight, against its own 6000/min ceiling (§4.5). */
   private binanceSpotWeightUsed1m = 0;
@@ -94,6 +96,19 @@ export class MetricsService {
       },
     });
 
+    // IB-147: what the weight is spent ON — documented weight per caller since the process started, so a cold-boot
+    // minute can be split by the difference of two scrapes. Our own traffic only (the header above is the IP's).
+    new client.Gauge({
+      name: 'ib_binance_weight_spent_by_caller',
+      help: 'Binance futures REST weight spent per caller since start, at the documented weights (cumulative; IB-147)',
+      labelNames: ['caller'],
+      registers: [this.registry],
+      collect() {
+        this.reset();
+        for (const [caller, w] of self.spentSource?.() ?? []) this.set({ caller }, w);
+      },
+    });
+
     // IB-096: where the memory is — the process split and each cache's entries, read at scrape time
     new client.Gauge({
       name: 'ib_process_memory_bytes',
@@ -138,6 +153,11 @@ export class MetricsService {
   /** Registers the live reader. The collector calls this once, at boot. */
   setBinanceWeightSource(source: () => number): void {
     this.weightSource = source;
+  }
+
+  /** IB-147: registers the per-caller reader (the same tracker as the weight source). */
+  setBinanceSpentSource(source: () => ReadonlyMap<string, number>): void {
+    this.spentSource = source;
   }
 
   /** Fallback for a process with no collector running (the scaffold's 0). */

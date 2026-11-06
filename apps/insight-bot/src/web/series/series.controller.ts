@@ -14,6 +14,7 @@ import * as repo from './pg/liquidations.repo';
 import { FundingService } from '../market/funding.service';
 import { OiLsService } from '../market/oi-ls.service';
 import { OiDivergenceService } from '../market/oi-divergence.service';
+import { SpendsWeightAs } from '../../venues/binance/weight-caller';
 
 /** The venues whose liquidations a symbol can have: one per spelling `venueSpellings` resolves. */
 const LIQUIDATION_VENUES = WebVenueFilterSchema.options.filter((v) => v !== 'all').length;
@@ -58,6 +59,7 @@ export class SeriesController {
   }
 
   @Get('candles')
+  @SpendsWeightAs('chart')
   async candles(
     @Query('symbol') symbol: string,
     @Query('from') from: string,

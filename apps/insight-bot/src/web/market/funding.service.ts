@@ -8,6 +8,7 @@ import type { OkxRest } from '../../venues/okx/okx-rest';
 import { FUNDING_TTL_MS, windowKey, type TtlCache } from '../../venues/ttl-cache';
 import { binanceFundingPoints, bybitFundingPoints, okxFundingPoints } from './funding-points';
 import { WEIGHT_CEILING_1M } from './universe-summary.service';
+import { SpendsWeightAs } from '../../venues/binance/weight-caller';
 
 /**
  * WD-008 step 2 — settled funding per venue and Binance's predicted rate, read from the venues on
@@ -64,6 +65,7 @@ export class FundingService {
     this.now = options.now ?? Date.now;
   }
 
+  @SpendsWeightAs('market_funding')
   async funding(symbol: string, fromMs: number, toMs: number): Promise<OnDemandFunding> {
     const key = windowKey({ venue: 'all', market: 'perp', symbol, tf: 'funding', fromMs, toMs }, HOUR_MS);
     return this.options.cache.getOrLoad(key, FUNDING_TTL_MS, () => this.load(symbol, fromMs, toMs), (v) => v.unavailable.length === 0);
@@ -103,6 +105,7 @@ export class FundingService {
    * IB-085 (D9): Binance's settled funding alone, for the positioning baseline — the same read the
    * panel makes, without asking Bybit and OKX for a series the table does not use.
    */
+  @SpendsWeightAs('market_funding')
   async binanceSettledHistory(symbol: string, fromMs: number, toMs: number): Promise<WebFundingPoint[]> {
     return this.binanceSettled(symbol, fromMs, toMs);
   }

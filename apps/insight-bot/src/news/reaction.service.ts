@@ -11,6 +11,7 @@ import {
   barsFromKlines, closeAtOrBefore, closedBars, klinesRequest, klinesWeight, MAX_VENUE_CALLS_PER_PASS,
   windowCoverage, type ReactionBar,
 } from './reaction-prices';
+import { SpendsWeightAs } from '../venues/binance/weight-caller';
 
 /** Every five minutes: the shortest horizon is 15m, so nothing waits long for its window to close. */
 export const REACTION_TICK_MS = 5 * 60_000;
@@ -87,6 +88,7 @@ export class ReactionService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   /** One pass over everything pending. Public so a spec can drive it without timers. */
+  @SpendsWeightAs('news_reaction')
   async tick(now = Date.now()): Promise<ReactionPass | null> {
     const db = this.db;
     if (!db || this.running) return null;

@@ -5,6 +5,7 @@ import { runInsights } from './engine';
 import { RULES } from './rules';
 import { INSIGHTS_CACHE_MS } from './thresholds';
 import type { InsightSnapshot } from './types';
+import { SpendsWeightAs } from '../venues/binance/weight-caller';
 
 /**
  * IB-086 (D1) — builds the snapshot from the market services (not HTTP) and runs the engine.
@@ -51,6 +52,7 @@ export class InsightsService {
    * the engine — pure, a few dozen comparisons — runs per request on the viewer's variant. Default:
    * hidden.
    */
+  @SpendsWeightAs('insights')
   async insights(period: WebMarketPeriod, viewer: { admin: boolean } = { admin: false }): Promise<WebInsightsResponse> {
     const { snapshot, membersVisible } = await this.snapshot(period);
     const sees = viewer.admin || membersVisible;
