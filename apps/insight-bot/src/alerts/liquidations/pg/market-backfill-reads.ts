@@ -2,8 +2,8 @@ import type { DbHandle } from '../../../db/db.port';
 
 const ms = (d: Date | string | null): number | null => (d === null ? null : new Date(d).getTime());
 
-/** A `market_alerts` type with a history run: liquidations (IB-123) and funding (IB-125). */
-export type MarketBackfillType = 'liq' | 'funding';
+/** A `market_alerts` type with a history run: liquidations (IB-123), funding (IB-125) and levels (IB-127). */
+export type MarketBackfillType = 'liq' | 'funding' | 'level';
 
 /**
  * IB-123, generalised by IB-125 — the reads a market-alert history run is bounded and checked by, for ONE type.
@@ -71,6 +71,20 @@ export class PgMarketBackfillReads {
 export class PgFundingBackfillReads extends PgMarketBackfillReads {
   constructor(db: DbHandle) {
     super(db, 'funding');
+  }
+
+  backfillCounts(): Promise<Record<string, number>> {
+    return this.rowsByEventAndKind();
+  }
+}
+
+/**
+ * IB-127: the level history run's reads. `backfillCounts` keys: `alerts_<event>` (breakout_up … crossover),
+ * `controls_touch`, `controls_random`, `paths`, `paths_measured`.
+ */
+export class PgLevelBackfillReads extends PgMarketBackfillReads {
+  constructor(db: DbHandle) {
+    super(db, 'level');
   }
 
   backfillCounts(): Promise<Record<string, number>> {

@@ -105,7 +105,7 @@ export interface NewPaths {
  * `funding`): `market` takes every type, so the liquidation run's weekly rerun would have measured the funding
  * run's backlog too, with its weight and its bands.
  */
-export type PathSubjects = 'all' | 'oi' | 'market' | 'liq' | 'funding';
+export type PathSubjects = 'all' | 'oi' | 'market' | 'liq' | 'funding' | 'level';
 
 export interface PathDue {
   id: number;
@@ -170,7 +170,7 @@ export interface OiAlertStore {
   /**
    * `subjects` (IB-123): which subjects' windows — `all` (the live tick: one queue, one measurer), `oi` (the OI
    * divergence journal, controls and near-misses: IB-116's history run) or `market` (market_alerts and their
-   * controls), or one market type, `liq` (IB-123's run) or `funding` (IB-125's). Each history run measures only its
+   * controls), or one market type, `liq` (IB-123's run), `funding` (IB-125's) or `level` (IB-127's). Each history run measures only its
    * own backlog, so its weight and its check's bands are its own.
    */
   pathsDue(source: OiJournalSource, nowSec: number, limit: number, retryAfterSec: number, subjects?: PathSubjects): Promise<PathDue[]>;
