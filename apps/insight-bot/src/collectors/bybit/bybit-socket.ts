@@ -10,7 +10,13 @@ import WebSocket from 'ws';
  * for each of those; when dev-1's `binance-common` lands, the pieces that really are shared —
  * backoff, the silence watchdog — can move there.
  *
- * Dead-socket rule, as IB-005: no message for `silenceMs` (90 s) → reconnect. Bybit's WS is
+ * Dead-socket rule, as IB-005: no **data frame** for `silenceMs` (90 s) → reconnect. IB-BUG-051 made it
+ * hold in the two cases it missed: it is armed when the connect **starts** (a handshake that never
+ * completes emits neither `open` nor `close`, so a rule armed by `open` never fired), and only a
+ * topic frame resets it. The liveness topic (`tickers.{first symbol}`, see `BybitCollector`) is what
+ * keeps it quiet in a quiet market. Our own `pong` and the subscribe acks prove the TCP link, not
+ * that the route publishes: counted, a socket whose topics deliver nothing looked alive for ever.
+ * Bybit's WS is
  * reachable from the dev network (unlike Binance's fstream), so there is no degraded REST mode
  * here: `allLiquidation` has no REST equivalent at all, and a silent socket is a reconnect, not a
  * fallback.
@@ -61,7 +67,9 @@ export class BybitSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
+  /** The last data frame, or the start of the current connect: the silence rule's clock. */
   private lastMessageAt: number | null = null;
+  private opened = false;
   /** IB-122 (L5): the topics to (re)subscribe; `setTopics` changes them on a live socket without a reconnect. */
   private topics: string[];
   private subscribed = false;
@@ -104,8 +112,17 @@ export class BybitSocket {
     this.closeSocket();
     const socket = this.factory(this.options.url);
     this.socket = socket;
+    this.opened = false;
+    // IB-BUG-051: armed now, not on 'open' — a handshake that hangs never emits 'open'
+    this.lastMessageAt = this.now();
+    // A replaced socket's events arrive late (`ws` emits close asynchronously): they must not touch
+    // the socket that replaced it — a stale close used to null the live one, stop its ping and open
+    // a third, leaving the second open and delivering with nobody pinging it.
+    const current = () => this.socket === socket;
 
     socket.on('open', (() => {
+      if (!current()) return;
+      this.opened = true;
       this.backoffMs = INITIAL_BACKOFF_MS;
       this.lastMessageAt = this.now();
       for (const chunk of chunkTopics(this.topics)) {
@@ -117,7 +134,7 @@ export class BybitSocket {
     }) as never);
 
     socket.on('message', ((raw: unknown) => {
-      this.lastMessageAt = this.now();
+      if (!current()) return;
       let parsed: unknown;
       try {
         parsed = JSON.parse(String(raw));
@@ -130,10 +147,12 @@ export class BybitSocket {
         return;
       }
       if (ack?.op === 'ping' || ack?.op === 'pong' || ack?.op === 'subscribe' || ack?.op === 'unsubscribe') return; // acks are not data
+      this.lastMessageAt = this.now(); // only a topic frame proves the route publishes
       this.options.handlers.onMessage(parsed);
     }) as never);
 
     socket.on('close', ((code: number) => {
+      if (!current()) return;
       this.socket = null;
       this.subscribed = false;
       this.stopPing();
@@ -142,6 +161,7 @@ export class BybitSocket {
     }) as never);
 
     socket.on('error', ((error: Error) => {
+      if (!current()) return; // the replaced socket's "closed before the connection was established"
       this.options.handlers.onError(error?.message ?? 'socket error');
     }) as never);
   }
@@ -150,7 +170,8 @@ export class BybitSocket {
   checkSilence(now = this.now()): boolean {
     if (this.stopped || this.lastMessageAt === null) return false;
     if (now - this.lastMessageAt < this.silenceMs) return false;
-    this.options.handlers.onError(`no message for ${Math.round((now - this.lastMessageAt) / 1000)} s — reconnecting`);
+    const seconds = Math.round((now - this.lastMessageAt) / 1000);
+    this.options.handlers.onError(`no message for ${seconds} s${this.opened ? '' : ' (never opened)'} — reconnecting`);
     this.lastMessageAt = now; // do not fire again until the new socket has had its window
     this.open();
     return true;

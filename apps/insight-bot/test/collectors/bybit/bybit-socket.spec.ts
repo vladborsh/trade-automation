@@ -126,6 +126,60 @@ describe('BybitSocket', () => {
     h.socket.stop();
   });
 
+  it('IB-BUG-051: the replaced socket closing late does not tear down its replacement', () => {
+    jest.useFakeTimers();
+    try {
+      const h = harness(['tickers.BTCUSDT']);
+      h.socket.open();
+      h.made[0].emit('open');
+      h.advance(SILENCE_MS);
+      expect(h.socket.checkSilence()).toBe(true);
+      h.made[1].emit('open');
+      const sentBefore = h.made[1].sent.length;
+
+      // `ws` emits the old socket's close asynchronously, after the new one exists
+      h.made[0].emit('close', 1006);
+      h.made[0].emit('message', JSON.stringify(LIQUIDATIONS[0]));
+      jest.advanceTimersByTime(PING_MS);
+
+      expect(h.made).toHaveLength(2); // no third socket, no orphan left delivering
+      expect(h.made[1].sent.length).toBe(sentBefore + 1); // the live socket is still pinged
+      expect(h.data).toEqual([]); // the stale socket's frames are not data
+      expect(h.events).not.toContain('close:1006'); // and its close is not a reconnect of ours
+      h.socket.stop();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('IB-BUG-051: a pong or an ack does not hold off the silence rule; a data frame does', () => {
+    const h = harness(['tickers.BTCUSDT']);
+    h.socket.open();
+    h.made[0].emit('open');
+    h.advance(SILENCE_MS - 1);
+    h.made[0].emit('message', JSON.stringify({ success: true, ret_msg: 'pong', op: 'ping' }));
+    h.made[0].emit('message', JSON.stringify({ success: true, ret_msg: '', op: 'subscribe' }));
+    h.advance(1);
+    expect(h.socket.checkSilence()).toBe(true);
+
+    h.made[1].emit('open');
+    h.advance(SILENCE_MS - 1);
+    h.made[1].emit('message', JSON.stringify(LIQUIDATIONS[0]));
+    h.advance(1);
+    expect(h.socket.checkSilence()).toBe(false);
+    h.socket.stop();
+  });
+
+  it('IB-BUG-051: the rule is armed when the connect starts, before any open', () => {
+    const h = harness(['tickers.BTCUSDT']);
+    h.socket.open(); // no 'open' ever
+    h.advance(SILENCE_MS);
+    expect(h.socket.checkSilence()).toBe(true);
+    expect(h.made).toHaveLength(2);
+    expect(h.events.some((e) => /never opened/.test(e))).toBe(true);
+    h.socket.stop();
+  });
+
   it('reconnects after a close with a doubling backoff', () => {
     jest.useFakeTimers();
     try {

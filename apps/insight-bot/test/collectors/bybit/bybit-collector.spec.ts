@@ -19,7 +19,7 @@ function harness(over: Partial<BybitCollectorPorts> = {}) {
     recordMessage(id: string) { this.messages.push(id); },
     recordReconnect() { this.reconnects++; },
   };
-  const sockets: Array<{ opened: number; stopped: number; silenceChecks: number; topics: readonly string[] }> = [];
+  const sockets: Array<{ opened: number; stopped: number; silenceChecks: number; fires: boolean; topics: readonly string[] }> = [];
   const warnings: string[] = [];
   let handlers!: Parameters<BybitCollectorPorts['socketFactory']>[0];
 
@@ -29,7 +29,7 @@ function harness(over: Partial<BybitCollectorPorts> = {}) {
     registry,
     socketFactory: (hs, topics): BybitSocketLike => {
       handlers = hs;
-      const state = { opened: 0, stopped: 0, silenceChecks: 0, topics };
+      const state = { opened: 0, stopped: 0, silenceChecks: 0, fires: false, topics };
       sockets.push(state);
       return {
         setTopics: (next) => {
@@ -40,7 +40,7 @@ function harness(over: Partial<BybitCollectorPorts> = {}) {
         },
         open: () => void state.opened++,
         stop: () => void state.stopped++,
-        checkSilence: () => (state.silenceChecks++, false),
+        checkSilence: () => (state.silenceChecks++, state.fires),
       };
     },
     logger: { log: () => undefined, warn: (m: string) => void warnings.push(m) },
@@ -99,6 +99,16 @@ describe('BybitCollector — liquidations (§4.3)', () => {
     h.collector.stop();
     h.collector.tick();
     expect(h.sockets[0]).toMatchObject({ silenceChecks: 1, stopped: 1 });
+  });
+
+  it('IB-BUG-051: a silence reconnect is recorded as a reconnect; a quiet tick is not', () => {
+    const h = harness();
+    h.collector.start();
+    h.collector.tick();
+    expect(h.registry.reconnects).toBe(0);
+    h.sockets[0].fires = true;
+    h.collector.tick();
+    expect(h.registry.reconnects).toBe(1);
   });
 
   it('a failing write through the socket handler is logged, not thrown; a refused topic is shouted', async () => {

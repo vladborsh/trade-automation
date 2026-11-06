@@ -108,10 +108,15 @@ export class BybitCollector {
     this.socket.open();
   }
 
-  /** The silence watchdog (the socket owns the rule; this is its clock). */
+  /**
+   * The silence watchdog (the socket owns the rule; this is its clock). A silence reconnect replaces the
+   * socket without a `close` reaching us (the stale socket's events are dropped, IB-BUG-051), so it is
+   * counted here, the same as a close.
+   */
   tick(): void {
     if (this.stopped) return;
-    this.socket?.checkSilence(this.now());
+    const now = this.now();
+    if (this.socket?.checkSilence(now)) this.ports.registry.recordReconnect(STREAM_LIQUIDATION, now);
   }
 
   stop(): void {

@@ -9,7 +9,9 @@ import WebSocket from 'ws';
  * Mechanics only — no write policy. Reconnect backoff and the silence watchdog live here, the
  * same division IB-008's `BybitSocket` settled on.
  *
- * **Dead-socket rule, as IB-005/IB-008: no message for `silenceMs` (90 s) → reconnect.** There is
+ * **Dead-socket rule, as IB-005/IB-008: no message for `silenceMs` (90 s) → reconnect.** Armed when
+ * the connect starts (IB-BUG-051): a handshake that never completes emits neither `open` nor
+ * `close`, and a rule armed by `open` left such a socket hanging for ever. There is
  * deliberately no degraded REST mode: OKX's WS is reachable from the dev network (confirmed
  * 2026-09-28, unlike Binance's fstream), and `liquidation-orders` has no REST equivalent at all,
  * so a silent socket is a reconnect, not a fallback. `checkSilence()` is called by the service's
@@ -68,7 +70,9 @@ export class OkxSocket {
   private backoffTimer: ReturnType<typeof setTimeout> | null = null;
   private backoffMs = INITIAL_BACKOFF_MS;
   private closed = false;
+  /** The last venue frame, or the start of the current connect: the silence rule's clock. */
   private lastMessageAt: number | null = null;
+  private opened = false;
   private readonly now: () => number;
   readonly silenceMs: number;
 
@@ -92,8 +96,11 @@ export class OkxSocket {
     const factory = this.options.factory ?? ((url: string) => new WebSocket(url) as unknown as WebSocketLike);
     const socket = factory(this.options.wsUrl);
     this.socket = socket;
+    this.opened = false;
+    this.lastMessageAt = this.now(); // IB-BUG-051: armed now, not on 'open' — a hung handshake never opens
 
     socket.on('open', (() => {
+      this.opened = true;
       this.backoffMs = INITIAL_BACKOFF_MS;
       this.lastMessageAt = this.now();
       socket.send(OkxSocket.subscribeFrame(this.options.subscriptions));
@@ -187,7 +194,8 @@ export class OkxSocket {
   checkSilence(now = this.now()): boolean {
     if (this.closed || this.lastMessageAt === null) return false;
     if (now - this.lastMessageAt < this.silenceMs) return false;
-    this.options.handlers.onError(`no message for ${Math.round((now - this.lastMessageAt) / 1000)} s — reconnecting`);
+    const seconds = Math.round((now - this.lastMessageAt) / 1000);
+    this.options.handlers.onError(`no message for ${seconds} s${this.opened ? '' : ' (never opened)'} — reconnecting`);
     this.lastMessageAt = now;
     this.reopen();
     return true;
