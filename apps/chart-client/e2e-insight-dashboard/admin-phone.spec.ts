@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { gotoReady } from './ready';
 // IB-BUG-034: real answers from slot dev-3's bot (2026-11-04), signed in as its admin
 import streams from './fixtures/admin-health-streams.json';
 import db from './fixtures/admin-health-db.json';
@@ -110,13 +111,23 @@ const PAGES = [
   ['/admin/alerts', 'Сигналы OI'],
 ] as const;
 
+/** IB-BUG-049: what each page must have been SERVED before it is measured — instead of a 5 s `h1` wait. */
+const SERVED: Record<(typeof PAGES)[number][0], readonly string[]> = {
+  '/health': ['/health/streams', '/health/db'],
+  '/admin/members': ['/admin/members'],
+  '/admin/logins': ['/admin/login-events'],
+  '/admin/alerts': ['/admin/alerts', '/admin/alerts/liq', '/admin/alerts/funding', '/admin/alerts/levels', '/admin/alerts/levels/custom'],
+};
+const openReady = (page: Page, path: (typeof PAGES)[number][0]) =>
+  gotoReady(page, path, { served: SERVED[path], ready: page.locator('table').first() });
+
 test.describe('admin pages — phone 390×844 (IB-BUG-034)', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 
   for (const [path, title] of PAGES) {
     test(`${path}: no page horizontal scroll; every table fits or scrolls in its own box`, async ({ page }, info) => {
       await mockApi(page);
-      await page.goto(path);
+      await openReady(page, path); // IB-BUG-049
       await expect(page.locator('h1')).toContainText(title);
       await expect(page.locator('table').first()).toBeVisible();
       if (path === '/admin/alerts') await expect(page.locator('app-admin-liq-alerts tbody tr')).toHaveCount(liqPage.coins.length + 1);
@@ -147,7 +158,7 @@ test.describe('admin pages — desktop 1440×900 (IB-BUG-034)', () => {
   for (const [path, title] of PAGES) {
     test(`${path}: every table fits the page at desktop width`, async ({ page }, info) => {
       await mockApi(page);
-      await page.goto(path);
+      await openReady(page, path); // IB-BUG-049
       await expect(page.locator('h1')).toContainText(title);
       await expect(page.locator('table').first()).toBeVisible();
       const m = await measure(page);

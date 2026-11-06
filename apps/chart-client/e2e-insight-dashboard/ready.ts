@@ -20,11 +20,20 @@ import type { Locator, Page } from '@playwright/test';
  * Call `page.clock.runFor` AFTER this: only then does it advance a running page.
  */
 export async function gotoReady(page: Page, url: string, opts: { served: readonly string[]; ready: Locator }): Promise<void> {
+  await readyAfter(page, () => page.goto(url), opts);
+}
+
+/**
+ * IB-BUG-049 — the same wait around any action that loads a page or a route: a `reload`, or a click
+ * on a link that navigates inside the app. The response waits are armed BEFORE the action, so an
+ * answer that comes back during it is not missed.
+ */
+export async function readyAfter(page: Page, action: () => Promise<unknown>, opts: { served: readonly string[]; ready: Locator }): Promise<void> {
   const served = opts.served.map((path) =>
     page.waitForResponse((r) => new URL(r.url()).pathname === `/api/web${path}`, { timeout: 0 }));
-  // a goto that throws must not leave the waits as unhandled rejections; they are awaited below
+  // an action that throws must not leave the waits as unhandled rejections; they are awaited below
   for (const s of served) s.catch(() => undefined);
-  await page.goto(url);
+  await action();
   await Promise.all(served);
   await opts.ready.waitFor({ state: 'attached', timeout: 0 });
 }

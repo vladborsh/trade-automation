@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import recorded from './fixtures/instrument-btcusdt.json';
+import { gotoReady, readyAfter } from './ready';
 
 /**
  * IB-099 — the owner's instrument-page fixes, in a real browser: the calendar badge opens the
@@ -18,9 +19,15 @@ async function open(page: Page): Promise<void> {
     const hit = responses[u.pathname.replace('/api/web', '') + u.search];
     return route.fulfill({ status: hit?.status ?? 404, contentType: 'application/json', body: JSON.stringify(hit?.body ?? { code: 'NOT_RECORDED', message: u.pathname }) });
   });
-  await page.goto('/instrument/BTCUSDT');
-  await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
+  await gotoReady(page, '/instrument/BTCUSDT', INSTRUMENT_READY(page)); // IB-BUG-049
+  await expect(page.locator('.calendar-badge')).toHaveCount(1);
 }
+
+/**
+ * IB-BUG-049: the instrument page is ready when its candles and calendar have been served and the
+ * calendar badge (drawn from both) is on the chart — instead of a blind 30 s on the badge.
+ */
+const INSTRUMENT_READY = (page: Page) => ({ served: ['/series/candles', '/calendar/events'], ready: page.locator('.calendar-badge') });
 
 /** IB-BUG-019's measure: what the CHART holds (lightweight-charts' panes and series, and the marks the
  *  component attached), read through Angular's dev-mode handle — not a DOM node the switch could hide. */
@@ -35,8 +42,32 @@ async function chartState(page: Page): Promise<{ panes: number; series: number; 
     return { panes: panes.length, series: panes.reduce((n, p) => n + p.getSeries().length, 0), primitives: c.renderers.paneMarks.length };
   });
 }
+/**
+ * IB-BUG-049: the live tail REPLACES the calendar badge every ~5 s (`replaceChildren`; probed under CPU
+ * ×8, 3 of 3 runs, 4.5–5 s apart, never hidden). `locator.boundingBox()` resolves the element, then
+ * measures it in a second round trip: a replacement in between reads null (4 of 5 runs at ×8, on
+ * master too), and under ×8 each round trip is slow enough that polling it ran out of time as well.
+ * Found and measured in ONE page task, nothing can come in between, and no budget is needed.
+ */
+async function boxOf(page: Page, selector: string): Promise<{ x: number; y: number; width: number; height: number }> {
+  return page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) throw new Error(`boxOf: no ${sel}`);
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  }, selector);
+}
 const overlap = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/**
+ * IB-BUG-049 — a named budget per full instrument-page load, for a test that loads the page more than
+ * once (the suite's flat 60 s is per test, whatever it does). Measured on 6019fda1, the 3-load reload
+ * test, 3 runs each: 13.2–13.6 s at ×1 (≈ 4.5 s a load) and 68.0–69.4 s under CPU ×8 (≈ 23 s a
+ * load), which the flat 60 s failed 1 of 3. 40 s a load keeps ×8 green with room; a page that never
+ * becomes ready still fails, naming what gotoReady / readyAfter waited for.
+ */
+const INSTRUMENT_LOAD_MS = 40_000;
 
 test.describe('instrument page — desktop (IB-099)', () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
@@ -45,7 +76,7 @@ test.describe('instrument page — desktop (IB-099)', () => {
     await open(page);
     const badge = page.locator('.calendar-badge');
     await expect(badge).toBeVisible();
-    const box = (await badge.boundingBox())!;
+    const box = await boxOf(page, '.calendar-badge'); // IB-BUG-049: one atomic read, see boxOf
     expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(24);
     await expect(badge.locator('svg')).toHaveCount(1); // an SVG flag, not an emoji
     await badge.click();
@@ -63,6 +94,7 @@ test.describe('instrument page — desktop (IB-099)', () => {
   });
 
   test('IB-105: the on-chart switch hides every legend and nothing else; same spot to show them; reload keeps it', async ({ page }) => {
+    test.setTimeout(3 * INSTRUMENT_LOAD_MS); // open + two reloads (IB-BUG-049)
     await open(page);
     const legends = page.locator('.pane-legend');
     const toggle = page.locator('.chart-column app-legend-toggle button');
@@ -81,15 +113,15 @@ test.describe('instrument page — desktop (IB-099)', () => {
     expect(await toggle.boundingBox()).toEqual(spot); // the way back is where it was
     await expect(toggle).toHaveAttribute('aria-label', 'Show legend');
 
-    await page.reload();
-    await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
+    await readyAfter(page, () => page.reload(), INSTRUMENT_READY(page));
+    await expect(page.locator('.calendar-badge')).toHaveCount(1);
     await expect(legends.filter({ visible: true })).toHaveCount(0);
     expect(await chartState(page)).toEqual(before);
 
     await toggle.click();
     await expect(legends.first()).toBeVisible();
-    await page.reload();
-    await expect(page.locator('.calendar-badge')).toHaveCount(1, { timeout: 30_000 });
+    await readyAfter(page, () => page.reload(), INSTRUMENT_READY(page));
+    await expect(page.locator('.calendar-badge')).toHaveCount(1);
     await expect(legends.first()).toBeVisible();
     expect(await chartState(page)).toEqual(before);
   });
@@ -99,7 +131,7 @@ test.describe('instrument page — desktop (IB-099)', () => {
     const t = (await page.locator('.chart-column app-legend-toggle button').boundingBox())!;
     expect(Math.max(t.width, t.height)).toBeLessThanOrEqual(22); // a small glyph on desktop
     for (const [name, sel] of [['price legend', '.pane-legend[data-pane="price"]'], ['badge', '.calendar-badge'], ['full screen', 'app-fullscreen-button button']] as const) {
-      expect(overlap(t, (await page.locator(sel).boundingBox())!), name).toBe(false);
+      expect(overlap(t, await boxOf(page, sel)), name).toBe(false);
     }
     const host = (await page.locator('.chart-host').boundingBox())!;
     expect(t.x - host.x).toBeLessThan(12); // at the chart's left edge…
@@ -152,7 +184,7 @@ test.describe('instrument page — phone 390×844 (IB-099)', () => {
   test('the badge is a ≥ 40 px target and a tap opens the tooltip; the page does not scroll sideways', async ({ page }) => {
     await open(page);
     const badge = page.locator('.calendar-badge');
-    const box = (await badge.boundingBox())!;
+    const box = await boxOf(page, '.calendar-badge'); // IB-BUG-049: one atomic read, see boxOf
     expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(40);
     await badge.tap();
     await expect(page.locator('.calendar-tooltip')).toContainText('Congressional Elections');
@@ -171,7 +203,7 @@ test.describe('instrument page — phone 390×844 (IB-099)', () => {
     const hits = await page.evaluate(([x0, y0]) => [[1, 1], [39, 1], [1, 39], [39, 39], [20, 20]].map(([dx, dy]) =>
       !!document.elementFromPoint(x0 + dx, y0 + dy)?.closest('app-legend-toggle')), [host.x, host.y]);
     expect(hits).toEqual([true, true, true, true, true]);
-    expect(overlap(g, (await page.locator('.calendar-badge').boundingBox())!)).toBe(false);
+    expect(overlap(g, await boxOf(page, '.calendar-badge'))).toBe(false); // IB-BUG-049: atomic, see boxOf
     const before = await chartState(page);
     await toggle.tap();
     await expect(page.locator('.pane-legend').filter({ visible: true })).toHaveCount(0);
@@ -219,13 +251,14 @@ test.describe('an R4 statement opens the whole period (IB-BUG-023)', () => {
       const hit = responses[path + u.search];
       return route.fulfill({ status: hit?.status ?? 404, contentType: 'application/json', body: JSON.stringify(hit?.body ?? { code: 'NOT_RECORDED', message: path }) });
     });
-    await page.goto('/market?p=1h');
     const link = page.locator('#insights a.link').first();
-    await expect(link).toHaveAttribute('href', `/instrument/BTCUSDT?at=${at}&span=1h`, { timeout: 30_000 });
-    await link.click();
-    await expect(page).toHaveURL(new RegExp(`/instrument/BTCUSDT\\?at=${at}&span=1h$`));
+    await gotoReady(page, '/market?p=1h', { served: ['/market/insights'], ready: link }); // IB-BUG-049
+    await expect(link).toHaveAttribute('href', `/instrument/BTCUSDT?at=${at}&span=1h`);
     const marker = page.locator('.focus-marker');
-    await expect(marker).toHaveAttribute('data-at', String(at), { timeout: 30_000 });
+    // an in-app navigation: the instrument route's chunk, its candles, then the marker
+    await readyAfter(page, () => link.click(), { served: ['/series/candles'], ready: marker });
+    await expect(page).toHaveURL(new RegExp(`/instrument/BTCUSDT\\?at=${at}&span=1h$`));
+    await expect(marker).toHaveAttribute('data-at', String(at));
     await expect(marker).toContainText('period start');
     await expect(page.getByRole('button', { name: '1m', exact: true })).toHaveClass(/active/);
   });
