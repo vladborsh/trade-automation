@@ -1,4 +1,4 @@
-import type { WebPositioningResponse, WebPositioningRow } from '@trade-automation/contracts';
+import { WEB_POSITIONING_UNAVAILABLE, type WebPositioningResponse, type WebPositioningRow } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import fixture from '../../../../../../../../libs/contracts/test/fixtures/positioning.24h.json';
 import { en } from '../../i18n/en';
@@ -170,7 +170,17 @@ describe('heat — by rarity, not by sign', () => {
     expect(btc.cells.fundingRate.text).toBe('0.0120 %');
     expect(btc.cells.lsGlobal.text).toBe('1.84');
     expect(btc.cells.liqUsd).toEqual({ text: '$3.4M', heat: 'none', reasonKey: 'positioning.unavailable.insufficient_history' });
-    for (const t of [ru, en]) for (const k of ['positioning.unavailable.insufficient_history', 'positioning.unavailable.venue_unavailable', 'positioning.unavailable.not_listed']) expect((t as Record<string, string>)[k], k).toBeTruthy();
+    for (const t of [ru, en]) for (const k of WEB_POSITIONING_UNAVAILABLE.map((u) => `positioning.unavailable.${u}`)) expect((t as Record<string, string>)[k], k).toBeTruthy();
+  });
+
+  it('IB-BUG-037: a 7d cell that is never rated says so, not «under 20 days»', () => {
+    const btc = rows.find((r) => r.base === 'BTC')!;
+    const unrated = { value: 2.1, rarity: null, unavailable: 'not_rated_at_period' as const, sample: 0 };
+    const c = heatRow({ ...btc, priceChangePct: unrated, oiChangePct: unrated, liqUsd: { ...unrated, value: 3.4e6 } }).cells;
+    for (const cell of [c.priceChangePct, c.oiChangePct, c.liqUsd]) expect(cell).toMatchObject({ heat: 'none', reasonKey: 'positioning.unavailable.not_rated_at_period' });
+    expect(ru['positioning.unavailable.not_rated_at_period']).toBe('на 7 дней редкость не считается: в 30 днях только 4 таких окна');
+    expect(en['positioning.unavailable.not_rated_at_period']).toBe('rarity is not measured over 7 days: 30 days hold only 4 such windows');
+    for (const t of [ru, en]) expect((t as Record<string, string>)['positioning.unavailable.not_rated_at_period']).not.toMatch(/20/);
   });
 
   it('every signal word is translated (the enum is closed)', () => {

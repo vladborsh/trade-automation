@@ -369,6 +369,7 @@ export type StringKey =
   | 'positioning.signal.crowded_short'
   | 'positioning.signal.quiet'
   | 'positioning.unavailable.insufficient_history'
+  | 'positioning.unavailable.not_rated_at_period'
   | 'positioning.unavailable.venue_unavailable'
   | 'positioning.unavailable.not_listed'
   | 'caps.title'

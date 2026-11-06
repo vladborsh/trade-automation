@@ -369,6 +369,7 @@ export const ru: Strings = {
   'positioning.signal.crowded_short': 'толпа в шортах',
   'positioning.signal.quiet': 'тихо',
   'positioning.unavailable.insufficient_history': 'пока мало истории (меньше 20 дней)',
+  'positioning.unavailable.not_rated_at_period': 'на 7 дней редкость не считается: в 30 днях только 4 таких окна',
   'positioning.unavailable.venue_unavailable': 'биржа не ответила',
   'positioning.unavailable.not_listed': 'у биржи нет такого ряда для этой монеты',
   'caps.title': 'Капитализация',

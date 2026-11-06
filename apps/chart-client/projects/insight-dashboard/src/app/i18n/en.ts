@@ -363,6 +363,7 @@ export const en: Strings = {
   'positioning.signal.crowded_short': 'crowd in shorts',
   'positioning.signal.quiet': 'quiet',
   'positioning.unavailable.insufficient_history': 'not enough history yet (under 20 days)',
+  'positioning.unavailable.not_rated_at_period': 'rarity is not measured over 7 days: 30 days hold only 4 such windows',
   'positioning.unavailable.venue_unavailable': 'the exchange did not answer',
   'positioning.unavailable.not_listed': 'the exchange has no such series for this coin',
   'caps.title': 'Market cap',
