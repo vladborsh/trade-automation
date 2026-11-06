@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MARKET_ALERT_SOURCES } from './market-alerts';
+import { MARKET_ALERT_SOURCES, MarketAlertMutedBySchema } from './market-alerts';
 import { AlertSymbolSchema } from './oi-divergence-admin';
 
 /**
@@ -181,6 +181,8 @@ export const WebLevelAlertRowSchema = z.object({
   firedAt: z.number().int().nullable(),
   late: z.boolean(),
   recipients: z.number().int(),
+  /** IB-151: the switch that muted it; null = none did. */
+  mutedBy: MarketAlertMutedBySchema.nullable(),
 });
 export type WebLevelAlertRow = z.infer<typeof WebLevelAlertRowSchema>;
 

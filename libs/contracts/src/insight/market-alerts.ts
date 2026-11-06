@@ -19,6 +19,29 @@ export type MarketAlertType = z.infer<typeof MarketAlertTypeSchema>;
 export const MARKET_ALERT_SOURCES = ['live', 'backfill'] as const;
 export type MarketAlertSource = (typeof MARKET_ALERT_SOURCES)[number];
 
+/**
+ * IB-151 (owner ruling 2026-11-06 B: «пускай все пишется … в админке … не будет уведомлять») — every admin switch
+ * below the type's own `enabled` only MUTES: the row is journalled whatever it says, with `market_alerts.muted_by`
+ * naming the switch that kept it from being sent (migration 037). Null = no switch muted it (it may still be unsent:
+ * the type is off, it was late, or it is a history row).
+ * - `coin`: the coin's `perCoin[symbol].enabled` is false (liq, funding, level — a custom level too);
+ * - `daily`: a PDH/PDL level on a coin whose `perCoin[symbol].daily` is off (level);
+ * - `event`: `events[kind][event]` is false (level);
+ * - `custom_event`: the custom level's own switch for that event is off (level, IB-128).
+ * When several apply, the first in this order is named.
+ */
+export const MARKET_ALERT_MUTED_BY = ['coin', 'daily', 'event', 'custom_event'] as const;
+export const MarketAlertMutedBySchema = z.enum(MARKET_ALERT_MUTED_BY);
+export type MarketAlertMutedBy = z.infer<typeof MarketAlertMutedBySchema>;
+
+/**
+ * IB-151: a muted row's once-key — the type's own key plus `:muted`, so it never takes the key a sent row would use.
+ * Turning a switch back on mid-period then sends what would have been sent had the muted row never been written.
+ */
+export function mutedDedupeKey(dedupeKey: string): string {
+  return `${dedupeKey}:muted`;
+}
+
 /** Controls (L8, F8, P7): what a control row is. Liquidations use `random` and `near_miss`. */
 export const MARKET_ALERT_CONTROL_KINDS = ['random', 'near_miss', 'touch'] as const;
 export type MarketAlertControlKind = (typeof MARKET_ALERT_CONTROL_KINDS)[number];
@@ -272,6 +295,8 @@ export const WebLiqAlertRowSchema = z.object({
   firedAt: z.number().int().nullable(),
   late: z.boolean(),
   recipients: z.number().int(),
+  /** IB-151: the switch that muted it; null = none did. */
+  mutedBy: MarketAlertMutedBySchema.nullable(),
 });
 export type WebLiqAlertRow = z.infer<typeof WebLiqAlertRowSchema>;
 

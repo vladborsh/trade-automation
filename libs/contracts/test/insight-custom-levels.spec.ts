@@ -54,7 +54,7 @@ describe('custom level contracts (IB-128)', () => {
   });
 
   it('the levels journal row may be a custom level, with its id', () => {
-    const row = { id: 1, source: 'live', event: 'breakout_up', symbol: 'BTCUSDT', price: 72_000, at: 1, close: 72_100, firedAt: null, late: false, recipients: 0 };
+    const row = { id: 1, source: 'live', event: 'breakout_up', symbol: 'BTCUSDT', price: 72_000, at: 1, close: 72_100, firedAt: null, late: false, recipients: 0, mutedBy: null };
     expect(WebLevelAlertRowSchema.safeParse({ ...row, kind: 'custom', customLevelId: 7 }).success).toBe(true);
     expect(WebLevelAlertRowSchema.safeParse({ ...row, kind: 'PWH', customLevelId: null }).success).toBe(true);
     expect(WebLevelAlertRowSchema.safeParse({ ...row, kind: 'CUSTOM', customLevelId: 7 }).success).toBe(false);
