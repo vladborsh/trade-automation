@@ -394,6 +394,13 @@ def first_liq_evaluate(raw):
     return {'flags': flags, 'rows': rows, 'notes': ['the owner was not told: he received the message itself'], 'measured': measured, 'done': True}
 
 
+def first_fired_since(rows, fired_col, since_iso):
+    """The rows (ordered by fired_at) from the first one fired at or after `since_iso` — [] when none."""
+    since = datetime.strptime(since_iso, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc).timestamp()
+    kept = [r for r in rows if r[fired_col] is not None and float(r[fired_col]) >= since]
+    return kept[:1]
+
+
 # ------------------------------------------------------------------------------------- first-live-level
 # Owner ruling 2026-11-06 (levels ON, owner only, weekly open OFF): the first live LEVEL alert that was SENT (one of the
 # six events, fired_at set): its facts go to a file. Bands, all read from the box, none a measured number: recipients
@@ -404,6 +411,11 @@ def first_liq_evaluate(raw):
 # banded. The message text is not stored: the dev-side waiter renders it with the shipped levelAlert over this row.
 # PENDING until one exists; then the timer removes itself. The owner is NOT told — he got the alert.
 
+# The enable statement's own time (dev-1, 2026-11-06, `UPDATE 1` at 13:06:05Z). A row fired before it is not «the first
+# live level alert»: it would FLAG recipients / type_enabled on a row that predates the switch. Not a recipients > 0
+# filter — that would hide the very fault the band is there to catch. Bounds the query AND the evaluation (the test seam
+# skips the query, so the evaluation's bound is the one checks.test.sh proves).
+LEVEL_ENABLED_AT = '2026-11-06T13:06:05Z'
 LEVEL_EVENTS = ('breakout_up', 'breakout_down', 'sweep_above', 'sweep_below', 'crossunder', 'crossover')
 
 
@@ -415,9 +427,11 @@ def first_level_gather():
                         " s.enabled"
                         " from market_alerts a cross join alert_type_settings s"
                         " where s.type = 'level' and a.type = 'level' and a.source = 'live' and a.fired_at is not null"
-                        " and a.event in (%s) order by a.fired_at, a.id limit 1" % ', '.join("'%s'" % e for e in LEVEL_EVENTS))
+                        " and a.fired_at >= '%s' and a.event in (%s) order by a.fired_at, a.id limit 5"
+                        % (LEVEL_ENABLED_AT, ', '.join("'%s'" % e for e in LEVEL_EVENTS)))
     raw['eligible'] = psql("select count(*) from users where level_alerts and not disabled and chat_id is not null")
     raw['link_code'] = None
+    raw['alert'] = first_fired_since(raw['alert'], 5, LEVEL_ENABLED_AT)
     if raw['alert']:
         a = raw['alert'][0]
         base = env_value(os.path.join(DEPLOY_DIR, '.env'), 'WEB_BASE_URL') or ''
@@ -430,6 +444,7 @@ def first_level_gather():
 
 
 def first_level_evaluate(raw):
+    raw = dict(raw, alert=first_fired_since(raw['alert'], 5, LEVEL_ENABLED_AT))
     if not raw['alert']:
         return {'pending': True, 'flags': [], 'rows': [], 'notes': ['no live level alert sent yet at %s' % raw['now']], 'measured': None}
     a = raw['alert'][0]
@@ -460,12 +475,21 @@ def first_level_evaluate(raw):
 # three are on since 2026-11-06, the owner's 4h ruling); and the link answers 200 through Caddy. PENDING until one exists; then the timer removes itself. The owner is
 # NOT told — he got the alert.
 
-def first_hidden_gather():
+# first-live-hidden-4h (owner ruling 2026-11-06: 4h switched on over V47's 4h FAIL, the IB-141 6/2 SOL artefact): the
+# same bands as first-live-hidden, 4h only, from the enable statement's own time (dev-1, `UPDATE 1` at 13:02:05Z) — a
+# 4h hidden row journalled while 4h was off must not count. Its first real message gets its own record.
+HIDDEN_4H_ENABLED_AT = '2026-11-06T13:02:05Z'
+
+
+def first_hidden_gather(tf=None, since=None):
     raw = {'now': utc(time.time())}
+    where = (" and a.tf = '%s'" % tf if tf else '') + (" and a.fired_at >= '%s'" % since if since else '')
     raw['alert'] = psql("select a.id, a.symbol, a.tf, a.direction, extract(epoch from a.b_time), extract(epoch from a.confirmed_at),"
                         " extract(epoch from a.fired_at), a.recipients, a.late, a.build, s.params->'perTf'->a.tf->>'sendHidden'"
                         " from oi_divergence_alerts a cross join alert_settings s"
-                        " where s.id = 1 and a.source = 'live' and a.kind = 'hidden' and a.fired_at is not null order by a.fired_at, a.id limit 1")
+                        " where s.id = 1 and a.source = 'live' and a.kind = 'hidden' and a.fired_at is not null%s"
+                        " order by a.fired_at, a.id limit 5" % where)
+    raw['alert'] = first_fired_since(raw['alert'], 6, since) if since else raw['alert'][:1]
     raw['eligible'] = psql("select count(*) from users where oi_alerts and not disabled and chat_id is not null")
     raw['link_code'] = None
     if raw['alert']:
@@ -477,6 +501,12 @@ def first_hidden_gather():
                                  capture_output=True, text=True, timeout=30).stdout.strip()
             raw['link_code'] = int(out) if out.isdigit() else None
     return raw
+
+
+def first_hidden_4h_evaluate(raw):
+    """first-live-hidden's bands on the first 4h row fired since the 4h enable (the test seam skips the query)."""
+    rows = [r for r in raw['alert'] if r[2] == '4h']
+    return first_hidden_evaluate(dict(raw, alert=first_fired_since(rows, 6, HIDDEN_4H_ENABLED_AT)))
 
 
 def first_hidden_evaluate(raw):
@@ -963,6 +993,7 @@ CHECKS = {
     'first-live-alert': (first_alert_gather, first_alert_evaluate, 'The first live OI alert: facts to a file, then the timer stops'),
     'first-live-hidden': (first_hidden_gather, first_hidden_evaluate, 'IB-144: the first live hidden OI divergence alert sent (owner only, its TF switched on): facts to a file, then the timer stops'),
     'first-live-liq': (first_liq_gather, first_liq_evaluate, 'IB-143: the first live liquidation message (owner only): facts to a file, then the timer stops'),
+    'first-live-hidden-4h': (lambda: first_hidden_gather('4h', HIDDEN_4H_ENABLED_AT), first_hidden_4h_evaluate, 'Owner ruling 2026-11-06: the first live 4h hidden OI divergence alert sent since 4h was switched on: facts to a file, then the timer stops'),
     'first-live-level': (first_level_gather, first_level_evaluate, 'Levels ON 2026-11-06: the first live level alert sent (owner only, WO off): facts to a file, then the timer stops'),
     'backfill-rerun': (backfill_gather, backfill_evaluate, 'IB-116 rerun: /root/box-backfill.sh --write for the open windows'),
     'oi-4h-first-eval': (oi4h_gather, oi4h_evaluate, 'IB-141: the 4h OI evaluations since boot run on 6 left / 2 right (migration 032)'),

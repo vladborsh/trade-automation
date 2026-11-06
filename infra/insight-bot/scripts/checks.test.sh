@@ -286,6 +286,42 @@ fixture fllv-late "$LVL
 d['alert'][0][7] = 't'; d['alert'][0][13] = 'f'; d['link_code'] = 502"
 run first-live-level fllv-late
 check 'first-live-level late, type off and a 502 link → FLAG:late,type_enabled,link_http' '[ "$(verdict fllv-late first-live-level)" = FLAG:late,type_enabled,link_http ]'
+# a row fired BEFORE the enable (13:06:05Z = 1793970365), recipients 0 and the type off then, ahead of a real one
+fixture fllv-pre "$LVL
+d['alert'].insert(0, ['8999', 'crossover', 'BTCUSDT', '1793966100', '1793967005', '1793967006', '0', 'f', '2b35ac5a0c05', 'PWL', '101000', None, 'false', 'f'])"
+run first-live-level fllv-pre
+check 'first-live-level a recipients-0 row fired before the enable, then a sent one → evaluates the later (PASS, id 9001)' \
+  '[ "$(verdict fllv-pre first-live-level)" = PASS ] && grep -q "\"id\": 9001" $work/out-fllv-pre/first-live-level.json'
+fixture fllv-only-pre "$LVL
+d['alert'][0][5] = '1793970364'"
+run first-live-level fllv-only-pre
+check 'first-live-level only a row fired 1 s before the enable → PENDING (no sentinel)' \
+  '[ ! -e $work/out-fllv-only-pre/first-live-level.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-fllv-only-pre/first-live-level.json'
+
+# ------------------------------------------------------------------------------------ first-live-hidden-4h (owner ruling 2026-11-06)
+# 4h switched on at 13:02:05Z = 1793970125; the row shape is first-live-hidden's
+H4='
+d = {"now": "2026-11-06T17:00:00Z", "eligible": [["1"]], "link": "https://x/instrument/SOLUSDT?at=1793966400&tf=4h", "link_code": 200,
+     "alert": [["520", "SOLUSDT", "4h", "bearish", "1793966400", "1793980800", "1793981160", "1", "f", "623a09d6390a", "true"]]}
+'
+fixture flh4-pending 'd = {"now": "2026-11-06T13:10:00Z", "alert": [], "eligible": [["1"]], "link_code": None}'
+run first-live-hidden-4h flh4-pending
+check 'first-live-hidden-4h none yet → PENDING: no sentinel, nothing sent, exit 0' \
+  '[ ! -e $work/out-flh4-pending/first-live-hidden-4h.done ] && grep -q "\"verdict\": \"PENDING\"" $work/out-flh4-pending/first-live-hidden-4h.json && [ "$(sent)" = 0 ] && [ "$(cat $work/flh4-pending.rc)" = 0 ]'
+fixture flh4-pass "$H4"
+run first-live-hidden-4h flh4-pass
+check 'first-live-hidden-4h the owner only, 4h on, link 200 → PASS with the facts; the owner is NOT told' \
+  '[ "$(verdict flh4-pass first-live-hidden-4h)" = PASS ] && [ "$(sent)" = 0 ] && grep -q "\"tf\": \"4h\"" $work/out-flh4-pass/first-live-hidden-4h.json'
+fixture flh4-pre "$H4
+d['alert'].insert(0, ['500', 'SOLUSDT', '4h', 'bullish', '1793952000', '1793966400', '1793966760', '0', 'f', '2b35ac5a0c05', 'false'])
+d['alert'].insert(1, ['510', 'ETHUSDT', '15m', 'bullish', '1793975000', '1793976000', '1793976300', '1', 'f', '623a09d6390a', 'true'])"
+run first-live-hidden-4h flh4-pre
+check 'first-live-hidden-4h a 4h row fired before the enable and a 15m row after → evaluates the later 4h row (PASS, id 520)' \
+  '[ "$(verdict flh4-pre first-live-hidden-4h)" = PASS ] && grep -q "\"id\": 520" $work/out-flh4-pre/first-live-hidden-4h.json'
+fixture flh4-two "$H4
+d['alert'][0][7] = '2'; d['eligible'] = [['2']]"
+run first-live-hidden-4h flh4-two
+check 'first-live-hidden-4h sent to 2 → FLAG:recipients,oi_alerts_users' '[ "$(verdict flh4-two first-live-hidden-4h)" = FLAG:recipients,oi_alerts_users ]'
 
 # ------------------------------------------------------------------------------------ oi-4h-first-eval
 # IB-141 batch 3: the lines are the bot's own shape, as pinned by apps/insight-bot/test/delivery/oi-alerts-log-line.spec.ts.
