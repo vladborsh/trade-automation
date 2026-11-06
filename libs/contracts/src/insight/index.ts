@@ -45,3 +45,4 @@ export * from './oi-divergence-admin';
 export * from './oi-divergence-research';
 // IB-122 — the generic market-alert journal (liquidations first; funding and levels later).
 export * from './market-alerts';
+export * from './funding-alerts';
