@@ -83,8 +83,58 @@ describe('PositioningService', () => {
 
   it('7d: changes have values but no rarity (four 7-day windows are not a norm)', async () => {
     const btc = (await service(30 * 24).positioning('7d')).rows[0];
+    expect(btc.priceChangePct.value).not.toBeNull();
     expect(btc.priceChangePct.rarity).toBeNull();
-    expect(btc.priceChangePct.unavailable).toBe('insufficient_history');
+  });
+
+  describe('IB-BUG-037: at 7d price, OI and liquidations are NEVER rated — they say so, not «under 20 days»', () => {
+    const withLiq = (hours: number, liqDays: number) => {
+      const f = fakes(hours);
+      const sample = Array.from({ length: 40 }, (_, i) => 1e6 + i * 1e4);
+      return new PositioningService({
+        symbols: SYMBOLS as never, cache: new TtlCache({ now: () => NOW }), summary: f.summary as never, candles: f.candles as never,
+        funding: f.funding as never, oiLs: f.oiLs as never, now: () => NOW,
+        liquidations: { coinPeriodSamples: async () => new Map([['BTCUSDT', { usd: 3.4e6, sample, days: liqDays }]]) } as never,
+      });
+    };
+
+    for (const hours of [30 * 24, 10 * 24]) {
+      it(`7d with ${hours / 24} days of history: not_rated_at_period, the values still there`, async () => {
+        const btc = (await withLiq(hours, hours / 24).positioning('7d')).rows[0];
+        for (const c of [btc.priceChangePct, btc.oiChangePct, btc.liqUsd]) {
+          expect(c.value).not.toBeNull();
+          expect(c).toMatchObject({ rarity: null, unavailable: 'not_rated_at_period', sample: 0 });
+        }
+        // levels ARE rated at 7d: with a short history they keep the honest «under 20 days»
+        if (hours < 20 * 24) expect(btc.fundingRate.unavailable).toBe('insufficient_history');
+        else expect(btc.fundingRate.unavailable).toBeNull();
+      });
+    }
+
+    it('7d with the venue silent: venue_unavailable wins — no value is not "not rated"', async () => {
+      const f = fakes(30 * 24);
+      const svc = new PositioningService({
+        symbols: SYMBOLS as never, cache: new TtlCache({ now: () => NOW }), summary: f.summary as never, candles: f.candles as never,
+        funding: f.funding as never, liquidations: null, now: () => NOW,
+        oiLs: { ...f.oiLs, openInterest: async () => { throw new Error('418'); } } as never,
+      });
+      const [btc, eth] = (await svc.positioning('7d')).rows;
+      expect(btc.oiChangePct).toMatchObject({ value: null, unavailable: 'venue_unavailable' });
+      expect(eth.priceChangePct).toMatchObject({ value: null, unavailable: 'venue_unavailable' });
+    });
+
+    it('24h with under 20 days: still insufficient_history for the same three cells', async () => {
+      const btc = (await withLiq(10 * 24, 10).positioning('24h')).rows[0];
+      for (const c of [btc.priceChangePct, btc.oiChangePct, btc.liqUsd]) {
+        expect(c.value).not.toBeNull();
+        expect(c).toMatchObject({ rarity: null, unavailable: 'insufficient_history' });
+      }
+    });
+
+    it('24h with 30 days: the same three cells are rated (the positive control)', async () => {
+      const btc = (await withLiq(30 * 24, 30).positioning('24h')).rows[0];
+      for (const c of [btc.priceChangePct, btc.oiChangePct, btc.liqUsd]) expect(c).toMatchObject({ unavailable: null });
+    });
   });
 
   it('a coin the summary does not carry: its price and funding cells say venue_unavailable', async () => {

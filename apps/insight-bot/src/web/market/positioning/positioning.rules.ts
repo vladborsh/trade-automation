@@ -39,6 +39,16 @@ export function cell(
   return { value, rarity: r, unavailable: r === null ? 'insufficient_history' : null, sample: sample.length };
 }
 
+/**
+ * IB-BUG-037: a cell this period NEVER rates (a 7d change, 7d liquidations — 30 days hold four 7-day
+ * windows), however long the history: `not_rated_at_period`, not «under 20 days». No value still
+ * says the venue did not answer.
+ */
+export function unratedCell(value: number | null): WebPositioningCell {
+  if (value === null) return cell(null, null, () => null);
+  return { value, rarity: null, unavailable: 'not_rated_at_period', sample: 0 };
+}
+
 export { changeRarity, levelRarity } from '../../../insights/rarity';
 
 /** Percent changes over `steps` positions, for every position that has a predecessor that far back. */

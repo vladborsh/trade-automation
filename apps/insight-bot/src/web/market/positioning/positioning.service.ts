@@ -13,7 +13,7 @@ import type { CandlesService } from '../candles.service';
 import type { FundingService } from '../funding.service';
 import type { OiLsService } from '../oi-ls.service';
 import type { UniverseSummaryService } from '../universe-summary.service';
-import { cell, changeRarity, levelRarity, quadrantOf, rollingChangesPct, signalOf } from './positioning.rules';
+import { cell, unratedCell, changeRarity, levelRarity, quadrantOf, rollingChangesPct, signalOf } from './positioning.rules';
 import { REF_BARS_CACHE_MS, hourlyRef, refBarCloseMs, refBarsWindow, refFromBars, type PriceRef } from './price-ref';
 
 /**
@@ -34,8 +34,9 @@ import { REF_BARS_CACHE_MS, hourlyRef, refBarCloseMs, refBarsWindow, refFromBars
  * on average — arithmetic from the documented weights; the measured figure is in the IB-085 report.
  *
  * **Minimums (D3):** a rarity needs ≥ 20 days of the coin's own series, else `insufficient_history`.
- * A 7d change has no rarity: 30 days hold four 7-day windows (the D14 rule for liquidations, applied
- * to every change). The value is still shown.
+ * A 7d change and 7d liquidations have no rarity: 30 days hold four 7-day windows (the D14 rule for
+ * liquidations, applied to every change). The value is still shown, with `not_rated_at_period`
+ * (IB-BUG-037) — the history is not short, the period is never rated.
  */
 export interface PositioningOptions {
   symbols: readonly UniverseSymbol[];
@@ -112,15 +113,18 @@ export class PositioningService {
   ): WebPositioningRow {
     const steps = WEB_MARKET_PERIOD_SECONDS[period] / 3_600;
     const enoughHours = (n: number) => n >= POSITIONING_MIN_HISTORY_DAYS * 24;
+    const rated = period !== '7d';
     const changeSample = (series: readonly number[] | undefined) =>
-      period === '7d' || !series || !enoughHours(series.length) ? null : rollingChangesPct(series, steps);
+      !series || !enoughHours(series.length) ? null : rollingChangesPct(series, steps);
+    const changeCell = (value: number | null, series: readonly number[] | undefined) =>
+      rated ? cell(value, changeSample(series), changeRarity) : unratedCell(value);
 
     // price: the last price now vs the reference close at ≈ now − P (`priceRef`, IB-BUG-040)
     const price = summary?.lastPrice ?? null;
     const priceChange = price !== null && ref !== null && ref.close > 0 ? (price / ref.close - 1) * 100 : null;
-    const priceChangePct = cell(priceChange, changeSample(base?.closes), changeRarity);
+    const priceChangePct = changeCell(priceChange, base?.closes);
 
-    const oiChangePct = cell(current.oiChangePct, changeSample(base?.oiHourly), changeRarity);
+    const oiChangePct = changeCell(current.oiChangePct, base?.oiHourly);
     const fundingSettled = base ? fundingSample(base.fundingSettled) : null;
     const fundingRate = cell(summary?.fundingRate ?? null, fundingSettled, levelRarity);
     const levelSample = (s: readonly number[] | undefined) => (s && enoughHours(s.length) ? s : null);
@@ -128,7 +132,7 @@ export class PositioningService {
     const lsTopPosition = cell(current.lsTop, levelSample(base?.lsTopHourly), levelRarity);
     const liqUsd = liq === null
       ? cell(null, null, levelRarity, this.options.liquidations ? 'venue_unavailable' : 'not_listed')
-      : cell(liq.usd, period !== '7d' && liq.days >= POSITIONING_MIN_HISTORY_DAYS ? liq.sample : null, levelRarity);
+      : rated ? cell(liq.usd, liq.days >= POSITIONING_MIN_HISTORY_DAYS ? liq.sample : null, levelRarity) : unratedCell(liq.usd);
 
     const quadrant = quadrantOf(priceChangePct.value, oiChangePct.value, fundingRate.value);
     const cells: WebPositioningCell[] = [priceChangePct, oiChangePct, fundingRate, lsGlobal, lsTopPosition, liqUsd];

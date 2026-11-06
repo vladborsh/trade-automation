@@ -1,4 +1,4 @@
-import { cell, changeRarity, levelRarity, quadrantOf, rollingChangesPct, signalOf } from '../../../../src/web/market/positioning/positioning.rules';
+import { cell, unratedCell, changeRarity, levelRarity, quadrantOf, rollingChangesPct, signalOf } from '../../../../src/web/market/positioning/positioning.rules';
 import { mapLimited } from '../../../../src/web/market/positioning/positioning.service';
 import { rarity } from '../../../../src/insights/rarity';
 
@@ -35,6 +35,16 @@ describe('cell — a missing number is a stated reason, never 0', () => {
 
   it('a value with a sample: its rarity and the sample size', () => {
     expect(cell(3, [1, 2, 4, 5], changeRarity)).toEqual({ value: 3, rarity: 0.5, unavailable: null, sample: 4 });
+  });
+});
+
+describe('IB-BUG-037: unratedCell — a period that never rates says so', () => {
+  it('a value: not_rated_at_period, no rarity, no sample', () => {
+    expect(unratedCell(4.2)).toEqual({ value: 4.2, rarity: null, unavailable: 'not_rated_at_period', sample: 0 });
+    expect(unratedCell(0)).toEqual({ value: 0, rarity: null, unavailable: 'not_rated_at_period', sample: 0 });
+  });
+  it('no value: the venue did not answer, as for any cell', () => {
+    expect(unratedCell(null)).toEqual({ value: null, rarity: null, unavailable: 'venue_unavailable', sample: 0 });
   });
 });
 
