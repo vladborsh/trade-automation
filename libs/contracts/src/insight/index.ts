@@ -17,6 +17,8 @@ export * from './universe';
 export * from './liquidations-overview';
 // IB-120 — the /liquidations page: every large liquidation of the period, filtered.
 export * from './liquidations-large';
+// IB-153 — the instrument page's liquidation profile by price: the grid, the folding, the answer.
+export * from './liq-profile';
 // IB-133 — the /liquidations page as «episodes»: grouped cascades above a rate-set norm, with price paths.
 export * from './liquidation-episodes';
 // IB-015 — the feature frame: the key set, the per-key value type, and the arming rule.
