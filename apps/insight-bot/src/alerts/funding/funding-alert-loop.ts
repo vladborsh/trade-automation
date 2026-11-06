@@ -29,7 +29,7 @@ import { stateKey, type FundingAlertStore, type FundingSettings, type NewFunding
  *    coin and day. Price paths for alerts and controls, direction-free (see `insertPaths`): the crowded side is the
  *    row's `direction`.
  *
- * Memory: per coin, the settled history (≤ 720 points for a 1 h coin, 90 for an 8 h one) and a near-miss key a side.
+ * Memory: per coin, the settled history (≤ 720 points for a 1 h coin, 90 for an 8 h one); the state is re-read each tick.
  */
 export interface FundingVenuePort {
   /** `premiumIndex?symbol=`: the predicted rate (fraction), the venue's timestamp and the next settlement, epoch ms. */
@@ -75,8 +75,6 @@ interface Coin { symbol: string; base: string; floorPer8h: number }
 export class FundingAlertLoop {
   private running = false;
   private readonly history = new Map<string, { fetchedAt: number; points: Array<{ time: number; rate: number }> }>();
-  /** F8: `symbol|side` → the UTC day its near-miss was written (one a day). */
-  private readonly nearMissDay = new Map<string, string>();
 
   constructor(private readonly ports: FundingAlertLoopPorts) {}
 
@@ -137,7 +135,6 @@ export class FundingAlertLoop {
     }
     const { store, source, build } = this.ports;
     const ids = await store.commit({ source, build, params: settings.params, confirmedAtMs: nowMs, symbol: coin.symbol, states: next, alerts });
-    for (const { side, state } of next) states.set(stateKey(coin.symbol, side), state);
 
     for (const [i, a] of alerts.entries()) {
       const id = ids[i];
@@ -192,14 +189,13 @@ export class FundingAlertLoop {
   ): Promise<void> {
     const { store, source, build } = this.ports;
     const nm = check.nearMiss;
-    const key = nm ? stateKey(coin.symbol, nm.side) : '';
-    if (nm && next.find((n) => n.side === nm.side)?.state.zone === 'normal' && this.nearMissDay.get(key) !== dayOf(nowMs)) {
+    // one a coin, side and UTC day: the once-key absorbs the day's later candidates (one insert attempt a check at most)
+    if (nm && next.find((n) => n.side === nm.side)?.state.zone === 'normal') {
       const details: FundingNearMissDetails = { ...check.facts, side: nm.side, failed: nm.failed };
       const id = await store.insertControl(source, build, params, {
         kind: 'near_miss', symbol: coin.symbol, direction: FUNDING_SIDE_DIRECTION[nm.side], atMs: nowMs, details,
         dedupeKey: `funding-nm:${coin.symbol}:${nm.side}:${dayOf(nowMs)}`,
       });
-      this.nearMissDay.set(key, dayOf(nowMs));
       if (id !== null) {
         report.controls++;
         await store.insertPaths({ marketControlId: id }, coin.symbol, liqPathT0(nowMs));

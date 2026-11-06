@@ -90,6 +90,19 @@ describe('IB-124 funding state machine (F4, F5, F7)', () => {
     expect(r.events.map((e) => e.kind)).toEqual(['enter', 'flip', 'enter', 'flip']);
   });
 
+  it('F5: a zero rate is no sign at all: it breaks an opposite run and never starts one', () => {
+    const ep = rep('x', HOURS(24));
+    let s = run(`${ep}...`).state;
+    let at = (HOURS(24) + 3) * STEP;
+    for (const r of [-0.0001, -0.0001, 0, -0.0001, -0.0001]) {
+      const step = fundingStep(s, 'high', at, false, r, PARAMS);
+      expect(step.event).toBeNull();
+      s = step.state;
+      at += STEP;
+    }
+    expect(fundingStep({ ...s, oppChecks: 0, oppSince: null }, 'high', at, false, 0, PARAMS).state.oppChecks).toBe(0);
+  });
+
   it('F5: 24 and 72 are parameters', () => {
     const r = run(`${rep('x', HOURS(2))}...---`, { params: { minEpisodeHours: 2, flipWithinHours: 1 } });
     expect(r.events.map((e) => e.kind)).toEqual(['enter', 'flip']);

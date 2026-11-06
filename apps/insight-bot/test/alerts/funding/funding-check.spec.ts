@@ -41,6 +41,13 @@ describe('IB-124 funding check (F2, F3, F8)', () => {
     }
   });
 
+  it('the recorded band is R5\'s at RARITY_SHOW on a sample without ties (not a neighbouring quantile)', () => {
+    const distinct = Array.from({ length: 90 }, (_, i) => ({ time: (i - 90) * 8 * H, rate: 0.00001 * (i + 1) * (i % 2 ? 1 : -0.5) }));
+    const rates = distinct.map((p) => p.rate);
+    expect(at(0.0005, distinct)?.facts.band).toEqual(levelBand(rates, RARITY_SHOW));
+    expect(levelBand(rates, RARITY_SHOW)).not.toEqual(levelBand(rates, 0.95));
+  });
+
   it('F3: the floor defaults to FUNDING_FLOOR_PER_8H and a coin floor overrides it', () => {
     expect(at(0.0005)?.facts.floorPer8h).toBe(0.0003);
     expect(at(0.0005, MONTH_8H, 0.0006)?.extreme).toBeNull();
@@ -74,6 +81,8 @@ describe('IB-124 funding check (F2, F3, F8)', () => {
     expect(at(0.00025)?.nearMiss).toEqual({ side: 'high', failed: 'floor' });
     const parked = settled(90, 8, [0.0005, 0.00045, 0.00055]);
     expect(at(0.0005, parked)?.nearMiss).toEqual({ side: 'high', failed: 'band' });
+    const parkedLow = settled(90, 8, [-0.0005, -0.00045, -0.00055]);
+    expect(at(-0.0005, parkedLow)?.nearMiss).toEqual({ side: 'low', failed: 'band' });
     expect(at(0.0001)?.nearMiss).toBeNull();
     expect(at(0.0005)?.nearMiss).toBeNull();
   });

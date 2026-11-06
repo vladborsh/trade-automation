@@ -5,7 +5,7 @@ import {
   WebFundingResponseSchema, WebInsightsResponseSchema, WebLiquidationEpisodesResponseSchema, WebKpisResponseSchema, WebLiquidationEventsResponseSchema, WebLiquidationsOverviewResponseSchema,
   WebLiquidationsResponseSchema, WebLoginEventsResponseSchema, WebLongShortResponseSchema, WebMarketCardsResponseSchema, WebMeResponseSchema,
   WebMembersResponseSchema, WebOpenInterestResponseSchema, WebPositioningResponseSchema, WebStreamsResponseSchema, WebTopLiquidationSchema,
-  WebUniverseSummaryResponseSchema, WebUniverseTopResponseSchema, WebLiqAlertsAdminResponseSchema,
+  WebUniverseSummaryResponseSchema, WebUniverseTopResponseSchema, WebLiqAlertsAdminResponseSchema, WebFundingAlertsAdminResponseSchema,
 } from '@trade-automation/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -32,6 +32,8 @@ const SINGLE: Record<string, z.ZodTypeAny> = {
   'admin-alerts.synthetic.json': WebAlertsAdminResponseSchema,
   // IB-122: slot dev-3's LiqAlertsAdmin answer (2026-11-05)
   'admin-alerts-liq.json': WebLiqAlertsAdminResponseSchema,
+  // IB-124: slot dev-3's FundingAlertsAdmin answer (2026-11-06)
+  'admin-alerts-funding.json': WebFundingAlertsAdminResponseSchema,
   'admin-health-db.json': WebDbHealthResponseSchema,
   'admin-health-streams.json': WebStreamsResponseSchema,
   'admin-login-events.json': WebLoginEventsResponseSchema,

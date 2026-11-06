@@ -26,6 +26,7 @@ describe('IB-124 funding texts (F2, F4, F5, C3)', () => {
 
   it('an 8 h coin prints one figure; an unknown interval is said, never hidden', () => {
     expect(fundingEnter(t, { ...enter, intervalH: 8, ratePer8h: 0.0002 }, '').ru).toContain('Ставка Binance +0.0200 % за 8 ч\n');
+    expect(fundingEnter(t, { ...enter, intervalH: 8, ratePer8h: 0.0002 }, '').en).toContain('Binance rate +0.0200% per 8h\n');
     expect(fundingEnter(t, { ...enter, intervalH: null, ratePer8h: 0.0002 }, '').en).toContain('settlement interval unknown, counted as 8h');
   });
 

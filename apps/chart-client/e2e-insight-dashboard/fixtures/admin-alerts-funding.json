@@ -1,0 +1,51 @@
+{
+  "settings": {
+    "enabled": false,
+    "membersVisible": false,
+    "params": {
+      "minEpisodeHours": 24,
+      "flipWithinHours": 72,
+      "perCoin": {}
+    },
+    "updatedAt": 1793927545
+  },
+  "defaultFloorPer8h": 0.0003,
+  "coins": [
+    {
+      "symbol": "BNBUSDT",
+      "base": "BNB",
+      "listed": true,
+      "enabled": true,
+      "floorPer8h": null
+    },
+    {
+      "symbol": "BTCUSDT",
+      "base": "BTC",
+      "listed": true,
+      "enabled": true,
+      "floorPer8h": null
+    },
+    {
+      "symbol": "ETHUSDT",
+      "base": "ETH",
+      "listed": true,
+      "enabled": true,
+      "floorPer8h": null
+    },
+    {
+      "symbol": "SOLUSDT",
+      "base": "SOL",
+      "listed": true,
+      "enabled": true,
+      "floorPer8h": null
+    },
+    {
+      "symbol": "TRXUSDT",
+      "base": "TRX",
+      "listed": true,
+      "enabled": true,
+      "floorPer8h": null
+    }
+  ],
+  "alerts": []
+}

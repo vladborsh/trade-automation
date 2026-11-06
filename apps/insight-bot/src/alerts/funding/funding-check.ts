@@ -49,12 +49,12 @@ export function fundingCheck(x: FundingCheckInput): FundingCheck | null {
   return { facts, extreme, nearMiss: extreme === null ? nearMissOf(rarity, ratePer8h, x.floorPer8h) : null };
 }
 
+/** Only for a check that is not extreme (see the caller). */
 function nearMissOf(rarity: number, ratePer8h: number, floor: number): FundingCheck['nearMiss'] {
   if (ratePer8h === 0) return null;
   const side: FundingSide = ratePer8h > 0 ? 'high' : 'low';
-  const rare = rarity >= RARITY_SHOW;
-  const beyondFloor = Math.abs(ratePer8h) >= floor;
-  if (rare && !beyondFloor) return { side, failed: 'floor' };
-  if (!rare && beyondFloor) return { side, failed: 'band' };
+  // called only when the check is NOT extreme, so rare here means it failed the floor, and beyond the floor means it failed the band
+  if (rarity >= RARITY_SHOW) return { side, failed: 'floor' };
+  if (Math.abs(ratePer8h) >= floor) return { side, failed: 'band' };
   return null;
 }

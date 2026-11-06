@@ -1,6 +1,6 @@
 import { FUNDING_DEFAULT_PARAMS, FundingEnterDetailsSchema, FundingFlipDetailsSchema, FundingNearMissDetailsSchema, type FundingParams, type MarketAlertSource } from '@trade-automation/contracts';
 import { FundingAlertLoop, coinsOf, type FundingVenuePort } from '../../../src/alerts/funding/funding-alert-loop';
-import { randomCheckSlots } from '../../../src/alerts/funding/controls';
+import { randomCheckSlots, randomSlotAt } from '../../../src/alerts/funding/controls';
 import type { FundingSideState } from '../../../src/alerts/funding/funding-state';
 import type { FundingAlertStore, FundingCommit, FundingSettings, NewFundingControl } from '../../../src/alerts/funding/pg/funding-alerts.repo';
 
@@ -188,6 +188,14 @@ describe('IB-124 funding alert loop (F1, F4–F8)', () => {
     }
     const rnd = h.store.controls.filter((c) => c.kind === 'random');
     expect(rnd.map((c) => c.dedupeKey)).toEqual(slots.map((s) => `funding-rnd:BTCUSDT:${s}`));
+    for (const s of slots) {
+      expect(randomSlotAt('BTCUSDT', s)).toBe(s);
+      expect(randomSlotAt('BTCUSDT', s + 5 * MIN - 1)).toBe(s);
+      expect(randomSlotAt('BTCUSDT', s + 5 * MIN)).not.toBe(s); // the first moment after a slot is not in it
+    }
+    h.setNow(slots[0]! + 5 * MIN);
+    await h.tick(0.0001);
+    expect(h.store.controls.filter((c) => c.kind === 'random')).toHaveLength(2);
     expect(rnd.every((c) => c.direction === null && typeof (c.details as { band: unknown }).band === 'object')).toBe(true);
   });
 
