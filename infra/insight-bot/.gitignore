@@ -7,5 +7,6 @@ terraform/*.auto.tfvars
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.*
+terraform/.build/
 # backend.tf is committed since IB-073: the state bucket is already public knowledge in
 # LIVE-RESOURCES.md, and a backend only one laptop knows about is how the state got lost before.

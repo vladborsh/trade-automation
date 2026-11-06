@@ -11,6 +11,11 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.60"
     }
+    # IB-150: zips the alarm Lambda's one source file at plan time (alarms.tf).
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.7"
+    }
   }
 }
 

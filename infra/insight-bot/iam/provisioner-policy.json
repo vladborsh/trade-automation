@@ -136,7 +136,7 @@
       }
     },
     {
-      "Sid": "TheTwoRolesAndNothingElse",
+      "Sid": "TheThreeRolesAndNothingElse",
       "Effect": "Allow",
       "Action": [
         "iam:CreateRole",
@@ -158,7 +158,8 @@
       "Resource": [
         "arn:aws:iam::*:role/insight-bot-instance",
         "arn:aws:iam::*:role/insight-bot-deploy",
-        "arn:aws:iam::*:instance-profile/insight-bot-instance"
+        "arn:aws:iam::*:instance-profile/insight-bot-instance",
+        "arn:aws:iam::*:role/insight-bot-alarm-telegram"
       ]
     },
     {
@@ -245,45 +246,6 @@
         "budgets:ListTagsForResource"
       ],
       "Resource": "arn:aws:budgets::*:budget/insight-bot-monthly"
-    },
-    {
-      "Sid": "TheTwoAlarmsOnly",
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:PutMetricAlarm",
-        "cloudwatch:DeleteAlarms",
-        "cloudwatch:TagResource",
-        "cloudwatch:UntagResource",
-        "cloudwatch:ListTagsForResource"
-      ],
-      "Resource": "arn:aws:cloudwatch:ap-northeast-1:*:alarm:insight-bot-*"
-    },
-    {
-      "Sid": "ReadAlarms",
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:DescribeAlarms"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "TheAlarmTopicOnly",
-      "Effect": "Allow",
-      "Action": [
-        "sns:CreateTopic",
-        "sns:DeleteTopic",
-        "sns:GetTopicAttributes",
-        "sns:SetTopicAttributes",
-        "sns:Subscribe",
-        "sns:Unsubscribe",
-        "sns:GetSubscriptionAttributes",
-        "sns:SetSubscriptionAttributes",
-        "sns:ListSubscriptionsByTopic",
-        "sns:TagResource",
-        "sns:UntagResource",
-        "sns:ListTagsForResource"
-      ],
-      "Resource": "arn:aws:sns:ap-northeast-1:*:insight-bot-alarms"
     }
   ]
 }

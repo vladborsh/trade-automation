@@ -65,18 +65,26 @@ data "aws_iam_policy_document" "instance" {
     resources = [aws_s3_bucket.backups.arn, "${aws_s3_bucket.backups.arn}/*"]
   }
 
-  # IB-150 (proposal): the watchdog's dead-man heartbeat (alarms.tf). PutMetricData has no
-  # resource ARN for classic metrics, so "*" — fenced by the namespace: the box can write
-  # InsightBot/* and nothing else, never AWS/* nor another project's namespace.
+  # IB-150: IB-149's metric publisher (alarms.tf). PutMetricData has no resource ARN for classic
+  # metrics, so "*", fenced by the namespace: the box can write InsightBot/* and nothing else,
+  # never AWS/* and never another project's namespace.
   statement {
-    sid       = "PutHeartbeat"
+    sid       = "PublishMetrics"
     actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = [local.heartbeat_namespace]
+      values   = [local.ns]
     }
+  }
+
+  # IB-150: docker's awslogs driver (IB-149), into the three groups alarms.tf creates. The driver
+  # runs with awslogs-create-group=false, so no CreateLogGroup.
+  statement {
+    sid       = "ShipLogs"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = [for g in aws_cloudwatch_log_group.box : "${g.arn}:*"]
   }
 }
 
