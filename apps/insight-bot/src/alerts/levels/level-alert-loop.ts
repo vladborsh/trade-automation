@@ -1,7 +1,7 @@
 import {
   LEVEL_BAR_SEC, LEVEL_DAILY_KINDS, LEVEL_EVENT_DIRECTION, LEVEL_LATE_SEC, LEVEL_SETTLE_SEC, levelEventOn,
-  type CustomLevelAlertDetails, type LevelAlertDetails, type LevelBar, type LevelInForce, type LevelKind, type LevelParams, type LevelRandomDetails, type LevelTouchDetails,
-  type MarketAlertSource, type WebCandle,
+  type CustomLevelAlertDetails, type LevelAlertDetails, type LevelBar, type LevelInForce, type LevelEvent, type LevelKind, type LevelParams, type LevelRandomDetails, type LevelTouchDetails,
+  mutedDedupeKey, type MarketAlertMutedBy, type MarketAlertSource, type WebCandle,
 } from '@trade-automation/contracts';
 import { levelsInForce } from '@trade-automation/market-data-core';
 import { barCloseMs, levelAlert } from '../../delivery/templates/level-alerts.texts';
@@ -16,7 +16,7 @@ import { stateKey, type LevelAlertStore, type LevelSettings, type LevelStateRow,
  * IB-126 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §4, P2–P7, P10) — the level alert loop, as plain
  * logic over ports. The Nest service in delivery/ calls `tick` once a minute, 5 s past it.
  *
- * Per enabled coin, when a 15m bar has closed (≥ 5 s ago) that it has not evaluated:
+ * Per listed coin (`alert_symbols`, enabled), when a 15m bar has closed (≥ 5 s ago) that it has not evaluated:
  * 1. P5: the bars since its cursor, one `klines 15m` call at exactly that count (`limit = 2` in steady state, weight
  *    1; after downtime up to 99 bars, still weight 1). The cursor is the last bar evaluated, held in memory and, across
  *    a restart, read from the P10 rows' `last_bar_at`. A bar whose close is older than 20 min is journalled `late`,
@@ -30,6 +30,12 @@ import { stateKey, type LevelAlertStore, type LevelSettings, type LevelStateRow,
  *    period's first bar starts fresh; a missing or gapped row later in the period waits for its seed (no crossunder or
  *    crossover until then; breakouts and sweeps go on). One coin is seeded per tick, so ≤ 2 pages × weight 10 a minute.
  * 5. Sent only while the type's switch is on (default OFF), to users with `level_alerts`, in their language.
+ * 5a. IB-151 (owner ruling 2026-11-06 B): **every admin switch below the type's only mutes.** A coin switched off,
+ *    PDH/PDL with `daily` off, an event switched off, a custom level's event switched off: the bar is evaluated and
+ *    the alert journalled all the same, with `mutedBy` naming the switch (`levelMutedBy`), and never sent. A muted row's
+ *    once-key ends in `:muted`, so it never takes the key a sent row would use: turning the switch back on mid-period
+ *    sends what would have been sent had the muted row never been written. PDH/PDL come from the daily copy the
+ *    loop reads anyway (no extra venue weight); their P10 rows are seeded with the coin's other levels.
  * 6. P7: a `touch` per level and UTC day, 2 hash-picked `random` bars per coin and day; price paths for all, direction-free.
  * 7. IB-128 (P9): the coin's custom levels (`custom`, read once per evaluating tick, so a deleted level never fires
  *    after the tick that read it) on the same bar, as opens, once per (level, event, UTC day), in the same commit;
@@ -78,6 +84,8 @@ export interface LevelTickReport {
   weight: number;
   alerts: number;
   late: number;
+  /** IB-151: alerts journalled muted by an admin switch (never sent). */
+  muted: number;
   sent: number;
   controls: number;
   /** Coins whose P10 rows were seeded this tick, and coins still waiting. */
@@ -94,7 +102,8 @@ export const LEVEL_CATCHUP_BARS = 99;
 /** `/fapi/v1/klines`' limit ceiling: a seed reads in pages of this. */
 export const LEVEL_SEED_PAGE = 1_500;
 
-interface Coin { symbol: string; base: string; daily: boolean }
+/** `on`: the coin's own switch (`perCoin[symbol].enabled`); off only mutes (IB-151). `daily`: PDH/PDL send. */
+interface Coin { symbol: string; base: string; on: boolean; daily: boolean }
 type StateMap = Map<string, LevelStateRow & { symbol: string }>;
 
 /** The newest 15m bar whose close is at least the settle time before `nowMs`: its OPEN. */
@@ -119,7 +128,7 @@ export class LevelAlertLoop {
     try {
       const due = dueBarOpen(nowMs);
       const report: LevelTickReport = {
-        atMs: nowMs, dueBarMs: due, coins: 0, bars: 0, calls: 0, weight: 0, alerts: 0, late: 0, sent: 0, controls: 0, seeded: [], pendingSeed: 0, failed: [],
+        atMs: nowMs, dueBarMs: due, coins: 0, bars: 0, calls: 0, weight: 0, alerts: 0, late: 0, muted: 0, sent: 0, controls: 0, seeded: [], pendingSeed: 0, failed: [],
       };
       const { store, source } = this.ports;
       const settings = await store.settings();
@@ -188,7 +197,7 @@ export class LevelAlertLoop {
     const params = settings.params;
     const closeMs = barCloseMs(bar.openMs);
     const late = nowMs - closeMs > LATE_MS;
-    const levels = this.levelsAt(coin, daily, bar.openMs);
+    const levels = this.levelsAt(daily, bar.openMs);
     const rows: LevelStateRow[] = [];
     const alerts: NewLevelAlert[] = [];
     const touches: LevelTouchDetails[] = [];
@@ -207,18 +216,22 @@ export class LevelAlertLoop {
         states.set(stateKey(coin.symbol, lv.kind, lv.periodStartMs), { ...row, symbol: coin.symbol });
       }
       for (const event of r.events) {
-        if (!levelEventOn(params, lv.kind, event)) continue;
+        const mutedBy = levelMutedBy(coin, params, lv.kind, event);
         const details: LevelAlertDetails = {
           ...lv, bar, prevClose, firstBeyondAtMs: event === 'crossunder' || event === 'crossover' ? state?.firstBeyondAtMs ?? null : null,
         };
+        const dedupeKey = `level:${coin.symbol}:${lv.kind}:${lv.periodStartMs}:${event}`;
         alerts.push({
           event, symbol: coin.symbol, direction: LEVEL_EVENT_DIRECTION[event], atMs: bar.openMs, late, details,
-          dedupeKey: `level:${coin.symbol}:${lv.kind}:${lv.periodStartMs}:${event}`,
+          ...(mutedBy ? { mutedBy, dedupeKey: mutedDedupeKey(dedupeKey) } : { dedupeKey }),
         });
       }
       if (r.touch) touches.push({ ...lv, bar, from: r.touch.from, distance: r.touch.distance, touchBand: params.touchBand });
     }
-    alerts.push(...customLevelAlerts(coin.symbol, custom, bar, prevClose, late));
+    // a coin switched off mutes its custom levels too (before IB-151 it was not evaluated at all)
+    for (const a of customLevelAlerts(coin.symbol, custom, bar, prevClose, late)) {
+      alerts.push(coin.on ? a : { ...a, mutedBy: 'coin', dedupeKey: a.mutedBy ? a.dedupeKey : mutedDedupeKey(a.dedupeKey) });
+    }
 
     const ids = rows.length > 0 || alerts.length > 0
       ? await store.commit({ source, build, params, confirmedAtMs: nowMs, symbol: coin.symbol, states: rows, alerts })
@@ -228,8 +241,9 @@ export class LevelAlertLoop {
       if (id === null || id === undefined) continue;
       report.alerts++;
       if (a.late) report.late++;
+      if (a.mutedBy) report.muted++;
       await store.insertPaths({ marketAlertId: id }, coin.symbol, closeMs / 1000);
-      if (source === 'live' && settings.enabled && !a.late) {
+      if (source === 'live' && settings.enabled && !a.late && !a.mutedBy) {
         report.sent += a.details.kind === 'custom'
           ? await this.deliver(id, customLevelAlert(coin, a.event, a.details as CustomLevelAlertDetails, this.ports.webBaseUrl), nowMs, 'custom')
           : await this.deliver(id, levelAlert(coin, a.event, a.details as LevelAlertDetails, this.ports.webBaseUrl), nowMs, 'level');
@@ -264,7 +278,7 @@ export class LevelAlertLoop {
   private async seedCoin(coin: Coin, settings: LevelSettings, states: StateMap, nowMs: number, report: LevelTickReport): Promise<void> {
     const cursor = this.cursor.get(coin.symbol) as number;
     const daily = await this.dailyOf(coin.symbol, nowMs, report);
-    const need = this.levelsAt(coin, daily, cursor).filter((lv) => {
+    const need = this.levelsAt(daily, cursor).filter((lv) => {
       if (!hasState(lv.kind)) return false;
       const row = states.get(stateKey(coin.symbol, lv.kind, lv.periodStartMs));
       return !row || row.state.lastBarMs < cursor;
@@ -290,10 +304,12 @@ export class LevelAlertLoop {
     this.pending.delete(coin.symbol);
   }
 
-  /** The coin's levels in force at `atMs`: its kinds only, and only those the daily copy can vouch for. */
-  private levelsAt(coin: Coin, daily: { fetchedAt: number; bars: WebCandle[] }, atMs: number): LevelInForce[] {
+  /**
+   * The levels in force at `atMs` that the daily copy can vouch for. Every kind, PDH/PDL too whatever `daily` says
+   * (IB-151: `daily` only mutes, `levelMutedBy`).
+   */
+  private levelsAt(daily: { fetchedAt: number; bars: WebCandle[] }, atMs: number): LevelInForce[] {
     return levelsInForce(daily.bars, atMs / 1000)
-      .filter((l) => coin.daily || !LEVEL_DAILY_KINDS.includes(l.kind))
       .filter((l) => l.start * 1000 <= daily.fetchedAt)
       .map((l) => ({ kind: l.kind as LevelKind, price: l.price, periodStartMs: l.start * 1000, periodEndMs: l.end * 1000 }));
   }
@@ -326,7 +342,7 @@ export class LevelAlertLoop {
     return delivered;
   }
 
-  /** A coin switched off or delisted is forgotten, so switching it back on starts from its rows again. */
+  /** A coin paused or removed on `alert_symbols` is forgotten, so resuming it starts from its rows again. (A coin's own level switch only mutes, IB-151.) */
   private forget(coins: readonly Coin[]): void {
     const on = new Set(coins.map((c) => c.symbol));
     for (const m of [this.cursor, this.dailyCopy]) for (const s of m.keys()) if (!on.has(s)) m.delete(s);
@@ -341,9 +357,21 @@ function cursorFromRows(states: StateMap, symbol: string): number | null {
   return best;
 }
 
-/** Enabled `alert_symbols` that levels have not switched off; a coin missing from `perCoin` is on with PDH/PDL off. */
+/**
+ * Every enabled `alert_symbols` coin, with its switches; a coin missing from `perCoin` is on with PDH/PDL off. A coin
+ * switched off is still evaluated (IB-151): its rows are journalled muted.
+ */
 export function coinsOf(listed: ReadonlyArray<{ symbol: string; base: string }>, params: LevelParams): Coin[] {
-  return listed
-    .filter((c) => params.perCoin[c.symbol]?.enabled ?? true)
-    .map((c) => ({ symbol: c.symbol, base: c.base, daily: params.perCoin[c.symbol]?.daily ?? false }));
+  return listed.map((c) => ({ symbol: c.symbol, base: c.base, on: params.perCoin[c.symbol]?.enabled ?? true, daily: params.perCoin[c.symbol]?.daily ?? false }));
+}
+
+/**
+ * IB-151: the admin switch that keeps a built-in level's event from being sent, or null. The first that applies, in
+ * `MARKET_ALERT_MUTED_BY`'s order: the coin, then PDH/PDL's `daily`, then the (kind, event) switch.
+ */
+export function levelMutedBy(coin: Pick<Coin, 'on' | 'daily'>, params: Pick<LevelParams, 'events'>, kind: LevelKind, event: LevelEvent): MarketAlertMutedBy | null {
+  if (!coin.on) return 'coin';
+  if (!coin.daily && LEVEL_DAILY_KINDS.includes(kind)) return 'daily';
+  if (!levelEventOn(params, kind, event)) return 'event';
+  return null;
 }

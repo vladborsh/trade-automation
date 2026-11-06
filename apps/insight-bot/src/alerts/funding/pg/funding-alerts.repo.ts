@@ -1,5 +1,5 @@
 import {
-  FUNDING_ALERT_TF, FundingParamsSchema, type FundingAlertEvent, type FundingParams, type FundingSide, type MarketAlertControlKind, type MarketAlertSource,
+  FUNDING_ALERT_TF, FundingParamsSchema, type FundingAlertEvent, type FundingParams, type FundingSide, type MarketAlertControlKind, type MarketAlertMutedBy, type MarketAlertSource,
   type WebFundingAlertRow,
 } from '@trade-automation/contracts';
 import type { Db, DbHandle } from '../../../db/db.port';
@@ -21,6 +21,8 @@ export interface NewFundingAlert {
   atMs: number;
   details: Record<string, unknown>;
   dedupeKey: string;
+  /** IB-151: the switch that keeps it from being sent; absent = none (the journal gets it either way). */
+  mutedBy?: MarketAlertMutedBy;
 }
 
 export interface NewFundingControl {
@@ -152,13 +154,13 @@ export class PgFundingAlertStore implements FundingAlertStore {
   async journalPage(limit = 50): Promise<WebFundingAlertRow[]> {
     const rows = await this.db.query<{
       id: string; source: MarketAlertSource; event: FundingAlertEvent; symbol: string; at: Date; details: Record<string, unknown>;
-      fired_at: Date | null; late: boolean; recipients: number;
-    }>(`select id, source, event, symbol, at, details, fired_at, late, recipients from market_alerts where type = 'funding' order by at desc, id desc limit $1`, [limit]);
+      fired_at: Date | null; late: boolean; recipients: number; muted_by: MarketAlertMutedBy | null;
+    }>(`select id, source, event, symbol, at, details, fired_at, late, recipients, muted_by from market_alerts where type = 'funding' order by at desc, id desc limit $1`, [limit]);
     return rows.map((r) => ({
       id: Number(r.id), source: r.source, event: r.event, symbol: r.symbol, side: r.details.side as FundingSide, at: Math.floor(ms(r.at) / 1000),
       rate: Number(r.details.rate), intervalH: r.details.intervalH === null ? null : Number(r.details.intervalH), ratePer8h: Number(r.details.ratePer8h),
       episodeHours: r.event === 'flip' ? Number(r.details.episodeHours) : null,
-      firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients,
+      firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients, mutedBy: r.muted_by,
     }));
   }
 
@@ -177,10 +179,11 @@ export class PgFundingAlertStore implements FundingAlertStore {
 
 async function insertAlert(tx: DbHandle, x: FundingCommit, a: NewFundingAlert): Promise<number | null> {
   const rows = await tx.query<{ id: string }>(
-    `insert into market_alerts (type, event, symbol, direction, at, tf, details, params, source, build, confirmed_at, late, dedupe_key)
-     values ('funding', $1, $2, $3, $4, $11, $5, $6, $7, $8, $9, false, $10)
+    `insert into market_alerts (type, event, symbol, direction, at, tf, details, params, source, build, confirmed_at, late, dedupe_key, muted_by)
+     values ('funding', $1, $2, $3, $4, $11, $5, $6, $7, $8, $9, false, $10, $12)
      on conflict (source, type, dedupe_key) do nothing returning id`,
-    [a.event, a.symbol, a.direction, new Date(a.atMs), JSON.stringify(a.details), JSON.stringify(x.params), x.source, x.build, new Date(x.confirmedAtMs), a.dedupeKey, FUNDING_ALERT_TF],
+    [a.event, a.symbol, a.direction, new Date(a.atMs), JSON.stringify(a.details), JSON.stringify(x.params), x.source, x.build, new Date(x.confirmedAtMs), a.dedupeKey, FUNDING_ALERT_TF,
+      a.mutedBy ?? null],
   );
   return rows[0] ? Number(rows[0].id) : null;
 }

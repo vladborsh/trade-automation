@@ -1,5 +1,5 @@
 import {
-  LiqParamsSchema, OI_RESEARCH_WINDOWS, type LiqAlertEvent, type LiqParams, type LiqSide, type LiqVenue, type MarketAlertControlKind,
+  LiqParamsSchema, OI_RESEARCH_WINDOWS, type LiqAlertEvent, type LiqParams, type LiqSide, type LiqVenue, type MarketAlertControlKind, type MarketAlertMutedBy,
   type MarketAlertSource, type WebLiqAlertRow,
 } from '@trade-automation/contracts';
 import type { DbHandle } from '../../../db/db.port';
@@ -50,10 +50,16 @@ export interface JournalLiqRow {
   totalUsd: number | null;
   /** IB-148, `event` rows: taken in by the same-side event with this T0, and how (L17 / L18); null = not. */
   mergedInto: { eventAt: number; how: 'after' | 'before' } | null;
+  /**
+   * IB-151: journalled while its coin was switched off (`muted_by = 'coin'`). Such a crossing is never part of an
+   * event, and a coin that is on does not see it (its quiet period, its near-miss exclusion): what is sent is what
+   * would have been sent had the row never been written.
+   */
+  muted: boolean;
 }
 
 /** One journal row from its stored columns; shared by the Pg store and the in-memory ones. */
-export function journalRow(r: { id: number; event: LiqAlertEvent; symbol: string; atMs: number; late: boolean; details: Record<string, unknown> }): JournalLiqRow {
+export function journalRow(r: { id: number; event: LiqAlertEvent; symbol: string; atMs: number; late: boolean; details: Record<string, unknown>; muted: boolean }): JournalLiqRow {
   const d = r.details;
   const num = (v: unknown): number | null => (v === undefined || v === null ? null : Number(v));
   const coins = Array.isArray(d.coins) ? (d.coins as Array<{ symbol: string }>).map((c) => c.symbol) : [];
@@ -62,7 +68,7 @@ export function journalRow(r: { id: number; event: LiqAlertEvent; symbol: string
     windowStartMs: Number(d.windowStartMs ?? NaN), thresholdUsd: Number(d.thresholdUsd ?? NaN),
     alertId: num(d.alertId), eventAt: num(d.eventAt), sentAt: num(d.sentAt),
     settled: d.settled === 'quiet' || d.settled === 'cap' ? d.settled : null, coins,
-    totalUsd: num(d.totalUsd), mergedInto: mergedOf(d.mergedInto),
+    totalUsd: num(d.totalUsd), mergedInto: mergedOf(d.mergedInto), muted: r.muted,
   };
 }
 
@@ -83,6 +89,8 @@ export interface NewMarketAlert {
   confirmedAtMs: number;
   late: boolean;
   dedupeKey: string;
+  /** IB-151: the switch that keeps it from being sent; absent = none. */
+  mutedBy?: MarketAlertMutedBy;
 }
 
 export interface NewMarketControl {
@@ -152,11 +160,11 @@ export class PgLiqAlertStore implements LiqAlertStore {
   }
 
   async journal(source: MarketAlertSource, sinceMs: number): Promise<JournalLiqRow[]> {
-    const rows = await this.db.query<{ id: string; event: LiqAlertEvent; symbol: string; at: Date; late: boolean; details: Record<string, unknown> }>(
-      `select id, event, symbol, at, late, details from market_alerts where type = 'liq' and source = $1 and at > $2 order by at, id`,
+    const rows = await this.db.query<{ id: string; event: LiqAlertEvent; symbol: string; at: Date; late: boolean; details: Record<string, unknown>; muted: boolean }>(
+      `select id, event, symbol, at, late, details, muted_by is not null as muted from market_alerts where type = 'liq' and source = $1 and at > $2 order by at, id`,
       [source, new Date(sinceMs)],
     );
-    return rows.map((r) => journalRow({ id: Number(r.id), event: r.event, symbol: r.symbol, atMs: ms(r.at), late: r.late, details: r.details }));
+    return rows.map((r) => journalRow({ id: Number(r.id), event: r.event, symbol: r.symbol, atMs: ms(r.at), late: r.late, details: r.details, muted: r.muted }));
   }
 
   async venueStatus(gapsSinceMs?: number): Promise<VenueStatus> {
@@ -183,10 +191,11 @@ export class PgLiqAlertStore implements LiqAlertStore {
 
   async insertAlert(x: NewMarketAlert): Promise<number | null> {
     const rows = await this.db.query<{ id: string }>(
-      `insert into market_alerts (type, event, symbol, direction, at, tf, details, params, source, build, confirmed_at, late, dedupe_key)
-       values ('liq', $1, $2, null, $3, '5m', $4, $5, $6, $7, $8, $9, $10)
+      `insert into market_alerts (type, event, symbol, direction, at, tf, details, params, source, build, confirmed_at, late, dedupe_key, muted_by)
+       values ('liq', $1, $2, null, $3, '5m', $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (source, type, dedupe_key) do nothing returning id`,
-      [x.event, x.symbol, new Date(x.atMs), JSON.stringify(x.details), JSON.stringify(x.params), x.source, x.build, new Date(x.confirmedAtMs), x.late, x.dedupeKey],
+      [x.event, x.symbol, new Date(x.atMs), JSON.stringify(x.details), JSON.stringify(x.params), x.source, x.build, new Date(x.confirmedAtMs), x.late, x.dedupeKey,
+        x.mutedBy ?? null],
     );
     return rows[0] ? Number(rows[0].id) : null;
   }
@@ -238,11 +247,11 @@ export class PgLiqAlertStore implements LiqAlertStore {
   async journalPage(limit = 50): Promise<WebLiqAlertRow[]> {
     const rows = await this.db.query<{
       id: string; source: MarketAlertSource; event: LiqAlertEvent; symbol: string; at: Date; details: Record<string, unknown>;
-      fired_at: Date | null; late: boolean; recipients: number;
-    }>(`select id, source, event, symbol, at, details, fired_at, late, recipients from market_alerts where type = 'liq' order by at desc, id desc limit $1`, [limit]);
+      fired_at: Date | null; late: boolean; recipients: number; muted_by: MarketAlertMutedBy | null;
+    }>(`select id, source, event, symbol, at, details, fired_at, late, recipients, muted_by from market_alerts where type = 'liq' order by at desc, id desc limit $1`, [limit]);
     return rows.map((r) => ({
       id: Number(r.id), source: r.source, event: r.event, symbol: r.symbol, side: r.details.side as LiqSide, at: Math.floor(ms(r.at) / 1000),
-      firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients,
+      firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients, mutedBy: r.muted_by,
       ...adminFigures(r.event, r.symbol, r.details),
     }));
   }

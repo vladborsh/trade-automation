@@ -27,11 +27,11 @@ maybeDescribe('IB-129 alert marks against a real database', () => {
   let db: PgDatabase;
   let n = 0;
 
-  const insert = (o: { type?: string; event: string; symbol?: string; atMs: number; details: unknown; source?: string; late?: boolean }) =>
+  const insert = (o: { type?: string; event: string; symbol?: string; atMs: number; details: unknown; source?: string; late?: boolean; mutedBy?: string }) =>
     db.query(
-      `insert into market_alerts (type, event, symbol, at, tf, details, params, source, build, confirmed_at, dedupe_key, late)
-       values ($1, $2, $3, $4, '5m', $5, '{}', $6, 'dev', $4, $7, $8)`,
-      [o.type ?? 'liq', o.event, o.symbol ?? 'BTCUSDT', new Date(o.atMs), JSON.stringify(o.details), o.source ?? 'live', `k${++n}`, o.late ?? false],
+      `insert into market_alerts (type, event, symbol, at, tf, details, params, source, build, confirmed_at, dedupe_key, late, muted_by)
+       values ($1, $2, $3, $4, '5m', $5, '{}', $6, 'dev', $4, $7, $8, $9)`,
+      [o.type ?? 'liq', o.event, o.symbol ?? 'BTCUSDT', new Date(o.atMs), JSON.stringify(o.details), o.source ?? 'live', `k${++n}`, o.late ?? false, o.mutedBy ?? null],
     );
 
   beforeAll(async () => {
@@ -59,6 +59,9 @@ maybeDescribe('IB-129 alert marks against a real database', () => {
     await insert({ event: 'continuing', atMs: T + 5 * MIN, details: {} });
     await insert({ type: 'level', event: 'breakout_up', atMs: T + 6 * MIN, details: {} });
     await insert({ event: 'alert', symbol: 'ETHUSDT', atMs: T + 7 * MIN, details: liqDetails });
+    // IB-151: a crossing of a coin switched off, and a funding enter likewise — never written before IB-151, so never a mark
+    await insert({ event: 'alert', atMs: T + 8 * MIN, details: liqDetails, mutedBy: 'coin' });
+    await insert({ type: 'funding', event: 'enter', atMs: T + 9 * MIN, details: enterDetails, mutedBy: 'coin' });
     await insert({ event: 'alert', atMs: T + 60 * MIN, details: liqDetails }); // on `to` exactly: out
   }, DB_HOOK_TIMEOUT_MS);
 

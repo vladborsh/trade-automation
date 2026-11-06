@@ -1,6 +1,6 @@
 import {
   FUNDING_HISTORY_REFRESH_SEC, FUNDING_LATE_SEC, FUNDING_SIDES, FUNDING_SIDE_DIRECTION, type FundingEnterDetails, type FundingFlipDetails,
-  type FundingNearMissDetails, type FundingParams, type FundingSide, type MarketAlertSource,
+  type FundingNearMissDetails, type FundingParams, type FundingSide, type MarketAlertSource, mutedDedupeKey,
 } from '@trade-automation/contracts';
 import { fundingEnter, fundingFlip } from '../../delivery/templates/funding-alerts.texts';
 import type { Texts } from '../../delivery/templates/texts';
@@ -15,7 +15,7 @@ import { stateKey, type FundingAlertStore, type FundingSettings, type NewFunding
  * IB-124 (architecture/alerts-liq-funding-levels-design-2026-11-05.md §3, F1–F8) — the funding alert loop, as plain
  * logic over ports. The Nest service in delivery/ only schedules it every 5 min.
  *
- * Per enabled coin and check:
+ * Per listed coin (`alert_symbols`, enabled) and check:
  * 1. F1: its predicted rate (`premiumIndex?symbol=`, weight 1). Its 30-day settled history (`fundingRate`, weight 1)
  *    is re-read when the copy held is older than an hour; it is never stored (S1).
  * 2. F7: a rate older than 15 min gives no signal and does not move the state.
@@ -25,6 +25,10 @@ import { stateKey, type FundingAlertStore, type FundingSettings, type NewFunding
  *    `funding-flip:{symbol}:{side}:{episode start}`).
  * 5. Sent only while the type's switch is on (default OFF), to users with `funding_alerts`, in their language. A
  *    funding row is never `late`: a stale check is dropped before it can produce one (F7).
+ * 5a. IB-151 (owner ruling 2026-11-06 B): a coin switched off (`perCoin[symbol].enabled = false`) is checked, its
+ *    state kept and its rows journalled as for any coin, with `mutedBy: 'coin'` and a once-key of their own
+ *    (`mutedDedupeKey`); they are never sent. Its two calls a check (weight 1 each, every 5 min) cost 0.4 weight a
+ *    minute per switched-off coin, plus its hourly history read.
  * 6. F8: the first near-miss of a coin, side and UTC day while that side is normal; 2 hash-picked random checks a
  *    coin and day. Price paths for alerts and controls, direction-free (see `insertPaths`): the crowded side is the
  *    row's `direction`.
@@ -59,6 +63,8 @@ export interface FundingTickReport {
   insufficient: number;
   enters: number;
   flips: number;
+  /** IB-151: enters and flips journalled muted by the coin's switch (never sent). */
+  muted: number;
   sent: number;
   controls: number;
   /** Coins whose check failed (venue or DB); the others went on. */
@@ -70,7 +76,8 @@ const REFRESH_MS = FUNDING_HISTORY_REFRESH_SEC * 1_000;
 const LATE_MS = FUNDING_LATE_SEC * 1_000;
 const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
-interface Coin { symbol: string; base: string; floorPer8h: number }
+/** `on`: the coin's own switch; off only mutes (IB-151). */
+interface Coin { symbol: string; base: string; floorPer8h: number; on: boolean }
 
 export class FundingAlertLoop {
   private running = false;
@@ -83,7 +90,7 @@ export class FundingAlertLoop {
     if (this.running) return null;
     this.running = true;
     try {
-      const report: FundingTickReport = { atMs: nowMs, coins: 0, calls: 0, stale: 0, insufficient: 0, enters: 0, flips: 0, sent: 0, controls: 0, failed: [] };
+      const report: FundingTickReport = { atMs: nowMs, coins: 0, calls: 0, stale: 0, insufficient: 0, enters: 0, flips: 0, muted: 0, sent: 0, controls: 0, failed: [] };
       const { store, source } = this.ports;
       const settings = await store.settings();
       const coins = coinsOf(await store.listedCoins(), settings.params);
@@ -134,6 +141,7 @@ export class FundingAlertLoop {
       }
     }
     const { store, source, build } = this.ports;
+    if (!coin.on) for (const [i, a] of alerts.entries()) alerts[i] = { ...a, mutedBy: 'coin', dedupeKey: mutedDedupeKey(a.dedupeKey) };
     const ids = await store.commit({ source, build, params: settings.params, confirmedAtMs: nowMs, symbol: coin.symbol, states: next, alerts });
 
     for (const [i, a] of alerts.entries()) {
@@ -141,8 +149,9 @@ export class FundingAlertLoop {
       if (id === null || id === undefined) continue;
       if (a.event === 'enter') report.enters++;
       else report.flips++;
+      if (a.mutedBy) report.muted++;
       await store.insertPaths({ marketAlertId: id }, coin.symbol, liqPathT0(a.atMs));
-      if (source === 'live' && settings.enabled) {
+      if (source === 'live' && settings.enabled && !a.mutedBy) {
         const t = { base: coin.base, symbol: coin.symbol };
         const texts = a.event === 'enter'
           ? fundingEnter(t, a.details as FundingEnterDetails, this.ports.webBaseUrl)
@@ -214,9 +223,12 @@ export class FundingAlertLoop {
   }
 }
 
-/** Enabled `alert_symbols` that funding has not switched off; a coin missing from `perCoin` is on at the shared floor. */
+/**
+ * Every enabled `alert_symbols` coin; a coin missing from `perCoin` is on at the shared floor. A coin funding has
+ * switched off is still checked (IB-151): its rows are journalled muted.
+ */
 export function coinsOf(listed: ReadonlyArray<{ symbol: string; base: string }>, params: FundingParams): Coin[] {
-  return listed
-    .filter((c) => params.perCoin[c.symbol]?.enabled ?? true)
-    .map((c) => ({ symbol: c.symbol, base: c.base, floorPer8h: params.perCoin[c.symbol]?.floorPer8h ?? FUNDING_FLOOR_PER_8H }));
+  return listed.map((c) => ({
+    symbol: c.symbol, base: c.base, floorPer8h: params.perCoin[c.symbol]?.floorPer8h ?? FUNDING_FLOOR_PER_8H, on: params.perCoin[c.symbol]?.enabled ?? true,
+  }));
 }

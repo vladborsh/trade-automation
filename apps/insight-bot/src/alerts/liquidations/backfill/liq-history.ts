@@ -80,7 +80,7 @@ export interface CountedAlert {
  * Paths are counted, not kept.
  */
 export class MemoryJournalStore implements LiqAlertStore {
-  readonly alerts: Array<CountedAlert & { id: number; source: string; dedupeKey: string; late: boolean; details: Record<string, unknown> }> = [];
+  readonly alerts: Array<CountedAlert & { id: number; source: string; dedupeKey: string; late: boolean; details: Record<string, unknown>; muted: boolean }> = [];
   readonly controls: Array<{ id: number; kind: string; symbol: string; atMs: number; dedupeKey: string; source: string }> = [];
   paths = 0;
   private nextId = 1;
@@ -94,7 +94,7 @@ export class MemoryJournalStore implements LiqAlertStore {
 
   async journal(source: 'live' | 'backfill', sinceMs: number): Promise<JournalLiqRow[]> {
     return this.alerts.filter((a) => a.source === source && a.atMs > sinceMs).sort((a, b) => a.atMs - b.atMs || a.id - b.id)
-      .map((a) => journalRow({ id: a.id, event: a.event, symbol: a.symbol, atMs: a.atMs, late: a.late, details: a.details }));
+      .map((a) => journalRow({ id: a.id, event: a.event, symbol: a.symbol, atMs: a.atMs, late: a.late, details: a.details, muted: a.muted }));
   }
 
   async insertAlert(x: NewMarketAlert): Promise<number | null> {
@@ -102,7 +102,7 @@ export class MemoryJournalStore implements LiqAlertStore {
     const d = x.details;
     const id = this.nextId++;
     this.alerts.push({
-      id, source: x.source, dedupeKey: x.dedupeKey, event: x.event, symbol: x.symbol, atMs: x.atMs, side: d.side as LiqSide, late: x.late, details: d,
+      id, source: x.source, dedupeKey: x.dedupeKey, event: x.event, symbol: x.symbol, atMs: x.atMs, side: d.side as LiqSide, late: x.late, details: d, muted: x.mutedBy !== undefined,
       sumUsd: Number(d.sumUsd ?? d.totalUsd), thresholdUsd: Number(d.thresholdUsd ?? NaN),
       silent: Array.isArray(d.silentVenues) ? (d.silentVenues as CountedAlert['silent']) : [],
     });

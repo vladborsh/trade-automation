@@ -24,6 +24,15 @@
  *   per day at each band. The ×1 count without PDH/PDL is cross-checked against the backfill rows stored. Last line:
  *   `LEVEL_HISTORY_JSON {…}`.
  *
+ * IB-151 — `--muted-gap <ISO>` (with `--dry-run` or `--write` and `--until`): the rows the live loop SKIPPED before
+ * IB-151 because a switch was off, from the switch time `<ISO>` (the owner's 2026-11-06 enable with the weekly open
+ * off: 13:06:05Z) to the deploy's first heartbeat close `--until`. The replay is this run's, from the first bar
+ * evaluated after the switch (`firstBarDecidedAfter`), with the LIVE settings read once at the start (WO off, PDH/PDL
+ * off, …) instead of the shipped defaults; `mutedGapStore` writes only the muted alerts (`source = 'backfill'`,
+ * `muted_by` set) whose once-key live has not journalled, with their paths; no controls. The 90-day counts are not run,
+ * and the «a live row before --until» refusal does not apply (live rows fill the window: that is the point).
+ * Venue weight: 15m from the month start before `<ISO>` (≤ 2 pages of weight 10 a coin) and 1d (weight 2) a coin.
+ *
  * Memory, as IB-116/IB-123/IB-125: run with `--max-old-space-size=40 --max-semi-space-size=1 --optimize-for-size`;
  * the start gate (MEM_START_FLOOR_MB, default 170) refuses, the guard pauses below 120 MB before every replayed day
  * and every 30 s while measuring. The box wrapper (`infra/insight-bot/scripts/level-backfill.sh`) kills it below
@@ -46,7 +55,7 @@ import { WeightPacer } from '../../oi-divergence/backfill/weight-pacer';
 import { PgOiAlertStore } from '../../oi-divergence/pg/oi-alerts.repo';
 import { PgLevelAlertStore, type LevelAlertStore } from '../pg/level-alerts.repo';
 import {
-  BAR_MS, DAY_MS, HistoryLevelVenue, LEVEL_HISTORY_BAND_MULTIPLIERS, LEVEL_HISTORY_DAYS, MemoryLevelJournal, fetchClosed, levelCountRows,
+  BAR_MS, DAY_MS, HistoryLevelVenue, firstBarDecidedAfter, mutedGapStore, LEVEL_HISTORY_BAND_MULTIPLIERS, LEVEL_HISTORY_DAYS, MemoryLevelJournal, fetchClosed, levelCountRows,
   levelCrossCheck, levelHistoryParams, levelHistoryStore, levelShippedCounts, levelTouchRows, replayLevels, seedFrom, toLevelBar,
   type CountedLevelAlert, type LevelCountRow, type LevelReplayTotals, type LevelTouchRow,
 } from './level-history';
@@ -62,11 +71,16 @@ class DryRunRollback extends Error {
   constructor(readonly payload: { totals: LevelReplayTotals; counts: Record<string, number>; due: { windows: number; weight: number } }) { super('dry run: rolled back'); }
 }
 
-export interface LevelCliArgs { mode: 'dry-run' | 'write'; untilMs: number }
+export interface LevelCliArgs {
+  mode: 'dry-run' | 'write';
+  untilMs: number;
+  /** IB-151: the switch time the muted-gap run starts from; absent = the IB-127 90-day run. */
+  gapFromMs?: number;
+}
 
 /** Pure: argv → the run's arguments; throws a usage line on anything else. */
 export function parseLevelCliArgs(argv: readonly string[]): LevelCliArgs {
-  const usage = 'usage: level-backfill.cli.js --dry-run | --write  --until <ISO>';
+  const usage = 'usage: level-backfill.cli.js --dry-run | --write  --until <ISO>  [--muted-gap <ISO>]';
   const dry = argv.includes('--dry-run');
   const write = argv.includes('--write');
   if (dry === write) throw new Error(usage);
@@ -76,7 +90,13 @@ export function parseLevelCliArgs(argv: readonly string[]): LevelCliArgs {
   const untilMs = Date.parse(raw);
   if (!Number.isFinite(untilMs) || !/Z$|[+-]\d\d:\d\d$/.test(raw)) throw new Error(`--until needs an ISO time with a zone: ${usage}`);
   if (untilMs % BAR_MS !== 0) throw new Error(`--until ${raw} is not a 15m close (the heartbeat line's time is): ${usage}`);
-  return { mode: dry ? 'dry-run' : 'write', untilMs };
+  const g = argv.indexOf('--muted-gap');
+  if (g < 0) return { mode: dry ? 'dry-run' : 'write', untilMs };
+  const gapRaw = argv[g + 1];
+  const gapFromMs = gapRaw === undefined ? NaN : Date.parse(gapRaw);
+  if (gapRaw === undefined || !Number.isFinite(gapFromMs) || !/Z$|[+-]\d\d:\d\d$/.test(gapRaw)) throw new Error(`--muted-gap needs the switch time, ISO with a zone: ${usage}`);
+  if (firstBarDecidedAfter(gapFromMs) >= untilMs - BAR_MS) throw new Error(`--muted-gap ${gapRaw} leaves no bar before --until ${raw}: ${usage}`);
+  return { mode: dry ? 'dry-run' : 'write', untilMs, gapFromMs };
 }
 
 /** The replay's bar opens, [from, to): the 90 days before the bar the live loop evaluated first. */
@@ -100,6 +120,7 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
   let exit = 0;
   try {
     if (args.untilMs > now()) throw new Error(`--until ${iso(args.untilMs)} is in the future`);
+    if (args.gapFromMs !== undefined) return await mutedGap(args as Required<LevelCliArgs>, db, env, guard, now);
     const { fromMs, toMs } = levelReplayRange(args.untilMs);
     const reads = new PgLevelBackfillReads(db);
     const live = await reads.liveRowsUpTo(toMs - 1);
@@ -208,6 +229,82 @@ async function main(argv: string[], now: () => number = Date.now): Promise<numbe
     await db.end();
   }
   return exit;
+}
+
+/** IB-151's gap run (see the module comment). Exit 0 when it completed, 1 when the replay broke. */
+async function mutedGap(
+  args: Required<LevelCliArgs>, db: PgDatabase, env: ReturnType<typeof validateEnv>, guard: MemoryGuard, now: () => number,
+): Promise<number> {
+  const fromMs = firstBarDecidedAfter(args.gapFromMs);
+  const toMs = args.untilMs - BAR_MS;
+  const live = new PgLevelAlertStore(db);
+  const settings = await live.settings();
+  const coins = await live.listedCoins();
+  if (coins.length === 0) throw new Error('no enabled alert_symbols coin');
+  await guard.gate('the gap replay');
+  const weight = new BinanceWeightTracker();
+  const pacer = new WeightPacer(LEVEL_BACKFILL_WEIGHT_PER_MIN, now);
+  const candles = new CandlesService({ futuresBaseUrl: env.BINANCE_FUTURES_REST_BASE_URL, spotBaseUrl: env.BINANCE_SPOT_REST_BASE_URL, weight });
+  const bars = new Map<string, LevelBar[]>();
+  const daily = new Map<string, WebCandle[]>();
+  let venueWeight = 0;
+  for (const { symbol } of coins) {
+    const m = await fetchClosed((s, l) => candles.closedKlines(symbol, '15m', s, l), BAR_MS, seedFrom(fromMs), args.untilMs, (w) => pacer.take(w));
+    const d = await fetchClosed((s, l) => candles.closedKlines(symbol, '1d', s, l), DAY_MS, fromMs - LEVEL_DAILY_BARS * DAY_MS, args.untilMs, (w) => pacer.take(w));
+    venueWeight += m.weight + d.weight;
+    bars.set(symbol, m.candles.map(toLevelBar));
+    daily.set(symbol, d.candles);
+  }
+  say(`level muted-gap ${args.mode}: build ${env.BUILD_SHA}; switch ${iso(args.gapFromMs)} → bars [${iso(fromMs)}, ${iso(toMs)}); ${coins.length} coins; venue weight ${venueWeight}`);
+  say(`live settings, frozen for the run: ${JSON.stringify(settings.params)}`);
+  const reads = new PgLevelBackfillReads(db);
+  const replay = async (base: PgLevelAlertStore, r: PgLevelBackfillReads) => {
+    const store = mutedGapStore(base, (keys) => r.liveKeys(keys));
+    const totals = await replayLevels({
+      store: levelHistoryStore(store, { params: settings.params, coins }), venue: new HistoryLevelVenue(bars, daily), build: env.BUILD_SHA, log: say,
+      beforeDay: (l) => guard.check(l),
+    }, fromMs, toMs);
+    return { totals, unmuted: store.unmuted, inLive: store.inLive };
+  };
+  let out: Awaited<ReturnType<typeof replay>>;
+  let counts: Record<string, number>;
+  if (args.mode === 'dry-run') {
+    try {
+      await db.transaction(async (tx) => {
+        const r = new PgLevelBackfillReads(tx);
+        const x = await replay(new PgLevelAlertStore(savepointDb(tx)), r);
+        throw new GapRollback(x, await r.backfillCounts());
+      });
+      throw new Error('unreachable');
+    } catch (error) {
+      if (!(error instanceof GapRollback)) throw error;
+      ({ out, counts } = error);
+    }
+  } else {
+    out = await replay(new PgLevelAlertStore(db), reads);
+    counts = await reads.backfillCounts();
+  }
+  const { totals } = out;
+  say(`${args.mode} muted-gap: ${totals.ticks} ticks, ${totals.bars} coin-bars, ${totals.seeds} seeds; muted rows written ${totals.alerts}; `
+    + `skipped: unmuted ${out.unmuted} (live journalled those), already in live ${out.inLive}; failed ${totals.failed}`);
+  say(`rows with type = level, source = backfill now: ${JSON.stringify(counts)}`);
+  for (const [m, n] of Object.entries(totals.warnings)) say(`  WARNING ×${n}: ${m}`);
+  if (args.mode === 'write') {
+    await guard.gate('path measuring');
+    const paths = await measureBackfillPaths(
+      { store: new PgOiAlertStore(db), build: env.BUILD_SHA, log: say, klines5m: async (symbol, from, limit) => candles.closedKlines(symbol, '5m', from * 1000, limit) },
+      { take: async (w) => { await guard.every30s('path measuring'); await pacer.take(w); } }, now, 50, 'level',
+    );
+    const left = await reads.unmeasuredPaths();
+    say(`paths: measured ${paths.measured}, failed ${paths.failed}, weight ${paths.weight}; left ${left.count}`
+      + (left.lastCloses ? ` (the last window closes ${iso(left.lastCloses)}; a rerun after it measures them)` : ''));
+  }
+  say(`LEVEL_MUTED_GAP_JSON ${JSON.stringify({ mode: args.mode, switchAt: iso(args.gapFromMs), from: iso(fromMs), to: iso(toMs), venueWeight, written: totals.alerts, unmuted: out.unmuted, inLive: out.inLive, counts })}`);
+  return Object.keys(totals.warnings).length > 0 || totals.failed > 0 ? 1 : 0;
+}
+
+class GapRollback extends Error {
+  constructor(readonly out: { totals: LevelReplayTotals; unmuted: number; inLive: number }, readonly counts: Record<string, number>) { super('dry run: rolled back'); }
 }
 
 function printTable(rows: readonly LevelCountRow[], touches: readonly LevelTouchRow[], fromMs: number, toMs: number, days: number): void {

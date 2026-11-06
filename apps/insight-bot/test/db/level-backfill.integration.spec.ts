@@ -105,19 +105,26 @@ maybeDescribe('IB-127 the level history run on real SQL', () => {
     const first = await run(db);
     expect(first).toMatchObject({ failed: 0, warnings: {} });
     const rows = await db.query<{ event: string; at: Date; source: string; fired_at: Date | null; recipients: number; late: boolean; tf: string; dedupe_key: string }>(
-      `select event, at, source, fired_at, recipients, late, tf, dedupe_key from market_alerts where type = 'level' order by at`);
+      `select event, at, source, fired_at, recipients, late, tf, dedupe_key from market_alerts where type = 'level' and muted_by is null order by at`);
     expect(rows.map((r) => [r.event, new Date(r.at).getTime(), r.source, r.fired_at, r.recipients, r.late, r.tf, r.dedupe_key])).toEqual([
       ['breakout_up', ABOVE, 'backfill', null, 0, false, '15m', `level:BTCUSDT:PWH:${WEEK}:breakout_up`],
       ['crossunder', BELOW, 'backfill', null, 0, false, '15m', `level:BTCUSDT:PWH:${WEEK}:crossunder`],
     ]);
     expect(await db.query(`select 1 from alert_level_state`)).toEqual([]);
+    // IB-151: PDH/PDL (daily off by default) are written too, muted by `daily`, never sent
+    const muted = await db.query<{ kind: string; muted_by: string; fired_at: Date | null }>(
+      `select details ->> 'kind' as kind, muted_by, fired_at from market_alerts where type = 'level' and muted_by is not null`);
+    expect(muted.length).toBeGreaterThan(0);
+    expect(muted.every((m) => (m.kind === 'PDH' || m.kind === 'PDL') && m.muted_by === 'daily' && m.fired_at === null)).toBe(true);
 
     const stored = await new PgLevelBackfillReads(db).backfillCounts();
     const mem = new MemoryLevelJournal();
     await run(db, mem, levelHistoryParams(['BTCUSDT'], 1, true));
     expect(mem.alerts.some((a) => a.kind === 'PDH' || a.kind === 'PDL')).toBe(true);
     expect(levelCrossCheck(mem, stored)).toBeNull();
-    expect(stored.paths).toBe(3 * (2 + (stored.controls_touch ?? 0) + (stored.controls_random ?? 0))); // 4h, 24h, 72h per subject
+    const mutedRows = Object.entries(stored).filter(([k]) => k.startsWith('muted_')).reduce((n, [, v]) => n + v, 0);
+    expect(mutedRows).toBe(muted.length);
+    expect(stored.paths).toBe(3 * (2 + mutedRows + (stored.controls_touch ?? 0) + (stored.controls_random ?? 0))); // 4h, 24h, 72h per subject
 
     expect(await run(db)).toMatchObject({ alerts: 0, controls: 0 });
     expect(await new PgLevelBackfillReads(db).backfillCounts()).toEqual(stored);

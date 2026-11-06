@@ -50,10 +50,15 @@ export class PgMarketBackfillReads {
     return { windows: Number(r?.n ?? 0), weight: Number(r?.w ?? 0) };
   }
 
-  /** Backfill rows of the type: `alerts_<event>` per event, `controls_<kind>` per kind, `paths`, `paths_measured`. */
+  /**
+   * Backfill rows of the type: `alerts_<event>` per event, `controls_<kind>` per kind, `paths`, `paths_measured`.
+   * IB-151: `alerts_<event>` counts the rows no switch muted (all of them before IB-151); a muted row counts under
+   * `muted_<event>`, a key present only when there is one.
+   */
   protected async rowsByEventAndKind(): Promise<Record<string, number>> {
     const rows = await this.db.query<{ t: string; n: string }>(
-      `select 'alerts_' || event as t, count(*) as n from market_alerts where type = $1 and source = 'backfill' group by event
+      `select 'alerts_' || event as t, count(*) as n from market_alerts where type = $1 and source = 'backfill' and muted_by is null group by event
+       union all select 'muted_' || event, count(*) from market_alerts where type = $1 and source = 'backfill' and muted_by is not null group by event
        union all select 'controls_' || kind, count(*) from market_alert_controls where type = $1 and source = 'backfill' group by kind
        union all select 'paths', count(*) from oi_divergence_paths p
          left join market_alerts ma on ma.id = p.market_alert_id and ma.type = $1
@@ -89,5 +94,13 @@ export class PgLevelBackfillReads extends PgMarketBackfillReads {
 
   backfillCounts(): Promise<Record<string, number>> {
     return this.rowsByEventAndKind();
+  }
+
+  /** IB-151's gap run: which of these once-keys the LIVE loop has already journalled (a row written either way). */
+  async liveKeys(keys: readonly string[]): Promise<Set<string>> {
+    if (keys.length === 0) return new Set();
+    const rows = await this.db.query<{ dedupe_key: string }>(
+      `select dedupe_key from market_alerts where type = 'level' and source = 'live' and dedupe_key = any($1::text[])`, [keys]);
+    return new Set(rows.map((r) => r.dedupe_key));
   }
 }

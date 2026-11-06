@@ -293,7 +293,7 @@ describe('IB-148: the journal and the admin page read a merged row', () => {
     h.print(T + 90 * S, 4e5, 'BNB');
     await h.run(h.make(), T - 30 * S, T + 10 * MIN);
     const [large, small] = h.events();
-    const row = (a: typeof small) => journalRow({ id: a?.id ?? 0, event: 'event', symbol: a?.symbol ?? '', atMs: a?.atMs ?? 0, late: false, details: a?.details ?? {} });
+    const row = (a: typeof small) => journalRow({ id: a?.id ?? 0, event: 'event', symbol: a?.symbol ?? '', atMs: a?.atMs ?? 0, late: false, details: a?.details ?? {}, muted: false });
     expect(row(small)).toMatchObject({ mergedInto: { eventAt: T, how: 'after' }, totalUsd: 4e5 });
     expect(row(large)).toMatchObject({ mergedInto: null, totalUsd: 30e6 });
     expect(adminFigures('event', 'BNBUSDT', small?.details ?? {})).toMatchObject({ news: false, sumUsd: 4e5 });

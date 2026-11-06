@@ -6,6 +6,8 @@ import type { AlertMarkRow } from '../alert-marks';
  * IB-129 — the chart's alert marks for one coin and window: ONE read of `market_alerts`, no venue call
  * (alerts design §5). Which rows are marks is the contract's rule (`alert-marks.ts` in contracts): the live
  * loop's rows that were not late — liquidation crossings (`alert`) and funding `enter` / `flip`.
+ * IB-151: not a row an admin switch muted (`muted_by`): before IB-151 such a row was never written, so the chart shows
+ * what it showed.
  *
  * Newest first with one row over the cap, so the caller can say the window was cut and keep the newest.
  * `type in (…) and symbol and at` is the prefix of `market_alerts_type_symbol_at_idx (type, symbol, at desc)`, so the
@@ -15,7 +17,7 @@ export async function alertMarkRows(db: Db, symbol: string, fromMs: number, toMs
   return db.query<AlertMarkRow>(
     `select type, event, at, details from market_alerts
       where type in ('liq', 'funding') and symbol = $1 and at >= $2 and at < $3
-        and source = 'live' and not late
+        and source = 'live' and not late and muted_by is null
         and ((type = 'liq' and event = 'alert') or (type = 'funding' and event in ('enter', 'flip')))
       order by at desc, id desc
       limit $4`,

@@ -46,7 +46,7 @@ export class MemoryLiqStore implements LiqAlertStore {
 
   async journal(source: 'live' | 'backfill', sinceMs: number): Promise<JournalLiqRow[]> {
     return this.alerts.filter((a) => a.source === source && a.atMs > sinceMs).sort((a, b) => a.atMs - b.atMs || a.id - b.id)
-      .map((a) => journalRow({ id: a.id, event: a.event, symbol: a.symbol, atMs: a.atMs, late: a.late, details: a.details }));
+      .map((a) => journalRow({ id: a.id, event: a.event, symbol: a.symbol, atMs: a.atMs, late: a.late, details: a.details, muted: a.mutedBy !== undefined }));
   }
 
   async venueStatus(): Promise<VenueStatus> {

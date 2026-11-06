@@ -12,7 +12,7 @@ import { join } from 'node:path';
 const DAY = 86_400_000;
 const report = (over: Partial<LevelTickReport> = {}): LevelTickReport => ({
   atMs: Date.UTC(2026, 10, 6, 3, 15, 5), dueBarMs: Date.UTC(2026, 10, 6, 3, 0), coins: 5, bars: 5, calls: 5, weight: 5,
-  alerts: 0, late: 0, sent: 0, controls: 1, seeded: [], pendingSeed: 0, failed: [], ...over,
+  alerts: 0, late: 0, muted: 0, sent: 0, controls: 1, seeded: [], pendingSeed: 0, failed: [], ...over,
 });
 
 describe('IB-126 level alerts service', () => {

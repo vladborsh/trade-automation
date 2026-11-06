@@ -15,7 +15,7 @@ const S = 1_000;
 const MIN = 60 * S;
 const at = (h: number, m: number, s = 0, ms = 0) => Date.UTC(2026, 10, 5, h, m, s, ms);
 const quiet = (toMs: number, extra: Partial<LiqTickReport> = {}): LiqTickReport => ({
-  fromMs: toMs - 60 * S, toMs, coins: 5, alerts: 0, events: 0, merged: 0, continuations: 0, late: 0, sent: 0, controls: 0, reads: 5, maxPrints: 40, prints: 40, failed: [], ...extra,
+  fromMs: toMs - 60 * S, toMs, coins: 5, alerts: 0, events: 0, merged: 0, continuations: 0, late: 0, muted: 0, sent: 0, controls: 0, reads: 5, maxPrints: 40, prints: 40, failed: [], ...extra,
 });
 const FIXTURE = readFileSync(join(__dirname, '../fixtures/liq-heartbeat-lines.txt'), 'utf8').trimEnd().split('\n');
 

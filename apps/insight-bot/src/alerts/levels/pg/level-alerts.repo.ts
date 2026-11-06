@@ -1,5 +1,5 @@
 import {
-  LEVEL_ALERT_TF, LevelParamsSchema, type LevelEvent, type LevelKind, type LevelParams, type MarketAlertControlKind, type MarketAlertSource,
+  LEVEL_ALERT_TF, LevelParamsSchema, type LevelEvent, type LevelKind, type LevelParams, type MarketAlertControlKind, type MarketAlertMutedBy, type MarketAlertSource,
   type WebLevelAlertRow,
 } from '@trade-automation/contracts';
 import type { Db, DbHandle } from '../../../db/db.port';
@@ -24,6 +24,8 @@ export interface NewLevelAlert {
   late: boolean;
   details: Record<string, unknown>;
   dedupeKey: string;
+  /** IB-151: the switch that keeps it from being sent; absent = none (the journal gets it either way). */
+  mutedBy?: MarketAlertMutedBy;
 }
 
 export interface NewLevelControl {
@@ -156,14 +158,14 @@ export class PgLevelAlertStore implements LevelAlertStore {
   async journalPage(limit = 50): Promise<WebLevelAlertRow[]> {
     const rows = await this.db.query<{
       id: string; source: MarketAlertSource; event: LevelEvent; symbol: string; at: Date; details: Record<string, unknown>;
-      fired_at: Date | null; late: boolean; recipients: number;
-    }>(`select id, source, event, symbol, at, details, fired_at, late, recipients from market_alerts where type = 'level' order by at desc, id desc limit $1`, [limit]);
+      fired_at: Date | null; late: boolean; recipients: number; muted_by: MarketAlertMutedBy | null;
+    }>(`select id, source, event, symbol, at, details, fired_at, late, recipients, muted_by from market_alerts where type = 'level' order by at desc, id desc limit $1`, [limit]);
     return rows.map((r) => ({
       id: Number(r.id), source: r.source, event: r.event, symbol: r.symbol, price: Number(r.details.price),
       // IB-128: a custom level's row names its level
       kind: r.details.kind as LevelKind | 'custom', customLevelId: r.details.kind === 'custom' ? Number(r.details.levelId) : null,
       at: Math.floor(ms(r.at) / 1000), close: Number((r.details.bar as { close: number }).close),
-      firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients,
+      firedAt: r.fired_at ? Math.floor(ms(r.fired_at) / 1000) : null, late: r.late, recipients: r.recipients, mutedBy: r.muted_by,
     }));
   }
 
@@ -188,11 +190,11 @@ export class PgLevelAlertStore implements LevelAlertStore {
 
 async function insertAlert(tx: DbHandle, x: LevelCommit, a: NewLevelAlert): Promise<number | null> {
   const rows = await tx.query<{ id: string }>(
-    `insert into market_alerts (type, event, symbol, direction, at, tf, details, params, source, build, confirmed_at, late, dedupe_key)
-     values ('level', $1, $2, $3, $4, $12, $5, $6, $7, $8, $9, $10, $11)
+    `insert into market_alerts (type, event, symbol, direction, at, tf, details, params, source, build, confirmed_at, late, dedupe_key, muted_by)
+     values ('level', $1, $2, $3, $4, $12, $5, $6, $7, $8, $9, $10, $11, $13)
      on conflict (source, type, dedupe_key) do nothing returning id`,
     [a.event, a.symbol, a.direction, new Date(a.atMs), JSON.stringify(a.details), JSON.stringify(x.params), x.source, x.build,
-      new Date(x.confirmedAtMs), a.late && x.source === 'live', a.dedupeKey, LEVEL_ALERT_TF],
+      new Date(x.confirmedAtMs), a.late && x.source === 'live', a.dedupeKey, LEVEL_ALERT_TF, a.mutedBy ?? null],
   );
   return rows[0] ? Number(rows[0].id) : null;
 }

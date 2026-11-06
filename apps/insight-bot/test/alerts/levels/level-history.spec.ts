@@ -1,8 +1,8 @@
 import { LEVEL_DEFAULT_PARAMS, type LevelBar, type WebCandle } from '@trade-automation/contracts';
 import { levelsInForce } from '@trade-automation/market-data-core';
 import {
-  BAR_MS, DAY_MS, HistoryLevelVenue, MemoryLevelJournal, fetchClosed, levelCountRows, levelCrossCheck, levelHistoryParams, levelHistoryStore,
-  levelShippedCounts, levelTouchRows, replayLevels, seedFrom,
+  BAR_MS, DAY_MS, HistoryLevelVenue, MemoryLevelJournal, fetchClosed, firstBarDecidedAfter, levelCountRows, levelCrossCheck, levelHistoryParams, levelHistoryStore,
+  levelShippedCounts, levelTouchRows, mutedGapStore, replayLevels, seedFrom,
 } from '../../../src/alerts/levels/backfill/level-history';
 import { levelReplayRange, parseLevelCliArgs } from '../../../src/alerts/levels/backfill/level-backfill.cli';
 
@@ -60,7 +60,9 @@ async function replay(fromMs: number, toMs: number, opts: { params?: typeof LEVE
   const t = await replayLevels({ store: levelHistoryStore(j, { params: opts.params ?? LEVEL_DEFAULT_PARAMS, coins: COINS }), venue: v, build: 'dev' }, fromMs, toMs);
   return { j, t, v };
 }
-const names = (j: MemoryLevelJournal) => j.alerts.map((a) => `${a.kind}:${a.event}@${new Date(a.atMs).toISOString().slice(5, 16)}`);
+/** The unmuted alerts (IB-151: the ×1 run also writes PDH/PDL, muted by `daily`). */
+const names = (j: MemoryLevelJournal) => j.alerts.filter((a) => a.mutedBy === null).map((a) => `${a.kind}:${a.event}@${new Date(a.atMs).toISOString().slice(5, 16)}`);
+const muted = (j: MemoryLevelJournal) => j.alerts.filter((a) => a.mutedBy !== null).map((a) => `${a.kind}:${a.event}:${a.mutedBy}`);
 
 describe('IB-127 HistoryLevelVenue', () => {
   it('bars15m: from `fromMs`, at most `limit`, only bars CLOSED by now', async () => {
@@ -106,7 +108,8 @@ describe('IB-127 replayLevels (the live loop, ticking once a minute)', () => {
   it('P10 is seeded from the PERIOD start, before the replay window: a replay from Wednesday still sees Tuesday\'s close above PWH → crossunder', async () => {
     const { j, t } = await replay(utc(11, 11), utc(11, 12));
     expect(names(j)).toEqual(['PWH:crossunder@11-11T10:00']);
-    expect(j.alerts[0]?.details.firstBeyondAtMs).toBe(ABOVE + BAR_MS);
+    expect(j.alerts.find((a) => a.mutedBy === null)?.details.firstBeyondAtMs).toBe(ABOVE + BAR_MS);
+    expect(muted(j)).toEqual(['PDH:crossunder:daily']);
     expect(t).toMatchObject({ bars: 96, seeds: 1, failed: 0, warnings: {} });
   });
 
@@ -116,12 +119,15 @@ describe('IB-127 replayLevels (the live loop, ticking once a minute)', () => {
     expect(names(j)).toEqual(['PWH:breakout_up@11-10T06:00', 'PWH:crossunder@11-11T10:00']);
   });
 
-  it('×1 rows are the shipped defaults (PDH/PDL off); with `daily` on the PDH/PDL rows appear and nothing else changes', async () => {
+  it('×1 rows are the shipped defaults (PDH/PDL off: written muted, IB-151); with `daily` on the same PDH/PDL rows, unmuted, and nothing else changes', async () => {
     const off = await replay(WEEK, utc(11, 12));
     const on = await replay(WEEK, utc(11, 12), { params: levelHistoryParams(['BTCUSDT'], 1, true) });
     expect(levelHistoryParams(['BTCUSDT'], 1, false)).toBe(LEVEL_DEFAULT_PARAMS);
-    expect(on.j.alerts.some((a) => a.kind === 'PDH' || a.kind === 'PDL')).toBe(true);
-    expect(off.j.alerts.some((a) => a.kind === 'PDH' || a.kind === 'PDL')).toBe(false);
+    const daily = (j: MemoryLevelJournal) => j.alerts.filter((a) => a.kind === 'PDH' || a.kind === 'PDL');
+    expect(daily(on.j).length).toBeGreaterThan(0);
+    expect(daily(on.j).every((a) => a.mutedBy === null)).toBe(true);
+    expect(daily(off.j).map((a) => [a.event, a.atMs, a.mutedBy, a.dedupeKey])).toEqual(daily(on.j).map((a) => [a.event, a.atMs, 'daily', `${a.dedupeKey}:muted`]));
+    expect(on.j.alerts.filter((a) => a.mutedBy === null && !daily(on.j).includes(a)).map((a) => a.dedupeKey)).toEqual(off.j.alerts.filter((a) => a.mutedBy === null).map((a) => a.dedupeKey));
     expect(levelShippedCounts(on.j)).toEqual(levelShippedCounts(off.j));
     expect(levelCrossCheck(on.j, levelShippedCounts(off.j))).toBeNull();
   });
@@ -166,12 +172,13 @@ describe('IB-127 replayLevels (the live loop, ticking once a minute)', () => {
     expect(touched).toEqual([{ PDH: 1 }, { PDH: 1 }, { PDH: 1, WO: 1, MO: 1 }]);
   });
 
-  it('PDH/PDL touches are dropped from what the shipped defaults journal (the cross-check\'s side)', async () => {
+  it('PDH/PDL touches are journalled with daily off too (IB-151: a control is never muted), so both sides of the cross-check count them', async () => {
     const on = await replay(WEEK, utc(11, 11), { bars: touchBars(), params: levelHistoryParams(['BTCUSDT'], 1, true) });
     const off = await replay(WEEK, utc(11, 11), { bars: touchBars() });
     expect(on.j.controls.filter((c) => c.kind === 'touch')).toHaveLength(1);
+    expect(off.j.controls.filter((c) => c.kind === 'touch').map((c) => c.dedupeKey)).toEqual(on.j.controls.filter((c) => c.kind === 'touch').map((c) => c.dedupeKey));
     expect(levelShippedCounts(on.j)).toEqual(levelShippedCounts(off.j));
-    expect(levelShippedCounts(on.j).controls_touch).toBeUndefined();
+    expect(levelShippedCounts(on.j).controls_touch).toBe(1);
   });
 
   it('both ends must be on the 15m grid', async () => {
@@ -181,8 +188,10 @@ describe('IB-127 replayLevels (the live loop, ticking once a minute)', () => {
 
 describe('IB-127 counts and the cross-check', () => {
   it('levelCountRows: per coin, kind and event, a weekly rate', async () => {
-    const { j } = await replay(utc(11, 11), utc(11, 12));
-    expect(levelCountRows(j, ['BTCUSDT'], 7)).toEqual([{ symbol: 'BTCUSDT', kind: 'PWH', event: 'crossunder', count: 1, perWeek: 1 }]);
+    const { j } = await replay(utc(11, 11), utc(11, 12), { params: levelHistoryParams(['BTCUSDT'], 1, true) });
+    expect(levelCountRows(j, ['BTCUSDT'], 7)).toEqual([
+      { symbol: 'BTCUSDT', kind: 'PWH', event: 'crossunder', count: 1, perWeek: 1 }, { symbol: 'BTCUSDT', kind: 'PDH', event: 'crossunder', count: 1, perWeek: 1 },
+    ]);
   });
 
   it('levelCrossCheck names both sides on a mismatch', async () => {
@@ -227,5 +236,37 @@ describe('IB-127 CLI arguments', () => {
     expect(() => parseLevelCliArgs(['--write', '--until', '2026-11-06T05:30:00'])).toThrow('zone');
     expect(() => parseLevelCliArgs(['--write', '--dry-run', '--until', '2026-11-06T05:30:00Z'])).toThrow('usage');
     expect(() => parseLevelCliArgs(['--write'])).toThrow('--until is required');
+  });
+});
+
+describe('IB-151 the muted-gap run', () => {
+  it('--muted-gap takes the switch time; the first bar it decided is the one evaluated at or after it (close + 5 s)', () => {
+    const a = parseLevelCliArgs(['--write', '--until', '2026-11-07T10:00:00Z', '--muted-gap', '2026-11-06T13:06:05Z']);
+    expect(a).toEqual({ mode: 'write', untilMs: utc(11, 7, 10), gapFromMs: utc(11, 6, 13, 6) + 5_000 });
+    // the 12:45 bar was evaluated at 13:00:05, before the switch; the 13:00 bar at 13:15:05, after it
+    expect(firstBarDecidedAfter(utc(11, 6, 13, 6) + 5_000)).toBe(utc(11, 6, 13));
+    expect(firstBarDecidedAfter(utc(11, 6, 13, 0) + 5_000)).toBe(utc(11, 6, 12, 45));
+    expect(firstBarDecidedAfter(utc(11, 6, 13, 0) + 5_001)).toBe(utc(11, 6, 13));
+    expect(() => parseLevelCliArgs(['--write', '--until', '2026-11-07T10:00:00Z', '--muted-gap', '2026-11-06T13:06:05'])).toThrow('switch time');
+    expect(() => parseLevelCliArgs(['--write', '--until', '2026-11-06T13:15:00Z', '--muted-gap', '2026-11-06T13:06:05Z'])).toThrow('no bar');
+  });
+
+  it('mutedGapStore: with the live switches (PWH breakout off), only the muted rows are written — not one live journalled, and no controls', async () => {
+    const params = { ...LEVEL_DEFAULT_PARAMS, events: { PWH: { breakout_up: false } } };
+    const all = new MemoryLevelJournal();
+    await replayLevels({ store: levelHistoryStore(all, { params, coins: COINS }), venue: venue(), build: 'dev' }, WEEK, utc(11, 12));
+    const mutedKeys = all.alerts.filter((a) => a.mutedBy !== null).map((a) => a.dedupeKey);
+    expect(mutedKeys).toEqual(expect.arrayContaining([`level:BTCUSDT:PWH:${WEEK}:breakout_up:muted`]));
+    // the live loop (new build) already wrote one of them after the deploy
+    const inLive = mutedKeys[0] as string;
+    const j = new MemoryLevelJournal();
+    const gap = mutedGapStore(j, async (keys) => new Set(keys.filter((k) => k === inLive)));
+    const t = await replayLevels({ store: levelHistoryStore(gap, { params, coins: COINS }), venue: venue(), build: 'dev' }, WEEK, utc(11, 12));
+    expect(j.alerts.map((a) => a.dedupeKey).sort()).toEqual(mutedKeys.filter((k) => k !== inLive).sort());
+    expect(j.alerts.every((a) => a.mutedBy !== null)).toBe(true);
+    expect(j.controls).toEqual([]);
+    expect(gap).toMatchObject({ unmuted: all.alerts.filter((a) => a.mutedBy === null).length, inLive: 1 });
+    expect(t).toMatchObject({ alerts: mutedKeys.length - 1, failed: 0, warnings: {} });
+    expect(j.paths).toBe(mutedKeys.length - 1);
   });
 });

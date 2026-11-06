@@ -1,6 +1,6 @@
 import {
   LIQ_LATE_SEC, LIQ_SIDES, LIQ_TICK_SEC, type LiqAlertDetails, type LiqEventCoin, type LiqEventContinuingDetails, type LiqEventDetails,
-  type LiqNearMissDetails, type LiqParams, type LiqRandomDetails, type LiqSide, type MarketAlertSource,
+  type LiqNearMissDetails, type LiqParams, type LiqRandomDetails, type LiqSide, type MarketAlertSource, mutedDedupeKey,
 } from '@trade-automation/contracts';
 import { liqEvent, liqEventContinuation } from '../../delivery/templates/liq-alerts.texts';
 import type { Texts } from '../../delivery/templates/texts';
@@ -44,6 +44,13 @@ import { QUIET_MS, WINDOW_MS, bestPerHour, quietAt, scanSide, statsAt, type LiqP
  *    `event` row and a computable S, re-derived every tick from the tape and the journal like any other, so a
  *    restart mid-hold resumes it and the once-key still writes (and sends) it once.
  * 5. Sent only while the type's switch is on (default OFF), to users with `liq_alerts`, in their language.
+ * 5a. IB-151 (owner ruling 2026-11-06 B): a coin switched off (`perCoin[symbol].enabled = false`, threshold kept) is
+ *    evaluated like any coin, and its crossings are journalled as `alert` rows with `mutedBy: 'coin'`, no `eventAt`
+ *    and a once-key of their own (`mutedDedupeKey`). **Such a crossing never reaches the events:** it is journalled
+ *    before the grouping, the grouping reads only unmuted rows, so it cannot join or enlarge an event, open one, or
+ *    count for IB-148's small/large merge. A coin that is on does not see its own muted rows either (quiet period,
+ *    near-miss exclusion), so what is sent is what would have been sent had they never been written. Its prints are
+ *    in the tick's one tape read already (they always were: L5 tracks every listed coin); no venue call.
  * 6. Controls (L8): the hour's largest near-miss per coin and side, written once the hour has been fully
  *    evaluated; 2 hash-picked random windows per coin and day. Direction-free price paths for all three.
  *
@@ -80,6 +87,8 @@ export interface LiqTickReport {
   /** Event closes journalled (`event_continuing` rows), sent or not. */
   continuations: number;
   late: number;
+  /** IB-151: crossings journalled muted by the coin's switch (never part of an event, never sent). */
+  muted: number;
   sent: number;
   controls: number;
   /** L7, measured: DB round trips this tick, and the most prints held at once. */
@@ -101,10 +110,14 @@ const HOUR_MS = 3_600_000;
 /** L14: the crossings the event grouping reads — an event acted on (T0 within the boot look-back) and the one before it. */
 export const EVENT_LOOKBACK_MS = BOOT_LOOKBACK_MS + EVENT_MAX_MS;
 
-interface Coin { symbol: string; base: string; thresholdUsd: number; venues: VenueSymbols; pairs: VenuePair[] }
+/** `on`: the coin's own switch; off only mutes (IB-151). */
+interface Coin { symbol: string; base: string; thresholdUsd: number; on: boolean; venues: VenueSymbols; pairs: VenuePair[] }
 
-/** A crossing found this tick, journalled once its event is known. */
+/** A crossing found this tick, journalled once its event is known (a muted coin's: at once, with no event). */
 interface Pending { coin: Coin; side: LiqSide; at: number; stats: ReturnType<typeof statsAt>; late: boolean }
+
+/** IB-151: the journal rows a coin's own quiet period and near-miss exclusion see — a coin that is on, only unmuted ones. */
+const ownRows = (on: boolean) => (j: JournalLiqRow): boolean => !on || !j.muted;
 type Settings = Awaited<ReturnType<LiqAlertStore['settings']>>;
 
 export class LiqAlertLoop {
@@ -115,7 +128,7 @@ export class LiqAlertLoop {
    * running max: a candidate can turn out to be the prelude of an alert found a tick later, and is then
    * dropped at the flush in favour of the hour's next best.
    */
-  private readonly nearMisses = new Map<string, { symbol: string; side: LiqSide; thresholdUsd: number; hour: number; candidates: NearMissCandidate[] }>();
+  private readonly nearMisses = new Map<string, { symbol: string; side: LiqSide; thresholdUsd: number; on: boolean; hour: number; candidates: NearMissCandidate[] }>();
   /** Venue status, read at most once a tick and only when a row needs it. */
   private status: VenueStatus | null = null;
 
@@ -127,7 +140,7 @@ export class LiqAlertLoop {
     this.running = true;
     try {
       const from = this.cursor === null ? nowMs - BOOT_LOOKBACK_MS : Math.min(this.cursor, nowMs) - OVERLAP_MS;
-      const report: LiqTickReport = { fromMs: from, toMs: nowMs, coins: 0, alerts: 0, events: 0, merged: 0, continuations: 0, late: 0, sent: 0, controls: 0, reads: 0, maxPrints: 0, prints: 0, failed: [] };
+      const report: LiqTickReport = { fromMs: from, toMs: nowMs, coins: 0, alerts: 0, events: 0, merged: 0, continuations: 0, late: 0, muted: 0, sent: 0, controls: 0, reads: 0, maxPrints: 0, prints: 0, failed: [] };
       this.status = null;
       const pending: Pending[] = [];
       const { store } = this.ports;
@@ -138,7 +151,15 @@ export class LiqAlertLoop {
       for (let s = from; s < nowMs; s = Math.min(s + CHUNK_MS, nowMs)) {
         await this.evaluate(coins, settings, s, Math.min(s + CHUNK_MS, nowMs), nowMs, report, pending);
       }
-      await this.events(coins, settings, pending, nowMs, report);
+      for (const p of pending.filter((q) => !q.coin.on)) {
+        try {
+          await this.journalAlert(p, null, settings, nowMs, report);
+        } catch (error) {
+          if (!report.failed.includes(p.coin.symbol)) report.failed.push(p.coin.symbol);
+          this.ports.log?.warn(`liq alerts ${p.coin.symbol} (muted): ${(error as Error).message}`);
+        }
+      }
+      await this.events(coins, settings, pending.filter((q) => q.coin.on), nowMs, report);
       await this.flushNearMisses(nowMs, settings.params, report);
       this.cursor = nowMs;
       return report;
@@ -147,15 +168,15 @@ export class LiqAlertLoop {
     }
   }
 
-  /** L4: enabled `alert_symbols` that have a threshold and are switched on for liquidations. */
+  /** L4: enabled `alert_symbols` that have a threshold; switched off for liquidations = evaluated, muted (IB-151). */
   private coins(listed: ReadonlyArray<{ symbol: string; base: string }>, params: LiqParams): Coin[] {
     const out: Coin[] = [];
     for (const c of listed) {
       const p = params.perCoin[c.symbol];
-      if (!p?.enabled) continue;
+      if (!p) continue; // no threshold: nothing to evaluate against
       const venues = venueSymbols(c.symbol, c.base, this.ports.universe);
       if (!venues) { this.ports.log?.warn(`liq alerts ${c.symbol}: base '${c.base}' names no USDT-linear contract — not evaluated`); continue; }
-      out.push({ symbol: c.symbol, base: c.base, thresholdUsd: p.thresholdUsd, venues, pairs: venuePairs(venues) });
+      out.push({ symbol: c.symbol, base: c.base, thresholdUsd: p.thresholdUsd, on: p.enabled, venues, pairs: venuePairs(venues) });
     }
     return out;
   }
@@ -176,7 +197,7 @@ export class LiqAlertLoop {
         const own = prints.filter((p) => bySymbol.get(`${p.venue}|${p.symbol}`) === coin.symbol);
         for (const side of LIQ_SIDES) {
           const sidePrints: LiqPrint[] = own.filter((p) => p.side === side).map((p) => ({ ts: p.ts, usd: p.usd, venue: p.venue }));
-          const alertAts = journal.filter((j) => j.event === 'alert' && j.symbol === coin.symbol && j.side === side).map((j) => j.at)
+          const alertAts = journal.filter((j) => j.event === 'alert' && j.symbol === coin.symbol && j.side === side && ownRows(coin.on)(j)).map((j) => j.at)
             .concat(pending.filter((p) => p.coin.symbol === coin.symbol && p.side === side).map((p) => p.at));
           const scan = scanSide(sidePrints, fromMs, toMs, coin.thresholdUsd, alertAts);
           for (const crossing of scan.alerts) {
@@ -184,7 +205,7 @@ export class LiqAlertLoop {
           }
           for (const nm of scan.nearMisses.values()) {
             const key = `${coin.symbol}|${side}|${nm.hour}`;
-            const bucket = this.nearMisses.get(key) ?? { symbol: coin.symbol, side, thresholdUsd: coin.thresholdUsd, hour: nm.hour, candidates: [] };
+            const bucket = this.nearMisses.get(key) ?? { symbol: coin.symbol, side, thresholdUsd: coin.thresholdUsd, on: coin.on, hour: nm.hour, candidates: [] };
             bucket.candidates.push(nm);
             this.nearMisses.set(key, bucket);
           }
@@ -202,22 +223,24 @@ export class LiqAlertLoop {
     return this.status;
   }
 
-  /** L10: the crossing's row, with its event's T0; never sent by itself. */
-  private async journalAlert(p: Pending, eventAt: number, settings: Settings, nowMs: number, report: LiqTickReport): Promise<void> {
+  /** L10: the crossing's row, with its event's T0; never sent by itself. IB-151: a muted coin's has no event (`eventAt` null). */
+  private async journalAlert(p: Pending, eventAt: number | null, settings: Settings, nowMs: number, report: LiqTickReport): Promise<void> {
     const { store, source, build } = this.ports;
     const windowStartMs = p.at - WINDOW_MS;
     const details: LiqAlertDetails = {
       side: p.side, windowStartMs, sumUsd: p.stats.sum, thresholdUsd: p.coin.thresholdUsd, byVenue: p.stats.byVenue, count: p.stats.count,
       largest: p.stats.largest, silentVenues: silentVenues(p.coin.venues, windowStartMs, p.at, await this.venueStatus(report)), binanceFootnote: false,
-      eventAt,
+      ...(eventAt !== null ? { eventAt } : {}),
     };
+    const dedupeKey = `liq:${p.coin.symbol}:${p.side}:${windowStartMs}`;
     const id = await store.insertAlert({
       source, event: 'alert', symbol: p.coin.symbol, atMs: p.at, details, params: settings.params, build, confirmedAtMs: nowMs, late: p.late,
-      dedupeKey: `liq:${p.coin.symbol}:${p.side}:${windowStartMs}`,
+      ...(p.coin.on ? { dedupeKey } : { dedupeKey: mutedDedupeKey(dedupeKey), mutedBy: 'coin' as const }),
     });
     if (id === null) return;
     report.alerts++;
     if (p.late) report.late++;
+    if (!p.coin.on) report.muted++;
     await store.insertPaths({ marketAlertId: id }, p.coin.symbol, liqPathT0(p.at));
   }
 
@@ -228,7 +251,8 @@ export class LiqAlertLoop {
    */
   private async events(coins: readonly Coin[], settings: Settings, pending: readonly Pending[], nowMs: number, report: LiqTickReport): Promise<void> {
     const { store, source } = this.ports;
-    const journal = (await store.journal(source, nowMs - EVENT_LOOKBACK_MS)).filter((j) => j.at <= nowMs);
+    // IB-151: a muted row is never part of an event
+    const journal = (await store.journal(source, nowMs - EVENT_LOOKBACK_MS)).filter((j) => j.at <= nowMs && !j.muted);
     report.reads++;
 
     const sides = LIQ_SIDES.map((side) => this.sideState(side, journal, pending));
@@ -460,7 +484,7 @@ export class LiqAlertLoop {
     report.reads++;
     for (const [key, b] of due) {
       this.nearMisses.delete(key);
-      const alertAts = journal.filter((j) => j.event === 'alert' && j.symbol === b.symbol && j.side === b.side).map((j) => j.at);
+      const alertAts = journal.filter((j) => j.event === 'alert' && j.symbol === b.symbol && j.side === b.side && ownRows(b.on)(j)).map((j) => j.at);
       const nm = bestPerHour(b.candidates.filter((c) => !quietAt(c.at, alertAts))).get(b.hour);
       if (!nm) continue;
       const details: LiqNearMissDetails = {

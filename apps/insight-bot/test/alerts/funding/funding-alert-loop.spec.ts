@@ -18,7 +18,7 @@ class MemoryStore implements FundingAlertStore {
   settingsRow: FundingSettings = { enabled: false, membersVisible: false, params: FUNDING_DEFAULT_PARAMS, updatedAt: 0 };
   coins = [{ symbol: 'BTCUSDT', base: 'BTC' }];
   rows = new Map<string, FundingSideState>();
-  alerts: Array<{ id: number; event: string; symbol: string; direction: string; atMs: number; details: Record<string, unknown>; dedupeKey: string; firedAt: number | null; recipients: number }> = [];
+  alerts: Array<{ id: number; event: string; symbol: string; direction: string; atMs: number; details: Record<string, unknown>; dedupeKey: string; firedAt: number | null; recipients: number; mutedBy?: string }> = [];
   controls: Array<NewFundingControl & { id: number }> = [];
   paths: Array<{ subject: unknown; t0Sec: number }> = [];
   commits = 0;
@@ -205,12 +205,32 @@ describe('IB-124 funding alert loop (F1, F4–F8)', () => {
     expect(h.venue.calls).toEqual({ premium: 24, settled: 2 });
   });
 
-  it('coins: alert_symbols ∩ funding switch; a coin missing from perCoin is on at the shared floor; a coin floor is used', () => {
+  it('coins: every alert_symbols coin, with its switch (IB-151: off only mutes); a coin missing from perCoin is on at the shared floor; a coin floor is used', () => {
     const listed = [{ symbol: 'BTCUSDT', base: 'BTC' }, { symbol: 'ETHUSDT', base: 'ETH' }, { symbol: 'TRXUSDT', base: 'TRX' }];
     const params: FundingParams = { ...FUNDING_DEFAULT_PARAMS, perCoin: { ETHUSDT: { enabled: false }, TRXUSDT: { enabled: true, floorPer8h: 0.0005 } } };
     expect(coinsOf(listed, params)).toEqual([
-      { symbol: 'BTCUSDT', base: 'BTC', floorPer8h: 0.0003 },
-      { symbol: 'TRXUSDT', base: 'TRX', floorPer8h: 0.0005 },
+      { symbol: 'BTCUSDT', base: 'BTC', floorPer8h: 0.0003, on: true },
+      { symbol: 'ETHUSDT', base: 'ETH', floorPer8h: 0.0003, on: false },
+      { symbol: 'TRXUSDT', base: 'TRX', floorPer8h: 0.0005, on: true },
     ]);
+  });
+
+  it('IB-151: a coin switched off is checked and its enter and flip journalled, muted by the coin under keys of their own; nothing sent', async () => {
+    const on = harness();
+    const off = harness();
+    on.store.settingsRow = { ...on.store.settingsRow, enabled: true };
+    off.store.settingsRow = { ...off.store.settingsRow, enabled: true, params: { ...FUNDING_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: false } } } };
+    for (const h of [on, off]) {
+      for (let i = 0; i < 24 * 12 + 1; i++) await h.tick(0.0005);
+      for (let i = 0; i < 6; i++) await h.tick(-0.0001);
+    }
+    expect(on.store.alerts.map((a) => a.event)).toEqual(['enter', 'flip']);
+    // the same calls, the same state, the same rows: only the mark and the key differ
+    expect(off.venue.calls).toEqual(on.venue.calls);
+    expect([...off.store.rows]).toEqual([...on.store.rows]);
+    expect(off.store.alerts.map((a) => [a.event, a.mutedBy, a.dedupeKey, a.firedAt])).toEqual(on.store.alerts.map((a) => [a.event, 'coin', `${a.dedupeKey}:muted`, null]));
+    expect(off.store.controls.map((c) => c.dedupeKey)).toEqual(on.store.controls.map((c) => c.dedupeKey));
+    expect(on.sent.length).toBeGreaterThan(0);
+    expect(off.sent).toEqual([]);
   });
 });

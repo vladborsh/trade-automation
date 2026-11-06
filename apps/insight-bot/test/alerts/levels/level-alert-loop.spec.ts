@@ -2,7 +2,7 @@ import {
   LEVEL_DEFAULT_PARAMS, LevelAlertDetailsSchema, LevelRandomDetailsSchema, LevelTouchDetailsSchema, type LevelBar, type LevelParams, type MarketAlertSource,
   type WebCandle,
 } from '@trade-automation/contracts';
-import { LEVEL_CATCHUP_BARS, LevelAlertLoop, coinsOf, dueBarOpen, type LevelVenuePort } from '../../../src/alerts/levels/level-alert-loop';
+import { LEVEL_CATCHUP_BARS, LevelAlertLoop, coinsOf, dueBarOpen, levelMutedBy, type LevelVenuePort } from '../../../src/alerts/levels/level-alert-loop';
 import { randomBarOpens } from '../../../src/alerts/levels/controls';
 import type { LevelState } from '../../../src/alerts/levels/level-step';
 import { stateKey, type LevelAlertStore, type LevelCommit, type LevelSettings, type LevelStateRow, type NewLevelControl } from '../../../src/alerts/levels/pg/level-alerts.repo';
@@ -62,13 +62,16 @@ class Venue implements LevelVenuePort {
   }
 }
 
-type AlertRow = { id: number; event: string; symbol: string; direction: string; atMs: number; late: boolean; details: Record<string, unknown>; dedupeKey: string; firedAt: number | null; recipients: number };
+type AlertRow = { id: number; event: string; symbol: string; direction: string; atMs: number; late: boolean; details: Record<string, unknown>; dedupeKey: string; firedAt: number | null; recipients: number; mutedBy?: string };
 
 class MemoryStore implements LevelAlertStore {
   settingsRow: LevelSettings = { enabled: false, membersVisible: false, params: LEVEL_DEFAULT_PARAMS, updatedAt: 0 };
   coins = [{ symbol: 'BTCUSDT', base: 'BTC' }];
   rows = new Map<string, LevelStateRow & { symbol: string }>();
-  alerts: AlertRow[] = [];
+  /** Every row written (IB-151: muted ones too). */
+  journal: AlertRow[] = [];
+  /** The rows no switch muted — what the journal held before IB-151. */
+  get alerts(): AlertRow[] { return this.journal.filter((a) => !a.mutedBy); }
   controls: Array<NewLevelControl & { id: number }> = [];
   paths: Array<{ subject: unknown; t0Sec: number }> = [];
   private id = 0;
@@ -78,9 +81,9 @@ class MemoryStore implements LevelAlertStore {
   async states(_s: MarketAlertSource) { return new Map([...this.rows].map(([k, v]) => [k, { ...v, state: { ...v.state } }])); }
   async commit(x: LevelCommit) {
     const ids = x.alerts.map((a) => {
-      if (this.alerts.some((r) => r.dedupeKey === a.dedupeKey)) return null;
+      if (this.journal.some((r) => r.dedupeKey === a.dedupeKey)) return null;
       const id = ++this.id;
-      this.alerts.push({ id, ...a, firedAt: null, recipients: 0 });
+      this.journal.push({ id, ...a, firedAt: null, recipients: 0 });
       return id;
     });
     for (const r of x.states) {
@@ -98,7 +101,7 @@ class MemoryStore implements LevelAlertStore {
   async insertPaths(subject: unknown, _symbol: string, t0Sec: number) { this.paths.push({ subject, t0Sec }); }
   async recipients() { return [{ chatId: 7, lang: 'ru' as const }, { chatId: 8, lang: 'en' as const }]; }
   async markFired(id: number, at: number, n: number) {
-    const r = this.alerts.find((a) => a.id === id);
+    const r = this.journal.find((a) => a.id === id);
     if (r) { r.firedAt = at; r.recipients = n; }
   }
   row(kind: string, periodStartMs: number): LevelState | undefined { return this.rows.get(stateKey('BTCUSDT', kind as never, periodStartMs))?.state; }
@@ -136,8 +139,10 @@ describe('IB-126 level alert loop', () => {
     expect(seed[0]).toEqual({ what: '15m', from: MONTH, limit: (T - MONTH) / M + 1 });
     expect(seed).toHaveLength(1); // 10.4 days = 1 001 bars, one page
     expect(r).toMatchObject({ bars: 1, seeded: ['BTCUSDT'], pendingSeed: 0, alerts: 0, calls: 3, weight: 1 + 1 + 10 });
-    // four high/low rows (PDH/PDL off), every one at the cursor
-    expect([...h.store.rows.values()].map((v) => `${v.kind}@${v.periodStartMs === WEEK ? 'week' : 'month'}`).sort()).toEqual(['PMH@month', 'PML@month', 'PWH@week', 'PWL@week']);
+    // six high/low rows, every one at the cursor — PDH/PDL too, though `daily` is off (IB-151: it only mutes), at no
+    // extra weight: their day is inside the month the seed reads anyway
+    const period = (v: { periodStartMs: number }) => (v.periodStartMs === WEEK ? 'week' : v.periodStartMs === MONTH ? 'month' : v.periodStartMs === utc(11, 11) ? 'day' : '?');
+    expect([...h.store.rows.values()].map((v) => `${v.kind}@${period(v)}`).sort()).toEqual(['PDH@day', 'PDL@day', 'PMH@month', 'PML@month', 'PWH@week', 'PWL@week']);
     expect(h.store.row('PWH', WEEK)).toEqual({ lastSide: 'below', firstBeyondAtMs: null, lastBarMs: T });
     expect(h.store.row('PWL', WEEK)).toEqual({ lastSide: 'above', firstBeyondAtMs: null, lastBarMs: T });
   });
@@ -166,7 +171,9 @@ describe('IB-126 level alert loop', () => {
     await h.bar(T);
     h.venue.closes.set(T + M, 101);
     const r = await h.bar(T + M);
-    expect(r?.alerts).toBe(1);
+    // 101 also breaks PDH 95, journalled muted by `daily` (IB-151)
+    expect(r).toMatchObject({ alerts: 2, muted: 1 });
+    expect(h.store.journal.map((x) => [`${(x.details as { kind: string }).kind}:${x.event}`, x.mutedBy ?? null])).toEqual([['PDH:breakout_up', 'daily'], ['PWH:breakout_up', null]]);
     const a = h.store.alerts[0];
     expect(a).toMatchObject({ event: 'breakout_up', direction: 'bullish', atMs: T + M, late: false, dedupeKey: `level:BTCUSDT:PWH:${WEEK}:breakout_up`, firedAt: null });
     expect(LevelAlertDetailsSchema.parse(a.details)).toMatchObject({ kind: 'PWH', price: 100, periodStartMs: WEEK, prevClose: 92, firstBeyondAtMs: null });
@@ -309,21 +316,63 @@ describe('IB-126 level alert loop', () => {
     expect(h.store.alerts.filter((a) => a.symbol === 'AAAUSDT').map((a) => a.event)).toEqual([]); // seeded rows emit nothing
   });
 
-  it('P2: PDH/PDL only for a coin with daily on; an event switched off is not journalled while its sibling is', async () => {
+  it('P2: PDH/PDL sent only for a coin with daily on; an event switched off is not sent while its sibling is', async () => {
     const h = harness();
-    h.store.settingsRow = { ...h.store.settingsRow, params: { ...LEVEL_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: true, daily: true } }, events: { PWH: { breakout_up: false } } } };
+    h.store.settingsRow = { ...h.store.settingsRow, enabled: true, params: { ...LEVEL_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: true, daily: true } }, events: { PWH: { breakout_up: false } } } };
     await h.bar(T);
     expect(h.store.row('PDH', utc(11, 11))).toBeDefined();
     h.venue.closes.set(T + M, 101);
     await h.bar(T + M);
     expect(events(h.store)).toEqual(['PDH:breakout_up']);
+    expect(h.sent.filter(([c]) => c === 7).map(([, t]) => t.split(' — ')[0])).toEqual(['BTC: пробой PDH 95.000']);
+    // IB-151: the switched-off event is in the journal all the same, muted, under a key of its own
+    expect(h.store.journal.filter((x) => x.mutedBy).map((x) => [x.dedupeKey, x.mutedBy, x.firedAt])).toEqual([[`level:BTCUSDT:PWH:${WEEK}:breakout_up:muted`, 'event', null]]);
   });
 
-  it('a coin switched off is not read at all', async () => {
+  it('IB-151: a coin switched off is evaluated and journalled like any, every row muted by the coin, nothing sent', async () => {
+    const on = harness();
+    const off = harness();
+    on.store.settingsRow = { ...on.store.settingsRow, enabled: true };
+    off.store.settingsRow = { ...off.store.settingsRow, enabled: true, params: { ...LEVEL_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: false, daily: false } } } };
+    for (const h of [on, off]) {
+      await h.bar(T);
+      h.venue.closes.set(T + M, 101);
+      await h.bar(T + M);
+    }
+    // the same reads, the same rows: only the mark and the key differ
+    expect(off.venue.calls).toEqual(on.venue.calls);
+    expect(off.store.journal.map((x) => [x.event, x.mutedBy, x.dedupeKey])).toEqual(on.store.journal.map((x) => [x.event, 'coin', x.mutedBy ? x.dedupeKey : `${x.dedupeKey}:muted`]));
+    expect(on.sent.length).toBe(2); // PWH; PDH is muted by `daily` on both
+    expect(off.sent).toEqual([]);
+    expect(off.store.journal.every((x) => x.firedAt === null && x.recipients === 0)).toBe(true);
+    expect(coinsOf([{ symbol: 'X1USDT', base: 'X1' }], LEVEL_DEFAULT_PARAMS)).toEqual([{ symbol: 'X1USDT', base: 'X1', on: true, daily: false }]);
+  });
+
+  it('IB-151: levelMutedBy names the first switch that applies — coin, then daily, then the event', () => {
+    const off = { events: { PDH: { breakout_up: false } } };
+    expect(levelMutedBy({ on: false, daily: false }, off, 'PDH', 'breakout_up')).toBe('coin');
+    expect(levelMutedBy({ on: true, daily: false }, off, 'PDH', 'breakout_up')).toBe('daily');
+    expect(levelMutedBy({ on: true, daily: true }, off, 'PDH', 'breakout_up')).toBe('event');
+    expect(levelMutedBy({ on: true, daily: true }, off, 'PDH', 'breakout_down')).toBeNull();
+    expect(levelMutedBy({ on: true, daily: false }, off, 'PWH', 'breakout_up')).toBeNull();
+  });
+
+  it('IB-151: a muted row never takes the sending key — the switch turned back on mid-period sends the next one', async () => {
     const h = harness();
-    h.store.settingsRow = { ...h.store.settingsRow, params: { ...LEVEL_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: false, daily: false } } } };
-    expect(await h.bar(T)).toMatchObject({ coins: 0, calls: 0 });
-    expect(coinsOf([{ symbol: 'X1USDT', base: 'X1' }], LEVEL_DEFAULT_PARAMS)).toEqual([{ symbol: 'X1USDT', base: 'X1', daily: false }]);
+    h.store.settingsRow = { ...h.store.settingsRow, enabled: true, params: { ...LEVEL_DEFAULT_PARAMS, events: { WO: { breakout_up: false } } } };
+    h.venue.closes.set(T - M, 89);
+    h.venue.closes.set(T, 89);
+    await h.bar(T);
+    h.venue.closes.set(T + M, 91); // up through WO 90: muted
+    await h.bar(T + M);
+    h.store.settingsRow = { ...h.store.settingsRow, params: LEVEL_DEFAULT_PARAMS };
+    h.venue.closes.set(T + 2 * M, 89);
+    await h.bar(T + 2 * M);
+    h.venue.closes.set(T + 3 * M, 91); // up again, the switch now on: sent, as it was before IB-151
+    await h.bar(T + 3 * M);
+    expect(h.store.journal.filter((x) => (x.details as { kind: string }).kind === 'WO').map((x) => [x.event, x.mutedBy ?? null, x.firedAt !== null])).toEqual([
+      ['breakout_up', 'event', false], ['breakout_down', null, true], ['breakout_up', null, true],
+    ]);
   });
 
   it('opens: up through the weekly open, then back down — two messages, directions as closed', async () => {
@@ -358,7 +407,8 @@ describe('IB-126 level alert loop', () => {
     for (let o = day + M; o < day + DAY; o += M) await h2.bar(o);
     const rnd = h2.store.controls.filter((c) => c.kind === 'random');
     expect(rnd.map((c) => c.atMs)).toEqual(picks.filter((p) => p >= day + M || p === day));
-    expect(LevelRandomDetailsSchema.parse(rnd[0].details).levels.map((l) => l.kind)).toEqual(['PWH', 'PWL', 'PMH', 'PML', 'WO', 'MO']);
+    // IB-151: every level in force, PDH/PDL too (daily off only mutes sending)
+    expect(LevelRandomDetailsSchema.parse(rnd[0].details).levels.map((l) => l.kind)).toEqual(['PDH', 'PDL', 'PWH', 'PWL', 'PMH', 'PML', 'WO', 'MO']);
     expect(h2.store.paths.some((p) => (p.subject as { marketControlId?: number }).marketControlId === rnd[0].id)).toBe(true);
   });
 

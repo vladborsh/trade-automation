@@ -1,6 +1,6 @@
 import {
   LEVEL_BAR_SEC, LEVEL_DAILY_BARS, LEVEL_DAILY_KINDS, LEVEL_DEFAULT_PARAMS, LEVEL_EVENTS, LEVEL_KINDS, LEVEL_SETTLE_SEC, LEVEL_TOUCH_BAND_DEFAULT,
-  type LevelBar, type LevelEvent, type LevelKind, type LevelParams, type MarketAlertSource, type WebCandle,
+  type LevelBar, type LevelEvent, type LevelKind, type LevelParams, type MarketAlertMutedBy, type MarketAlertSource, type WebCandle,
 } from '@trade-automation/contracts';
 import { klinesWeight } from '../../../news/reaction-prices';
 import { LevelAlertLoop, type LevelTickReport, type LevelVenuePort } from '../level-alert-loop';
@@ -25,7 +25,9 @@ import {
  *
  * Only the store differs from live (`levelHistoryStore`):
  * - settings frozen for the run: the shipped `LEVEL_DEFAULT_PARAMS` for the rows written (PDH/PDL off, every event
- *   on, touch band 0.1 %), sending off. Pinned, so a rerun after the owner edits a setting still writes 0 rows;
+ *   on, touch band 0.1 %), sending off. Pinned, so a rerun after the owner edits a setting still writes 0 rows.
+ *   IB-151: as live, PDH/PDL with `daily` off are written MUTED (`muted_by = 'daily'`), with their touches; a first
+ *   rerun after IB-151 over rows written before it adds exactly those, then 0;
  * - the coin list frozen at the start;
  * - P10's rows kept IN MEMORY (with live's rollover deletion): `alert_level_state` gets no backfill rows, the
  *   live loop never reads them, and ≈ 130 000 minutes × 5 coins would otherwise be state writes on the box. An
@@ -33,7 +35,7 @@ import {
  *   the real SQL, once-keys and constraints, so a rerun writes 0.
  *
  * The counts (PDH/PDL on for every coin, touch band ×½ / ×1 / ×2) replay into `MemoryLevelJournal`; the ×1 count
- * without PDH/PDL is cross-checked against the backfill rows the database holds. The events (P3) have no threshold:
+ * without PDH/PDL (and without muted rows) is cross-checked against the unmuted backfill rows the database holds. The events (P3) have no threshold:
  * the band changes touches only.
  */
 export const BAR_MS = LEVEL_BAR_SEC * 1_000;
@@ -153,6 +155,45 @@ export function levelHistoryStore(
   };
 }
 
+/**
+ * IB-151 — the first bar whose evaluation a switch flipped at `switchMs` decided: live evaluates a bar at its close
+ * + 5 s, so the bar opening at the result is the first one evaluated at or after the switch.
+ */
+export function firstBarDecidedAfter(switchMs: number): number {
+  return Math.ceil((switchMs - BAR_MS - LEVEL_SETTLE_SEC * 1_000) / BAR_MS) * BAR_MS;
+}
+
+/**
+ * IB-151 — the gap run's store under `levelHistoryStore`: only the MUTED alerts reach `base` (what the live loop
+ * skipped before IB-151), and of those only the ones whose once-key live has not journalled itself (a bar the new
+ * build evaluated after the deploy); no controls (not the journal, and live wrote the window's). Ids come back in
+ * the loop's order, null where a row was not written.
+ */
+export function mutedGapStore(base: LevelAlertStore, liveKeys: (keys: readonly string[]) => Promise<Set<string>>): LevelAlertStore & { unmuted: number; inLive: number } {
+  const out = {
+    unmuted: 0,
+    inLive: 0,
+    settings: () => base.settings(),
+    listedCoins: () => base.listedCoins(),
+    states: (s: MarketAlertSource) => base.states(s),
+    commit: async (x: LevelCommit): Promise<Array<number | null>> => {
+      const live = await liveKeys(x.alerts.filter((a) => a.mutedBy).map((a) => a.dedupeKey));
+      const keep = x.alerts.filter((a) => {
+        if (!a.mutedBy) { out.unmuted++; return false; }
+        if (live.has(a.dedupeKey)) { out.inLive++; return false; }
+        return true;
+      });
+      const ids = keep.length > 0 ? await base.commit({ ...x, alerts: keep }) : [];
+      return x.alerts.map((a) => { const i = keep.indexOf(a); return i < 0 ? null : ids[i] ?? null; });
+    },
+    insertControl: async () => null,
+    insertPaths: (...a: Parameters<LevelAlertStore['insertPaths']>) => base.insertPaths(...a),
+    recipients: async () => [],
+    markFired: async () => { throw new Error('the history run never sends'); },
+  };
+  return out;
+}
+
 /** A journalled alert as the counts and the report need it. */
 export interface CountedLevelAlert {
   id: number;
@@ -163,6 +204,8 @@ export interface CountedLevelAlert {
   atMs: number;
   dedupeKey: string;
   details: Record<string, unknown>;
+  /** IB-151: the switch that muted it, null = none. */
+  mutedBy: MarketAlertMutedBy | null;
 }
 
 /** Alerts and controls in memory with migration 031's once-keys (source, type, dedupe_key); paths counted. */
@@ -183,7 +226,7 @@ export class MemoryLevelJournal implements LevelAlertStore {
       this.keys.add(`a|${a.dedupeKey}`);
       const id = this.nextId++;
       const d = a.details as { kind: LevelKind; price: number };
-      this.alerts.push({ id, event: a.event, symbol: a.symbol, kind: d.kind, price: d.price, atMs: a.atMs, dedupeKey: a.dedupeKey, details: a.details });
+      this.alerts.push({ id, event: a.event, symbol: a.symbol, kind: d.kind, price: d.price, atMs: a.atMs, dedupeKey: a.dedupeKey, details: a.details, mutedBy: a.mutedBy ?? null });
       return id;
     });
   }
@@ -305,20 +348,21 @@ export function levelTouchRows(journal: MemoryLevelJournal, symbols: readonly st
   });
 }
 
-/** What the shipped defaults journal: the in-memory replay (PDH/PDL on) without PDH/PDL, as `backfillCounts` keys. */
+/**
+ * What the shipped defaults journal UNMUTED, as `backfillCounts`' `alerts_` / `controls_` keys: the alerts without
+ * PDH/PDL (`daily` is off by default) and without any muted row, and every control. IB-151: the ×1 run writes
+ * PDH/PDL too, muted (`muted_<event>`), and their touches, so a replay with PDH/PDL on and one with them off agree here.
+ */
 export function levelShippedCounts(journal: MemoryLevelJournal): Record<string, number> {
   const out: Record<string, number> = {};
   const add = (k: string) => { out[k] = (out[k] ?? 0) + 1; };
-  for (const a of journal.alerts) if (!LEVEL_DAILY_KINDS.includes(a.kind)) add(`alerts_${a.event}`);
-  for (const c of journal.controls) {
-    if (c.kind === 'touch' && LEVEL_DAILY_KINDS.includes((c.details as { kind: LevelKind }).kind)) continue;
-    add(`controls_${c.kind}`);
-  }
+  for (const a of journal.alerts) if (!LEVEL_DAILY_KINDS.includes(a.kind) && a.mutedBy === null) add(`alerts_${a.event}`);
+  for (const c of journal.controls) add(`controls_${c.kind}`);
   return out;
 }
 
 /**
- * The ×1 in-memory replay, PDH/PDL dropped, against the backfill rows the database holds
+ * The ×1 in-memory replay, PDH/PDL and muted alerts dropped, against the backfill rows the database holds
  * (`PgLevelBackfillReads.backfillCounts`). Not against the rows THIS run wrote: a rerun writes 0 and still holds
  * every row. Null when they agree.
  */

@@ -71,13 +71,38 @@ describe('LiqAlertLoop (L1): one cascade, one alert, at the exact crossing', () 
     expect(h.sent).toEqual([]);
   });
 
-  it('L4: a listed coin without a threshold, or switched off, is not evaluated', async () => {
+  it('L4: a listed coin without a threshold is not evaluated; IB-151: one switched off is, its crossing journalled muted, outside any event', async () => {
     const h = setup();
+    h.store.enabled = true;
     h.store.params = { perCoin: { BTCUSDT: { enabled: false, thresholdUsd: 5e6 } } };
     h.print(T, 9e6);
     h.print(T, 9e6, 'binance', 'long', 'TRX');
-    await h.run(h.loop, T - 30 * S, T + 3 * MIN);
-    expect(h.store.alerts).toEqual([]);
+    const reports: Array<{ muted: number } | null> = [];
+    for (let t = T - 30 * S; t <= T + 3 * MIN; t += 10 * S) reports.push(await h.loop.tick(t));
+    expect(h.store.alerts.map((a) => [a.event, a.symbol, a.mutedBy, a.dedupeKey, a.firedAt])).toEqual([
+      ['alert', 'BTCUSDT', 'coin', `liq:BTCUSDT:long:${T - 5 * MIN}:muted`, null],
+    ]);
+    expect((h.store.alerts[0]?.details as LiqAlertDetails).eventAt).toBeUndefined();
+    expect(h.store.paths.filter((p) => p.subject === `alert:${h.store.alerts[0]?.id}`)).toHaveLength(1);
+    expect(reports.reduce((n, r) => n + (r?.muted ?? 0), 0)).toBe(1);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('IB-151: a muted coin\'s quiet period is its own — a coin turned back on crosses again at once, as if the muted row had never been written', async () => {
+    const h = setup();
+    h.store.params = { perCoin: { BTCUSDT: { enabled: false, thresholdUsd: 5e6 } } };
+    h.print(T, 9e6);
+    h.print(T + 3 * MIN, 1e6); // still inside the muted crossing's 30-min quiet
+    await h.run(h.loop, T - 30 * S, T + MIN);
+    // muted: a second crossing inside its own quiet period is not journalled
+    h.print(T + 90 * S, 6e6);
+    await h.run(h.loop, T + MIN + 10 * S, T + 2 * MIN);
+    expect(h.store.alerts.filter((a) => a.event === 'alert').map((a) => a.mutedBy)).toEqual(['coin']);
+    h.store.params = { perCoin: { BTCUSDT: { enabled: true, thresholdUsd: 5e6 } } };
+    await h.run(h.loop, T + 2 * MIN + 10 * S, T + 6 * MIN);
+    // on: the unmuted coin does not see its muted row, so the window crossing again (9M + 6M + 1M) is a crossing
+    const unmuted = h.store.alerts.filter((a) => a.event === 'alert' && a.mutedBy === undefined);
+    expect(unmuted.map((a) => a.atMs)).toEqual([T + 3 * MIN]);
   });
 });
 

@@ -45,7 +45,7 @@ class Venue implements LevelVenuePort {
 class Store implements LevelAlertStore {
   settingsRow: LevelSettings = { enabled: false, membersVisible: false, params: LEVEL_DEFAULT_PARAMS, updatedAt: 0 };
   rows = new Map<string, LevelStateRow & { symbol: string }>();
-  alerts: Array<{ id: number; event: string; dedupeKey: string; details: Record<string, unknown>; late: boolean; firedAt: number | null; recipients: number }> = [];
+  alerts: Array<{ id: number; event: string; dedupeKey: string; details: Record<string, unknown>; late: boolean; firedAt: number | null; recipients: number; mutedBy: string | null }> = [];
   commits: LevelCommit[] = [];
   private id = 0;
   async settings() { return this.settingsRow; }
@@ -57,7 +57,7 @@ class Store implements LevelAlertStore {
     return x.alerts.map((a) => {
       if (this.alerts.some((r) => r.dedupeKey === a.dedupeKey)) return null;
       const id = ++this.id;
-      this.alerts.push({ id, event: a.event, dedupeKey: a.dedupeKey, details: a.details, late: a.late, firedAt: null, recipients: 0 });
+      this.alerts.push({ id, event: a.event, dedupeKey: a.dedupeKey, details: a.details, late: a.late, firedAt: null, recipients: 0, mutedBy: a.mutedBy ?? null });
       return id;
     });
   }
@@ -92,7 +92,9 @@ function harness(custom: Custom | null = new Custom()) {
   return { store, venue, sent, loop, bar, custom };
 }
 
-const customAlerts = (s: Store) => s.alerts.filter((a) => a.details.kind === 'custom');
+/** The custom rows no switch muted (all of them, before IB-151); `mutedCustom` the others. */
+const customAlerts = (s: Store) => s.alerts.filter((a) => a.details.kind === 'custom' && a.mutedBy === null);
+const mutedCustom = (s: Store) => s.alerts.filter((a) => a.details.kind === 'custom' && a.mutedBy !== null);
 
 describe('IB-128 custom levels in the level loop', () => {
   it('a breakout up of the custom level: journalled from the same read, no extra venue call, in the bar\'s one commit', async () => {
@@ -154,13 +156,16 @@ describe('IB-128 custom levels in the level loop', () => {
     expect(h.custom!.reads).toBe(2);
   });
 
-  it('the level\'s own switch: breakout up off, so the breakout is silent and the sweep is not', async () => {
+  it('the level\'s own switch: breakout up off, so the breakout is silent (journalled muted, IB-151) and the sweep is not', async () => {
     const h = harness();
+    h.store.settingsRow = { ...h.store.settingsRow, enabled: true };
     h.custom!.levels = [{ ...h.custom!.levels[0], events: { breakout_up: false } }];
     await h.bar(T - M);
     h.venue.closes.set(T, 201);
     await h.bar(T);
     expect(customAlerts(h.store)).toEqual([]);
+    expect(h.sent).toEqual([]);
+    expect(mutedCustom(h.store).map((a) => [a.event, a.mutedBy, a.firedAt, a.dedupeKey])).toEqual([['breakout_up', 'custom_event', null, `level:BTCUSDT:custom-7:${utc(11, 11)}:breakout_up:muted`]]);
     // back below (a breakout down, on), then a wick through to 200.3 closing at 199.8: the sweep above, on
     h.venue.closes.set(T + M, 199);
     h.venue.closes.set(T + 2 * M, 199.8);
@@ -169,14 +174,22 @@ describe('IB-128 custom levels in the level loop', () => {
     expect(customAlerts(h.store).map((a) => a.event)).toEqual(['breakout_down', 'sweep_above']);
   });
 
-  it('the coin switched off for levels: its custom levels are off too', async () => {
+  it('the coin switched off for levels: its custom levels are muted too — journalled by the coin, never sent (IB-151)', async () => {
     const h = harness();
-    h.store.settingsRow = { ...h.store.settingsRow, params: { ...LEVEL_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: false, daily: false } } } };
+    h.store.settingsRow = { ...h.store.settingsRow, enabled: true, params: { ...LEVEL_DEFAULT_PARAMS, perCoin: { BTCUSDT: { enabled: false, daily: false } } } };
+    h.custom!.levels = [{ ...h.custom!.levels[0], events: { sweep_above: false } }];
     await h.bar(T - M);
     h.venue.closes.set(T, 201);
     await h.bar(T);
+    h.venue.closes.set(T + M, 199);
+    h.venue.closes.set(T + 2 * M, 199.8);
+    await h.bar(T + M);
+    await h.bar(T + 2 * M);
     expect(customAlerts(h.store)).toEqual([]);
-    expect(h.custom!.reads).toBe(0);
+    expect(h.sent).toEqual([]);
+    // the coin is named, not the level's own switch, and the key is muted once
+    expect(mutedCustom(h.store).map((a) => [a.event, a.mutedBy, a.dedupeKey.endsWith(':muted') && !a.dedupeKey.endsWith(':muted:muted')]))
+      .toEqual([['breakout_up', 'coin', true], ['breakout_down', 'coin', true], ['sweep_above', 'coin', true]]);
   });
 
   it('no custom port (the history run): no custom alerts, the built-in levels as before', async () => {

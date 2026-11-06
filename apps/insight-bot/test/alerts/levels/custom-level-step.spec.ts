@@ -33,10 +33,13 @@ describe('IB-128 custom level step', () => {
     expect(events(bar(95, 96, 94, 95.5), 95)).toEqual([]);
   });
 
-  it('the level\'s own switches: a switched-off event is dropped, the others stay', () => {
+  it('the level\'s own switches: a switched-off event is muted (IB-151: journalled, its own key), the others stay', () => {
     const off = [level({ events: { breakout_up: false } })];
-    expect(events(bar(99, 101, 98, 100.5), 99, off)).toEqual([]);
-    expect(events(bar(101, 102, 99, 99.5), 101, off)).toEqual(['breakout_down']);
+    const [muted] = customLevelAlerts('BTCUSDT', off, bar(99, 101, 98, 100.5), 99, false);
+    expect(muted).toMatchObject({ event: 'breakout_up', mutedBy: 'custom_event', dedupeKey: `level:BTCUSDT:custom-7:${Date.UTC(2026, 10, 11)}:breakout_up:muted` });
+    const [on] = customLevelAlerts('BTCUSDT', off, bar(101, 102, 99, 99.5), 101, false);
+    expect(on.event).toBe('breakout_down');
+    expect(on.mutedBy).toBeUndefined();
   });
 
   it('another coin\'s level, or one added after the bar closed, does not fire; one added before the close does', () => {
